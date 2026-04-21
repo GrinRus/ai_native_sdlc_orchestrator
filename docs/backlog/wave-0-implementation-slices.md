@@ -50,7 +50,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S02 — Contracts package and schema loader baseline
 - **Epic:** EPIC-0 Repository development system
-- **State:** blocked
+- **State:** done
 - **Outcome:** Make the documented contracts machine-loadable so profiles, packets, reports, and live E2E assets can be validated through one shared path.
 - **Primary modules:** `packages/contracts`, `docs/contracts/**`, `examples/**`
 - **Hard dependencies:** W0-S01
@@ -81,7 +81,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S03 — Example and reference integrity checks
 - **Epic:** EPIC-0 Repository development system
-- **State:** blocked
+- **State:** done
 - **Outcome:** Prevent docs, examples, and contract references from drifting apart before implementation volume increases.
 - **Primary modules:** `packages/contracts`, `examples/**`, root validation scripts
 - **Hard dependencies:** W0-S02

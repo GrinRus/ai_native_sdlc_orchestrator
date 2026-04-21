@@ -92,6 +92,29 @@ export interface LoadedExampleContracts {
   issues: ContractValidationIssue[];
 }
 
+export type ReferenceValidationIssueCode =
+  | "reference_format_invalid"
+  | "reference_target_missing"
+  | "reference_target_type_mismatch";
+
+export interface ReferenceValidationIssue {
+  code: ReferenceValidationIssueCode;
+  source: string;
+  field: string | null;
+  expected: string | null;
+  actual: string | null;
+  reference: string | null;
+  message: string;
+}
+
+export interface ReferenceValidationResult {
+  ok: boolean;
+  workspaceRoot: string;
+  examplesRoot: string;
+  checkedReferences: number;
+  issues: ReferenceValidationIssue[];
+}
+
 export function getContractFamilyIndex(): ContractFamilyIndexEntry[];
 
 export function validateContractDocument(options: {
@@ -103,3 +126,5 @@ export function validateContractDocument(options: {
 export function loadContractFile(options: LoadContractFileOptions): LoadedContractFile;
 
 export function loadExampleContracts(options?: LoadExampleContractsOptions): LoadedExampleContracts;
+
+export function validateExampleReferences(options?: LoadExampleContractsOptions): ReferenceValidationResult;

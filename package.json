@@ -10,6 +10,7 @@
   "scripts": {
     "build": "node ./scripts/build.mjs",
     "test": "node ./scripts/test.mjs",
+    "test:references": "node ./scripts/reference-integrity.mjs",
     "lint": "node ./scripts/lint.mjs",
     "check": "node ./scripts/lint.mjs && node ./scripts/test.mjs && node ./scripts/build.mjs"
   }

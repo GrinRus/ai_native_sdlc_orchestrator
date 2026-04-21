@@ -111,8 +111,14 @@ for (const file of waveFiles) {
 
 console.log(`backlog consistency ok: ${waveSliceIds.length} slices across ${waveFiles.length} waves`);
 
-const contractsTestPath = path.join(root, "packages/contracts/test/contracts-loader.test.mjs");
-const contractsTestRun = spawnSync(process.execPath, ["--test", contractsTestPath], {
+const contractsTestDir = path.join(root, "packages/contracts/test");
+const contractsTestFiles = fs
+  .readdirSync(contractsTestDir)
+  .filter((fileName) => fileName.endsWith(".test.mjs"))
+  .sort()
+  .map((fileName) => path.join(contractsTestDir, fileName));
+
+const contractsTestRun = spawnSync(process.execPath, ["--test", ...contractsTestFiles], {
   cwd: root,
   stdio: "inherit",
 });
@@ -122,3 +128,15 @@ if (contractsTestRun.status !== 0) {
 }
 
 console.log("contracts loader tests ok: coverage, validation, and index mapping");
+
+const referenceIntegrityCheckPath = path.join(root, "scripts/reference-integrity.mjs");
+const referenceIntegrityRun = spawnSync(process.execPath, [referenceIntegrityCheckPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (referenceIntegrityRun.status !== 0) {
+  process.exit(referenceIntegrityRun.status ?? 1);
+}
+
+console.log("reference integrity checks ok: examples refs are consistent");

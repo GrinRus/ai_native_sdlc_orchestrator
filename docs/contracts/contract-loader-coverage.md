@@ -26,3 +26,28 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Operations | `live-run-event.md` | `live-run-event` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Operations | `live-e2e-profile.md` | `live-e2e-profile` | `examples/live-e2e/*.yaml` | implemented | Required fields + top-level type checks. |
 | Operations | `control-plane-api.md` | `control-plane-api` | none | limitation | Narrative contract; no YAML schema in `W0-S02`. TODO: add machine-loadable shape in a dedicated schema slice. |
+
+## Reference integrity checks (W0-S03)
+
+The reference-integrity validator checks only local example graph refs and intentionally ignores external namespaces (for example `evidence://`, `schema://`, `approval://`, `incident://`, `review://`, `redact://`, `validate.*`, `retry.*`, `repair.*`).
+
+| Source family | Field path | Expected target |
+|---|---|---|
+| `project-profile` | `default_route_profiles.*` | existing `route_id` (`provider-route-profile`) |
+| `project-profile` | `default_wrapper_profiles.*` | existing `wrapper_id@vN` (`wrapper-profile`) |
+| `project-profile` | `default_step_policies.*` | existing `policy_id` (`step-policy-profile`) |
+| `project-profile` | `eval_policy.default_release_suite_ref` | existing `suite_id@vN` (`evaluation-suite`) |
+| `project-profile` | `live_e2e_defaults.profiles.*` | existing `profile_id@vN` (`live-e2e-profile`) |
+| `provider-route-profile` | `wrapper_profile_ref` | existing `wrapper_id@vN` (`wrapper-profile`) |
+| `wrapper-profile` | `prompt_bundle_ref` | existing `prompt-bundle://prompt_bundle_id@vN` (`prompt-bundle`) |
+| `evaluation-suite` | `dataset_ref` | existing `dataset://dataset_id@version` (`dataset`) |
+| `step-policy-profile` | `quality_gate.suite_ref` (if present) | existing `suite_id@vN` (`evaluation-suite`) |
+| `prompt-bundle` | `certification_hints.default_suite_refs[]` (if present) | existing `suite_id@vN` (`evaluation-suite`) |
+| `live-e2e-profile` | `project_profile_template_ref` | existing example file resolved as `project-profile` |
+| `live-e2e-profile` | `verification.eval_suites[]` (if present) | existing `suite_id@vN` (`evaluation-suite`) |
+
+### Reference failure shapes
+
+- `reference_format_invalid` — the reference value shape is invalid for the expected field format.
+- `reference_target_missing` — the reference format is valid, but no matching target exists in local examples.
+- `reference_target_type_mismatch` — the reference resolves to an existing object of a different contract family.
