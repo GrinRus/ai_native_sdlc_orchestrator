@@ -6,6 +6,7 @@ import {
   approveHandoffArtifacts,
   prepareHandoffArtifacts,
 } from "../../../packages/orchestrator-core/src/handoff-packets.mjs";
+import { runEvaluationSuite } from "../../../packages/orchestrator-core/src/eval-runner.mjs";
 import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { validateProjectRuntime } from "../../../packages/orchestrator-core/src/project-validate.mjs";
@@ -93,6 +94,10 @@ function parseFlags(args) {
  * @returns {string}
  */
 function formatCommandHelp(definition) {
+  const statusLine =
+    definition.command === "eval run"
+      ? "Status: implemented in quality shell (W3-S03)"
+      : "Status: implemented in bootstrap shell (W1-S01)";
   const notes =
     definition.command === "project init"
       ? [
@@ -124,6 +129,14 @@ function formatCommandHelp(definition) {
             "- --routed-dry-run-step executes one routed dry-run step and writes a durable step-result artifact.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
           ]
+      : definition.command === "eval run"
+        ? [
+            "- --project-ref must point to an existing directory.",
+            "- --subject-ref is required and must use '<subject_type>://<target>' format.",
+            "- --suite-ref is optional and falls back to eval_policy.default_release_suite_ref.",
+            "- Eval run is offline and independent from delivery automation.",
+            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+          ]
       : definition.command === "handoff prepare"
         ? [
             "- --project-ref must point to an existing directory.",
@@ -145,7 +158,7 @@ function formatCommandHelp(definition) {
     `aor ${definition.command}`,
     definition.summary ?? "No summary available.",
     "",
-    "Status: implemented in bootstrap shell (W1-S01)",
+    statusLine,
     `Inputs: ${(definition.inputs ?? []).join(", ")}`,
     `Outputs: ${(definition.outputs ?? []).join(", ")}`,
     `Contract families: ${(definition.contractFamilies ?? []).join(", ") || "none"}`,
@@ -169,7 +182,7 @@ function formatTopLevelHelp() {
   const lines = [
     "AOR CLI command surface",
     "",
-    "Implemented bootstrap commands (W1-S01):",
+    "Implemented commands:",
     ...implementedLines,
     "",
     "Planned commands (not implemented yet):",
@@ -430,6 +443,12 @@ function executeImplementedCommand(command, flags, cwd) {
   let verifyStepResultFiles = null;
   let routedStepResultId = null;
   let routedStepResultFile = null;
+  let evaluationReportId = null;
+  let evaluationReportFile = null;
+  let evaluationStatus = null;
+  let evaluationBlocking = null;
+  let evaluationSuiteRef = null;
+  let evaluationSubjectRef = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -544,6 +563,32 @@ function executeImplementedCommand(command, flags, cwd) {
       routedStepResultFile = routedResult.stepResultPath;
       verifyStepResultFiles = [...verifyResult.stepResultFiles, routedResult.stepResultPath];
     }
+  } else if (command === "eval run") {
+    ensureRequiredFlags(command, flags);
+
+    const evalResult = runEvaluationSuite({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      suiteRef: resolveOptionalStringFlag("suite-ref", flags["suite-ref"]),
+      subjectRef: /** @type {string} */ (
+        resolveOptionalStringFlag("subject-ref", flags["subject-ref"])
+      ),
+      subjectVersion: resolveOptionalStringFlag("subject-version", flags["subject-version"]),
+    });
+
+    resolvedProjectRef = evalResult.projectRoot;
+    resolvedRuntimeRoot = evalResult.runtimeRoot;
+    runtimeLayout = evalResult.runtimeLayout;
+    runtimeStateFile = evalResult.stateFile;
+    projectProfileRef = evalResult.projectProfileRef;
+    evaluationReportId = evalResult.evaluationReport.report_id;
+    evaluationReportFile = evalResult.evaluationReportPath;
+    evaluationStatus = evalResult.evaluationReport.status;
+    evaluationBlocking = evalResult.blocking;
+    evaluationSuiteRef = evalResult.suiteRef;
+    evaluationSubjectRef = evalResult.subjectRef;
   } else if (command === "handoff prepare") {
     ensureRequiredFlags(command, flags);
 
@@ -654,6 +699,12 @@ function executeImplementedCommand(command, flags, cwd) {
     step_result_files: verifyStepResultFiles,
     routed_step_result_id: routedStepResultId,
     routed_step_result_file: routedStepResultFile,
+    evaluation_report_id: evaluationReportId,
+    evaluation_report_file: evaluationReportFile,
+    evaluation_status: evaluationStatus,
+    evaluation_blocking: evaluationBlocking,
+    evaluation_suite_ref: evaluationSuiteRef,
+    evaluation_subject_ref: evaluationSubjectRef,
     contract_families: resolvedFamilies,
     command_catalog_alignment: "docs/architecture/14-cli-command-catalog.md",
   };

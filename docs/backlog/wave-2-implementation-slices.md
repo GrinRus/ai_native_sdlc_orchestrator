@@ -174,7 +174,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S06 — First routed execution rehearsal
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Prove that approved packets can drive no-write routed steps before delivery automation begins.
 - **Primary modules:** `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`
 - **Hard dependencies:** W2-S05, W1-S07, W0-S05

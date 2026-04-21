@@ -19,7 +19,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S01 — Validation kernel generalization and asset graph checks
 - **Epic:** EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Expand validation from bootstrap-only checks into a reusable asset-graph validator for the whole control plane.
 - **Primary modules:** `packages/contracts`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/**`
 - **Hard dependencies:** W2-S05, W1-S04
@@ -81,7 +81,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S03 — Eval runner and scorer interface
 - **Epic:** EPIC-4 Quality platform
-- **State:** done
+- **State:** ready
 - **Outcome:** Create the first repeatable offline eval runtime for wrappers, prompt bundles, routes, and step behavior.
 - **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli`
 - **Hard dependencies:** W3-S02, W2-S04, W2-S05
@@ -112,7 +112,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S04 — Harness capture and replay runtime
 - **Epic:** EPIC-4 Quality platform
-- **State:** done
+- **State:** ready
 - **Outcome:** Make step execution evidence replayable so platform changes can be tested against real traces rather than intuition.
 - **Primary modules:** `packages/harness`, `packages/observability`, `packages/orchestrator-core`
 - **Hard dependencies:** W3-S02, W2-S05

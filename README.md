@@ -130,13 +130,13 @@ aor project init [--project-ref <path>] [--project-profile <path>] [--runtime-ro
 aor project analyze --project-ref <path> [--project-profile <path>] [--runtime-root <path>]
 aor project validate --project-ref <path> [--project-profile <path>] [--runtime-root <path>]
 aor project verify --project-ref <path> [--project-profile <path>] [--runtime-root <path>] [--require-validation-pass]
+aor eval run --project-ref <path> --subject-ref <subject_type://target> [--suite-ref <suite_id@vN>] [--subject-version <version>] [--project-profile <path>] [--runtime-root <path>]
 ```
 
 The broader product command surface is still planned:
 
 ```bash
 aor run step
-aor eval run
 aor harness replay
 aor delivery plan
 aor delivery apply
