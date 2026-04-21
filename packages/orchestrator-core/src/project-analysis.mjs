@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { resolveAdapterMatrix } from "../../adapter-sdk/src/index.mjs";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
@@ -270,10 +271,12 @@ function createVerificationPlan(commands, unknownFacts) {
  *  runtimeRoot?: string,
  *  routeOverrides?: Record<string, string>,
  *  policyOverrides?: Record<string, string>,
+ *  adapterOverrides?: Record<string, string>,
  *  routesRoot?: string,
  *  wrappersRoot?: string,
  *  promptsRoot?: string,
  *  policiesRoot?: string,
+ *  adaptersRoot?: string,
  * }} options
  */
 export function analyzeProjectRuntime(options = {}) {
@@ -352,6 +355,11 @@ export function analyzeProjectRuntime(options = {}) {
       ? options.policiesRoot
       : path.resolve(init.projectRoot, options.policiesRoot)
     : path.join(init.projectRoot, "examples/policies");
+  const adaptersRoot = options.adaptersRoot
+    ? path.isAbsolute(options.adaptersRoot)
+      ? options.adaptersRoot
+      : path.resolve(init.projectRoot, options.adaptersRoot)
+    : path.join(init.projectRoot, "examples/adapters");
   const routeResolutionMatrix = resolveRouteMatrix({
     projectProfilePath: init.projectProfilePath,
     routesRoot,
@@ -370,6 +378,11 @@ export function analyzeProjectRuntime(options = {}) {
     policiesRoot,
     routeOverrides: options.routeOverrides,
     policyOverrides: options.policyOverrides,
+  });
+  const adapterResolutionMatrix = resolveAdapterMatrix({
+    adaptersRoot,
+    routeResolutionMatrix,
+    adapterOverrides: options.adapterOverrides,
   });
 
   const report = {
@@ -497,5 +510,6 @@ export function analyzeProjectRuntime(options = {}) {
     routeResolutionMatrix,
     assetResolutionMatrix,
     policyResolutionMatrix,
+    adapterResolutionMatrix,
   };
 }

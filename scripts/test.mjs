@@ -254,6 +254,18 @@ if (providerRoutingTestRun.status !== 0) {
 
 console.log("provider-routing tests ok: deterministic route registry and override resolution");
 
+const adapterSdkTests = [path.join(root, "packages/adapter-sdk/test/adapter-sdk.test.mjs")];
+const adapterSdkTestRun = spawnSync(process.execPath, ["--test", ...adapterSdkTests], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (adapterSdkTestRun.status !== 0) {
+  process.exit(adapterSdkTestRun.status ?? 1);
+}
+
+console.log("adapter-sdk tests ok: envelopes, capability negotiation, and deterministic mock execution");
+
 const orchestratorCoreTests = [
   path.join(root, "packages/orchestrator-core/test/project-init.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/handoff-packets.test.mjs"),

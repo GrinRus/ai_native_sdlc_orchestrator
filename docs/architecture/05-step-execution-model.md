@@ -30,6 +30,14 @@ For each step AOR resolves:
 7. optionally run eval or harness
 8. retry, repair, escalate, or close
 
+## Adapter SDK baseline (W2-S04)
+Adapter invocation uses one stable envelope pair:
+- request envelope: `request_id`, `run_id`, `step_id`, `step_class`, resolved route/asset/policy bundles, input packet refs, and dry-run flag;
+- response envelope: `request_id`, `adapter_id`, `status`, summary, normalized output payload, evidence refs, and tool traces.
+
+Shared lifecycle hooks are explicit and adapter-agnostic:
+`before_step`, `invoke_adapter`, `after_step`, `on_retry`, `on_repair`, `on_escalation`.
+
 ## Why one model matters
 A single step model keeps:
 - quality logic reusable;

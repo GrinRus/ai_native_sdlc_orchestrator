@@ -9,7 +9,7 @@
 - `packages/contracts` — schemas, parsers, and validation helpers
 - `packages/orchestrator-core` — workflow decisions and packet lifecycle logic
 - `packages/provider-routing` — route resolution and promotion-aware routing
-- `packages/adapter-sdk` — runner abstraction and capability mapping
+- `packages/adapter-sdk` — runner abstraction, request/response envelopes, capability negotiation, and deterministic mock adapter
 - `packages/harness` — replay, certification, and compare-to-baseline flows
 - `packages/observability` — live events, evidence links, and telemetry
 
