@@ -6,7 +6,7 @@ import { loadContractFile, validateContractDocument } from "../../contracts/src/
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 
-const SUPPORTED_DELIVERY_MODES = new Set(["patch-only", "local-branch"]);
+const SUPPORTED_DELIVERY_MODES = new Set(["patch-only", "local-branch", "fork-first-pr"]);
 
 /**
  * @param {unknown} value
@@ -122,6 +122,32 @@ function readGitHead(cwd) {
 }
 
 /**
+ * @param {string} remoteUrl
+ * @returns {{ host: string, owner: string, repo: string } | null}
+ */
+function parseGitHubRemote(remoteUrl) {
+  const httpsMatch = remoteUrl.match(/^https:\/\/([^/]+)\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (httpsMatch) {
+    return {
+      host: httpsMatch[1].toLowerCase(),
+      owner: httpsMatch[2],
+      repo: httpsMatch[3],
+    };
+  }
+
+  const sshMatch = remoteUrl.match(/^git@([^:]+):([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (sshMatch) {
+    return {
+      host: sshMatch[1].toLowerCase(),
+      owner: sshMatch[2],
+      repo: sshMatch[3],
+    };
+  }
+
+  return null;
+}
+
+/**
  * @param {{
  *   deliveryPlanPath?: string,
  *   deliveryPlan?: Record<string, unknown>,
@@ -168,7 +194,7 @@ function loadDeliveryPlan(options) {
 /**
  * @param {Record<string, unknown>} deliveryPlan
  * @param {string | undefined} requestedMode
- * @returns {"patch-only" | "local-branch"}
+ * @returns {"patch-only" | "local-branch" | "fork-first-pr"}
  */
 function resolveDeliveryMode(deliveryPlan, requestedMode) {
   const status = asString(deliveryPlan.status);
@@ -186,7 +212,7 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
   const mode = asString(deliveryPlan.delivery_mode);
   if (!mode || !SUPPORTED_DELIVERY_MODES.has(mode)) {
     throw new Error(
-      `Delivery mode '${String(deliveryPlan.delivery_mode)}' is not supported in this slice. Expected one of: patch-only, local-branch.`,
+      `Delivery mode '${String(deliveryPlan.delivery_mode)}' is not supported in this slice. Expected one of: patch-only, local-branch, fork-first-pr.`,
     );
   }
 
@@ -194,7 +220,7 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
     throw new Error(`Requested delivery mode '${requestedMode}' does not match plan mode '${mode}'.`);
   }
 
-  return /** @type {"patch-only" | "local-branch"} */ (mode);
+  return /** @type {"patch-only" | "local-branch" | "fork-first-pr"} */ (mode);
 }
 
 /**
@@ -206,8 +232,12 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
  *  runId?: string,
  *  stepId?: string,
  *  mode?: string,
- *  branchName?: string,
- *  commitMessage?: string,
+  *  branchName?: string,
+  *  commitMessage?: string,
+ *  forkOwner?: string,
+ *  baseRef?: string,
+ *  prTitle?: string,
+ *  prBody?: string,
  *  executionRoot?: string,
  *  deliveryPlanPath?: string,
  *  deliveryPlan?: Record<string, unknown>,
@@ -354,6 +384,100 @@ export function runDeliveryDriver(options = {}) {
         commit_sha: commitSha,
         commit_message: commitMessage,
       };
+    } else if (mode === "fork-first-pr") {
+      commands.push("git remote get-url origin");
+      const originUrl = runGitChecked({
+        cwd: executionRoot,
+        args: ["remote", "get-url", "origin"],
+      }).trim();
+      const parsedRemote = parseGitHubRemote(originUrl);
+      if (!parsedRemote || parsedRemote.host !== "github.com") {
+        throw new Error(
+          `fork-first-pr mode expects GitHub origin remote; got '${originUrl || "<missing>"}'.`,
+        );
+      }
+
+      const forkOwner = asString(options.forkOwner) ?? "aor-bot";
+      const baseRef = asString(options.baseRef) ?? gitHeadBefore.branch;
+      const headBranch = asString(options.branchName) ?? `aor/${normalizeForId(runId)}`;
+      const prTitle = asString(options.prTitle) ?? `AOR delivery ${runId}`;
+      const prBody =
+        asString(options.prBody) ??
+        "Draft PR prepared by AOR fork-first delivery planning mode. No network write was executed in this run.";
+
+      commands.push("git diff --name-only HEAD");
+      changedPaths = parseLineList(
+        runGitChecked({
+          cwd: executionRoot,
+          args: ["diff", "--name-only", "HEAD"],
+        }),
+      );
+
+      commands.push("git diff --numstat HEAD");
+      diffStats = parseNumstat(
+        runGitChecked({
+          cwd: executionRoot,
+          args: ["diff", "--numstat", "HEAD"],
+        }),
+      );
+
+      const apiIntent = {
+        mode: "fork-first-pr",
+        network_mode: "stubbed",
+        remote: {
+          host: parsedRemote.host,
+          upstream_repo: `${parsedRemote.owner}/${parsedRemote.repo}`,
+          fork_repo: `${forkOwner}/${parsedRemote.repo}`,
+        },
+        branch: {
+          base_ref: baseRef,
+          head_ref: `refs/heads/${headBranch}`,
+          head_branch: headBranch,
+        },
+        pr_draft: {
+          title: prTitle,
+          body: prBody,
+          is_draft: true,
+          base_repo: `${parsedRemote.owner}/${parsedRemote.repo}`,
+          base_branch: baseRef,
+          head_repo: `${forkOwner}/${parsedRemote.repo}`,
+          head_branch: headBranch,
+        },
+        api_evidence: {
+          fork_request: {
+            method: "POST",
+            path: `/repos/${parsedRemote.owner}/${parsedRemote.repo}/forks`,
+            owner: forkOwner,
+          },
+          push_request: {
+            method: "POST",
+            path: `/repos/${forkOwner}/${parsedRemote.repo}/git/refs`,
+            ref: `refs/heads/${headBranch}`,
+          },
+          pr_request: {
+            method: "POST",
+            path: `/repos/${parsedRemote.owner}/${parsedRemote.repo}/pulls`,
+            draft: true,
+          },
+        },
+        policy_guardrails: {
+          public_repo_default: true,
+          direct_upstream_write_allowed: false,
+        },
+      };
+      const apiIntentFile = path.join(
+        init.runtimeLayout.artifactsRoot,
+        `fork-first-intent-${normalizeForId(runId)}-${Date.now()}.json`,
+      );
+      fs.writeFileSync(apiIntentFile, `${JSON.stringify(apiIntent, null, 2)}\n`, "utf8");
+
+      outputs = {
+        fork_target: apiIntent.remote,
+        branch_ref: apiIntent.branch,
+        pr_draft: apiIntent.pr_draft,
+        api_intent_file: apiIntentFile,
+        network_mode: "stubbed",
+      };
     }
   } catch (error) {
     status = "failed";
@@ -365,6 +489,12 @@ export function runDeliveryDriver(options = {}) {
             "Inspect the delivery transcript and fix git state in the isolated checkout before retrying.",
             "If a temporary branch was created, delete it only after confirming no data is needed.",
           ]
+        : mode === "fork-first-pr"
+          ? [
+              "Inspect fork_target, branch_ref, and pr_draft metadata in transcript outputs.",
+              "Validate GitHub credentials and permissions before executing real network write-back.",
+              "Retry fork-first planning with explicit --fork-owner / --base-ref overrides if required.",
+            ]
         : [
             "Inspect the delivery transcript and working tree diff.",
             "Fix patch generation prerequisites, then rerun patch-only delivery.",

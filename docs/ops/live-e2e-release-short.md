@@ -61,3 +61,6 @@ aor live-e2e start   --profile ./examples/live-e2e/release-short.yaml
 Evidence fixtures for W4-S03 baseline:
 - `examples/live-e2e/fixtures/w4-s03/delivery-patch.sample.patch`
 - `examples/live-e2e/fixtures/w4-s03/delivery-local-branch-transcript.sample.json`
+
+Related runbook:
+- `docs/ops/github-fork-first-delivery.md`

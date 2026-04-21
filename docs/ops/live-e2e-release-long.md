@@ -54,3 +54,6 @@ aor live-e2e start   --profile ./examples/live-e2e/release-long.yaml
 - `yarn g:lint`, `yarn g:typecheck`, and `yarn g:test-unit` succeed;
 - impacted-repo and changed-path metadata are recorded;
 - release packet and delivery manifest are materialized.
+
+Related runbook:
+- `docs/ops/github-fork-first-delivery.md`

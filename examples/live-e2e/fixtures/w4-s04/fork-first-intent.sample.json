@@ -1,0 +1,44 @@
+{
+  "mode": "fork-first-pr",
+  "network_mode": "stubbed",
+  "remote": {
+    "host": "github.com",
+    "upstream_repo": "openai/openai",
+    "fork_repo": "aor-bot/openai"
+  },
+  "branch": {
+    "base_ref": "main",
+    "head_ref": "refs/heads/aor/w4-s04-fork-first",
+    "head_branch": "aor/w4-s04-fork-first"
+  },
+  "pr_draft": {
+    "title": "W4-S04 fork-first draft",
+    "body": "Draft PR prepared by AOR fork-first delivery planning mode. No network write was executed in this run.",
+    "is_draft": true,
+    "base_repo": "openai/openai",
+    "base_branch": "main",
+    "head_repo": "aor-bot/openai",
+    "head_branch": "aor/w4-s04-fork-first"
+  },
+  "api_evidence": {
+    "fork_request": {
+      "method": "POST",
+      "path": "/repos/openai/openai/forks",
+      "owner": "aor-bot"
+    },
+    "push_request": {
+      "method": "POST",
+      "path": "/repos/aor-bot/openai/git/refs",
+      "ref": "refs/heads/aor/w4-s04-fork-first"
+    },
+    "pr_request": {
+      "method": "POST",
+      "path": "/repos/openai/openai/pulls",
+      "draft": true
+    }
+  },
+  "policy_guardrails": {
+    "public_repo_default": true,
+    "direct_upstream_write_allowed": false
+  }
+}
