@@ -58,27 +58,5 @@ aor live-e2e start \
 - impacted-repo and changed-path metadata are recorded;
 - release packet and delivery manifest are materialized.
 
-## Post-run artifact inspection
-Inspect the latest materialized artifacts:
-```bash
-ls -1 .aor/projects/<project_id>/artifacts/delivery-manifest-*.json | tail -n 1
-ls -1 .aor/projects/<project_id>/artifacts/release-packet-*.json | tail -n 1
-```
-Confirm delivery lineage and approval context:
-```bash
-jq '.delivery_mode, .approval_context, .repo_deliveries[0].changed_paths' <delivery-manifest-file>
-jq '.delivery_manifest_ref, .evidence_lineage' <release-packet-file>
-```
-
-## W4-S06 rehearsal findings
-- long rehearsal uses `fork-first-pr` as the default bounded delivery mode for public monorepo targets;
-- success path must preserve delivery manifest and release packet lineage for later audit;
-- failure path must preserve transcript recovery instructions and blocked release packet status.
-
-Evidence fixtures for W4-S06:
-- `examples/live-e2e/fixtures/w4-s06/nextjs-release-long.delivery-transcript-failure.sample.json`
-- `examples/live-e2e/fixtures/w4-s06/nextjs-release-long.release-packet-failure.sample.json`
-- `examples/live-e2e/fixtures/w4-s06/public-target-delivery-rehearsal.sample.md`
-
 Related runbook:
 - `docs/ops/github-fork-first-delivery.md`

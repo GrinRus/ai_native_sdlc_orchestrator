@@ -81,7 +81,7 @@ Add safe write-back modes, manifests, and release artifacts so AOR can move from
 
 ## W4-S03 — Patch and local branch delivery driver
 - **Epic:** EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Support the safest write-back modes first: patch emission and local branch application.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `packages/observability`
 - **Hard dependencies:** W4-S02

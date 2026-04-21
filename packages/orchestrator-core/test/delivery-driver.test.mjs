@@ -49,7 +49,7 @@ function withTempRepo(callback) {
  * @param {{
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   runId: string,
- *   mode: "patch-only" | "local-branch",
+ *   mode: "patch-only" | "local-branch" | "fork-first-pr",
  * }} options
  * @returns {{ deliveryPlanFile: string }}
  */
@@ -184,5 +184,46 @@ test("runDeliveryDriver records recovery guidance when local-branch mode fails m
     assert.match(String(transcript.error), /checkout -B/i);
     assert.ok(Array.isArray(transcript.recovery_steps));
     assert.ok(transcript.recovery_steps.some((step) => step.includes("git checkout")));
+  });
+});
+
+test("runDeliveryDriver builds fork-first PR metadata in stubbed network mode", () => {
+  withTempRepo((repoRoot) => {
+    runGitChecked({
+      cwd: repoRoot,
+      args: ["remote", "add", "origin", "https://github.com/openai/openai.git"],
+    });
+    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
+    fs.appendFileSync(targetFile, "\n# w4-s04 fork-first delivery test\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.fork.v1",
+      mode: "fork-first-pr",
+    });
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.fork.v1",
+      mode: "fork-first-pr",
+      deliveryPlanPath: deliveryPlanFile,
+      forkOwner: "aor-bot",
+      branchName: "aor/w4-s04-fork-first",
+      prTitle: "W4-S04 fork-first draft",
+    });
+
+    assert.equal(result.status, "success");
+    assert.equal(result.outputs.network_mode, "stubbed");
+    assert.equal(result.outputs.fork_target.upstream_repo, "openai/openai");
+    assert.equal(result.outputs.fork_target.fork_repo, "aor-bot/openai");
+    assert.equal(result.outputs.pr_draft.is_draft, true);
+    assert.equal(fs.existsSync(result.outputs.api_intent_file), true);
+
+    const transcript = JSON.parse(fs.readFileSync(result.transcriptFile, "utf8"));
+    assert.equal(transcript.status, "success");
+    assert.equal(transcript.mode, "fork-first-pr");
+    assert.equal(transcript.git.commands.some((command) => command.includes("push")), false);
   });
 });
