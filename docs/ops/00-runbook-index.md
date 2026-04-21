@@ -7,6 +7,7 @@
 - `live-e2e-regress-long.md` — deeper regression rehearsal with stronger verification.
 - `live-e2e-release-short.md` — short release rehearsal that still materializes a release packet.
 - `live-e2e-release-long.md` — long monorepo release rehearsal with stronger gates.
+- `live-e2e-standard-runner.md` — standard start/status/report/abort surfaces for catalog profiles.
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
 - `live-run-event-stream.md` — replay-safe stream behavior, reconnect flow, and backpressure baseline.
 
