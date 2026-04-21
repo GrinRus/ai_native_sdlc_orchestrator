@@ -38,4 +38,4 @@
 - `control-plane-api.md`
 
 ## Loader coverage
-See `contract-loader-coverage.md` for the contract-to-loader mapping table, supported reference-integrity rules, and current limitations.
+See `contract-loader-coverage.md` for the contract-to-loader mapping table, current limitation status, and W0-S03 reference-integrity failure shapes.

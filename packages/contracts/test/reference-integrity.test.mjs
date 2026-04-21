@@ -47,14 +47,12 @@ test("reference integrity passes for current examples graph", () => {
   assert.equal(result.ok, true, "expected current examples graph to pass reference integrity");
   assert.equal(result.issues.length, 0, "expected zero reference integrity issues");
   assert.ok(result.checkedReferences > 0, "expected validator to check at least one reference");
-  assert.ok(result.checkedCompatibility > 0, "expected validator to check at least one compatibility edge");
 });
 
-test("missing project default prompt bundle reference fails with reference_target_missing", () => {
+test("missing route wrapper reference fails with reference_target_missing", () => {
   withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
-      const defaultPromptBundles = /** @type {Record<string, unknown>} */ (document.default_prompt_bundles);
-      defaultPromptBundles.planning = "prompt-bundle://missing@v1";
+    mutateYamlFile(tempRoot, "examples/routes/implement-default.yaml", (document) => {
+      document.wrapper_profile_ref = "wrapper.missing@v1";
     });
 
     const result = validateExampleReferences({ workspaceRoot: tempRoot });
@@ -63,18 +61,36 @@ test("missing project default prompt bundle reference fails with reference_targe
     const issue = result.issues.find(
       (candidate) =>
         candidate.code === "reference_target_missing" &&
-        candidate.field === "default_prompt_bundles.planning" &&
+        candidate.field === "wrapper_profile_ref" &&
+        candidate.reference === "wrapper.missing@v1",
+    );
+    assert.ok(issue, "expected missing wrapper reference issue");
+  });
+});
+
+test("missing wrapper prompt bundle reference fails with reference_target_missing", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/wrappers/wrapper-runner-default.yaml", (document) => {
+      document.prompt_bundle_ref = "prompt-bundle://missing@v1";
+    });
+
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_missing" &&
+        candidate.field === "prompt_bundle_ref" &&
         candidate.reference === "prompt-bundle://missing@v1",
     );
     assert.ok(issue, "expected missing prompt bundle reference issue");
   });
 });
 
-test("missing project default context bundle reference fails with reference_target_missing", () => {
+test("missing suite dataset reference fails with reference_target_missing", () => {
   withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
-      const defaultContextBundles = /** @type {Record<string, unknown>} */ (document.default_context_bundles);
-      defaultContextBundles.planning = ["context-bundle://missing@v1"];
+    mutateYamlFile(tempRoot, "examples/eval/suite-release-core.yaml", (document) => {
+      document.dataset_ref = "dataset://missing@2026-04-20T08:00:00Z";
     });
 
     const result = validateExampleReferences({ workspaceRoot: tempRoot });
@@ -83,29 +99,10 @@ test("missing project default context bundle reference fails with reference_targ
     const issue = result.issues.find(
       (candidate) =>
         candidate.code === "reference_target_missing" &&
-        candidate.field === "default_context_bundles.planning[0]" &&
-        candidate.reference === "context-bundle://missing@v1",
+        candidate.field === "dataset_ref" &&
+        candidate.reference === "dataset://missing@2026-04-20T08:00:00Z",
     );
-    assert.ok(issue, "expected missing context bundle reference issue");
-  });
-});
-
-test("missing context bundle doc reference fails with reference_target_missing", () => {
-  withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/context/bundles/runner-foundation.yaml", (document) => {
-      document.context_doc_refs = ["context-doc://missing@v1"];
-    });
-
-    const result = validateExampleReferences({ workspaceRoot: tempRoot });
-    assert.equal(result.ok, false);
-
-    const issue = result.issues.find(
-      (candidate) =>
-        candidate.code === "reference_target_missing" &&
-        candidate.field === "context_doc_refs[0]" &&
-        candidate.reference === "context-doc://missing@v1",
-    );
-    assert.ok(issue, "expected missing context doc reference issue");
+    assert.ok(issue, "expected missing dataset reference issue");
   });
 });
 
@@ -146,142 +143,5 @@ test("wrong-family suite ref fails with reference_target_type_mismatch", () => {
         candidate.reference === "wrapper.runner.default@v3",
     );
     assert.ok(issue, "expected wrong-family suite ref issue");
-  });
-});
-
-test("project default prompt bundle must match default route class", () => {
-  withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
-      const defaultPromptBundles = /** @type {Record<string, unknown>} */ (document.default_prompt_bundles);
-      defaultPromptBundles.planning = "prompt-bundle://runner-default@v3";
-    });
-
-    const result = validateExampleReferences({ workspaceRoot: tempRoot });
-    assert.equal(result.ok, false);
-
-    const issue = result.issues.find(
-      (candidate) =>
-        candidate.code === "reference_target_incompatible" &&
-        candidate.field === "default_prompt_bundles.planning" &&
-        candidate.reference === "prompt-bundle://runner-default@v3",
-    );
-    assert.ok(issue, "expected prompt bundle / route class compatibility issue");
-  });
-});
-
-test("project default context bundle must apply to the workflow step", () => {
-  withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/context/bundles/planner-foundation.yaml", (document) => {
-      const appliesTo = /** @type {Record<string, unknown>} */ (document.applies_to);
-      appliesTo.steps = ["implement"];
-    });
-
-    const result = validateExampleReferences({ workspaceRoot: tempRoot });
-    assert.equal(result.ok, false);
-
-    const issue = result.issues.find(
-      (candidate) =>
-        candidate.code === "reference_target_incompatible" &&
-        candidate.field === "default_context_bundles.planning[0]" &&
-        candidate.reference === "context-bundle://context.bundle.planner.foundation@v1",
-    );
-    assert.ok(issue, "expected context bundle applicability issue");
-  });
-});
-
-test("suite and dataset subject_type mismatch fails with reference_target_incompatible", () => {
-  withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/eval/suite-release-core.yaml", (document) => {
-      document.subject_type = "wrapper";
-    });
-
-    const result = validateExampleReferences({ workspaceRoot: tempRoot });
-    assert.equal(result.ok, false);
-
-    const issue = result.issues.find(
-      (candidate) =>
-        candidate.code === "reference_target_incompatible" &&
-        candidate.field === "dataset_ref" &&
-        candidate.reference === "dataset://run-regression@2026-04-20T08:00:00Z",
-    );
-    assert.ok(issue, "expected suite/dataset subject_type compatibility issue");
-  });
-});
-
-test("route required capabilities mismatch fails with reference_target_incompatible", () => {
-  withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/routes/implement-default.yaml", (document) => {
-      document.required_adapter_capabilities = ["repo_write", "binary_signing"];
-    });
-
-    const result = validateExampleReferences({ workspaceRoot: tempRoot });
-    assert.equal(result.ok, false);
-
-    const issue = result.issues.find(
-      (candidate) =>
-        candidate.code === "reference_target_incompatible" &&
-        candidate.field === "primary.adapter" &&
-        candidate.reference === "codex-cli",
-    );
-    assert.ok(issue, "expected route adapter capability compatibility issue");
-  });
-});
-
-test("project default route using non-allowed adapter fails with reference_target_incompatible", () => {
-  withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
-      document.allowed_adapters = ["mock-runner"];
-    });
-
-    const result = validateExampleReferences({ workspaceRoot: tempRoot });
-    assert.equal(result.ok, false);
-
-    const issue = result.issues.find(
-      (candidate) =>
-        candidate.code === "reference_target_incompatible" &&
-        candidate.field === "default_route_profiles.implement" &&
-        candidate.reference === "route.implement.default",
-    );
-    assert.ok(issue, "expected project route adapter allowlist compatibility issue");
-  });
-});
-
-test("missing default skill ref fails with reference_target_missing", () => {
-  withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
-      const defaultSkills = /** @type {Record<string, unknown>} */ (document.default_skill_profiles);
-      defaultSkills.runner = ["skill.runner.missing@v1"];
-    });
-
-    const result = validateExampleReferences({ workspaceRoot: tempRoot });
-    assert.equal(result.ok, false);
-
-    const issue = result.issues.find(
-      (candidate) =>
-        candidate.code === "reference_target_missing" &&
-        candidate.field === "default_skill_profiles.runner" &&
-        candidate.reference === "skill.runner.missing@v1",
-    );
-    assert.ok(issue, "expected missing default skill reference issue");
-  });
-});
-
-test("skill override with incompatible step class fails with reference_target_incompatible", () => {
-  withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
-      const overrides = /** @type {Record<string, unknown>} */ (document.skill_overrides);
-      overrides.implement = ["skill.eval.default@v1"];
-    });
-
-    const result = validateExampleReferences({ workspaceRoot: tempRoot });
-    assert.equal(result.ok, false);
-
-    const issue = result.issues.find(
-      (candidate) =>
-        candidate.code === "reference_target_incompatible" &&
-        candidate.field === "skill_overrides.implement" &&
-        candidate.reference === "skill.eval.default@v1",
-    );
-    assert.ok(issue, "expected skill override compatibility issue");
   });
 });

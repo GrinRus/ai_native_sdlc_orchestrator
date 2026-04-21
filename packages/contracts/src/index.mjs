@@ -16,15 +16,6 @@ const ROUTE_STEP_VALUES = [
   "harness",
 ];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
-const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
-const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
-const LIVE_RUN_EVENT_TYPE_VALUES = [
-  "run.started",
-  "step.updated",
-  "evidence.linked",
-  "warning.raised",
-  "run.terminal",
-];
 const EXTERNAL_REFERENCE_PREFIXES = [
   "evidence://",
   "schema://",
@@ -32,8 +23,6 @@ const EXTERNAL_REFERENCE_PREFIXES = [
   "incident://",
   "review://",
   "redact://",
-  "packet://",
-  "compiler://",
   "validate.",
   "retry.",
   "repair.",
@@ -1059,7 +1048,6 @@ export function validateExampleReferences(options = {}) {
   /** @type {import("./index.d.ts").ReferenceValidationIssue[]} */
   const issues = [];
   let checkedReferences = 0;
-  let checkedCompatibility = 0;
 
   for (const result of loaded.results) {
     if (!result.ok || !result.family || !isPlainObject(result.document)) {
@@ -1070,13 +1058,7 @@ export function validateExampleReferences(options = {}) {
     const source = result.source;
 
     if (result.family === "project-profile") {
-      const allowedAdapters = new Set(
-        Array.isArray(document.allowed_adapters)
-          ? document.allowed_adapters.filter((value) => typeof value === "string")
-          : [],
-      );
       const defaultRouteProfiles = document.default_route_profiles;
-      const defaultRouteProfilesRecord = isPlainObject(defaultRouteProfiles) ? defaultRouteProfiles : {};
       if (isPlainObject(defaultRouteProfiles)) {
         for (const [key, rawValue] of Object.entries(defaultRouteProfiles)) {
           checkedReferences += 1;
@@ -1093,41 +1075,6 @@ export function validateExampleReferences(options = {}) {
             expectedSet: registry.routeIds,
             registry,
           });
-
-          const routeProfile = registry.routeProfilesById.get(reference);
-          if (!routeProfile) continue;
-
-          checkedCompatibility += 1;
-          if (routeProfile.step && routeProfile.step !== key) {
-            issues.push(
-              referenceIssue({
-                code: "reference_target_incompatible",
-                source,
-                field,
-                reference,
-                expected: `route step '${key}'`,
-                actual: routeProfile.step,
-                message: `Route '${reference}' has step '${routeProfile.step}', which does not match profile slot '${key}'.`,
-              }),
-            );
-          }
-
-          if (allowedAdapters.size === 0) continue;
-          for (const adapterRef of routeProfile.adapters) {
-            checkedCompatibility += 1;
-            if (allowedAdapters.has(adapterRef.adapterId)) continue;
-            issues.push(
-              referenceIssue({
-                code: "reference_target_incompatible",
-                source,
-                field,
-                reference,
-                expected: "route adapters included in allowed_adapters",
-                actual: `${adapterRef.adapterId} is not allowed`,
-                message: `Route '${reference}' uses adapter '${adapterRef.adapterId}', which is not listed in allowed_adapters.`,
-              }),
-            );
-          }
         }
       }
 
@@ -1162,127 +1109,6 @@ export function validateExampleReferences(options = {}) {
             expectedSet: registry.wrapperRefs,
             registry,
           });
-
-          const wrapperProfile = registry.wrapperProfilesByRef.get(reference);
-          if (!wrapperProfile || !wrapperProfile.stepClass) continue;
-          checkedCompatibility += 1;
-          if (wrapperProfile.stepClass === key) continue;
-          issues.push(
-            referenceIssue({
-              code: "reference_target_incompatible",
-              source,
-              field,
-              reference,
-              expected: `wrapper step_class '${key}'`,
-              actual: wrapperProfile.stepClass,
-              message: `Wrapper '${reference}' has step_class '${wrapperProfile.stepClass}', which does not match profile slot '${key}'.`,
-            }),
-          );
-        }
-      }
-
-      const defaultPromptBundles = document.default_prompt_bundles;
-      if (isPlainObject(defaultPromptBundles)) {
-        for (const [key, rawValue] of Object.entries(defaultPromptBundles)) {
-          checkedReferences += 1;
-          const field = `default_prompt_bundles.${key}`;
-          const reference = asReferenceString(rawValue, { issues, source, field });
-          if (!reference || isExternalReference(reference)) continue;
-          if (!isPromptBundleRef(reference)) {
-            issues.push(
-              referenceIssue({
-                code: "reference_format_invalid",
-                source,
-                field,
-                reference,
-                expected: "prompt-bundle://prompt_bundle_id@vN",
-                actual: reference,
-                message: `Field '${field}' must use prompt-bundle://prompt_bundle_id@vN format.`,
-              }),
-            );
-            continue;
-          }
-          validateReferenceTarget({
-            issues,
-            source,
-            field,
-            reference,
-            expected: "existing prompt-bundle://prompt_bundle_id@vN",
-            expectedFamily: "prompt-bundle",
-            expectedSet: registry.promptBundleRefs,
-            registry,
-          });
-
-          const routeProfileRef = isPlainObject(defaultRouteProfiles) ? defaultRouteProfiles[key] : undefined;
-          const routeProfile =
-            typeof routeProfileRef === "string" ? registry.routeProfilesById.get(routeProfileRef) : null;
-          const promptBundle = registry.promptBundlesByRef.get(reference);
-          if (!routeProfile?.routeClass || !promptBundle?.stepClass) continue;
-          checkedCompatibility += 1;
-          if (promptBundle.stepClass === routeProfile.routeClass) continue;
-          issues.push(
-            referenceIssue({
-              code: "reference_target_incompatible",
-              source,
-              field,
-              reference,
-              expected: `prompt bundle step_class '${routeProfile.routeClass}'`,
-              actual: promptBundle.stepClass,
-              message: `Prompt bundle '${reference}' is incompatible with default route class '${routeProfile.routeClass}' for step '${key}'.`,
-            }),
-          );
-        }
-      }
-
-      const defaultContextBundles = document.default_context_bundles;
-      if (isPlainObject(defaultContextBundles)) {
-        for (const [key, rawValue] of Object.entries(defaultContextBundles)) {
-          const references = asStringArray(rawValue, { issues, source, field: `default_context_bundles.${key}` });
-          references.forEach((reference, index) => {
-            checkedReferences += 1;
-            const field = `default_context_bundles.${key}[${index}]`;
-            if (isExternalReference(reference)) return;
-            if (!isContextBundleRef(reference)) {
-              issues.push(
-                referenceIssue({
-                  code: "reference_format_invalid",
-                  source,
-                  field,
-                  reference,
-                  expected: "context-bundle://context_bundle_id@vN",
-                  actual: reference,
-                  message: `Field '${field}' must use context-bundle://context_bundle_id@vN format.`,
-                }),
-              );
-              return;
-            }
-            validateReferenceTarget({
-              issues,
-              source,
-              field,
-              reference,
-              expected: "existing context-bundle://context_bundle_id@vN",
-              expectedFamily: "context-bundle",
-              expectedSet: registry.contextBundleRefs,
-              registry,
-            });
-
-            const contextBundle = registry.contextBundlesByRef.get(reference);
-            if (!contextBundle) return;
-            checkedCompatibility += 1;
-            if (contextBundle.appliesToSteps.has(key)) return;
-            issues.push(
-              referenceIssue({
-                code: "reference_target_incompatible",
-                source,
-                field,
-                reference,
-                expected: `context bundle applies_to.steps includes '${key}'`,
-                actual: [...contextBundle.appliesToSteps].join(", ") || "none",
-                message: `Context bundle '${reference}' does not apply to workflow step '${key}'.`,
-              }),
-            );
-          });
         }
       }
 
@@ -1303,177 +1129,6 @@ export function validateExampleReferences(options = {}) {
             expectedSet: registry.policyIds,
             registry,
           });
-
-          const policyProfile = registry.policyProfilesById.get(reference);
-          if (!policyProfile || !policyProfile.stepClass) continue;
-          checkedCompatibility += 1;
-          if (policyProfile.stepClass === key) continue;
-          issues.push(
-            referenceIssue({
-              code: "reference_target_incompatible",
-              source,
-              field,
-              reference,
-              expected: `policy step_class '${key}'`,
-              actual: policyProfile.stepClass,
-              message: `Policy '${reference}' has step_class '${policyProfile.stepClass}', which does not match profile slot '${key}'.`,
-            }),
-          );
-        }
-      }
-
-      const defaultSkillProfiles = document.default_skill_profiles;
-      if (isPlainObject(defaultSkillProfiles)) {
-        for (const [key, rawValue] of Object.entries(defaultSkillProfiles)) {
-          const field = `default_skill_profiles.${key}`;
-          if (!STEP_CLASS_VALUES.includes(key)) {
-            checkedCompatibility += 1;
-            issues.push(
-              referenceIssue({
-                code: "reference_target_incompatible",
-                source,
-                field,
-                reference: null,
-                expected: STEP_CLASS_VALUES.join("|"),
-                actual: key,
-                message: `Field '${field}' uses unsupported step_class slot '${key}'.`,
-              }),
-            );
-            continue;
-          }
-
-          const references = asStringArray(rawValue, {
-            issues,
-            source,
-            field,
-          });
-
-          for (const reference of references) {
-            checkedReferences += 1;
-            if (isExternalReference(reference)) {
-              continue;
-            }
-            if (!isVersionedRef(reference)) {
-              issues.push(
-                referenceIssue({
-                  code: "reference_format_invalid",
-                  source,
-                  field,
-                  reference,
-                  expected: "skill_id@vN",
-                  actual: reference,
-                  message: `Field '${field}' entries must use skill_id@vN format.`,
-                }),
-              );
-              continue;
-            }
-
-            validateReferenceTarget({
-              issues,
-              source,
-              field,
-              reference,
-              expected: "existing skill_id@vN",
-              expectedFamily: "skill-profile",
-              expectedSet: registry.skillRefs,
-              registry,
-            });
-
-            const skillProfile = registry.skillProfilesByRef.get(reference);
-            if (!skillProfile || !skillProfile.stepClass) continue;
-            checkedCompatibility += 1;
-            if (skillProfile.stepClass === key) continue;
-            issues.push(
-              referenceIssue({
-                code: "reference_target_incompatible",
-                source,
-                field,
-                reference,
-                expected: `skill step_class '${key}'`,
-                actual: skillProfile.stepClass,
-                message: `Skill '${reference}' has step_class '${skillProfile.stepClass}', which does not match profile slot '${key}'.`,
-              }),
-            );
-          }
-        }
-      }
-
-      const skillOverrides = document.skill_overrides;
-      if (isPlainObject(skillOverrides)) {
-        for (const [key, rawValue] of Object.entries(skillOverrides)) {
-          const field = `skill_overrides.${key}`;
-          if (!ROUTE_STEP_VALUES.includes(key)) {
-            checkedCompatibility += 1;
-            issues.push(
-              referenceIssue({
-                code: "reference_target_incompatible",
-                source,
-                field,
-                reference: null,
-                expected: ROUTE_STEP_VALUES.join("|"),
-                actual: key,
-                message: `Field '${field}' uses unsupported route-step slot '${key}'.`,
-              }),
-            );
-            continue;
-          }
-
-          const references = asStringArray(rawValue, {
-            issues,
-            source,
-            field,
-          });
-          const routeRefRaw = defaultRouteProfilesRecord[key];
-          const routeRef = typeof routeRefRaw === "string" ? routeRefRaw : null;
-          const expectedRouteClass = routeRef ? registry.routeProfilesById.get(routeRef)?.routeClass ?? null : null;
-
-          for (const reference of references) {
-            checkedReferences += 1;
-            if (isExternalReference(reference)) {
-              continue;
-            }
-            if (!isVersionedRef(reference)) {
-              issues.push(
-                referenceIssue({
-                  code: "reference_format_invalid",
-                  source,
-                  field,
-                  reference,
-                  expected: "skill_id@vN",
-                  actual: reference,
-                  message: `Field '${field}' entries must use skill_id@vN format.`,
-                }),
-              );
-              continue;
-            }
-
-            validateReferenceTarget({
-              issues,
-              source,
-              field,
-              reference,
-              expected: "existing skill_id@vN",
-              expectedFamily: "skill-profile",
-              expectedSet: registry.skillRefs,
-              registry,
-            });
-
-            const skillProfile = registry.skillProfilesByRef.get(reference);
-            if (!skillProfile || !skillProfile.stepClass || !expectedRouteClass) continue;
-            checkedCompatibility += 1;
-            if (skillProfile.stepClass === expectedRouteClass) continue;
-            issues.push(
-              referenceIssue({
-                code: "reference_target_incompatible",
-                source,
-                field,
-                reference,
-                expected: `skill step_class '${expectedRouteClass}'`,
-                actual: skillProfile.stepClass,
-                message: `Skill '${reference}' has step_class '${skillProfile.stepClass}', which is incompatible with '${key}' route class '${expectedRouteClass}'.`,
-              }),
-            );
-          }
         }
       }
 
@@ -1547,212 +1202,50 @@ export function validateExampleReferences(options = {}) {
 
     if (result.family === "provider-route-profile") {
       checkedReferences += 1;
-      const primaryAdapterField = "primary.adapter";
-      const primaryAdapterValue = isPlainObject(document.primary) ? document.primary.adapter : undefined;
-      const primaryAdapterRef = asReferenceString(primaryAdapterValue, {
-        issues,
-        source,
-        field: primaryAdapterField,
-      });
-      if (
-        primaryAdapterRef &&
-        !isExternalReference(primaryAdapterRef) &&
-        !isPlaceholderAdapterReference(primaryAdapterRef)
-      ) {
-        validateReferenceTarget({
-          issues,
-          source,
-          field: primaryAdapterField,
-          reference: primaryAdapterRef,
-          expected: "existing adapter_id",
-          expectedFamily: "adapter-capability-profile",
-          expectedSet: registry.adapterIds,
-          registry,
-        });
-      }
-
-      const fallback = document.fallback;
-      if (Array.isArray(fallback)) {
-        fallback.forEach((candidate, index) => {
-          checkedReferences += 1;
-          const fallbackAdapterField = `fallback[${index}].adapter`;
-          const fallbackAdapterValue = isPlainObject(candidate) ? candidate.adapter : candidate;
-          const fallbackAdapterRef = asReferenceString(fallbackAdapterValue, {
-            issues,
-            source,
-            field: fallbackAdapterField,
-          });
-          if (
-            !fallbackAdapterRef ||
-            isExternalReference(fallbackAdapterRef) ||
-            isPlaceholderAdapterReference(fallbackAdapterRef)
-          ) {
-            return;
-          }
+      const field = "wrapper_profile_ref";
+      const reference = asReferenceString(document.wrapper_profile_ref, { issues, source, field });
+      if (reference && !isExternalReference(reference)) {
+        if (!isVersionedRef(reference)) {
+          issues.push(
+            referenceIssue({
+              code: "reference_format_invalid",
+              source,
+              field,
+              reference,
+              expected: "wrapper_id@vN",
+              actual: reference,
+              message: "wrapper_profile_ref must use wrapper_id@vN format.",
+            }),
+          );
+        } else {
           validateReferenceTarget({
             issues,
             source,
-            field: fallbackAdapterField,
-            reference: fallbackAdapterRef,
-            expected: "existing adapter_id",
-            expectedFamily: "adapter-capability-profile",
-            expectedSet: registry.adapterIds,
+            field,
+            reference,
+            expected: "existing wrapper_id@vN",
+            expectedFamily: "wrapper-profile",
+            expectedSet: registry.wrapperRefs,
             registry,
           });
-        });
-      }
-
-      const requiredAdapterCapabilities = asStringArray(document.required_adapter_capabilities, {
-        issues,
-        source,
-        field: "required_adapter_capabilities",
-      });
-      if (requiredAdapterCapabilities.length > 0) {
-        const routeAdapterRefs = extractRouteAdapterRefs(document);
-        for (const adapterRef of routeAdapterRefs) {
-          const adapterProfile = registry.adapterProfilesById.get(adapterRef.adapterId);
-          if (!adapterProfile) continue;
-          checkedCompatibility += 1;
-          const missingCapabilities = requiredAdapterCapabilities.filter(
-            (capability) => !adapterProfile.capabilities.has(capability),
-          );
-          if (missingCapabilities.length === 0) continue;
-          issues.push(
-            referenceIssue({
-              code: "reference_target_incompatible",
-              source,
-              field: adapterRef.field,
-              reference: adapterRef.adapterId,
-              expected: `adapter with capabilities: ${requiredAdapterCapabilities.join(", ")}`,
-              actual: `missing capabilities: ${missingCapabilities.join(", ")}`,
-              message: `Adapter '${adapterRef.adapterId}' does not satisfy required route capabilities.`,
-            }),
-          );
         }
       }
     }
 
-    if (result.family === "context-bundle") {
-      const contextDocRefs = asStringArray(document.context_doc_refs, {
-        issues,
-        source,
-        field: "context_doc_refs",
-      });
-      contextDocRefs.forEach((reference, index) => {
-        checkedReferences += 1;
-        const field = `context_doc_refs[${index}]`;
-        if (isExternalReference(reference)) return;
-        if (!isContextDocRef(reference)) {
-          issues.push(
-            referenceIssue({
-              code: "reference_format_invalid",
-              source,
-              field,
-              reference,
-              expected: "context-doc://context_doc_id@vN",
-              actual: reference,
-              message: `${field} must use context-doc://context_doc_id@vN format.`,
-            }),
-          );
-          return;
-        }
-        validateReferenceTarget({
-          issues,
-          source,
-          field,
-          reference,
-          expected: "existing context-doc://context_doc_id@vN",
-          expectedFamily: "context-doc",
-          expectedSet: registry.contextDocRefs,
-          registry,
-        });
-      });
-
-      const contextRuleRefs = asStringArray(document.context_rule_refs, {
-        issues,
-        source,
-        field: "context_rule_refs",
-      });
-      contextRuleRefs.forEach((reference, index) => {
-        checkedReferences += 1;
-        const field = `context_rule_refs[${index}]`;
-        if (isExternalReference(reference)) return;
-        if (!isContextRuleRef(reference)) {
-          issues.push(
-            referenceIssue({
-              code: "reference_format_invalid",
-              source,
-              field,
-              reference,
-              expected: "context-rule://context_rule_id@vN",
-              actual: reference,
-              message: `${field} must use context-rule://context_rule_id@vN format.`,
-            }),
-          );
-          return;
-        }
-        validateReferenceTarget({
-          issues,
-          source,
-          field,
-          reference,
-          expected: "existing context-rule://context_rule_id@vN",
-          expectedFamily: "context-rule",
-          expectedSet: registry.contextRuleRefs,
-          registry,
-        });
-      });
-
-      const contextSkillRefs = asStringArray(document.context_skill_refs, {
-        issues,
-        source,
-        field: "context_skill_refs",
-      });
-      contextSkillRefs.forEach((reference, index) => {
-        checkedReferences += 1;
-        const field = `context_skill_refs[${index}]`;
-        if (isExternalReference(reference)) return;
-        if (!isContextSkillRef(reference)) {
-          issues.push(
-            referenceIssue({
-              code: "reference_format_invalid",
-              source,
-              field,
-              reference,
-              expected: "context-skill://context_skill_id@vN",
-              actual: reference,
-              message: `${field} must use context-skill://context_skill_id@vN format.`,
-            }),
-          );
-          return;
-        }
-        validateReferenceTarget({
-          issues,
-          source,
-          field,
-          reference,
-          expected: "existing context-skill://context_skill_id@vN",
-          expectedFamily: "context-skill",
-          expectedSet: registry.contextSkillRefs,
-          registry,
-        });
-      });
-    }
-
-    if (result.family === "compiled-context-artifact") {
+    if (result.family === "wrapper-profile") {
       checkedReferences += 1;
-      const promptBundleField = "prompt_bundle_ref";
-      const promptBundleRef = asReferenceString(document.prompt_bundle_ref, { issues, source, field: promptBundleField });
-      if (promptBundleRef && !isExternalReference(promptBundleRef)) {
-        if (!isPromptBundleRef(promptBundleRef)) {
+      const field = "prompt_bundle_ref";
+      const reference = asReferenceString(document.prompt_bundle_ref, { issues, source, field });
+      if (reference && !isExternalReference(reference)) {
+        if (!isPromptBundleRef(reference)) {
           issues.push(
             referenceIssue({
               code: "reference_format_invalid",
               source,
-              field: promptBundleField,
-              reference: promptBundleRef,
+              field,
+              reference,
               expected: "prompt-bundle://prompt_bundle_id@vN",
-              actual: promptBundleRef,
+              actual: reference,
               message: "prompt_bundle_ref must use prompt-bundle://prompt_bundle_id@vN format.",
             }),
           );
@@ -1760,8 +1253,8 @@ export function validateExampleReferences(options = {}) {
           validateReferenceTarget({
             issues,
             source,
-            field: promptBundleField,
-            reference: promptBundleRef,
+            field,
+            reference,
             expected: "existing prompt-bundle://prompt_bundle_id@vN",
             expectedFamily: "prompt-bundle",
             expectedSet: registry.promptBundleRefs,
@@ -1769,51 +1262,6 @@ export function validateExampleReferences(options = {}) {
           });
         }
       }
-
-      validatePrefixedReferenceArray({
-        issues,
-        source,
-        field: "context_bundle_refs",
-        values: document.context_bundle_refs,
-        expectedFormat: "context-bundle://context_bundle_id@vN",
-        isExpectedRef: isContextBundleRef,
-        expectedFamily: "context-bundle",
-        expectedSet: registry.contextBundleRefs,
-        registry,
-      });
-      validatePrefixedReferenceArray({
-        issues,
-        source,
-        field: "context_doc_refs",
-        values: document.context_doc_refs,
-        expectedFormat: "context-doc://context_doc_id@vN",
-        isExpectedRef: isContextDocRef,
-        expectedFamily: "context-doc",
-        expectedSet: registry.contextDocRefs,
-        registry,
-      });
-      validatePrefixedReferenceArray({
-        issues,
-        source,
-        field: "context_rule_refs",
-        values: document.context_rule_refs,
-        expectedFormat: "context-rule://context_rule_id@vN",
-        isExpectedRef: isContextRuleRef,
-        expectedFamily: "context-rule",
-        expectedSet: registry.contextRuleRefs,
-        registry,
-      });
-      validatePrefixedReferenceArray({
-        issues,
-        source,
-        field: "context_skill_refs",
-        values: document.context_skill_refs,
-        expectedFormat: "context-skill://context_skill_id@vN",
-        isExpectedRef: isContextSkillRef,
-        expectedFamily: "context-skill",
-        expectedSet: registry.contextSkillRefs,
-        registry,
-      });
     }
 
     if (result.family === "evaluation-suite") {
@@ -1844,25 +1292,6 @@ export function validateExampleReferences(options = {}) {
             expectedSet: registry.datasetRefs,
             registry,
           });
-
-          const suiteSubjectType = typeof document.subject_type === "string" ? document.subject_type : null;
-          const dataset = registry.datasetsByRef.get(reference);
-          if (suiteSubjectType && dataset?.subjectType) {
-            checkedCompatibility += 1;
-            if (dataset.subjectType !== suiteSubjectType) {
-              issues.push(
-                referenceIssue({
-                  code: "reference_target_incompatible",
-                  source,
-                  field,
-                  reference,
-                  expected: `dataset subject_type '${suiteSubjectType}'`,
-                  actual: dataset.subjectType,
-                  message: `Suite subject_type '${suiteSubjectType}' is incompatible with dataset '${reference}' subject_type '${dataset.subjectType}'.`,
-                }),
-              );
-            }
-          }
         }
       }
     }
@@ -2019,7 +1448,6 @@ export function validateExampleReferences(options = {}) {
     workspaceRoot: loaded.workspaceRoot,
     examplesRoot: loaded.examplesRoot,
     checkedReferences,
-    checkedCompatibility,
     issues,
   };
 }
@@ -2193,198 +1621,8 @@ function isPromptBundleRef(value) {
  * @param {string} value
  * @returns {boolean}
  */
-function isContextDocRef(value) {
-  return /^context-doc:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
-}
-
-/**
- * @param {string} value
- * @returns {boolean}
- */
-function isContextRuleRef(value) {
-  return /^context-rule:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
-}
-
-/**
- * @param {string} value
- * @returns {boolean}
- */
-function isContextSkillRef(value) {
-  return /^context-skill:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
-}
-
-/**
- * @param {string} value
- * @returns {boolean}
- */
-function isContextBundleRef(value) {
-  return /^context-bundle:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
-}
-
-/**
- * @param {string} value
- * @returns {boolean}
- */
 function isDatasetRef(value) {
   return /^dataset:\/\/[A-Za-z0-9._-]+@[^@\s]+$/.test(value);
-}
-
-/**
- * @param {string} value
- * @returns {boolean}
- */
-function isPlaceholderAdapterReference(value) {
-  return value === "none";
-}
-
-/**
- * @param {unknown} value
- * @param {{ issues: import("./index.d.ts").ReferenceValidationIssue[], source: string, field: string }} options
- * @returns {string[]}
- */
-function asStringArray(value, { issues, source, field }) {
-  if (value === undefined) {
-    return [];
-  }
-
-  if (!Array.isArray(value)) {
-    issues.push(
-      referenceIssue({
-        code: "reference_format_invalid",
-        source,
-        field,
-        expected: "array of strings",
-        actual: describeActualType(value),
-        message: `Field '${field}' must be an array of string values.`,
-      }),
-    );
-    return [];
-  }
-
-  /** @type {string[]} */
-  const values = [];
-  value.forEach((entry, index) => {
-    if (typeof entry === "string") {
-      values.push(entry);
-      return;
-    }
-    issues.push(
-      referenceIssue({
-        code: "reference_format_invalid",
-        source,
-        field: `${field}[${index}]`,
-        expected: "string",
-        actual: describeActualType(entry),
-        message: `Field '${field}[${index}]' must be a string.`,
-      }),
-    );
-  });
-  return values;
-}
-
-/**
- * @param {Record<string, unknown>} document
- * @returns {string[]}
- */
-function extractAppliesToSteps(document) {
-  if (!isPlainObject(document.applies_to) || !Array.isArray(document.applies_to.steps)) {
-    return [];
-  }
-
-  return document.applies_to.steps.filter((value) => typeof value === "string");
-}
-
-/**
- * @param {{
- *   issues: import("./index.d.ts").ReferenceValidationIssue[],
- *   source: string,
- *   field: string,
- *   values: unknown,
- *   expectedFormat: string,
- *   isExpectedRef: (value: string) => boolean,
- *   expectedFamily: import("./index.d.ts").ContractFamily,
- *   expectedSet: Set<string>,
- *   registry: { knownReferenceFamilies: Map<string, Set<import("./index.d.ts").ContractFamily>> }
- * }} options
- */
-function validatePrefixedReferenceArray({
-  issues,
-  source,
-  field,
-  values,
-  expectedFormat,
-  isExpectedRef,
-  expectedFamily,
-  expectedSet,
-  registry,
-}) {
-  const references = asStringArray(values, { issues, source, field });
-  references.forEach((reference, index) => {
-    const indexedField = `${field}[${index}]`;
-    if (isExternalReference(reference)) {
-      return;
-    }
-
-    if (!isExpectedRef(reference)) {
-      issues.push(
-        referenceIssue({
-          code: "reference_format_invalid",
-          source,
-          field: indexedField,
-          reference,
-          expected: expectedFormat,
-          actual: reference,
-          message: `${indexedField} must use ${expectedFormat} format.`,
-        }),
-      );
-      return;
-    }
-
-    validateReferenceTarget({
-      issues,
-      source,
-      field: indexedField,
-      reference,
-      expected: `existing ${expectedFormat}`,
-      expectedFamily,
-      expectedSet,
-      registry,
-    });
-  });
-}
-
-/**
- * @param {Record<string, unknown>} routeProfile
- * @returns {Array<{ field: string, adapterId: string }>}
- */
-function extractRouteAdapterRefs(routeProfile) {
-  /** @type {Array<{ field: string, adapterId: string }>} */
-  const references = [];
-
-  const primary = routeProfile.primary;
-  if (
-    isPlainObject(primary) &&
-    typeof primary.adapter === "string" &&
-    !isPlaceholderAdapterReference(primary.adapter)
-  ) {
-    references.push({ field: "primary.adapter", adapterId: primary.adapter });
-  }
-
-  const fallback = routeProfile.fallback;
-  if (Array.isArray(fallback)) {
-    fallback.forEach((candidate, index) => {
-      if (
-        !isPlainObject(candidate) ||
-        typeof candidate.adapter !== "string" ||
-        isPlaceholderAdapterReference(candidate.adapter)
-      ) {
-        return;
-      }
-      references.push({ field: `fallback[${index}].adapter`, adapterId: candidate.adapter });
-    });
-  }
-
-  return references;
 }
 
 /**
@@ -2394,24 +1632,10 @@ function extractRouteAdapterRefs(routeProfile) {
  *   routeIds: Set<string>,
  *   wrapperRefs: Set<string>,
  *   policyIds: Set<string>,
- *   skillRefs: Set<string>,
  *   suiteRefs: Set<string>,
  *   datasetRefs: Set<string>,
  *   liveE2eProfileRefs: Set<string>,
  *   promptBundleRefs: Set<string>,
- *   contextDocRefs: Set<string>,
- *   contextRuleRefs: Set<string>,
- *   contextSkillRefs: Set<string>,
- *   contextBundleRefs: Set<string>,
- *   adapterIds: Set<string>,
- *   routeProfilesById: Map<string, { source: string, step: string | null, routeClass: string | null, adapters: Array<{ field: string, adapterId: string }> }>,
- *   wrapperProfilesByRef: Map<string, { source: string, stepClass: string | null }>,
- *   policyProfilesById: Map<string, { source: string, stepClass: string | null }>,
- *   skillProfilesByRef: Map<string, { source: string, stepClass: string | null }>,
- *   promptBundlesByRef: Map<string, { source: string, stepClass: string | null }>,
- *   contextBundlesByRef: Map<string, { source: string, appliesToSteps: Set<string> }>,
- *   datasetsByRef: Map<string, { source: string, subjectType: string | null }>,
- *   adapterProfilesById: Map<string, { source: string, capabilities: Set<string> }>,
  *   knownReferenceFamilies: Map<string, Set<import("./index.d.ts").ContractFamily>>,
  * }}
  */
@@ -2419,32 +1643,10 @@ function buildReferenceRegistry(results, workspaceRoot) {
   const routeIds = new Set();
   const wrapperRefs = new Set();
   const policyIds = new Set();
-  const skillRefs = new Set();
   const suiteRefs = new Set();
   const datasetRefs = new Set();
   const liveE2eProfileRefs = new Set();
   const promptBundleRefs = new Set();
-  const contextDocRefs = new Set();
-  const contextRuleRefs = new Set();
-  const contextSkillRefs = new Set();
-  const contextBundleRefs = new Set();
-  const adapterIds = new Set();
-  /** @type {Map<string, { source: string, step: string | null, routeClass: string | null, adapters: Array<{ field: string, adapterId: string }> }>} */
-  const routeProfilesById = new Map();
-  /** @type {Map<string, { source: string, stepClass: string | null }>} */
-  const wrapperProfilesByRef = new Map();
-  /** @type {Map<string, { source: string, stepClass: string | null }>} */
-  const policyProfilesById = new Map();
-  /** @type {Map<string, { source: string, stepClass: string | null }>} */
-  const skillProfilesByRef = new Map();
-  /** @type {Map<string, { source: string, stepClass: string | null }>} */
-  const promptBundlesByRef = new Map();
-  /** @type {Map<string, { source: string, appliesToSteps: Set<string> }>} */
-  const contextBundlesByRef = new Map();
-  /** @type {Map<string, { source: string, subjectType: string | null }>} */
-  const datasetsByRef = new Map();
-  /** @type {Map<string, { source: string, capabilities: Set<string> }>} */
-  const adapterProfilesById = new Map();
   /** @type {Map<string, Set<import("./index.d.ts").ContractFamily>>} */
   const knownReferenceFamilies = new Map();
 
@@ -2460,12 +1662,6 @@ function buildReferenceRegistry(results, workspaceRoot) {
         if (typeof routeId === "string") {
           routeIds.add(routeId);
           registerKnownReference(knownReferenceFamilies, routeId, "provider-route-profile");
-          routeProfilesById.set(routeId, {
-            source: result.source,
-            step: typeof document.step === "string" ? document.step : null,
-            routeClass: typeof document.route_class === "string" ? document.route_class : null,
-            adapters: extractRouteAdapterRefs(document),
-          });
         }
         break;
       }
@@ -2476,10 +1672,6 @@ function buildReferenceRegistry(results, workspaceRoot) {
           const wrapperRef = `${wrapperId}@v${version}`;
           wrapperRefs.add(wrapperRef);
           registerKnownReference(knownReferenceFamilies, wrapperRef, "wrapper-profile");
-          wrapperProfilesByRef.set(wrapperRef, {
-            source: result.source,
-            stepClass: typeof document.step_class === "string" ? document.step_class : null,
-          });
         }
         break;
       }
@@ -2488,24 +1680,6 @@ function buildReferenceRegistry(results, workspaceRoot) {
         if (typeof policyId === "string") {
           policyIds.add(policyId);
           registerKnownReference(knownReferenceFamilies, policyId, "step-policy-profile");
-          policyProfilesById.set(policyId, {
-            source: result.source,
-            stepClass: typeof document.step_class === "string" ? document.step_class : null,
-          });
-        }
-        break;
-      }
-      case "skill-profile": {
-        const skillId = document.skill_id;
-        const version = document.version;
-        if (typeof skillId === "string" && typeof version === "number") {
-          const skillRef = `${skillId}@v${version}`;
-          skillRefs.add(skillRef);
-          registerKnownReference(knownReferenceFamilies, skillRef, "skill-profile");
-          skillProfilesByRef.set(skillRef, {
-            source: result.source,
-            stepClass: typeof document.step_class === "string" ? document.step_class : null,
-          });
         }
         break;
       }
@@ -2526,10 +1700,6 @@ function buildReferenceRegistry(results, workspaceRoot) {
           const datasetRef = `dataset://${datasetId}@${version}`;
           datasetRefs.add(datasetRef);
           registerKnownReference(knownReferenceFamilies, datasetRef, "dataset");
-          datasetsByRef.set(datasetRef, {
-            source: result.source,
-            subjectType: typeof document.subject_type === "string" ? document.subject_type : null,
-          });
         }
         break;
       }
@@ -2550,83 +1720,6 @@ function buildReferenceRegistry(results, workspaceRoot) {
           const bundleRef = `prompt-bundle://${bundleId}@v${version}`;
           promptBundleRefs.add(bundleRef);
           registerKnownReference(knownReferenceFamilies, bundleRef, "prompt-bundle");
-          promptBundlesByRef.set(bundleRef, {
-            source: result.source,
-            stepClass: typeof document.step_class === "string" ? document.step_class : null,
-          });
-        }
-        break;
-      }
-      case "context-doc": {
-        const contextDocId = document.context_doc_id;
-        const version = document.version;
-        if (typeof contextDocId === "string" && typeof version === "number") {
-          const contextDocRef = `context-doc://${contextDocId}@v${version}`;
-          contextDocRefs.add(contextDocRef);
-          registerKnownReference(knownReferenceFamilies, contextDocRef, "context-doc");
-        }
-        break;
-      }
-      case "context-rule": {
-        const contextRuleId = document.context_rule_id;
-        const version = document.version;
-        if (typeof contextRuleId === "string" && typeof version === "number") {
-          const contextRuleRef = `context-rule://${contextRuleId}@v${version}`;
-          contextRuleRefs.add(contextRuleRef);
-          registerKnownReference(knownReferenceFamilies, contextRuleRef, "context-rule");
-        }
-        break;
-      }
-      case "context-skill": {
-        const contextSkillId = document.context_skill_id;
-        const version = document.version;
-        if (typeof contextSkillId === "string" && typeof version === "number") {
-          const contextSkillRef = `context-skill://${contextSkillId}@v${version}`;
-          contextSkillRefs.add(contextSkillRef);
-          registerKnownReference(knownReferenceFamilies, contextSkillRef, "context-skill");
-        }
-        break;
-      }
-      case "context-bundle": {
-        const contextBundleId = document.context_bundle_id;
-        const version = document.version;
-        if (typeof contextBundleId === "string" && typeof version === "number") {
-          const contextBundleRef = `context-bundle://${contextBundleId}@v${version}`;
-          contextBundleRefs.add(contextBundleRef);
-          registerKnownReference(knownReferenceFamilies, contextBundleRef, "context-bundle");
-          contextBundlesByRef.set(contextBundleRef, {
-            source: result.source,
-            appliesToSteps: new Set(extractAppliesToSteps(document)),
-          });
-        }
-        break;
-      }
-      case "compiled-context-artifact": {
-        const compiledContextId = document.compiled_context_id;
-        const version = document.version;
-        if (typeof compiledContextId === "string" && typeof version === "number") {
-          registerKnownReference(
-            knownReferenceFamilies,
-            `compiled-context://${compiledContextId}@v${version}`,
-            "compiled-context-artifact",
-          );
-        }
-        break;
-      }
-      case "adapter-capability-profile": {
-        const adapterId = document.adapter_id;
-        if (typeof adapterId === "string") {
-          adapterIds.add(adapterId);
-          registerKnownReference(knownReferenceFamilies, adapterId, "adapter-capability-profile");
-          const capabilities = new Set(
-            Object.entries(isPlainObject(document.capabilities) ? document.capabilities : {})
-              .filter(([, value]) => value === true)
-              .map(([capability]) => capability),
-          );
-          adapterProfilesById.set(adapterId, {
-            source: result.source,
-            capabilities,
-          });
         }
         break;
       }
@@ -2644,24 +1737,10 @@ function buildReferenceRegistry(results, workspaceRoot) {
     routeIds,
     wrapperRefs,
     policyIds,
-    skillRefs,
     suiteRefs,
     datasetRefs,
     liveE2eProfileRefs,
     promptBundleRefs,
-    contextDocRefs,
-    contextRuleRefs,
-    contextSkillRefs,
-    contextBundleRefs,
-    adapterIds,
-    routeProfilesById,
-    wrapperProfilesByRef,
-    policyProfilesById,
-    skillProfilesByRef,
-    promptBundlesByRef,
-    contextBundlesByRef,
-    datasetsByRef,
-    adapterProfilesById,
     knownReferenceFamilies,
   };
 }
