@@ -42,6 +42,15 @@ test("validateProjectRuntime emits pass status when safety checks and analysis r
     assert.equal(result.report.status, "pass");
     assert.equal(result.blocking, false);
     assert.equal(fs.existsSync(result.validationReportPath), true);
+    const referenceValidator = result.report.validators.find(
+      (validator) => validator.validator_id === "asset-reference-integrity",
+    );
+    assert.ok(referenceValidator, "expected asset-reference-integrity validator");
+    assert.equal(typeof referenceValidator.details?.checked_compatibility, "number");
+    assert.ok(
+      /** @type {number} */ (referenceValidator.details?.checked_compatibility) > 0,
+      "expected deterministic compatibility checks in validation details",
+    );
   });
 });
 

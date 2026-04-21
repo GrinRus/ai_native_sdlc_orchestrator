@@ -14,30 +14,11 @@ Deterministic validation is a hard gate before eval or harness:
 Task-specific scoring based on datasets, suites, and graders.
 
 Eval begins only after deterministic validation is `pass`. Eval answers "how good is the candidate" rather than "is the graph structurally valid".
-Eval execution runs through one scorer interface that supports deterministic-only, judge-only, and mixed suites.
-Each run persists a durable `evaluation-report` with:
-- target asset identity (`subject_ref`, `subject_type`, `subject_fingerprint`);
-- suite/dataset identity (`suite_ref`, `dataset_ref`);
-- scorer metadata and per-grader results (`scorer_metadata`, `grader_results`);
-- summary metrics and threshold verdicts for baseline comparisons across asset changes.
 
 ### Harness
 Replay, certification, compare-to-baseline, and failure-mode workflows.
 
 Harness consumes validated assets and eval outputs to produce replay/certification evidence. Harness logic must not replace structural validation rules.
-Harness capture artifacts include:
-- step input envelope (`adapter_request`);
-- selected route/wrapper/prompt/policy/adapter snapshots;
-- compiled-context compatibility metadata (`compiled_context_fingerprint`, `skill_refs`);
-- tool activity trace from adapter response;
-- normalized step output;
-- scoring snapshot from the linked evaluation report.
-
-Replay uses one stable interface:
-1. load capture artifact;
-2. compare captured compatibility metadata against current runtime route/wrapper/prompt/policy/adapter/context/skill selection;
-3. reject replay explicitly on mismatch;
-4. if compatible, rerun evaluation through the same scorer path used by `eval run`.
 
 ### Promotion
 Decision layer that moves an asset or route from candidate to stable or frozen.

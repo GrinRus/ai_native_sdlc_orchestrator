@@ -27,7 +27,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Operations | `live-e2e-profile.md` | `live-e2e-profile` | `examples/live-e2e/*.yaml` | implemented | Required fields + top-level type checks, including `preflight` no-write shape. |
 | Operations | `control-plane-api.md` | `control-plane-api` | none | limitation | Narrative contract; no YAML schema in `W0-S02`. TODO: add machine-loadable shape in a dedicated schema slice. |
 
-## Reference integrity checks (W0-S03)
+## Reference integrity and compatibility checks (W3-S01)
 
 The reference-integrity validator checks only local example graph refs and intentionally ignores external namespaces (for example `evidence://`, `schema://`, `approval://`, `incident://`, `review://`, `redact://`, `validate.*`, `retry.*`, `repair.*`).
 
@@ -39,6 +39,8 @@ The reference-integrity validator checks only local example graph refs and inten
 | `project-profile` | `eval_policy.default_release_suite_ref` | existing `suite_id@vN` (`evaluation-suite`) |
 | `project-profile` | `live_e2e_defaults.profiles.*` | existing `profile_id@vN` (`live-e2e-profile`) |
 | `provider-route-profile` | `wrapper_profile_ref` | existing `wrapper_id@vN` (`wrapper-profile`) |
+| `provider-route-profile` | `primary.adapter` | existing `adapter_id` (`adapter-capability-profile`) |
+| `provider-route-profile` | `fallback[].adapter` | existing `adapter_id` (`adapter-capability-profile`) |
 | `wrapper-profile` | `prompt_bundle_ref` | existing `prompt-bundle://prompt_bundle_id@vN` (`prompt-bundle`) |
 | `evaluation-suite` | `dataset_ref` | existing `dataset://dataset_id@version` (`dataset`) |
 | `step-policy-profile` | `quality_gate.suite_ref` (if present) | existing `suite_id@vN` (`evaluation-suite`) |
@@ -46,8 +48,22 @@ The reference-integrity validator checks only local example graph refs and inten
 | `live-e2e-profile` | `project_profile_template_ref` | existing example file resolved as `project-profile` |
 | `live-e2e-profile` | `verification.eval_suites[]` (if present) | existing `suite_id@vN` (`evaluation-suite`) |
 
+### Compatibility checks
+
+The validator also enforces deterministic asset-graph compatibility after reference resolution:
+
+- route slot key (`project.default_route_profiles.<step>`) must match referenced route `step`;
+- wrapper slot key (`project.default_wrapper_profiles.<step_class>`) must match wrapper `step_class`;
+- policy slot key (`project.default_step_policies.<step_class>`) must match policy `step_class`;
+- route `route_class` must match referenced wrapper `step_class`;
+- wrapper `step_class` must match referenced prompt-bundle `step_class`;
+- suite `subject_type` must match referenced dataset `subject_type`;
+- route adapters must satisfy `required_adapter_capabilities[]`;
+- project `allowed_adapters[]` must include adapters used by referenced default routes.
+
 ### Reference failure shapes
 
 - `reference_format_invalid` — the reference value shape is invalid for the expected field format.
 - `reference_target_missing` — the reference format is valid, but no matching target exists in local examples.
 - `reference_target_type_mismatch` — the reference resolves to an existing object of a different contract family.
+- `reference_target_incompatible` — both assets exist, but their deterministic compatibility constraints do not match.

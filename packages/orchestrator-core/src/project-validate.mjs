@@ -219,6 +219,7 @@ export function validateProjectRuntime(options = {}) {
         : `Example reference integrity checks failed with ${referenceIntegrity.issues.length} issue(s).`,
       details: {
         checked_references: referenceIntegrity.checkedReferences,
+        checked_compatibility: referenceIntegrity.checkedCompatibility,
         issues: referenceIntegrity.issues,
       },
     });
