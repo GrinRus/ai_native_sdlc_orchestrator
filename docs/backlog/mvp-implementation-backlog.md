@@ -37,28 +37,28 @@ This is the master index for the implementation slices across all defined waves.
 | W2-S02 | Wrapper, prompt-bundle, and asset loader runtime | EPIC-3 | done | `packages/orchestrator-core`, `packages/contracts`, `examples/wrappers/**`, `examples/prompts/**` | W2-S01 |
 | W2-S03 | Step policy resolution, budgets, and guardrails | EPIC-3 | done | `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**` | W2-S01 |
 | W2-S04 | Adapter SDK and mock adapter baseline | EPIC-3 | done | `packages/adapter-sdk`, `packages/orchestrator-core`, `examples/adapters/**` | W2-S01 |
-| W2-S05 | Routed step execution engine and durable step results | EPIC-3 | ready | `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `packages/adapter-sdk` | W2-S02, W2-S03, W2-S04, W1-S06 |
-| W2-S06 | First routed execution rehearsal | EPIC-7 | blocked | `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W2-S05, W1-S07, W0-S05 |
+| W2-S05 | Routed step execution engine and durable step results | EPIC-3 | done | `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `packages/adapter-sdk` | W2-S02, W2-S03, W2-S04, W1-S06 |
+| W2-S06 | First routed execution rehearsal | EPIC-7 | ready | `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W2-S05, W1-S07, W0-S05 |
 
 ## W3 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W3-S01 | Validation kernel generalization and asset graph checks | EPIC-4 | done | `packages/contracts`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/**` | W2-S05, W1-S04 |
-| W3-S02 | Dataset and evaluation suite registry | EPIC-4 | done | `packages/contracts`, `packages/orchestrator-core`, `examples/eval/**` | W3-S01 |
-| W3-S03 | Eval runner and scorer interface | EPIC-4 | done | `packages/harness`, `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli` | W3-S02, W2-S04, W2-S05 |
-| W3-S04 | Harness capture and replay runtime | EPIC-4 | done | `packages/harness`, `packages/observability`, `packages/orchestrator-core` | W3-S02, W2-S05 |
-| W3-S05 | Certification and promotion decision baseline | EPIC-4 | done | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `apps/cli` | W3-S03, W3-S04 |
-| W3-S06 | Quality rehearsal on selected public targets | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `packages/harness`, `apps/cli` | W3-S05, W0-S05 |
+| W3-S01 | Validation kernel generalization and asset graph checks | EPIC-4 | ready | `packages/contracts`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/**` | W2-S05, W1-S04 |
+| W3-S02 | Dataset and evaluation suite registry | EPIC-4 | blocked | `packages/contracts`, `packages/orchestrator-core`, `examples/eval/**` | W3-S01 |
+| W3-S03 | Eval runner and scorer interface | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli` | W3-S02, W2-S04, W2-S05 |
+| W3-S04 | Harness capture and replay runtime | EPIC-4 | blocked | `packages/harness`, `packages/observability`, `packages/orchestrator-core` | W3-S02, W2-S05 |
+| W3-S05 | Certification and promotion decision baseline | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `apps/cli` | W3-S03, W3-S04 |
+| W3-S06 | Quality rehearsal on selected public targets | EPIC-7 | blocked | `docs/ops/**`, `examples/live-e2e/**`, `packages/harness`, `apps/cli` | W3-S05, W0-S05 |
 
 ## W4 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W4-S01 | Isolated worktree and workspace execution foundation | EPIC-5 | done | `packages/orchestrator-core`, `packages/observability`, `docs/ops/**` | W2-S05, W1-S05 |
-| W4-S02 | Delivery planning and write-back mode policy | EPIC-5 | done | `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**` | W4-S01, W1-S07, W3-S05 |
-| W4-S03 | Patch and local branch delivery driver | EPIC-5 | done | `packages/orchestrator-core`, `apps/cli`, `packages/observability` | W4-S02 |
-| W4-S04 | Fork-first GitHub PR delivery driver | EPIC-5 | done | `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli`, `docs/ops/**` | W4-S02, W2-S04 |
-| W4-S05 | Delivery manifest and release packet materialization | EPIC-5 | done | `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**`, `apps/cli` | W4-S03, W4-S04, W3-S05 |
-| W4-S06 | Delivery rehearsal and recovery-safe operations | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability` | W4-S05, W0-S05 |
+| W4-S01 | Isolated worktree and workspace execution foundation | EPIC-5 | ready | `packages/orchestrator-core`, `packages/observability`, `docs/ops/**` | W2-S05, W1-S05 |
+| W4-S02 | Delivery planning and write-back mode policy | EPIC-5 | blocked | `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**` | W4-S01, W1-S07, W3-S05 |
+| W4-S03 | Patch and local branch delivery driver | EPIC-5 | blocked | `packages/orchestrator-core`, `apps/cli`, `packages/observability` | W4-S02 |
+| W4-S04 | Fork-first GitHub PR delivery driver | EPIC-5 | blocked | `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli`, `docs/ops/**` | W4-S02, W2-S04 |
+| W4-S05 | Delivery manifest and release packet materialization | EPIC-5 | blocked | `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**`, `apps/cli` | W4-S03, W4-S04, W3-S05 |
+| W4-S06 | Delivery rehearsal and recovery-safe operations | EPIC-7 | blocked | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability` | W4-S05, W0-S05 |
 
 ## W5 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

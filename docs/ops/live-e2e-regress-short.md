@@ -34,28 +34,6 @@ Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
 5. verify
 6. stop unless no-write gates pass
 
-Isolation mode defaults:
-- use `workspace-clone` when this rehearsal feeds patch-only or fork-first delivery preparation;
-- keep `ephemeral` only for bootstrap smoke with no delivery mutation intent.
-
-## Prerequisites
-- See `docs/ops/live-e2e-dependency-matrix.md` for canonical dependency and command requirements.
-- Local environment must allow npm dependency and Playwright browser downloads.
-
-## Abort conditions
-- Clone or dependency installation fails.
-- `npm test` fails during preflight verification.
-- Any requested delivery mode requires upstream write-back.
-
-## No-write preflight
-Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
-1. clone
-2. inspect
-3. analyze
-4. validate
-5. verify
-6. stop unless no-write gates pass
-
 ## Prerequisites
 - Node `>=22` and npm available.
 - Network access for clone and dependency install.

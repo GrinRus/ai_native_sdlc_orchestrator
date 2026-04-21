@@ -143,7 +143,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S05 — Routed step execution engine and durable step results
 - **Epic:** EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Execute routed steps end to end in bounded mode and persist normalized step results with asset and policy provenance.
 - **Primary modules:** `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `packages/adapter-sdk`
 - **Hard dependencies:** W2-S02, W2-S03, W2-S04, W1-S06
@@ -174,7 +174,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S06 — First routed execution rehearsal
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** done
+- **State:** ready
 - **Outcome:** Prove that approved packets can drive no-write routed steps before delivery automation begins.
 - **Primary modules:** `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`
 - **Hard dependencies:** W2-S05, W1-S07, W0-S05

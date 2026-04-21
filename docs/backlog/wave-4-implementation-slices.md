@@ -19,7 +19,7 @@ Add safe write-back modes, manifests, and release artifacts so AOR can move from
 
 ## W4-S01 — Isolated worktree and workspace execution foundation
 - **Epic:** EPIC-5 Delivery and release
-- **State:** done
+- **State:** ready
 - **Outcome:** Prepare safe local isolation primitives so delivery can happen without mutating the operator's main checkout accidentally.
 - **Primary modules:** `packages/orchestrator-core`, `packages/observability`, `docs/ops/**`
 - **Hard dependencies:** W2-S05, W1-S05

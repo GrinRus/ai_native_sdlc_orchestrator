@@ -44,6 +44,30 @@ Observed baseline:
 
 Validation step output must materialize a deterministic `validation-report` with `pass`, `warn`, or `fail` status. When verify is started with validation gating enabled, a `fail` report blocks verify until the failing validators are resolved.
 
+## Routed rehearsal procedure (W2-S06 baseline)
+Use this bounded no-write rehearsal to prove routed execution path readiness (route + asset + policy + adapter) before delivery automation:
+
+```bash
+aor project init --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal
+aor project analyze --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal
+aor handoff prepare --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal
+aor handoff approve --project-ref <AOR_WORKSPACE> --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal --handoff-packet <AOR_WORKSPACE>/.aor/w2-s06-rehearsal/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json --approval-ref approval://W2-S06-REHEARSAL
+aor project validate --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal --require-approved-handoff --handoff-packet <AOR_WORKSPACE>/.aor/w2-s06-rehearsal/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json
+aor project verify --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w2-s06-rehearsal --require-validation-pass --routed-dry-run-step implement
+```
+
+Expected routed rehearsal signals:
+- `handoff approve` returns `handoff_status=approved`;
+- validation handoff gate returns `pass`;
+- `project verify` materializes `routed_step_result_file`;
+- `step-result-routed-implement.json` contains route, asset, policy, and adapter resolution metadata with `mode=dry-run`.
+
+Evidence fixtures captured for this procedure:
+- `examples/live-e2e/fixtures/routed-rehearsal/aor/routed-rehearsal-transcript.md`
+- `examples/live-e2e/fixtures/routed-rehearsal/aor/project-verify-routed.json`
+- `examples/live-e2e/fixtures/routed-rehearsal/aor/step-result-routed-implement.json`
+- `examples/live-e2e/fixtures/routed-rehearsal/aor/runtime-tree.txt`
+
 ## Required target annotations
 Each profile and runbook must provide:
 - prerequisites;
@@ -56,6 +80,7 @@ Abort the rehearsal when any of these conditions occur:
 - checkout, setup, or dependency installation fails;
 - required verification commands fail;
 - a command path requires upstream write-back in a no-write rehearsal;
+- routed dry-run step result status is `failed`;
 - budget limits are exceeded before safety gates pass.
 
 ## Reuse map for later waves

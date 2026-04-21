@@ -19,7 +19,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S01 — Validation kernel generalization and asset graph checks
 - **Epic:** EPIC-4 Quality platform
-- **State:** done
+- **State:** ready
 - **Outcome:** Expand validation from bootstrap-only checks into a reusable asset-graph validator for the whole control plane.
 - **Primary modules:** `packages/contracts`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/**`
 - **Hard dependencies:** W2-S05, W1-S04
