@@ -1,12 +1,21 @@
 # CLI command catalog
 
-## Project bootstrap
-- `aor project init`
-- `aor project analyze`
-- `aor project validate`
-- `aor project verify`
+This catalog separates bootstrap commands implemented in the current shell from roadmap-only commands.
 
-## Intake and planning
+## Implemented bootstrap shell commands (W1-S01)
+
+| Command | Status | Inputs | Outputs | Contract family |
+| --- | --- | --- | --- | --- |
+| `aor project init` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `contract_families`, `command_catalog_alignment` | `project-profile` |
+| `aor project analyze` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `contract_families`, `command_catalog_alignment` | `project-analysis-report` |
+| `aor project validate` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `contract_families`, `command_catalog_alignment` | `validation-report` |
+| `aor project verify` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `contract_families`, `command_catalog_alignment` | `step-result` |
+
+Implemented command behavior in W1-S01 is command-contract validation only: unknown commands, missing required flags, and invalid project refs fail with explicit errors.
+
+## Planned command contracts
+The following commands remain planned and are intentionally not implemented in the bootstrap shell yet.
+
 - `aor intake create`
 - `aor discovery run`
 - `aor spec build`
@@ -14,7 +23,6 @@
 - `aor handoff prepare`
 - `aor handoff approve`
 
-## Execution lifecycle
 - `aor run start`
 - `aor run pause`
 - `aor run resume`
@@ -22,25 +30,21 @@
 - `aor run cancel`
 - `aor run status`
 
-## Quality workflows
 - `aor eval run`
 - `aor harness replay`
 - `aor harness certify`
 - `aor asset promote`
 - `aor asset freeze`
 
-## Delivery and release
 - `aor deliver prepare`
 - `aor release prepare`
 - `aor packet show`
 - `aor evidence show`
 
-## Incidents and audit
 - `aor incident open`
 - `aor incident show`
 - `aor audit runs`
 
-## Live E2E and UI
 - `aor live-e2e start`
 - `aor live-e2e status`
 - `aor live-e2e report`

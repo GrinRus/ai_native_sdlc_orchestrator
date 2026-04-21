@@ -228,6 +228,18 @@ if (sliceCycleTestRun.status !== 0) {
 
 console.log("slice cycle tests ok: selection, state sync, and plan extraction");
 
+const cliTestsPath = path.join(root, "apps/cli/test/cli.test.mjs");
+const cliTestRun = spawnSync(process.execPath, ["--test", cliTestsPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (cliTestRun.status !== 0) {
+  process.exit(cliTestRun.status ?? 1);
+}
+
+console.log("cli tests ok: bootstrap command contracts, parsing, and help output");
+
 const referenceIntegrityCheckPath = path.join(root, "scripts/reference-integrity.mjs");
 const referenceIntegrityRun = spawnSync(process.execPath, [referenceIntegrityCheckPath], {
   cwd: root,

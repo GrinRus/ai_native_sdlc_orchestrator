@@ -114,15 +114,20 @@ At a high level, AOR is intended to work like this:
 8. **Feed learning back into the platform**  
    Turn live E2E output, scorecards, and incidents into new evals, harness captures, and backlog work.
 
-## Planned command surface
+## Command surface status
 
-The planned product command surface includes flows such as:
+Bootstrap command contracts are implemented in the CLI shell:
 
 ```bash
-aor project init
-aor project analyze
-aor project validate
-aor project verify
+aor project init --project-ref <path> [--runtime-root <path>]
+aor project analyze --project-ref <path> [--runtime-root <path>]
+aor project validate --project-ref <path> [--runtime-root <path>]
+aor project verify --project-ref <path> [--runtime-root <path>]
+```
+
+The broader product command surface is still planned:
+
+```bash
 aor run step
 aor eval run
 aor harness replay
@@ -130,7 +135,7 @@ aor delivery plan
 aor delivery apply
 ```
 
-These commands are part of the roadmap. The current repository package does **not** implement the full runtime yet.
+These roadmap commands are not fully implemented runtime flows yet.
 
 ## Repository map
 
