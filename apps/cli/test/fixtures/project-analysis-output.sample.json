@@ -5,47 +5,6 @@
   "resolved_runtime_root": "<PROJECT_ROOT>/.aor",
   "analysis_report_id": "aor-core.analysis.v1",
   "analysis_report_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/project-analysis-report.json",
-  "route_resolution_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/route-resolution-report.json",
-  "route_resolution_steps": [
-    {
-      "step_class": "planning",
-      "resolved_route_id": "route.plan.default",
-      "resolution_source": {
-        "kind": "project-default",
-        "field": "default_route_profiles.planning"
-      }
-    }
-  ],
-  "asset_resolution_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/asset-resolution-report.json",
-  "asset_resolution_steps": [
-    {
-      "step_class": "planning",
-      "wrapper": {
-        "wrapper_ref": "wrapper.planner.default@v1"
-      },
-      "prompt_bundle": {
-        "prompt_bundle_ref": "prompt-bundle://planner-default@v1"
-      }
-    }
-  ],
-  "policy_resolution_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/policy-resolution-report.json",
-  "policy_resolution_steps": [
-    {
-      "step_class": "planning",
-      "policy": {
-        "policy_id": "policy.step.planner.default"
-      },
-      "resolved_bounds": {
-        "budget": {
-          "max_cost_usd": 4,
-          "timeout_sec": 300
-        },
-        "writeback_mode": {
-          "mode": "pull-request"
-        }
-      }
-    }
-  ],
   "contract_families": [
     {
       "family": "project-analysis-report",

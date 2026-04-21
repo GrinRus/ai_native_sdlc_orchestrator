@@ -17,7 +17,11 @@ const workspaceRoot = path.resolve(currentDir, "../../..");
 function withTempRepo(callback) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w1-s03-"));
   fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
-  fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(repoRoot, "examples"), { recursive: true });
+  fs.copyFileSync(
+    path.join(workspaceRoot, "examples/project.aor.yaml"),
+    path.join(repoRoot, "examples/project.aor.yaml"),
+  );
 
   try {
     callback(repoRoot);
@@ -60,40 +64,10 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
       "pnpm build",
     ]);
     assert.equal(fs.existsSync(result.reportPath), true);
-    assert.equal(fs.existsSync(result.routeResolutionPath), true);
-    assert.equal(result.routeResolutionMatrix.length, 10);
-    assert.equal(fs.existsSync(result.assetResolutionPath), true);
-    assert.equal(result.assetResolutionMatrix.length, 10);
-    assert.equal(fs.existsSync(result.policyResolutionPath), true);
-    assert.equal(result.policyResolutionMatrix.length, 10);
-    assert.equal(result.adapterResolutionMatrix.length, 10);
-    assert.equal(fs.existsSync(result.evaluationRegistryPath), true);
-    assert.ok(result.evaluationRegistry.datasets.length > 0);
-    assert.ok(result.evaluationRegistry.suites.length > 0);
-    assert.equal(
-      result.assetResolutionMatrix.find((entry) => entry.step_class === "planning")?.wrapper.wrapper_ref,
-      "wrapper.planner.default@v1",
-    );
-    assert.equal(result.report.route_resolution.matrix.length, 10);
-    assert.equal(result.report.asset_resolution.matrix.length, 10);
-    assert.equal(result.report.policy_resolution.matrix.length, 10);
-    assert.ok(result.report.evaluation_registry.dataset_refs.length > 0);
-    assert.ok(result.report.evaluation_registry.suite_refs.length > 0);
-    assert.equal(
-      result.policyResolutionMatrix.find((entry) => entry.step_class === "planning")?.policy.policy_id,
-      "policy.step.planner.default",
-    );
-    assert.equal(
-      result.adapterResolutionMatrix.find((entry) => entry.step_class === "implement")?.adapter.adapter_id,
-      "codex-cli",
-    );
 
     const reloaded = JSON.parse(fs.readFileSync(result.reportPath, "utf8"));
     assert.equal(reloaded.report_id, result.report.report_id);
     assert.equal(reloaded.status, "ready-for-bootstrap");
-    assert.equal(reloaded.route_resolution.matrix.length, 10);
-    assert.equal(reloaded.asset_resolution.matrix.length, 10);
-    assert.equal(reloaded.policy_resolution.matrix.length, 10);
   });
 });
 
@@ -137,68 +111,7 @@ test("analyzeProjectRuntime works on the AOR repository with isolated runtime ro
     assert.equal(result.report.repo_facts.package_manager, "pnpm");
     assert.equal(result.reportPath.startsWith(runtimeRoot), true);
     assert.equal(fs.existsSync(result.reportPath), true);
-    assert.equal(fs.existsSync(result.routeResolutionPath), true);
-    assert.equal(fs.existsSync(result.assetResolutionPath), true);
-    assert.equal(fs.existsSync(result.policyResolutionPath), true);
-    assert.equal(fs.existsSync(result.evaluationRegistryPath), true);
   } finally {
     fs.rmSync(runtimeRoot, { recursive: true, force: true });
   }
-});
-
-test("analyzeProjectRuntime surfaces deterministic step-level route overrides", () => {
-  withTempRepo((repoRoot) => {
-    const result = analyzeProjectRuntime({
-      projectRef: repoRoot,
-      cwd: repoRoot,
-      routeOverrides: {
-        planning: "route.plan.default",
-      },
-    });
-
-    const planning = result.routeResolutionMatrix.find((entry) => entry.step_class === "planning");
-    assert.ok(planning);
-    assert.equal(planning.resolution_source.kind, "step-override");
-    assert.equal(planning.resolution_source.field, "step_overrides.planning");
-    const planningBundle = result.assetResolutionMatrix.find((entry) => entry.step_class === "planning");
-    assert.ok(planningBundle);
-    assert.equal(planningBundle.wrapper.resolution_source.kind, "project-default");
-    const planningPolicy = result.policyResolutionMatrix.find((entry) => entry.step_class === "planning");
-    assert.ok(planningPolicy);
-    assert.equal(planningPolicy.policy.resolution_source.kind, "project-default");
-  });
-});
-
-test("analyzeProjectRuntime fails early when resolved adapter lacks required route capability", () => {
-  withTempRepo((repoRoot) => {
-    const adapterPath = path.join(repoRoot, "examples/adapters/codex-cli.yaml");
-    const adapterContent = fs.readFileSync(adapterPath, "utf8");
-    fs.writeFileSync(adapterPath, adapterContent.replace("live_logs: true", "live_logs: false"), "utf8");
-
-    assert.throws(
-      () =>
-        analyzeProjectRuntime({
-          projectRef: repoRoot,
-          cwd: repoRoot,
-        }),
-      /missing capabilities \[live_logs\]/i,
-    );
-  });
-});
-
-test("analyzeProjectRuntime fails early when suite and dataset subject types are incompatible", () => {
-  withTempRepo((repoRoot) => {
-    const suitePath = path.join(repoRoot, "examples/eval/suite-release-core.yaml");
-    const suiteContent = fs.readFileSync(suitePath, "utf8");
-    fs.writeFileSync(suitePath, suiteContent.replace("subject_type: run", "subject_type: wrapper"), "utf8");
-
-    assert.throws(
-      () =>
-        analyzeProjectRuntime({
-          projectRef: repoRoot,
-          cwd: repoRoot,
-        }),
-      /Evaluation registry validation failed:/i,
-    );
-  });
 });

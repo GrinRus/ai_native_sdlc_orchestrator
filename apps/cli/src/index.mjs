@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { getContractFamilyIndex } from "../../../packages/contracts/src/index.mjs";
+import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 
 import {
@@ -92,6 +93,12 @@ function formatCommandHelp(definition) {
           "- --project-profile can override default profile discovery in project root.",
           `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
         ]
+      : definition.command === "project analyze"
+        ? [
+            "- --project-ref must point to an existing directory.",
+            "- --project-profile can override default profile discovery in project root.",
+            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
+          ]
       : [
           "- --project-ref must point to an existing directory.",
           `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
@@ -257,6 +264,8 @@ function executeImplementedCommand(command, flags, cwd) {
   let runtimeLayout = null;
   let runtimeStateFile = null;
   let projectProfileRef = null;
+  let analysisReportId = null;
+  let analysisReportFile = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -271,6 +280,23 @@ function executeImplementedCommand(command, flags, cwd) {
     runtimeLayout = initResult.runtimeLayout;
     runtimeStateFile = initResult.stateFile;
     projectProfileRef = initResult.projectProfileRef;
+  } else if (command === "project analyze") {
+    ensureRequiredFlags(command, flags);
+
+    const analyzeResult = analyzeProjectRuntime({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+
+    resolvedProjectRef = analyzeResult.projectRoot;
+    resolvedRuntimeRoot = analyzeResult.runtimeRoot;
+    runtimeLayout = analyzeResult.runtimeLayout;
+    runtimeStateFile = analyzeResult.stateFile;
+    projectProfileRef = analyzeResult.projectProfileRef;
+    analysisReportId = analyzeResult.report.report_id;
+    analysisReportFile = analyzeResult.reportPath;
   } else {
     ensureRequiredFlags(command, flags);
 
@@ -302,6 +328,8 @@ function executeImplementedCommand(command, flags, cwd) {
     project_profile_ref: projectProfileRef,
     runtime_layout: runtimeLayout,
     runtime_state_file: runtimeStateFile,
+    analysis_report_id: analysisReportId,
+    analysis_report_file: analysisReportFile,
     contract_families: resolvedFamilies,
     command_catalog_alignment: "docs/architecture/14-cli-command-catalog.md",
   };

@@ -243,8 +243,11 @@ if (cliTestRun.status !== 0) {
 
 console.log("cli tests ok: bootstrap command contracts, parsing, and help output");
 
-const orchestratorCoreTestsPath = path.join(root, "packages/orchestrator-core/test/project-init.test.mjs");
-const orchestratorCoreTestRun = spawnSync(process.execPath, ["--test", orchestratorCoreTestsPath], {
+const orchestratorCoreTests = [
+  path.join(root, "packages/orchestrator-core/test/project-init.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/project-analysis.test.mjs"),
+];
+const orchestratorCoreTestRun = spawnSync(process.execPath, ["--test", ...orchestratorCoreTests], {
   cwd: root,
   stdio: "inherit",
 });

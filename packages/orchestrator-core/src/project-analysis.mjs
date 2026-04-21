@@ -1,13 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { resolveAdapterMatrix } from "../../adapter-sdk/src/index.mjs";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
-import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
-import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
-import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
-import { resolveStepPolicyMatrix } from "./policy-resolution.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 
 const LANGUAGE_BY_EXTENSION = Object.freeze({
@@ -270,14 +265,6 @@ function createVerificationPlan(commands, unknownFacts) {
  *  projectRef?: string,
  *  projectProfile?: string,
  *  runtimeRoot?: string,
- *  routeOverrides?: Record<string, string>,
- *  policyOverrides?: Record<string, string>,
- *  adapterOverrides?: Record<string, string>,
- *  routesRoot?: string,
- *  wrappersRoot?: string,
- *  promptsRoot?: string,
- *  policiesRoot?: string,
- *  adaptersRoot?: string,
  * }} options
  */
 export function analyzeProjectRuntime(options = {}) {
@@ -336,66 +323,6 @@ export function analyzeProjectRuntime(options = {}) {
   }
 
   const verificationPlan = createVerificationPlan(commandCandidates, unknownFacts);
-  const routesRoot = options.routesRoot
-    ? path.isAbsolute(options.routesRoot)
-      ? options.routesRoot
-      : path.resolve(init.projectRoot, options.routesRoot)
-    : path.join(init.projectRoot, "examples/routes");
-  const wrappersRoot = options.wrappersRoot
-    ? path.isAbsolute(options.wrappersRoot)
-      ? options.wrappersRoot
-      : path.resolve(init.projectRoot, options.wrappersRoot)
-    : path.join(init.projectRoot, "examples/wrappers");
-  const promptsRoot = options.promptsRoot
-    ? path.isAbsolute(options.promptsRoot)
-      ? options.promptsRoot
-      : path.resolve(init.projectRoot, options.promptsRoot)
-    : path.join(init.projectRoot, "examples/prompts");
-  const policiesRoot = options.policiesRoot
-    ? path.isAbsolute(options.policiesRoot)
-      ? options.policiesRoot
-      : path.resolve(init.projectRoot, options.policiesRoot)
-    : path.join(init.projectRoot, "examples/policies");
-  const adaptersRoot = options.adaptersRoot
-    ? path.isAbsolute(options.adaptersRoot)
-      ? options.adaptersRoot
-      : path.resolve(init.projectRoot, options.adaptersRoot)
-    : path.join(init.projectRoot, "examples/adapters");
-  const routeResolutionMatrix = resolveRouteMatrix({
-    projectProfilePath: init.projectProfilePath,
-    routesRoot,
-    stepOverrides: options.routeOverrides,
-  });
-  const assetResolutionMatrix = resolveAssetBundleMatrix({
-    projectProfilePath: init.projectProfilePath,
-    routesRoot,
-    wrappersRoot,
-    promptsRoot,
-    routeOverrides: options.routeOverrides,
-  });
-  const policyResolutionMatrix = resolveStepPolicyMatrix({
-    projectProfilePath: init.projectProfilePath,
-    routesRoot,
-    policiesRoot,
-    routeOverrides: options.routeOverrides,
-    policyOverrides: options.policyOverrides,
-  });
-  const adapterResolutionMatrix = resolveAdapterMatrix({
-    adaptersRoot,
-    routeResolutionMatrix,
-    adapterOverrides: options.adapterOverrides,
-  });
-  const evaluationRegistry = loadEvaluationRegistry({
-    workspaceRoot: init.projectRoot,
-  });
-
-  if (!evaluationRegistry.ok) {
-    const issueSummary = evaluationRegistry.issues
-      .map((issue) => `${issue.code}: ${issue.message}`)
-      .slice(0, 5)
-      .join("; ");
-    throw new Error(`Evaluation registry validation failed: ${issueSummary}`);
-  }
 
   const report = {
     report_id: `${init.projectId}.analysis.v1`,
@@ -415,28 +342,6 @@ export function analyzeProjectRuntime(options = {}) {
     toolchain_facts: toolchainFacts,
     command_catalog: commandCatalog,
     service_boundaries: repoFacts.service_boundaries,
-    route_resolution: {
-      routes_root: path.relative(init.projectRoot, routesRoot) || ".",
-      applied_overrides: options.routeOverrides ?? {},
-      matrix: routeResolutionMatrix,
-    },
-    asset_resolution: {
-      wrappers_root: path.relative(init.projectRoot, wrappersRoot) || ".",
-      prompts_root: path.relative(init.projectRoot, promptsRoot) || ".",
-      matrix: assetResolutionMatrix,
-    },
-    policy_resolution: {
-      policies_root: path.relative(init.projectRoot, policiesRoot) || ".",
-      applied_overrides: options.policyOverrides ?? {},
-      matrix: policyResolutionMatrix,
-    },
-    evaluation_registry: {
-      examples_root: path.relative(init.projectRoot, evaluationRegistry.examplesRoot) || ".",
-      dataset_refs: evaluationRegistry.datasets.map((dataset) => dataset.dataset_ref),
-      suite_refs: evaluationRegistry.suites.map((suite) => suite.suite_ref),
-      datasets: evaluationRegistry.datasets,
-      suites: evaluationRegistry.suites,
-    },
     verification_plan: verificationPlan,
     status: "ready-for-bootstrap",
     unknown_facts: unknownFacts,
@@ -455,106 +360,10 @@ export function analyzeProjectRuntime(options = {}) {
 
   const reportPath = path.join(init.runtimeLayout.reportsRoot, "project-analysis-report.json");
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
-  const routeResolutionPath = path.join(init.runtimeLayout.reportsRoot, "route-resolution-report.json");
-  fs.writeFileSync(
-    routeResolutionPath,
-    `${JSON.stringify(
-      {
-        report_id: `${init.projectId}.route-resolution.v1`,
-        project_id: init.projectId,
-        generated_from: {
-          command: "aor project analyze",
-          selected_profile_ref: init.projectProfileRef,
-        },
-        routes_root: path.relative(init.projectRoot, routesRoot) || ".",
-        applied_overrides: options.routeOverrides ?? {},
-        matrix: routeResolutionMatrix,
-        status: "resolved",
-      },
-      null,
-      2,
-    )}\n`,
-    "utf8",
-  );
-  const assetResolutionPath = path.join(init.runtimeLayout.reportsRoot, "asset-resolution-report.json");
-  fs.writeFileSync(
-    assetResolutionPath,
-    `${JSON.stringify(
-      {
-        report_id: `${init.projectId}.asset-resolution.v1`,
-        project_id: init.projectId,
-        generated_from: {
-          command: "aor project analyze",
-          selected_profile_ref: init.projectProfileRef,
-        },
-        wrappers_root: path.relative(init.projectRoot, wrappersRoot) || ".",
-        prompts_root: path.relative(init.projectRoot, promptsRoot) || ".",
-        matrix: assetResolutionMatrix,
-        status: "resolved",
-      },
-      null,
-      2,
-    )}\n`,
-    "utf8",
-  );
-  const policyResolutionPath = path.join(init.runtimeLayout.reportsRoot, "policy-resolution-report.json");
-  fs.writeFileSync(
-    policyResolutionPath,
-    `${JSON.stringify(
-      {
-        report_id: `${init.projectId}.policy-resolution.v1`,
-        project_id: init.projectId,
-        generated_from: {
-          command: "aor project analyze",
-          selected_profile_ref: init.projectProfileRef,
-        },
-        policies_root: path.relative(init.projectRoot, policiesRoot) || ".",
-        applied_overrides: options.policyOverrides ?? {},
-        matrix: policyResolutionMatrix,
-        status: "resolved",
-      },
-      null,
-      2,
-    )}\n`,
-    "utf8",
-  );
-  const evaluationRegistryPath = path.join(init.runtimeLayout.reportsRoot, "evaluation-registry-report.json");
-  fs.writeFileSync(
-    evaluationRegistryPath,
-    `${JSON.stringify(
-      {
-        report_id: `${init.projectId}.evaluation-registry.v1`,
-        project_id: init.projectId,
-        generated_from: {
-          command: "aor project analyze",
-          selected_profile_ref: init.projectProfileRef,
-        },
-        examples_root: path.relative(init.projectRoot, evaluationRegistry.examplesRoot) || ".",
-        dataset_refs: evaluationRegistry.datasets.map((dataset) => dataset.dataset_ref),
-        suite_refs: evaluationRegistry.suites.map((suite) => suite.suite_ref),
-        datasets: evaluationRegistry.datasets,
-        suites: evaluationRegistry.suites,
-        issues: evaluationRegistry.issues,
-        status: "resolved",
-      },
-      null,
-      2,
-    )}\n`,
-    "utf8",
-  );
 
   return {
     ...init,
     reportPath,
-    routeResolutionPath,
-    assetResolutionPath,
-    policyResolutionPath,
-    evaluationRegistryPath,
     report,
-    routeResolutionMatrix,
-    assetResolutionMatrix,
-    policyResolutionMatrix,
-    adapterResolutionMatrix,
-    evaluationRegistry,
   };
 }

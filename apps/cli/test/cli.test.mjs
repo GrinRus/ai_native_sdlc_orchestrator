@@ -140,3 +140,31 @@ test("project init discovers repo root from cwd and materializes runtime layout 
     assert.equal(runtimeState.project_root, projectRoot);
   });
 });
+
+test("project analyze writes durable analysis report under runtime root", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "examples"), { recursive: true });
+    fs.copyFileSync(
+      path.join(workspaceRoot, "examples/project.aor.yaml"),
+      path.join(projectRoot, "examples/project.aor.yaml"),
+    );
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify({ name: "fixture", scripts: { lint: "eslint .", test: "node --test", build: "tsc -b" } }, null, 2),
+      "utf8",
+    );
+    fs.writeFileSync(path.join(projectRoot, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\\n", "utf8");
+
+    const result = invokeCli(["project", "analyze", "--project-ref", projectRoot]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.analysis_report_id, "aor-core.analysis.v1");
+    assert.equal(fs.existsSync(parsed.analysis_report_file), true);
+
+    const report = JSON.parse(fs.readFileSync(parsed.analysis_report_file, "utf8"));
+    assert.equal(report.project_id, "aor-core");
+    assert.equal(report.status, "ready-for-bootstrap");
+  });
+});
