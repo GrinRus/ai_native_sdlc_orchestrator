@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { appendRunEvent } from "../../api/src/index.mjs";
 import { invokeCli } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -67,6 +68,16 @@ test("harness certify help documents certification semantics", () => {
   assert.match(result.stdout, /Status semantics are pass, hold, or fail\./);
 });
 
+test("operator command help documents read-only and future control semantics", () => {
+  const result = invokeCli(["run", "status", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in operator shell \(W5-S03\)/);
+  assert.match(result.stdout, /This command is read-only\./);
+  assert.match(result.stdout, /Future control hooks remain planned/);
+});
+
 test("unknown command fails clearly", () => {
   const result = invokeCli(["project", "unknown"]);
 
@@ -97,6 +108,150 @@ test("planned commands report not implemented status", () => {
   assert.equal(result.exitCode, 1);
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /Command 'aor run start' is planned and not implemented yet\./);
+});
+
+test("operator commands inspect runs, packets, and evidence through shared control-plane surfaces", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const verifyResult = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--routed-dry-run-step",
+      "implement",
+    ]);
+    assert.equal(verifyResult.exitCode, 0, verifyResult.stderr);
+    const verifyPayload = JSON.parse(verifyResult.stdout);
+    const routedStepResult = JSON.parse(fs.readFileSync(verifyPayload.routed_step_result_file, "utf8"));
+    const runId = routedStepResult.run_id;
+
+    appendRunEvent({
+      projectRef: projectRoot,
+      cwd: projectRoot,
+      runId,
+      eventType: "run.started",
+      payload: {
+        stage: "bootstrap",
+      },
+    });
+    appendRunEvent({
+      projectRef: projectRoot,
+      cwd: projectRoot,
+      runId,
+      eventType: "step.updated",
+      payload: {
+        step_id: "runner.implement",
+        status: "pass",
+      },
+    });
+
+    const runStatusResult = invokeCli([
+      "run",
+      "status",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+      "--follow",
+      "true",
+      "--max-replay",
+      "10",
+    ]);
+    assert.equal(runStatusResult.exitCode, 0, runStatusResult.stderr);
+    const runStatusPayload = JSON.parse(runStatusResult.stdout);
+    assert.ok(runStatusPayload.run_summaries.some((summary) => summary.run_id === runId));
+    assert.equal(runStatusPayload.follow_mode.enabled, true);
+    assert.equal(runStatusPayload.stream_protocol, "sse");
+    assert.equal(runStatusPayload.stream_backpressure.policy, "bounded-replay-window");
+    assert.deepEqual(
+      runStatusPayload.replay_events.map((event) => event.event_type),
+      ["run.started", "step.updated"],
+    );
+    assert.equal(runStatusPayload.read_only, true);
+    assert.ok(runStatusPayload.future_control_hooks.includes("run pause"));
+
+    const prepareResult = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
+    assert.equal(prepareResult.exitCode, 0, prepareResult.stderr);
+
+    const packetResult = invokeCli([
+      "packet",
+      "show",
+      "--project-ref",
+      projectRoot,
+      "--family",
+      "wave-ticket",
+      "--limit",
+      "1",
+    ]);
+    assert.equal(packetResult.exitCode, 0, packetResult.stderr);
+    const packetPayload = JSON.parse(packetResult.stdout);
+    assert.equal(packetPayload.selected_family, "wave-ticket");
+    assert.equal(packetPayload.read_only, true);
+    assert.equal(packetPayload.packet_artifacts.length, 1);
+    assert.equal(packetPayload.packet_artifacts[0].family, "wave-ticket");
+
+    const evalResult = invokeCli([
+      "eval",
+      "run",
+      "--project-ref",
+      projectRoot,
+      "--suite-ref",
+      "suite.release.core@v1",
+      "--subject-ref",
+      "run://operator-cli-smoke",
+    ]);
+    assert.equal(evalResult.exitCode, 0, evalResult.stderr);
+
+    const certifyResult = invokeCli([
+      "harness",
+      "certify",
+      "--project-ref",
+      projectRoot,
+      "--asset-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--subject-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--suite-ref",
+      "suite.cert.core@v4",
+    ]);
+    assert.equal(certifyResult.exitCode, 0, certifyResult.stderr);
+
+    const evidenceResult = invokeCli(["evidence", "show", "--project-ref", projectRoot]);
+    assert.equal(evidenceResult.exitCode, 0, evidenceResult.stderr);
+    const evidencePayload = JSON.parse(evidenceResult.stdout);
+    assert.ok(Array.isArray(evidencePayload.step_results));
+    assert.ok(Array.isArray(evidencePayload.quality_artifacts));
+    assert.ok(Array.isArray(evidencePayload.promotion_decisions));
+    assert.equal(evidencePayload.read_only, true);
+    assert.ok(evidencePayload.future_control_hooks.includes("incident open"));
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "operator-cli-transcript.json"), "utf8"),
+    );
+    const transcriptSubset = {
+      run_status: {
+        command: runStatusPayload.command,
+        status: runStatusPayload.status,
+        read_only: runStatusPayload.read_only,
+        stream_protocol: runStatusPayload.stream_protocol,
+      },
+      packet_show: {
+        command: packetPayload.command,
+        status: packetPayload.status,
+        selected_family: packetPayload.selected_family,
+        read_only: packetPayload.read_only,
+      },
+      evidence_show: {
+        command: evidencePayload.command,
+        status: evidencePayload.status,
+        read_only: evidencePayload.read_only,
+      },
+    };
+    assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
 });
 
 test("project verify resolves runtime root and contract metadata", () => {

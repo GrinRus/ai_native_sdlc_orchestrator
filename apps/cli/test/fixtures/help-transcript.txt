@@ -9,6 +9,9 @@ Implemented commands:
   - aor harness certify
   - aor handoff prepare
   - aor handoff approve
+  - aor run status
+  - aor packet show
+  - aor evidence show
 
 Planned commands (not implemented yet):
   - aor intake create
@@ -20,14 +23,11 @@ Planned commands (not implemented yet):
   - aor run resume
   - aor run steer
   - aor run cancel
-  - aor run status
   - aor harness replay
   - aor asset promote
   - aor asset freeze
   - aor deliver prepare
   - aor release prepare
-  - aor packet show
-  - aor evidence show
   - aor incident open
   - aor incident show
   - aor audit runs
