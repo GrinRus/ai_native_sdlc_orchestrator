@@ -62,12 +62,20 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.equal(fs.existsSync(result.reportPath), true);
     assert.equal(fs.existsSync(result.routeResolutionPath), true);
     assert.equal(result.routeResolutionMatrix.length, 10);
+    assert.equal(fs.existsSync(result.assetResolutionPath), true);
+    assert.equal(result.assetResolutionMatrix.length, 10);
+    assert.equal(
+      result.assetResolutionMatrix.find((entry) => entry.step_class === "planning")?.wrapper.wrapper_ref,
+      "wrapper.planner.default@v1",
+    );
     assert.equal(result.report.route_resolution.matrix.length, 10);
+    assert.equal(result.report.asset_resolution.matrix.length, 10);
 
     const reloaded = JSON.parse(fs.readFileSync(result.reportPath, "utf8"));
     assert.equal(reloaded.report_id, result.report.report_id);
     assert.equal(reloaded.status, "ready-for-bootstrap");
     assert.equal(reloaded.route_resolution.matrix.length, 10);
+    assert.equal(reloaded.asset_resolution.matrix.length, 10);
   });
 });
 
@@ -112,6 +120,7 @@ test("analyzeProjectRuntime works on the AOR repository with isolated runtime ro
     assert.equal(result.reportPath.startsWith(runtimeRoot), true);
     assert.equal(fs.existsSync(result.reportPath), true);
     assert.equal(fs.existsSync(result.routeResolutionPath), true);
+    assert.equal(fs.existsSync(result.assetResolutionPath), true);
   } finally {
     fs.rmSync(runtimeRoot, { recursive: true, force: true });
   }
@@ -131,5 +140,8 @@ test("analyzeProjectRuntime surfaces deterministic step-level route overrides", 
     assert.ok(planning);
     assert.equal(planning.resolution_source.kind, "step-override");
     assert.equal(planning.resolution_source.field, "step_overrides.planning");
+    const planningBundle = result.assetResolutionMatrix.find((entry) => entry.step_class === "planning");
+    assert.ok(planningBundle);
+    assert.equal(planningBundle.wrapper.resolution_source.kind, "project-default");
   });
 });

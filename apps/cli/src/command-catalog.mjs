@@ -45,6 +45,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "analysis_report_file",
       "route_resolution_file",
       "route_resolution_steps",
+      "asset_resolution_file",
+      "asset_resolution_steps",
       "contract_families",
       "command_catalog_alignment",
     ],

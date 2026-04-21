@@ -19,7 +19,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S01 — Route registry and step resolution kernel
 - **Epic:** EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Resolve every step type through an explicit route model instead of hard-coded command branches.
 - **Primary modules:** `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/routes/**`
 - **Hard dependencies:** W1-S08
@@ -50,7 +50,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S02 — Wrapper, prompt-bundle, and asset loader runtime
 - **Epic:** EPIC-3 Routed execution
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Load wrappers and prompt bundles as first-class runtime assets instead of embedding prompts directly in code paths.
 - **Primary modules:** `packages/orchestrator-core`, `packages/contracts`, `examples/wrappers/**`, `examples/prompts/**`
 - **Hard dependencies:** W2-S01
@@ -81,7 +81,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S03 — Step policy resolution, budgets, and guardrails
 - **Epic:** EPIC-3 Routed execution
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Make execution bounds explicit by resolving step policies before any adapter call happens.
 - **Primary modules:** `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**`
 - **Hard dependencies:** W2-S01
@@ -112,7 +112,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S04 — Adapter SDK and mock adapter baseline
 - **Epic:** EPIC-3 Routed execution
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Create a runner-agnostic adapter surface that can start with deterministic mocks before real providers are wired in.
 - **Primary modules:** `packages/adapter-sdk`, `packages/orchestrator-core`, `examples/adapters/**`
 - **Hard dependencies:** W2-S01

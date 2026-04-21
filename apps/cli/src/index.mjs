@@ -105,6 +105,7 @@ function formatCommandHelp(definition) {
             "- --project-profile can override default profile discovery in project root.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
             "- --route-overrides accepts comma-separated step overrides like planning=route.plan.default.",
+            "- Analyze emits route and asset resolution reports for downstream wrapper/prompt/policy loaders.",
           ]
       : definition.command === "project validate"
         ? [
@@ -356,6 +357,8 @@ function executeImplementedCommand(command, flags, cwd) {
   let analysisReportFile = null;
   let routeResolutionFile = null;
   let routeResolutionSteps = null;
+  let assetResolutionFile = null;
+  let assetResolutionSteps = null;
   let validationReportId = null;
   let validationReportFile = null;
   let validationStatus = null;
@@ -412,6 +415,8 @@ function executeImplementedCommand(command, flags, cwd) {
     analysisReportFile = analyzeResult.reportPath;
     routeResolutionFile = analyzeResult.routeResolutionPath;
     routeResolutionSteps = analyzeResult.routeResolutionMatrix;
+    assetResolutionFile = analyzeResult.assetResolutionPath;
+    assetResolutionSteps = analyzeResult.assetResolutionMatrix;
   } else if (command === "project validate") {
     ensureRequiredFlags(command, flags);
     handoffGateEnforced = resolveOptionalBooleanFlag(
@@ -546,6 +551,8 @@ function executeImplementedCommand(command, flags, cwd) {
     analysis_report_file: analysisReportFile,
     route_resolution_file: routeResolutionFile,
     route_resolution_steps: routeResolutionSteps,
+    asset_resolution_file: assetResolutionFile,
+    asset_resolution_steps: assetResolutionSteps,
     validation_report_id: validationReportId,
     validation_report_file: validationReportFile,
     validation_status: validationStatus,

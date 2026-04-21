@@ -16,6 +16,18 @@
       }
     }
   ],
+  "asset_resolution_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/asset-resolution-report.json",
+  "asset_resolution_steps": [
+    {
+      "step_class": "planning",
+      "wrapper": {
+        "wrapper_ref": "wrapper.planner.default@v1"
+      },
+      "prompt_bundle": {
+        "prompt_bundle_ref": "prompt-bundle://planner-default@v1"
+      }
+    }
+  ],
   "contract_families": [
     {
       "family": "project-analysis-report",

@@ -25,6 +25,7 @@ For project `<project_id>`, the runtime layout is:
       reports/
         project-analysis-report.json
         route-resolution-report.json
+        asset-resolution-report.json
         validation-report.json
         verify-summary.json
         step-result-*.json

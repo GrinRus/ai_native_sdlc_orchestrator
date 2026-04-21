@@ -31,3 +31,12 @@ Prompt guidance should not be buried inside wrappers or scattered across docs. A
 - certify prompt-bundle changes independently when possible;
 - keep baseline references explicit;
 - preserve incident and promotion history for every platform asset.
+
+## Runtime loading order (W2-S02)
+Asset resolution for a step is deterministic and follows this order:
+1. resolve route profile for the step class;
+2. choose wrapper profile (`step override` first, then `project default` by route class);
+3. choose prompt bundle (`step override` first, then wrapper `prompt_bundle_ref`);
+4. emit one asset bundle with route, wrapper, prompt bundle, and provenance refs.
+
+If any source is missing or conflicts with the step class, resolution fails before execution.

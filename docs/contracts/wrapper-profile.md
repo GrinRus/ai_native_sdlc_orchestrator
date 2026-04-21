@@ -13,6 +13,7 @@ Execution envelope around a runner session: included files, included packets, to
 
 ## Notes
 Keep wrapper concerns separate from route selection and prompt-bundle content.
+Runtime asset resolution should use `project-profile.default_wrapper_profiles` by route class unless a step-level wrapper override is provided.
 
 ## Example
 See `examples/wrappers/*.yaml`.
