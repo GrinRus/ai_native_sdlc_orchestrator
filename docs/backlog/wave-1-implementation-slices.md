@@ -19,7 +19,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S01 — Bootstrap CLI shell and command contracts
 - **Epic:** EPIC-6 Operator surface
-- **State:** done
+- **State:** ready
 - **Outcome:** Define the first stable command surface for bootstrap work without yet implementing the full control plane.
 - **Primary modules:** `apps/cli`, `docs/architecture/14-cli-command-catalog.md`, `docs/contracts/**`
 - **Hard dependencies:** W0-S01, W0-S02
