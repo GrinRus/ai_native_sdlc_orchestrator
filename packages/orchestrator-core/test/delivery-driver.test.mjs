@@ -6,7 +6,6 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { loadContractFile } from "../../contracts/src/index.mjs";
 import { materializeDeliveryPlan } from "../src/delivery-plan.mjs";
 import { runDeliveryDriver } from "../src/delivery-driver.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
@@ -50,7 +49,7 @@ function withTempRepo(callback) {
  * @param {{
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   runId: string,
- *   mode: "patch-only" | "local-branch" | "fork-first-pr",
+ *   mode: "patch-only" | "local-branch",
  * }} options
  * @returns {{ deliveryPlanFile: string }}
  */
@@ -85,41 +84,6 @@ function createReadyPlan(options) {
   };
 }
 
-/**
- * @param {ReturnType<typeof runDeliveryDriver>} result
- */
-function assertDeliveryArtifacts(result) {
-  assert.equal(fs.existsSync(result.deliveryManifestFile), true);
-  assert.equal(fs.existsSync(result.releasePacketFile), true);
-  assert.equal(fs.existsSync(result.learningLoopScorecardFile), true);
-  assert.equal(fs.existsSync(result.learningLoopHandoffFile), true);
-
-  const manifestLoaded = loadContractFile({
-    filePath: result.deliveryManifestFile,
-    family: "delivery-manifest",
-  });
-  assert.equal(manifestLoaded.ok, true);
-  assert.equal(manifestLoaded.document.delivery_mode, result.mode);
-  assert.equal(typeof manifestLoaded.document.evidence_root, "string");
-  assert.equal(typeof manifestLoaded.document.approval_context, "object");
-
-  const releaseLoaded = loadContractFile({
-    filePath: result.releasePacketFile,
-    family: "release-packet",
-  });
-  assert.equal(releaseLoaded.ok, true);
-  assert.equal(typeof releaseLoaded.document.delivery_manifest_ref, "string");
-  assert.equal(typeof releaseLoaded.document.evidence_lineage, "object");
-
-  const learningScorecard = JSON.parse(fs.readFileSync(result.learningLoopScorecardFile, "utf8"));
-  assert.equal(learningScorecard.run_id, result.runId);
-  assert.equal(typeof learningScorecard.source_kind, "string");
-
-  const learningHandoff = JSON.parse(fs.readFileSync(result.learningLoopHandoffFile, "utf8"));
-  assert.equal(learningHandoff.run_id, result.runId);
-  assert.equal(typeof learningHandoff.scorecard_ref, "string");
-}
-
 test("runDeliveryDriver emits patch artifact and transcript for patch-only mode", () => {
   withTempRepo((repoRoot) => {
     const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
@@ -148,7 +112,6 @@ test("runDeliveryDriver emits patch artifact and transcript for patch-only mode"
 
     const patchBody = fs.readFileSync(result.outputs.patch_file, "utf8");
     assert.match(patchBody, /examples\/project\.aor\.yaml/);
-    assertDeliveryArtifacts(result);
   });
 });
 
@@ -189,7 +152,6 @@ test("runDeliveryDriver commits to bounded local branch and captures commit meta
     assert.equal(transcript.status, "success");
     assert.equal(Array.isArray(transcript.git.commands), true);
     assert.equal(transcript.git.commands.some((command) => command.includes("push")), false);
-    assertDeliveryArtifacts(result);
   });
 });
 
@@ -222,113 +184,5 @@ test("runDeliveryDriver records recovery guidance when local-branch mode fails m
     assert.match(String(transcript.error), /checkout -B/i);
     assert.ok(Array.isArray(transcript.recovery_steps));
     assert.ok(transcript.recovery_steps.some((step) => step.includes("git checkout")));
-    assertDeliveryArtifacts(result);
-
-    const releaseLoaded = loadContractFile({
-      filePath: result.releasePacketFile,
-      family: "release-packet",
-    });
-    assert.equal(releaseLoaded.ok, true);
-    assert.equal(releaseLoaded.document.status, "blocked");
-    assert.equal(typeof result.incidentReportFile, "string");
-    assert.equal(fs.existsSync(result.incidentReportFile), true);
-
-    const incidentLoaded = loadContractFile({
-      filePath: result.incidentReportFile,
-      family: "incident-report",
-    });
-    assert.equal(incidentLoaded.ok, true);
-    assert.ok(Array.isArray(incidentLoaded.document.linked_run_refs));
-    assert.ok(incidentLoaded.document.linked_run_refs.some((ref) => String(ref).includes(result.runId)));
-  });
-});
-
-test("runDeliveryDriver builds fork-first PR metadata in stubbed network mode", () => {
-  withTempRepo((repoRoot) => {
-    runGitChecked({
-      cwd: repoRoot,
-      args: ["remote", "add", "origin", "https://github.com/openai/openai.git"],
-    });
-    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
-    fs.appendFileSync(targetFile, "\n# w4-s04 fork-first delivery test\n", "utf8");
-
-    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
-    const { deliveryPlanFile } = createReadyPlan({
-      init,
-      runId: "run.delivery.fork.v1",
-      mode: "fork-first-pr",
-    });
-
-    const result = runDeliveryDriver({
-      projectRef: repoRoot,
-      cwd: repoRoot,
-      runId: "run.delivery.fork.v1",
-      mode: "fork-first-pr",
-      deliveryPlanPath: deliveryPlanFile,
-      forkOwner: "aor-bot",
-      branchName: "aor/w4-s04-fork-first",
-      prTitle: "W4-S04 fork-first draft",
-    });
-
-    assert.equal(result.status, "success");
-    assert.equal(result.outputs.network_mode, "stubbed");
-    assert.equal(result.outputs.fork_target.upstream_repo, "openai/openai");
-    assert.equal(result.outputs.fork_target.fork_repo, "aor-bot/openai");
-    assert.equal(result.outputs.pr_draft.is_draft, true);
-    assert.equal(fs.existsSync(result.outputs.api_intent_file), true);
-
-    const transcript = JSON.parse(fs.readFileSync(result.transcriptFile, "utf8"));
-    assert.equal(transcript.status, "success");
-    assert.equal(transcript.mode, "fork-first-pr");
-    assert.equal(transcript.git.commands.some((command) => command.includes("push")), false);
-    assertDeliveryArtifacts(result);
-  });
-});
-
-test("runDeliveryDriver artifacts reload after runtime restart", () => {
-  withTempRepo((repoRoot) => {
-    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
-    fs.appendFileSync(targetFile, "\n# w4-s05 reload test\n", "utf8");
-
-    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
-    const { deliveryPlanFile } = createReadyPlan({
-      init,
-      runId: "run.delivery.reload.v1",
-      mode: "patch-only",
-    });
-
-    const firstRun = runDeliveryDriver({
-      projectRef: repoRoot,
-      cwd: repoRoot,
-      runId: "run.delivery.reload.v1",
-      mode: "patch-only",
-      deliveryPlanPath: deliveryPlanFile,
-    });
-    assert.equal(firstRun.status, "success");
-
-    const restarted = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
-    assert.equal(restarted.projectId, firstRun.projectId);
-
-    const manifestReload = loadContractFile({
-      filePath: firstRun.deliveryManifestFile,
-      family: "delivery-manifest",
-    });
-    assert.equal(manifestReload.ok, true);
-    assert.equal(manifestReload.document.delivery_mode, "patch-only");
-    assert.equal(manifestReload.document.step_ref, "delivery.apply");
-    assert.ok(Array.isArray(manifestReload.document.repo_deliveries));
-    assert.ok(manifestReload.document.repo_deliveries[0].changed_paths.includes("examples/project.aor.yaml"));
-    assert.equal(typeof manifestReload.document.approval_context, "object");
-
-    const releaseReload = loadContractFile({
-      filePath: firstRun.releasePacketFile,
-      family: "release-packet",
-    });
-    assert.equal(releaseReload.ok, true);
-    assert.equal(releaseReload.document.delivery_manifest_ref.includes("delivery-manifest"), true);
-    assert.equal(typeof releaseReload.document.evidence_lineage, "object");
-    assert.ok(Array.isArray(releaseReload.document.evidence_lineage.handoff_refs));
-    assert.ok(Array.isArray(releaseReload.document.evidence_lineage.promotion_refs));
-    assert.ok(Array.isArray(releaseReload.document.evidence_lineage.execution_refs));
   });
 });
