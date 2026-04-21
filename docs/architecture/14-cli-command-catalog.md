@@ -17,6 +17,9 @@ This catalog separates bootstrap commands implemented in the current shell from 
 | `aor run status` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--follow <true\|false>` (optional); `--after-event-id <event_id>` (optional); `--max-replay <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `run_summaries`, `follow_mode`, `stream_protocol`, `stream_backpressure`, `replay_events`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event`, `step-result`, `delivery-manifest`, `release-packet`, `promotion-decision` |
 | `aor packet show` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--family <contract_family\|all>` (optional); `--limit <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `packet_artifacts`, `selected_family`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `artifact-packet`, `wave-ticket`, `handoff-packet`, `delivery-plan`, `delivery-manifest`, `release-packet` |
 | `aor evidence show` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `step_results`, `quality_artifacts`, `delivery_manifests`, `promotion_decisions`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `step-result`, `validation-report`, `evaluation-report`, `promotion-decision`, `delivery-manifest`, `release-packet` |
+| `aor live-e2e start` | implemented | `--project-ref <path>`; `--profile <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--hold-open <true\|false>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_profile_ref`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecard_files`, `live_e2e_abort_supported`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-e2e-profile`, `live-run-event`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
+| `aor live-e2e status` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>`; `--abort <true\|false>` (optional); `--reason <text>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecards`, `live_e2e_abort_applied`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
+| `aor live-e2e report` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecards`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
 
 `aor eval run` (W3-S03) and `aor harness certify` (W3-S05) provide the quality-runtime baseline: durable eval output plus durable certification and promotion-decision artifacts.
 
@@ -45,9 +48,6 @@ The following commands remain planned and are intentionally not implemented in t
 - `aor incident show`
 - `aor audit runs`
 
-- `aor live-e2e start`
-- `aor live-e2e status`
-- `aor live-e2e report`
 - `aor ui attach`
 - `aor ui detach`
 
@@ -58,3 +58,8 @@ The following commands remain planned and are intentionally not implemented in t
   - run control: `aor run pause`, `aor run resume`, `aor run steer`, `aor run cancel`
   - delivery control: `aor deliver prepare`, `aor release prepare`
   - incident/audit control: `aor incident open`, `aor incident show`, `aor audit runs`
+
+## Standard live E2E semantics for W5-S05
+- `aor live-e2e start` is the standard orchestration entrypoint for target-catalog rehearsal profiles.
+- `aor live-e2e status` is observe-first and supports bounded abort (`--abort=true`) for non-terminal runs.
+- `aor live-e2e report` is read-only and returns durable run summary plus per-target scorecards.

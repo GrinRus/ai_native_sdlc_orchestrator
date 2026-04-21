@@ -12,6 +12,9 @@ Implemented commands:
   - aor run status
   - aor packet show
   - aor evidence show
+  - aor live-e2e start
+  - aor live-e2e status
+  - aor live-e2e report
 
 Planned commands (not implemented yet):
   - aor intake create
@@ -31,9 +34,6 @@ Planned commands (not implemented yet):
   - aor incident open
   - aor incident show
   - aor audit runs
-  - aor live-e2e start
-  - aor live-e2e status
-  - aor live-e2e report
   - aor ui attach
   - aor ui detach
 

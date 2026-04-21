@@ -78,6 +78,16 @@ test("operator command help documents read-only and future control semantics", (
   assert.match(result.stdout, /Future control hooks remain planned/);
 });
 
+test("live-e2e command help documents start observe and abort semantics", () => {
+  const result = invokeCli(["live-e2e", "start", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in live E2E shell \(W5-S05\)/);
+  assert.match(result.stdout, /standard profile run and emits durable run summary \+ scorecard artifacts/);
+  assert.match(result.stdout, /--hold-open=true leaves the run in running state/);
+});
+
 test("unknown command fails clearly", () => {
   const result = invokeCli(["project", "unknown"]);
 
@@ -248,6 +258,88 @@ test("operator commands inspect runs, packets, and evidence through shared contr
         command: evidencePayload.command,
         status: evidencePayload.status,
         read_only: evidencePayload.read_only,
+      },
+    };
+    assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("live-e2e standard runner supports start observe report and bounded abort surfaces", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const startResult = invokeCli([
+      "live-e2e",
+      "start",
+      "--project-ref",
+      projectRoot,
+      "--profile",
+      path.join(workspaceRoot, "examples/live-e2e/regress-short.yaml"),
+      "--hold-open",
+      "true",
+    ]);
+    assert.equal(startResult.exitCode, 0, startResult.stderr);
+    const startPayload = JSON.parse(startResult.stdout);
+    assert.equal(startPayload.live_e2e_run_status, "running");
+    assert.equal(fs.existsSync(startPayload.live_e2e_run_summary_file), true);
+    assert.ok(Array.isArray(startPayload.live_e2e_scorecard_files));
+    assert.ok(startPayload.live_e2e_scorecard_files.length >= 1);
+    assert.equal(fs.existsSync(startPayload.live_e2e_scorecard_files[0]), true);
+
+    const statusResult = invokeCli([
+      "live-e2e",
+      "status",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      startPayload.live_e2e_run_id,
+      "--abort",
+      "true",
+      "--reason",
+      "test-abort",
+    ]);
+    assert.equal(statusResult.exitCode, 0, statusResult.stderr);
+    const statusPayload = JSON.parse(statusResult.stdout);
+    assert.equal(statusPayload.live_e2e_abort_applied, true);
+    assert.equal(statusPayload.live_e2e_run_status, "aborted");
+    assert.ok(Array.isArray(statusPayload.live_e2e_scorecards));
+    assert.ok(statusPayload.live_e2e_scorecards.length >= 1);
+
+    const reportResult = invokeCli([
+      "live-e2e",
+      "report",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      startPayload.live_e2e_run_id,
+    ]);
+    assert.equal(reportResult.exitCode, 0, reportResult.stderr);
+    const reportPayload = JSON.parse(reportResult.stdout);
+    assert.equal(reportPayload.live_e2e_run_status, "aborted");
+    assert.equal(reportPayload.read_only, true);
+    assert.ok(Array.isArray(reportPayload.live_e2e_scorecards));
+    assert.ok(reportPayload.live_e2e_scorecards.length >= 1);
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "live-e2e-standard-transcript.json"), "utf8"),
+    );
+    const transcriptSubset = {
+      start: {
+        command: startPayload.command,
+        status: startPayload.status,
+        live_e2e_run_status: startPayload.live_e2e_run_status,
+      },
+      status: {
+        command: statusPayload.command,
+        status: statusPayload.status,
+        live_e2e_run_status: statusPayload.live_e2e_run_status,
+        live_e2e_abort_applied: statusPayload.live_e2e_abort_applied,
+      },
+      report: {
+        command: reportPayload.command,
+        status: reportPayload.status,
+        read_only: reportPayload.read_only,
       },
     };
     assert.deepEqual(transcriptSubset, transcriptFixture);

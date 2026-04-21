@@ -1,0 +1,22 @@
+{
+  "scorecard_id": "live-e2e.regress.short.run-202604211530.scorecard.target",
+  "run_id": "live-e2e.regress.short.run-202604211530",
+  "profile_id": "live-e2e.regress.short",
+  "scenario_id": "ky-regression-smoke",
+  "flow_kind": "regress",
+  "duration_class": "short",
+  "target_repo": {
+    "repo_id": "target",
+    "repo_url": "https://github.com/sindresorhus/ky.git",
+    "ref": "main"
+  },
+  "stage_counts": {
+    "pass": 6,
+    "fail": 0,
+    "pending": 0,
+    "skipped": 4
+  },
+  "status": "pass",
+  "summary_ref": ".aor/projects/aor-core/reports/live-e2e-run-summary-live-e2e.regress.short.run-202604211530.json",
+  "generated_at": "2026-04-21T15:30:00.000Z"
+}
