@@ -32,6 +32,11 @@ Expected output includes:
 - `live_e2e_run_summary_file`
 - `live_e2e_scorecard_files`
 
+The run summary also carries learning-loop linkage fields:
+- `learning_loop_scorecard_file`
+- `learning_loop_handoff_file`
+- `incident_report_file` (for failed or aborted runs)
+
 ## Observe
 ```bash
 aor live-e2e status \
@@ -65,3 +70,4 @@ Expected abort behavior:
 - Run summary and scorecard files exist under `.aor/projects/<project_id>/reports/`.
 - `aor run status --run-id <RUN_ID> --follow true` can observe the same run stream.
 - CLI-only operation remains valid with web UI detached.
+- Use `live-e2e-learning-loop.md` to hand off incidents and scorecards into backlog and quality follow-up.

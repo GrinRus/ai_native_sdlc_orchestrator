@@ -305,6 +305,13 @@ test("live-e2e standard runner supports start observe report and bounded abort s
     assert.equal(statusPayload.live_e2e_run_status, "aborted");
     assert.ok(Array.isArray(statusPayload.live_e2e_scorecards));
     assert.ok(statusPayload.live_e2e_scorecards.length >= 1);
+    const abortedSummary = JSON.parse(fs.readFileSync(statusPayload.live_e2e_run_summary_file, "utf8"));
+    assert.equal(fs.existsSync(abortedSummary.learning_loop_scorecard_file), true);
+    assert.equal(fs.existsSync(abortedSummary.learning_loop_handoff_file), true);
+    assert.equal(fs.existsSync(abortedSummary.incident_report_file), true);
+    const incidentReport = JSON.parse(fs.readFileSync(abortedSummary.incident_report_file, "utf8"));
+    assert.ok(Array.isArray(incidentReport.linked_run_refs));
+    assert.ok(incidentReport.linked_run_refs.some((entry) => String(entry).includes(startPayload.live_e2e_run_id)));
 
     const reportResult = invokeCli([
       "live-e2e",

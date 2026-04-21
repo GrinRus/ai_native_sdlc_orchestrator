@@ -1,0 +1,28 @@
+{
+  "incident_id": "aor-core.incident.live-e2e.regress.short.run-202604211600.202604211601",
+  "project_id": "aor-core",
+  "severity": "high",
+  "summary": "Live E2E run failed during delivery release packet materialization.",
+  "linked_run_refs": [
+    "run://live-e2e.regress.short.run-202604211600"
+  ],
+  "linked_asset_refs": [
+    "evidence://projects/aor-core/reports/live-e2e-run-summary-live-e2e.regress.short.run-202604211600.json",
+    "evidence://projects/aor-core/reports/learning-loop-scorecard-live-e2e-live-e2e.regress.short.run-202604211600.json",
+    "evidence://projects/aor-core/reports/delivery-transcript-patch-only-live-e2e.regress.short.run-202604211600.json"
+  ],
+  "status": "open",
+  "linked_eval_suite_refs": [
+    "suite.release.core@v1"
+  ],
+  "linked_harness_capture_refs": [
+    "evidence://projects/aor-core/reports/harness-capture-live-e2e.regress.short.run-202604211600.json"
+  ],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/wave-5-implementation-slices.md"
+  ],
+  "evidence_root": ".aor/projects/aor-core/reports",
+  "learning_handoff_ref": "evidence://projects/aor-core/reports/learning-loop-handoff-live-e2e.regress.short.run-202604211600-aor-core.incident.live-e2e.regress.short.run-202604211600.202604211601.json",
+  "created_at": "2026-04-21T16:01:00.000Z"
+}

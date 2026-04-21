@@ -335,6 +335,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "step-result",
       "validation-report",
       "evaluation-report",
+      "incident-report",
       "promotion-decision",
       "delivery-manifest",
       "release-packet",
@@ -347,7 +348,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
     command: "live-e2e start",
     category: "live-e2e-and-ui",
     status: "implemented",
-    summary: "Start one standard live E2E orchestration run from a catalog profile and emit durable summary/scorecard artifacts.",
+    summary:
+      "Start one standard live E2E orchestration run from a catalog profile and emit durable summary/scorecard/learning-loop artifacts.",
     inputs: [
       "--project-ref <path>",
       "--profile <path>",
@@ -374,6 +376,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     contractFamilies: [
       "live-e2e-profile",
       "live-run-event",
+      "incident-report",
       "step-result",
       "evaluation-report",
       "delivery-manifest",
@@ -407,7 +410,14 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "command_catalog_alignment",
     ],
     requiredFlags: ["project-ref", "run-id"],
-    contractFamilies: ["live-run-event", "step-result", "evaluation-report", "delivery-manifest", "release-packet"],
+    contractFamilies: [
+      "live-run-event",
+      "incident-report",
+      "step-result",
+      "evaluation-report",
+      "delivery-manifest",
+      "release-packet",
+    ],
   },
   {
     command: "live-e2e report",
@@ -433,7 +443,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "command_catalog_alignment",
     ],
     requiredFlags: ["project-ref", "run-id"],
-    contractFamilies: ["step-result", "evaluation-report", "delivery-manifest", "release-packet"],
+    contractFamilies: ["incident-report", "step-result", "evaluation-report", "delivery-manifest", "release-packet"],
   },
   { command: "ui attach", category: "live-e2e-and-ui", status: "planned" },
   { command: "ui detach", category: "live-e2e-and-ui", status: "planned" },

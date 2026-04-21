@@ -1,0 +1,27 @@
+{
+  "scorecard_id": "live-e2e.regress.short.run-202604211600.learning-loop.scorecard.v1",
+  "project_id": "aor-core",
+  "run_id": "live-e2e.regress.short.run-202604211600",
+  "source_kind": "live-e2e",
+  "status": "fail",
+  "summary": "Live E2E run 'live-e2e.regress.short.run-202604211600' completed with status 'fail'.",
+  "evidence_refs": [
+    "evidence://projects/aor-core/reports/live-e2e-run-summary-live-e2e.regress.short.run-202604211600.json",
+    "evidence://projects/aor-core/reports/live-e2e-scorecard-target-live-e2e.regress.short.run-202604211600.json",
+    "evidence://projects/aor-core/reports/delivery-transcript-patch-only-live-e2e.regress.short.run-202604211600.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://projects/aor-core/reports/live-e2e-scorecard-target-live-e2e.regress.short.run-202604211600.json"
+  ],
+  "linked_eval_suite_refs": [
+    "suite.release.core@v1"
+  ],
+  "linked_harness_capture_refs": [
+    "evidence://projects/aor-core/reports/harness-capture-live-e2e.regress.short.run-202604211600.json"
+  ],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/wave-5-implementation-slices.md"
+  ],
+  "generated_at": "2026-04-21T16:01:00.000Z"
+}

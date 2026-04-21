@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { appendRunEvent } from "../../api/src/index.mjs";
 import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
+import { materializeLearningLoopArtifacts } from "../../../packages/observability/src/index.mjs";
 import { certifyAssetPromotion } from "../../../packages/orchestrator-core/src/certification-decision.mjs";
 import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
 import { materializeDeliveryPlan } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
@@ -151,6 +152,55 @@ function summarizeStageCounts(stageResults) {
   }
 
   return { pass, fail, pending, skipped };
+}
+
+/**
+ * @param {string[]} values
+ * @returns {string[]}
+ */
+function uniqueStrings(values) {
+  return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function looksLikeRef(value) {
+  return (
+    value.startsWith("evidence://") ||
+    value.includes("/") ||
+    value.includes("\\") ||
+    /\.(json|jsonl|yaml|yml|patch|log)$/iu.test(value)
+  );
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function collectStringRefs(value) {
+  if (typeof value === "string") {
+    return value.trim().length > 0 && looksLikeRef(value.trim()) ? [value.trim()] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => collectStringRefs(entry));
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.values(value).flatMap((entry) => collectStringRefs(entry));
+  }
+  return [];
+}
+
+/**
+ * @param {Array<{ stage: string, status: string, evidence_refs: string[], summary: string | null }>} stageResults
+ * @param {Record<string, unknown>} artifacts
+ * @returns {string[]}
+ */
+function collectLearningEvidenceRefs(stageResults, artifacts) {
+  const stageRefs = stageResults.flatMap((stage) => (Array.isArray(stage.evidence_refs) ? stage.evidence_refs : []));
+  const artifactRefs = collectStringRefs(artifacts);
+  return uniqueStrings([...stageRefs, ...artifactRefs]);
 }
 
 /**
@@ -465,6 +515,7 @@ export function startStandardLiveE2ERun(options) {
   const stageResults = flattenStageMap(stageMap);
   const summary = {
     run_id: runId,
+    project_id: init.projectId,
     profile_ref: profilePath,
     profile_id: profile.profile_id,
     scenario_id: profile.scenario_id,
@@ -497,6 +548,31 @@ export function startStandardLiveE2ERun(options) {
   writeJson(summaryFile, summary);
   writeJson(scorecardFile, scorecard);
 
+  const learningLoop = materializeLearningLoopArtifacts({
+    projectId: init.projectId,
+    projectRoot: init.projectRoot,
+    runtimeLayout: init.runtimeLayout,
+    runId,
+    sourceKind: "live-e2e",
+    runStatus: status,
+    summary: errorMessage ?? `Live E2E run '${runId}' completed with status '${status}'.`,
+    evidenceRefs: uniqueStrings([summaryFile, scorecardFile, ...collectLearningEvidenceRefs(stageResults, artifacts)]),
+    linkedScorecardRefs: [scorecardFile],
+    evalSuiteRefs: Array.isArray(profile.verification?.eval_suites)
+      ? profile.verification.eval_suites.filter((entry) => typeof entry === "string")
+      : [],
+    backlogRefs: [
+      "docs/backlog/mvp-implementation-backlog.md",
+      "docs/backlog/wave-5-implementation-slices.md",
+      "docs/ops/live-e2e-standard-runner.md",
+    ],
+    incidentSummary: errorMessage ?? undefined,
+  });
+  summary.learning_loop_scorecard_file = learningLoop.scorecardFile;
+  summary.learning_loop_handoff_file = learningLoop.handoffFile;
+  summary.incident_report_file = learningLoop.incidentFile;
+  writeJson(summaryFile, summary);
+
   appendRunEvent({
     cwd,
     projectRef: init.projectRoot,
@@ -506,6 +582,9 @@ export function startStandardLiveE2ERun(options) {
     payload: {
       summary_file: summaryFile,
       scorecard_file: scorecardFile,
+      learning_loop_scorecard_file: learningLoop.scorecardFile,
+      learning_loop_handoff_file: learningLoop.handoffFile,
+      incident_report_file: learningLoop.incidentFile,
     },
   });
 
@@ -515,6 +594,9 @@ export function startStandardLiveE2ERun(options) {
     summaryFile,
     scorecards: [scorecard],
     scorecardFiles: [scorecardFile],
+    learningLoopScorecardFile: learningLoop.scorecardFile,
+    learningLoopHandoffFile: learningLoop.handoffFile,
+    incidentReportFile: learningLoop.incidentFile,
   };
 }
 
@@ -565,6 +647,11 @@ export function readStandardLiveE2ERun(options) {
  */
 export function abortStandardLiveE2ERun(options) {
   const cwd = options.cwd ?? process.cwd();
+  const init = initializeProjectRuntime({
+    cwd,
+    projectRef: options.projectRef,
+    runtimeRoot: options.runtimeRoot,
+  });
   const current = readStandardLiveE2ERun(options);
   const summary = { ...current.summary };
 
@@ -579,6 +666,43 @@ export function abortStandardLiveE2ERun(options) {
   summary.status = "aborted";
   summary.finished_at = nowIso();
   summary.abort_reason = options.reason ?? "operator-requested";
+  const stageResults = Array.isArray(summary.stage_results)
+    ? summary.stage_results.filter((entry) => typeof entry === "object" && entry !== null)
+    : [];
+  const artifacts = typeof summary.artifacts === "object" && summary.artifacts !== null ? summary.artifacts : {};
+  const scorecardFiles = Array.isArray(summary.scorecard_files)
+    ? summary.scorecard_files.filter((entry) => typeof entry === "string")
+    : [];
+  const learningLoop = materializeLearningLoopArtifacts({
+    projectId: init.projectId,
+    projectRoot: init.projectRoot,
+    runtimeLayout: init.runtimeLayout,
+    runId: options.runId,
+    sourceKind: "live-e2e",
+    runStatus: "aborted",
+    summary: String(summary.abort_reason),
+    evidenceRefs: uniqueStrings([
+      current.summaryFile,
+      ...scorecardFiles,
+      ...collectLearningEvidenceRefs(
+        /** @type {Array<{ stage: string, status: string, evidence_refs: string[], summary: string | null }>} */ (
+          stageResults
+        ),
+        /** @type {Record<string, unknown>} */ (artifacts),
+      ),
+    ]),
+    linkedScorecardRefs: scorecardFiles,
+    backlogRefs: [
+      "docs/backlog/mvp-implementation-backlog.md",
+      "docs/backlog/wave-5-implementation-slices.md",
+      "docs/ops/live-e2e-standard-runner.md",
+    ],
+    forceIncident: true,
+    incidentSummary: String(summary.abort_reason),
+  });
+  summary.learning_loop_scorecard_file = learningLoop.scorecardFile;
+  summary.learning_loop_handoff_file = learningLoop.handoffFile;
+  summary.incident_report_file = learningLoop.incidentFile;
   writeJson(current.summaryFile, summary);
 
   appendRunEvent({
@@ -607,5 +731,8 @@ export function abortStandardLiveE2ERun(options) {
     ...current,
     summary,
     abortApplied: true,
+    incidentReportFile: learningLoop.incidentFile,
+    learningLoopHandoffFile: learningLoop.handoffFile,
+    learningLoopScorecardFile: learningLoop.scorecardFile,
   };
 }
