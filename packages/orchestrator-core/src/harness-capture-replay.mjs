@@ -85,6 +85,7 @@ export function captureHarnessReplayArtifact(options) {
     capture,
     capturePath,
     stepResultPath: stepResult.stepResultPath,
+    evaluationReport: evalResult.evaluationReport,
     evaluationReportPath: evalResult.evaluationReportPath,
   };
 }

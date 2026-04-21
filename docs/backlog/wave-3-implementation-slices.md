@@ -112,7 +112,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S04 — Harness capture and replay runtime
 - **Epic:** EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Make step execution evidence replayable so platform changes can be tested against real traces rather than intuition.
 - **Primary modules:** `packages/harness`, `packages/observability`, `packages/orchestrator-core`
 - **Hard dependencies:** W3-S02, W2-S05
@@ -143,7 +143,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S05 — Certification and promotion decision baseline
 - **Epic:** EPIC-4 Quality platform
-- **State:** done
+- **State:** ready
 - **Outcome:** Convert eval and harness output into an explicit certification and promotion gate for platform assets.
 - **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `apps/cli`
 - **Hard dependencies:** W3-S03, W3-S04

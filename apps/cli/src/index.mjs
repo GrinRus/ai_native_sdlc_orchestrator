@@ -6,6 +6,7 @@ import {
   approveHandoffArtifacts,
   prepareHandoffArtifacts,
 } from "../../../packages/orchestrator-core/src/handoff-packets.mjs";
+import { certifyAssetPromotion } from "../../../packages/orchestrator-core/src/certification-decision.mjs";
 import { runEvaluationSuite } from "../../../packages/orchestrator-core/src/eval-runner.mjs";
 import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
@@ -97,6 +98,8 @@ function formatCommandHelp(definition) {
   const statusLine =
     definition.command === "eval run"
       ? "Status: implemented in quality shell (W3-S03)"
+      : definition.command === "harness certify"
+        ? "Status: implemented in quality shell (W3-S05)"
       : "Status: implemented in bootstrap shell (W1-S01)";
   const notes =
     definition.command === "project init"
@@ -135,6 +138,14 @@ function formatCommandHelp(definition) {
             "- --subject-ref is required and must use '<subject_type>://<target>' format.",
             "- --suite-ref is optional and falls back to eval_policy.default_release_suite_ref.",
             "- Eval run is offline and independent from delivery automation.",
+            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+          ]
+      : definition.command === "harness certify"
+        ? [
+            "- --asset-ref is the asset being promoted (for example wrapper://..., route://..., prompt-bundle://...).",
+            "- --subject-ref defines the eval/harness subject family used to produce evidence.",
+            "- Certification combines eval report + harness capture + harness replay into one promotion-decision.",
+            "- Status semantics are pass, hold, or fail.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
           ]
       : definition.command === "handoff prepare"
@@ -449,6 +460,12 @@ function executeImplementedCommand(command, flags, cwd) {
   let evaluationBlocking = null;
   let evaluationSuiteRef = null;
   let evaluationSubjectRef = null;
+  let promotionDecisionId = null;
+  let promotionDecisionFile = null;
+  let promotionDecisionStatus = null;
+  let certificationEvaluationReportFile = null;
+  let certificationHarnessCaptureFile = null;
+  let certificationHarnessReplayFile = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -589,6 +606,33 @@ function executeImplementedCommand(command, flags, cwd) {
     evaluationBlocking = evalResult.blocking;
     evaluationSuiteRef = evalResult.suiteRef;
     evaluationSubjectRef = evalResult.subjectRef;
+  } else if (command === "harness certify") {
+    ensureRequiredFlags(command, flags);
+
+    const certifyResult = certifyAssetPromotion({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      assetRef: /** @type {string} */ (resolveOptionalStringFlag("asset-ref", flags["asset-ref"])),
+      subjectRef: /** @type {string} */ (resolveOptionalStringFlag("subject-ref", flags["subject-ref"])),
+      suiteRef: resolveOptionalStringFlag("suite-ref", flags["suite-ref"]),
+      stepClass: resolveOptionalStringFlag("step-class", flags["step-class"]),
+      fromChannel: resolveOptionalStringFlag("from-channel", flags["from-channel"]),
+      toChannel: resolveOptionalStringFlag("to-channel", flags["to-channel"]),
+    });
+
+    resolvedProjectRef = certifyResult.projectRoot;
+    resolvedRuntimeRoot = certifyResult.runtimeRoot;
+    runtimeLayout = certifyResult.runtimeLayout;
+    runtimeStateFile = certifyResult.stateFile;
+    projectProfileRef = certifyResult.projectProfileRef;
+    promotionDecisionId = certifyResult.decision.decision_id;
+    promotionDecisionFile = certifyResult.decisionPath;
+    promotionDecisionStatus = certifyResult.decision.status;
+    certificationEvaluationReportFile = certifyResult.evaluationReportPath;
+    certificationHarnessCaptureFile = certifyResult.harnessCapturePath;
+    certificationHarnessReplayFile = certifyResult.harnessReplayPath;
   } else if (command === "handoff prepare") {
     ensureRequiredFlags(command, flags);
 
@@ -705,6 +749,12 @@ function executeImplementedCommand(command, flags, cwd) {
     evaluation_blocking: evaluationBlocking,
     evaluation_suite_ref: evaluationSuiteRef,
     evaluation_subject_ref: evaluationSubjectRef,
+    promotion_decision_id: promotionDecisionId,
+    promotion_decision_file: promotionDecisionFile,
+    promotion_decision_status: promotionDecisionStatus,
+    certification_evaluation_report_file: certificationEvaluationReportFile,
+    certification_harness_capture_file: certificationHarnessCaptureFile,
+    certification_harness_replay_file: certificationHarnessReplayFile,
     contract_families: resolvedFamilies,
     command_catalog_alignment: "docs/architecture/14-cli-command-catalog.md",
   };

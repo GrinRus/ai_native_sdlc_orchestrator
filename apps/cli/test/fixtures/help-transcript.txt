@@ -6,6 +6,7 @@ Implemented commands:
   - aor project validate
   - aor project verify
   - aor eval run
+  - aor harness certify
   - aor handoff prepare
   - aor handoff approve
 
@@ -21,7 +22,6 @@ Planned commands (not implemented yet):
   - aor run cancel
   - aor run status
   - aor harness replay
-  - aor harness certify
   - aor asset promote
   - aor asset freeze
   - aor deliver prepare

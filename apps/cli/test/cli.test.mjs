@@ -58,6 +58,15 @@ test("eval run help documents quality-shell status and offline semantics", () =>
   assert.match(result.stdout, /Eval run is offline and independent from delivery automation\./);
 });
 
+test("harness certify help documents certification semantics", () => {
+  const result = invokeCli(["harness", "certify", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in quality shell \(W3-S05\)/);
+  assert.match(result.stdout, /Status semantics are pass, hold, or fail\./);
+});
+
 test("unknown command fails clearly", () => {
   const result = invokeCli(["project", "unknown"]);
 
@@ -206,6 +215,56 @@ test("eval run executes offline suite and persists evaluation report", () => {
       evaluation_blocking: parsed.evaluation_blocking,
       evaluation_suite_ref: parsed.evaluation_suite_ref,
       evaluation_subject_ref: parsed.evaluation_subject_ref,
+    };
+    assert.deepEqual(smokeSubset, smokeFixture);
+  });
+});
+
+test("harness certify writes durable promotion decision with explicit evidence set", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const smokeFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "harness-certify-transcript.json"), "utf8"),
+    );
+
+    const result = invokeCli([
+      "harness",
+      "certify",
+      "--project-ref",
+      projectRoot,
+      "--asset-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--subject-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--suite-ref",
+      "suite.cert.core@v4",
+      "--step-class",
+      "implement",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(typeof parsed.promotion_decision_id, "string");
+    assert.equal(fs.existsSync(parsed.promotion_decision_file), true);
+    assert.equal(fs.existsSync(parsed.certification_evaluation_report_file), true);
+    assert.equal(fs.existsSync(parsed.certification_harness_capture_file), true);
+    assert.equal(fs.existsSync(parsed.certification_harness_replay_file), true);
+
+    const decision = JSON.parse(fs.readFileSync(parsed.promotion_decision_file, "utf8"));
+    assert.equal(decision.subject_ref, "wrapper://wrapper.eval.default@v1");
+    assert.equal(decision.status, "pass");
+    assert.equal(typeof decision.evidence_summary, "object");
+    assert.ok(Array.isArray(decision.evidence_refs));
+    assert.ok(decision.evidence_refs.length >= 3);
+    assert.equal(decision.evidence_summary.evaluation_status, "pass");
+    assert.equal(decision.evidence_summary.harness_replay_status, "pass");
+
+    const smokeSubset = {
+      command: parsed.command,
+      status: parsed.status,
+      promotion_decision_status: parsed.promotion_decision_status,
     };
     assert.deepEqual(smokeSubset, smokeFixture);
   });
