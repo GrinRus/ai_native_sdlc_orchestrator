@@ -1,0 +1,8 @@
+{
+  "command": "eval run",
+  "status": "implemented",
+  "evaluation_status": "pass",
+  "evaluation_blocking": false,
+  "evaluation_suite_ref": "suite.release.core@v1",
+  "evaluation_subject_ref": "run://smoke-target"
+}

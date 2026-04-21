@@ -14,6 +14,12 @@ Deterministic validation is a hard gate before eval or harness:
 Task-specific scoring based on datasets, suites, and graders.
 
 Eval begins only after deterministic validation is `pass`. Eval answers "how good is the candidate" rather than "is the graph structurally valid".
+Eval execution runs through one scorer interface that supports deterministic-only, judge-only, and mixed suites.
+Each run persists a durable `evaluation-report` with:
+- target asset identity (`subject_ref`, `subject_type`, `subject_fingerprint`);
+- suite/dataset identity (`suite_ref`, `dataset_ref`);
+- scorer metadata and per-grader results (`scorer_metadata`, `grader_results`);
+- summary metrics and threshold verdicts for baseline comparisons across asset changes.
 
 ### Harness
 Replay, certification, compare-to-baseline, and failure-mode workflows.

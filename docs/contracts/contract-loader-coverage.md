@@ -14,7 +14,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Core packets and profiles | `incident-report.md` | `incident-report` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Execution and quality | `step-result.md` | `step-result` | none | implemented | Includes closed-set enum check for `step_class`; routed replay metadata is optional. |
 | Execution and quality | `validation-report.md` | `validation-report` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
-| Execution and quality | `evaluation-report.md` | `evaluation-report` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
+| Execution and quality | `evaluation-report.md` | `evaluation-report` | `examples/eval/report-*.sample.yaml` | implemented | Required fields + top-level type checks, including scorer metadata and summary metrics. |
 | Execution and quality | `dataset.md` | `dataset` | `examples/eval/dataset-*.yaml` | implemented | Required fields + top-level type checks. |
 | Execution and quality | `evaluation-suite.md` | `evaluation-suite` | `examples/eval/suite-*.yaml` | implemented | Required fields + top-level type checks. |
 | Execution and quality | `promotion-decision.md` | `promotion-decision` | none | implemented | Includes closed-set enum checks for promotion channels. |

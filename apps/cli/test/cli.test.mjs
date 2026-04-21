@@ -49,6 +49,15 @@ test("implemented command help documents inputs outputs and contracts", () => {
   assert.match(result.stdout, /Contract families: project-profile/);
 });
 
+test("eval run help documents quality-shell status and offline semantics", () => {
+  const result = invokeCli(["eval", "run", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in quality shell \(W3-S03\)/);
+  assert.match(result.stdout, /Eval run is offline and independent from delivery automation\./);
+});
+
 test("unknown command fails clearly", () => {
   const result = invokeCli(["project", "unknown"]);
 
@@ -157,6 +166,48 @@ test("project verify supports routed dry-run smoke execution and durable routed 
     assert.equal(routedStepResult.routed_execution.route_resolution.step_class, "implement");
     assert.equal(routedStepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
     assert.equal(routedStepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
+  });
+});
+
+test("eval run executes offline suite and persists evaluation report", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const smokeFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "eval-run-smoke-transcript.json"), "utf8"),
+    );
+    const result = invokeCli([
+      "eval",
+      "run",
+      "--project-ref",
+      projectRoot,
+      "--suite-ref",
+      "suite.release.core@v1",
+      "--subject-ref",
+      "run://smoke-target",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(typeof parsed.evaluation_report_id, "string");
+    assert.equal(fs.existsSync(parsed.evaluation_report_file), true);
+
+    const evaluationReport = JSON.parse(fs.readFileSync(parsed.evaluation_report_file, "utf8"));
+    assert.equal(evaluationReport.suite_ref, "suite.release.core@v1");
+    assert.equal(evaluationReport.subject_ref, "run://smoke-target");
+    assert.equal(Array.isArray(evaluationReport.scorer_metadata), true);
+    assert.equal(typeof evaluationReport.summary_metrics, "object");
+
+    const smokeSubset = {
+      command: parsed.command,
+      status: parsed.status,
+      evaluation_status: parsed.evaluation_status,
+      evaluation_blocking: parsed.evaluation_blocking,
+      evaluation_suite_ref: parsed.evaluation_suite_ref,
+      evaluation_subject_ref: parsed.evaluation_subject_ref,
+    };
+    assert.deepEqual(smokeSubset, smokeFixture);
   });
 });
 
