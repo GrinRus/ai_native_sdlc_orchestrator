@@ -1,0 +1,9 @@
+diff --git a/examples/project.aor.yaml b/examples/project.aor.yaml
+index 4ea7f2b..5ac9c56 100644
+--- a/examples/project.aor.yaml
++++ b/examples/project.aor.yaml
+@@ -96,3 +96,4 @@ live_ops:
+   transport: sse
+   ui_attachable: true
+   ui_catchup_mode: read-model-plus-stream
++  recovery_note: w4-s03-delivery-rehearsal

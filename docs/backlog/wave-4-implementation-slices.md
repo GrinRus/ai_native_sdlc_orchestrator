@@ -50,7 +50,7 @@ Add safe write-back modes, manifests, and release artifacts so AOR can move from
 
 ## W4-S02 — Delivery planning and write-back mode policy
 - **Epic:** EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Make delivery intent explicit before any write-back happens by choosing a mode, approval boundary, and safety policy.
 - **Primary modules:** `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**`
 - **Hard dependencies:** W4-S01, W1-S07, W3-S05
@@ -81,7 +81,7 @@ Add safe write-back modes, manifests, and release artifacts so AOR can move from
 
 ## W4-S03 — Patch and local branch delivery driver
 - **Epic:** EPIC-5 Delivery and release
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Support the safest write-back modes first: patch emission and local branch application.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `packages/observability`
 - **Hard dependencies:** W4-S02
@@ -112,7 +112,7 @@ Add safe write-back modes, manifests, and release artifacts so AOR can move from
 
 ## W4-S04 — Fork-first GitHub PR delivery driver
 - **Epic:** EPIC-5 Delivery and release
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Add the first networked delivery mode with explicit fork-first safety defaults for public repositories.
 - **Primary modules:** `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli`, `docs/ops/**`
 - **Hard dependencies:** W4-S02, W2-S04
