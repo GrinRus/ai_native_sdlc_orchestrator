@@ -18,6 +18,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "project_profile_ref",
       "runtime_layout",
       "runtime_state_file",
+      "artifact_packet_id",
+      "artifact_packet_file",
       "contract_families",
       "command_catalog_alignment",
     ],

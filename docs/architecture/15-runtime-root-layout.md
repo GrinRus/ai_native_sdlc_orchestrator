@@ -18,6 +18,8 @@ For project `<project_id>`, the runtime layout is:
   projects/
     <project_id>/
       artifacts/
+        <project_id>.artifact.bootstrap.v1.json
+        <project_id>.artifact.bootstrap.v1.body.json
       reports/
         project-analysis-report.json
         validation-report.json
@@ -33,6 +35,8 @@ For project `<project_id>`, the runtime layout is:
 - `project_root`
 - `runtime_root`
 - `runtime_layout` paths (`project_runtime_root`, `artifacts_root`, `reports_root`, `state_root`)
+
+The first bootstrap packet created by `project init` records packet metadata plus invocation/evidence linkage and can be reloaded directly from `<project_id>.artifact.bootstrap.v1.json`.
 
 ## Idempotency
 Repeated `aor project init` runs against the same project root must:

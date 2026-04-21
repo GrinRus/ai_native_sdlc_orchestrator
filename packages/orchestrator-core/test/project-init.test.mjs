@@ -68,6 +68,9 @@ test("initializeProjectRuntime creates idempotent runtime layout and durable sta
     assert.equal(secondRun.projectRoot, tempRoot);
     assert.equal(firstRun.projectProfileRef, "examples/project.aor.yaml");
     assert.equal(secondRun.projectProfileRef, "examples/project.aor.yaml");
+    assert.equal(firstRun.artifactPacketId, "aor-core.artifact.bootstrap.v1");
+    assert.equal(firstRun.artifactPacketFile, secondRun.artifactPacketFile);
+    assert.equal(fs.existsSync(firstRun.artifactPacketFile), true);
 
     for (const dirPath of [
       firstRun.runtimeLayout.runtimeRoot,
@@ -90,6 +93,11 @@ test("initializeProjectRuntime creates idempotent runtime layout and durable sta
     assert.equal(parsedState.selected_profile_ref, "examples/project.aor.yaml");
     assert.equal(parsedState.project_root, tempRoot);
     assert.equal(parsedState.runtime_root, path.join(tempRoot, ".aor"));
+
+    const packet = JSON.parse(fs.readFileSync(firstRun.artifactPacketFile, "utf8"));
+    assert.equal(packet.packet_id, "aor-core.artifact.bootstrap.v1");
+    assert.equal(packet.packet_type, "bootstrap");
+    assert.equal(packet.project_id, "aor-core");
   });
 });
 

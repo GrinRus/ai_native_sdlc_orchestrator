@@ -320,6 +320,8 @@ function executeImplementedCommand(command, flags, cwd) {
   let validationBlocking = null;
   let validationGateEnforced = false;
   let validationGateStatus = null;
+  let artifactPacketId = null;
+  let artifactPacketFile = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -334,6 +336,8 @@ function executeImplementedCommand(command, flags, cwd) {
     runtimeLayout = initResult.runtimeLayout;
     runtimeStateFile = initResult.stateFile;
     projectProfileRef = initResult.projectProfileRef;
+    artifactPacketId = initResult.artifactPacketId;
+    artifactPacketFile = initResult.artifactPacketFile;
   } else if (command === "project analyze") {
     ensureRequiredFlags(command, flags);
 
@@ -440,6 +444,8 @@ function executeImplementedCommand(command, flags, cwd) {
     validation_blocking: validationBlocking,
     validation_gate_enforced: validationGateEnforced,
     validation_gate_status: validationGateStatus,
+    artifact_packet_id: artifactPacketId,
+    artifact_packet_file: artifactPacketFile,
     contract_families: resolvedFamilies,
     command_catalog_alignment: "docs/architecture/14-cli-command-catalog.md",
   };
