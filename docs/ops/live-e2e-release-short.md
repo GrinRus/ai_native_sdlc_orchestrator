@@ -4,6 +4,7 @@
 - Repository: `https://github.com/sindresorhus/ky.git`
 - Branch/ref: `main`
 - Goal: short release-shaped rehearsal on a small library
+- Repo shape note: single-package TypeScript library with npm-first verification
 
 ## When to use it
 - before promoting a wrapper, route, or adapter change;
@@ -18,6 +19,25 @@ Run the full flow through delivery preparation and release-packet materializatio
 2. Require review and QA.
 3. Materialize a delivery manifest and release packet.
 4. Keep upstream write-back disabled unless a fork is configured.
+
+## No-write preflight
+Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
+1. clone
+2. inspect
+3. analyze
+4. validate
+5. verify
+6. stop unless no-write gates pass
+
+## Prerequisites
+- Node `>=22` and npm available.
+- Network access for clone and dependency install.
+- Local shell can run `npm test`.
+
+## Abort conditions
+- Clone or dependency installation fails.
+- `npm test` fails during preflight verification.
+- Delivery or release step requires upstream write-back.
 
 ## Start command
 ```bash

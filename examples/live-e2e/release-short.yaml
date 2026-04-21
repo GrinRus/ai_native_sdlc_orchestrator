@@ -10,6 +10,31 @@ target_repo:
   ref: main
   checkout_strategy: shallow
   write_target: patch-or-fork
+preflight:
+  mode: no-write
+  sequence:
+  - clone
+  - inspect
+  - analyze
+  - validate
+  - verify
+  - stop
+  prerequisites:
+  - node >=22 with npm available
+  - network access for shallow clone and npm install
+  repo_shape_notes:
+  - single-package TypeScript library with fast test verification
+  failure_safe_defaults:
+  - keep output_policy.write_back_to_remote set to false
+  - allow release artifacts only in patch/local/fork delivery modes
+  abort_conditions:
+  - repository clone fails or ref cannot be resolved
+  - npm test fails during preflight verification
+  - release mode requires upstream writes
+  reusable_assumptions:
+    bootstrap: no-write bootstrap flow is identical to regress-short profile
+    quality: review and qa stages assume verify gate passes before release steps
+    delivery: release packet and manifest can be generated without upstream push
 runtime:
   mode: ephemeral
   runtime_root: .aor
