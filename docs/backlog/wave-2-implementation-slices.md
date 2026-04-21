@@ -19,7 +19,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S01 — Route registry and step resolution kernel
 - **Epic:** EPIC-3 Routed execution
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Resolve every step type through an explicit route model instead of hard-coded command branches.
 - **Primary modules:** `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/routes/**`
 - **Hard dependencies:** W1-S08

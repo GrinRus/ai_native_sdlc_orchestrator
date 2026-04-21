@@ -28,6 +28,20 @@ command_catalog:
   required_for_smoke_verify:
     - pnpm lint
     - pnpm test -- --runInBand
+route_resolution:
+  routes_root: examples/routes
+  applied_overrides: {}
+  matrix:
+    - step_class: discovery
+      resolved_route_id: route.discovery.default
+      resolution_source:
+        kind: project-default
+        field: default_route_profiles.discovery
+    - step_class: planning
+      resolved_route_id: route.plan.default
+      resolution_source:
+        kind: project-default
+        field: default_route_profiles.planning
 service_boundaries:
   - service_id: api
     paths:

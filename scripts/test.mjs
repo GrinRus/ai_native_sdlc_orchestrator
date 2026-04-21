@@ -240,6 +240,20 @@ if (cliTestRun.status !== 0) {
 
 console.log("cli tests ok: bootstrap command contracts, parsing, and help output");
 
+const providerRoutingTests = [
+  path.join(root, "packages/provider-routing/test/route-resolution.test.mjs"),
+];
+const providerRoutingTestRun = spawnSync(process.execPath, ["--test", ...providerRoutingTests], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (providerRoutingTestRun.status !== 0) {
+  process.exit(providerRoutingTestRun.status ?? 1);
+}
+
+console.log("provider-routing tests ok: deterministic route registry and override resolution");
+
 const orchestratorCoreTests = [
   path.join(root, "packages/orchestrator-core/test/project-init.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/handoff-packets.test.mjs"),

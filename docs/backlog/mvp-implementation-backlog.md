@@ -28,12 +28,12 @@ This is the master index for the implementation slices across all defined waves.
 | W1-S05 | Project verify flow and bounded preflight execution | EPIC-1 | done | `packages/orchestrator-core`, `apps/cli`, `packages/observability` | W1-S03, W1-S04, W0-S05 |
 | W1-S06 | Runtime store and artifact packet materialization | EPIC-2 | done | `packages/orchestrator-core`, `packages/contracts`, `apps/cli` | W1-S02 |
 | W1-S07 | Wave ticket and handoff packet foundation | EPIC-2 | done | `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**` | W1-S04, W1-S06 |
-| W1-S08 | Bootstrap end-to-end rehearsal | EPIC-7 | ready | `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W1-S03, W1-S04, W1-S05, W1-S07 |
+| W1-S08 | Bootstrap end-to-end rehearsal | EPIC-7 | done | `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W1-S03, W1-S04, W1-S05, W1-S07 |
 
 ## W2 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W2-S01 | Route registry and step resolution kernel | EPIC-3 | blocked | `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/routes/**` | W1-S08 |
+| W2-S01 | Route registry and step resolution kernel | EPIC-3 | ready | `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/routes/**` | W1-S08 |
 | W2-S02 | Wrapper, prompt-bundle, and asset loader runtime | EPIC-3 | blocked | `packages/orchestrator-core`, `packages/contracts`, `examples/wrappers/**`, `examples/prompts/**` | W2-S01 |
 | W2-S03 | Step policy resolution, budgets, and guardrails | EPIC-3 | blocked | `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**` | W2-S01 |
 | W2-S04 | Adapter SDK and mock adapter baseline | EPIC-3 | blocked | `packages/adapter-sdk`, `packages/orchestrator-core`, `examples/adapters/**` | W2-S01 |
