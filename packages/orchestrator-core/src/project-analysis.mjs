@@ -5,6 +5,7 @@ import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
 import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
+import { resolveStepPolicyMatrix } from "./policy-resolution.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 
 const LANGUAGE_BY_EXTENSION = Object.freeze({
@@ -268,9 +269,11 @@ function createVerificationPlan(commands, unknownFacts) {
  *  projectProfile?: string,
  *  runtimeRoot?: string,
  *  routeOverrides?: Record<string, string>,
+ *  policyOverrides?: Record<string, string>,
  *  routesRoot?: string,
  *  wrappersRoot?: string,
  *  promptsRoot?: string,
+ *  policiesRoot?: string,
  * }} options
  */
 export function analyzeProjectRuntime(options = {}) {
@@ -344,6 +347,11 @@ export function analyzeProjectRuntime(options = {}) {
       ? options.promptsRoot
       : path.resolve(init.projectRoot, options.promptsRoot)
     : path.join(init.projectRoot, "examples/prompts");
+  const policiesRoot = options.policiesRoot
+    ? path.isAbsolute(options.policiesRoot)
+      ? options.policiesRoot
+      : path.resolve(init.projectRoot, options.policiesRoot)
+    : path.join(init.projectRoot, "examples/policies");
   const routeResolutionMatrix = resolveRouteMatrix({
     projectProfilePath: init.projectProfilePath,
     routesRoot,
@@ -355,6 +363,13 @@ export function analyzeProjectRuntime(options = {}) {
     wrappersRoot,
     promptsRoot,
     routeOverrides: options.routeOverrides,
+  });
+  const policyResolutionMatrix = resolveStepPolicyMatrix({
+    projectProfilePath: init.projectProfilePath,
+    routesRoot,
+    policiesRoot,
+    routeOverrides: options.routeOverrides,
+    policyOverrides: options.policyOverrides,
   });
 
   const report = {
@@ -384,6 +399,11 @@ export function analyzeProjectRuntime(options = {}) {
       wrappers_root: path.relative(init.projectRoot, wrappersRoot) || ".",
       prompts_root: path.relative(init.projectRoot, promptsRoot) || ".",
       matrix: assetResolutionMatrix,
+    },
+    policy_resolution: {
+      policies_root: path.relative(init.projectRoot, policiesRoot) || ".",
+      applied_overrides: options.policyOverrides ?? {},
+      matrix: policyResolutionMatrix,
     },
     verification_plan: verificationPlan,
     status: "ready-for-bootstrap",
@@ -445,14 +465,37 @@ export function analyzeProjectRuntime(options = {}) {
     )}\n`,
     "utf8",
   );
+  const policyResolutionPath = path.join(init.runtimeLayout.reportsRoot, "policy-resolution-report.json");
+  fs.writeFileSync(
+    policyResolutionPath,
+    `${JSON.stringify(
+      {
+        report_id: `${init.projectId}.policy-resolution.v1`,
+        project_id: init.projectId,
+        generated_from: {
+          command: "aor project analyze",
+          selected_profile_ref: init.projectProfileRef,
+        },
+        policies_root: path.relative(init.projectRoot, policiesRoot) || ".",
+        applied_overrides: options.policyOverrides ?? {},
+        matrix: policyResolutionMatrix,
+        status: "resolved",
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 
   return {
     ...init,
     reportPath,
     routeResolutionPath,
     assetResolutionPath,
+    policyResolutionPath,
     report,
     routeResolutionMatrix,
     assetResolutionMatrix,
+    policyResolutionMatrix,
   };
 }

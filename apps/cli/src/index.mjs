@@ -105,7 +105,8 @@ function formatCommandHelp(definition) {
             "- --project-profile can override default profile discovery in project root.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
             "- --route-overrides accepts comma-separated step overrides like planning=route.plan.default.",
-            "- Analyze emits route and asset resolution reports for downstream wrapper/prompt/policy loaders.",
+            "- --policy-overrides accepts comma-separated step overrides like planning=policy.step.planner.default.",
+            "- Analyze emits route, asset, and policy resolution reports for downstream execution planning.",
           ]
       : definition.command === "project validate"
         ? [
@@ -266,6 +267,48 @@ function resolveRouteOverridesFlag(value) {
 }
 
 /**
+ * @param {string | true | undefined} value
+ * @returns {Record<string, string> | undefined}
+ */
+function resolvePolicyOverridesFlag(value) {
+  if (value === undefined) return undefined;
+  if (value === true) {
+    throw new CliUsageError("Flag '--policy-overrides' requires a value.");
+  }
+
+  /** @type {Record<string, string>} */
+  const overrides = {};
+  const pairs = value
+    .split(",")
+    .map((pair) => pair.trim())
+    .filter((pair) => pair.length > 0);
+
+  for (const pair of pairs) {
+    const [step, policyId, remainder] = pair.split("=");
+    if (!step || !policyId || remainder !== undefined) {
+      throw new CliUsageError(
+        `Invalid policy override '${pair}'. Use '--policy-overrides step=policy_id[,step=policy_id]'.`,
+      );
+    }
+
+    const normalizedStep = step.trim();
+    const normalizedPolicyId = policyId.trim();
+    if (normalizedStep.length === 0 || normalizedPolicyId.length === 0) {
+      throw new CliUsageError(
+        `Invalid policy override '${pair}'. Step and policy_id must both be non-empty.`,
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(overrides, normalizedStep)) {
+      throw new CliUsageError(`Duplicate policy override for step '${normalizedStep}'.`);
+    }
+
+    overrides[normalizedStep] = normalizedPolicyId;
+  }
+
+  return overrides;
+}
+
+/**
  * @param {string} projectRef
  * @param {string} cwd
  * @returns {string}
@@ -359,6 +402,8 @@ function executeImplementedCommand(command, flags, cwd) {
   let routeResolutionSteps = null;
   let assetResolutionFile = null;
   let assetResolutionSteps = null;
+  let policyResolutionFile = null;
+  let policyResolutionSteps = null;
   let validationReportId = null;
   let validationReportFile = null;
   let validationStatus = null;
@@ -397,6 +442,7 @@ function executeImplementedCommand(command, flags, cwd) {
   } else if (command === "project analyze") {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
+    const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
 
     const analyzeResult = analyzeProjectRuntime({
       cwd,
@@ -404,6 +450,7 @@ function executeImplementedCommand(command, flags, cwd) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       routeOverrides,
+      policyOverrides,
     });
 
     resolvedProjectRef = analyzeResult.projectRoot;
@@ -417,6 +464,8 @@ function executeImplementedCommand(command, flags, cwd) {
     routeResolutionSteps = analyzeResult.routeResolutionMatrix;
     assetResolutionFile = analyzeResult.assetResolutionPath;
     assetResolutionSteps = analyzeResult.assetResolutionMatrix;
+    policyResolutionFile = analyzeResult.policyResolutionPath;
+    policyResolutionSteps = analyzeResult.policyResolutionMatrix;
   } else if (command === "project validate") {
     ensureRequiredFlags(command, flags);
     handoffGateEnforced = resolveOptionalBooleanFlag(
@@ -553,6 +602,8 @@ function executeImplementedCommand(command, flags, cwd) {
     route_resolution_steps: routeResolutionSteps,
     asset_resolution_file: assetResolutionFile,
     asset_resolution_steps: assetResolutionSteps,
+    policy_resolution_file: policyResolutionFile,
+    policy_resolution_steps: policyResolutionSteps,
     validation_report_id: validationReportId,
     validation_report_file: validationReportFile,
     validation_status: validationStatus,

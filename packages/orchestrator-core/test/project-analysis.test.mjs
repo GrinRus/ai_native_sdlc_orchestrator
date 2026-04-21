@@ -64,18 +64,26 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.equal(result.routeResolutionMatrix.length, 10);
     assert.equal(fs.existsSync(result.assetResolutionPath), true);
     assert.equal(result.assetResolutionMatrix.length, 10);
+    assert.equal(fs.existsSync(result.policyResolutionPath), true);
+    assert.equal(result.policyResolutionMatrix.length, 10);
     assert.equal(
       result.assetResolutionMatrix.find((entry) => entry.step_class === "planning")?.wrapper.wrapper_ref,
       "wrapper.planner.default@v1",
     );
     assert.equal(result.report.route_resolution.matrix.length, 10);
     assert.equal(result.report.asset_resolution.matrix.length, 10);
+    assert.equal(result.report.policy_resolution.matrix.length, 10);
+    assert.equal(
+      result.policyResolutionMatrix.find((entry) => entry.step_class === "planning")?.policy.policy_id,
+      "policy.step.planner.default",
+    );
 
     const reloaded = JSON.parse(fs.readFileSync(result.reportPath, "utf8"));
     assert.equal(reloaded.report_id, result.report.report_id);
     assert.equal(reloaded.status, "ready-for-bootstrap");
     assert.equal(reloaded.route_resolution.matrix.length, 10);
     assert.equal(reloaded.asset_resolution.matrix.length, 10);
+    assert.equal(reloaded.policy_resolution.matrix.length, 10);
   });
 });
 
@@ -121,6 +129,7 @@ test("analyzeProjectRuntime works on the AOR repository with isolated runtime ro
     assert.equal(fs.existsSync(result.reportPath), true);
     assert.equal(fs.existsSync(result.routeResolutionPath), true);
     assert.equal(fs.existsSync(result.assetResolutionPath), true);
+    assert.equal(fs.existsSync(result.policyResolutionPath), true);
   } finally {
     fs.rmSync(runtimeRoot, { recursive: true, force: true });
   }
@@ -143,5 +152,8 @@ test("analyzeProjectRuntime surfaces deterministic step-level route overrides", 
     const planningBundle = result.assetResolutionMatrix.find((entry) => entry.step_class === "planning");
     assert.ok(planningBundle);
     assert.equal(planningBundle.wrapper.resolution_source.kind, "project-default");
+    const planningPolicy = result.policyResolutionMatrix.find((entry) => entry.step_class === "planning");
+    assert.ok(planningPolicy);
+    assert.equal(planningPolicy.policy.resolution_source.kind, "project-default");
   });
 });

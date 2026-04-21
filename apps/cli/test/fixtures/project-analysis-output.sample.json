@@ -28,6 +28,24 @@
       }
     }
   ],
+  "policy_resolution_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/policy-resolution-report.json",
+  "policy_resolution_steps": [
+    {
+      "step_class": "planning",
+      "policy": {
+        "policy_id": "policy.step.planner.default"
+      },
+      "resolved_bounds": {
+        "budget": {
+          "max_cost_usd": 4,
+          "timeout_sec": 300
+        },
+        "writeback_mode": {
+          "mode": "pull-request"
+        }
+      }
+    }
+  ],
   "contract_families": [
     {
       "family": "project-analysis-report",

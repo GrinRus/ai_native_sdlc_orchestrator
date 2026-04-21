@@ -34,7 +34,7 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W2-S01 | Route registry and step resolution kernel | EPIC-3 | done | `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/routes/**` | W1-S08 |
-| W2-S02 | Wrapper, prompt-bundle, and asset loader runtime | EPIC-3 | ready | `packages/orchestrator-core`, `packages/contracts`, `examples/wrappers/**`, `examples/prompts/**` | W2-S01 |
+| W2-S02 | Wrapper, prompt-bundle, and asset loader runtime | EPIC-3 | done | `packages/orchestrator-core`, `packages/contracts`, `examples/wrappers/**`, `examples/prompts/**` | W2-S01 |
 | W2-S03 | Step policy resolution, budgets, and guardrails | EPIC-3 | ready | `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**` | W2-S01 |
 | W2-S04 | Adapter SDK and mock adapter baseline | EPIC-3 | ready | `packages/adapter-sdk`, `packages/orchestrator-core`, `examples/adapters/**` | W2-S01 |
 | W2-S05 | Routed step execution engine and durable step results | EPIC-3 | blocked | `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `packages/adapter-sdk` | W2-S02, W2-S03, W2-S04, W1-S06 |
