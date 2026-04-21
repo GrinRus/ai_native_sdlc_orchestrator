@@ -66,6 +66,7 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.equal(result.assetResolutionMatrix.length, 10);
     assert.equal(fs.existsSync(result.policyResolutionPath), true);
     assert.equal(result.policyResolutionMatrix.length, 10);
+    assert.equal(result.adapterResolutionMatrix.length, 10);
     assert.equal(
       result.assetResolutionMatrix.find((entry) => entry.step_class === "planning")?.wrapper.wrapper_ref,
       "wrapper.planner.default@v1",
@@ -76,6 +77,10 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.equal(
       result.policyResolutionMatrix.find((entry) => entry.step_class === "planning")?.policy.policy_id,
       "policy.step.planner.default",
+    );
+    assert.equal(
+      result.adapterResolutionMatrix.find((entry) => entry.step_class === "implement")?.adapter.adapter_id,
+      "codex-cli",
     );
 
     const reloaded = JSON.parse(fs.readFileSync(result.reportPath, "utf8"));
@@ -155,5 +160,22 @@ test("analyzeProjectRuntime surfaces deterministic step-level route overrides", 
     const planningPolicy = result.policyResolutionMatrix.find((entry) => entry.step_class === "planning");
     assert.ok(planningPolicy);
     assert.equal(planningPolicy.policy.resolution_source.kind, "project-default");
+  });
+});
+
+test("analyzeProjectRuntime fails early when resolved adapter lacks required route capability", () => {
+  withTempRepo((repoRoot) => {
+    const adapterPath = path.join(repoRoot, "examples/adapters/codex-cli.yaml");
+    const adapterContent = fs.readFileSync(adapterPath, "utf8");
+    fs.writeFileSync(adapterPath, adapterContent.replace("live_logs: true", "live_logs: false"), "utf8");
+
+    assert.throws(
+      () =>
+        analyzeProjectRuntime({
+          projectRef: repoRoot,
+          cwd: repoRoot,
+        }),
+      /missing capabilities \[live_logs\]/i,
+    );
   });
 });

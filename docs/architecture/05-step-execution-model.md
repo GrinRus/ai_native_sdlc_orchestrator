@@ -51,6 +51,14 @@ The first routed execution baseline runs one deterministic path:
 
 The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with selected route/assets/policy/adapter metadata, context-compilation diagnostics, and evidence refs.
 
+## Adapter SDK baseline (W2-S04)
+Adapter invocation uses one stable envelope pair:
+- request envelope: `request_id`, `run_id`, `step_id`, `step_class`, resolved route/asset/policy bundles, input packet refs, and dry-run flag;
+- response envelope: `request_id`, `adapter_id`, `status`, summary, normalized output payload, evidence refs, and tool traces.
+
+Shared lifecycle hooks are explicit and adapter-agnostic:
+`before_step`, `invoke_adapter`, `after_step`, `on_retry`, `on_repair`, `on_escalation`.
+
 ## Why one model matters
 A single step model keeps:
 - quality logic reusable;

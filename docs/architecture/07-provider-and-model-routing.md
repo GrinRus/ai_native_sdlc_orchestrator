@@ -42,3 +42,10 @@ Route resolution feeds policy resolution directly:
 - route-level policy references (`retry_policy_ref`, `repair_policy_ref`) require compatible retry/repair fields in the resolved step policy.
 
 If this handoff cannot resolve a complete policy envelope, execution planning must fail before any adapter call.
+
+## Adapter capability negotiation (W2-S04)
+After route resolution selects `primary.adapter`, adapter negotiation checks:
+1. adapter profile exists in `examples/adapters` (or configured adapter registry);
+2. every `required_adapter_capabilities[]` entry in the route is declared as `true` by the selected adapter.
+
+If either check fails, route planning fails deterministically before execution starts.

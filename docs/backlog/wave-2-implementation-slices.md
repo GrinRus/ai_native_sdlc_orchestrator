@@ -81,7 +81,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S03 — Step policy resolution, budgets, and guardrails
 - **Epic:** EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Make execution bounds explicit by resolving step policies before any adapter call happens.
 - **Primary modules:** `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**`
 - **Hard dependencies:** W2-S01
