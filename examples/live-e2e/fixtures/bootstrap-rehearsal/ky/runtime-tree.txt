@@ -1,0 +1,12 @@
+<KY_TARGET_ROOT>/.aor/projects/ky-target/artifacts/ky-target.artifact.bootstrap.v1.body.json
+<KY_TARGET_ROOT>/.aor/projects/ky-target/artifacts/ky-target.artifact.bootstrap.v1.json
+<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/project-analysis-report.json
+<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/step-result-1.json
+<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/step-result-2.json
+<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/step-result-3.json
+<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/validation-report.json
+<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/verify-command-1.log
+<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/verify-command-2.log
+<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/verify-command-3.log
+<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/verify-summary.json
+<KY_TARGET_ROOT>/.aor/projects/ky-target/state/project-init-state.json

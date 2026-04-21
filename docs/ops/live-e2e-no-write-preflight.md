@@ -15,6 +15,33 @@ This procedure is the reusable baseline for public-repo rehearsals across bootst
 5. **Verify** bounded local commands.
 6. **Stop** (or proceed to later stages only when all no-write gates pass).
 
+## Bootstrap rehearsal procedure (W1 baseline)
+Use this exact sequence when validating bootstrap flow readiness without delivery automation:
+
+```bash
+# AOR workspace target (expected verify success)
+aor project init --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w1-s08-aor
+aor project analyze --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w1-s08-aor
+aor project validate --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w1-s08-aor
+aor project verify --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w1-s08-aor --require-validation-pass
+
+# Public target from catalog (sindresorhus/ky, safe-failure verify allowed)
+aor project init --project-ref <KY_TARGET_ROOT> --project-profile <KY_TARGET_ROOT>/examples/project.aor.yaml
+aor project analyze --project-ref <KY_TARGET_ROOT> --project-profile <KY_TARGET_ROOT>/examples/project.aor.yaml
+aor project validate --project-ref <KY_TARGET_ROOT> --project-profile <KY_TARGET_ROOT>/examples/project.aor.yaml
+aor project verify --project-ref <KY_TARGET_ROOT> --project-profile <KY_TARGET_ROOT>/examples/project.aor.yaml --require-validation-pass
+```
+
+Evidence fixtures captured for this procedure:
+- `examples/live-e2e/fixtures/bootstrap-rehearsal/aor/*.json`
+- `examples/live-e2e/fixtures/bootstrap-rehearsal/aor/runtime-tree.txt`
+- `examples/live-e2e/fixtures/bootstrap-rehearsal/ky/*.json`
+- `examples/live-e2e/fixtures/bootstrap-rehearsal/ky/runtime-tree.txt`
+
+Observed baseline:
+- AOR target completes validate `pass` and verify `passed`.
+- `sindresorhus/ky` target keeps validate `pass` and verify `failed` safely with no upstream write-back.
+
 Validation step output must materialize a deterministic `validation-report` with `pass`, `warn`, or `fail` status. When verify is started with validation gating enabled, a `fail` report blocks verify until the failing validators are resolved.
 
 ## Required target annotations

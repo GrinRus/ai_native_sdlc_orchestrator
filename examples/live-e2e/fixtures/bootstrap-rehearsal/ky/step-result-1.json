@@ -1,0 +1,16 @@
+{
+  "step_result_id": "ky-target.verify.v1.step.1",
+  "run_id": "ky-target.verify.v1",
+  "step_id": "verify.command.1",
+  "step_class": "runner",
+  "status": "passed",
+  "summary": "Verification command 'npm run lint --if-present' passed under owner 'main'.",
+  "evidence_refs": [
+    "<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/verify-command-1.log"
+  ],
+  "repo_scope": "main",
+  "command": "npm run lint --if-present",
+  "command_owner": "main",
+  "missing_prerequisites": [],
+  "blocked_next_step": null
+}

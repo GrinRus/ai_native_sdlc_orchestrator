@@ -1,0 +1,46 @@
+{
+  "command": "project analyze",
+  "status": "implemented",
+  "resolved_project_ref": "<KY_TARGET_ROOT>",
+  "resolved_runtime_root": "<KY_TARGET_ROOT>/.aor",
+  "project_profile_ref": "examples/project.aor.yaml",
+  "runtime_layout": {
+    "runtimeRoot": "<KY_TARGET_ROOT>/.aor",
+    "projectsRoot": "<KY_TARGET_ROOT>/.aor/projects",
+    "projectRuntimeRoot": "<KY_TARGET_ROOT>/.aor/projects/ky-target",
+    "artifactsRoot": "<KY_TARGET_ROOT>/.aor/projects/ky-target/artifacts",
+    "reportsRoot": "<KY_TARGET_ROOT>/.aor/projects/ky-target/reports",
+    "stateRoot": "<KY_TARGET_ROOT>/.aor/projects/ky-target/state"
+  },
+  "runtime_state_file": "<KY_TARGET_ROOT>/.aor/projects/ky-target/state/project-init-state.json",
+  "analysis_report_id": "ky-target.analysis.v1",
+  "analysis_report_file": "<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/project-analysis-report.json",
+  "validation_report_id": null,
+  "validation_report_file": null,
+  "validation_status": null,
+  "validation_blocking": null,
+  "validation_gate_enforced": false,
+  "validation_gate_status": null,
+  "handoff_gate_enforced": false,
+  "handoff_gate_status": null,
+  "handoff_gate_blocking": null,
+  "handoff_packet_id": null,
+  "handoff_packet_file": null,
+  "handoff_status": null,
+  "handoff_approval_state": null,
+  "wave_ticket_id": null,
+  "wave_ticket_file": null,
+  "artifact_packet_id": null,
+  "artifact_packet_file": null,
+  "verify_summary_file": null,
+  "step_result_files": null,
+  "contract_families": [
+    {
+      "family": "project-analysis-report",
+      "group": "core-packets-and-profiles",
+      "source_contract": "docs/contracts/project-analysis-report.md",
+      "status": "implemented"
+    }
+  ],
+  "command_catalog_alignment": "docs/architecture/14-cli-command-catalog.md"
+}

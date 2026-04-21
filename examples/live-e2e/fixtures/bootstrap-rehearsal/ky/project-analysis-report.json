@@ -1,0 +1,79 @@
+{
+  "report_id": "ky-target.analysis.v1",
+  "project_id": "ky-target",
+  "version": 1,
+  "generated_from": {
+    "command": "aor project analyze",
+    "project_root": "<KY_TARGET_ROOT>",
+    "selected_profile_ref": "examples/project.aor.yaml"
+  },
+  "repo_facts": {
+    "topology": "single-repo",
+    "package_manager": "unknown",
+    "languages": [
+      "typescript"
+    ],
+    "ci_systems": [
+      "github-actions"
+    ]
+  },
+  "toolchain_facts": {
+    "build_commands": [
+      "pnpm build"
+    ],
+    "test_commands": [
+      "pnpm test"
+    ],
+    "lint_commands": [
+      "unknown"
+    ]
+  },
+  "command_catalog": {
+    "required_for_smoke_verify": [
+      "pnpm test",
+      "pnpm build"
+    ]
+  },
+  "service_boundaries": [
+    {
+      "service_id": "unknown",
+      "paths": [
+        "unknown"
+      ],
+      "confidence": "low",
+      "reason": "No common service boundary directories found."
+    }
+  ],
+  "verification_plan": {
+    "preflight": [
+      "project-init-state",
+      "project-profile-load",
+      "analysis-report-write"
+    ],
+    "smoke_commands": [
+      "pnpm test",
+      "pnpm build"
+    ]
+  },
+  "status": "ready-for-bootstrap",
+  "unknown_facts": [
+    {
+      "field": "repo_facts.package_manager",
+      "confidence": "low",
+      "value": "unknown",
+      "reason": "No known JavaScript package-manager lockfile found."
+    },
+    {
+      "field": "service_boundaries",
+      "confidence": "low",
+      "value": "unknown",
+      "reason": "No apps/packages/services/libs directories found."
+    },
+    {
+      "field": "toolchain_facts.lint_commands",
+      "confidence": "low",
+      "value": "unknown",
+      "reason": "No lint command candidate found."
+    }
+  ]
+}

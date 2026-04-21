@@ -1,0 +1,71 @@
+{
+  "report_id": "ky-target.validation.v1",
+  "subject_ref": "examples/project.aor.yaml",
+  "validators": [
+    {
+      "validator_id": "profile-contract",
+      "status": "pass",
+      "summary": "Project profile contract validation passed."
+    },
+    {
+      "validator_id": "profile-default-refs",
+      "status": "pass",
+      "summary": "Project profile default refs are present.",
+      "details": {
+        "default_route_profiles": "object",
+        "default_step_policies": "object",
+        "default_wrapper_profiles": "object"
+      }
+    },
+    {
+      "validator_id": "runtime-defaults",
+      "status": "pass",
+      "summary": "runtime_defaults.runtime_root is configured.",
+      "details": {
+        "runtime_root": ".aor"
+      }
+    },
+    {
+      "validator_id": "writeback-safety",
+      "status": "pass",
+      "summary": "Write-back safety defaults keep direct writes disabled.",
+      "details": {
+        "allow_direct_write": false
+      }
+    },
+    {
+      "validator_id": "analysis-report-presence",
+      "status": "pass",
+      "summary": "project-analysis-report is present and reusable.",
+      "details": {
+        "status": "ready-for-bootstrap"
+      }
+    },
+    {
+      "validator_id": "asset-reference-integrity",
+      "status": "pass",
+      "summary": "Example reference integrity checks passed.",
+      "details": {
+        "checked_references": 88,
+        "issues": []
+      }
+    },
+    {
+      "validator_id": "handoff-approval-gate",
+      "status": "pass",
+      "summary": "Execution gate blocked: no handoff packet is present. (enforcement disabled).",
+      "details": {
+        "reason": "handoff-missing",
+        "blocked_next_step": "Run 'aor handoff prepare' and approve the packet before execution-style flows.",
+        "enforced": false,
+        "handoff_packet_file": "<KY_TARGET_ROOT>/.aor/projects/ky-target/artifacts/ky-target.handoff.bootstrap.v1.json"
+      }
+    }
+  ],
+  "status": "pass",
+  "evidence_refs": [
+    "<KY_TARGET_ROOT>/.aor/projects/ky-target/state/project-init-state.json",
+    "<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/project-analysis-report.json",
+    "reference-integrity:88"
+  ]
+}
