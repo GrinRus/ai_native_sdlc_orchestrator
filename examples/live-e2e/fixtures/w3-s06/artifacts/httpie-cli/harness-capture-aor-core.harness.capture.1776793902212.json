@@ -576,13 +576,7 @@
         }
       }
     },
-    "tool_activity": [
-      {
-        "phase": "invoke_adapter",
-        "kind": "mock-run",
-        "detail": "deterministic_seed=routed.implement:implement:route.implement.default:dry-run"
-      }
-    ],
+    "tool_activity": [],
     "normalized_output": {
       "request_id": "aor-core.routed-execution.v1.step.implement.request",
       "adapter_id": "mock-runner",

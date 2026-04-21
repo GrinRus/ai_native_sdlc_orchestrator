@@ -50,7 +50,7 @@ Add safe write-back modes, manifests, and release artifacts so AOR can move from
 
 ## W4-S02 — Delivery planning and write-back mode policy
 - **Epic:** EPIC-5 Delivery and release
-- **State:** done
+- **State:** ready
 - **Outcome:** Make delivery intent explicit before any write-back happens by choosing a mode, approval boundary, and safety policy.
 - **Primary modules:** `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**`
 - **Hard dependencies:** W4-S01, W1-S07, W3-S05
