@@ -56,6 +56,7 @@ AOR should support these delivery modes:
 - controlled direct write for trusted internal projects only
 
 All non-trivial delivery modes should leave a delivery manifest behind.
+Delivery-capable runs should execute from an isolated root (`workspace-clone` or `worktree`) rather than mutating the operator's primary checkout directly.
 
 ## Asset evolution model
 Prompt bundles, wrappers, routes, policies, and adapters evolve on their own lifecycle:

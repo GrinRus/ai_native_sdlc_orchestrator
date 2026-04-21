@@ -34,6 +34,10 @@ Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
 5. verify
 6. stop unless no-write gates pass
 
+Isolation mode defaults:
+- use `workspace-clone` when this rehearsal feeds patch-only or fork-first delivery preparation;
+- keep `ephemeral` only for bootstrap smoke with no delivery mutation intent.
+
 ## Prerequisites
 - Node `>=22` and npm available.
 - Network access for clone and dependency install.

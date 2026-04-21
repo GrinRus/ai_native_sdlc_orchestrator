@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { isSupportedWorkspaceMode, prepareWorkspaceIsolation } from "./workspace-isolation.mjs";
 
 const NO_WRITE_PREFLIGHT_SEQUENCE = Object.freeze(["clone", "inspect", "analyze", "validate", "verify", "stop"]);
 
@@ -71,12 +72,17 @@ function evaluatePreflightSafety(profile) {
     });
   }
 
-  if (runtimeDefaults.workspace_mode !== "ephemeral") {
+  const requestedWorkspaceMode =
+    typeof runtimeDefaults.workspace_mode === "string" ? runtimeDefaults.workspace_mode : "ephemeral";
+  if (!isSupportedWorkspaceMode(requestedWorkspaceMode)) {
     violations.push({
       stepSuffix: "workspace-isolation",
-      summary: "Verify blocked because runtime workspace isolation is not ephemeral.",
-      blockedNextStep: "Set runtime_defaults.workspace_mode to 'ephemeral' and rerun verify.",
-      missingPrerequisites: ["runtime_defaults.workspace_mode must be 'ephemeral' for no-write preflight."],
+      summary: `Verify blocked because runtime workspace isolation mode '${requestedWorkspaceMode}' is unsupported.`,
+      blockedNextStep:
+        "Set runtime_defaults.workspace_mode to one of: ephemeral, workspace-clone, worktree; then rerun verify.",
+      missingPrerequisites: [
+        "runtime_defaults.workspace_mode must be one of: ephemeral, workspace-clone, worktree.",
+      ],
     });
   }
 
@@ -151,6 +157,8 @@ function inferMissingPrerequisites(command, commandRun) {
  *   command?: string | null,
  *   commandOwner?: string,
  *   missingPrerequisites?: string[],
+ *   executionRoot?: string | null,
+ *   isolationMode?: string | null,
  * }} options
  * @returns {{ stepResultPath: string, stepResult: Record<string, unknown> }}
  */
@@ -168,6 +176,8 @@ function materializeStepResult(options) {
     command_owner: options.commandOwner ?? "profile",
     missing_prerequisites: options.missingPrerequisites ?? [],
     blocked_next_step: options.blockedNextStep ?? null,
+    execution_root: options.executionRoot ?? null,
+    execution_isolation_mode: options.isolationMode ?? null,
   };
 
   const validation = validateContractDocument({
@@ -233,6 +243,13 @@ export function verifyProjectRuntime(options = {}) {
   const validationGateStatus = options.requireValidationPass ? readValidationGateStatus(init.runtimeLayout) : null;
 
   const runId = `${init.projectId}.verify.v1`;
+  const workspaceIsolation = prepareWorkspaceIsolation({
+    projectRoot: init.projectRoot,
+    runtimeRoot: init.runtimeRoot,
+    projectRuntimeRoot: init.runtimeLayout.projectRuntimeRoot,
+    runtimeDefaults: preflightSafety.runtimeDefaults,
+    runId,
+  });
   const verifyCommands = collectVerifyCommands(profile);
   const stepResultFiles = [];
   /** @type {Array<Record<string, unknown>>} */
@@ -253,6 +270,8 @@ export function verifyProjectRuntime(options = {}) {
         blockedNextStep: violation.blockedNextStep,
         commandOwner: "project-profile",
         missingPrerequisites: violation.missingPrerequisites,
+        executionRoot: workspaceIsolation.executionRoot,
+        isolationMode: workspaceIsolation.mode,
       });
       stepResults.push(stepResult);
       stepResultFiles.push(stepResultPath);
@@ -262,7 +281,7 @@ export function verifyProjectRuntime(options = {}) {
       const stepId = `verify.command.${index + 1}`;
       const transcriptPath = path.join(init.runtimeLayout.reportsRoot, `verify-command-${index + 1}.log`);
       const commandRun = spawnSync(item.command, {
-        cwd: init.projectRoot,
+        cwd: workspaceIsolation.executionRoot,
         shell: true,
         encoding: "utf8",
       });
@@ -270,6 +289,8 @@ export function verifyProjectRuntime(options = {}) {
       const transcript = [
         `command: ${item.command}`,
         `repo_scope: ${item.repoId}`,
+        `execution_root: ${workspaceIsolation.executionRoot}`,
+        `execution_isolation_mode: ${workspaceIsolation.mode}`,
         `exit_code: ${commandRun.status ?? -1}`,
         "stdout:",
         commandRun.stdout ?? "",
@@ -308,6 +329,8 @@ export function verifyProjectRuntime(options = {}) {
         command: item.command,
         commandOwner: item.repoId,
         missingPrerequisites,
+        executionRoot: workspaceIsolation.executionRoot,
+        isolationMode: workspaceIsolation.mode,
       });
       stepResults.push(stepResult);
       stepResultFiles.push(stepResultPath);
@@ -327,12 +350,15 @@ export function verifyProjectRuntime(options = {}) {
       blockedNextStep: "Define lint/test/build command lists in project profile repos[] and rerun verify.",
       commandOwner: "project-profile",
       missingPrerequisites: ["At least one bounded command is required in repos[].lint/test/build command lists."],
+      executionRoot: workspaceIsolation.executionRoot,
+      isolationMode: workspaceIsolation.mode,
     });
     stepResults.push(stepResult);
     stepResultFiles.push(stepResultPath);
   }
 
   const summaryStatus = stepResults.some((result) => result.status === "failed") ? "failed" : "passed";
+  const cleanupResult = workspaceIsolation.finalize(summaryStatus === "passed" ? "success" : "failure");
   const verifySummary = {
     run_id: runId,
     status: summaryStatus,
@@ -343,8 +369,22 @@ export function verifyProjectRuntime(options = {}) {
       writeback_policy: {
         allow_direct_write: preflightSafety.writebackPolicy.allow_direct_write ?? false,
       },
-      workspace_mode: preflightSafety.runtimeDefaults.workspace_mode ?? "unknown",
+      workspace_mode:
+        typeof preflightSafety.runtimeDefaults.workspace_mode === "string"
+          ? preflightSafety.runtimeDefaults.workspace_mode
+          : "ephemeral",
       network_mode: preflightSafety.toolingPolicy.network_mode ?? "unknown",
+    },
+    execution_isolation: {
+      requested_mode: workspaceIsolation.requestedMode,
+      mode: workspaceIsolation.mode,
+      source_root: workspaceIsolation.sourceRoot,
+      execution_root: workspaceIsolation.executionRoot,
+      checkout: workspaceIsolation.checkout,
+      provisioning: workspaceIsolation.provisioning,
+      provisioned: workspaceIsolation.provisioned,
+      cleanup_policy: workspaceIsolation.cleanupPolicy,
+      cleanup: cleanupResult,
     },
     step_result_refs: stepResultFiles,
     command_owners: Array.from(

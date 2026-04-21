@@ -34,6 +34,10 @@ Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
 5. verify
 6. stop unless no-write gates pass
 
+Isolation mode defaults:
+- prefer `worktree` when rehearsing local-branch delivery behavior;
+- prefer `workspace-clone` when rehearsing fork-first delivery behavior on public targets.
+
 ## Prerequisites
 - Python and pip available.
 - `make` is available in the local shell.

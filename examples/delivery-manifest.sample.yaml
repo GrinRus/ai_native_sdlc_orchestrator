@@ -4,6 +4,17 @@ ticket_id: WAVE-004
 run_refs:
   - RUN-101
 delivery_mode: pull-request
+execution_isolation:
+  mode: workspace-clone
+  source_root: /workspace/aor-core
+  execution_root: /workspace/aor-core/.aor/projects/aor-core/workspaces/workspace-clone-aor-core.verify.v1
+  checkout:
+    strategy: workspace-clone
+    ref: local-working-copy
+  cleanup:
+    on_success: delete
+    on_abort: delete
+    on_failure: retain
 writeback_policy:
   allow_remote_push: true
   require_review_before_merge: true
