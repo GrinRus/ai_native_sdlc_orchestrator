@@ -6,6 +6,7 @@ import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
 import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
+import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
 import { resolveStepPolicyMatrix } from "./policy-resolution.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 
@@ -384,6 +385,17 @@ export function analyzeProjectRuntime(options = {}) {
     routeResolutionMatrix,
     adapterOverrides: options.adapterOverrides,
   });
+  const evaluationRegistry = loadEvaluationRegistry({
+    workspaceRoot: init.projectRoot,
+  });
+
+  if (!evaluationRegistry.ok) {
+    const issueSummary = evaluationRegistry.issues
+      .map((issue) => `${issue.code}: ${issue.message}`)
+      .slice(0, 5)
+      .join("; ");
+    throw new Error(`Evaluation registry validation failed: ${issueSummary}`);
+  }
 
   const report = {
     report_id: `${init.projectId}.analysis.v1`,
@@ -417,6 +429,13 @@ export function analyzeProjectRuntime(options = {}) {
       policies_root: path.relative(init.projectRoot, policiesRoot) || ".",
       applied_overrides: options.policyOverrides ?? {},
       matrix: policyResolutionMatrix,
+    },
+    evaluation_registry: {
+      examples_root: path.relative(init.projectRoot, evaluationRegistry.examplesRoot) || ".",
+      dataset_refs: evaluationRegistry.datasets.map((dataset) => dataset.dataset_ref),
+      suite_refs: evaluationRegistry.suites.map((suite) => suite.suite_ref),
+      datasets: evaluationRegistry.datasets,
+      suites: evaluationRegistry.suites,
     },
     verification_plan: verificationPlan,
     status: "ready-for-bootstrap",
@@ -499,6 +518,30 @@ export function analyzeProjectRuntime(options = {}) {
     )}\n`,
     "utf8",
   );
+  const evaluationRegistryPath = path.join(init.runtimeLayout.reportsRoot, "evaluation-registry-report.json");
+  fs.writeFileSync(
+    evaluationRegistryPath,
+    `${JSON.stringify(
+      {
+        report_id: `${init.projectId}.evaluation-registry.v1`,
+        project_id: init.projectId,
+        generated_from: {
+          command: "aor project analyze",
+          selected_profile_ref: init.projectProfileRef,
+        },
+        examples_root: path.relative(init.projectRoot, evaluationRegistry.examplesRoot) || ".",
+        dataset_refs: evaluationRegistry.datasets.map((dataset) => dataset.dataset_ref),
+        suite_refs: evaluationRegistry.suites.map((suite) => suite.suite_ref),
+        datasets: evaluationRegistry.datasets,
+        suites: evaluationRegistry.suites,
+        issues: evaluationRegistry.issues,
+        status: "resolved",
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 
   return {
     ...init,
@@ -506,10 +549,12 @@ export function analyzeProjectRuntime(options = {}) {
     routeResolutionPath,
     assetResolutionPath,
     policyResolutionPath,
+    evaluationRegistryPath,
     report,
     routeResolutionMatrix,
     assetResolutionMatrix,
     policyResolutionMatrix,
     adapterResolutionMatrix,
+    evaluationRegistry,
   };
 }

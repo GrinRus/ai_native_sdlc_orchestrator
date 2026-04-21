@@ -8,6 +8,7 @@ import {
 } from "../../contracts/src/index.mjs";
 
 import { validateApprovedHandoffGate } from "./handoff-packets.mjs";
+import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 
 /**
@@ -209,6 +210,11 @@ export function validateProjectRuntime(options = {}) {
       status: "warn",
       summary: "No examples directory found; reference integrity checks were skipped.",
     });
+    validators.push({
+      validator_id: "evaluation-registry",
+      status: "warn",
+      summary: "No examples directory found; dataset/suite registry checks were skipped.",
+    });
   } else {
     const referenceIntegrity = validateExampleReferences({ workspaceRoot: init.projectRoot });
     validators.push({
@@ -224,6 +230,21 @@ export function validateProjectRuntime(options = {}) {
       },
     });
     evidenceRefs.push(`reference-integrity:${referenceIntegrity.checkedReferences}`);
+
+    const evaluationRegistry = loadEvaluationRegistry({ workspaceRoot: init.projectRoot });
+    validators.push({
+      validator_id: "evaluation-registry",
+      status: evaluationRegistry.ok ? "pass" : "fail",
+      summary: evaluationRegistry.ok
+        ? "Dataset and evaluation-suite registry checks passed."
+        : `Dataset and evaluation-suite registry checks failed with ${evaluationRegistry.issues.length} issue(s).`,
+      details: {
+        dataset_count: evaluationRegistry.datasets.length,
+        suite_count: evaluationRegistry.suites.length,
+        issues: evaluationRegistry.issues,
+      },
+    });
+    evidenceRefs.push(`evaluation-registry:${evaluationRegistry.suites.length}/${evaluationRegistry.datasets.length}`);
   }
 
   const handoffGate = validateApprovedHandoffGate({

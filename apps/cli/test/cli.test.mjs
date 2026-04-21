@@ -239,6 +239,11 @@ test("project analyze writes durable analysis report under runtime root", () => 
     assert.equal(fs.existsSync(parsed.policy_resolution_file), true);
     assert.ok(Array.isArray(parsed.policy_resolution_steps));
     assert.equal(parsed.policy_resolution_steps.length, 10);
+    assert.equal(fs.existsSync(parsed.evaluation_registry_file), true);
+    assert.ok(Array.isArray(parsed.evaluation_registry_suites));
+    assert.ok(Array.isArray(parsed.evaluation_registry_datasets));
+    assert.ok(parsed.evaluation_registry_suites.length > 0);
+    assert.ok(parsed.evaluation_registry_datasets.length > 0);
     const planningRoute = parsed.route_resolution_steps.find((step) => step.step_class === "planning");
     assert.ok(planningRoute);
     assert.equal(planningRoute.resolution_source.kind, "step-override");
@@ -257,6 +262,8 @@ test("project analyze writes durable analysis report under runtime root", () => 
     assert.equal(report.route_resolution.matrix.length, 10);
     assert.equal(report.asset_resolution.matrix.length, 10);
     assert.equal(report.policy_resolution.matrix.length, 10);
+    assert.ok(Array.isArray(report.evaluation_registry.suite_refs));
+    assert.ok(Array.isArray(report.evaluation_registry.dataset_refs));
   });
 });
 

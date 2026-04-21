@@ -77,6 +77,25 @@ policy_resolution:
             - pnpm build
         writeback_mode:
           mode: pull-request
+evaluation_registry:
+  examples_root: examples
+  dataset_refs:
+    - dataset://run-regression@2026-04-20T08:00:00Z
+  suite_refs:
+    - suite.release.core@v1
+  datasets:
+    - dataset_ref: dataset://run-regression@2026-04-20T08:00:00Z
+      dataset_id: run-regression
+      version: 2026-04-20T08:00:00Z
+      subject_type: run
+      source: examples/eval/dataset-run-regression.yaml
+  suites:
+    - suite_ref: suite.release.core@v1
+      suite_id: suite.release.core
+      version: 1
+      subject_type: run
+      dataset_ref: dataset://run-regression@2026-04-20T08:00:00Z
+      source: examples/eval/suite-release-core.yaml
 service_boundaries:
   - service_id: api
     paths:

@@ -26,6 +26,11 @@ Decision layer that moves an asset or route from candidate to stable or frozen.
 ## Datasets and suites
 A dataset stores cases for a specific subject type. A suite defines how those cases are graded and how pass/fail is decided.
 
+Datasets and suites are loaded through one deterministic registry path (`examples/eval/**` via shared loader), not ad hoc file reads. Registry resolution must provide:
+- suite refs (`suite_id@vN`);
+- dataset refs (`dataset://dataset_id@version`);
+- subject-type compatibility verdicts before eval/harness execution.
+
 AOR needs suites for:
 - run regression,
 - release readiness,
