@@ -7,6 +7,7 @@
 - `live-e2e-release-short.md` — short release rehearsal that still materializes a release packet.
 - `live-e2e-release-long.md` — long monorepo release rehearsal with stronger gates.
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
+- `live-run-event-stream.md` — replay-safe stream behavior, reconnect flow, and backpressure baseline.
 
 ## UI lifecycle
 - `ui-attach-detach.md` — how to attach or detach the optional web UI from a running AOR system.

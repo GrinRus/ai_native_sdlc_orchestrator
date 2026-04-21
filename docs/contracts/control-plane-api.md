@@ -43,6 +43,25 @@ All read responses must reuse existing contract families and IDs rather than API
 ## Streaming
 The API should provide SSE-first live events so CLI and web can observe active work without owning workflow state.
 
+## Streaming endpoint (W5-S02 baseline)
+- `GET /api/projects/:projectId/runs/:runId/events`
+  - transport: SSE (or equivalent stream abstraction with the same event contract);
+  - event contract: `live-run-event`;
+  - query: `after_event_id` for replay from the last acknowledged event;
+  - query: `max_replay` for bounded catch-up window.
+
+Expected event types:
+- `run.started`
+- `step.updated`
+- `evidence.linked`
+- `warning.raised`
+- `run.terminal`
+
+Reconnect and backpressure baseline:
+- replay from `after_event_id` when provided;
+- bounded replay window (do not allow unbounded buffers);
+- preserve monotonic per-run event ordering via payload sequence.
+
 ## Key design rules
 - keep the API usable without the web UI;
 - keep ids and references visible in responses;

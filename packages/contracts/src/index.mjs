@@ -6,6 +6,13 @@ const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "h
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
+const LIVE_RUN_EVENT_TYPE_VALUES = [
+  "run.started",
+  "step.updated",
+  "evidence.linked",
+  "warning.raised",
+  "run.terminal",
+];
 const EXTERNAL_REFERENCE_PREFIXES = [
   "evidence://",
   "schema://",
@@ -542,7 +549,7 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       event_type: "string",
       payload: "object",
     },
-    enumChecks: [],
+    enumChecks: [{ field: "event_type", allowedValues: LIVE_RUN_EVENT_TYPE_VALUES }],
   },
   {
     family: "live-e2e-profile",
