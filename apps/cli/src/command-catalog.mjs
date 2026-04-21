@@ -35,8 +35,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-ref <path>",
       "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
-      "--require-approved-handoff (optional)",
-      "--handoff-packet <path> (optional)",
+      "--route-overrides <step=route_id,...> (optional)",
       "--help",
     ],
     outputs: [
@@ -44,6 +43,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "resolved_runtime_root",
       "analysis_report_id",
       "analysis_report_file",
+      "route_resolution_file",
+      "route_resolution_steps",
       "contract_families",
       "command_catalog_alignment",
     ],
@@ -59,6 +60,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-ref <path>",
       "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
+      "--require-approved-handoff (optional)",
+      "--handoff-packet <path> (optional)",
       "--help",
     ],
     outputs: [

@@ -5,6 +5,17 @@
   "resolved_runtime_root": "<PROJECT_ROOT>/.aor",
   "analysis_report_id": "aor-core.analysis.v1",
   "analysis_report_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/project-analysis-report.json",
+  "route_resolution_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/route-resolution-report.json",
+  "route_resolution_steps": [
+    {
+      "step_class": "planning",
+      "resolved_route_id": "route.plan.default",
+      "resolution_source": {
+        "kind": "project-default",
+        "field": "default_route_profiles.planning"
+      }
+    }
+  ],
   "contract_families": [
     {
       "family": "project-analysis-report",

@@ -104,6 +104,7 @@ function formatCommandHelp(definition) {
             "- --project-ref must point to an existing directory.",
             "- --project-profile can override default profile discovery in project root.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
+            "- --route-overrides accepts comma-separated step overrides like planning=route.plan.default.",
           ]
       : definition.command === "project validate"
         ? [
@@ -222,6 +223,48 @@ function resolveOptionalBooleanFlag(flagName, value) {
 }
 
 /**
+ * @param {string | true | undefined} value
+ * @returns {Record<string, string> | undefined}
+ */
+function resolveRouteOverridesFlag(value) {
+  if (value === undefined) return undefined;
+  if (value === true) {
+    throw new CliUsageError("Flag '--route-overrides' requires a value.");
+  }
+
+  /** @type {Record<string, string>} */
+  const overrides = {};
+  const pairs = value
+    .split(",")
+    .map((pair) => pair.trim())
+    .filter((pair) => pair.length > 0);
+
+  for (const pair of pairs) {
+    const [step, routeId, remainder] = pair.split("=");
+    if (!step || !routeId || remainder !== undefined) {
+      throw new CliUsageError(
+        `Invalid route override '${pair}'. Use '--route-overrides step=route_id[,step=route_id]'.`,
+      );
+    }
+
+    const normalizedStep = step.trim();
+    const normalizedRouteId = routeId.trim();
+    if (normalizedStep.length === 0 || normalizedRouteId.length === 0) {
+      throw new CliUsageError(
+        `Invalid route override '${pair}'. Step and route_id must both be non-empty.`,
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(overrides, normalizedStep)) {
+      throw new CliUsageError(`Duplicate route override for step '${normalizedStep}'.`);
+    }
+
+    overrides[normalizedStep] = normalizedRouteId;
+  }
+
+  return overrides;
+}
+
+/**
  * @param {string} projectRef
  * @param {string} cwd
  * @returns {string}
@@ -311,6 +354,8 @@ function executeImplementedCommand(command, flags, cwd) {
   let projectProfileRef = null;
   let analysisReportId = null;
   let analysisReportFile = null;
+  let routeResolutionFile = null;
+  let routeResolutionSteps = null;
   let validationReportId = null;
   let validationReportFile = null;
   let validationStatus = null;
@@ -348,12 +393,14 @@ function executeImplementedCommand(command, flags, cwd) {
     artifactPacketFile = initResult.artifactPacketFile;
   } else if (command === "project analyze") {
     ensureRequiredFlags(command, flags);
+    const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
 
     const analyzeResult = analyzeProjectRuntime({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      routeOverrides,
     });
 
     resolvedProjectRef = analyzeResult.projectRoot;
@@ -363,6 +410,8 @@ function executeImplementedCommand(command, flags, cwd) {
     projectProfileRef = analyzeResult.projectProfileRef;
     analysisReportId = analyzeResult.report.report_id;
     analysisReportFile = analyzeResult.reportPath;
+    routeResolutionFile = analyzeResult.routeResolutionPath;
+    routeResolutionSteps = analyzeResult.routeResolutionMatrix;
   } else if (command === "project validate") {
     ensureRequiredFlags(command, flags);
     handoffGateEnforced = resolveOptionalBooleanFlag(
@@ -495,6 +544,8 @@ function executeImplementedCommand(command, flags, cwd) {
     runtime_state_file: runtimeStateFile,
     analysis_report_id: analysisReportId,
     analysis_report_file: analysisReportFile,
+    route_resolution_file: routeResolutionFile,
+    route_resolution_steps: routeResolutionSteps,
     validation_report_id: validationReportId,
     validation_report_file: validationReportFile,
     validation_status: validationStatus,

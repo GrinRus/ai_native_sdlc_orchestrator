@@ -236,7 +236,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S08 — Bootstrap end-to-end rehearsal
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Prove that the Wave 1 baseline closes as one bounded flow on real inputs before moving on to routed execution.
 - **Primary modules:** `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`
 - **Hard dependencies:** W1-S03, W1-S04, W1-S05, W1-S07

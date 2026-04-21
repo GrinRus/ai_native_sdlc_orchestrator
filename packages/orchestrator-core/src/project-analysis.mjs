@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 
@@ -265,6 +266,8 @@ function createVerificationPlan(commands, unknownFacts) {
  *  projectRef?: string,
  *  projectProfile?: string,
  *  runtimeRoot?: string,
+ *  routeOverrides?: Record<string, string>,
+ *  routesRoot?: string,
  * }} options
  */
 export function analyzeProjectRuntime(options = {}) {
@@ -323,6 +326,16 @@ export function analyzeProjectRuntime(options = {}) {
   }
 
   const verificationPlan = createVerificationPlan(commandCandidates, unknownFacts);
+  const routesRoot = options.routesRoot
+    ? path.isAbsolute(options.routesRoot)
+      ? options.routesRoot
+      : path.resolve(init.projectRoot, options.routesRoot)
+    : path.join(init.projectRoot, "examples/routes");
+  const routeResolutionMatrix = resolveRouteMatrix({
+    projectProfilePath: init.projectProfilePath,
+    routesRoot,
+    stepOverrides: options.routeOverrides,
+  });
 
   const report = {
     report_id: `${init.projectId}.analysis.v1`,
@@ -342,6 +355,11 @@ export function analyzeProjectRuntime(options = {}) {
     toolchain_facts: toolchainFacts,
     command_catalog: commandCatalog,
     service_boundaries: repoFacts.service_boundaries,
+    route_resolution: {
+      routes_root: path.relative(init.projectRoot, routesRoot) || ".",
+      applied_overrides: options.routeOverrides ?? {},
+      matrix: routeResolutionMatrix,
+    },
     verification_plan: verificationPlan,
     status: "ready-for-bootstrap",
     unknown_facts: unknownFacts,
@@ -360,10 +378,33 @@ export function analyzeProjectRuntime(options = {}) {
 
   const reportPath = path.join(init.runtimeLayout.reportsRoot, "project-analysis-report.json");
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  const routeResolutionPath = path.join(init.runtimeLayout.reportsRoot, "route-resolution-report.json");
+  fs.writeFileSync(
+    routeResolutionPath,
+    `${JSON.stringify(
+      {
+        report_id: `${init.projectId}.route-resolution.v1`,
+        project_id: init.projectId,
+        generated_from: {
+          command: "aor project analyze",
+          selected_profile_ref: init.projectProfileRef,
+        },
+        routes_root: path.relative(init.projectRoot, routesRoot) || ".",
+        applied_overrides: options.routeOverrides ?? {},
+        matrix: routeResolutionMatrix,
+        status: "resolved",
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 
   return {
     ...init,
     reportPath,
+    routeResolutionPath,
     report,
+    routeResolutionMatrix,
   };
 }

@@ -11,8 +11,7 @@ Execution route for a step, including adapter/provider/model choice, required ca
 - `primary`
 
 ## Notes
-Routes choose provider, adapter, model, and execution constraints. They do not own wrapper or prompt selection.
-
+Routes should also declare fallback behavior, required adapter capabilities, and promotion channel.
 Route resolution should be deterministic: step-level override first, then `project-profile.default_route_profiles`.
 If a resolved route points to a different `step`, resolution must fail with an explicit conflict.
 

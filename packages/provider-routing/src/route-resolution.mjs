@@ -93,6 +93,7 @@ export function buildRouteRegistry(options) {
  *     step: string,
  *     route_class: string,
  *     risk_tier: string,
+ *     wrapper_profile_ref: string,
  *     primary: {
  *       adapter: string | null,
  *       provider: string | null,
@@ -186,6 +187,7 @@ export function resolveRouteForStep(options) {
       step: String(routeProfile.step ?? options.stepClass),
       route_class: String(routeProfile.route_class ?? "unknown"),
       risk_tier: String(routeProfile.risk_tier ?? "unknown"),
+      wrapper_profile_ref: String(routeProfile.wrapper_profile_ref ?? "unknown"),
       primary: {
         adapter: typeof primary.adapter === "string" ? primary.adapter : null,
         provider: typeof primary.provider === "string" ? primary.provider : null,

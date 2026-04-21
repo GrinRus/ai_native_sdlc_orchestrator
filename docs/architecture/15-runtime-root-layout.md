@@ -24,6 +24,7 @@ For project `<project_id>`, the runtime layout is:
         <project_id>.handoff.bootstrap.v1.json
       reports/
         project-analysis-report.json
+        route-resolution-report.json
         validation-report.json
         verify-summary.json
         step-result-*.json

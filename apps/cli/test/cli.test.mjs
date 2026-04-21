@@ -175,11 +175,7 @@ test("project init discovers repo root from cwd and materializes runtime layout 
 test("project analyze writes durable analysis report under runtime root", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
-    fs.mkdirSync(path.join(projectRoot, "examples"), { recursive: true });
-    fs.copyFileSync(
-      path.join(workspaceRoot, "examples/project.aor.yaml"),
-      path.join(projectRoot, "examples/project.aor.yaml"),
-    );
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
     fs.writeFileSync(
       path.join(projectRoot, "package.json"),
       JSON.stringify({ name: "fixture", scripts: { lint: "eslint .", test: "node --test", build: "tsc -b" } }, null, 2),
@@ -187,16 +183,31 @@ test("project analyze writes durable analysis report under runtime root", () => 
     );
     fs.writeFileSync(path.join(projectRoot, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\\n", "utf8");
 
-    const result = invokeCli(["project", "analyze", "--project-ref", projectRoot]);
+    const result = invokeCli([
+      "project",
+      "analyze",
+      "--project-ref",
+      projectRoot,
+      "--route-overrides",
+      "planning=route.plan.default",
+    ]);
 
     assert.equal(result.exitCode, 0, result.stderr);
     const parsed = JSON.parse(result.stdout);
     assert.equal(parsed.analysis_report_id, "aor-core.analysis.v1");
     assert.equal(fs.existsSync(parsed.analysis_report_file), true);
+    assert.equal(fs.existsSync(parsed.route_resolution_file), true);
+    assert.ok(Array.isArray(parsed.route_resolution_steps));
+    assert.equal(parsed.route_resolution_steps.length, 10);
+    assert.ok(parsed.route_resolution_steps.every((step) => typeof step.resolved_route_id === "string"));
+    const planningRoute = parsed.route_resolution_steps.find((step) => step.step_class === "planning");
+    assert.ok(planningRoute);
+    assert.equal(planningRoute.resolution_source.kind, "step-override");
 
     const report = JSON.parse(fs.readFileSync(parsed.analysis_report_file, "utf8"));
     assert.equal(report.project_id, "aor-core");
     assert.equal(report.status, "ready-for-bootstrap");
+    assert.equal(report.route_resolution.matrix.length, 10);
   });
 });
 

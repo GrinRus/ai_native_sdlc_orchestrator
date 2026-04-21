@@ -17,11 +17,7 @@ const workspaceRoot = path.resolve(currentDir, "../../..");
 function withTempRepo(callback) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w1-s03-"));
   fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
-  fs.mkdirSync(path.join(repoRoot, "examples"), { recursive: true });
-  fs.copyFileSync(
-    path.join(workspaceRoot, "examples/project.aor.yaml"),
-    path.join(repoRoot, "examples/project.aor.yaml"),
-  );
+  fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
 
   try {
     callback(repoRoot);
@@ -64,10 +60,14 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
       "pnpm build",
     ]);
     assert.equal(fs.existsSync(result.reportPath), true);
+    assert.equal(fs.existsSync(result.routeResolutionPath), true);
+    assert.equal(result.routeResolutionMatrix.length, 10);
+    assert.equal(result.report.route_resolution.matrix.length, 10);
 
     const reloaded = JSON.parse(fs.readFileSync(result.reportPath, "utf8"));
     assert.equal(reloaded.report_id, result.report.report_id);
     assert.equal(reloaded.status, "ready-for-bootstrap");
+    assert.equal(reloaded.route_resolution.matrix.length, 10);
   });
 });
 
@@ -111,7 +111,25 @@ test("analyzeProjectRuntime works on the AOR repository with isolated runtime ro
     assert.equal(result.report.repo_facts.package_manager, "pnpm");
     assert.equal(result.reportPath.startsWith(runtimeRoot), true);
     assert.equal(fs.existsSync(result.reportPath), true);
+    assert.equal(fs.existsSync(result.routeResolutionPath), true);
   } finally {
     fs.rmSync(runtimeRoot, { recursive: true, force: true });
   }
+});
+
+test("analyzeProjectRuntime surfaces deterministic step-level route overrides", () => {
+  withTempRepo((repoRoot) => {
+    const result = analyzeProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      routeOverrides: {
+        planning: "route.plan.default",
+      },
+    });
+
+    const planning = result.routeResolutionMatrix.find((entry) => entry.step_class === "planning");
+    assert.ok(planning);
+    assert.equal(planning.resolution_source.kind, "step-override");
+    assert.equal(planning.resolution_source.field, "step_overrides.planning");
+  });
 });
