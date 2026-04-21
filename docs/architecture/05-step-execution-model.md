@@ -38,6 +38,16 @@ Adapter invocation uses one stable envelope pair:
 Shared lifecycle hooks are explicit and adapter-agnostic:
 `before_step`, `invoke_adapter`, `after_step`, `on_retry`, `on_repair`, `on_escalation`.
 
+## Routed execution engine baseline (W2-S05)
+The first routed execution baseline runs one deterministic path:
+1. resolve route;
+2. resolve wrapper + prompt bundle;
+3. resolve policy bounds and guardrails;
+4. negotiate adapter capabilities;
+5. invoke deterministic mock adapter in dry-run mode.
+
+The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with selected route/assets/policy/adapter metadata and evidence refs.
+
 ## Why one model matters
 A single step model keeps:
 - quality logic reusable;

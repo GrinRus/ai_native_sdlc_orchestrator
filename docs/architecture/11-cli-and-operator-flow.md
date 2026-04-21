@@ -20,3 +20,5 @@ The CLI is the primary operator surface for AOR. It must remain usable when the 
 - flags should be explicit;
 - risky actions should expose approval or dry-run modes;
 - the CLI must surface run ids, packet ids, and evidence locations clearly.
+
+`aor project verify --routed-dry-run-step <step_class>` is the baseline smoke path for routed no-write execution and durable step-result emission.
