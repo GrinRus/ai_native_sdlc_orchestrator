@@ -126,6 +126,7 @@ aor project analyze --project-ref <path> [--project-profile <path>] [--runtime-r
 aor project validate --project-ref <path> [--project-profile <path>] [--runtime-root <path>]
 aor project verify --project-ref <path> [--project-profile <path>] [--runtime-root <path>] [--require-validation-pass]
 aor eval run --project-ref <path> --subject-ref <subject_type://target> [--suite-ref <suite_id@vN>] [--subject-version <version>] [--project-profile <path>] [--runtime-root <path>]
+aor harness certify --project-ref <path> --asset-ref <asset://target> --subject-ref <subject_type://target> [--suite-ref <suite_id@vN>] [--step-class <step_class>] [--from-channel <channel>] [--to-channel <channel>] [--project-profile <path>] [--runtime-root <path>]
 ```
 
 The broader product command surface is still planned:

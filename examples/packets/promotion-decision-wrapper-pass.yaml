@@ -1,0 +1,14 @@
+decision_id: aor-core.promotion.wrapper.eval.default.v1
+subject_ref: wrapper://wrapper.eval.default@v1
+from_channel: candidate
+to_channel: stable
+evidence_refs:
+  - runtime://reports/evaluation-report-suite.cert.core-v4.json
+  - runtime://reports/harness-capture-aor-core.json
+  - runtime://reports/harness-replay-aor-core.json
+evidence_summary:
+  suite_ref: suite.cert.core@v4
+  evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4.json
+  harness_capture_ref: runtime://reports/harness-capture-aor-core.json
+  harness_replay_ref: runtime://reports/harness-replay-aor-core.json
+status: pass

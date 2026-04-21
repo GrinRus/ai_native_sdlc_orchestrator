@@ -41,6 +41,8 @@ Replay uses one stable interface:
 ### Promotion
 Decision layer that moves an asset or route from candidate to stable or frozen.
 
+Certification baseline stores a durable `promotion-decision` artifact with `pass|hold|fail` semantics and an explicit evidence set (`evaluation-report`, `harness-capture`, `harness-replay` refs).
+
 ## Datasets and suites
 A dataset stores cases for a specific subject type. A suite defines how those cases are graded and how pass/fail is decided.
 

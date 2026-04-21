@@ -46,8 +46,8 @@ This is the master index for the implementation slices across all defined waves.
 | W3-S01 | Validation kernel generalization and asset graph checks | EPIC-4 | done | `packages/contracts`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/**` | W2-S05, W1-S04 |
 | W3-S02 | Dataset and evaluation suite registry | EPIC-4 | done | `packages/contracts`, `packages/orchestrator-core`, `examples/eval/**` | W3-S01 |
 | W3-S03 | Eval runner and scorer interface | EPIC-4 | done | `packages/harness`, `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli` | W3-S02, W2-S04, W2-S05 |
-| W3-S04 | Harness capture and replay runtime | EPIC-4 | ready | `packages/harness`, `packages/observability`, `packages/orchestrator-core` | W3-S02, W2-S05 |
-| W3-S05 | Certification and promotion decision baseline | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `apps/cli` | W3-S03, W3-S04 |
+| W3-S04 | Harness capture and replay runtime | EPIC-4 | done | `packages/harness`, `packages/observability`, `packages/orchestrator-core` | W3-S02, W2-S05 |
+| W3-S05 | Certification and promotion decision baseline | EPIC-4 | ready | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `apps/cli` | W3-S03, W3-S04 |
 | W3-S06 | Quality rehearsal on selected public targets | EPIC-7 | blocked | `docs/ops/**`, `examples/live-e2e/**`, `packages/harness`, `apps/cli` | W3-S05, W0-S05 |
 
 ## W4 slices

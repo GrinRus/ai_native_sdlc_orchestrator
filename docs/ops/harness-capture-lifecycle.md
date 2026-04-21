@@ -29,6 +29,17 @@ Use `replayHarnessCapture(...)` to:
 3. reject replay explicitly with `status: incompatible` when drift is detected;
 4. rerun eval scoring only when compatibility passes.
 
+## Minimum evidence bar for promotion decisions
+A promotion decision can move an asset from `candidate` to `stable` only when all required evidence exists:
+- one evaluation report for the certification suite (`evaluation-report-*.json`);
+- one harness capture (`harness-capture-*.json`);
+- one harness replay verdict (`harness-replay-*.json`).
+
+Decision semantics:
+- `pass`: evaluation is `pass` and harness replay is `pass`;
+- `hold`: evaluation is `pass` but harness replay is missing/incompatible;
+- `fail`: evaluation is `fail` or harness replay is `fail`.
+
 ## Pruning and retention rules
 - Keep at least one latest successful capture/replay pair per critical suite (`release`, `regress`, `cert`).
 - Remove stale captures after asset/version migration once replacements are recorded.
