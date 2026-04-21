@@ -30,21 +30,14 @@ Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
 6. stop unless no-write gates pass
 
 ## Prerequisites
-- See `docs/ops/live-e2e-dependency-matrix.md` for canonical dependency and command requirements.
-- Local environment must allow npm dependency and Playwright browser downloads.
+- Node `>=22` and npm available.
+- Network access for clone and dependency install.
+- Local shell can run `npm test`.
 
 ## Abort conditions
 - Clone or dependency installation fails.
 - `npm test` fails during preflight verification.
 - Delivery or release step requires upstream write-back.
-
-## Local-branch recovery baseline (W4-S03)
-When local-branch delivery fails mid-run:
-1. Open the latest `delivery-transcript-local-branch-*.json` under `.aor/projects/<project_id>/reports/`.
-2. Checkout the original branch recorded in `git.head_before.branch`.
-3. Inspect the transcript `error` and `recovery_steps` fields before retrying.
-4. Delete temporary delivery branch only after confirming no required commit/evidence is on it.
-5. If retrying in same workspace, rerun no-write preflight before a second local-branch attempt.
 
 ## Start command
 ```bash

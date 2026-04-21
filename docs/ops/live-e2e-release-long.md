@@ -35,8 +35,9 @@ Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
 6. stop unless no-write gates pass
 
 ## Prerequisites
-- See `docs/ops/live-e2e-dependency-matrix.md` for canonical dependency and command requirements.
-- Local environment must allow workspace dependency install and full lint/typecheck/test execution.
+- Node + corepack + yarn available.
+- Network access for clone and workspace install.
+- Shell resources suitable for workspace lint/typecheck/test commands.
 
 ## Abort conditions
 - Clone or workspace installation fails.

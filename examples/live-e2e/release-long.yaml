@@ -27,7 +27,7 @@ preflight:
   - Next.js/Turborepo monorepo with apps and shared packages
   failure_safe_defaults:
   - keep output_policy.write_back_to_remote set to false
-  - keep delivery mode in fork-first-pr for long public-target rehearsals
+  - stop at patch output or fork-local branch unless policy is explicitly changed
   abort_conditions:
   - repository clone fails or ref cannot be resolved
   - yarn g:lint, g:typecheck, or g:test-unit fails during preflight verification

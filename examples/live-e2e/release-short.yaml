@@ -21,12 +21,12 @@ preflight:
   - stop
   prerequisites:
   - node >=22 with npm available
-  - network access for shallow clone, npm install, and playwright browser download
+  - network access for shallow clone and npm install
   repo_shape_notes:
   - single-package TypeScript library with fast test verification
   failure_safe_defaults:
   - keep output_policy.write_back_to_remote set to false
-  - keep delivery mode in patch-only for short public-target rehearsals
+  - allow release artifacts only in patch/local/fork delivery modes
   abort_conditions:
   - repository clone fails or ref cannot be resolved
   - npm test fails during preflight verification

@@ -21,7 +21,7 @@ preflight:
   - stop
   prerequisites:
   - node >=22 with npm available
-  - network access for shallow clone, npm install, and playwright browser download
+  - network access for shallow clone and npm install
   repo_shape_notes:
   - single-package TypeScript library with npm-based checks
   failure_safe_defaults:
