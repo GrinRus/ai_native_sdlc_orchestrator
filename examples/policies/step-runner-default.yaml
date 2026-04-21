@@ -1,0 +1,37 @@
+policy_id: policy.step.runner.default
+step_class: runner
+pre_validators:
+  - contract-shape
+  - repo-scope
+  - approval-present
+  - route-resolved
+post_validators:
+  - output-schema
+  - evidence-complete
+  - validation-commands
+quality_gate:
+  required: true
+  suite_ref: suite.release.core@v1
+retry:
+  max_attempts: 2
+  on:
+    - provider-timeout
+    - rate-limit
+    - runner-crash
+repair:
+  max_attempts: 2
+  on:
+    - schema-mismatch
+    - lint-failed
+    - tests-failed
+    - missing-evidence
+escalation:
+  after_total_failures: 4
+  on:
+    - business-ambiguity
+    - policy-conflict
+    - security-boundary
+blocking_rules:
+  - approval-missing
+  - repo-scope-violation
+  - frozen-route

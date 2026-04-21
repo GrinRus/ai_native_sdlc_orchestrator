@@ -1,0 +1,14 @@
+suite_id: suite.release.core
+version: 1
+subject_type: run
+dataset_ref: dataset://run-regression@2026-04-20T08:00:00Z
+graders:
+  - deterministic
+thresholds:
+  min_pass_rate: 1.0
+blocking_rules:
+  - any-critical-regression
+baseline_policy:
+  required: false
+retry_policy:
+  flaky_case_retries: 0

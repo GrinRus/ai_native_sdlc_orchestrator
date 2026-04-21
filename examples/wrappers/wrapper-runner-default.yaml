@@ -1,0 +1,28 @@
+wrapper_id: wrapper.runner.default
+version: 3
+step_class: runner
+prompt_bundle_ref: prompt-bundle://runner-default@v3
+session_bootstrap:
+  include_files:
+    - README.md
+    - AGENTS.md
+  include_packets:
+    - handoff
+    - spec
+tool_policy:
+  allow_repo_write: true
+  allow_shell: true
+  allow_network: false
+command_policy:
+  allowed:
+    - pnpm lint
+    - pnpm test
+output_schema_ref: schema://step-result.runner.v1
+verification_section:
+  must_run_commands:
+    - pnpm lint
+    - pnpm test
+  must_produce:
+    - diff
+    - validation-report
+redaction_policy_ref: redact://default-secret-safe

@@ -1,0 +1,25 @@
+route_id: route.qa.default
+step: qa
+route_class: runner
+risk_tier: medium
+primary:
+  adapter: codex-cli
+  provider: openai
+  model: coding-primary
+fallback:
+  - adapter: claude-code
+    provider: anthropic
+    model: coding-fallback
+wrapper_profile_ref: wrapper.runner.default@v3
+required_adapter_capabilities:
+  - repo_read
+  - shell_commands
+  - live_logs
+validation_profile_ref: validate.qa.default
+retry_policy_ref: retry.transient.default
+repair_policy_ref: repair.code.default
+constraints:
+  timeout_sec: 1200
+  max_cost_usd: 10
+  allow_scope_expansion: false
+promotion_channel: stable

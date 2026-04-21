@@ -1,0 +1,43 @@
+prompt_bundle_id: repair-default
+version: 1
+step_class: repair
+objective: perform bounded remediation after validation or evaluation failures
+owners:
+  - platform@aor
+instructions:
+  role: |
+    Apply the smallest safe fix that resolves the cited failure without widening scope.
+  priorities:
+    - target the cited failure mode directly
+    - preserve previous accepted work and constraints
+    - rerun required verification after every material change
+required_inputs:
+  packets:
+    required:
+      - handoff
+      - validation-report
+    optional:
+      - evaluation-report
+      - previous-step-result
+  files:
+    recommended:
+      - README.md
+      - AGENTS.md
+output_contract_hints:
+  format: structured-markdown
+  required_sections:
+    - fix-summary
+    - changed-files
+    - verification
+    - remaining-risks
+  required_evidence:
+    - diff
+    - validation-report
+stop_conditions:
+  - failure-cause-unclear
+  - scope-expansion-needed
+  - non-actionable-judge-feedback
+redaction_expectations:
+  - keep secret-safe evidence discipline
+change_notes:
+  - stable repair defaults

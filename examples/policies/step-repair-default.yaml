@@ -1,0 +1,32 @@
+policy_id: policy.step.repair.default
+step_class: repair
+pre_validators:
+  - contract-shape
+  - repo-scope
+  - route-resolved
+post_validators:
+  - output-schema
+  - evidence-complete
+  - validation-commands
+quality_gate:
+  required: true
+  suite_ref: suite.release.core@v1
+retry:
+  max_attempts: 1
+  on:
+    - provider-timeout
+    - runner-crash
+repair:
+  max_attempts: 2
+  on:
+    - schema-mismatch
+    - lint-failed
+    - tests-failed
+escalation:
+  after_total_failures: 3
+  on:
+    - business-ambiguity
+    - security-boundary
+blocking_rules:
+  - repo-scope-violation
+  - frozen-route

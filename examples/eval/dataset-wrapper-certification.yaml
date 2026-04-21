@@ -1,0 +1,22 @@
+dataset_id: wrapper-certification
+version: 2026-04-20T08:00:00Z
+subject_type: wrapper
+provenance:
+  sources:
+    - certification-golden-cases
+    - incident-backfills
+splits:
+  - certification
+  - regression
+cases:
+  - case_id: CASE-WRAP-0023
+    split: certification
+    tags:
+      - wrapper-change
+      - evidence-discipline
+    input_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/input.json
+    expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json
+    source_ref: review://CERT-GOLDEN-023
+flake_policy:
+  default_retry_count: 1
+  quarantine_allowed: true

@@ -1,0 +1,54 @@
+report_id: ANALYZE-001
+project_id: github-sandbox
+version: 1
+generated_from:
+  repo_refs:
+    - repo_id: target
+      ref: main
+  sources:
+    - README.md
+    - AGENTS.md
+    - package.json
+    - .github/workflows/ci.yaml
+repo_facts:
+  topology: monorepo
+  package_manager: pnpm
+  languages:
+    - typescript
+  ci_systems:
+    - github-actions
+toolchain_facts:
+  build_commands:
+    - pnpm build
+  test_commands:
+    - pnpm test
+  lint_commands:
+    - pnpm lint
+command_catalog:
+  required_for_smoke_verify:
+    - pnpm lint
+    - pnpm test -- --runInBand
+service_boundaries:
+  - service_id: api
+    paths:
+      - apps/api/**
+  - service_id: web
+    paths:
+      - apps/web/**
+risk_zones:
+  - name: auth
+    paths:
+      - packages/auth/**
+    reason: credential and session handling
+missing_prerequisites:
+  - Add project-local AGENTS.md with explicit verification commands.
+verification_plan:
+  preflight:
+    - validate-project-profile
+    - resolve-routes
+  smoke_commands:
+    - pnpm lint
+status: ready-for-bootstrap
+agent_guidance_candidates:
+  - docs/architecture/**
+  - docs/contracts/**

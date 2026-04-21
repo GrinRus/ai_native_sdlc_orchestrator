@@ -1,0 +1,22 @@
+route_id: route.discovery.default
+step: discovery
+route_class: artifact
+risk_tier: low
+primary:
+  adapter: none
+  provider: openai
+  model: planning-primary
+fallback:
+  - adapter: none
+    provider: anthropic
+    model: planning-fallback
+wrapper_profile_ref: wrapper.artifact.default@v1
+required_adapter_capabilities: []
+validation_profile_ref: validate.discovery.default
+retry_policy_ref: retry.transient.default
+repair_policy_ref: repair.artifact.default
+constraints:
+  timeout_sec: 180
+  max_cost_usd: 2
+  allow_scope_expansion: false
+promotion_channel: stable

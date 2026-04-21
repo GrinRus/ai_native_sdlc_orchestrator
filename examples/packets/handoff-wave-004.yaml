@@ -1,0 +1,40 @@
+packet_id: HANDOFF-004
+project_id: aor-core
+ticket_id: WAVE-004
+version: 2
+status: approved
+risk_tier: medium
+approved_objective: >
+  Implement bounded multirepo support with repo graph, scoped locks and release delivery manifest.
+repo_scopes:
+  - repo_id: main
+    paths:
+      - docs/**
+      - packages/orchestrator-core/**
+      - packages/contracts/**
+allowed_paths:
+  - docs/**
+  - packages/orchestrator-core/**
+  - packages/contracts/**
+allowed_commands:
+  - pnpm lint
+  - pnpm test
+required_artifacts:
+  - docs/architecture/10-multirepo-and-governance.md
+  - docs/contracts/project-profile.md
+  - docs/contracts/release-packet.md
+verification_plan:
+  validators:
+    - contract-shape
+    - repo-scope
+    - evidence-complete
+  commands:
+    - pnpm test
+route_overrides:
+  implement: route.implement.default
+approval_refs:
+  - approval://APP-882
+baseline_refs:
+  - route://route.implement.default@stable
+material_assumptions:
+  - No autonomous cross-team orchestration in MVP.

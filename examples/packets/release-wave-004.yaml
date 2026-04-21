@@ -1,0 +1,20 @@
+packet_id: REL-004
+project_id: aor-core
+ticket_id: WAVE-004
+run_refs:
+  - RUN-101
+change_summary: >
+  Added bounded multirepo governance documents, contracts and examples.
+impacted_repos:
+  - main
+verification_refs:
+  - evidence://reports/RUN-101/tests.xml
+  - evidence://evaluation/RUN-101/release-suite.json
+residual_risks:
+  - Runtime implementation is still scaffold-only.
+rollback_notes: >
+  Revert docs and contract changes as a single patch set.
+signoff_refs:
+  - approval://APP-910
+status: ready-for-close
+delivery_manifest_ref: evidence://release/REL-004/delivery-manifest.yaml

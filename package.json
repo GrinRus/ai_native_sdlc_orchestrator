@@ -1,0 +1,16 @@
+{
+  "name": "aor",
+  "private": true,
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "test": "node ./scripts/test.mjs",
+    "lint": "node ./scripts/lint.mjs",
+    "check": "node ./scripts/lint.mjs && node ./scripts/test.mjs && node ./scripts/build.mjs"
+  }
+}

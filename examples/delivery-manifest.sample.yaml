@@ -1,0 +1,29 @@
+manifest_id: DM-004
+project_id: aor-core
+ticket_id: WAVE-004
+run_refs:
+  - RUN-101
+delivery_mode: pull-request
+writeback_policy:
+  allow_remote_push: true
+  require_review_before_merge: true
+  branch_pattern: aor/WAVE-004/RUN-101
+repo_deliveries:
+  - repo_id: main
+    base_ref: origin/main
+    head_ref: refs/heads/aor/WAVE-004/RUN-101
+    branch_name: aor/WAVE-004/RUN-101
+    changed_paths:
+      - docs/architecture/**
+      - docs/contracts/**
+    commit_refs:
+      - 9f3c2ab
+    pr_ref: https://github.com/your-org/your-repo/pull/42
+    merge_strategy: squash
+    writeback_result: pr-opened
+    rollback_refs:
+      - revert://9f3c2ab
+verification_refs:
+  - evidence://reports/RUN-101/tests.xml
+  - evidence://evaluation/RUN-101/release-suite.json
+status: submitted

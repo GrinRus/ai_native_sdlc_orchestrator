@@ -1,0 +1,24 @@
+wrapper_id: wrapper.harness.default
+version: 1
+step_class: harness
+prompt_bundle_ref: prompt-bundle://harness-default@v1
+session_bootstrap:
+  include_files:
+    - README.md
+    - AGENTS.md
+  include_packets:
+    - step-result
+    - evaluation-report
+    - release
+tool_policy:
+  allow_repo_write: false
+  allow_shell: false
+  allow_network: false
+command_policy:
+  allowed: []
+output_schema_ref: schema://step-result.harness.v1
+verification_section:
+  must_produce:
+    - harness-report
+    - environment-fingerprint
+redaction_policy_ref: redact://default-secret-safe

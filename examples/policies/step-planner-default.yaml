@@ -1,0 +1,28 @@
+policy_id: policy.step.planner.default
+step_class: planner
+pre_validators:
+  - contract-shape
+  - route-resolved
+  - spec-present
+post_validators:
+  - output-schema
+  - evidence-complete
+quality_gate:
+  required: false
+retry:
+  max_attempts: 1
+  on:
+    - provider-timeout
+repair:
+  max_attempts: 1
+  on:
+    - schema-mismatch
+    - incomplete-wave-plan
+escalation:
+  after_total_failures: 2
+  on:
+    - business-ambiguity
+    - dependency-conflict
+blocking_rules:
+  - spec-missing
+  - route-unavailable

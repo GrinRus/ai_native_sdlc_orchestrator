@@ -1,0 +1,25 @@
+policy_id: policy.step.artifact.default
+step_class: artifact
+pre_validators:
+  - contract-shape
+  - route-resolved
+post_validators:
+  - output-schema
+  - evidence-complete
+quality_gate:
+  required: false
+retry:
+  max_attempts: 2
+  on:
+    - provider-timeout
+repair:
+  max_attempts: 2
+  on:
+    - missing-evidence
+    - incomplete-artifact
+escalation:
+  after_total_failures: 3
+  on:
+    - business-ambiguity
+blocking_rules:
+  - route-unavailable

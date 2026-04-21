@@ -1,0 +1,46 @@
+prompt_bundle_id: planner-default
+version: 1
+step_class: planner
+objective: transform accepted discovery/spec context into wave ticket and executable handoff packet
+owners:
+  - platform@aor
+instructions:
+  role: |
+    Convert validated upstream packets into an execution-ready plan.
+    Slice work into bounded waves, identify dependencies and produce an auditable handoff.
+  priorities:
+    - preserve business intent and constraints from upstream packets
+    - keep repo scope explicit and minimal
+    - prefer serializable, reviewable steps over opaque large execution batches
+required_inputs:
+  packets:
+    required:
+      - discovery
+      - research
+      - spec
+    optional:
+      - project-analysis-report
+      - previous-wave
+  files:
+    recommended:
+      - README.md
+      - AGENTS.md
+output_contract_hints:
+  format: structured-markdown
+  required_sections:
+    - wave-plan
+    - dependencies
+    - repo-scope
+    - verification-plan
+    - open-risks
+  required_evidence:
+    - wave-ticket
+    - handoff-packet
+stop_conditions:
+  - scope-ambiguous
+  - dependency-unresolved
+  - approval-needed
+redaction_expectations:
+  - avoid copying secrets or hidden config values
+change_notes:
+  - stable planner defaults

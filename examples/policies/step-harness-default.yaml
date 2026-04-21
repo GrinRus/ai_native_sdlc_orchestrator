@@ -1,0 +1,31 @@
+policy_id: policy.step.harness.default
+step_class: harness
+pre_validators:
+  - contract-shape
+  - subject-ref-present
+  - route-resolved
+  - environment-pinned
+post_validators:
+  - output-schema
+  - evidence-complete
+  - environment-match
+quality_gate:
+  required: false
+retry:
+  max_attempts: 1
+  on:
+    - provider-timeout
+    - environment-provision-failed
+repair:
+  max_attempts: 1
+  on:
+    - missing-trace
+    - incomplete-comparison
+escalation:
+  after_total_failures: 2
+  on:
+    - environment-mismatch
+    - certification-conflict
+blocking_rules:
+  - subject-ref-missing
+  - environment-unpinned

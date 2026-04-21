@@ -1,0 +1,63 @@
+profile_id: live-e2e.regress.long
+version: 1
+flow_kind: regress
+duration_class: long
+project_profile_template_ref: examples/project.github.aor.yaml
+scenario_id: httpie-regression-long
+target_repo:
+  repo_id: target
+  repo_url: https://github.com/httpie/cli.git
+  ref: master
+  checkout_strategy: shallow
+  write_target: patch-or-fork
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+objective:
+  title: Live E2E deep regression rehearsal on httpie/cli
+  task_brief:
+  - bootstrap the repository using its documented make-based developer flow
+  - implement one bounded CLI fix or UX improvement with tests
+  - stop at patch output or a fork-local branch
+  success_definition:
+  - source checkout succeeds
+  - handoff packet is materialized
+  - execution completes with evidence
+  - make test passes
+  - make codestyle passes
+stages:
+- bootstrap
+- discovery
+- spec
+- planning
+- handoff
+- execution
+- review
+- qa
+- eval
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  commands:
+  - make test
+  - make codestyle
+  eval_suites:
+  - suite.regress.long@v1
+  harness:
+    enabled: true
+budgets:
+  wall_clock_limit_min: 75
+  max_changed_files: 14
+  max_cost_usd: 30
+approvals:
+  handoff: required
+  release: skipped
+output_policy:
+  materialize_release_packet: false
+  write_back_to_remote: false
+  preferred_delivery_mode: patch
+ui:
+  attachable: true
+  default_scope: run

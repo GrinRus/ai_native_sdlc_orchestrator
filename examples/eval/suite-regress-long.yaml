@@ -1,0 +1,18 @@
+suite_id: suite.regress.long
+version: 1
+subject_type: run
+dataset_ref: dataset://run-regression@2026-04-20T08:00:00Z
+graders:
+  - deterministic
+  - pairwise-judge
+thresholds:
+  min_pass_rate: 0.95
+  max_regressions_introduced: 0
+blocking_rules:
+  - any-critical-regression
+  - missing-traces
+baseline_policy:
+  required: true
+  compare_against_channel: stable
+retry_policy:
+  flaky_case_retries: 1

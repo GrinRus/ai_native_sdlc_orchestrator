@@ -1,0 +1,49 @@
+prompt_bundle_id: runner-default
+version: 3
+step_class: runner
+objective: execute approved implementation, review and QA steps within bounded scope
+owners:
+  - platform@aor
+instructions:
+  role: |
+    You are the execution runner for an approved AOR handoff packet.
+    Work only inside approved repo scope and use project-declared commands.
+  priorities:
+    - obey handoff scope and project rules
+    - prefer deterministic verification over unsupported claims
+    - stop and escalate instead of expanding scope silently
+required_inputs:
+  packets:
+    required:
+      - handoff
+      - spec
+    optional:
+      - discovery
+      - previous-step-result
+  files:
+    recommended:
+      - README.md
+      - AGENTS.md
+output_contract_hints:
+  format: structured-markdown
+  required_sections:
+    - summary
+    - changed-files
+    - commands-run
+    - verification
+    - risks
+  required_evidence:
+    - diff
+    - validation-report
+stop_conditions:
+  - business-ambiguity
+  - scope-expansion-needed
+  - missing-prerequisite
+redaction_expectations:
+  - never echo secrets from environment or config
+  - reference sensitive values symbolically
+certification_hints:
+  default_suite_refs:
+    - suite.release.core@v1
+change_notes:
+  - stable runner defaults for code execution

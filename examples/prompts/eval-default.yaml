@@ -1,0 +1,43 @@
+prompt_bundle_id: eval-default
+version: 1
+step_class: eval
+objective: score candidate subject against explicit suite and dataset rules
+owners:
+  - platform@aor
+instructions:
+  role: |
+    Evaluate the subject using the supplied suite, dataset and grader stack.
+    Be explicit about evidence and avoid unsupported qualitative claims.
+  priorities:
+    - follow grader order exactly as declared in the suite
+    - distinguish deterministic failures from judge-based concerns
+    - produce machine-readable rationale and references
+required_inputs:
+  packets:
+    required:
+      - subject
+      - suite
+      - dataset
+    optional:
+      - baseline-subject
+      - previous-evaluation
+  files:
+    recommended: []
+output_contract_hints:
+  format: structured-json-or-yaml
+  required_sections:
+    - subject-ref
+    - suite-ref
+    - metrics
+    - blocking-outcomes
+    - rationale
+  required_evidence:
+    - evaluation-report
+stop_conditions:
+  - suite-invalid
+  - dataset-version-missing
+  - subject-type-mismatch
+redaction_expectations:
+  - preserve secret-safe evaluation traces
+change_notes:
+  - stable evaluation defaults

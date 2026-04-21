@@ -1,0 +1,60 @@
+# Live E2E target catalog
+
+This catalog defines the public repositories AOR uses for live end-to-end rehearsals.
+
+## Safety policy
+- Default to **read-only bootstrap and patch output**.
+- Never push to upstream public repositories by default.
+- If a delivery rehearsal needs write-back, use a personal fork or a local mirror.
+- Always produce a delivery manifest when the rehearsal reaches delivery.
+
+## Target 1 — `sindresorhus/ky`
+- Shape: small TypeScript library.
+- Why it is useful: single-package repo, modern Node runtime, small blast radius, and a crisp `test` command.
+- Current signals from the repository:
+  - Node `>=22`
+  - `npm test` runs `xo`, `build`, and `ava`
+  - the project is a tiny HTTP client with no runtime dependencies
+- Best scenarios:
+  - `regress short`
+  - `release short`
+- Suggested rehearsal task:
+  - add or adjust one narrow regression test;
+  - make the smallest source change needed;
+  - stop at patch, local branch, or fork PR draft.
+
+## Target 2 — `httpie/cli`
+- Shape: medium Python CLI project.
+- Why it is useful: different language, CLI-oriented workflow, stronger local setup, and richer test targets.
+- Current signals from the repository:
+  - main development instructions use `make all`
+  - local checks include `make test`, `make test-cover`, and `make codestyle`
+  - the project uses `pytest`
+- Best scenario:
+  - `regress long`
+- Suggested rehearsal task:
+  - implement a bounded bug fix or UX improvement in one CLI surface;
+  - add or update tests;
+  - verify with `make test` and `make codestyle`.
+
+## Target 3 — `belgattitude/nextjs-monorepo-example`
+- Shape: public Next.js/Turborepo/Yarn monorepo with apps and packages.
+- Why it is useful: representative monorepo topology, shared packages, app/package boundaries, and workspace-wide checks.
+- Current signals from the repository:
+  - install starts with `corepack enable` and `yarn install`
+  - root scripts include `g:lint`, `g:typecheck`, and `g:test-unit`
+  - the workspace uses `apps/*` and `packages/*`
+- Best scenario:
+  - `release long`
+- Suggested rehearsal task:
+  - update one shared package and one consuming app;
+  - run workspace lint, typecheck, and unit tests;
+  - materialize release packet and delivery manifest for a fork or local mirror.
+
+## Why these targets
+Together these targets cover:
+- small library workflows;
+- deeper CLI regressions;
+- monorepo release-shaped delivery;
+- more than one language/runtime;
+- both short and long rehearsal budgets.

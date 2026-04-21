@@ -1,0 +1,39 @@
+# Step execution model
+
+## Purpose
+AOR needs one execution model for both execution and non-execution steps.
+
+## Supported step classes
+- `artifact` — discovery, research, ADR, spec, review summaries
+- `planner` — wave and handoff planning
+- `runner` — bounded execution through a coding runner
+- `repair` — narrower fix-up loops after failures
+- `eval` — suite execution and scoring
+- `harness` — replay, certification, compare-to-baseline, failure-mode runs
+
+## Step resolution stack
+For each step AOR resolves:
+1. project profile
+2. route profile
+3. wrapper profile
+4. prompt bundle
+5. step policy
+6. adapter/provider/model execution
+
+## Standard step phases
+1. load context and required packets
+2. resolve policy and route
+3. pre-validate prerequisites
+4. execute the step
+5. normalize output into a step result
+6. run post-validation
+7. optionally run eval or harness
+8. retry, repair, escalate, or close
+
+## Why one model matters
+A single step model keeps:
+- quality logic reusable;
+- replay possible;
+- routing consistent;
+- audits easier to read;
+- platform-asset changes comparable across flows.

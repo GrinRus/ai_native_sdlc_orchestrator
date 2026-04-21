@@ -1,0 +1,26 @@
+adapter_id: claude-code
+runner_family: claude
+version: 1
+launch_modes:
+  - interactive
+  - non-interactive
+capabilities:
+  repo_read: true
+  repo_write: true
+  shell_commands: true
+  structured_output: true
+  live_logs: true
+  mcp_tools: true
+  subagents: true
+sandbox_mode: local-or-container
+approval_features:
+  supports_human_approval: true
+  supports_pause_resume: true
+log_features:
+  stdout: true
+  stderr: true
+  tool_calls: true
+  normalized_summary: true
+certification_state: candidate
+limitations:
+  - Structured output reliability must be validated via wrapper-level schema checks.

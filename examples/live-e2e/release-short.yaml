@@ -1,0 +1,62 @@
+profile_id: live-e2e.release.short
+version: 1
+flow_kind: release
+duration_class: short
+project_profile_template_ref: examples/project.github.aor.yaml
+scenario_id: ky-release-short
+target_repo:
+  repo_id: target
+  repo_url: https://github.com/sindresorhus/ky.git
+  ref: main
+  checkout_strategy: shallow
+  write_target: patch-or-fork
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+objective:
+  title: Live E2E short release rehearsal on sindresorhus/ky
+  task_brief:
+  - run a narrow change with review and QA
+  - materialize a delivery manifest and release packet
+  - keep upstream write-back disabled unless a fork is explicitly configured
+  success_definition:
+  - execution, review, and qa complete with evidence
+  - npm test passes
+  - delivery manifest is materialized
+  - release packet is materialized
+stages:
+- bootstrap
+- discovery
+- spec
+- planning
+- handoff
+- execution
+- review
+- qa
+- delivery
+- release
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  commands:
+  - npm test
+  eval_suites:
+  - suite.release.short@v1
+  harness:
+    enabled: false
+budgets:
+  wall_clock_limit_min: 35
+  max_changed_files: 10
+  max_cost_usd: 18
+approvals:
+  handoff: required
+  release: required
+output_policy:
+  materialize_release_packet: true
+  write_back_to_remote: false
+  preferred_delivery_mode: patch
+ui:
+  attachable: true
+  default_scope: run

@@ -1,0 +1,66 @@
+profile_id: live-e2e.release.long
+version: 1
+flow_kind: release
+duration_class: long
+project_profile_template_ref: examples/project.github.aor.yaml
+scenario_id: nextjs-monorepo-release-long
+target_repo:
+  repo_id: target
+  repo_url: https://github.com/belgattitude/nextjs-monorepo-example.git
+  ref: main
+  checkout_strategy: shallow
+  write_target: patch-or-fork
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+objective:
+  title: Live E2E long release rehearsal on belgattitude/nextjs-monorepo-example
+  task_brief:
+  - bootstrap the monorepo and map the package/app graph
+  - change one shared package and one consumer surface
+  - materialize delivery and release artifacts against a patch or fork
+  success_definition:
+  - source checkout succeeds
+  - execution completes with evidence
+  - workspace verification commands pass
+  - delivery manifest is materialized
+  - release packet is materialized
+stages:
+- bootstrap
+- discovery
+- spec
+- planning
+- handoff
+- execution
+- review
+- qa
+- eval
+- delivery
+- release
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  commands:
+  - yarn g:lint
+  - yarn g:typecheck
+  - yarn g:test-unit
+  eval_suites:
+  - suite.release.long@v1
+  harness:
+    enabled: true
+budgets:
+  wall_clock_limit_min: 120
+  max_changed_files: 20
+  max_cost_usd: 45
+approvals:
+  handoff: required
+  release: required
+output_policy:
+  materialize_release_packet: true
+  write_back_to_remote: false
+  preferred_delivery_mode: patch
+ui:
+  attachable: true
+  default_scope: run

@@ -1,0 +1,24 @@
+policy_id: policy.step.eval.default
+step_class: eval
+pre_validators:
+  - contract-shape
+  - suite-present
+post_validators:
+  - output-schema
+  - evidence-complete
+quality_gate:
+  required: false
+retry:
+  max_attempts: 1
+  on:
+    - provider-timeout
+repair:
+  max_attempts: 1
+  on:
+    - missing-trace
+escalation:
+  after_total_failures: 2
+  on:
+    - judge-conflict
+blocking_rules:
+  - dataset-version-missing

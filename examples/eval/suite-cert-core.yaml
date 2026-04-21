@@ -1,0 +1,18 @@
+suite_id: suite.cert.core
+version: 4
+subject_type: wrapper
+dataset_ref: dataset://wrapper-certification@2026-04-20T08:00:00Z
+graders:
+  - deterministic
+  - pairwise-judge
+thresholds:
+  min_pass_rate: 0.9
+  max_regressions_introduced: 0
+blocking_rules:
+  - any-critical-regression
+  - missing-traces
+baseline_policy:
+  required: true
+  compare_against_channel: stable
+retry_policy:
+  flaky_case_retries: 1

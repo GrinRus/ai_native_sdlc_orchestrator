@@ -1,0 +1,12 @@
+node_modules
+.pnpm-store
+.next
+dist
+coverage
+.env
+.env.*
+.DS_Store
+.aor
+.aor/
+aor/
+*.log

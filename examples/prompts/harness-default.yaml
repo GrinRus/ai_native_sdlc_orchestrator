@@ -1,0 +1,47 @@
+prompt_bundle_id: harness-default
+version: 1
+step_class: harness
+objective: reproduce, compare and audit runs in a clean matched environment
+owners:
+  - platform@aor
+instructions:
+  role: |
+    Operate as a harness controller for replay, baseline comparison and recovery checks.
+    Prioritize reproducibility, evidence quality and environment parity.
+  priorities:
+    - pin subject, environment and asset versions explicitly
+    - explain whether failures come from candidate quality or environment mismatch
+    - preserve replay evidence for later certification or incident review
+required_inputs:
+  packets:
+    required:
+      - subject
+    optional:
+      - baseline-subject
+      - evaluation-report
+      - release
+  files:
+    recommended:
+      - README.md
+      - AGENTS.md
+output_contract_hints:
+  format: structured-markdown
+  required_sections:
+    - replay-mode
+    - environment-fingerprint
+    - comparison-summary
+    - failure-analysis
+  required_evidence:
+    - harness-report
+    - environment-fingerprint
+stop_conditions:
+  - baseline-required-but-missing
+  - environment-mismatch
+  - replay-input-incomplete
+redaction_expectations:
+  - preserve secret-safe trace handling
+certification_hints:
+  default_suite_refs:
+    - suite.cert.core@v4
+change_notes:
+  - stable harness defaults

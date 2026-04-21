@@ -1,0 +1,97 @@
+project_id: aor-core
+display_name: AOR Core
+repo_topology: monorepo
+repos:
+  - repo_id: main
+    name: main
+    source:
+      kind: local
+      root: .
+    default_branch: main
+    role: application
+    build_commands:
+      - pnpm build
+    test_commands:
+      - pnpm test
+    lint_commands:
+      - pnpm lint
+repo_graph: []
+allowed_providers:
+  - openai
+  - anthropic
+  - open-code
+allowed_adapters:
+  - codex-cli
+  - claude-code
+  - open-code
+  - mock-runner
+default_route_profiles:
+  discovery: route.discovery.default
+  research: route.research.default
+  spec: route.spec.default
+  planning: route.plan.default
+  implement: route.implement.default
+  review: route.review.default
+  qa: route.qa.default
+  repair: route.repair.default
+  eval: route.eval.default
+  harness: route.harness.default
+default_step_policies:
+  artifact: policy.step.artifact.default
+  planner: policy.step.planner.default
+  runner: policy.step.runner.default
+  repair: policy.step.repair.default
+  eval: policy.step.eval.default
+  harness: policy.step.harness.default
+default_wrapper_profiles:
+  artifact: wrapper.artifact.default@v1
+  planner: wrapper.planner.default@v1
+  runner: wrapper.runner.default@v3
+  repair: wrapper.repair.default@v1
+  eval: wrapper.eval.default@v1
+  harness: wrapper.harness.default@v1
+budget_policy:
+  default_cost_limit_usd: 50
+  default_timeout_sec: 3600
+approval_policy:
+  required_for_execution: true
+  invalidate_on_material_change: true
+security_policy:
+  redact_secrets: true
+  provider_allowlist_enforced: true
+eval_policy:
+  required_for_release: true
+  default_release_suite_ref: suite.release.core@v1
+runtime_defaults:
+  runtime_root: .aor
+  workspace_mode: ephemeral
+bootstrap_policy:
+  run_project_analysis: true
+  require_project_verify: true
+writeback_policy:
+  default_delivery_mode: pull-request
+  allow_direct_write: false
+  require_delivery_manifest: true
+tooling_policy:
+  network_mode: deny-by-default
+  mcp_allowlist: []
+live_e2e_defaults:
+  profiles:
+    regress_short: live-e2e.regress.short@v1
+    regress_long: live-e2e.regress.long@v1
+    release_short: live-e2e.release.short@v1
+    release_long: live-e2e.release.long@v1
+risk_tiers:
+  low:
+    require_human_approval: false
+  medium:
+    require_human_approval: true
+  high:
+    require_human_approval: true
+    require_security_review: true
+live_ops:
+  enabled: true
+  transport: sse
+  ui_attachable: true
+  ui_catchup_mode: read-model-plus-stream
+  retain_logs_days: 30

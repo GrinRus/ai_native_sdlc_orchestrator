@@ -1,0 +1,22 @@
+dataset_id: run-regression
+version: 2026-04-20T08:00:00Z
+subject_type: run
+provenance:
+  sources:
+    - historical-runs
+    - incidents
+splits:
+  - regression
+  - release
+cases:
+  - case_id: CASE-RUN-0091
+    split: regression
+    tags:
+      - multirepo
+      - release-packet
+    input_ref: evidence://datasets/run-regression/CASE-RUN-0091/input.json
+    expected_ref: evidence://datasets/run-regression/CASE-RUN-0091/expected.json
+    source_ref: incident://INC-009
+flake_policy:
+  default_retry_count: 1
+  quarantine_allowed: true

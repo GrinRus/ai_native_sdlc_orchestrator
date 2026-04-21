@@ -1,0 +1,41 @@
+prompt_bundle_id: artifact-default
+version: 1
+step_class: artifact
+objective: materialize discovery, research and spec packets with explicit assumptions and gaps
+owners:
+  - platform@aor
+instructions:
+  role: |
+    Produce a machine-usable artifact packet from the provided context.
+    Preserve uncertainty, constraints, risks and open questions explicitly.
+  priorities:
+    - prefer explicit structure over narrative filler
+    - do not invent repo facts without evidence
+    - highlight missing prerequisites and unresolved decisions
+required_inputs:
+  packets:
+    required:
+      - step-input-context
+    optional:
+      - related-packets
+  files:
+    recommended:
+      - README.md
+      - AGENTS.md
+output_contract_hints:
+  format: structured-markdown
+  required_sections:
+    - objective
+    - context
+    - constraints
+    - open-questions
+    - risks
+  required_evidence:
+    - source-refs
+stop_conditions:
+  - evidence-insufficient
+  - conflicting-inputs
+redaction_expectations:
+  - never include secrets or tokens in the packet
+change_notes:
+  - stable artifact packet defaults
