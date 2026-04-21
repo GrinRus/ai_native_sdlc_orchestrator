@@ -7,6 +7,18 @@ This procedure is the reusable baseline for public-repo rehearsals across bootst
 - Preferred delivery mode stays in patch/local/fork-safe options.
 - Rehearsal stops immediately when preflight safety gates fail.
 
+## Isolation mode guidance (W4-S01)
+Choose runtime workspace isolation explicitly through `project-profile.runtime_defaults.workspace_mode`:
+
+- `ephemeral` — run in the primary checkout. Use for bootstrap-only no-write smoke where delivery mutation is not attempted.
+- `workspace-clone` — run in an isolated filesystem clone. Recommended for patch-only and fork-first delivery rehearsals.
+- `worktree` — run in an isolated worktree-style root. Recommended for local-branch delivery rehearsals.
+
+Cleanup policy is controlled by `runtime_defaults.workspace_cleanup`:
+- `on_success`, `on_abort`, `on_failure` each accept `delete`, `retain`, or `none`.
+- Default behavior for isolated roots is `delete` on success/abort and `retain` on failure.
+- Default behavior for `ephemeral` mode is `none` for all outcomes.
+
 ## Preflight sequence
 1. **Clone** target repository with the configured ref and checkout strategy.
 2. **Inspect** repo shape, prerequisites, and local command ownership.
