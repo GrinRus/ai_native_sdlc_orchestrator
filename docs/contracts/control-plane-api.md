@@ -29,7 +29,7 @@ The API exposes command, query, and live-stream surfaces for AOR.
 - `GET /api/projects/:projectId/step-results` — `step-result` artifacts from reports.
 - `GET /api/projects/:projectId/manifests` — delivery-manifest artifacts.
 - `GET /api/projects/:projectId/promotion-decisions` — promotion-decision artifacts.
-- `GET /api/projects/:projectId/quality-artifacts` — validation/evaluation reports and promotion decisions.
+- `GET /api/projects/:projectId/quality-artifacts` — validation/evaluation reports, incident reports, and promotion decisions.
 - `GET /api/projects/:projectId/runs` — aggregated run-level view derived from packet, step-result, and quality artifact references.
 
 All read responses must reuse existing contract families and IDs rather than API-only parallel shapes.

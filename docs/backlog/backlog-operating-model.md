@@ -120,6 +120,15 @@ Use the helper script to keep this loop deterministic:
 - `pnpm slice:complete -- W0-S04 --apply` — mark one slice as `done` in both backlog docs.
 - `pnpm slice:gate` — run the mandatory check gate before commit.
 
+## Learning-loop intake
+
+When live operations produce learning artifacts (`learning-loop-scorecard-*`, `incident-report-*`, `learning-loop-handoff-*`):
+
+1. Use the handoff artifact as the planning source.
+2. Link follow-up quality work to explicit suite/capture surfaces.
+3. Add backlog changes only at slice granularity in the owning wave and master backlog docs.
+4. Keep run id traceability in the backlog note so improvement work can be audited back to runtime evidence.
+
 ## When creating or changing slices
 
 If you add, remove, split, or merge a slice, update all of the following together:

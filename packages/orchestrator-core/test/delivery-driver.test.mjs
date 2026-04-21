@@ -91,6 +91,8 @@ function createReadyPlan(options) {
 function assertDeliveryArtifacts(result) {
   assert.equal(fs.existsSync(result.deliveryManifestFile), true);
   assert.equal(fs.existsSync(result.releasePacketFile), true);
+  assert.equal(fs.existsSync(result.learningLoopScorecardFile), true);
+  assert.equal(fs.existsSync(result.learningLoopHandoffFile), true);
 
   const manifestLoaded = loadContractFile({
     filePath: result.deliveryManifestFile,
@@ -108,6 +110,14 @@ function assertDeliveryArtifacts(result) {
   assert.equal(releaseLoaded.ok, true);
   assert.equal(typeof releaseLoaded.document.delivery_manifest_ref, "string");
   assert.equal(typeof releaseLoaded.document.evidence_lineage, "object");
+
+  const learningScorecard = JSON.parse(fs.readFileSync(result.learningLoopScorecardFile, "utf8"));
+  assert.equal(learningScorecard.run_id, result.runId);
+  assert.equal(typeof learningScorecard.source_kind, "string");
+
+  const learningHandoff = JSON.parse(fs.readFileSync(result.learningLoopHandoffFile, "utf8"));
+  assert.equal(learningHandoff.run_id, result.runId);
+  assert.equal(typeof learningHandoff.scorecard_ref, "string");
 }
 
 test("runDeliveryDriver emits patch artifact and transcript for patch-only mode", () => {
@@ -220,6 +230,16 @@ test("runDeliveryDriver records recovery guidance when local-branch mode fails m
     });
     assert.equal(releaseLoaded.ok, true);
     assert.equal(releaseLoaded.document.status, "blocked");
+    assert.equal(typeof result.incidentReportFile, "string");
+    assert.equal(fs.existsSync(result.incidentReportFile), true);
+
+    const incidentLoaded = loadContractFile({
+      filePath: result.incidentReportFile,
+      family: "incident-report",
+    });
+    assert.equal(incidentLoaded.ok, true);
+    assert.ok(Array.isArray(incidentLoaded.document.linked_run_refs));
+    assert.ok(incidentLoaded.document.linked_run_refs.some((ref) => String(ref).includes(result.runId)));
   });
 });
 

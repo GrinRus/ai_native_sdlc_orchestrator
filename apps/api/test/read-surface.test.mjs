@@ -168,6 +168,20 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
       },
     });
 
+    writeContractFile({
+      family: "incident-report",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "incident-report-runtime.json"),
+      document: {
+        incident_id: `${init.projectId}.incident.runtime`,
+        project_id: init.projectId,
+        severity: "high",
+        summary: "Delivery failure rehearsal requires follow-up.",
+        linked_run_refs: [`run://${runId}`],
+        linked_asset_refs: [deliveryResult.transcriptFile],
+        status: "open",
+      },
+    });
+
     const projectState = readProjectState({ projectRef: repoRoot, cwd: repoRoot });
     assert.equal(projectState.project_id, init.projectId);
     assert.equal(projectState.project_root, repoRoot);
@@ -190,6 +204,7 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     const qualityArtifacts = listQualityArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "validation-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "evaluation-report"));
+    assert.ok(qualityArtifacts.some((artifact) => artifact.family === "incident-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "promotion-decision"));
 
     const runs = listRuns({ projectRef: repoRoot, cwd: repoRoot });
@@ -197,5 +212,6 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     assert.ok(runSummary);
     assert.ok(runSummary.packet_refs.length >= 1);
     assert.ok(runSummary.step_result_refs.length >= 1);
+    assert.ok(runSummary.quality_refs.length >= 1);
   });
 });

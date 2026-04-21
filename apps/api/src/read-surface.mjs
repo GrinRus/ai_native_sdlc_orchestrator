@@ -14,6 +14,7 @@ const PROMOTION_DECISION_REGEX = /^promotion-decision-.*\.json$/;
 const STEP_RESULT_REGEX = /^step-result-.*\.json$/;
 const VALIDATION_REPORT_REGEX = /^validation-report.*\.json$/;
 const EVALUATION_REPORT_REGEX = /^evaluation-report.*\.json$/;
+const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
 
 /**
  * @param {string} value
@@ -188,6 +189,7 @@ export function listQualityArtifacts(options = {}) {
   return [
     ...loadContractDocuments({ init, files: reportFiles, family: "validation-report", matcher: VALIDATION_REPORT_REGEX }),
     ...loadContractDocuments({ init, files: reportFiles, family: "evaluation-report", matcher: EVALUATION_REPORT_REGEX }),
+    ...loadContractDocuments({ init, files: reportFiles, family: "incident-report", matcher: INCIDENT_REPORT_REGEX }),
     ...listPromotionDecisions(options),
   ];
 }
@@ -200,6 +202,14 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {string} runRef
+ * @returns {string}
+ */
+function normalizeRunRef(runRef) {
+  return runRef.startsWith("run://") ? runRef.slice("run://".length) : runRef;
 }
 
 /**
@@ -237,7 +247,7 @@ export function listRuns(options = {}) {
   }
 
   for (const packet of packets) {
-    const runRefs = asStringArray(packet.document.run_refs);
+    const runRefs = asStringArray(packet.document.run_refs).map((runRef) => normalizeRunRef(runRef));
     for (const runRef of runRefs) {
       const run = ensureRun(runRef);
       run.packet_refs.push(packet.artifact_ref);
@@ -247,15 +257,19 @@ export function listRuns(options = {}) {
   for (const stepResult of stepResults) {
     const runId = typeof stepResult.document.run_id === "string" ? stepResult.document.run_id : null;
     if (!runId) continue;
-    const run = ensureRun(runId);
+    const run = ensureRun(normalizeRunRef(runId));
     run.step_result_refs.push(stepResult.artifact_ref);
   }
 
   for (const artifact of quality) {
-    const runId = typeof artifact.document.run_id === "string" ? artifact.document.run_id : null;
-    if (!runId) continue;
-    const run = ensureRun(runId);
-    run.quality_refs.push(artifact.artifact_ref);
+    const runIds = [
+      ...(typeof artifact.document.run_id === "string" ? [normalizeRunRef(artifact.document.run_id)] : []),
+      ...asStringArray(artifact.document.linked_run_refs).map((runRef) => normalizeRunRef(runRef)),
+    ];
+    for (const runId of runIds) {
+      const run = ensureRun(runId);
+      run.quality_refs.push(artifact.artifact_ref);
+    }
   }
 
   return [...runMap.values()].map((entry) => ({

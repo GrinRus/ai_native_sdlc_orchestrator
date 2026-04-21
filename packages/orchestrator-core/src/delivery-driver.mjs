@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
+import { materializeLearningLoopArtifacts } from "../../observability/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 
@@ -747,6 +748,39 @@ export function runDeliveryDriver(options = {}) {
     delivery_manifest_file: deliveryManifestFile,
     release_packet_file: releasePacketFile,
   };
+
+  const learningLoop = materializeLearningLoopArtifacts({
+    projectId: init.projectId,
+    projectRoot: init.projectRoot,
+    runtimeLayout: init.runtimeLayout,
+    runId,
+    sourceKind: "delivery",
+    runStatus: status,
+    summary:
+      status === "failed"
+        ? errorMessage ?? releasePacket.change_summary
+        : releasePacket.change_summary,
+    evidenceRefs: uniqueStrings([
+      deliveryPlanPath,
+      transcriptFile,
+      deliveryManifestFile,
+      releasePacketFile,
+      ...deliveryManifest.verification_refs,
+      ...deliveryOutputRefs,
+    ]),
+    backlogRefs: [
+      "docs/backlog/mvp-implementation-backlog.md",
+      "docs/backlog/wave-5-implementation-slices.md",
+    ],
+    incidentSummary: status === "failed" ? errorMessage ?? undefined : undefined,
+  });
+
+  transcript.outputs = {
+    ...asRecord(transcript.outputs),
+    learning_loop_scorecard_file: learningLoop.scorecardFile,
+    learning_loop_handoff_file: learningLoop.handoffFile,
+    incident_report_file: learningLoop.incidentFile,
+  };
   fs.writeFileSync(transcriptFile, `${JSON.stringify(transcript, null, 2)}\n`, "utf8");
 
   return {
@@ -764,6 +798,12 @@ export function runDeliveryDriver(options = {}) {
     deliveryManifestFile,
     releasePacket,
     releasePacketFile,
+    learningLoopScorecard: learningLoop.scorecard,
+    learningLoopScorecardFile: learningLoop.scorecardFile,
+    incidentReport: learningLoop.incident,
+    incidentReportFile: learningLoop.incidentFile,
+    learningLoopHandoff: learningLoop.handoff,
+    learningLoopHandoffFile: learningLoop.handoffFile,
     changedPaths,
     diffStats,
     outputs,
