@@ -69,6 +69,8 @@ What these commands do today:
 - `pnpm build` checks scaffold integrity for community files, workflow conventions, and root package settings.
 - `pnpm check` runs all of the above in sequence.
 
+CI runs the same gate on pull requests, pushes to `main`, and manual workflow dispatch through `.github/workflows/ci.yml`.
+
 Suggested implementation workflow:
 
 1. Pick one `ready` slice from `docs/backlog/mvp-implementation-backlog.md`.
@@ -164,7 +166,10 @@ These roadmap commands are not fully implemented runtime flows yet.
 
 ### Contributor support
 - `.agents/skills/**` — reusable repo skills for agents.
-- `.github/**` — CI and GitHub community-health assets.
+- `.github/workflows/ci.yml` — pinned, least-privilege CI workflow for repo integrity checks.
+- `.github/ISSUE_TEMPLATE/bug-report.md` — bug-report template.
+- `.github/ISSUE_TEMPLATE/feature-request.md` — feature-request template.
+- `.github/PULL_REQUEST_TEMPLATE.md` — pull-request checklist template.
 - `scripts/**` — root repository-integrity checks used by local commands and CI.
 
 ## Live E2E target projects

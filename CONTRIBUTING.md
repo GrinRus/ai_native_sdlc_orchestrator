@@ -61,6 +61,22 @@ Notes:
 - `slice:complete` updates both the master backlog and the owning wave doc state.
 - `slice:gate` runs the mandatory pre-commit gate (`lint`, `test`, `build`, `check`).
 
+## CI acceptance gates
+
+The repository uses a single workflow: `.github/workflows/ci.yml`.
+
+It runs on:
+- pull requests;
+- pushes to `main`;
+- manual `workflow_dispatch`.
+
+What it proves today:
+- `pnpm lint` validates guidance coverage and required repo files;
+- `pnpm test` validates backlog consistency, contracts loading, reference integrity, and slice-cycle behavior;
+- `pnpm build` validates scaffold integrity and workflow/community-file conventions.
+
+If CI fails, the failing step maps directly to one of these root checks so the remediation path stays explicit.
+
 ## Repo-specific rules
 
 - English is the default project language.
