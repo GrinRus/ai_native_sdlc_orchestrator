@@ -1,0 +1,75 @@
+{
+  "manifest_id": "aor-core.delivery-manifest.patch-only.1776795000000",
+  "project_id": "aor-core",
+  "ticket_id": "WAVE-004",
+  "run_refs": [
+    "live-e2e.release.short.run-001",
+    "live-e2e.release.short.run-001"
+  ],
+  "step_ref": "delivery.apply",
+  "delivery_mode": "patch-only",
+  "writeback_policy": {
+    "mode": "patch-only",
+    "mode_source": {
+      "resolved_mode": "patch-only",
+      "canonical_mode": "patch-only",
+      "resolution_kind": "project-default",
+      "resolution_field": "writeback_policy.default_delivery_mode"
+    },
+    "writeback_allowed": true,
+    "blocking_reasons": [],
+    "network_mode": "local"
+  },
+  "repo_deliveries": [
+    {
+      "repo_id": "target",
+      "base_ref": "main",
+      "head_ref": "main",
+      "branch_name": null,
+      "changed_paths": [
+        "source/core.ts",
+        "test/core.test.ts"
+      ],
+      "diff_totals": {
+        "files": 2,
+        "added": 12,
+        "deleted": 3
+      },
+      "commit_refs": [],
+      "writeback_result": "patch-materialized"
+    }
+  ],
+  "verification_refs": [
+    "evidence://reports/live-e2e.release.short.run-001/project-verify.json",
+    "evidence://reports/live-e2e.release.short.run-001/eval-report.json",
+    "evidence://reports/live-e2e.release.short.run-001/delivery-transcript-patch-only.json"
+  ],
+  "approval_context": {
+    "approved_handoff": {
+      "required": true,
+      "status": "present",
+      "ref": "evidence://artifacts/handoff-wave-004.json"
+    },
+    "promotion_evidence": {
+      "required": true,
+      "status": "present",
+      "refs": [
+        "evidence://reports/live-e2e.release.short.run-001/promotion-decision.json"
+      ]
+    },
+    "evidence_refs": [
+      "evidence://artifacts/handoff-wave-004.json",
+      "evidence://reports/live-e2e.release.short.run-001/promotion-decision.json"
+    ]
+  },
+  "evidence_root": ".aor/projects/aor-core/reports",
+  "source_refs": {
+    "delivery_plan_ref": "evidence://artifacts/delivery-plan-implement-1776795000000.json",
+    "delivery_transcript_ref": "evidence://reports/live-e2e.release.short.run-001/delivery-transcript-patch-only.json",
+    "delivery_output_refs": [
+      "evidence://artifacts/delivery-patch-live-e2e.release.short.run-001.patch"
+    ]
+  },
+  "status": "submitted",
+  "created_at": "2026-04-21T15:10:00.000Z"
+}

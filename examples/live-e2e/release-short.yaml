@@ -26,7 +26,7 @@ preflight:
   - single-package TypeScript library with fast test verification
   failure_safe_defaults:
   - keep output_policy.write_back_to_remote set to false
-  - allow release artifacts only in patch/local/fork delivery modes
+  - keep delivery mode in patch-only for short public-target rehearsals
   abort_conditions:
   - repository clone fails or ref cannot be resolved
   - npm test fails during preflight verification
@@ -81,7 +81,7 @@ approvals:
 output_policy:
   materialize_release_packet: true
   write_back_to_remote: false
-  preferred_delivery_mode: patch
+  preferred_delivery_mode: patch-only
 ui:
   attachable: true
   default_scope: run

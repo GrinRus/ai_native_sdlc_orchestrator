@@ -27,7 +27,7 @@ This catalog defines the public repositories AOR uses for live end-to-end rehear
   - network access for clone and install.
 - Failure-safe defaults:
   - keep `write_back_to_remote=false`;
-  - keep delivery mode in patch/local/fork-safe options.
+  - keep delivery mode in `patch-only`.
 - Abort conditions:
   - checkout or install fails;
   - `npm test` fails during preflight.
@@ -74,7 +74,7 @@ This catalog defines the public repositories AOR uses for live end-to-end rehear
   - shell resources suitable for monorepo checks.
 - Failure-safe defaults:
   - keep `write_back_to_remote=false`;
-  - keep delivery in patch/local/fork-safe modes unless policy explicitly changes.
+  - keep delivery mode in `fork-first-pr` unless policy explicitly changes.
 - Abort conditions:
   - checkout or workspace install fails;
   - `yarn g:lint`, `yarn g:typecheck`, or `yarn g:test-unit` fails.

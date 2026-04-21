@@ -70,9 +70,19 @@ jq '.delivery_mode, .approval_context, .repo_deliveries[0].changed_paths' <deliv
 jq '.delivery_manifest_ref, .evidence_lineage' <release-packet-file>
 ```
 
+## W4-S06 rehearsal findings
+- short rehearsal keeps `patch-only` as the safest default for public targets;
+- success path must preserve delivery manifest and release packet as durable JSON files;
+- failure path must preserve transcript `recovery_steps` plus blocked release packet lineage.
+
 Evidence fixtures for W4-S03 baseline:
 - `examples/live-e2e/fixtures/w4-s03/delivery-patch.sample.patch`
 - `examples/live-e2e/fixtures/w4-s03/delivery-local-branch-transcript.sample.json`
+
+Evidence fixtures for W4-S06:
+- `examples/live-e2e/fixtures/w4-s06/ky-release-short.delivery-manifest.sample.json`
+- `examples/live-e2e/fixtures/w4-s06/ky-release-short.release-packet.sample.json`
+- `examples/live-e2e/fixtures/w4-s06/public-target-delivery-rehearsal.sample.md`
 
 Related runbook:
 - `docs/ops/github-fork-first-delivery.md`

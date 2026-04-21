@@ -67,5 +67,15 @@ jq '.delivery_mode, .approval_context, .repo_deliveries[0].changed_paths' <deliv
 jq '.delivery_manifest_ref, .evidence_lineage' <release-packet-file>
 ```
 
+## W4-S06 rehearsal findings
+- long rehearsal uses `fork-first-pr` as the default bounded delivery mode for public monorepo targets;
+- success path must preserve delivery manifest and release packet lineage for later audit;
+- failure path must preserve transcript recovery instructions and blocked release packet status.
+
+Evidence fixtures for W4-S06:
+- `examples/live-e2e/fixtures/w4-s06/nextjs-release-long.delivery-transcript-failure.sample.json`
+- `examples/live-e2e/fixtures/w4-s06/nextjs-release-long.release-packet-failure.sample.json`
+- `examples/live-e2e/fixtures/w4-s06/public-target-delivery-rehearsal.sample.md`
+
 Related runbook:
 - `docs/ops/github-fork-first-delivery.md`
