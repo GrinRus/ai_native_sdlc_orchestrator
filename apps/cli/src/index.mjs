@@ -4,6 +4,7 @@ import path from "node:path";
 import { getContractFamilyIndex } from "../../../packages/contracts/src/index.mjs";
 import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
+import { validateProjectRuntime } from "../../../packages/orchestrator-core/src/project-validate.mjs";
 
 import {
   RUNTIME_ROOT_DIRNAME,
@@ -99,6 +100,19 @@ function formatCommandHelp(definition) {
             "- --project-profile can override default profile discovery in project root.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
           ]
+      : definition.command === "project validate"
+        ? [
+            "- --project-ref must point to an existing directory.",
+            "- --project-profile can override default profile discovery in project root.",
+            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
+            "- Validation report status can be pass, warn, or fail.",
+          ]
+      : definition.command === "project verify"
+        ? [
+            "- --project-ref must point to an existing directory.",
+            "- --require-validation-pass enforces validation gate before verify can proceed.",
+            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+          ]
       : [
           "- --project-ref must point to an existing directory.",
           `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
@@ -174,6 +188,40 @@ function resolveOptionalStringFlag(flagName, value) {
     throw new CliUsageError(`Flag '--${flagName}' cannot be empty.`);
   }
   return value;
+}
+
+/**
+ * @param {string} flagName
+ * @param {string | true | undefined} value
+ * @returns {boolean}
+ */
+function resolveOptionalBooleanFlag(flagName, value) {
+  if (value === undefined) return false;
+  if (value === true) return true;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new CliUsageError(`Flag '--${flagName}' accepts only boolean values ('true' or 'false').`);
+}
+
+/**
+ * @param {string} reportPath
+ * @returns {string}
+ */
+function readValidationReportStatus(reportPath) {
+  if (!fs.existsSync(reportPath)) {
+    throw new CliUsageError(
+      `Validation gate requires '${reportPath}', but no validation report was found. Run 'aor project validate' first.`,
+    );
+  }
+
+  const parsed = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  const status = parsed.status;
+
+  if (typeof status !== "string") {
+    throw new CliUsageError(`Validation report '${reportPath}' is missing a valid status field.`);
+  }
+
+  return status;
 }
 
 /**
@@ -266,6 +314,12 @@ function executeImplementedCommand(command, flags, cwd) {
   let projectProfileRef = null;
   let analysisReportId = null;
   let analysisReportFile = null;
+  let validationReportId = null;
+  let validationReportFile = null;
+  let validationStatus = null;
+  let validationBlocking = null;
+  let validationGateEnforced = false;
+  let validationGateStatus = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -297,6 +351,56 @@ function executeImplementedCommand(command, flags, cwd) {
     projectProfileRef = analyzeResult.projectProfileRef;
     analysisReportId = analyzeResult.report.report_id;
     analysisReportFile = analyzeResult.reportPath;
+  } else if (command === "project validate") {
+    ensureRequiredFlags(command, flags);
+
+    const validateResult = validateProjectRuntime({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+
+    resolvedProjectRef = validateResult.projectRoot;
+    resolvedRuntimeRoot = validateResult.runtimeRoot;
+    runtimeLayout = validateResult.runtimeLayout;
+    runtimeStateFile = validateResult.stateFile;
+    projectProfileRef = validateResult.projectProfileRef;
+    validationReportId = validateResult.report.report_id;
+    validationReportFile = validateResult.validationReportPath;
+    validationStatus = validateResult.report.status;
+    validationBlocking = validateResult.blocking;
+  } else if (command === "project verify") {
+    ensureRequiredFlags(command, flags);
+
+    const verifyInit = initializeProjectRuntime({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+
+    resolvedProjectRef = verifyInit.projectRoot;
+    resolvedRuntimeRoot = verifyInit.runtimeRoot;
+    runtimeLayout = verifyInit.runtimeLayout;
+    runtimeStateFile = verifyInit.stateFile;
+    projectProfileRef = verifyInit.projectProfileRef;
+
+    validationGateEnforced = resolveOptionalBooleanFlag(
+      "require-validation-pass",
+      flags["require-validation-pass"],
+    );
+
+    if (validationGateEnforced) {
+      const gateReportPath = path.join(verifyInit.runtimeLayout.reportsRoot, "validation-report.json");
+      validationGateStatus = readValidationReportStatus(gateReportPath);
+
+      if (validationGateStatus === "fail") {
+        throw new CliUsageError(
+          `Validation gate blocked verify flow because '${gateReportPath}' has status 'fail'.`,
+        );
+      }
+    }
   } else {
     ensureRequiredFlags(command, flags);
 
@@ -330,6 +434,12 @@ function executeImplementedCommand(command, flags, cwd) {
     runtime_state_file: runtimeStateFile,
     analysis_report_id: analysisReportId,
     analysis_report_file: analysisReportFile,
+    validation_report_id: validationReportId,
+    validation_report_file: validationReportFile,
+    validation_status: validationStatus,
+    validation_blocking: validationBlocking,
+    validation_gate_enforced: validationGateEnforced,
+    validation_gate_status: validationGateStatus,
     contract_families: resolvedFamilies,
     command_catalog_alignment: "docs/architecture/14-cli-command-catalog.md",
   };

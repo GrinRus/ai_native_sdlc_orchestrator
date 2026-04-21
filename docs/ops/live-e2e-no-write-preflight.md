@@ -15,6 +15,8 @@ This procedure is the reusable baseline for public-repo rehearsals across bootst
 5. **Verify** bounded local commands.
 6. **Stop** (or proceed to later stages only when all no-write gates pass).
 
+Validation step output must materialize a deterministic `validation-report` with `pass`, `warn`, or `fail` status. When verify is started with validation gating enabled, a `fail` report blocks verify until the failing validators are resolved.
+
 ## Required target annotations
 Each profile and runbook must provide:
 - prerequisites;

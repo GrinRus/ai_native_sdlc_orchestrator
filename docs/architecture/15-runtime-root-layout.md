@@ -20,6 +20,7 @@ For project `<project_id>`, the runtime layout is:
       artifacts/
       reports/
         project-analysis-report.json
+        validation-report.json
       state/
         project-init-state.json
 ```
