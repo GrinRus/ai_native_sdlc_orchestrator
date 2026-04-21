@@ -19,7 +19,7 @@ Expose operator-grade APIs, live views, and standardized live E2E orchestration 
 
 ## W5-S01 — Control plane API read surface
 - **Epic:** EPIC-6 Operator surface
-- **State:** done
+- **State:** ready
 - **Outcome:** Expose project state, packets, runs, and quality evidence through a stable read API before adding live control features.
 - **Primary modules:** `apps/api`, `packages/orchestrator-core`, `packages/contracts`
 - **Hard dependencies:** W4-S05, W2-S05
