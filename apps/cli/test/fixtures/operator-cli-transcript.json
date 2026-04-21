@@ -1,0 +1,19 @@
+{
+  "run_status": {
+    "command": "run status",
+    "status": "implemented",
+    "read_only": true,
+    "stream_protocol": "sse"
+  },
+  "packet_show": {
+    "command": "packet show",
+    "status": "implemented",
+    "selected_family": "wave-ticket",
+    "read_only": true
+  },
+  "evidence_show": {
+    "command": "evidence show",
+    "status": "implemented",
+    "read_only": true
+  }
+}

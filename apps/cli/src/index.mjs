@@ -1,6 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  listDeliveryManifests,
+  listPacketArtifacts,
+  listPromotionDecisions,
+  listQualityArtifacts,
+  listRuns,
+  listStepResults,
+  openRunEventStream,
+  readProjectState,
+} from "../../api/src/index.mjs";
 import { getContractFamilyIndex } from "../../../packages/contracts/src/index.mjs";
 import {
   approveHandoffArtifacts,
@@ -100,7 +110,11 @@ function formatCommandHelp(definition) {
       ? "Status: implemented in quality shell (W3-S03)"
       : definition.command === "harness certify"
         ? "Status: implemented in quality shell (W3-S05)"
-      : "Status: implemented in bootstrap shell (W1-S01)";
+        : definition.command === "run status" ||
+            definition.command === "packet show" ||
+            definition.command === "evidence show"
+          ? "Status: implemented in operator shell (W5-S03)"
+          : "Status: implemented in bootstrap shell (W1-S01)";
   const notes =
     definition.command === "project init"
       ? [
@@ -160,6 +174,24 @@ function formatCommandHelp(definition) {
             "- --handoff-packet is optional and defaults to bootstrap handoff packet path.",
             "- Approval sets handoff status to approved for downstream execution validation gates.",
           ]
+        : definition.command === "run status"
+          ? [
+              "- This command is read-only. It does not mutate run state.",
+              "- --follow=true requires --run-id and reuses the shared live-run event stream protocol.",
+              "- Future control hooks remain planned: run pause, run resume, run steer, run cancel.",
+            ]
+          : definition.command === "packet show"
+            ? [
+                "- This command is read-only and resolves packet artifacts through the API read surface.",
+                "- --family filters contract families (artifact-packet, wave-ticket, handoff-packet, delivery-plan, delivery-manifest, release-packet).",
+                "- Future control hooks remain planned: deliver prepare, release prepare.",
+              ]
+            : definition.command === "evidence show"
+              ? [
+                  "- This command is read-only and aggregates step, quality, and delivery evidence.",
+                  "- --run-id scopes results to one run when contracts include run_id.",
+                  "- Future control hooks remain planned: incident open, incident show, audit runs.",
+                ]
       : [
           "- --project-ref must point to an existing directory.",
           `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
@@ -248,6 +280,43 @@ function resolveOptionalBooleanFlag(flagName, value) {
   if (value === "true") return true;
   if (value === "false") return false;
   throw new CliUsageError(`Flag '--${flagName}' accepts only boolean values ('true' or 'false').`);
+}
+
+/**
+ * @param {string} flagName
+ * @param {string | true | undefined} value
+ * @param {{ min?: number }} [options]
+ * @returns {number | undefined}
+ */
+function resolveOptionalIntegerFlag(flagName, value, options = {}) {
+  if (value === undefined) return undefined;
+  if (value === true) {
+    throw new CliUsageError(`Flag '--${flagName}' requires a value.`);
+  }
+  if (!/^-?\d+$/.test(value)) {
+    throw new CliUsageError(`Flag '--${flagName}' must be an integer.`);
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) {
+    throw new CliUsageError(`Flag '--${flagName}' must be an integer.`);
+  }
+
+  if (options.min !== undefined && parsed < options.min) {
+    throw new CliUsageError(`Flag '--${flagName}' must be >= ${options.min}.`);
+  }
+
+  return parsed;
+}
+
+/**
+ * @param {Array<{ document: Record<string, unknown> }>} artifacts
+ * @param {string | undefined} runId
+ * @returns {Array<{ document: Record<string, unknown> }>}
+ */
+function filterArtifactsByRunId(artifacts, runId) {
+  if (!runId) return artifacts;
+  return artifacts.filter((artifact) => artifact.document.run_id === runId);
 }
 
 /**
@@ -466,6 +535,19 @@ function executeImplementedCommand(command, flags, cwd) {
   let certificationEvaluationReportFile = null;
   let certificationHarnessCaptureFile = null;
   let certificationHarnessReplayFile = null;
+  let runSummaries = null;
+  let followMode = null;
+  let streamProtocol = null;
+  let streamBackpressure = null;
+  let replayEvents = null;
+  let packetArtifacts = null;
+  let selectedFamily = null;
+  let stepResults = null;
+  let qualityArtifacts = null;
+  let deliveryManifests = null;
+  let promotionDecisions = null;
+  let readOnly = null;
+  let futureControlHooks = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -680,6 +762,158 @@ function executeImplementedCommand(command, flags, cwd) {
     handoffPacketFile = approveResult.handoffPacketFile;
     handoffStatus = approveResult.handoffPacket.status;
     handoffApprovalState = approveResult.handoffPacket.approval_state;
+  } else if (command === "run status") {
+    ensureRequiredFlags(command, flags);
+    const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    const follow = resolveOptionalBooleanFlag("follow", flags.follow);
+    const afterEventId = resolveOptionalStringFlag("after-event-id", flags["after-event-id"]);
+    const maxReplay = resolveOptionalIntegerFlag("max-replay", flags["max-replay"], { min: 0 });
+
+    if (afterEventId && !follow) {
+      throw new CliUsageError("Flag '--after-event-id' can only be used with '--follow'.");
+    }
+    if (maxReplay !== undefined && !follow) {
+      throw new CliUsageError("Flag '--max-replay' can only be used with '--follow'.");
+    }
+    if (follow && !runId) {
+      throw new CliUsageError("Flag '--run-id' is required when '--follow' is enabled.");
+    }
+
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    resolvedProjectRef = projectState.project_root;
+    resolvedRuntimeRoot = projectState.runtime_root;
+    runtimeLayout = projectState.runtime_layout;
+    runtimeStateFile = projectState.state_file;
+    projectProfileRef = projectState.project_profile_ref;
+
+    runSummaries = listRuns({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    }).filter((summary) => !runId || summary.run_id === runId);
+
+    followMode = {
+      enabled: follow,
+      run_id: runId ?? null,
+      source: follow ? "control-plane-live-run-event-stream" : "disabled",
+    };
+
+    if (follow) {
+      const stream = openRunEventStream({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId: /** @type {string} */ (runId),
+        afterEventId,
+        maxReplay,
+      });
+      streamProtocol = stream.protocol;
+      streamBackpressure = stream.backpressure;
+      replayEvents = stream.replay_events;
+      followMode = {
+        ...followMode,
+        replay_count: stream.replay_events.length,
+        stream_log_file: stream.log_file,
+      };
+    } else {
+      replayEvents = [];
+    }
+
+    readOnly = true;
+    futureControlHooks = ["run pause", "run resume", "run steer", "run cancel"];
+  } else if (command === "packet show") {
+    ensureRequiredFlags(command, flags);
+    const family = resolveOptionalStringFlag("family", flags.family) ?? "all";
+    const limit = resolveOptionalIntegerFlag("limit", flags.limit, { min: 1 });
+    const supportedFamilies = new Set([
+      "artifact-packet",
+      "wave-ticket",
+      "handoff-packet",
+      "delivery-plan",
+      "delivery-manifest",
+      "release-packet",
+    ]);
+
+    if (family !== "all" && !supportedFamilies.has(family)) {
+      throw new CliUsageError(
+        "Flag '--family' must be one of artifact-packet, wave-ticket, handoff-packet, delivery-plan, delivery-manifest, release-packet, or all.",
+      );
+    }
+
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    resolvedProjectRef = projectState.project_root;
+    resolvedRuntimeRoot = projectState.runtime_root;
+    runtimeLayout = projectState.runtime_layout;
+    runtimeStateFile = projectState.state_file;
+    projectProfileRef = projectState.project_profile_ref;
+
+    const packets = listPacketArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const familyFiltered = family === "all" ? packets : packets.filter((packet) => packet.family === family);
+    packetArtifacts = typeof limit === "number" ? familyFiltered.slice(0, limit) : familyFiltered;
+    selectedFamily = family;
+    readOnly = true;
+    futureControlHooks = ["deliver prepare", "release prepare"];
+  } else if (command === "evidence show") {
+    ensureRequiredFlags(command, flags);
+    const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    resolvedProjectRef = projectState.project_root;
+    resolvedRuntimeRoot = projectState.runtime_root;
+    runtimeLayout = projectState.runtime_layout;
+    runtimeStateFile = projectState.state_file;
+    projectProfileRef = projectState.project_profile_ref;
+
+    stepResults = filterArtifactsByRunId(
+      listStepResults({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      }),
+      runId,
+    );
+    qualityArtifacts = filterArtifactsByRunId(
+      listQualityArtifacts({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      }),
+      runId,
+    );
+    deliveryManifests = filterArtifactsByRunId(
+      listDeliveryManifests({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      }),
+      runId,
+    );
+    promotionDecisions = filterArtifactsByRunId(
+      listPromotionDecisions({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      }),
+      runId,
+    );
+    readOnly = true;
+    futureControlHooks = ["incident open", "incident show", "audit runs"];
   } else {
     ensureRequiredFlags(command, flags);
 
@@ -755,6 +989,19 @@ function executeImplementedCommand(command, flags, cwd) {
     certification_evaluation_report_file: certificationEvaluationReportFile,
     certification_harness_capture_file: certificationHarnessCaptureFile,
     certification_harness_replay_file: certificationHarnessReplayFile,
+    run_summaries: runSummaries,
+    follow_mode: followMode,
+    stream_protocol: streamProtocol,
+    stream_backpressure: streamBackpressure,
+    replay_events: replayEvents,
+    packet_artifacts: packetArtifacts,
+    selected_family: selectedFamily,
+    step_results: stepResults,
+    quality_artifacts: qualityArtifacts,
+    delivery_manifests: deliveryManifests,
+    promotion_decisions: promotionDecisions,
+    read_only: readOnly,
+    future_control_hooks: futureControlHooks,
     contract_families: resolvedFamilies,
     command_catalog_alignment: "docs/architecture/14-cli-command-catalog.md",
   };
