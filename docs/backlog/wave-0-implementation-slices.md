@@ -19,7 +19,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S01 — Workspace and package build baseline
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Replace the echo-only scaffold with an honest root command surface that can host real apps, packages, and repo checks.
 - **Primary modules:** root workspace files, `apps/**`, `packages/**`
 - **Hard dependencies:** none
@@ -143,7 +143,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S05 — Live E2E profile registry and no-write preflight
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Standardize live rehearsal targets and prove that public-repo runs can be prepared safely before any write-back feature exists.
 - **Primary modules:** `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/orchestrator-core`
 - **Hard dependencies:** W0-S02, W0-S03
