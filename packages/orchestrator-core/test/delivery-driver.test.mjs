@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { loadContractFile } from "../../contracts/src/index.mjs";
 import { materializeDeliveryPlan } from "../src/delivery-plan.mjs";
 import { runDeliveryDriver } from "../src/delivery-driver.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
@@ -84,6 +85,31 @@ function createReadyPlan(options) {
   };
 }
 
+/**
+ * @param {ReturnType<typeof runDeliveryDriver>} result
+ */
+function assertDeliveryArtifacts(result) {
+  assert.equal(fs.existsSync(result.deliveryManifestFile), true);
+  assert.equal(fs.existsSync(result.releasePacketFile), true);
+
+  const manifestLoaded = loadContractFile({
+    filePath: result.deliveryManifestFile,
+    family: "delivery-manifest",
+  });
+  assert.equal(manifestLoaded.ok, true);
+  assert.equal(manifestLoaded.document.delivery_mode, result.mode);
+  assert.equal(typeof manifestLoaded.document.evidence_root, "string");
+  assert.equal(typeof manifestLoaded.document.approval_context, "object");
+
+  const releaseLoaded = loadContractFile({
+    filePath: result.releasePacketFile,
+    family: "release-packet",
+  });
+  assert.equal(releaseLoaded.ok, true);
+  assert.equal(typeof releaseLoaded.document.delivery_manifest_ref, "string");
+  assert.equal(typeof releaseLoaded.document.evidence_lineage, "object");
+}
+
 test("runDeliveryDriver emits patch artifact and transcript for patch-only mode", () => {
   withTempRepo((repoRoot) => {
     const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
@@ -112,6 +138,7 @@ test("runDeliveryDriver emits patch artifact and transcript for patch-only mode"
 
     const patchBody = fs.readFileSync(result.outputs.patch_file, "utf8");
     assert.match(patchBody, /examples\/project\.aor\.yaml/);
+    assertDeliveryArtifacts(result);
   });
 });
 
@@ -152,6 +179,7 @@ test("runDeliveryDriver commits to bounded local branch and captures commit meta
     assert.equal(transcript.status, "success");
     assert.equal(Array.isArray(transcript.git.commands), true);
     assert.equal(transcript.git.commands.some((command) => command.includes("push")), false);
+    assertDeliveryArtifacts(result);
   });
 });
 
@@ -184,6 +212,14 @@ test("runDeliveryDriver records recovery guidance when local-branch mode fails m
     assert.match(String(transcript.error), /checkout -B/i);
     assert.ok(Array.isArray(transcript.recovery_steps));
     assert.ok(transcript.recovery_steps.some((step) => step.includes("git checkout")));
+    assertDeliveryArtifacts(result);
+
+    const releaseLoaded = loadContractFile({
+      filePath: result.releasePacketFile,
+      family: "release-packet",
+    });
+    assert.equal(releaseLoaded.ok, true);
+    assert.equal(releaseLoaded.document.status, "blocked");
   });
 });
 
@@ -225,5 +261,54 @@ test("runDeliveryDriver builds fork-first PR metadata in stubbed network mode", 
     assert.equal(transcript.status, "success");
     assert.equal(transcript.mode, "fork-first-pr");
     assert.equal(transcript.git.commands.some((command) => command.includes("push")), false);
+    assertDeliveryArtifacts(result);
+  });
+});
+
+test("runDeliveryDriver artifacts reload after runtime restart", () => {
+  withTempRepo((repoRoot) => {
+    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
+    fs.appendFileSync(targetFile, "\n# w4-s05 reload test\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.reload.v1",
+      mode: "patch-only",
+    });
+
+    const firstRun = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.reload.v1",
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+    assert.equal(firstRun.status, "success");
+
+    const restarted = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    assert.equal(restarted.projectId, firstRun.projectId);
+
+    const manifestReload = loadContractFile({
+      filePath: firstRun.deliveryManifestFile,
+      family: "delivery-manifest",
+    });
+    assert.equal(manifestReload.ok, true);
+    assert.equal(manifestReload.document.delivery_mode, "patch-only");
+    assert.equal(manifestReload.document.step_ref, "delivery.apply");
+    assert.ok(Array.isArray(manifestReload.document.repo_deliveries));
+    assert.ok(manifestReload.document.repo_deliveries[0].changed_paths.includes("examples/project.aor.yaml"));
+    assert.equal(typeof manifestReload.document.approval_context, "object");
+
+    const releaseReload = loadContractFile({
+      filePath: firstRun.releasePacketFile,
+      family: "release-packet",
+    });
+    assert.equal(releaseReload.ok, true);
+    assert.equal(releaseReload.document.delivery_manifest_ref.includes("delivery-manifest"), true);
+    assert.equal(typeof releaseReload.document.evidence_lineage, "object");
+    assert.ok(Array.isArray(releaseReload.document.evidence_lineage.handoff_refs));
+    assert.ok(Array.isArray(releaseReload.document.evidence_lineage.promotion_refs));
+    assert.ok(Array.isArray(releaseReload.document.evidence_lineage.execution_refs));
   });
 });

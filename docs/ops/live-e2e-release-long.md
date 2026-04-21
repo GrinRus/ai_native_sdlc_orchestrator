@@ -58,5 +58,17 @@ aor live-e2e start \
 - impacted-repo and changed-path metadata are recorded;
 - release packet and delivery manifest are materialized.
 
+## Post-run artifact inspection
+Inspect the latest materialized artifacts:
+```bash
+ls -1 .aor/projects/<project_id>/artifacts/delivery-manifest-*.json | tail -n 1
+ls -1 .aor/projects/<project_id>/artifacts/release-packet-*.json | tail -n 1
+```
+Confirm delivery lineage and approval context:
+```bash
+jq '.delivery_mode, .approval_context, .repo_deliveries[0].changed_paths' <delivery-manifest-file>
+jq '.delivery_manifest_ref, .evidence_lineage' <release-packet-file>
+```
+
 Related runbook:
 - `docs/ops/github-fork-first-delivery.md`

@@ -25,6 +25,24 @@ function asString(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function asStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
+    : [];
+}
+
+/**
+ * @param {string[]} values
+ * @returns {string[]}
+ */
+function uniqueStrings(values) {
+  return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -148,6 +166,63 @@ function parseGitHubRemote(remoteUrl) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toEvidenceRef(projectRoot, filePath) {
+  const relative = path.relative(projectRoot, filePath).replace(/\\/g, "/");
+  if (!relative || relative.startsWith("../")) {
+    return `evidence://${filePath}`;
+  }
+  return `evidence://${relative}`;
+}
+
+/**
+ * @param {string[]} refs
+ * @returns {{
+ *   handoffRefs: string[],
+ *   promotionRefs: string[],
+ *   executionRefs: string[],
+ *   otherRefs: string[],
+ * }}
+ */
+function classifyEvidenceRefs(refs) {
+  /** @type {string[]} */
+  const handoffRefs = [];
+  /** @type {string[]} */
+  const promotionRefs = [];
+  /** @type {string[]} */
+  const executionRefs = [];
+  /** @type {string[]} */
+  const otherRefs = [];
+
+  for (const ref of refs) {
+    const normalized = ref.toLowerCase();
+    if (normalized.includes("handoff")) {
+      handoffRefs.push(ref);
+      continue;
+    }
+    if (normalized.includes("promotion")) {
+      promotionRefs.push(ref);
+      continue;
+    }
+    if (normalized.includes("step-result") || normalized.includes("delivery-transcript")) {
+      executionRefs.push(ref);
+      continue;
+    }
+    otherRefs.push(ref);
+  }
+
+  return {
+    handoffRefs: uniqueStrings(handoffRefs),
+    promotionRefs: uniqueStrings(promotionRefs),
+    executionRefs: uniqueStrings(executionRefs),
+    otherRefs: uniqueStrings(otherRefs),
+  };
+}
+
+/**
  * @param {{
  *   deliveryPlanPath?: string,
  *   deliveryPlan?: Record<string, unknown>,
@@ -238,6 +313,7 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
  *  baseRef?: string,
  *  prTitle?: string,
  *  prBody?: string,
+ *  ticketId?: string,
  *  executionRoot?: string,
  *  deliveryPlanPath?: string,
  *  deliveryPlan?: Record<string, unknown>,
@@ -532,6 +608,147 @@ export function runDeliveryDriver(options = {}) {
   };
   fs.writeFileSync(transcriptFile, `${JSON.stringify(transcript, null, 2)}\n`, "utf8");
 
+  const ticketId = asString(options.ticketId) ?? `${init.projectId}.wave.${normalizeForId(runId)}`;
+  const deliveryPlanEvidenceRefs = uniqueStrings(asStringArray(deliveryPlan.evidence_refs));
+  const planRef =
+    deliveryPlanPath.startsWith("runtime://") || !path.isAbsolute(deliveryPlanPath)
+      ? deliveryPlanPath
+      : toEvidenceRef(init.projectRoot, deliveryPlanPath);
+  const transcriptRef = toEvidenceRef(init.projectRoot, transcriptFile);
+
+  /** @type {string[]} */
+  const deliveryOutputRefs = [];
+  if (typeof outputs.patch_file === "string") {
+    deliveryOutputRefs.push(toEvidenceRef(init.projectRoot, outputs.patch_file));
+  }
+  if (typeof outputs.api_intent_file === "string") {
+    deliveryOutputRefs.push(toEvidenceRef(init.projectRoot, outputs.api_intent_file));
+  }
+
+  const writebackResult =
+    status === "success"
+      ? mode === "patch-only"
+        ? "patch-materialized"
+        : mode === "local-branch"
+          ? "local-branch-committed"
+          : "fork-pr-planned"
+      : "failed";
+
+  const repoDelivery = {
+    repo_id: "main",
+    base_ref: gitHeadBefore.branch,
+    head_ref: gitHeadAfter.branch,
+    branch_name: typeof outputs.branch_name === "string" ? outputs.branch_name : null,
+    changed_paths: changedPaths,
+    diff_totals: diffStats.totals,
+    commit_refs: typeof outputs.commit_sha === "string" ? [outputs.commit_sha] : [],
+    writeback_result: writebackResult,
+  };
+  if (mode === "fork-first-pr" && asRecord(outputs.pr_draft).title) {
+    repoDelivery.pr_draft = {
+      title: asRecord(outputs.pr_draft).title,
+      base_repo: asRecord(outputs.pr_draft).base_repo,
+      base_branch: asRecord(outputs.pr_draft).base_branch,
+      head_repo: asRecord(outputs.pr_draft).head_repo,
+      head_branch: asRecord(outputs.pr_draft).head_branch,
+      is_draft: asRecord(outputs.pr_draft).is_draft,
+    };
+  }
+
+  const deliveryManifest = {
+    manifest_id: `${init.projectId}.delivery-manifest.${normalizeForId(mode)}.${Date.now()}`,
+    project_id: init.projectId,
+    ticket_id: ticketId,
+    run_refs: uniqueStrings([runId, asString(deliveryPlan.run_id) ?? ""]),
+    step_ref: stepId,
+    delivery_mode: mode,
+    writeback_policy: {
+      mode,
+      mode_source: asRecord(deliveryPlan.mode_source),
+      writeback_allowed: deliveryPlan.writeback_allowed === true,
+      blocking_reasons: asStringArray(deliveryPlan.blocking_reasons),
+      network_mode: asString(outputs.network_mode) ?? "local",
+    },
+    repo_deliveries: [repoDelivery],
+    verification_refs: uniqueStrings([...deliveryPlanEvidenceRefs, transcriptRef]),
+    approval_context: {
+      approved_handoff: asRecord(asRecord(deliveryPlan.preconditions).approved_handoff),
+      promotion_evidence: asRecord(asRecord(deliveryPlan.preconditions).promotion_evidence),
+      evidence_refs: deliveryPlanEvidenceRefs,
+    },
+    evidence_root: init.runtimeLayout.reportsRoot,
+    source_refs: {
+      delivery_plan_ref: planRef,
+      delivery_transcript_ref: transcriptRef,
+      delivery_output_refs: uniqueStrings(deliveryOutputRefs),
+    },
+    status: status === "success" ? "submitted" : "failed",
+    created_at: finishedAt,
+  };
+  const manifestValidation = validateContractDocument({
+    family: "delivery-manifest",
+    document: deliveryManifest,
+    source: "runtime://delivery-manifest",
+  });
+  if (!manifestValidation.ok) {
+    const issues = manifestValidation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Generated delivery manifest failed contract validation: ${issues}`);
+  }
+
+  const deliveryManifestFile = path.join(
+    init.runtimeLayout.artifactsRoot,
+    `delivery-manifest-${normalizeForId(mode)}-${normalizeForId(runId)}-${Date.now()}.json`,
+  );
+  fs.writeFileSync(deliveryManifestFile, `${JSON.stringify(deliveryManifest, null, 2)}\n`, "utf8");
+  const deliveryManifestRef = toEvidenceRef(init.projectRoot, deliveryManifestFile);
+
+  const evidenceGroups = classifyEvidenceRefs(deliveryPlanEvidenceRefs);
+  const executionRefs = uniqueStrings([planRef, transcriptRef, ...evidenceGroups.executionRefs]);
+  const releasePacket = {
+    packet_id: `${init.projectId}.release-packet.${normalizeForId(mode)}.${Date.now()}`,
+    project_id: init.projectId,
+    ticket_id: ticketId,
+    run_refs: uniqueStrings([runId, asString(deliveryPlan.run_id) ?? ""]),
+    change_summary: `Delivery mode '${mode}' produced ${diffStats.totals.files} changed file(s), +${diffStats.totals.added}/-${diffStats.totals.deleted}.`,
+    verification_refs: uniqueStrings([...deliveryManifest.verification_refs, deliveryManifestRef]),
+    delivery_manifest_ref: deliveryManifestRef,
+    evidence_lineage: {
+      handoff_refs: evidenceGroups.handoffRefs,
+      promotion_refs: evidenceGroups.promotionRefs,
+      execution_refs: executionRefs,
+      delivery_output_refs: uniqueStrings([deliveryManifestRef, ...deliveryOutputRefs]),
+    },
+    status: status === "success" ? "ready-for-close" : "blocked",
+    created_at: finishedAt,
+  };
+  if (status === "failed") {
+    releasePacket.residual_risks = [errorMessage ?? "Delivery execution failed before write-back completed."];
+    releasePacket.rollback_notes = "Inspect delivery transcript and restore repository state before retry.";
+  }
+
+  const releaseValidation = validateContractDocument({
+    family: "release-packet",
+    document: releasePacket,
+    source: "runtime://release-packet",
+  });
+  if (!releaseValidation.ok) {
+    const issues = releaseValidation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Generated release packet failed contract validation: ${issues}`);
+  }
+
+  const releasePacketFile = path.join(
+    init.runtimeLayout.artifactsRoot,
+    `release-packet-${normalizeForId(mode)}-${normalizeForId(runId)}-${Date.now()}.json`,
+  );
+  fs.writeFileSync(releasePacketFile, `${JSON.stringify(releasePacket, null, 2)}\n`, "utf8");
+
+  transcript.outputs = {
+    ...asRecord(transcript.outputs),
+    delivery_manifest_file: deliveryManifestFile,
+    release_packet_file: releasePacketFile,
+  };
+  fs.writeFileSync(transcriptFile, `${JSON.stringify(transcript, null, 2)}\n`, "utf8");
+
   return {
     ...init,
     runId,
@@ -543,6 +760,10 @@ export function runDeliveryDriver(options = {}) {
     deliveryPlanPath,
     transcript,
     transcriptFile,
+    deliveryManifest,
+    deliveryManifestFile,
+    releasePacket,
+    releasePacketFile,
     changedPaths,
     diffStats,
     outputs,

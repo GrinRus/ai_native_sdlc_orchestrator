@@ -112,7 +112,7 @@ Add safe write-back modes, manifests, and release artifacts so AOR can move from
 
 ## W4-S04 — Fork-first GitHub PR delivery driver
 - **Epic:** EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Add the first networked delivery mode with explicit fork-first safety defaults for public repositories.
 - **Primary modules:** `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli`, `docs/ops/**`
 - **Hard dependencies:** W4-S02, W2-S04
@@ -143,7 +143,7 @@ Add safe write-back modes, manifests, and release artifacts so AOR can move from
 
 ## W4-S05 — Delivery manifest and release packet materialization
 - **Epic:** EPIC-5 Delivery and release
-- **State:** done
+- **State:** ready
 - **Outcome:** Turn delivery output into durable release evidence that can be reviewed, replayed, and audited later.
 - **Primary modules:** `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**`, `apps/cli`
 - **Hard dependencies:** W4-S03, W4-S04, W3-S05
