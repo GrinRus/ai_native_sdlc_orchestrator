@@ -15,19 +15,19 @@ This is the master index for the implementation slices across all defined waves.
 | W0-S02 | Contracts package and schema loader baseline | EPIC-0 | done | `packages/contracts`, `docs/contracts/**`, `examples/**` | W0-S01 |
 | W0-S03 | Example and reference integrity checks | EPIC-0 | done | `packages/contracts`, `examples/**`, root validation scripts | W0-S02 |
 | W0-S04 | Agent guidance and backlog workflow baseline | EPIC-0 | done | root `AGENTS.md`, `docs/backlog/**`, `.agents/skills/**` | none |
-| W0-S05 | Live E2E profile registry and no-write preflight | EPIC-7 | ready | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/orchestrator-core` | W0-S02, W0-S03 |
-| W0-S06 | Repository CI and acceptance gates | EPIC-0 | blocked | root CI config, validation scripts, `docs/**`, community health files | W0-S01, W0-S03, W0-S04, W0-S05 |
+| W0-S05 | Live E2E profile registry and no-write preflight | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/orchestrator-core` | W0-S02, W0-S03 |
+| W0-S06 | Repository CI and acceptance gates | EPIC-0 | done | root CI config, validation scripts, `docs/**`, community health files | W0-S01, W0-S03, W0-S04, W0-S05 |
 
 ## W1 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W1-S01 | Bootstrap CLI shell and command contracts | EPIC-6 | ready | `apps/cli`, `docs/architecture/14-cli-command-catalog.md`, `docs/contracts/**` | W0-S01, W0-S02 |
-| W1-S02 | Project init and profile loading runtime | EPIC-1 | blocked | `apps/cli`, `packages/contracts`, `packages/orchestrator-core` | W1-S01 |
-| W1-S03 | Project analysis engine and durable analysis report | EPIC-1 | blocked | `packages/orchestrator-core`, `packages/contracts`, `apps/cli` | W1-S02 |
-| W1-S04 | Deterministic project validate flow | EPIC-4 | blocked | `packages/contracts`, `packages/orchestrator-core`, `apps/cli` | W1-S02, W0-S03 |
-| W1-S05 | Project verify flow and bounded preflight execution | EPIC-1 | blocked | `packages/orchestrator-core`, `apps/cli`, `packages/observability` | W1-S03, W1-S04, W0-S05 |
-| W1-S06 | Runtime store and artifact packet materialization | EPIC-2 | blocked | `packages/orchestrator-core`, `packages/contracts`, `apps/cli` | W1-S02 |
-| W1-S07 | Wave ticket and handoff packet foundation | EPIC-2 | blocked | `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**` | W1-S04, W1-S06 |
+| W1-S01 | Bootstrap CLI shell and command contracts | EPIC-6 | done | `apps/cli`, `docs/architecture/14-cli-command-catalog.md`, `docs/contracts/**` | W0-S01, W0-S02 |
+| W1-S02 | Project init and profile loading runtime | EPIC-1 | done | `apps/cli`, `packages/contracts`, `packages/orchestrator-core` | W1-S01 |
+| W1-S03 | Project analysis engine and durable analysis report | EPIC-1 | done | `packages/orchestrator-core`, `packages/contracts`, `apps/cli` | W1-S02 |
+| W1-S04 | Deterministic project validate flow | EPIC-4 | done | `packages/contracts`, `packages/orchestrator-core`, `apps/cli` | W1-S02, W0-S03 |
+| W1-S05 | Project verify flow and bounded preflight execution | EPIC-1 | ready | `packages/orchestrator-core`, `apps/cli`, `packages/observability` | W1-S03, W1-S04, W0-S05 |
+| W1-S06 | Runtime store and artifact packet materialization | EPIC-2 | done | `packages/orchestrator-core`, `packages/contracts`, `apps/cli` | W1-S02 |
+| W1-S07 | Wave ticket and handoff packet foundation | EPIC-2 | ready | `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**` | W1-S04, W1-S06 |
 | W1-S08 | Bootstrap end-to-end rehearsal | EPIC-7 | blocked | `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W1-S03, W1-S04, W1-S05, W1-S07 |
 
 ## W2 slices

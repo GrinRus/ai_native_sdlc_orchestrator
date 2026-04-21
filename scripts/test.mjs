@@ -244,6 +244,7 @@ const orchestratorCoreTests = [
   path.join(root, "packages/orchestrator-core/test/project-init.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/project-analysis.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/project-validate.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/project-verify.test.mjs"),
 ];
 const orchestratorCoreTestRun = spawnSync(process.execPath, ["--test", ...orchestratorCoreTests], {
   cwd: root,
