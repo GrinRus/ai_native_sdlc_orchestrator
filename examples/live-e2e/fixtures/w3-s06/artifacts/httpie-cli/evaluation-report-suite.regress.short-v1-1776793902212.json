@@ -1,0 +1,70 @@
+{
+  "report_id": "aor-core.evaluation.suite.regress.short-v1.1776793902211",
+  "subject_ref": "run://httpie-main",
+  "subject_type": "run",
+  "subject_fingerprint": "sha256:9a623af97bb7f1deabb321c97adf07496dfe89989780208144b7b48a71f13e91",
+  "suite_ref": "suite.regress.short@v1",
+  "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z",
+  "scorer_metadata": [
+    {
+      "scorer_id": "deterministic",
+      "scorer_mode": "deterministic",
+      "scorer_impl": "harness.scorer.deterministic.v1"
+    }
+  ],
+  "grader_results": {
+    "deterministic": {
+      "scorer_id": "deterministic",
+      "scorer_mode": "deterministic",
+      "scorer_impl": "harness.scorer.deterministic.v1",
+      "status": "pass",
+      "evaluated_cases": 1,
+      "passed_cases": 1,
+      "failed_cases": 0,
+      "pass_rate": 1,
+      "case_results": [
+        {
+          "case_id": "CASE-RUN-0091",
+          "status": "pass",
+          "reason": "deterministic_refs_present",
+          "score": 1,
+          "critical": false
+        }
+      ]
+    }
+  },
+  "summary_metrics": {
+    "total_cases": 1,
+    "passed_cases": 1,
+    "failed_cases": 0,
+    "aggregate_pass_rate": 1,
+    "regressions_introduced": 0,
+    "threshold_checks": [
+      {
+        "name": "min_pass_rate",
+        "expected": 1,
+        "actual": 1,
+        "passed": true
+      },
+      {
+        "name": "max_regressions_introduced",
+        "expected": 0,
+        "actual": 0,
+        "passed": true
+      }
+    ],
+    "blocking_rule_hits": [],
+    "missing_scorers": [],
+    "generated_at": "2026-04-21T17:51:42.211Z",
+    "suite_version": 1,
+    "subject_version": null,
+    "comparison_key": "run://httpie-main::suite.regress.short@v1"
+  },
+  "status": "pass",
+  "evidence_refs": [
+    "/tmp/aor-w3-s06/httpie-cli/examples/project.aor.yaml",
+    "/tmp/aor-w3-s06/httpie-cli/examples/eval/suite-regress-short.yaml",
+    "/tmp/aor-w3-s06/httpie-cli/examples/eval/dataset-run-regression.yaml",
+    "/tmp/aor-w3-s06/httpie-cli/.aor/projects/aor-core/state/project-init-state.json"
+  ]
+}

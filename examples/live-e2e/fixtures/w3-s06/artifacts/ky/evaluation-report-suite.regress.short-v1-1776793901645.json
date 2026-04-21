@@ -1,0 +1,70 @@
+{
+  "report_id": "aor-core.evaluation.suite.regress.short-v1.1776793901644",
+  "subject_ref": "run://ky-main",
+  "subject_type": "run",
+  "subject_fingerprint": "sha256:db912bb5017f60ff87bbebf4a290c0431305567a9018e1f007a765302c54310f",
+  "suite_ref": "suite.regress.short@v1",
+  "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z",
+  "scorer_metadata": [
+    {
+      "scorer_id": "deterministic",
+      "scorer_mode": "deterministic",
+      "scorer_impl": "harness.scorer.deterministic.v1"
+    }
+  ],
+  "grader_results": {
+    "deterministic": {
+      "scorer_id": "deterministic",
+      "scorer_mode": "deterministic",
+      "scorer_impl": "harness.scorer.deterministic.v1",
+      "status": "pass",
+      "evaluated_cases": 1,
+      "passed_cases": 1,
+      "failed_cases": 0,
+      "pass_rate": 1,
+      "case_results": [
+        {
+          "case_id": "CASE-RUN-0091",
+          "status": "pass",
+          "reason": "deterministic_refs_present",
+          "score": 1,
+          "critical": false
+        }
+      ]
+    }
+  },
+  "summary_metrics": {
+    "total_cases": 1,
+    "passed_cases": 1,
+    "failed_cases": 0,
+    "aggregate_pass_rate": 1,
+    "regressions_introduced": 0,
+    "threshold_checks": [
+      {
+        "name": "min_pass_rate",
+        "expected": 1,
+        "actual": 1,
+        "passed": true
+      },
+      {
+        "name": "max_regressions_introduced",
+        "expected": 0,
+        "actual": 0,
+        "passed": true
+      }
+    ],
+    "blocking_rule_hits": [],
+    "missing_scorers": [],
+    "generated_at": "2026-04-21T17:51:41.644Z",
+    "suite_version": 1,
+    "subject_version": null,
+    "comparison_key": "run://ky-main::suite.regress.short@v1"
+  },
+  "status": "pass",
+  "evidence_refs": [
+    "/tmp/aor-w3-s06/ky/examples/project.aor.yaml",
+    "/tmp/aor-w3-s06/ky/examples/eval/suite-regress-short.yaml",
+    "/tmp/aor-w3-s06/ky/examples/eval/dataset-run-regression.yaml",
+    "/tmp/aor-w3-s06/ky/.aor/projects/aor-core/state/project-init-state.json"
+  ]
+}

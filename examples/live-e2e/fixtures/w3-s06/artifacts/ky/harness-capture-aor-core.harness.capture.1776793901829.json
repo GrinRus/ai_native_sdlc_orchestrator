@@ -1,0 +1,664 @@
+{
+  "capture_id": "aor-core.harness.capture.1776793901829",
+  "schema_version": 1,
+  "captured_at": "2026-04-21T17:51:41.829Z",
+  "capture_kind": "harness-step-execution",
+  "project_profile_ref": "examples/project.aor.yaml",
+  "subject_ref": "run://ky-main",
+  "suite_ref": "suite.regress.short@v1",
+  "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z",
+  "source_refs": {
+    "step_result_ref": "/tmp/aor-w3-s06/ky/.aor/projects/aor-core/reports/step-result-routed-implement.json",
+    "evaluation_report_ref": "/tmp/aor-w3-s06/ky/.aor/projects/aor-core/reports/evaluation-report-suite.regress.short-v1-1776793901828.json"
+  },
+  "compatibility": {
+    "step_class": "implement",
+    "route_id": "route.implement.default",
+    "wrapper_ref": "wrapper.runner.default@v3",
+    "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+    "policy_id": "policy.step.runner.default",
+    "adapter_id": "codex-cli"
+  },
+  "trace": {
+    "step_input": {
+      "request_id": "aor-core.routed-execution.v1.step.implement.request",
+      "run_id": "aor-core.routed-execution.v1",
+      "step_id": "routed.implement",
+      "step_class": "implement",
+      "route": {
+        "step_class": "implement",
+        "resolved_route_id": "route.implement.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.implement"
+        },
+        "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+        "route_profile": {
+          "route_id": "route.implement.default",
+          "step": "implement",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "wrapper_profile_ref": "wrapper.runner.default@v3",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1800,
+            "max_cost_usd": 25,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      "asset_bundle": {
+        "step_class": "implement",
+        "route": {
+          "step_class": "implement",
+          "resolved_route_id": "route.implement.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+          "route_profile": {
+            "route_id": "route.implement.default",
+            "step": "implement",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.runner.default@v3",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1800,
+              "max_cost_usd": 25,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.runner"
+          },
+          "profile_source": "/tmp/aor-w3-s06/ky/examples/wrappers/wrapper-runner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.runner.default",
+            "version": 3,
+            "step_class": "runner",
+            "prompt_bundle_ref": "prompt-bundle://runner-default@v3"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "/tmp/aor-w3-s06/ky/examples/prompts/runner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "runner-default",
+            "version": 3,
+            "step_class": "runner"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "/tmp/aor-w3-s06/ky/examples/project.aor.yaml",
+          "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+          "wrapper_profile_source": "/tmp/aor-w3-s06/ky/examples/wrappers/wrapper-runner-default.yaml",
+          "prompt_bundle_source": "/tmp/aor-w3-s06/ky/examples/prompts/runner-default.yaml"
+        }
+      },
+      "policy_bundle": {
+        "step_class": "implement",
+        "route": {
+          "step_class": "implement",
+          "resolved_route_id": "route.implement.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+          "route_profile": {
+            "route_id": "route.implement.default",
+            "step": "implement",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.runner.default@v3",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1800,
+              "max_cost_usd": 25,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.runner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.runner"
+          },
+          "profile_source": "/tmp/aor-w3-s06/ky/examples/policies/step-runner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.runner.default",
+            "step_class": "runner",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "approval-present",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout",
+                "rate-limit",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed",
+                "missing-evidence"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 4,
+              "on": [
+                "business-ambiguity",
+                "policy-conflict",
+                "security-boundary"
+              ]
+            },
+            "blocking_rules": [
+              "approval-missing",
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 25,
+            "timeout_sec": 1800,
+            "max_cost_source": "route.constraints.max_cost_usd (route.implement.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.implement.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout",
+              "rate-limit",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "/tmp/aor-w3-s06/ky/examples/project.aor.yaml",
+          "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+          "policy_profile_source": "/tmp/aor-w3-s06/ky/examples/policies/step-runner-default.yaml"
+        }
+      },
+      "input_packet_refs": [],
+      "dry_run": true,
+      "context": {}
+    },
+    "selected_assets": {
+      "route_resolution": {
+        "step_class": "implement",
+        "resolved_route_id": "route.implement.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.implement"
+        },
+        "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+        "route_profile": {
+          "route_id": "route.implement.default",
+          "step": "implement",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "wrapper_profile_ref": "wrapper.runner.default@v3",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1800,
+            "max_cost_usd": 25,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      "asset_resolution": {
+        "step_class": "implement",
+        "route": {
+          "step_class": "implement",
+          "resolved_route_id": "route.implement.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+          "route_profile": {
+            "route_id": "route.implement.default",
+            "step": "implement",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.runner.default@v3",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1800,
+              "max_cost_usd": 25,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.runner"
+          },
+          "profile_source": "/tmp/aor-w3-s06/ky/examples/wrappers/wrapper-runner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.runner.default",
+            "version": 3,
+            "step_class": "runner",
+            "prompt_bundle_ref": "prompt-bundle://runner-default@v3"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "/tmp/aor-w3-s06/ky/examples/prompts/runner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "runner-default",
+            "version": 3,
+            "step_class": "runner"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "/tmp/aor-w3-s06/ky/examples/project.aor.yaml",
+          "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+          "wrapper_profile_source": "/tmp/aor-w3-s06/ky/examples/wrappers/wrapper-runner-default.yaml",
+          "prompt_bundle_source": "/tmp/aor-w3-s06/ky/examples/prompts/runner-default.yaml"
+        }
+      },
+      "policy_resolution": {
+        "step_class": "implement",
+        "route": {
+          "step_class": "implement",
+          "resolved_route_id": "route.implement.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+          "route_profile": {
+            "route_id": "route.implement.default",
+            "step": "implement",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.runner.default@v3",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1800,
+              "max_cost_usd": 25,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.runner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.runner"
+          },
+          "profile_source": "/tmp/aor-w3-s06/ky/examples/policies/step-runner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.runner.default",
+            "step_class": "runner",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "approval-present",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout",
+                "rate-limit",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed",
+                "missing-evidence"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 4,
+              "on": [
+                "business-ambiguity",
+                "policy-conflict",
+                "security-boundary"
+              ]
+            },
+            "blocking_rules": [
+              "approval-missing",
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 25,
+            "timeout_sec": 1800,
+            "max_cost_source": "route.constraints.max_cost_usd (route.implement.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.implement.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout",
+              "rate-limit",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "/tmp/aor-w3-s06/ky/examples/project.aor.yaml",
+          "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+          "policy_profile_source": "/tmp/aor-w3-s06/ky/examples/policies/step-runner-default.yaml"
+        }
+      },
+      "adapter_resolution": {
+        "step_class": "implement",
+        "route_id": "route.implement.default",
+        "adapter": {
+          "adapter_id": "codex-cli",
+          "resolution_source": {
+            "kind": "route-primary",
+            "field": "route.primary.adapter"
+          },
+          "profile_source": "/tmp/aor-w3-s06/ky/examples/adapters/codex-cli.yaml",
+          "profile": {
+            "adapter_id": "codex-cli",
+            "version": 1,
+            "runner_family": "codex",
+            "capabilities": {
+              "repo_read": true,
+              "repo_write": true,
+              "shell_commands": true,
+              "structured_output": true,
+              "live_logs": true,
+              "mcp_tools": true,
+              "subagents": true
+            },
+            "constraints": {
+              "requires_local_runtime": true,
+              "default_network_mode": "deny-by-default",
+              "supports_no_write_rehearsal": true
+            }
+          }
+        },
+        "capability_check": {
+          "required": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "satisfied": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "missing": [],
+          "status": "pass"
+        },
+        "lifecycle_hooks": [
+          "before_step",
+          "invoke_adapter",
+          "after_step",
+          "on_retry",
+          "on_repair",
+          "on_escalation"
+        ],
+        "provenance": {
+          "route_profile_source": "/tmp/aor-w3-s06/ky/examples/routes/implement-default.yaml",
+          "adapter_profile_source": "/tmp/aor-w3-s06/ky/examples/adapters/codex-cli.yaml"
+        }
+      }
+    },
+    "tool_activity": [],
+    "normalized_output": {
+      "request_id": "aor-core.routed-execution.v1.step.implement.request",
+      "adapter_id": "mock-runner",
+      "status": "success",
+      "summary": "Mock adapter completed implement",
+      "output": {
+        "deterministic_seed": "routed.implement:implement:route.implement.default:dry-run",
+        "mode": "dry-run",
+        "route_id": "route.implement.default"
+      },
+      "evidence_refs": [
+        "evidence://mock-adapter/routed-implement-implement-route-implement-default-dry-run"
+      ],
+      "tool_traces": [
+        {
+          "phase": "invoke_adapter",
+          "kind": "mock-run",
+          "detail": "deterministic_seed=routed.implement:implement:route.implement.default:dry-run"
+        }
+      ]
+    }
+  },
+  "scoring_snapshot": {
+    "status": "pass",
+    "scorer_metadata": [
+      {
+        "scorer_id": "deterministic",
+        "scorer_mode": "deterministic",
+        "scorer_impl": "harness.scorer.deterministic.v1"
+      }
+    ],
+    "grader_results": {
+      "deterministic": {
+        "scorer_id": "deterministic",
+        "scorer_mode": "deterministic",
+        "scorer_impl": "harness.scorer.deterministic.v1",
+        "status": "pass",
+        "evaluated_cases": 1,
+        "passed_cases": 1,
+        "failed_cases": 0,
+        "pass_rate": 1,
+        "case_results": [
+          {
+            "case_id": "CASE-RUN-0091",
+            "status": "pass",
+            "reason": "deterministic_refs_present",
+            "score": 1,
+            "critical": false
+          }
+        ]
+      }
+    },
+    "summary_metrics": {
+      "total_cases": 1,
+      "passed_cases": 1,
+      "failed_cases": 0,
+      "aggregate_pass_rate": 1,
+      "regressions_introduced": 0,
+      "threshold_checks": [
+        {
+          "name": "min_pass_rate",
+          "expected": 1,
+          "actual": 1,
+          "passed": true
+        },
+        {
+          "name": "max_regressions_introduced",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        }
+      ],
+      "blocking_rule_hits": [],
+      "missing_scorers": [],
+      "generated_at": "2026-04-21T17:51:41.828Z",
+      "suite_version": 1,
+      "subject_version": null,
+      "comparison_key": "run://ky-main::suite.regress.short@v1"
+    }
+  },
+  "evidence_refs": [
+    "/tmp/aor-w3-s06/ky/.aor/projects/aor-core/reports/step-result-routed-implement.json",
+    "/tmp/aor-w3-s06/ky/.aor/projects/aor-core/reports/evaluation-report-suite.regress.short-v1-1776793901828.json"
+  ]
+}

@@ -80,6 +80,27 @@ Evidence fixtures captured for this procedure:
 - `examples/live-e2e/fixtures/routed-rehearsal/aor/step-result-routed-implement.json`
 - `examples/live-e2e/fixtures/routed-rehearsal/aor/runtime-tree.txt`
 
+## Quality rehearsal procedure (W3-S06 baseline)
+Use this baseline on selected public targets after no-write preflight gates pass:
+
+```bash
+aor eval run --project-ref <TARGET_ROOT> --project-profile <TARGET_ROOT>/examples/project.aor.yaml --suite-ref suite.regress.short@v1 --subject-ref run://<target-id>
+aor harness certify --project-ref <TARGET_ROOT> --project-profile <TARGET_ROOT>/examples/project.aor.yaml --asset-ref wrapper://wrapper.runner.default@v3 --subject-ref run://<target-id> --suite-ref suite.regress.short@v1 --step-class implement
+```
+
+Expected quality rehearsal signals:
+- eval output returns `evaluation_status=pass`;
+- certification output returns `promotion_decision_status=pass`;
+- evaluation report, harness capture/replay, and promotion decision files are all materialized.
+
+Evidence fixtures captured for this procedure:
+- `examples/live-e2e/fixtures/w3-s06/ky-eval.json`
+- `examples/live-e2e/fixtures/w3-s06/ky-certify.json`
+- `examples/live-e2e/fixtures/w3-s06/httpie-cli-eval.json`
+- `examples/live-e2e/fixtures/w3-s06/httpie-cli-certify.json`
+- `examples/live-e2e/fixtures/w3-s06/artifacts/ky/*`
+- `examples/live-e2e/fixtures/w3-s06/artifacts/httpie-cli/*`
+
 ## Required target annotations
 Each profile and runbook must provide:
 - prerequisites;
@@ -103,4 +124,5 @@ Abort the rehearsal when any of these conditions occur:
 ## Related artifacts
 - Target catalog: `docs/ops/live-e2e-target-catalog.md`
 - Profiles: `examples/live-e2e/*.yaml`
+- Quality rehearsal runbook: `docs/ops/live-e2e-quality-rehearsal.md`
 - Runbooks: `docs/ops/live-e2e-regress-short.md`, `docs/ops/live-e2e-regress-long.md`, `docs/ops/live-e2e-release-short.md`, `docs/ops/live-e2e-release-long.md`
