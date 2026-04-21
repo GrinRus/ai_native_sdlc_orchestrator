@@ -27,8 +27,8 @@ This is the master index for the implementation slices across all defined waves.
 | W1-S04 | Deterministic project validate flow | EPIC-4 | done | `packages/contracts`, `packages/orchestrator-core`, `apps/cli` | W1-S02, W0-S03 |
 | W1-S05 | Project verify flow and bounded preflight execution | EPIC-1 | done | `packages/orchestrator-core`, `apps/cli`, `packages/observability` | W1-S03, W1-S04, W0-S05 |
 | W1-S06 | Runtime store and artifact packet materialization | EPIC-2 | done | `packages/orchestrator-core`, `packages/contracts`, `apps/cli` | W1-S02 |
-| W1-S07 | Wave ticket and handoff packet foundation | EPIC-2 | ready | `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**` | W1-S04, W1-S06 |
-| W1-S08 | Bootstrap end-to-end rehearsal | EPIC-7 | blocked | `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W1-S03, W1-S04, W1-S05, W1-S07 |
+| W1-S07 | Wave ticket and handoff packet foundation | EPIC-2 | done | `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**` | W1-S04, W1-S06 |
+| W1-S08 | Bootstrap end-to-end rehearsal | EPIC-7 | ready | `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W1-S03, W1-S04, W1-S05, W1-S07 |
 
 ## W2 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
