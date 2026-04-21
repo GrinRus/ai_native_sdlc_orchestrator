@@ -81,7 +81,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S03 — Eval runner and scorer interface
 - **Epic:** EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Create the first repeatable offline eval runtime for wrappers, prompt bundles, routes, and step behavior.
 - **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli`
 - **Hard dependencies:** W3-S02, W2-S04, W2-S05

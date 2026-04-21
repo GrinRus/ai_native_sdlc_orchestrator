@@ -266,7 +266,10 @@ if (adapterSdkTestRun.status !== 0) {
 
 console.log("adapter-sdk tests ok: envelopes, capability negotiation, and deterministic mock execution");
 
-const harnessTests = [path.join(root, "packages/harness/test/scorer-interface.test.mjs")];
+const harnessTests = [
+  path.join(root, "packages/harness/test/scorer-interface.test.mjs"),
+  path.join(root, "packages/harness/test/capture-format.test.mjs"),
+];
 const harnessTestRun = spawnSync(process.execPath, ["--test", ...harnessTests], {
   cwd: root,
   stdio: "inherit",
@@ -276,13 +279,14 @@ if (harnessTestRun.status !== 0) {
   process.exit(harnessTestRun.status ?? 1);
 }
 
-console.log("harness tests ok: unified scorer interface for deterministic and judge modes");
+console.log("harness tests ok: scorer interface plus capture-format compatibility helpers");
 
 const orchestratorCoreTests = [
   path.join(root, "packages/orchestrator-core/test/project-init.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/handoff-packets.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/evaluation-registry.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/eval-runner.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/harness-capture-replay.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/asset-loader.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/policy-resolution.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/step-execution-engine.test.mjs"),

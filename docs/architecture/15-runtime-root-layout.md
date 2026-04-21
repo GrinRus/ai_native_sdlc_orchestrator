@@ -28,8 +28,11 @@ For project `<project_id>`, the runtime layout is:
         asset-resolution-report.json
         policy-resolution-report.json
         validation-report.json
+        evaluation-report-*.json
         verify-summary.json
         step-result-*.json
+        harness-capture-*.json
+        harness-replay-*.json
         verify-command-*.log
       state/
         project-init-state.json
