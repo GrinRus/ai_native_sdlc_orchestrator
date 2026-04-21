@@ -240,6 +240,18 @@ if (cliTestRun.status !== 0) {
 
 console.log("cli tests ok: bootstrap command contracts, parsing, and help output");
 
+const orchestratorCoreTestsPath = path.join(root, "packages/orchestrator-core/test/project-init.test.mjs");
+const orchestratorCoreTestRun = spawnSync(process.execPath, ["--test", orchestratorCoreTestsPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (orchestratorCoreTestRun.status !== 0) {
+  process.exit(orchestratorCoreTestRun.status ?? 1);
+}
+
+console.log("orchestrator-core tests ok: project init discovery, profile loading, and runtime layout");
+
 const referenceIntegrityCheckPath = path.join(root, "scripts/reference-integrity.mjs");
 const referenceIntegrityRun = spawnSync(process.execPath, [referenceIntegrityCheckPath], {
   cwd: root,

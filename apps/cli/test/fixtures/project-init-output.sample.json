@@ -1,0 +1,25 @@
+{
+  "command": "project init",
+  "status": "implemented",
+  "resolved_project_ref": "<PROJECT_ROOT>",
+  "resolved_runtime_root": "<PROJECT_ROOT>/.aor",
+  "project_profile_ref": "examples/project.aor.yaml",
+  "runtime_layout": {
+    "runtimeRoot": "<PROJECT_ROOT>/.aor",
+    "projectsRoot": "<PROJECT_ROOT>/.aor/projects",
+    "projectRuntimeRoot": "<PROJECT_ROOT>/.aor/projects/aor-core",
+    "artifactsRoot": "<PROJECT_ROOT>/.aor/projects/aor-core/artifacts",
+    "reportsRoot": "<PROJECT_ROOT>/.aor/projects/aor-core/reports",
+    "stateRoot": "<PROJECT_ROOT>/.aor/projects/aor-core/state"
+  },
+  "runtime_state_file": "<PROJECT_ROOT>/.aor/projects/aor-core/state/project-init-state.json",
+  "contract_families": [
+    {
+      "family": "project-profile",
+      "group": "core-packets-and-profiles",
+      "source_contract": "docs/contracts/project-profile.md",
+      "status": "implemented"
+    }
+  ],
+  "command_catalog_alignment": "docs/architecture/14-cli-command-catalog.md"
+}
