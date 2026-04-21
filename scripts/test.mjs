@@ -240,6 +240,18 @@ if (cliTestRun.status !== 0) {
 
 console.log("cli tests ok: bootstrap command contracts, parsing, and help output");
 
+const apiTests = [path.join(root, "apps/api/test/read-surface.test.mjs")];
+const apiTestRun = spawnSync(process.execPath, ["--test", ...apiTests], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (apiTestRun.status !== 0) {
+  process.exit(apiTestRun.status ?? 1);
+}
+
+console.log("api tests ok: control-plane read surface smoke endpoints");
+
 const providerRoutingTests = [
   path.join(root, "packages/provider-routing/test/route-resolution.test.mjs"),
 ];

@@ -23,6 +23,23 @@ The API exposes command, query, and live-stream surfaces for AOR.
 - incidents and promotion decisions
 - live E2E reports
 
+## Read endpoints (W5-S01 baseline)
+- `GET /api/projects/:projectId/state` — project runtime state and layout references.
+- `GET /api/projects/:projectId/packets` — packet artifacts (`artifact-packet`, `wave-ticket`, `handoff-packet`, `delivery-plan`, `delivery-manifest`, `release-packet`).
+- `GET /api/projects/:projectId/step-results` — `step-result` artifacts from reports.
+- `GET /api/projects/:projectId/manifests` — delivery-manifest artifacts.
+- `GET /api/projects/:projectId/promotion-decisions` — promotion-decision artifacts.
+- `GET /api/projects/:projectId/quality-artifacts` — validation/evaluation reports and promotion decisions.
+- `GET /api/projects/:projectId/runs` — aggregated run-level view derived from packet, step-result, and quality artifact references.
+
+All read responses must reuse existing contract families and IDs rather than API-only parallel shapes.
+
+## Authentication and permission assumptions
+- Baseline assumption for local/operator rehearsals: trusted local operator context behind workspace access controls.
+- Read endpoints are read-only and must not mutate runtime artifacts.
+- Production deployments should require authenticated identity with project-scoped read permissions before exposing packet or evidence references.
+- Endpoint responses should preserve `evidence://` or runtime-relative refs for audit traceability; do not return secrets or raw credential material.
+
 ## Streaming
 The API should provide SSE-first live events so CLI and web can observe active work without owning workflow state.
 

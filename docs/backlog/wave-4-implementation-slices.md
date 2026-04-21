@@ -174,7 +174,7 @@ Add safe write-back modes, manifests, and release artifacts so AOR can move from
 
 ## W4-S06 — Delivery rehearsal and recovery-safe operations
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Prove that delivery modes remain safe, inspectable, and recoverable on selected public targets before widening access.
 - **Primary modules:** `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability`
 - **Hard dependencies:** W4-S05, W0-S05
