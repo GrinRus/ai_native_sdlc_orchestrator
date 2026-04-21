@@ -6,7 +6,7 @@ This catalog separates bootstrap commands implemented in the current shell from 
 
 | Command | Status | Inputs | Outputs | Contract family |
 | --- | --- | --- | --- | --- |
-| `aor project init` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `contract_families`, `command_catalog_alignment` | `project-profile` |
+| `aor project init` | implemented | `--project-ref <path>` (optional); `--project-profile <path>` (optional); `--runtime-root <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `project_profile_ref`, `runtime_layout`, `runtime_state_file`, `contract_families`, `command_catalog_alignment` | `project-profile` |
 | `aor project analyze` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `contract_families`, `command_catalog_alignment` | `project-analysis-report` |
 | `aor project validate` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `contract_families`, `command_catalog_alignment` | `validation-report` |
 | `aor project verify` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `contract_families`, `command_catalog_alignment` | `step-result` |

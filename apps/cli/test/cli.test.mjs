@@ -9,6 +9,7 @@ import { invokeCli } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const fixturesDir = path.join(path.dirname(currentFilePath), "fixtures");
+const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../../..");
 
 /**
  * @param {(projectRoot: string) => void} callback
@@ -37,8 +38,14 @@ test("implemented command help documents inputs outputs and contracts", () => {
   assert.equal(result.exitCode, 0);
   assert.equal(result.stderr, "");
   assert.match(result.stdout, /Status: implemented in bootstrap shell \(W1-S01\)/);
-  assert.match(result.stdout, /Inputs: --project-ref <path>, --runtime-root <path> \(optional\), --help/);
-  assert.match(result.stdout, /Outputs: resolved_project_ref, resolved_runtime_root, contract_families, command_catalog_alignment/);
+  assert.match(
+    result.stdout,
+    /Inputs: --project-ref <path> \(optional, defaults to cwd discovery\), --project-profile <path> \(optional\), --runtime-root <path> \(optional\), --help/,
+  );
+  assert.match(
+    result.stdout,
+    /Outputs: resolved_project_ref, resolved_runtime_root, project_profile_ref, runtime_layout, runtime_state_file, contract_families, command_catalog_alignment/,
+  );
   assert.match(result.stdout, /Contract families: project-profile/);
 });
 
@@ -96,5 +103,40 @@ test("project verify resolves runtime root and contract metadata", () => {
         status: "implemented",
       },
     ]);
+  });
+});
+
+test("project init discovers repo root from cwd and materializes runtime layout idempotently", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "examples"), { recursive: true });
+    fs.copyFileSync(
+      path.join(workspaceRoot, "examples/project.aor.yaml"),
+      path.join(projectRoot, "examples/project.aor.yaml"),
+    );
+
+    const nestedCwd = path.join(projectRoot, "nested", "workspace");
+    fs.mkdirSync(nestedCwd, { recursive: true });
+
+    const firstRun = invokeCli(["project", "init"], { cwd: nestedCwd });
+    const secondRun = invokeCli(["project", "init"], { cwd: nestedCwd });
+
+    assert.equal(firstRun.exitCode, 0, firstRun.stderr);
+    assert.equal(secondRun.exitCode, 0, secondRun.stderr);
+
+    const firstPayload = JSON.parse(firstRun.stdout);
+    const secondPayload = JSON.parse(secondRun.stdout);
+
+    assert.equal(firstPayload.resolved_project_ref, projectRoot);
+    assert.equal(secondPayload.resolved_project_ref, projectRoot);
+    assert.equal(firstPayload.project_profile_ref, "examples/project.aor.yaml");
+    assert.equal(secondPayload.project_profile_ref, "examples/project.aor.yaml");
+    assert.equal(firstPayload.runtime_state_file, secondPayload.runtime_state_file);
+    assert.equal(fs.existsSync(firstPayload.runtime_state_file), true);
+
+    const runtimeState = JSON.parse(fs.readFileSync(firstPayload.runtime_state_file, "utf8"));
+    assert.equal(runtimeState.project_id, "aor-core");
+    assert.equal(runtimeState.selected_profile_ref, "examples/project.aor.yaml");
+    assert.equal(runtimeState.project_root, projectRoot);
   });
 });

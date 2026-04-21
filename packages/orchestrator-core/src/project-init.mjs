@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadContractFile } from "../../contracts/src/index.mjs";
-import { materializeBootstrapArtifactPacket } from "./artifact-store.mjs";
 
 const DEFAULT_RUNTIME_ROOT = ".aor";
 const DEFAULT_PROFILE_CANDIDATES = [
@@ -192,9 +191,6 @@ export function ensureRuntimeLayout(options) {
  *     stateRoot: string,
  *   },
  *   stateFile: string,
- *   artifactPacketFile: string,
- *   artifactPacketBodyFile: string,
- *   artifactPacketId: string,
  *   state: {
  *     schema_version: number,
  *     project_id: string,
@@ -250,14 +246,6 @@ export function initializeProjectRuntime(options = {}) {
   const stateFile = path.join(runtimeLayout.stateRoot, "project-init-state.json");
   fs.writeFileSync(stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
 
-  const artifactPacket = materializeBootstrapArtifactPacket({
-    projectId: loadedProfile.projectId,
-    projectRoot,
-    projectProfileRef: state.selected_profile_ref,
-    runtimeLayout,
-    command: "aor project init",
-  });
-
   return {
     projectRoot,
     projectProfilePath,
@@ -267,9 +255,6 @@ export function initializeProjectRuntime(options = {}) {
     runtimeRoot,
     runtimeLayout,
     stateFile,
-    artifactPacketFile: artifactPacket.packetFile,
-    artifactPacketBodyFile: artifactPacket.packetBodyFile,
-    artifactPacketId: artifactPacket.packet.packet_id,
     state,
   };
 }

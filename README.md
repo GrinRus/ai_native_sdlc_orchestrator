@@ -126,7 +126,7 @@ At a high level, AOR is intended to work like this:
 Bootstrap command contracts are implemented in the CLI shell:
 
 ```bash
-aor project init --project-ref <path> [--runtime-root <path>]
+aor project init [--project-ref <path>] [--project-profile <path>] [--runtime-root <path>]
 aor project analyze --project-ref <path> [--runtime-root <path>]
 aor project validate --project-ref <path> [--runtime-root <path>]
 aor project verify --project-ref <path> [--runtime-root <path>]

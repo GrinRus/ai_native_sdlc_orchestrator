@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { getContractFamilyIndex } from "../../../packages/contracts/src/index.mjs";
+import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 
 import {
   RUNTIME_ROOT_DIRNAME,
@@ -84,6 +85,18 @@ function parseFlags(args) {
  * @returns {string}
  */
 function formatCommandHelp(definition) {
+  const notes =
+    definition.command === "project init"
+      ? [
+          "- --project-ref is optional. When omitted, the command discovers repo root from cwd.",
+          "- --project-profile can override default profile discovery in project root.",
+          `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
+        ]
+      : [
+          "- --project-ref must point to an existing directory.",
+          `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+        ];
+
   const lines = [
     `aor ${definition.command}`,
     definition.summary ?? "No summary available.",
@@ -94,8 +107,7 @@ function formatCommandHelp(definition) {
     `Contract families: ${(definition.contractFamilies ?? []).join(", ") || "none"}`,
     "",
     "Notes:",
-    `- --project-ref must point to an existing directory.`,
-    `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+    ...notes,
   ];
 
   return `${lines.join("\n")}\n`;
@@ -139,6 +151,22 @@ function ensureRequiredFlags(command, flags) {
       throw new CliUsageError(`Missing required flag '--${required}' for 'aor ${command}'.`);
     }
   }
+}
+
+/**
+ * @param {string} flagName
+ * @param {string | true | undefined} value
+ * @returns {string | undefined}
+ */
+function resolveOptionalStringFlag(flagName, value) {
+  if (value === undefined) return undefined;
+  if (value === true) {
+    throw new CliUsageError(`Flag '--${flagName}' requires a value.`);
+  }
+  if (value.trim().length === 0) {
+    throw new CliUsageError(`Flag '--${flagName}' cannot be empty.`);
+  }
+  return value;
 }
 
 /**
@@ -224,11 +252,32 @@ function executeImplementedCommand(command, flags, cwd) {
     throw new CliUsageError(`Command 'aor ${command}' is planned and not implemented yet.`);
   }
 
-  ensureRequiredFlags(command, flags);
+  let resolvedProjectRef = null;
+  let resolvedRuntimeRoot = null;
+  let runtimeLayout = null;
+  let runtimeStateFile = null;
+  let projectProfileRef = null;
 
-  const projectRefInput = /** @type {string} */ (flags["project-ref"]);
-  const resolvedProjectRef = resolveProjectRef(projectRefInput, cwd);
-  const resolvedRuntimeRoot = resolveRuntimeRoot(flags["runtime-root"], resolvedProjectRef);
+  if (command === "project init") {
+    const initResult = initializeProjectRuntime({
+      cwd,
+      projectRef: resolveOptionalStringFlag("project-ref", flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+
+    resolvedProjectRef = initResult.projectRoot;
+    resolvedRuntimeRoot = initResult.runtimeRoot;
+    runtimeLayout = initResult.runtimeLayout;
+    runtimeStateFile = initResult.stateFile;
+    projectProfileRef = initResult.projectProfileRef;
+  } else {
+    ensureRequiredFlags(command, flags);
+
+    const projectRefInput = /** @type {string} */ (flags["project-ref"]);
+    resolvedProjectRef = resolveProjectRef(projectRefInput, cwd);
+    resolvedRuntimeRoot = resolveRuntimeRoot(flags["runtime-root"], resolvedProjectRef);
+  }
 
   const contractIndex = getContractFamilyIndex();
   const resolvedFamilies = (definition.contractFamilies ?? []).map((family) => {
@@ -250,6 +299,9 @@ function executeImplementedCommand(command, flags, cwd) {
     status: "implemented",
     resolved_project_ref: resolvedProjectRef,
     resolved_runtime_root: resolvedRuntimeRoot,
+    project_profile_ref: projectProfileRef,
+    runtime_layout: runtimeLayout,
+    runtime_state_file: runtimeStateFile,
     contract_families: resolvedFamilies,
     command_catalog_alignment: "docs/architecture/14-cli-command-catalog.md",
   };

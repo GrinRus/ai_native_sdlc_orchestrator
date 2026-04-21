@@ -13,8 +13,6 @@
     "stateRoot": "<PROJECT_ROOT>/.aor/projects/aor-core/state"
   },
   "runtime_state_file": "<PROJECT_ROOT>/.aor/projects/aor-core/state/project-init-state.json",
-  "artifact_packet_id": "aor-core.artifact.bootstrap.v1",
-  "artifact_packet_file": "<PROJECT_ROOT>/.aor/projects/aor-core/artifacts/aor-core.artifact.bootstrap.v1.json",
   "contract_families": [
     {
       "family": "project-profile",

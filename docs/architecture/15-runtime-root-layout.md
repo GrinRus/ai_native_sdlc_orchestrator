@@ -18,23 +18,7 @@ For project `<project_id>`, the runtime layout is:
   projects/
     <project_id>/
       artifacts/
-        <project_id>.artifact.bootstrap.v1.json
-        <project_id>.artifact.bootstrap.v1.body.json
-        wave-ticket-*.json
-        <project_id>.handoff.bootstrap.v1.json
-        delivery-plan-*.json
       reports/
-        project-analysis-report.json
-        route-resolution-report.json
-        asset-resolution-report.json
-        policy-resolution-report.json
-        validation-report.json
-        evaluation-report-*.json
-        verify-summary.json
-        step-result-*.json
-        harness-capture-*.json
-        harness-replay-*.json
-        verify-command-*.log
       state/
         project-init-state.json
 ```
@@ -47,8 +31,6 @@ For project `<project_id>`, the runtime layout is:
 - `project_root`
 - `runtime_root`
 - `runtime_layout` paths (`project_runtime_root`, `artifacts_root`, `reports_root`, `state_root`)
-
-The first bootstrap packet created by `project init` records packet metadata plus invocation/evidence linkage and can be reloaded directly from `<project_id>.artifact.bootstrap.v1.json`.
 
 ## Idempotency
 Repeated `aor project init` runs against the same project root must:
