@@ -69,6 +69,8 @@ Policy resolution is deterministic and runs before any adapter invocation:
    - budget and timeout: `route constraints` then `project budget defaults`;
    - command constraints: `policy command constraints`, otherwise `route constraints`, otherwise `project repo command allowlist`;
    - write-back mode: `policy override`, then `route constraints`, then `project writeback defaults`;
-4. persist guardrails (`approval_required`, allowlist enforcement, redaction, blocking rules) into step planning metadata.
+4. normalize write-back mode into delivery-plan modes (`no-write`, `patch-only`, `local-branch`, `fork-first-pr`);
+5. persist guardrails (`approval_required`, allowlist enforcement, redaction, blocking rules) into step planning metadata.
+6. persist a delivery-plan artifact before write-back, and block non-read-only modes without approved handoff and promotion evidence.
 
 Any missing or conflicting required policy source must fail deterministically before runner execution starts.

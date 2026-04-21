@@ -22,6 +22,7 @@ For project `<project_id>`, the runtime layout is:
         <project_id>.artifact.bootstrap.v1.body.json
         wave-ticket-*.json
         <project_id>.handoff.bootstrap.v1.json
+        delivery-plan-*.json
       reports/
         project-analysis-report.json
         route-resolution-report.json

@@ -41,17 +41,16 @@ Repository contributor guidance such as `AGENTS.md` and `.agents/**` belongs to 
 2. analyze or verify the project if required;
 3. materialize the next packet boundary;
 4. request human approval if the policy requires it;
-5. resolve route, wrapper, prompt bundle, context bundle, skill refs, and step policy from project-profile defaults plus explicit step overrides;
-6. compile working context and inject it into the adapter request envelope;
-7. execute the step through the selected adapter;
-8. collect evidence and normalize the step result;
-9. run validation;
-10. run eval or harness if the step policy requires it;
-11. decide whether to close, retry, repair, escalate, or block;
-12. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
-13. only if the delivery plan is ready, materialize a delivery manifest;
-14. if the flow reaches release, materialize a release packet;
-15. if the flow fails materially, open or update an incident path.
+5. resolve route, wrapper, prompt bundle, and step policy;
+6. execute the step through the selected adapter;
+7. collect evidence and normalize the step result;
+8. run validation;
+9. run eval or harness if the step policy requires it;
+10. decide whether to close, retry, repair, escalate, or block;
+11. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
+12. only if the delivery plan is ready, materialize a delivery manifest;
+13. if the flow reaches release, materialize a release packet;
+14. if the flow fails materially, open or update an incident path.
 
 ## Delivery model
 AOR should support these delivery modes:
@@ -62,6 +61,11 @@ AOR should support these delivery modes:
 
 All non-trivial delivery modes should leave a delivery manifest behind.
 Delivery-capable runs should execute from an isolated root (`workspace-clone` or `worktree`) rather than mutating the operator's primary checkout directly.
+
+Policy boundary between rehearsal and delivery:
+- rehearsal can proceed in `no-write` mode without handoff/promotion gates;
+- non-read-only delivery modes must be blocked unless approved handoff evidence and promotion evidence are both present;
+- write-back is allowed only when the delivery plan status is `ready`.
 
 ## Asset evolution model
 Prompt bundles, runtime context assets, wrappers, routes, policies, adapters, and compiler revisions evolve on their own lifecycle:

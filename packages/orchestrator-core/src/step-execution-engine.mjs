@@ -10,6 +10,7 @@ import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
 import { resolveAssetBundleForStep } from "./asset-loader.mjs";
+import { materializeDeliveryPlan } from "./delivery-plan.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
 
@@ -127,6 +128,8 @@ export function executeRoutedStep(options) {
   let policyResolution = null;
   /** @type {Record<string, unknown> | null} */
   let adapterResolution = null;
+  /** @type {{ deliveryPlan: Record<string, unknown>, deliveryPlanFile: string } | null} */
+  let deliveryPlanResult = null;
   /** @type {Record<string, unknown> | null} */
   let adapterRequest = null;
   /** @type {Record<string, unknown> | null} */
@@ -166,6 +169,13 @@ export function executeRoutedStep(options) {
       routeOverrides: options.routeOverrides,
       policyOverrides: options.policyOverrides,
     });
+    deliveryPlanResult = materializeDeliveryPlan({
+      runtimeLayout: init.runtimeLayout,
+      projectId: init.projectId,
+      runId,
+      stepClass: requestedStepClass,
+      policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
+    });
 
     adapterResolution = resolveAdapterForRoute({
       routeResolution: /** @type {any} */ (routeResolution),
@@ -174,6 +184,12 @@ export function executeRoutedStep(options) {
     });
 
     if (!dryRun) {
+      evidenceRefs = [
+        ...new Set([
+          init.projectProfilePath,
+          ...(deliveryPlanResult ? [deliveryPlanResult.deliveryPlanFile] : []),
+        ]),
+      ];
       status = "failed";
       summary = `Routed step '${requestedStepClass}' blocked: live adapter execution is not implemented yet; use dry-run mode.`;
       blockedNextStep = "Retry with '--routed-dry-run-step' until live adapter execution is implemented.";
@@ -192,7 +208,13 @@ export function executeRoutedStep(options) {
 
       const mockAdapter = createMockAdapter();
       adapterResponse = mockAdapter.execute(/** @type {any} */ (adapterRequest));
-      evidenceRefs = [...new Set([init.projectProfilePath, ...asStringArray(adapterResponse.evidence_refs)])];
+      evidenceRefs = [
+        ...new Set([
+          init.projectProfilePath,
+          ...(deliveryPlanResult ? [deliveryPlanResult.deliveryPlanFile] : []),
+          ...asStringArray(adapterResponse.evidence_refs),
+        ]),
+      ];
       summary = `Routed dry-run for step '${requestedStepClass}' completed with selected adapter '${String(
         /** @type {any} */ (adapterResolution).adapter?.adapter_id ?? "unknown",
       )}' and mock execution.`;
@@ -220,6 +242,15 @@ export function executeRoutedStep(options) {
       route_resolution: routeResolution,
       asset_resolution: assetResolution,
       policy_resolution: policyResolution,
+      delivery_plan: deliveryPlanResult
+        ? {
+            plan_id: deliveryPlanResult.deliveryPlan.plan_id,
+            delivery_mode: deliveryPlanResult.deliveryPlan.delivery_mode,
+            status: deliveryPlanResult.deliveryPlan.status,
+            writeback_allowed: deliveryPlanResult.deliveryPlan.writeback_allowed,
+            delivery_plan_file: deliveryPlanResult.deliveryPlanFile,
+          }
+        : null,
       adapter_resolution: adapterResolution,
       adapter_request: adapterRequest,
       adapter_response: adapterResponse,

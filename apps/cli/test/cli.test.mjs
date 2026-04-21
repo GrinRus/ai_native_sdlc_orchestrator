@@ -173,6 +173,12 @@ test("project verify supports routed dry-run smoke execution and durable routed 
     assert.equal(routedStepResult.routed_execution.mode, "dry-run");
     assert.equal(routedStepResult.routed_execution.no_write_enforced, true);
     assert.equal(routedStepResult.routed_execution.route_resolution.step_class, "implement");
+    assert.equal(routedStepResult.routed_execution.delivery_plan.delivery_mode, "fork-first-pr");
+    assert.equal(routedStepResult.routed_execution.delivery_plan.status, "blocked");
+    assert.equal(
+      fs.existsSync(routedStepResult.routed_execution.delivery_plan.delivery_plan_file),
+      true,
+    );
     assert.equal(routedStepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
     assert.equal(routedStepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
   });
