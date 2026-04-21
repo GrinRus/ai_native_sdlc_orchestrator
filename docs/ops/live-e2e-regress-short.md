@@ -23,6 +23,7 @@ Confirm that AOR can:
 2. Confirm install and verification commands.
 3. Apply one narrow regression-test-backed change.
 4. Produce patch output or a local/fork branch.
+5. Run routed dry-run smoke (`project verify --routed-dry-run-step implement`) before any delivery-stage action.
 
 ## No-write preflight
 Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
@@ -57,5 +58,6 @@ aor ui attach --run RUN-201 --control-plane http://localhost:8080
 - install succeeds;
 - `npm test` succeeds;
 - handoff packet and step results are materialized;
+- routed dry-run step result is materialized with route/asset/policy/adapter metadata;
 - evidence and live events are available;
 - no upstream write-back occurs.

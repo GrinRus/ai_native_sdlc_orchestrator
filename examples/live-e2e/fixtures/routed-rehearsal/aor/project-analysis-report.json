@@ -1,0 +1,2364 @@
+{
+  "report_id": "aor-core.analysis.v1",
+  "project_id": "aor-core",
+  "version": 1,
+  "generated_from": {
+    "command": "aor project analyze",
+    "project_root": "<AOR_WORKSPACE>",
+    "selected_profile_ref": "examples/project.aor.yaml"
+  },
+  "repo_facts": {
+    "topology": "monorepo",
+    "package_manager": "pnpm",
+    "languages": [
+      "javascript",
+      "typescript"
+    ],
+    "ci_systems": [
+      "github-actions"
+    ]
+  },
+  "toolchain_facts": {
+    "build_commands": [
+      "pnpm build"
+    ],
+    "test_commands": [
+      "pnpm test",
+      "pnpm test:references"
+    ],
+    "lint_commands": [
+      "pnpm lint"
+    ]
+  },
+  "command_catalog": {
+    "required_for_smoke_verify": [
+      "pnpm lint",
+      "pnpm test",
+      "pnpm test:references",
+      "pnpm build"
+    ]
+  },
+  "service_boundaries": [
+    {
+      "service_id": "apps",
+      "paths": [
+        "apps/**"
+      ]
+    },
+    {
+      "service_id": "packages",
+      "paths": [
+        "packages/**"
+      ]
+    }
+  ],
+  "route_resolution": {
+    "routes_root": "examples/routes",
+    "applied_overrides": {},
+    "matrix": [
+      {
+        "step_class": "discovery",
+        "resolved_route_id": "route.discovery.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.discovery"
+        },
+        "route_profile_source": "<AOR_WORKSPACE>/examples/routes/discovery-default.yaml",
+        "route_profile": {
+          "route_id": "route.discovery.default",
+          "step": "discovery",
+          "route_class": "artifact",
+          "risk_tier": "low",
+          "wrapper_profile_ref": "wrapper.artifact.default@v1",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 180,
+            "max_cost_usd": 2,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "research",
+        "resolved_route_id": "route.research.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.research"
+        },
+        "route_profile_source": "<AOR_WORKSPACE>/examples/routes/research-default.yaml",
+        "route_profile": {
+          "route_id": "route.research.default",
+          "step": "research",
+          "route_class": "artifact",
+          "risk_tier": "low",
+          "wrapper_profile_ref": "wrapper.artifact.default@v1",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 3,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "spec",
+        "resolved_route_id": "route.spec.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.spec"
+        },
+        "route_profile_source": "<AOR_WORKSPACE>/examples/routes/spec-default.yaml",
+        "route_profile": {
+          "route_id": "route.spec.default",
+          "step": "spec",
+          "route_class": "artifact",
+          "risk_tier": "low",
+          "wrapper_profile_ref": "wrapper.artifact.default@v1",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 4,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "planning",
+        "resolved_route_id": "route.plan.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.planning"
+        },
+        "route_profile_source": "<AOR_WORKSPACE>/examples/routes/plan-default.yaml",
+        "route_profile": {
+          "route_id": "route.plan.default",
+          "step": "planning",
+          "route_class": "planner",
+          "risk_tier": "medium",
+          "wrapper_profile_ref": "wrapper.planner.default@v1",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 4,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "implement",
+        "resolved_route_id": "route.implement.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.implement"
+        },
+        "route_profile_source": "<AOR_WORKSPACE>/examples/routes/implement-default.yaml",
+        "route_profile": {
+          "route_id": "route.implement.default",
+          "step": "implement",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "wrapper_profile_ref": "wrapper.runner.default@v3",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1800,
+            "max_cost_usd": 25,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "review",
+        "resolved_route_id": "route.review.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.review"
+        },
+        "route_profile_source": "<AOR_WORKSPACE>/examples/routes/review-default.yaml",
+        "route_profile": {
+          "route_id": "route.review.default",
+          "step": "review",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "wrapper_profile_ref": "wrapper.runner.default@v3",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_read",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1200,
+            "max_cost_usd": 10,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "qa",
+        "resolved_route_id": "route.qa.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.qa"
+        },
+        "route_profile_source": "<AOR_WORKSPACE>/examples/routes/qa-default.yaml",
+        "route_profile": {
+          "route_id": "route.qa.default",
+          "step": "qa",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "wrapper_profile_ref": "wrapper.runner.default@v3",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_read",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1200,
+            "max_cost_usd": 10,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "repair",
+        "resolved_route_id": "route.repair.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.repair"
+        },
+        "route_profile_source": "<AOR_WORKSPACE>/examples/routes/repair-default.yaml",
+        "route_profile": {
+          "route_id": "route.repair.default",
+          "step": "repair",
+          "route_class": "repair",
+          "risk_tier": "medium",
+          "wrapper_profile_ref": "wrapper.repair.default@v1",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 900,
+            "max_cost_usd": 8,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "eval",
+        "resolved_route_id": "route.eval.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.eval"
+        },
+        "route_profile_source": "<AOR_WORKSPACE>/examples/routes/eval-default.yaml",
+        "route_profile": {
+          "route_id": "route.eval.default",
+          "step": "eval",
+          "route_class": "eval",
+          "risk_tier": "low",
+          "wrapper_profile_ref": "wrapper.eval.default@v1",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "judge-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 5,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "harness",
+        "resolved_route_id": "route.harness.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.harness"
+        },
+        "route_profile_source": "<AOR_WORKSPACE>/examples/routes/harness-default.yaml",
+        "route_profile": {
+          "route_id": "route.harness.default",
+          "step": "harness",
+          "route_class": "harness",
+          "risk_tier": "medium",
+          "wrapper_profile_ref": "wrapper.harness.default@v1",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "judge-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 900,
+            "max_cost_usd": 6,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      }
+    ]
+  },
+  "asset_resolution": {
+    "wrappers_root": "examples/wrappers",
+    "prompts_root": "examples/prompts",
+    "matrix": [
+      {
+        "step_class": "discovery",
+        "route": {
+          "step_class": "discovery",
+          "resolved_route_id": "route.discovery.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.discovery"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/discovery-default.yaml",
+          "route_profile": {
+            "route_id": "route.discovery.default",
+            "step": "discovery",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "wrapper_profile_ref": "wrapper.artifact.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 180,
+              "max_cost_usd": 2,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.artifact.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.artifact"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-artifact-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.artifact.default",
+            "version": 1,
+            "step_class": "artifact",
+            "prompt_bundle_ref": "prompt-bundle://artifact-default@v1"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/prompts/artifact-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "artifact-default",
+            "version": 1,
+            "step_class": "artifact"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/discovery-default.yaml",
+          "wrapper_profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-artifact-default.yaml",
+          "prompt_bundle_source": "<AOR_WORKSPACE>/examples/prompts/artifact-default.yaml"
+        }
+      },
+      {
+        "step_class": "research",
+        "route": {
+          "step_class": "research",
+          "resolved_route_id": "route.research.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.research"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/research-default.yaml",
+          "route_profile": {
+            "route_id": "route.research.default",
+            "step": "research",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "wrapper_profile_ref": "wrapper.artifact.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 3,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.artifact.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.artifact"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-artifact-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.artifact.default",
+            "version": 1,
+            "step_class": "artifact",
+            "prompt_bundle_ref": "prompt-bundle://artifact-default@v1"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/prompts/artifact-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "artifact-default",
+            "version": 1,
+            "step_class": "artifact"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/research-default.yaml",
+          "wrapper_profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-artifact-default.yaml",
+          "prompt_bundle_source": "<AOR_WORKSPACE>/examples/prompts/artifact-default.yaml"
+        }
+      },
+      {
+        "step_class": "spec",
+        "route": {
+          "step_class": "spec",
+          "resolved_route_id": "route.spec.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.spec"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/spec-default.yaml",
+          "route_profile": {
+            "route_id": "route.spec.default",
+            "step": "spec",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "wrapper_profile_ref": "wrapper.artifact.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 4,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.artifact.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.artifact"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-artifact-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.artifact.default",
+            "version": 1,
+            "step_class": "artifact",
+            "prompt_bundle_ref": "prompt-bundle://artifact-default@v1"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/prompts/artifact-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "artifact-default",
+            "version": 1,
+            "step_class": "artifact"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/spec-default.yaml",
+          "wrapper_profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-artifact-default.yaml",
+          "prompt_bundle_source": "<AOR_WORKSPACE>/examples/prompts/artifact-default.yaml"
+        }
+      },
+      {
+        "step_class": "planning",
+        "route": {
+          "step_class": "planning",
+          "resolved_route_id": "route.plan.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.planning"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/plan-default.yaml",
+          "route_profile": {
+            "route_id": "route.plan.default",
+            "step": "planning",
+            "route_class": "planner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.planner.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 4,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.planner.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.planner"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-planner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.planner.default",
+            "version": 1,
+            "step_class": "planner",
+            "prompt_bundle_ref": "prompt-bundle://planner-default@v1"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://planner-default@v1",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/prompts/planner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "planner-default",
+            "version": 1,
+            "step_class": "planner"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/plan-default.yaml",
+          "wrapper_profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-planner-default.yaml",
+          "prompt_bundle_source": "<AOR_WORKSPACE>/examples/prompts/planner-default.yaml"
+        }
+      },
+      {
+        "step_class": "implement",
+        "route": {
+          "step_class": "implement",
+          "resolved_route_id": "route.implement.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/implement-default.yaml",
+          "route_profile": {
+            "route_id": "route.implement.default",
+            "step": "implement",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.runner.default@v3",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1800,
+              "max_cost_usd": 25,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.runner"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-runner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.runner.default",
+            "version": 3,
+            "step_class": "runner",
+            "prompt_bundle_ref": "prompt-bundle://runner-default@v3"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/prompts/runner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "runner-default",
+            "version": 3,
+            "step_class": "runner"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/implement-default.yaml",
+          "wrapper_profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-runner-default.yaml",
+          "prompt_bundle_source": "<AOR_WORKSPACE>/examples/prompts/runner-default.yaml"
+        }
+      },
+      {
+        "step_class": "review",
+        "route": {
+          "step_class": "review",
+          "resolved_route_id": "route.review.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.review"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/review-default.yaml",
+          "route_profile": {
+            "route_id": "route.review.default",
+            "step": "review",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.runner.default@v3",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_read",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1200,
+              "max_cost_usd": 10,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.runner"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-runner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.runner.default",
+            "version": 3,
+            "step_class": "runner",
+            "prompt_bundle_ref": "prompt-bundle://runner-default@v3"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/prompts/runner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "runner-default",
+            "version": 3,
+            "step_class": "runner"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/review-default.yaml",
+          "wrapper_profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-runner-default.yaml",
+          "prompt_bundle_source": "<AOR_WORKSPACE>/examples/prompts/runner-default.yaml"
+        }
+      },
+      {
+        "step_class": "qa",
+        "route": {
+          "step_class": "qa",
+          "resolved_route_id": "route.qa.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.qa"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/qa-default.yaml",
+          "route_profile": {
+            "route_id": "route.qa.default",
+            "step": "qa",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.runner.default@v3",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_read",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1200,
+              "max_cost_usd": 10,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.runner"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-runner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.runner.default",
+            "version": 3,
+            "step_class": "runner",
+            "prompt_bundle_ref": "prompt-bundle://runner-default@v3"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/prompts/runner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "runner-default",
+            "version": 3,
+            "step_class": "runner"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/qa-default.yaml",
+          "wrapper_profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-runner-default.yaml",
+          "prompt_bundle_source": "<AOR_WORKSPACE>/examples/prompts/runner-default.yaml"
+        }
+      },
+      {
+        "step_class": "repair",
+        "route": {
+          "step_class": "repair",
+          "resolved_route_id": "route.repair.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.repair"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/repair-default.yaml",
+          "route_profile": {
+            "route_id": "route.repair.default",
+            "step": "repair",
+            "route_class": "repair",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.repair.default@v1",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 900,
+              "max_cost_usd": 8,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.repair.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.repair"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-repair-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.repair.default",
+            "version": 1,
+            "step_class": "repair",
+            "prompt_bundle_ref": "prompt-bundle://repair-default@v1"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://repair-default@v1",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/prompts/repair-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "repair-default",
+            "version": 1,
+            "step_class": "repair"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/repair-default.yaml",
+          "wrapper_profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-repair-default.yaml",
+          "prompt_bundle_source": "<AOR_WORKSPACE>/examples/prompts/repair-default.yaml"
+        }
+      },
+      {
+        "step_class": "eval",
+        "route": {
+          "step_class": "eval",
+          "resolved_route_id": "route.eval.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.eval"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/eval-default.yaml",
+          "route_profile": {
+            "route_id": "route.eval.default",
+            "step": "eval",
+            "route_class": "eval",
+            "risk_tier": "low",
+            "wrapper_profile_ref": "wrapper.eval.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "judge-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 5,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.eval.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.eval"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-eval-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.eval.default",
+            "version": 1,
+            "step_class": "eval",
+            "prompt_bundle_ref": "prompt-bundle://eval-default@v1"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://eval-default@v1",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/prompts/eval-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "eval-default",
+            "version": 1,
+            "step_class": "eval"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/eval-default.yaml",
+          "wrapper_profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-eval-default.yaml",
+          "prompt_bundle_source": "<AOR_WORKSPACE>/examples/prompts/eval-default.yaml"
+        }
+      },
+      {
+        "step_class": "harness",
+        "route": {
+          "step_class": "harness",
+          "resolved_route_id": "route.harness.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.harness"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/harness-default.yaml",
+          "route_profile": {
+            "route_id": "route.harness.default",
+            "step": "harness",
+            "route_class": "harness",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.harness.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "judge-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 900,
+              "max_cost_usd": 6,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.harness.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.harness"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-harness-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.harness.default",
+            "version": 1,
+            "step_class": "harness",
+            "prompt_bundle_ref": "prompt-bundle://harness-default@v1"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://harness-default@v1",
+          "resolution_source": {
+            "kind": "wrapper-default",
+            "field": "wrapper.prompt_bundle_ref"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/prompts/harness-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "harness-default",
+            "version": 1,
+            "step_class": "harness"
+          }
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/harness-default.yaml",
+          "wrapper_profile_source": "<AOR_WORKSPACE>/examples/wrappers/wrapper-harness-default.yaml",
+          "prompt_bundle_source": "<AOR_WORKSPACE>/examples/prompts/harness-default.yaml"
+        }
+      }
+    ]
+  },
+  "policy_resolution": {
+    "policies_root": "examples/policies",
+    "applied_overrides": {},
+    "matrix": [
+      {
+        "step_class": "discovery",
+        "route": {
+          "step_class": "discovery",
+          "resolved_route_id": "route.discovery.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.discovery"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/discovery-default.yaml",
+          "route_profile": {
+            "route_id": "route.discovery.default",
+            "step": "discovery",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "wrapper_profile_ref": "wrapper.artifact.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 180,
+              "max_cost_usd": 2,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.artifact.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.artifact"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/policies/step-artifact-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.artifact.default",
+            "step_class": "artifact",
+            "pre_validators": [
+              "contract-shape",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "missing-evidence",
+                "incomplete-artifact"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 3,
+              "on": [
+                "business-ambiguity"
+              ]
+            },
+            "blocking_rules": [
+              "route-unavailable"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 2,
+            "timeout_sec": 180,
+            "max_cost_source": "route.constraints.max_cost_usd (route.discovery.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.discovery.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "route-unavailable"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/discovery-default.yaml",
+          "policy_profile_source": "<AOR_WORKSPACE>/examples/policies/step-artifact-default.yaml"
+        }
+      },
+      {
+        "step_class": "research",
+        "route": {
+          "step_class": "research",
+          "resolved_route_id": "route.research.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.research"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/research-default.yaml",
+          "route_profile": {
+            "route_id": "route.research.default",
+            "step": "research",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "wrapper_profile_ref": "wrapper.artifact.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 3,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.artifact.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.artifact"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/policies/step-artifact-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.artifact.default",
+            "step_class": "artifact",
+            "pre_validators": [
+              "contract-shape",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "missing-evidence",
+                "incomplete-artifact"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 3,
+              "on": [
+                "business-ambiguity"
+              ]
+            },
+            "blocking_rules": [
+              "route-unavailable"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 3,
+            "timeout_sec": 300,
+            "max_cost_source": "route.constraints.max_cost_usd (route.research.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.research.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "route-unavailable"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/research-default.yaml",
+          "policy_profile_source": "<AOR_WORKSPACE>/examples/policies/step-artifact-default.yaml"
+        }
+      },
+      {
+        "step_class": "spec",
+        "route": {
+          "step_class": "spec",
+          "resolved_route_id": "route.spec.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.spec"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/spec-default.yaml",
+          "route_profile": {
+            "route_id": "route.spec.default",
+            "step": "spec",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "wrapper_profile_ref": "wrapper.artifact.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 4,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.artifact.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.artifact"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/policies/step-artifact-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.artifact.default",
+            "step_class": "artifact",
+            "pre_validators": [
+              "contract-shape",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "missing-evidence",
+                "incomplete-artifact"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 3,
+              "on": [
+                "business-ambiguity"
+              ]
+            },
+            "blocking_rules": [
+              "route-unavailable"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 4,
+            "timeout_sec": 300,
+            "max_cost_source": "route.constraints.max_cost_usd (route.spec.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.spec.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "route-unavailable"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/spec-default.yaml",
+          "policy_profile_source": "<AOR_WORKSPACE>/examples/policies/step-artifact-default.yaml"
+        }
+      },
+      {
+        "step_class": "planning",
+        "route": {
+          "step_class": "planning",
+          "resolved_route_id": "route.plan.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.planning"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/plan-default.yaml",
+          "route_profile": {
+            "route_id": "route.plan.default",
+            "step": "planning",
+            "route_class": "planner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.planner.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 4,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.planner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.planner"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/policies/step-planner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.planner.default",
+            "step_class": "planner",
+            "pre_validators": [
+              "contract-shape",
+              "route-resolved",
+              "spec-present"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 1,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 1,
+              "on": [
+                "schema-mismatch",
+                "incomplete-wave-plan"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 2,
+              "on": [
+                "business-ambiguity",
+                "dependency-conflict"
+              ]
+            },
+            "blocking_rules": [
+              "spec-missing",
+              "route-unavailable"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 4,
+            "timeout_sec": 300,
+            "max_cost_source": "route.constraints.max_cost_usd (route.plan.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.plan.default)"
+          },
+          "retry": {
+            "max_attempts": 1,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "spec-missing",
+            "route-unavailable"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/plan-default.yaml",
+          "policy_profile_source": "<AOR_WORKSPACE>/examples/policies/step-planner-default.yaml"
+        }
+      },
+      {
+        "step_class": "implement",
+        "route": {
+          "step_class": "implement",
+          "resolved_route_id": "route.implement.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/implement-default.yaml",
+          "route_profile": {
+            "route_id": "route.implement.default",
+            "step": "implement",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.runner.default@v3",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1800,
+              "max_cost_usd": 25,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.runner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.runner"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/policies/step-runner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.runner.default",
+            "step_class": "runner",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "approval-present",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout",
+                "rate-limit",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed",
+                "missing-evidence"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 4,
+              "on": [
+                "business-ambiguity",
+                "policy-conflict",
+                "security-boundary"
+              ]
+            },
+            "blocking_rules": [
+              "approval-missing",
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 25,
+            "timeout_sec": 1800,
+            "max_cost_source": "route.constraints.max_cost_usd (route.implement.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.implement.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout",
+              "rate-limit",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/implement-default.yaml",
+          "policy_profile_source": "<AOR_WORKSPACE>/examples/policies/step-runner-default.yaml"
+        }
+      },
+      {
+        "step_class": "review",
+        "route": {
+          "step_class": "review",
+          "resolved_route_id": "route.review.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.review"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/review-default.yaml",
+          "route_profile": {
+            "route_id": "route.review.default",
+            "step": "review",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.runner.default@v3",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_read",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1200,
+              "max_cost_usd": 10,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.runner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.runner"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/policies/step-runner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.runner.default",
+            "step_class": "runner",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "approval-present",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout",
+                "rate-limit",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed",
+                "missing-evidence"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 4,
+              "on": [
+                "business-ambiguity",
+                "policy-conflict",
+                "security-boundary"
+              ]
+            },
+            "blocking_rules": [
+              "approval-missing",
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 10,
+            "timeout_sec": 1200,
+            "max_cost_source": "route.constraints.max_cost_usd (route.review.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.review.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout",
+              "rate-limit",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/review-default.yaml",
+          "policy_profile_source": "<AOR_WORKSPACE>/examples/policies/step-runner-default.yaml"
+        }
+      },
+      {
+        "step_class": "qa",
+        "route": {
+          "step_class": "qa",
+          "resolved_route_id": "route.qa.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.qa"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/qa-default.yaml",
+          "route_profile": {
+            "route_id": "route.qa.default",
+            "step": "qa",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.runner.default@v3",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_read",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1200,
+              "max_cost_usd": 10,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.runner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.runner"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/policies/step-runner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.runner.default",
+            "step_class": "runner",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "approval-present",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout",
+                "rate-limit",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed",
+                "missing-evidence"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 4,
+              "on": [
+                "business-ambiguity",
+                "policy-conflict",
+                "security-boundary"
+              ]
+            },
+            "blocking_rules": [
+              "approval-missing",
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 10,
+            "timeout_sec": 1200,
+            "max_cost_source": "route.constraints.max_cost_usd (route.qa.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.qa.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout",
+              "rate-limit",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/qa-default.yaml",
+          "policy_profile_source": "<AOR_WORKSPACE>/examples/policies/step-runner-default.yaml"
+        }
+      },
+      {
+        "step_class": "repair",
+        "route": {
+          "step_class": "repair",
+          "resolved_route_id": "route.repair.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.repair"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/repair-default.yaml",
+          "route_profile": {
+            "route_id": "route.repair.default",
+            "step": "repair",
+            "route_class": "repair",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.repair.default@v1",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 900,
+              "max_cost_usd": 8,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.repair.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.repair"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/policies/step-repair-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.repair.default",
+            "step_class": "repair",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 1,
+              "on": [
+                "provider-timeout",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 3,
+              "on": [
+                "business-ambiguity",
+                "security-boundary"
+              ]
+            },
+            "blocking_rules": [
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 8,
+            "timeout_sec": 900,
+            "max_cost_source": "route.constraints.max_cost_usd (route.repair.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.repair.default)"
+          },
+          "retry": {
+            "max_attempts": 1,
+            "on": [
+              "provider-timeout",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/repair-default.yaml",
+          "policy_profile_source": "<AOR_WORKSPACE>/examples/policies/step-repair-default.yaml"
+        }
+      },
+      {
+        "step_class": "eval",
+        "route": {
+          "step_class": "eval",
+          "resolved_route_id": "route.eval.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.eval"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/eval-default.yaml",
+          "route_profile": {
+            "route_id": "route.eval.default",
+            "step": "eval",
+            "route_class": "eval",
+            "risk_tier": "low",
+            "wrapper_profile_ref": "wrapper.eval.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "judge-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 5,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.eval.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.eval"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/policies/step-eval-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.eval.default",
+            "step_class": "eval",
+            "pre_validators": [
+              "contract-shape",
+              "suite-present"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 1,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 1,
+              "on": [
+                "missing-trace"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 2,
+              "on": [
+                "judge-conflict"
+              ]
+            },
+            "blocking_rules": [
+              "dataset-version-missing"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 5,
+            "timeout_sec": 300,
+            "max_cost_source": "route.constraints.max_cost_usd (route.eval.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.eval.default)"
+          },
+          "retry": {
+            "max_attempts": 1,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "dataset-version-missing"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/eval-default.yaml",
+          "policy_profile_source": "<AOR_WORKSPACE>/examples/policies/step-eval-default.yaml"
+        }
+      },
+      {
+        "step_class": "harness",
+        "route": {
+          "step_class": "harness",
+          "resolved_route_id": "route.harness.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.harness"
+          },
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/harness-default.yaml",
+          "route_profile": {
+            "route_id": "route.harness.default",
+            "step": "harness",
+            "route_class": "harness",
+            "risk_tier": "medium",
+            "wrapper_profile_ref": "wrapper.harness.default@v1",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "judge-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 900,
+              "max_cost_usd": 6,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.harness.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.harness"
+          },
+          "profile_source": "<AOR_WORKSPACE>/examples/policies/step-harness-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.harness.default",
+            "step_class": "harness",
+            "pre_validators": [
+              "contract-shape",
+              "subject-ref-present",
+              "route-resolved",
+              "environment-pinned"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "environment-match"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 1,
+              "on": [
+                "provider-timeout",
+                "environment-provision-failed"
+              ]
+            },
+            "repair": {
+              "max_attempts": 1,
+              "on": [
+                "missing-trace",
+                "incomplete-comparison"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 2,
+              "on": [
+                "environment-mismatch",
+                "certification-conflict"
+              ]
+            },
+            "blocking_rules": [
+              "subject-ref-missing",
+              "environment-unpinned"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 6,
+            "timeout_sec": 900,
+            "max_cost_source": "route.constraints.max_cost_usd (route.harness.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.harness.default)"
+          },
+          "retry": {
+            "max_attempts": 1,
+            "on": [
+              "provider-timeout",
+              "environment-provision-failed"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "pnpm build",
+              "pnpm test",
+              "pnpm lint"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "subject-ref-missing",
+            "environment-unpinned"
+          ]
+        },
+        "provenance": {
+          "project_profile_path": "<AOR_WORKSPACE>/examples/project.aor.yaml",
+          "route_profile_source": "<AOR_WORKSPACE>/examples/routes/harness-default.yaml",
+          "policy_profile_source": "<AOR_WORKSPACE>/examples/policies/step-harness-default.yaml"
+        }
+      }
+    ]
+  },
+  "verification_plan": {
+    "preflight": [
+      "project-init-state",
+      "project-profile-load",
+      "analysis-report-write"
+    ],
+    "smoke_commands": [
+      "pnpm lint",
+      "pnpm test",
+      "pnpm test:references",
+      "pnpm build"
+    ]
+  },
+  "status": "ready-for-bootstrap",
+  "unknown_facts": []
+}
