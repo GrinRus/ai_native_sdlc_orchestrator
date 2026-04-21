@@ -763,6 +763,7 @@ export function validateExampleReferences(options = {}) {
   /** @type {import("./index.d.ts").ReferenceValidationIssue[]} */
   const issues = [];
   let checkedReferences = 0;
+  let checkedCompatibility = 0;
 
   for (const result of loaded.results) {
     if (!result.ok || !result.family || !isPlainObject(result.document)) {
@@ -773,6 +774,11 @@ export function validateExampleReferences(options = {}) {
     const source = result.source;
 
     if (result.family === "project-profile") {
+      const allowedAdapters = new Set(
+        Array.isArray(document.allowed_adapters)
+          ? document.allowed_adapters.filter((value) => typeof value === "string")
+          : [],
+      );
       const defaultRouteProfiles = document.default_route_profiles;
       if (isPlainObject(defaultRouteProfiles)) {
         for (const [key, rawValue] of Object.entries(defaultRouteProfiles)) {
@@ -790,6 +796,41 @@ export function validateExampleReferences(options = {}) {
             expectedSet: registry.routeIds,
             registry,
           });
+
+          const routeProfile = registry.routeProfilesById.get(reference);
+          if (!routeProfile) continue;
+
+          checkedCompatibility += 1;
+          if (routeProfile.step && routeProfile.step !== key) {
+            issues.push(
+              referenceIssue({
+                code: "reference_target_incompatible",
+                source,
+                field,
+                reference,
+                expected: `route step '${key}'`,
+                actual: routeProfile.step,
+                message: `Route '${reference}' has step '${routeProfile.step}', which does not match profile slot '${key}'.`,
+              }),
+            );
+          }
+
+          if (allowedAdapters.size === 0) continue;
+          for (const adapterRef of routeProfile.adapters) {
+            checkedCompatibility += 1;
+            if (allowedAdapters.has(adapterRef.adapterId)) continue;
+            issues.push(
+              referenceIssue({
+                code: "reference_target_incompatible",
+                source,
+                field,
+                reference,
+                expected: "route adapters included in allowed_adapters",
+                actual: `${adapterRef.adapterId} is not allowed`,
+                message: `Route '${reference}' uses adapter '${adapterRef.adapterId}', which is not listed in allowed_adapters.`,
+              }),
+            );
+          }
         }
       }
 
@@ -824,6 +865,22 @@ export function validateExampleReferences(options = {}) {
             expectedSet: registry.wrapperRefs,
             registry,
           });
+
+          const wrapperProfile = registry.wrapperProfilesByRef.get(reference);
+          if (!wrapperProfile || !wrapperProfile.stepClass) continue;
+          checkedCompatibility += 1;
+          if (wrapperProfile.stepClass === key) continue;
+          issues.push(
+            referenceIssue({
+              code: "reference_target_incompatible",
+              source,
+              field,
+              reference,
+              expected: `wrapper step_class '${key}'`,
+              actual: wrapperProfile.stepClass,
+              message: `Wrapper '${reference}' has step_class '${wrapperProfile.stepClass}', which does not match profile slot '${key}'.`,
+            }),
+          );
         }
       }
 
@@ -844,6 +901,22 @@ export function validateExampleReferences(options = {}) {
             expectedSet: registry.policyIds,
             registry,
           });
+
+          const policyProfile = registry.policyProfilesById.get(reference);
+          if (!policyProfile || !policyProfile.stepClass) continue;
+          checkedCompatibility += 1;
+          if (policyProfile.stepClass === key) continue;
+          issues.push(
+            referenceIssue({
+              code: "reference_target_incompatible",
+              source,
+              field,
+              reference,
+              expected: `policy step_class '${key}'`,
+              actual: policyProfile.stepClass,
+              message: `Policy '${reference}' has step_class '${policyProfile.stepClass}', which does not match profile slot '${key}'.`,
+            }),
+          );
         }
       }
 
@@ -943,6 +1016,110 @@ export function validateExampleReferences(options = {}) {
             expectedSet: registry.wrapperRefs,
             registry,
           });
+
+          const wrapperProfile = registry.wrapperProfilesByRef.get(reference);
+          const routeClass = typeof document.route_class === "string" ? document.route_class : null;
+          if (wrapperProfile?.stepClass && routeClass) {
+            checkedCompatibility += 1;
+            if (wrapperProfile.stepClass !== routeClass) {
+              issues.push(
+                referenceIssue({
+                  code: "reference_target_incompatible",
+                  source,
+                  field,
+                  reference,
+                  expected: `wrapper step_class '${routeClass}'`,
+                  actual: wrapperProfile.stepClass,
+                  message: `Route class '${routeClass}' is incompatible with wrapper '${reference}' step_class '${wrapperProfile.stepClass}'.`,
+                }),
+              );
+            }
+          }
+        }
+      }
+
+      checkedReferences += 1;
+      const primaryAdapterField = "primary.adapter";
+      const primaryAdapterValue = isPlainObject(document.primary) ? document.primary.adapter : undefined;
+      const primaryAdapterRef = asReferenceString(primaryAdapterValue, {
+        issues,
+        source,
+        field: primaryAdapterField,
+      });
+      if (
+        primaryAdapterRef &&
+        !isExternalReference(primaryAdapterRef) &&
+        !isPlaceholderAdapterReference(primaryAdapterRef)
+      ) {
+        validateReferenceTarget({
+          issues,
+          source,
+          field: primaryAdapterField,
+          reference: primaryAdapterRef,
+          expected: "existing adapter_id",
+          expectedFamily: "adapter-capability-profile",
+          expectedSet: registry.adapterIds,
+          registry,
+        });
+      }
+
+      const fallback = document.fallback;
+      if (Array.isArray(fallback)) {
+        fallback.forEach((candidate, index) => {
+          checkedReferences += 1;
+          const fallbackAdapterField = `fallback[${index}].adapter`;
+          const fallbackAdapterValue = isPlainObject(candidate) ? candidate.adapter : candidate;
+          const fallbackAdapterRef = asReferenceString(fallbackAdapterValue, {
+            issues,
+            source,
+            field: fallbackAdapterField,
+          });
+          if (
+            !fallbackAdapterRef ||
+            isExternalReference(fallbackAdapterRef) ||
+            isPlaceholderAdapterReference(fallbackAdapterRef)
+          ) {
+            return;
+          }
+          validateReferenceTarget({
+            issues,
+            source,
+            field: fallbackAdapterField,
+            reference: fallbackAdapterRef,
+            expected: "existing adapter_id",
+            expectedFamily: "adapter-capability-profile",
+            expectedSet: registry.adapterIds,
+            registry,
+          });
+        });
+      }
+
+      const requiredAdapterCapabilities = asStringArray(document.required_adapter_capabilities, {
+        issues,
+        source,
+        field: "required_adapter_capabilities",
+      });
+      if (requiredAdapterCapabilities.length > 0) {
+        const routeAdapterRefs = extractRouteAdapterRefs(document);
+        for (const adapterRef of routeAdapterRefs) {
+          const adapterProfile = registry.adapterProfilesById.get(adapterRef.adapterId);
+          if (!adapterProfile) continue;
+          checkedCompatibility += 1;
+          const missingCapabilities = requiredAdapterCapabilities.filter(
+            (capability) => !adapterProfile.capabilities.has(capability),
+          );
+          if (missingCapabilities.length === 0) continue;
+          issues.push(
+            referenceIssue({
+              code: "reference_target_incompatible",
+              source,
+              field: adapterRef.field,
+              reference: adapterRef.adapterId,
+              expected: `adapter with capabilities: ${requiredAdapterCapabilities.join(", ")}`,
+              actual: `missing capabilities: ${missingCapabilities.join(", ")}`,
+              message: `Adapter '${adapterRef.adapterId}' does not satisfy required route capabilities.`,
+            }),
+          );
         }
       }
     }
@@ -975,6 +1152,25 @@ export function validateExampleReferences(options = {}) {
             expectedSet: registry.promptBundleRefs,
             registry,
           });
+
+          const wrapperStepClass = typeof document.step_class === "string" ? document.step_class : null;
+          const promptBundle = registry.promptBundlesByRef.get(reference);
+          if (wrapperStepClass && promptBundle?.stepClass) {
+            checkedCompatibility += 1;
+            if (promptBundle.stepClass !== wrapperStepClass) {
+              issues.push(
+                referenceIssue({
+                  code: "reference_target_incompatible",
+                  source,
+                  field,
+                  reference,
+                  expected: `prompt bundle step_class '${wrapperStepClass}'`,
+                  actual: promptBundle.stepClass,
+                  message: `Wrapper step_class '${wrapperStepClass}' is incompatible with prompt bundle '${reference}' step_class '${promptBundle.stepClass}'.`,
+                }),
+              );
+            }
+          }
         }
       }
     }
@@ -1007,6 +1203,25 @@ export function validateExampleReferences(options = {}) {
             expectedSet: registry.datasetRefs,
             registry,
           });
+
+          const suiteSubjectType = typeof document.subject_type === "string" ? document.subject_type : null;
+          const dataset = registry.datasetsByRef.get(reference);
+          if (suiteSubjectType && dataset?.subjectType) {
+            checkedCompatibility += 1;
+            if (dataset.subjectType !== suiteSubjectType) {
+              issues.push(
+                referenceIssue({
+                  code: "reference_target_incompatible",
+                  source,
+                  field,
+                  reference,
+                  expected: `dataset subject_type '${suiteSubjectType}'`,
+                  actual: dataset.subjectType,
+                  message: `Suite subject_type '${suiteSubjectType}' is incompatible with dataset '${reference}' subject_type '${dataset.subjectType}'.`,
+                }),
+              );
+            }
+          }
         }
       }
     }
@@ -1163,6 +1378,7 @@ export function validateExampleReferences(options = {}) {
     workspaceRoot: loaded.workspaceRoot,
     examplesRoot: loaded.examplesRoot,
     checkedReferences,
+    checkedCompatibility,
     issues,
   };
 }
@@ -1341,6 +1557,93 @@ function isDatasetRef(value) {
 }
 
 /**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isPlaceholderAdapterReference(value) {
+  return value === "none";
+}
+
+/**
+ * @param {unknown} value
+ * @param {{ issues: import("./index.d.ts").ReferenceValidationIssue[], source: string, field: string }} options
+ * @returns {string[]}
+ */
+function asStringArray(value, { issues, source, field }) {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    issues.push(
+      referenceIssue({
+        code: "reference_format_invalid",
+        source,
+        field,
+        expected: "array of strings",
+        actual: describeActualType(value),
+        message: `Field '${field}' must be an array of string values.`,
+      }),
+    );
+    return [];
+  }
+
+  /** @type {string[]} */
+  const values = [];
+  value.forEach((entry, index) => {
+    if (typeof entry === "string") {
+      values.push(entry);
+      return;
+    }
+    issues.push(
+      referenceIssue({
+        code: "reference_format_invalid",
+        source,
+        field: `${field}[${index}]`,
+        expected: "string",
+        actual: describeActualType(entry),
+        message: `Field '${field}[${index}]' must be a string.`,
+      }),
+    );
+  });
+  return values;
+}
+
+/**
+ * @param {Record<string, unknown>} routeProfile
+ * @returns {Array<{ field: string, adapterId: string }>}
+ */
+function extractRouteAdapterRefs(routeProfile) {
+  /** @type {Array<{ field: string, adapterId: string }>} */
+  const references = [];
+
+  const primary = routeProfile.primary;
+  if (
+    isPlainObject(primary) &&
+    typeof primary.adapter === "string" &&
+    !isPlaceholderAdapterReference(primary.adapter)
+  ) {
+    references.push({ field: "primary.adapter", adapterId: primary.adapter });
+  }
+
+  const fallback = routeProfile.fallback;
+  if (Array.isArray(fallback)) {
+    fallback.forEach((candidate, index) => {
+      if (
+        !isPlainObject(candidate) ||
+        typeof candidate.adapter !== "string" ||
+        isPlaceholderAdapterReference(candidate.adapter)
+      ) {
+        return;
+      }
+      references.push({ field: `fallback[${index}].adapter`, adapterId: candidate.adapter });
+    });
+  }
+
+  return references;
+}
+
+/**
  * @param {import("./index.d.ts").LoadedContractFile[]} results
  * @param {string} workspaceRoot
  * @returns {{
@@ -1351,6 +1654,13 @@ function isDatasetRef(value) {
  *   datasetRefs: Set<string>,
  *   liveE2eProfileRefs: Set<string>,
  *   promptBundleRefs: Set<string>,
+ *   adapterIds: Set<string>,
+ *   routeProfilesById: Map<string, { source: string, step: string | null, adapters: Array<{ field: string, adapterId: string }> }>,
+ *   wrapperProfilesByRef: Map<string, { source: string, stepClass: string | null }>,
+ *   policyProfilesById: Map<string, { source: string, stepClass: string | null }>,
+ *   promptBundlesByRef: Map<string, { source: string, stepClass: string | null }>,
+ *   datasetsByRef: Map<string, { source: string, subjectType: string | null }>,
+ *   adapterProfilesById: Map<string, { source: string, capabilities: Set<string> }>,
  *   knownReferenceFamilies: Map<string, Set<import("./index.d.ts").ContractFamily>>,
  * }}
  */
@@ -1362,6 +1672,19 @@ function buildReferenceRegistry(results, workspaceRoot) {
   const datasetRefs = new Set();
   const liveE2eProfileRefs = new Set();
   const promptBundleRefs = new Set();
+  const adapterIds = new Set();
+  /** @type {Map<string, { source: string, step: string | null, adapters: Array<{ field: string, adapterId: string }> }>} */
+  const routeProfilesById = new Map();
+  /** @type {Map<string, { source: string, stepClass: string | null }>} */
+  const wrapperProfilesByRef = new Map();
+  /** @type {Map<string, { source: string, stepClass: string | null }>} */
+  const policyProfilesById = new Map();
+  /** @type {Map<string, { source: string, stepClass: string | null }>} */
+  const promptBundlesByRef = new Map();
+  /** @type {Map<string, { source: string, subjectType: string | null }>} */
+  const datasetsByRef = new Map();
+  /** @type {Map<string, { source: string, capabilities: Set<string> }>} */
+  const adapterProfilesById = new Map();
   /** @type {Map<string, Set<import("./index.d.ts").ContractFamily>>} */
   const knownReferenceFamilies = new Map();
 
@@ -1377,6 +1700,11 @@ function buildReferenceRegistry(results, workspaceRoot) {
         if (typeof routeId === "string") {
           routeIds.add(routeId);
           registerKnownReference(knownReferenceFamilies, routeId, "provider-route-profile");
+          routeProfilesById.set(routeId, {
+            source: result.source,
+            step: typeof document.step === "string" ? document.step : null,
+            adapters: extractRouteAdapterRefs(document),
+          });
         }
         break;
       }
@@ -1387,6 +1715,10 @@ function buildReferenceRegistry(results, workspaceRoot) {
           const wrapperRef = `${wrapperId}@v${version}`;
           wrapperRefs.add(wrapperRef);
           registerKnownReference(knownReferenceFamilies, wrapperRef, "wrapper-profile");
+          wrapperProfilesByRef.set(wrapperRef, {
+            source: result.source,
+            stepClass: typeof document.step_class === "string" ? document.step_class : null,
+          });
         }
         break;
       }
@@ -1395,6 +1727,10 @@ function buildReferenceRegistry(results, workspaceRoot) {
         if (typeof policyId === "string") {
           policyIds.add(policyId);
           registerKnownReference(knownReferenceFamilies, policyId, "step-policy-profile");
+          policyProfilesById.set(policyId, {
+            source: result.source,
+            stepClass: typeof document.step_class === "string" ? document.step_class : null,
+          });
         }
         break;
       }
@@ -1415,6 +1751,10 @@ function buildReferenceRegistry(results, workspaceRoot) {
           const datasetRef = `dataset://${datasetId}@${version}`;
           datasetRefs.add(datasetRef);
           registerKnownReference(knownReferenceFamilies, datasetRef, "dataset");
+          datasetsByRef.set(datasetRef, {
+            source: result.source,
+            subjectType: typeof document.subject_type === "string" ? document.subject_type : null,
+          });
         }
         break;
       }
@@ -1435,6 +1775,27 @@ function buildReferenceRegistry(results, workspaceRoot) {
           const bundleRef = `prompt-bundle://${bundleId}@v${version}`;
           promptBundleRefs.add(bundleRef);
           registerKnownReference(knownReferenceFamilies, bundleRef, "prompt-bundle");
+          promptBundlesByRef.set(bundleRef, {
+            source: result.source,
+            stepClass: typeof document.step_class === "string" ? document.step_class : null,
+          });
+        }
+        break;
+      }
+      case "adapter-capability-profile": {
+        const adapterId = document.adapter_id;
+        if (typeof adapterId === "string") {
+          adapterIds.add(adapterId);
+          registerKnownReference(knownReferenceFamilies, adapterId, "adapter-capability-profile");
+          const capabilities = new Set(
+            Object.entries(isPlainObject(document.capabilities) ? document.capabilities : {})
+              .filter(([, value]) => value === true)
+              .map(([capability]) => capability),
+          );
+          adapterProfilesById.set(adapterId, {
+            source: result.source,
+            capabilities,
+          });
         }
         break;
       }
@@ -1456,6 +1817,13 @@ function buildReferenceRegistry(results, workspaceRoot) {
     datasetRefs,
     liveE2eProfileRefs,
     promptBundleRefs,
+    adapterIds,
+    routeProfilesById,
+    wrapperProfilesByRef,
+    policyProfilesById,
+    promptBundlesByRef,
+    datasetsByRef,
+    adapterProfilesById,
     knownReferenceFamilies,
   };
 }

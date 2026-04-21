@@ -47,6 +47,7 @@ test("reference integrity passes for current examples graph", () => {
   assert.equal(result.ok, true, "expected current examples graph to pass reference integrity");
   assert.equal(result.issues.length, 0, "expected zero reference integrity issues");
   assert.ok(result.checkedReferences > 0, "expected validator to check at least one reference");
+  assert.ok(result.checkedCompatibility > 0, "expected validator to check at least one compatibility edge");
 });
 
 test("missing route wrapper reference fails with reference_target_missing", () => {
@@ -143,5 +144,100 @@ test("wrong-family suite ref fails with reference_target_type_mismatch", () => {
         candidate.reference === "wrapper.runner.default@v3",
     );
     assert.ok(issue, "expected wrong-family suite ref issue");
+  });
+});
+
+test("route class and wrapper step_class mismatch fails with reference_target_incompatible", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/routes/implement-default.yaml", (document) => {
+      document.route_class = "eval";
+    });
+
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_incompatible" &&
+        candidate.field === "wrapper_profile_ref" &&
+        candidate.reference === "wrapper.runner.default@v3",
+    );
+    assert.ok(issue, "expected route/wrapper step_class compatibility issue");
+  });
+});
+
+test("wrapper and prompt bundle step_class mismatch fails with reference_target_incompatible", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/prompts/runner-default.yaml", (document) => {
+      document.step_class = "eval";
+    });
+
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_incompatible" &&
+        candidate.field === "prompt_bundle_ref" &&
+        candidate.reference === "prompt-bundle://runner-default@v3",
+    );
+    assert.ok(issue, "expected wrapper/prompt step_class compatibility issue");
+  });
+});
+
+test("suite and dataset subject_type mismatch fails with reference_target_incompatible", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/eval/suite-release-core.yaml", (document) => {
+      document.subject_type = "wrapper";
+    });
+
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_incompatible" &&
+        candidate.field === "dataset_ref" &&
+        candidate.reference === "dataset://run-regression@2026-04-20T08:00:00Z",
+    );
+    assert.ok(issue, "expected suite/dataset subject_type compatibility issue");
+  });
+});
+
+test("route required capabilities mismatch fails with reference_target_incompatible", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/routes/implement-default.yaml", (document) => {
+      document.required_adapter_capabilities = ["repo_write", "binary_signing"];
+    });
+
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_incompatible" &&
+        candidate.field === "primary.adapter" &&
+        candidate.reference === "codex-cli",
+    );
+    assert.ok(issue, "expected route adapter capability compatibility issue");
+  });
+});
+
+test("project default route using non-allowed adapter fails with reference_target_incompatible", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
+      document.allowed_adapters = ["mock-runner"];
+    });
+
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_incompatible" &&
+        candidate.field === "default_route_profiles.implement" &&
+        candidate.reference === "route.implement.default",
+    );
+    assert.ok(issue, "expected project route adapter allowlist compatibility issue");
   });
 });

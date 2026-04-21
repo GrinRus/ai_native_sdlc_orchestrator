@@ -30,5 +30,5 @@ if (!referenceValidation.ok) {
 
 const examplesRootRelative = path.relative(workspaceRoot, referenceValidation.examplesRoot) || ".";
 console.log(
-  `reference integrity ok: ${referenceValidation.checkedReferences} refs checked in ${examplesRootRelative}`,
+  `reference integrity ok: ${referenceValidation.checkedReferences} refs and ${referenceValidation.checkedCompatibility} compatibility checks in ${examplesRootRelative}`,
 );

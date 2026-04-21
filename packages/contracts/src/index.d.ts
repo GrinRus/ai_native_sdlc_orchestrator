@@ -95,7 +95,8 @@ export interface LoadedExampleContracts {
 export type ReferenceValidationIssueCode =
   | "reference_format_invalid"
   | "reference_target_missing"
-  | "reference_target_type_mismatch";
+  | "reference_target_type_mismatch"
+  | "reference_target_incompatible";
 
 export interface ReferenceValidationIssue {
   code: ReferenceValidationIssueCode;
@@ -112,6 +113,7 @@ export interface ReferenceValidationResult {
   workspaceRoot: string;
   examplesRoot: string;
   checkedReferences: number;
+  checkedCompatibility: number;
   issues: ReferenceValidationIssue[];
 }
 
