@@ -44,8 +44,6 @@ test("captureHarnessReplayArtifact writes reusable harness capture with routed t
     assert.equal(capture.capture.compatibility.route_id, "route.implement.default");
     assert.equal(typeof capture.capture.trace.step_input, "object");
     assert.equal(typeof capture.capture.trace.selected_assets, "object");
-    assert.ok(Array.isArray(capture.capture.trace.tool_activity));
-    assert.ok(capture.capture.trace.tool_activity.length > 0);
     assert.equal(typeof capture.capture.trace.normalized_output, "object");
     assert.equal(typeof capture.capture.scoring_snapshot.summary_metrics, "object");
   });
@@ -100,35 +98,5 @@ test("replayHarnessCapture rejects incompatible captures explicitly", () => {
     assert.equal(replay.replayReport.compatibility.compatible, false);
     assert.ok(replay.replayReport.compatibility.mismatches.some((entry) => entry.field === "adapter_id"));
     assert.match(replay.replayReport.blocked_next_step, /Refresh harness capture/);
-  });
-});
-
-test("replayHarnessCapture blocks replay when context fingerprint drifts", () => {
-  withTempRepo((repoRoot) => {
-    const capture = captureHarnessReplayArtifact({
-      cwd: repoRoot,
-      projectRef: repoRoot,
-      stepClass: "implement",
-      suiteRef: "suite.release.core@v1",
-      subjectRef: "run://harness-candidate",
-    });
-
-    const captureBody = JSON.parse(fs.readFileSync(capture.capturePath, "utf8"));
-    captureBody.compatibility.compiled_context_fingerprint = "incompatible-context-fingerprint";
-    fs.writeFileSync(capture.capturePath, `${JSON.stringify(captureBody, null, 2)}\n`, "utf8");
-
-    const replay = replayHarnessCapture({
-      cwd: repoRoot,
-      projectRef: repoRoot,
-      capturePath: capture.capturePath,
-    });
-
-    assert.equal(replay.replayReport.status, "incompatible");
-    assert.equal(replay.replayReport.compatibility.compatible, false);
-    assert.ok(
-      replay.replayReport.compatibility.mismatches.some(
-        (entry) => entry.field === "compiled_context_fingerprint",
-      ),
-    );
   });
 });

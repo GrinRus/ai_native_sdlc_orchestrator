@@ -85,7 +85,6 @@ export function captureHarnessReplayArtifact(options) {
     capture,
     capturePath,
     stepResultPath: stepResult.stepResultPath,
-    evaluationReport: evalResult.evaluationReport,
     evaluationReportPath: evalResult.evaluationReportPath,
   };
 }
@@ -188,7 +187,7 @@ export function replayHarnessCapture(options) {
     },
     blocked_next_step:
       compatibility.compatible === false
-        ? "Refresh harness capture from current route/wrapper/policy/adapter/context/skill versions and replay again."
+        ? "Refresh harness capture from current route/wrapper/policy/adapter versions and replay again."
         : null,
     evidence_refs: [path.resolve(options.capturePath), currentStep.stepResultPath, replayEvaluationReportPath].filter(
       (entry) => typeof entry === "string",

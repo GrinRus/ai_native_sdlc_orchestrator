@@ -11,13 +11,6 @@ export function extractHarnessCompatibility(stepResult) {
   const policy = /** @type {Record<string, unknown>} */ (policyResolution.policy ?? {});
   const adapterResolution = /** @type {Record<string, unknown>} */ (routedExecution.adapter_resolution ?? {});
   const adapter = /** @type {Record<string, unknown>} */ (adapterResolution.adapter ?? {});
-  const contextCompilation = /** @type {Record<string, unknown>} */ (routedExecution.context_compilation ?? {});
-  const adapterRequest = /** @type {Record<string, unknown>} */ (routedExecution.adapter_request ?? {});
-  const adapterRequestContext = /** @type {Record<string, unknown>} */ (adapterRequest.context ?? {});
-  const skillRefsFromCompilation = Array.isArray(contextCompilation.skill_refs)
-    ? contextCompilation.skill_refs
-    : [];
-  const skillRefsFromRequest = Array.isArray(adapterRequestContext.skill_refs) ? adapterRequestContext.skill_refs : [];
 
   return {
     step_class: typeof routeResolution.step_class === "string" ? routeResolution.step_class : null,
@@ -27,13 +20,6 @@ export function extractHarnessCompatibility(stepResult) {
       typeof promptResolution.prompt_bundle_ref === "string" ? promptResolution.prompt_bundle_ref : null,
     policy_id: typeof policy.policy_id === "string" ? policy.policy_id : null,
     adapter_id: typeof adapter.adapter_id === "string" ? adapter.adapter_id : null,
-    compiled_context_fingerprint:
-      typeof contextCompilation.compiled_context_fingerprint === "string"
-        ? contextCompilation.compiled_context_fingerprint
-        : typeof adapterRequestContext.compiled_context_fingerprint === "string"
-          ? adapterRequestContext.compiled_context_fingerprint
-          : null,
-    skill_refs: [...new Set([...skillRefsFromCompilation, ...skillRefsFromRequest])],
   };
 }
 
@@ -52,11 +38,6 @@ export function createHarnessCapture(options) {
   const compatibility = extractHarnessCompatibility(options.stepResult);
   const routedExecution = /** @type {Record<string, unknown>} */ (options.stepResult.routed_execution ?? {});
   const adapterResponse = /** @type {Record<string, unknown>} */ (routedExecution.adapter_response ?? {});
-  const toolActivity = Array.isArray(adapterResponse.tool_traces)
-    ? adapterResponse.tool_traces
-    : Array.isArray(adapterResponse.tool_trace)
-      ? adapterResponse.tool_trace
-      : [];
 
   return {
     capture_id: options.captureId,
@@ -80,7 +61,7 @@ export function createHarnessCapture(options) {
         policy_resolution: routedExecution.policy_resolution ?? null,
         adapter_resolution: routedExecution.adapter_resolution ?? null,
       },
-      tool_activity: toolActivity,
+      tool_activity: Array.isArray(adapterResponse.tool_trace) ? adapterResponse.tool_trace : [],
       normalized_output: routedExecution.adapter_response ?? null,
     },
     scoring_snapshot: {
@@ -91,20 +72,6 @@ export function createHarnessCapture(options) {
     },
     evidence_refs: [options.stepResultRef, options.evaluationReportRef],
   };
-}
-
-/**
- * @param {unknown} value
- * @returns {unknown}
- */
-function normalizeCompatibilityValue(value) {
-  if (Array.isArray(value)) {
-    return value
-      .filter((entry) => typeof entry === "string")
-      .map((entry) => entry.trim())
-      .sort((left, right) => left.localeCompare(right));
-  }
-  return value ?? null;
 }
 
 /**
@@ -120,21 +87,19 @@ export function compareHarnessCompatibility(options) {
     "prompt_bundle_ref",
     "policy_id",
     "adapter_id",
-    "compiled_context_fingerprint",
-    "skill_refs",
   ];
 
   const mismatches = fields
     .map((field) => {
-      const expected = normalizeCompatibilityValue(capturedCompatibility[field]);
-      const actual = normalizeCompatibilityValue(currentCompatibility[field]);
-      if (JSON.stringify(expected) === JSON.stringify(actual)) {
+      const expected = capturedCompatibility[field];
+      const actual = currentCompatibility[field];
+      if (expected === actual) {
         return null;
       }
       return {
         field,
-        expected,
-        actual,
+        expected: expected ?? null,
+        actual: actual ?? null,
       };
     })
     .filter((entry) => entry !== null);

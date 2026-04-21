@@ -25,6 +25,18 @@ Each run persists a durable `evaluation-report` with:
 Replay, certification, compare-to-baseline, and failure-mode workflows.
 
 Harness consumes validated assets and eval outputs to produce replay/certification evidence. Harness logic must not replace structural validation rules.
+Harness capture artifacts include:
+- step input envelope (`adapter_request`);
+- selected route/wrapper/prompt/policy/adapter snapshots;
+- tool activity trace from adapter response;
+- normalized step output;
+- scoring snapshot from the linked evaluation report.
+
+Replay uses one stable interface:
+1. load capture artifact;
+2. compare captured compatibility metadata against current runtime route/wrapper/prompt/policy/adapter selection;
+3. reject replay explicitly on mismatch;
+4. if compatible, rerun evaluation through the same scorer path used by `eval run`.
 
 ### Promotion
 Decision layer that moves an asset or route from candidate to stable or frozen.
