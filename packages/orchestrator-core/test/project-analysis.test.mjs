@@ -67,6 +67,9 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.equal(fs.existsSync(result.policyResolutionPath), true);
     assert.equal(result.policyResolutionMatrix.length, 10);
     assert.equal(result.adapterResolutionMatrix.length, 10);
+    assert.equal(fs.existsSync(result.evaluationRegistryPath), true);
+    assert.ok(result.evaluationRegistry.datasets.length > 0);
+    assert.ok(result.evaluationRegistry.suites.length > 0);
     assert.equal(
       result.assetResolutionMatrix.find((entry) => entry.step_class === "planning")?.wrapper.wrapper_ref,
       "wrapper.planner.default@v1",
@@ -74,6 +77,8 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.equal(result.report.route_resolution.matrix.length, 10);
     assert.equal(result.report.asset_resolution.matrix.length, 10);
     assert.equal(result.report.policy_resolution.matrix.length, 10);
+    assert.ok(result.report.evaluation_registry.dataset_refs.length > 0);
+    assert.ok(result.report.evaluation_registry.suite_refs.length > 0);
     assert.equal(
       result.policyResolutionMatrix.find((entry) => entry.step_class === "planning")?.policy.policy_id,
       "policy.step.planner.default",
@@ -135,6 +140,7 @@ test("analyzeProjectRuntime works on the AOR repository with isolated runtime ro
     assert.equal(fs.existsSync(result.routeResolutionPath), true);
     assert.equal(fs.existsSync(result.assetResolutionPath), true);
     assert.equal(fs.existsSync(result.policyResolutionPath), true);
+    assert.equal(fs.existsSync(result.evaluationRegistryPath), true);
   } finally {
     fs.rmSync(runtimeRoot, { recursive: true, force: true });
   }
@@ -176,6 +182,23 @@ test("analyzeProjectRuntime fails early when resolved adapter lacks required rou
           cwd: repoRoot,
         }),
       /missing capabilities \[live_logs\]/i,
+    );
+  });
+});
+
+test("analyzeProjectRuntime fails early when suite and dataset subject types are incompatible", () => {
+  withTempRepo((repoRoot) => {
+    const suitePath = path.join(repoRoot, "examples/eval/suite-release-core.yaml");
+    const suiteContent = fs.readFileSync(suitePath, "utf8");
+    fs.writeFileSync(suitePath, suiteContent.replace("subject_type: run", "subject_type: wrapper"), "utf8");
+
+    assert.throws(
+      () =>
+        analyzeProjectRuntime({
+          projectRef: repoRoot,
+          cwd: repoRoot,
+        }),
+      /Evaluation registry validation failed:/i,
     );
   });
 });

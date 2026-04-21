@@ -406,6 +406,9 @@ function executeImplementedCommand(command, flags, cwd) {
   let assetResolutionSteps = null;
   let policyResolutionFile = null;
   let policyResolutionSteps = null;
+  let evaluationRegistryFile = null;
+  let evaluationRegistrySuites = null;
+  let evaluationRegistryDatasets = null;
   let validationReportId = null;
   let validationReportFile = null;
   let validationStatus = null;
@@ -470,6 +473,9 @@ function executeImplementedCommand(command, flags, cwd) {
     assetResolutionSteps = analyzeResult.assetResolutionMatrix;
     policyResolutionFile = analyzeResult.policyResolutionPath;
     policyResolutionSteps = analyzeResult.policyResolutionMatrix;
+    evaluationRegistryFile = analyzeResult.evaluationRegistryPath;
+    evaluationRegistrySuites = analyzeResult.evaluationRegistry.suites;
+    evaluationRegistryDatasets = analyzeResult.evaluationRegistry.datasets;
   } else if (command === "project validate") {
     ensureRequiredFlags(command, flags);
     handoffGateEnforced = resolveOptionalBooleanFlag(
@@ -624,6 +630,9 @@ function executeImplementedCommand(command, flags, cwd) {
     asset_resolution_steps: assetResolutionSteps,
     policy_resolution_file: policyResolutionFile,
     policy_resolution_steps: policyResolutionSteps,
+    evaluation_registry_file: evaluationRegistryFile,
+    evaluation_registry_suites: evaluationRegistrySuites,
+    evaluation_registry_datasets: evaluationRegistryDatasets,
     validation_report_id: validationReportId,
     validation_report_file: validationReportFile,
     validation_status: validationStatus,

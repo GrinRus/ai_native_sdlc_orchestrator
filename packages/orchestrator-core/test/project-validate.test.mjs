@@ -51,6 +51,15 @@ test("validateProjectRuntime emits pass status when safety checks and analysis r
       /** @type {number} */ (referenceValidator.details?.checked_compatibility) > 0,
       "expected deterministic compatibility checks in validation details",
     );
+    const evaluationRegistryValidator = result.report.validators.find(
+      (validator) => validator.validator_id === "evaluation-registry",
+    );
+    assert.ok(evaluationRegistryValidator, "expected evaluation-registry validator");
+    assert.equal(evaluationRegistryValidator.status, "pass");
+    assert.ok(
+      typeof evaluationRegistryValidator.details?.suite_count === "number" &&
+        /** @type {number} */ (evaluationRegistryValidator.details?.suite_count) > 0,
+    );
   });
 });
 

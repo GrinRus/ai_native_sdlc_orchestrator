@@ -272,6 +272,7 @@ console.log("adapter-sdk tests ok: envelopes, capability negotiation, and determ
 const orchestratorCoreTests = [
   path.join(root, "packages/orchestrator-core/test/project-init.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/handoff-packets.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/evaluation-registry.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/asset-loader.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/policy-resolution.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/step-execution-engine.test.mjs"),
