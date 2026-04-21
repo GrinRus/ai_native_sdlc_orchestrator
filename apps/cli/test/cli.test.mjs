@@ -70,7 +70,7 @@ test("invalid project-ref fails clearly", () => {
 
   assert.equal(result.exitCode, 1);
   assert.equal(result.stdout, "");
-  assert.match(result.stderr, /Invalid --project-ref '\.\/does-not-exist': path does not exist\./);
+  assert.match(result.stderr, /Invalid project reference '\.\/does-not-exist': path does not exist\./);
 });
 
 test("planned commands report not implemented status", () => {
@@ -83,6 +83,8 @@ test("planned commands report not implemented status", () => {
 
 test("project verify resolves runtime root and contract metadata", () => {
   withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
     const result = invokeCli(["project", "verify", "--project-ref", projectRoot]);
 
     assert.equal(result.exitCode, 0);
@@ -166,5 +168,48 @@ test("project analyze writes durable analysis report under runtime root", () => 
     const report = JSON.parse(fs.readFileSync(parsed.analysis_report_file, "utf8"));
     assert.equal(report.project_id, "aor-core");
     assert.equal(report.status, "ready-for-bootstrap");
+  });
+});
+
+test("project validate writes validation report with deterministic status", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const result = invokeCli(["project", "validate", "--project-ref", projectRoot]);
+    assert.equal(result.exitCode, 0, result.stderr);
+
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.validation_report_id, "aor-core.validation.v1");
+    assert.equal(fs.existsSync(parsed.validation_report_file), true);
+    assert.ok(parsed.validation_status === "pass" || parsed.validation_status === "warn");
+  });
+});
+
+test("project verify refuses to continue when validation gate is enforced and status is fail", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    const profilePath = path.join(projectRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    fs.writeFileSync(
+      profilePath,
+      profileContent.replace("allow_direct_write: false", "allow_direct_write: true"),
+      "utf8",
+    );
+
+    const validateResult = invokeCli(["project", "validate", "--project-ref", projectRoot]);
+    assert.equal(validateResult.exitCode, 0, validateResult.stderr);
+
+    const verifyResult = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--require-validation-pass",
+    ]);
+
+    assert.equal(verifyResult.exitCode, 1);
+    assert.match(verifyResult.stderr, /Validation gate blocked verify flow/);
   });
 });

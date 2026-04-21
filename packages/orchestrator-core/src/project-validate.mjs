@@ -7,8 +7,6 @@ import {
   validateExampleReferences,
 } from "../../contracts/src/index.mjs";
 
-import { validateApprovedHandoffGate } from "./handoff-packets.mjs";
-import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 
 /**
@@ -123,13 +121,10 @@ function readAnalysisReportStatus(reportPath) {
  *  projectRef?: string,
  *  projectProfile?: string,
  *  runtimeRoot?: string,
- *  requireApprovedHandoff?: boolean,
- *  handoffPacketPath?: string,
  * }} options
  */
 export function validateProjectRuntime(options = {}) {
   const init = initializeProjectRuntime(options);
-  const requireApprovedHandoff = options.requireApprovedHandoff === true;
 
   /** @type {Array<{ validator_id: string, status: "pass" | "warn" | "fail", summary: string, details?: Record<string, unknown> }>} */
   const validators = [];
@@ -210,11 +205,6 @@ export function validateProjectRuntime(options = {}) {
       status: "warn",
       summary: "No examples directory found; reference integrity checks were skipped.",
     });
-    validators.push({
-      validator_id: "evaluation-registry",
-      status: "warn",
-      summary: "No examples directory found; dataset/suite registry checks were skipped.",
-    });
   } else {
     const referenceIntegrity = validateExampleReferences({ workspaceRoot: init.projectRoot });
     validators.push({
@@ -225,51 +215,10 @@ export function validateProjectRuntime(options = {}) {
         : `Example reference integrity checks failed with ${referenceIntegrity.issues.length} issue(s).`,
       details: {
         checked_references: referenceIntegrity.checkedReferences,
-        checked_compatibility: referenceIntegrity.checkedCompatibility,
         issues: referenceIntegrity.issues,
       },
     });
     evidenceRefs.push(`reference-integrity:${referenceIntegrity.checkedReferences}`);
-
-    const evaluationRegistry = loadEvaluationRegistry({ workspaceRoot: init.projectRoot });
-    validators.push({
-      validator_id: "evaluation-registry",
-      status: evaluationRegistry.ok ? "pass" : "fail",
-      summary: evaluationRegistry.ok
-        ? "Dataset and evaluation-suite registry checks passed."
-        : `Dataset and evaluation-suite registry checks failed with ${evaluationRegistry.issues.length} issue(s).`,
-      details: {
-        dataset_count: evaluationRegistry.datasets.length,
-        suite_count: evaluationRegistry.suites.length,
-        issues: evaluationRegistry.issues,
-      },
-    });
-    evidenceRefs.push(`evaluation-registry:${evaluationRegistry.suites.length}/${evaluationRegistry.datasets.length}`);
-  }
-
-  const handoffGate = validateApprovedHandoffGate({
-    runtimeLayout: init.runtimeLayout,
-    projectId: init.projectId,
-    cwd: options.cwd,
-    handoffPacketPath: options.handoffPacketPath,
-  });
-  validators.push({
-    validator_id: "handoff-approval-gate",
-    status: handoffGate.status === "pass" ? "pass" : requireApprovedHandoff ? "fail" : "pass",
-    summary:
-      handoffGate.status === "pass"
-        ? handoffGate.summary
-        : requireApprovedHandoff
-          ? handoffGate.summary
-          : `${handoffGate.summary} (enforcement disabled).`,
-    details: {
-      ...handoffGate.details,
-      enforced: requireApprovedHandoff,
-      handoff_packet_file: handoffGate.handoffPacketFile,
-    },
-  });
-  if (handoffGate.status === "pass") {
-    evidenceRefs.push(handoffGate.handoffPacketFile);
   }
 
   const status = summarizeValidationStatus(validators);
@@ -300,8 +249,5 @@ export function validateProjectRuntime(options = {}) {
     validationReportPath,
     report,
     blocking: status === "fail",
-    handoffGateStatus: handoffGate.status,
-    handoffGateBlocking: requireApprovedHandoff && handoffGate.status === "fail",
-    handoffPacketFile: handoffGate.handoffPacketFile,
   };
 }
