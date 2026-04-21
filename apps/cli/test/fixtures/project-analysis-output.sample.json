@@ -1,0 +1,17 @@
+{
+  "command": "project analyze",
+  "status": "implemented",
+  "resolved_project_ref": "<PROJECT_ROOT>",
+  "resolved_runtime_root": "<PROJECT_ROOT>/.aor",
+  "analysis_report_id": "aor-core.analysis.v1",
+  "analysis_report_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/project-analysis-report.json",
+  "contract_families": [
+    {
+      "family": "project-analysis-report",
+      "group": "core-packets-and-profiles",
+      "source_contract": "docs/contracts/project-analysis-report.md",
+      "status": "implemented"
+    }
+  ],
+  "command_catalog_alignment": "docs/architecture/14-cli-command-catalog.md"
+}
