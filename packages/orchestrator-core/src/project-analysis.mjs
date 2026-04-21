@@ -4,6 +4,7 @@ import path from "node:path";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
+import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 
 const LANGUAGE_BY_EXTENSION = Object.freeze({
@@ -268,6 +269,8 @@ function createVerificationPlan(commands, unknownFacts) {
  *  runtimeRoot?: string,
  *  routeOverrides?: Record<string, string>,
  *  routesRoot?: string,
+ *  wrappersRoot?: string,
+ *  promptsRoot?: string,
  * }} options
  */
 export function analyzeProjectRuntime(options = {}) {
@@ -331,10 +334,27 @@ export function analyzeProjectRuntime(options = {}) {
       ? options.routesRoot
       : path.resolve(init.projectRoot, options.routesRoot)
     : path.join(init.projectRoot, "examples/routes");
+  const wrappersRoot = options.wrappersRoot
+    ? path.isAbsolute(options.wrappersRoot)
+      ? options.wrappersRoot
+      : path.resolve(init.projectRoot, options.wrappersRoot)
+    : path.join(init.projectRoot, "examples/wrappers");
+  const promptsRoot = options.promptsRoot
+    ? path.isAbsolute(options.promptsRoot)
+      ? options.promptsRoot
+      : path.resolve(init.projectRoot, options.promptsRoot)
+    : path.join(init.projectRoot, "examples/prompts");
   const routeResolutionMatrix = resolveRouteMatrix({
     projectProfilePath: init.projectProfilePath,
     routesRoot,
     stepOverrides: options.routeOverrides,
+  });
+  const assetResolutionMatrix = resolveAssetBundleMatrix({
+    projectProfilePath: init.projectProfilePath,
+    routesRoot,
+    wrappersRoot,
+    promptsRoot,
+    routeOverrides: options.routeOverrides,
   });
 
   const report = {
@@ -359,6 +379,11 @@ export function analyzeProjectRuntime(options = {}) {
       routes_root: path.relative(init.projectRoot, routesRoot) || ".",
       applied_overrides: options.routeOverrides ?? {},
       matrix: routeResolutionMatrix,
+    },
+    asset_resolution: {
+      wrappers_root: path.relative(init.projectRoot, wrappersRoot) || ".",
+      prompts_root: path.relative(init.projectRoot, promptsRoot) || ".",
+      matrix: assetResolutionMatrix,
     },
     verification_plan: verificationPlan,
     status: "ready-for-bootstrap",
@@ -399,12 +424,35 @@ export function analyzeProjectRuntime(options = {}) {
     )}\n`,
     "utf8",
   );
+  const assetResolutionPath = path.join(init.runtimeLayout.reportsRoot, "asset-resolution-report.json");
+  fs.writeFileSync(
+    assetResolutionPath,
+    `${JSON.stringify(
+      {
+        report_id: `${init.projectId}.asset-resolution.v1`,
+        project_id: init.projectId,
+        generated_from: {
+          command: "aor project analyze",
+          selected_profile_ref: init.projectProfileRef,
+        },
+        wrappers_root: path.relative(init.projectRoot, wrappersRoot) || ".",
+        prompts_root: path.relative(init.projectRoot, promptsRoot) || ".",
+        matrix: assetResolutionMatrix,
+        status: "resolved",
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 
   return {
     ...init,
     reportPath,
     routeResolutionPath,
+    assetResolutionPath,
     report,
     routeResolutionMatrix,
+    assetResolutionMatrix,
   };
 }

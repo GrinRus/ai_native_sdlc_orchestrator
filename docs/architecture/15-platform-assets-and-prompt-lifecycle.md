@@ -51,32 +51,12 @@ Ownership is singular:
 - certify prompt-bundle, context, and compiler changes independently when possible;
 - keep baseline references explicit;
 - preserve incident and promotion history for every platform asset.
-- keep `AGENTS.md` guidance thin and operator-oriented; execution context source-of-truth lives in versioned platform assets (prompt bundles, wrappers, skills, policies, routes).
 
-## Target runtime loading order (W6+)
-Asset resolution and compilation for a step is deterministic and follows this order:
+## Runtime loading order (W2-S02)
+Asset resolution for a step is deterministic and follows this order:
 1. resolve route profile for the step class;
 2. choose wrapper profile (`step override` first, then `project default` by route class);
-3. choose prompt bundle (`step override` first, then project-profile default by step class);
-4. choose context bundles (`step override` first, then project-profile defaults by step class);
-5. choose skill refs (`step override` first, then `project default` by route class);
-6. expand selected context bundles into always-on rules plus predicate-selected docs and skills;
-7. ingest packet refs and project-analysis facts required by prompt bundle and policy;
-8. compile one bounded working-context artifact with hashes, dropped inputs, and provenance refs;
-9. emit one runtime asset bundle with route, wrapper, prompt bundle, context bundles, and compiled-context refs.
+3. choose prompt bundle (`step override` first, then wrapper `prompt_bundle_ref`);
+4. emit one asset bundle with route, wrapper, prompt bundle, and provenance refs.
 
 If any source is missing or conflicts with the step class, resolution fails before execution.
-
-## Policy loading order and guardrails (W2-S03)
-Policy resolution is deterministic and runs before any adapter invocation:
-1. resolve route for the step (`project default` or `step override`);
-2. resolve step policy id (`step override` first, then `project default` by route class);
-3. merge bounds in one path:
-   - budget and timeout: `route constraints` then `project budget defaults`;
-   - command constraints: `policy command constraints`, otherwise `route constraints`, otherwise `project repo command allowlist`;
-   - write-back mode: `policy override`, then `route constraints`, then `project writeback defaults`;
-4. normalize write-back mode into delivery-plan modes (`no-write`, `patch-only`, `local-branch`, `fork-first-pr`);
-5. persist guardrails (`approval_required`, allowlist enforcement, redaction, blocking rules) into step planning metadata together with compile-lineage refs.
-6. persist a delivery-plan artifact before write-back, and block non-read-only modes without approved handoff and promotion evidence.
-
-Any missing or conflicting required policy source must fail deterministically before runner execution starts.

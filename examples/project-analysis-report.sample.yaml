@@ -42,6 +42,17 @@ route_resolution:
       resolution_source:
         kind: project-default
         field: default_route_profiles.planning
+asset_resolution:
+  wrappers_root: examples/wrappers
+  prompts_root: examples/prompts
+  matrix:
+    - step_class: planning
+      route:
+        resolved_route_id: route.plan.default
+      wrapper:
+        wrapper_ref: wrapper.planner.default@v1
+      prompt_bundle:
+        prompt_bundle_ref: prompt-bundle://planner-default@v1
 service_boundaries:
   - service_id: api
     paths:

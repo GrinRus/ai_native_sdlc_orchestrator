@@ -200,14 +200,21 @@ test("project analyze writes durable analysis report under runtime root", () => 
     assert.ok(Array.isArray(parsed.route_resolution_steps));
     assert.equal(parsed.route_resolution_steps.length, 10);
     assert.ok(parsed.route_resolution_steps.every((step) => typeof step.resolved_route_id === "string"));
+    assert.equal(fs.existsSync(parsed.asset_resolution_file), true);
+    assert.ok(Array.isArray(parsed.asset_resolution_steps));
+    assert.equal(parsed.asset_resolution_steps.length, 10);
     const planningRoute = parsed.route_resolution_steps.find((step) => step.step_class === "planning");
     assert.ok(planningRoute);
     assert.equal(planningRoute.resolution_source.kind, "step-override");
+    const planningAssets = parsed.asset_resolution_steps.find((step) => step.step_class === "planning");
+    assert.ok(planningAssets);
+    assert.equal(planningAssets.wrapper.wrapper_ref, "wrapper.planner.default@v1");
 
     const report = JSON.parse(fs.readFileSync(parsed.analysis_report_file, "utf8"));
     assert.equal(report.project_id, "aor-core");
     assert.equal(report.status, "ready-for-bootstrap");
     assert.equal(report.route_resolution.matrix.length, 10);
+    assert.equal(report.asset_resolution.matrix.length, 10);
   });
 });
 
