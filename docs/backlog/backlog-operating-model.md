@@ -96,6 +96,29 @@ Create or split a shared slice only when the work introduces a new independently
 5. Use `story-traceability` when the change affects user-visible behavior.
 6. Close the slice only after every acceptance criterion has reviewable evidence.
 
+## Continuous slice-delivery loop
+
+The default implementation loop is sequential and slice-driven:
+
+1. Pick one slice.
+2. Build a branch-local plan from `### Local tasks`.
+3. Implement the slice.
+4. Run self-review against acceptance criteria.
+5. Run the full root check gate (`pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check`).
+6. Fix gaps and rerun step 4 and step 5 until clean.
+7. Commit one slice atomically.
+8. Mark the slice state as `done`.
+9. Recompute queue and continue until all slices are `done`.
+
+Use the helper script to keep this loop deterministic:
+
+- `pnpm slice:status` — show current state counts and the selected next action.
+- `pnpm slice:next -- --json` — print next slice selection in machine-readable form.
+- `pnpm slice:plan -- W0-S04` — print local tasks, acceptance criteria, and done evidence.
+- `pnpm slice:sync-ready -- --apply` — sync `blocked`/`ready` states from dependency truth.
+- `pnpm slice:complete -- W0-S04 --apply` — mark one slice as `done` in both backlog docs.
+- `pnpm slice:gate` — run the mandatory check gate before commit.
+
 ## When creating or changing slices
 
 If you add, remove, split, or merge a slice, update all of the following together:

@@ -17,6 +17,7 @@ Use this directory for all shared planning work.
 - Use `mvp-implementation-backlog.md` for the slice index.
 - Use the owning wave document for the starter local-task outline.
 - Update the epic map and dependency graph when slice shape changes.
+- Use `pnpm slice:status`, `pnpm slice:plan`, and `pnpm slice:gate` to keep the loop deterministic.
 
 ## Scope rule
 

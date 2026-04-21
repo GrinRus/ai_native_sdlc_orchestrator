@@ -42,6 +42,25 @@ If the change is implementation work, find the owning slice first. Do not start 
    ```
 7. Open a focused pull request with the evidence needed to review the slice.
 
+## Continuous slice loop
+
+Use the slice helper commands to keep one-slice-at-a-time delivery explicit:
+
+```bash
+pnpm slice:status
+pnpm slice:next -- --json
+pnpm slice:plan -- W0-S04
+pnpm slice:sync-ready -- --apply
+pnpm slice:gate
+pnpm slice:complete -- W0-S04 --apply
+```
+
+Notes:
+
+- `slice:sync-ready` recalculates `ready` and `blocked` from hard dependencies.
+- `slice:complete` updates both the master backlog and the owning wave doc state.
+- `slice:gate` runs the mandatory pre-commit gate (`lint`, `test`, `build`, `check`).
+
 ## Repo-specific rules
 
 - English is the default project language.

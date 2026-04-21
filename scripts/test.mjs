@@ -28,7 +28,33 @@ function parseWaveSlices(content) {
     const id = matches[i][1];
     const start = matches[i].index ?? 0;
     const end = i + 1 < matches.length ? (matches[i + 1].index ?? content.length) : content.length;
-    sections.set(id, content.slice(start, end));
+    const section = content.slice(start, end);
+
+    const stateMatch = section.match(/^- \*\*State:\*\* (ready|blocked|active|done)\s*$/m);
+    if (!stateMatch) {
+      console.error(`Slice ${id} is missing a valid '- **State:** <state>' line.`);
+      process.exit(1);
+    }
+
+    const depsMatch = section.match(/^- \*\*Hard dependencies:\*\* (.+)\s*$/m);
+    if (!depsMatch) {
+      console.error(`Slice ${id} is missing '- **Hard dependencies:** ...'.`);
+      process.exit(1);
+    }
+
+    const hardDependencies =
+      depsMatch[1].trim().toLowerCase() === "none"
+        ? []
+        : depsMatch[1]
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+    sections.set(id, {
+      section,
+      state: stateMatch[1],
+      hardDependencies,
+    });
   }
 
   return sections;
@@ -38,18 +64,19 @@ const waveSectionMap = new Map();
 for (const file of waveFiles) {
   const content = read(file);
   const sections = parseWaveSlices(content);
-  for (const [id, section] of sections.entries()) {
+  for (const [id, sectionData] of sections.entries()) {
     if (waveSectionMap.has(id)) {
       console.error(`Duplicate slice id found in wave docs: ${id}`);
       process.exit(1);
     }
+    const section = sectionData.section;
     for (const heading of ["### Local tasks", "### Acceptance criteria", "### Done evidence", "### Out of scope"]) {
       if (!section.includes(heading)) {
         console.error(`Slice ${id} is missing required section '${heading}'.`);
         process.exit(1);
       }
     }
-    waveSectionMap.set(id, section);
+    waveSectionMap.set(id, sectionData);
   }
 }
 
@@ -58,6 +85,25 @@ const waveSliceIds = [...waveSectionMap.keys()].sort();
 const masterBacklog = read("docs/backlog/mvp-implementation-backlog.md");
 const masterSliceIds = [...masterBacklog.matchAll(/^\| (W\d-S\d+) \|/gm)].map((match) => match[1]);
 const uniqueMasterSliceIds = [...new Set(masterSliceIds)].sort();
+const masterRows = [...masterBacklog.matchAll(/^\| (W\d-S\d+) \| ([^|]+) \| ([^|]+) \| (ready|blocked|active|done) \| ([^|]+) \| ([^|]+) \|$/gm)];
+const masterSliceMap = new Map();
+for (const row of masterRows) {
+  const sliceId = row[1];
+  const state = row[4];
+  const depCell = row[6].trim();
+  const hardDependencies =
+    depCell.toLowerCase() === "none"
+      ? []
+      : depCell
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+  masterSliceMap.set(sliceId, {
+    state,
+    hardDependencies,
+  });
+}
 
 const epicMap = read("docs/backlog/orchestrator-epics.md");
 const epicSliceIds = [...epicMap.matchAll(/`(W\d-S\d+)`/gm)].map((match) => match[1]);
@@ -87,16 +133,57 @@ if (!sameSet(waveSliceIds, uniqueDepSliceIds)) {
 }
 
 const depLines = depGraph.split("\n").filter((line) => /^\| W\d-S\d+ \|/.test(line));
+const depSliceMap = new Map();
 for (const line of depLines) {
   const cells = line.split("|").map((cell) => cell.trim()).filter(Boolean);
   const id = cells[0];
   const depCell = cells[1];
-  if (depCell.toLowerCase() === "none") continue;
-  for (const dep of depCell.split(",").map((item) => item.trim())) {
+  const dependencies =
+    depCell.toLowerCase() === "none"
+      ? []
+      : depCell
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+  depSliceMap.set(id, dependencies);
+
+  for (const dep of dependencies) {
     if (!waveSectionMap.has(dep)) {
       console.error(`Slice ${id} depends on unknown slice ${dep}.`);
       process.exit(1);
     }
+  }
+}
+
+for (const sliceId of waveSliceIds) {
+  const waveSlice = waveSectionMap.get(sliceId);
+  const masterSlice = masterSliceMap.get(sliceId);
+  if (!masterSlice) {
+    console.error(`Slice ${sliceId} exists in wave docs but not in master backlog rows.`);
+    process.exit(1);
+  }
+
+  if (waveSlice.state !== masterSlice.state) {
+    console.error(
+      `State mismatch for ${sliceId}: wave docs state '${waveSlice.state}' does not match master backlog state '${masterSlice.state}'.`,
+    );
+    process.exit(1);
+  }
+
+  const depSlice = depSliceMap.get(sliceId) ?? [];
+  const waveDeps = [...waveSlice.hardDependencies].sort();
+  const masterDeps = [...masterSlice.hardDependencies].sort();
+  const graphDeps = [...depSlice].sort();
+
+  if (JSON.stringify(waveDeps) !== JSON.stringify(masterDeps)) {
+    console.error(`Hard dependency mismatch for ${sliceId}: wave docs and master backlog disagree.`);
+    process.exit(1);
+  }
+
+  if (JSON.stringify(waveDeps) !== JSON.stringify(graphDeps)) {
+    console.error(`Hard dependency mismatch for ${sliceId}: wave docs and dependency graph disagree.`);
+    process.exit(1);
   }
 }
 
@@ -128,6 +215,18 @@ if (contractsTestRun.status !== 0) {
 }
 
 console.log("contracts loader tests ok: coverage, validation, and index mapping");
+
+const sliceCycleTestsPath = path.join(root, "scripts/test/slice-cycle.test.mjs");
+const sliceCycleTestRun = spawnSync(process.execPath, ["--test", sliceCycleTestsPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (sliceCycleTestRun.status !== 0) {
+  process.exit(sliceCycleTestRun.status ?? 1);
+}
+
+console.log("slice cycle tests ok: selection, state sync, and plan extraction");
 
 const referenceIntegrityCheckPath = path.join(root, "scripts/reference-integrity.mjs");
 const referenceIntegrityRun = spawnSync(process.execPath, [referenceIntegrityCheckPath], {

@@ -12,6 +12,12 @@
     "test": "node ./scripts/test.mjs",
     "test:references": "node ./scripts/reference-integrity.mjs",
     "lint": "node ./scripts/lint.mjs",
-    "check": "node ./scripts/lint.mjs && node ./scripts/test.mjs && node ./scripts/build.mjs"
+    "check": "node ./scripts/lint.mjs && node ./scripts/test.mjs && node ./scripts/build.mjs",
+    "slice:status": "node ./scripts/slice-cycle.mjs status",
+    "slice:next": "node ./scripts/slice-cycle.mjs next",
+    "slice:plan": "node ./scripts/slice-cycle.mjs plan",
+    "slice:gate": "node ./scripts/slice-cycle.mjs gate",
+    "slice:sync-ready": "node ./scripts/slice-cycle.mjs sync-ready",
+    "slice:complete": "node ./scripts/slice-cycle.mjs complete"
   }
 }

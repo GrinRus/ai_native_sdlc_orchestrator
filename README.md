@@ -77,6 +77,13 @@ Suggested implementation workflow:
 4. Update docs, examples, contracts, and code together.
 5. Run the root checks before opening a PR.
 
+Useful helpers for the slice loop:
+
+- `pnpm slice:status`
+- `pnpm slice:next -- --json`
+- `pnpm slice:plan -- <SLICE_ID>`
+- `pnpm slice:gate`
+
 For the repo-specific rules, read `CONTRIBUTING.md` and the nearest `AGENTS.md`.
 
 ## How AOR works

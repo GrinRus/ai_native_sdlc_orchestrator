@@ -112,7 +112,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S04 — Agent guidance and backlog workflow baseline
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Make the repo legible to coding agents and humans by default, with a clear backlog operating model and local guidance hierarchy.
 - **Primary modules:** root `AGENTS.md`, `docs/backlog/**`, `.agents/skills/**`
 - **Hard dependencies:** none

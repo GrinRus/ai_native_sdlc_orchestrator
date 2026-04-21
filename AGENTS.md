@@ -35,6 +35,7 @@ AOR is an AI-native orchestrator for the full SDLC: bootstrap, discovery, specif
 4. Update source-of-truth docs before or together with code.
 5. Keep contracts, examples, docs, and code aligned.
 6. Run the root checks before you consider the change done.
+7. Use the slice cycle helper (`pnpm slice:status`, `pnpm slice:plan`, `pnpm slice:gate`) to keep queueing and quality gates explicit.
 
 ## Non-negotiable rules
 
