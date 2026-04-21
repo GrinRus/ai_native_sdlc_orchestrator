@@ -44,7 +44,7 @@ test("implemented command help documents inputs outputs and contracts", () => {
   );
   assert.match(
     result.stdout,
-    /Outputs: resolved_project_ref, resolved_runtime_root, project_profile_ref, runtime_layout, runtime_state_file, contract_families, command_catalog_alignment/,
+    /Outputs: resolved_project_ref, resolved_runtime_root, project_profile_ref, runtime_layout, runtime_state_file, artifact_packet_id, artifact_packet_file, contract_families, command_catalog_alignment/,
   );
   assert.match(result.stdout, /Contract families: project-profile/);
 });
@@ -135,11 +135,19 @@ test("project init discovers repo root from cwd and materializes runtime layout 
     assert.equal(secondPayload.project_profile_ref, "examples/project.aor.yaml");
     assert.equal(firstPayload.runtime_state_file, secondPayload.runtime_state_file);
     assert.equal(fs.existsSync(firstPayload.runtime_state_file), true);
+    assert.equal(firstPayload.artifact_packet_id, "aor-core.artifact.bootstrap.v1");
+    assert.equal(firstPayload.artifact_packet_file, secondPayload.artifact_packet_file);
+    assert.equal(fs.existsSync(firstPayload.artifact_packet_file), true);
 
     const runtimeState = JSON.parse(fs.readFileSync(firstPayload.runtime_state_file, "utf8"));
     assert.equal(runtimeState.project_id, "aor-core");
     assert.equal(runtimeState.selected_profile_ref, "examples/project.aor.yaml");
     assert.equal(runtimeState.project_root, projectRoot);
+
+    const artifactPacket = JSON.parse(fs.readFileSync(firstPayload.artifact_packet_file, "utf8"));
+    assert.equal(artifactPacket.packet_id, "aor-core.artifact.bootstrap.v1");
+    assert.equal(artifactPacket.project_id, "aor-core");
+    assert.equal(artifactPacket.packet_type, "bootstrap");
   });
 });
 
