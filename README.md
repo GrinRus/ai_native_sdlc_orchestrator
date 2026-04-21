@@ -123,52 +123,26 @@ At a high level, AOR is intended to work like this:
 
 ## Command surface status
 
-The CLI command surface currently includes **14 implemented** commands and **19 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
-
-Implemented commands:
+Bootstrap command contracts are implemented in the CLI shell:
 
 ```bash
-aor project init [--project-ref <path>] [--project-profile <path>] [--runtime-root <path>]
-aor project analyze --project-ref <path> [--project-profile <path>] [--runtime-root <path>]
-aor project validate --project-ref <path> [--project-profile <path>] [--runtime-root <path>]
-aor project verify --project-ref <path> [--project-profile <path>] [--runtime-root <path>] [--require-validation-pass]
-aor eval run --project-ref <path> --subject-ref <subject_type://target> [--suite-ref <suite_id@vN>] [--subject-version <version>] [--project-profile <path>] [--runtime-root <path>]
-aor harness certify --project-ref <path> --asset-ref <asset://target> --subject-ref <subject_type://target> [--suite-ref <suite_id@vN>] [--step-class <step_class>] [--from-channel <channel>] [--to-channel <channel>] [--project-profile <path>] [--runtime-root <path>]
-aor handoff prepare --project-ref <path> [--project-profile <path>] [--runtime-root <path>] [--ticket-id <id>] [--approved-artifact <path>]
-aor handoff approve --project-ref <path> [--runtime-root <path>] [--handoff-packet <path>] --approval-ref <ref>
-aor run status --project-ref <path> [--runtime-root <path>] [--run-id <id>] [--follow <true|false>]
-aor packet show --project-ref <path> [--runtime-root <path>] [--family <contract_family|all>] [--limit <number>]
-aor evidence show --project-ref <path> [--runtime-root <path>] [--run-id <id>]
-aor live-e2e start --project-ref <path> --profile <path> [--runtime-root <path>] [--run-id <id>] [--hold-open <true|false>]
-aor live-e2e status --project-ref <path> --run-id <id> [--runtime-root <path>] [--abort <true|false>] [--reason <text>]
-aor live-e2e report --project-ref <path> --run-id <id> [--runtime-root <path>]
+aor project init --project-ref <path> [--runtime-root <path>]
+aor project analyze --project-ref <path> [--runtime-root <path>]
+aor project validate --project-ref <path> [--runtime-root <path>]
+aor project verify --project-ref <path> [--runtime-root <path>]
 ```
 
-Planned command contracts:
+The broader product command surface is still planned:
 
 ```bash
-aor intake create
-aor discovery run
-aor spec build
-aor wave create
-aor run start
-aor run pause
-aor run resume
-aor run steer
-aor run cancel
+aor run step
+aor eval run
 aor harness replay
-aor asset promote
-aor asset freeze
-aor deliver prepare
-aor release prepare
-aor incident open
-aor incident show
-aor audit runs
-aor ui attach
-aor ui detach
+aor delivery plan
+aor delivery apply
 ```
 
-Planned commands remain explicit roadmap items and are not fully implemented runtime flows yet.
+These roadmap commands are not fully implemented runtime flows yet.
 
 ## Repository map
 
