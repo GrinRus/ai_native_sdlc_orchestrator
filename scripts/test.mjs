@@ -243,7 +243,10 @@ if (cliTestRun.status !== 0) {
 
 console.log("cli tests ok: bootstrap command contracts, parsing, and help output");
 
-const apiTests = [path.join(root, "apps/api/test/read-surface.test.mjs")];
+const apiTests = [
+  path.join(root, "apps/api/test/read-surface.test.mjs"),
+  path.join(root, "apps/api/test/live-event-stream.test.mjs"),
+];
 const apiTestRun = spawnSync(process.execPath, ["--test", ...apiTests], {
   cwd: root,
   stdio: "inherit",

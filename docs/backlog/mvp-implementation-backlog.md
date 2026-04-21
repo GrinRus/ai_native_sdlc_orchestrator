@@ -63,8 +63,8 @@ This is the master index for the implementation slices across all defined waves.
 ## W5 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W5-S01 | Control plane API read surface | EPIC-6 | ready | `apps/api`, `packages/orchestrator-core`, `packages/contracts` | W4-S05, W2-S05 |
-| W5-S02 | Live run event stream | EPIC-6 | blocked | `apps/api`, `packages/observability`, `docs/contracts/**` | W5-S01, W2-S05 |
+| W5-S01 | Control plane API read surface | EPIC-6 | done | `apps/api`, `packages/orchestrator-core`, `packages/contracts` | W4-S05, W2-S05 |
+| W5-S02 | Live run event stream | EPIC-6 | ready | `apps/api`, `packages/observability`, `docs/contracts/**` | W5-S01, W2-S05 |
 | W5-S03 | CLI operator commands beyond bootstrap | EPIC-6 | blocked | `apps/cli`, `apps/api`, `docs/architecture/**` | W5-S01, W5-S02 |
 | W5-S04 | Detachable web UI baseline | EPIC-6 | blocked | `apps/web`, `apps/api`, `docs/ops/**` | W5-S01, W5-S02 |
 | W5-S05 | Standard live E2E orchestration runner | EPIC-7 | blocked | `apps/cli`, `apps/api`, `docs/ops/**`, `examples/live-e2e/**` | W5-S03, W4-S06, W3-S06 |

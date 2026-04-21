@@ -18,6 +18,13 @@ const ROUTE_STEP_VALUES = [
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
+const LIVE_RUN_EVENT_TYPE_VALUES = [
+  "run.started",
+  "step.updated",
+  "evidence.linked",
+  "warning.raised",
+  "run.terminal",
+];
 const EXTERNAL_REFERENCE_PREFIXES = [
   "evidence://",
   "schema://",
