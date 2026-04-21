@@ -174,7 +174,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S06 — Quality rehearsal on selected public targets
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Prove that eval, harness, and certification work on real repositories before delivery automation expands.
 - **Primary modules:** `docs/ops/**`, `examples/live-e2e/**`, `packages/harness`, `apps/cli`
 - **Hard dependencies:** W3-S05, W0-S05

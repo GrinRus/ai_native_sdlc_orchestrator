@@ -43,6 +43,9 @@ test("executeRoutedStep resolves route/assets/policy/adapter and writes durable 
     assert.equal(result.stepResult.routed_execution.asset_resolution.wrapper.wrapper_ref, "wrapper.runner.default@v3");
     assert.equal(result.stepResult.routed_execution.policy_resolution.policy.policy_id, "policy.step.runner.default");
     assert.equal(result.stepResult.routed_execution.policy_resolution.resolved_bounds.budget.max_cost_usd, 25);
+    assert.equal(result.stepResult.routed_execution.delivery_plan.delivery_mode, "fork-first-pr");
+    assert.equal(result.stepResult.routed_execution.delivery_plan.status, "blocked");
+    assert.equal(fs.existsSync(result.stepResult.routed_execution.delivery_plan.delivery_plan_file), true);
     assert.equal(result.stepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
     assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
     assert.ok(Array.isArray(result.stepResult.evidence_refs));

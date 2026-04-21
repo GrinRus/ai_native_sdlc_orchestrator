@@ -4,6 +4,8 @@ import { parse as parseYaml } from "yaml";
 
 const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
+const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
+const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
 const EXTERNAL_REFERENCE_PREFIXES = [
   "evidence://",
   "schema://",
@@ -201,6 +203,45 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       status: "string",
     },
     enumChecks: [],
+  },
+  {
+    family: "delivery-plan",
+    familyGroup: "core-packets-and-profiles",
+    sourceContract: "docs/contracts/delivery-plan.md",
+    exampleGlob: "examples/packets/delivery-plan-*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "plan_id",
+      "project_id",
+      "run_id",
+      "step_class",
+      "delivery_mode",
+      "mode_source",
+      "preconditions",
+      "writeback_allowed",
+      "blocking_reasons",
+      "status",
+      "evidence_refs",
+      "created_at",
+    ],
+    fieldTypes: {
+      plan_id: "string",
+      project_id: "string",
+      run_id: "string",
+      step_class: "string",
+      delivery_mode: "string",
+      mode_source: "object",
+      preconditions: "object",
+      writeback_allowed: "boolean",
+      blocking_reasons: "array",
+      status: "string",
+      evidence_refs: "array",
+      created_at: "string",
+    },
+    enumChecks: [
+      { field: "delivery_mode", allowedValues: DELIVERY_MODE_VALUES },
+      { field: "status", allowedValues: DELIVERY_PLAN_STATUS_VALUES },
+    ],
   },
   {
     family: "delivery-manifest",
@@ -538,6 +579,7 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
 const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/adapters\/[^/]+\.ya?ml$/, family: "adapter-capability-profile" },
   { regex: /^examples\/delivery-manifest[^/]*\.ya?ml$/, family: "delivery-manifest" },
+  { regex: /^examples\/packets\/delivery-plan-[^/]+\.ya?ml$/, family: "delivery-plan" },
   { regex: /^examples\/eval\/dataset-[^/]+\.ya?ml$/, family: "dataset" },
   { regex: /^examples\/eval\/report-[^/]+\.sample\.ya?ml$/, family: "evaluation-report" },
   { regex: /^examples\/eval\/suite-[^/]+\.ya?ml$/, family: "evaluation-suite" },

@@ -5,6 +5,7 @@ export type ContractFamily =
   | "wave-ticket"
   | "handoff-packet"
   | "release-packet"
+  | "delivery-plan"
   | "delivery-manifest"
   | "incident-report"
   | "step-result"

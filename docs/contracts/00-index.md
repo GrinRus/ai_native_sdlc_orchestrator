@@ -7,6 +7,7 @@
 - `wave-ticket.md`
 - `handoff-packet.md`
 - `release-packet.md`
+- `delivery-plan.md`
 - `delivery-manifest.md`
 - `incident-report.md`
 

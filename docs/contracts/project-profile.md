@@ -29,5 +29,13 @@ Use the project profile as the durable source of truth for execution defaults. L
 
 Optional `runtime_defaults.workspace_cleanup` can define `on_success`, `on_abort`, and `on_failure` actions (`delete`, `retain`, or `none`) for isolated roots.
 
+`writeback_policy.default_delivery_mode` should resolve to one of the delivery-plan modes:
+- `no-write`
+- `patch-only`
+- `local-branch`
+- `fork-first-pr`
+
+Legacy aliases (`patch`, `pull-request`) may still appear in older fixtures, but runtime planning normalizes them to canonical delivery-plan modes before write-back policy checks.
+
 ## Example
 See `examples/project.aor.yaml and examples/project.github.aor.yaml`.

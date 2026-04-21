@@ -20,6 +20,7 @@ AOR is the durable SDLC control plane that coordinates:
 - **Packet chain** — discovery through release.
 - **Run and step results** — normalized execution state.
 - **Quality evidence** — validation, eval, harness, logs, traces, and diffs.
+- **Delivery plan** — pre-write policy decision and gate status.
 - **Delivery manifest** — actual delivery transaction.
 - **Learning memory** — incidents, datasets, suites, and promotion decisions.
 
@@ -44,19 +45,25 @@ AOR is the durable SDLC control plane that coordinates:
 8. run validation;
 9. run eval or harness if the step policy requires it;
 10. decide whether to close, retry, repair, escalate, or block;
-11. if the flow reaches delivery, materialize a delivery manifest;
-12. if the flow reaches release, materialize a release packet;
-13. if the flow fails materially, open or update an incident path.
+11. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
+12. only if the delivery plan is ready, materialize a delivery manifest;
+13. if the flow reaches release, materialize a release packet;
+14. if the flow fails materially, open or update an incident path.
 
 ## Delivery model
 AOR should support these delivery modes:
-- patch only
-- local branch
-- fork branch / fork PR
-- controlled direct write for trusted internal projects only
+- `no-write`
+- `patch-only`
+- `local-branch`
+- `fork-first-pr`
 
 All non-trivial delivery modes should leave a delivery manifest behind.
 Delivery-capable runs should execute from an isolated root (`workspace-clone` or `worktree`) rather than mutating the operator's primary checkout directly.
+
+Policy boundary between rehearsal and delivery:
+- rehearsal can proceed in `no-write` mode without handoff/promotion gates;
+- non-read-only delivery modes must be blocked unless approved handoff evidence and promotion evidence are both present;
+- write-back is allowed only when the delivery plan status is `ready`.
 
 ## Asset evolution model
 Prompt bundles, wrappers, routes, policies, and adapters evolve on their own lifecycle:
