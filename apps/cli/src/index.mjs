@@ -5,6 +5,7 @@ import { getContractFamilyIndex } from "../../../packages/contracts/src/index.mj
 import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { validateProjectRuntime } from "../../../packages/orchestrator-core/src/project-validate.mjs";
+import { verifyProjectRuntime } from "../../../packages/orchestrator-core/src/project-verify.mjs";
 
 import {
   RUNTIME_ROOT_DIRNAME,
@@ -204,27 +205,6 @@ function resolveOptionalBooleanFlag(flagName, value) {
 }
 
 /**
- * @param {string} reportPath
- * @returns {string}
- */
-function readValidationReportStatus(reportPath) {
-  if (!fs.existsSync(reportPath)) {
-    throw new CliUsageError(
-      `Validation gate requires '${reportPath}', but no validation report was found. Run 'aor project validate' first.`,
-    );
-  }
-
-  const parsed = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-  const status = parsed.status;
-
-  if (typeof status !== "string") {
-    throw new CliUsageError(`Validation report '${reportPath}' is missing a valid status field.`);
-  }
-
-  return status;
-}
-
-/**
  * @param {string} projectRef
  * @param {string} cwd
  * @returns {string}
@@ -322,6 +302,8 @@ function executeImplementedCommand(command, flags, cwd) {
   let validationGateStatus = null;
   let artifactPacketId = null;
   let artifactPacketFile = null;
+  let verifySummaryFile = null;
+  let verifyStepResultFiles = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -377,34 +359,27 @@ function executeImplementedCommand(command, flags, cwd) {
   } else if (command === "project verify") {
     ensureRequiredFlags(command, flags);
 
-    const verifyInit = initializeProjectRuntime({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    });
-
-    resolvedProjectRef = verifyInit.projectRoot;
-    resolvedRuntimeRoot = verifyInit.runtimeRoot;
-    runtimeLayout = verifyInit.runtimeLayout;
-    runtimeStateFile = verifyInit.stateFile;
-    projectProfileRef = verifyInit.projectProfileRef;
-
     validationGateEnforced = resolveOptionalBooleanFlag(
       "require-validation-pass",
       flags["require-validation-pass"],
     );
 
-    if (validationGateEnforced) {
-      const gateReportPath = path.join(verifyInit.runtimeLayout.reportsRoot, "validation-report.json");
-      validationGateStatus = readValidationReportStatus(gateReportPath);
+    const verifyResult = verifyProjectRuntime({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      requireValidationPass: validationGateEnforced,
+    });
 
-      if (validationGateStatus === "fail") {
-        throw new CliUsageError(
-          `Validation gate blocked verify flow because '${gateReportPath}' has status 'fail'.`,
-        );
-      }
-    }
+    resolvedProjectRef = verifyResult.projectRoot;
+    resolvedRuntimeRoot = verifyResult.runtimeRoot;
+    runtimeLayout = verifyResult.runtimeLayout;
+    runtimeStateFile = verifyResult.stateFile;
+    projectProfileRef = verifyResult.projectProfileRef;
+    validationGateStatus = verifyResult.validationGateStatus;
+    verifySummaryFile = verifyResult.verifySummaryPath;
+    verifyStepResultFiles = verifyResult.stepResultFiles;
   } else {
     ensureRequiredFlags(command, flags);
 
@@ -446,6 +421,8 @@ function executeImplementedCommand(command, flags, cwd) {
     validation_gate_status: validationGateStatus,
     artifact_packet_id: artifactPacketId,
     artifact_packet_file: artifactPacketFile,
+    verify_summary_file: verifySummaryFile,
+    step_result_files: verifyStepResultFiles,
     contract_families: resolvedFamilies,
     command_catalog_alignment: "docs/architecture/14-cli-command-catalog.md",
   };

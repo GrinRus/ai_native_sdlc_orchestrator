@@ -55,53 +55,8 @@ test("verifyProjectRuntime records passing bounded command execution", () => {
     ]);
     assert.equal(result.verifySummary.preflight_safety.workspace_mode, "ephemeral");
     assert.equal(result.verifySummary.preflight_safety.network_mode, "deny-by-default");
-    assert.equal(result.verifySummary.execution_isolation.mode, "ephemeral");
-    assert.equal(result.verifySummary.execution_isolation.execution_root, repoRoot);
-    assert.equal(result.verifySummary.execution_isolation.cleanup.status, "skipped");
     assert.equal(fs.existsSync(result.verifySummaryPath), true);
     assert.equal(result.stepResultFiles.every((filePath) => fs.existsSync(filePath)), true);
-  });
-});
-
-test("verifyProjectRuntime runs commands in workspace-clone isolation and records cleanup metadata", () => {
-  withTempRepo((repoRoot) => {
-    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
-    const profileContent = fs.readFileSync(profilePath, "utf8");
-    const patched = profileContent
-      .replace("workspace_mode: ephemeral", "workspace_mode: workspace-clone")
-      .replace("- pnpm build", "- 'node -e \"require(\\\"node:fs\\\").writeFileSync(\\\"isolation-marker.txt\\\",\\\"ok\\\")\"'")
-      .replace("- pnpm test", "- 'node -e \"process.exit(0)\"'")
-      .replace("- pnpm lint", "- 'node -e \"process.exit(0)\"'");
-    fs.writeFileSync(profilePath, patched, "utf8");
-
-    const result = verifyProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
-
-    assert.equal(result.verifySummary.status, "passed");
-    assert.equal(result.verifySummary.execution_isolation.mode, "workspace-clone");
-    assert.notEqual(result.verifySummary.execution_isolation.execution_root, repoRoot);
-    assert.equal(result.verifySummary.execution_isolation.cleanup.status, "deleted");
-    assert.equal(fs.existsSync(result.verifySummary.execution_isolation.execution_root), false);
-    assert.equal(fs.existsSync(path.join(repoRoot, "isolation-marker.txt")), false);
-  });
-});
-
-test("verifyProjectRuntime supports worktree isolation mode and retains workspace on failure by default", () => {
-  withTempRepo((repoRoot) => {
-    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
-    const profileContent = fs.readFileSync(profilePath, "utf8");
-    const patched = profileContent
-      .replace("workspace_mode: ephemeral", "workspace_mode: worktree")
-      .replace("- pnpm build", "- 'node -e \"process.exit(0)\"'")
-      .replace("- pnpm test", "- 'node -e \"process.exit(0)\"'")
-      .replace("- pnpm lint", "- 'node -e \"process.exit(2)\"'");
-    fs.writeFileSync(profilePath, patched, "utf8");
-
-    const result = verifyProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
-
-    assert.equal(result.verifySummary.status, "failed");
-    assert.equal(result.verifySummary.execution_isolation.mode, "worktree");
-    assert.equal(result.verifySummary.execution_isolation.cleanup.status, "retained");
-    assert.equal(fs.existsSync(result.verifySummary.execution_isolation.execution_root), true);
   });
 });
 

@@ -96,6 +96,27 @@ test("project verify resolves runtime root and contract metadata", () => {
     assert.equal(parsed.resolved_project_ref, projectRoot);
     assert.equal(parsed.resolved_runtime_root, path.join(projectRoot, ".aor"));
     assert.equal(parsed.command_catalog_alignment, "docs/architecture/14-cli-command-catalog.md");
+    assert.equal(fs.existsSync(parsed.verify_summary_file), true);
+    assert.ok(Array.isArray(parsed.step_result_files));
+    assert.ok(parsed.step_result_files.length > 0);
+    assert.ok(parsed.step_result_files.every((filePath) => fs.existsSync(filePath)));
+    const verifySummary = JSON.parse(fs.readFileSync(parsed.verify_summary_file, "utf8"));
+    assert.deepEqual(verifySummary.preflight_safety.sequence, [
+      "clone",
+      "inspect",
+      "analyze",
+      "validate",
+      "verify",
+      "stop",
+    ]);
+    assert.equal(verifySummary.preflight_safety.workspace_mode, "ephemeral");
+    assert.equal(verifySummary.preflight_safety.network_mode, "deny-by-default");
+    assert.ok(Array.isArray(verifySummary.command_owners));
+    assert.ok(verifySummary.command_owners.includes("main"));
+    assert.equal(verifySummary.reusable_by.bootstrap_rehearsal, true);
+    assert.equal(verifySummary.reusable_by.quality_rehearsal, true);
+    assert.equal(verifySummary.reusable_by.delivery_rehearsal, true);
+    assert.equal(verifySummary.reusable_by.source_runbook, "docs/ops/live-e2e-no-write-preflight.md");
 
     assert.deepEqual(parsed.contract_families, [
       {

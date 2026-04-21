@@ -19,7 +19,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S01 — Bootstrap CLI shell and command contracts
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Define the first stable command surface for bootstrap work without yet implementing the full control plane.
 - **Primary modules:** `apps/cli`, `docs/architecture/14-cli-command-catalog.md`, `docs/contracts/**`
 - **Hard dependencies:** W0-S01, W0-S02
@@ -143,7 +143,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S05 — Project verify flow and bounded preflight execution
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** done
+- **State:** ready
 - **Outcome:** Prove that a target project is runnable under bounded local rules before orchestration attempts delivery work.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `packages/observability`
 - **Hard dependencies:** W1-S03, W1-S04, W0-S05
@@ -205,7 +205,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S07 — Wave ticket and handoff packet foundation
 - **Epic:** EPIC-2 Packet lifecycle
-- **State:** done
+- **State:** ready
 - **Outcome:** Establish the durable approval boundary that later execution work will consume.
 - **Primary modules:** `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**`
 - **Hard dependencies:** W1-S04, W1-S06

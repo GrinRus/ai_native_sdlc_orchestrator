@@ -89,6 +89,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "resolved_runtime_root",
       "validation_gate_enforced",
       "validation_gate_status",
+      "verify_summary_file",
+      "step_result_files",
       "contract_families",
       "command_catalog_alignment",
     ],
