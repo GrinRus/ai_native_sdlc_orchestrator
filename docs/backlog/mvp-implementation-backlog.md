@@ -25,7 +25,7 @@ This is the master index for the implementation slices across all defined waves.
 | W1-S02 | Project init and profile loading runtime | EPIC-1 | done | `apps/cli`, `packages/contracts`, `packages/orchestrator-core` | W1-S01 |
 | W1-S03 | Project analysis engine and durable analysis report | EPIC-1 | done | `packages/orchestrator-core`, `packages/contracts`, `apps/cli` | W1-S02 |
 | W1-S04 | Deterministic project validate flow | EPIC-4 | done | `packages/contracts`, `packages/orchestrator-core`, `apps/cli` | W1-S02, W0-S03 |
-| W1-S05 | Project verify flow and bounded preflight execution | EPIC-1 | ready | `packages/orchestrator-core`, `apps/cli`, `packages/observability` | W1-S03, W1-S04, W0-S05 |
+| W1-S05 | Project verify flow and bounded preflight execution | EPIC-1 | done | `packages/orchestrator-core`, `apps/cli`, `packages/observability` | W1-S03, W1-S04, W0-S05 |
 | W1-S06 | Runtime store and artifact packet materialization | EPIC-2 | done | `packages/orchestrator-core`, `packages/contracts`, `apps/cli` | W1-S02 |
 | W1-S07 | Wave ticket and handoff packet foundation | EPIC-2 | ready | `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**` | W1-S04, W1-S06 |
 | W1-S08 | Bootstrap end-to-end rehearsal | EPIC-7 | blocked | `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W1-S03, W1-S04, W1-S05, W1-S07 |

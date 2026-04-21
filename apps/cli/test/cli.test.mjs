@@ -215,6 +215,85 @@ test("project validate writes validation report with deterministic status", () =
   });
 });
 
+test("handoff prepare materializes wave-ticket and pending handoff packet", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const result = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
+    assert.equal(result.exitCode, 0, result.stderr);
+
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.command, "handoff prepare");
+    assert.equal(typeof parsed.wave_ticket_id, "string");
+    assert.equal(fs.existsSync(parsed.wave_ticket_file), true);
+    assert.equal(parsed.handoff_status, "pending-approval");
+    assert.equal(fs.existsSync(parsed.handoff_packet_file), true);
+    assert.equal(parsed.handoff_approval_state.state, "pending");
+
+    const handoffPacket = JSON.parse(fs.readFileSync(parsed.handoff_packet_file, "utf8"));
+    assert.equal(typeof handoffPacket.writeback_mode, "string");
+    assert.equal(typeof handoffPacket.scope_constraints, "object");
+    assert.equal(handoffPacket.command_policy.owner, "project-profile");
+  });
+});
+
+test("project validate enforces approved handoff gate when required", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const prepareResult = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
+    assert.equal(prepareResult.exitCode, 0, prepareResult.stderr);
+    const prepared = JSON.parse(prepareResult.stdout);
+
+    const validateBeforeApproval = invokeCli([
+      "project",
+      "validate",
+      "--project-ref",
+      projectRoot,
+      "--require-approved-handoff",
+      "--handoff-packet",
+      prepared.handoff_packet_file,
+    ]);
+    assert.equal(validateBeforeApproval.exitCode, 0, validateBeforeApproval.stderr);
+    const beforePayload = JSON.parse(validateBeforeApproval.stdout);
+    assert.equal(beforePayload.handoff_gate_status, "fail");
+    assert.equal(beforePayload.handoff_gate_blocking, true);
+    assert.equal(beforePayload.validation_status, "fail");
+
+    const approveResult = invokeCli([
+      "handoff",
+      "approve",
+      "--project-ref",
+      projectRoot,
+      "--handoff-packet",
+      prepared.handoff_packet_file,
+      "--approval-ref",
+      "approval://APP-1001",
+    ]);
+    assert.equal(approveResult.exitCode, 0, approveResult.stderr);
+    const approved = JSON.parse(approveResult.stdout);
+    assert.equal(approved.handoff_status, "approved");
+    assert.equal(approved.handoff_approval_state.state, "approved");
+
+    const validateAfterApproval = invokeCli([
+      "project",
+      "validate",
+      "--project-ref",
+      projectRoot,
+      "--require-approved-handoff",
+      "--handoff-packet",
+      prepared.handoff_packet_file,
+    ]);
+    assert.equal(validateAfterApproval.exitCode, 0, validateAfterApproval.stderr);
+    const afterPayload = JSON.parse(validateAfterApproval.stdout);
+    assert.equal(afterPayload.handoff_gate_status, "pass");
+    assert.equal(afterPayload.handoff_gate_blocking, false);
+    assert.notEqual(afterPayload.validation_status, "fail");
+  });
+});
+
 test("project verify refuses to continue when validation gate is enforced and status is fail", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });

@@ -2,6 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { getContractFamilyIndex } from "../../../packages/contracts/src/index.mjs";
+import {
+  approveHandoffArtifacts,
+  prepareHandoffArtifacts,
+} from "../../../packages/orchestrator-core/src/handoff-packets.mjs";
 import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { validateProjectRuntime } from "../../../packages/orchestrator-core/src/project-validate.mjs";
@@ -107,12 +111,25 @@ function formatCommandHelp(definition) {
             "- --project-profile can override default profile discovery in project root.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
             "- Validation report status can be pass, warn, or fail.",
+            "- --require-approved-handoff enforces approved handoff gate for execution-style readiness.",
           ]
       : definition.command === "project verify"
         ? [
             "- --project-ref must point to an existing directory.",
             "- --require-validation-pass enforces validation gate before verify can proceed.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+          ]
+      : definition.command === "handoff prepare"
+        ? [
+            "- --project-ref must point to an existing directory.",
+            "- --approved-artifact defaults to bootstrap artifact packet under runtime artifacts root.",
+            "- The generated handoff packet is pending approval until 'handoff approve' runs.",
+          ]
+      : definition.command === "handoff approve"
+        ? [
+            "- --approval-ref is required and becomes machine-checkable approval evidence.",
+            "- --handoff-packet is optional and defaults to bootstrap handoff packet path.",
+            "- Approval sets handoff status to approved for downstream execution validation gates.",
           ]
       : [
           "- --project-ref must point to an existing directory.",
@@ -300,6 +317,15 @@ function executeImplementedCommand(command, flags, cwd) {
   let validationBlocking = null;
   let validationGateEnforced = false;
   let validationGateStatus = null;
+  let handoffGateEnforced = false;
+  let handoffGateStatus = null;
+  let handoffGateBlocking = null;
+  let handoffPacketFile = null;
+  let handoffPacketId = null;
+  let handoffStatus = null;
+  let handoffApprovalState = null;
+  let waveTicketId = null;
+  let waveTicketFile = null;
   let artifactPacketId = null;
   let artifactPacketFile = null;
   let verifySummaryFile = null;
@@ -339,12 +365,18 @@ function executeImplementedCommand(command, flags, cwd) {
     analysisReportFile = analyzeResult.reportPath;
   } else if (command === "project validate") {
     ensureRequiredFlags(command, flags);
+    handoffGateEnforced = resolveOptionalBooleanFlag(
+      "require-approved-handoff",
+      flags["require-approved-handoff"],
+    );
 
     const validateResult = validateProjectRuntime({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      requireApprovedHandoff: handoffGateEnforced,
+      handoffPacketPath: resolveOptionalStringFlag("handoff-packet", flags["handoff-packet"]),
     });
 
     resolvedProjectRef = validateResult.projectRoot;
@@ -356,6 +388,9 @@ function executeImplementedCommand(command, flags, cwd) {
     validationReportFile = validateResult.validationReportPath;
     validationStatus = validateResult.report.status;
     validationBlocking = validateResult.blocking;
+    handoffGateStatus = validateResult.handoffGateStatus;
+    handoffGateBlocking = validateResult.handoffGateBlocking;
+    handoffPacketFile = validateResult.handoffPacketFile;
   } else if (command === "project verify") {
     ensureRequiredFlags(command, flags);
 
@@ -380,6 +415,53 @@ function executeImplementedCommand(command, flags, cwd) {
     validationGateStatus = verifyResult.validationGateStatus;
     verifySummaryFile = verifyResult.verifySummaryPath;
     verifyStepResultFiles = verifyResult.stepResultFiles;
+  } else if (command === "handoff prepare") {
+    ensureRequiredFlags(command, flags);
+
+    const prepareResult = prepareHandoffArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      ticketId: resolveOptionalStringFlag("ticket-id", flags["ticket-id"]),
+      approvedArtifactPath: resolveOptionalStringFlag("approved-artifact", flags["approved-artifact"]),
+    });
+
+    resolvedProjectRef = prepareResult.projectRoot;
+    resolvedRuntimeRoot = prepareResult.runtimeRoot;
+    runtimeLayout = prepareResult.runtimeLayout;
+    runtimeStateFile = prepareResult.stateFile;
+    projectProfileRef = prepareResult.projectProfileRef;
+    waveTicketId = prepareResult.waveTicket.ticket_id;
+    waveTicketFile = prepareResult.waveTicketFile;
+    handoffPacketId = prepareResult.handoffPacket.packet_id;
+    handoffPacketFile = prepareResult.handoffPacketFile;
+    handoffStatus = prepareResult.handoffPacket.status;
+    handoffApprovalState = prepareResult.handoffPacket.approval_state;
+  } else if (command === "handoff approve") {
+    ensureRequiredFlags(command, flags);
+    const approvalRef = resolveOptionalStringFlag("approval-ref", flags["approval-ref"]);
+    if (!approvalRef) {
+      throw new CliUsageError("Missing required flag '--approval-ref' for 'aor handoff approve'.");
+    }
+
+    const approveResult = approveHandoffArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      handoffPacketPath: resolveOptionalStringFlag("handoff-packet", flags["handoff-packet"]),
+      approvalRef,
+    });
+
+    resolvedProjectRef = approveResult.projectRoot;
+    resolvedRuntimeRoot = approveResult.runtimeRoot;
+    runtimeLayout = approveResult.runtimeLayout;
+    runtimeStateFile = approveResult.stateFile;
+    projectProfileRef = approveResult.projectProfileRef;
+    handoffPacketId = approveResult.handoffPacket.packet_id;
+    handoffPacketFile = approveResult.handoffPacketFile;
+    handoffStatus = approveResult.handoffPacket.status;
+    handoffApprovalState = approveResult.handoffPacket.approval_state;
   } else {
     ensureRequiredFlags(command, flags);
 
@@ -419,6 +501,15 @@ function executeImplementedCommand(command, flags, cwd) {
     validation_blocking: validationBlocking,
     validation_gate_enforced: validationGateEnforced,
     validation_gate_status: validationGateStatus,
+    handoff_gate_enforced: handoffGateEnforced,
+    handoff_gate_status: handoffGateStatus,
+    handoff_gate_blocking: handoffGateBlocking,
+    handoff_packet_id: handoffPacketId,
+    handoff_packet_file: handoffPacketFile,
+    handoff_status: handoffStatus,
+    handoff_approval_state: handoffApprovalState,
+    wave_ticket_id: waveTicketId,
+    wave_ticket_file: waveTicketFile,
     artifact_packet_id: artifactPacketId,
     artifact_packet_file: artifactPacketFile,
     verify_summary_file: verifySummaryFile,

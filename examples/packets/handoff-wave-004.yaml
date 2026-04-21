@@ -19,6 +19,19 @@ allowed_paths:
 allowed_commands:
   - pnpm lint
   - pnpm test
+scope_constraints:
+  max_changed_files: 18
+  enforce_repo_scope: true
+  require_validation_pass: true
+command_policy:
+  owner: planner
+  allow_unlisted_commands: false
+writeback_mode: pull-request
+approval_state:
+  required: true
+  state: approved
+  approval_refs:
+    - approval://APP-882
 required_artifacts:
   - docs/architecture/10-multirepo-and-governance.md
   - docs/contracts/project-profile.md

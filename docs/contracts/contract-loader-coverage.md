@@ -7,8 +7,8 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Core packets and profiles | `project-profile.md` | `project-profile` | `examples/project*.aor.yaml` | implemented | Required fields + top-level type checks. |
 | Core packets and profiles | `project-analysis-report.md` | `project-analysis-report` | `examples/project-analysis-report.sample.yaml` | implemented | Required fields + top-level type checks. |
 | Core packets and profiles | `artifact-packet.md` | `artifact-packet` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
-| Core packets and profiles | `wave-ticket.md` | `wave-ticket` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
-| Core packets and profiles | `handoff-packet.md` | `handoff-packet` | `examples/packets/handoff-*.yaml` | implemented | Required fields + top-level type checks. |
+| Core packets and profiles | `wave-ticket.md` | `wave-ticket` | `examples/packets/wave-ticket-*.yaml` | implemented | Required fields + top-level type checks. |
+| Core packets and profiles | `handoff-packet.md` | `handoff-packet` | `examples/packets/handoff-*.yaml` | implemented | Required fields + top-level type checks, including approval-state and writeback boundary fields. |
 | Core packets and profiles | `release-packet.md` | `release-packet` | `examples/packets/release-*.yaml` | implemented | Required fields + top-level type checks. |
 | Core packets and profiles | `delivery-manifest.md` | `delivery-manifest` | `examples/delivery-manifest*.yaml` | implemented | Required fields + top-level type checks. |
 | Core packets and profiles | `incident-report.md` | `incident-report` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |

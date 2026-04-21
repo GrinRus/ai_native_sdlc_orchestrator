@@ -6,6 +6,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { analyzeProjectRuntime } from "../src/project-analysis.mjs";
+import { approveHandoffArtifacts, prepareHandoffArtifacts } from "../src/handoff-packets.mjs";
 import { validateProjectRuntime } from "../src/project-validate.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -65,5 +66,52 @@ test("validateProjectRuntime emits fail status for unsafe writeback policy", () 
       ),
       "expected writeback-safety validator to fail",
     );
+  });
+});
+
+test("validateProjectRuntime fails when approved handoff is required but packet is unapproved", () => {
+  withTempRepo((repoRoot) => {
+    const prepared = prepareHandoffArtifacts({ projectRef: repoRoot, cwd: repoRoot });
+    const result = validateProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      requireApprovedHandoff: true,
+      handoffPacketPath: prepared.handoffPacketFile,
+    });
+
+    assert.equal(result.report.status, "fail");
+    assert.equal(result.handoffGateStatus, "fail");
+    assert.equal(result.handoffGateBlocking, true);
+    assert.ok(
+      result.report.validators.some(
+        (validator) =>
+          validator.validator_id === "handoff-approval-gate" && validator.status === "fail",
+      ),
+    );
+  });
+});
+
+test("validateProjectRuntime passes handoff approval gate after explicit approval", () => {
+  withTempRepo((repoRoot) => {
+    const prepared = prepareHandoffArtifacts({ projectRef: repoRoot, cwd: repoRoot });
+    approveHandoffArtifacts({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      handoffPacketPath: prepared.handoffPacketFile,
+      approvalRef: "approval://APP-2049",
+      approvedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    analyzeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const result = validateProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      requireApprovedHandoff: true,
+      handoffPacketPath: prepared.handoffPacketFile,
+    });
+
+    assert.notEqual(result.report.status, "fail");
+    assert.equal(result.handoffGateStatus, "pass");
+    assert.equal(result.handoffGateBlocking, false);
   });
 });

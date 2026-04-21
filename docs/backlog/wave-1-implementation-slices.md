@@ -143,7 +143,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S05 — Project verify flow and bounded preflight execution
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** ready
+- **State:** done
 - **Outcome:** Prove that a target project is runnable under bounded local rules before orchestration attempts delivery work.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `packages/observability`
 - **Hard dependencies:** W1-S03, W1-S04, W0-S05

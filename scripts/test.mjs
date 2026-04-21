@@ -242,6 +242,7 @@ console.log("cli tests ok: bootstrap command contracts, parsing, and help output
 
 const orchestratorCoreTests = [
   path.join(root, "packages/orchestrator-core/test/project-init.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/handoff-packets.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/project-analysis.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/project-validate.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/project-verify.test.mjs"),

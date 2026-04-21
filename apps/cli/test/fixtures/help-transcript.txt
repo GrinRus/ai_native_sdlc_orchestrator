@@ -5,14 +5,14 @@ Implemented bootstrap commands (W1-S01):
   - aor project analyze
   - aor project validate
   - aor project verify
+  - aor handoff prepare
+  - aor handoff approve
 
 Planned commands (not implemented yet):
   - aor intake create
   - aor discovery run
   - aor spec build
   - aor wave create
-  - aor handoff prepare
-  - aor handoff approve
   - aor run start
   - aor run pause
   - aor run resume

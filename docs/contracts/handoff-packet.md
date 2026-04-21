@@ -15,9 +15,15 @@ Approved execution boundary for runner-backed work. It defines allowed repos, pa
 - `allowed_paths`
 - `allowed_commands`
 - `verification_plan`
+- `scope_constraints`
+- `command_policy`
+- `writeback_mode`
+- `approval_state`
 
 ## Notes
 A handoff packet is the formal approval boundary for implementation work.
+`approval_state` must be machine-checkable and distinguish `pending` from `approved`.
+`writeback_mode`, `scope_constraints`, and `command_policy` keep downstream execution bounded.
 
 ## Example
 See `examples/packets/handoff-wave-004.yaml`.
