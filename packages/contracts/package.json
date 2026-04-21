@@ -1,0 +1,17 @@
+{
+  "name": "@aor/contracts",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.mjs",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.mjs",
+      "types": "./src/index.d.ts"
+    }
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  }
+}

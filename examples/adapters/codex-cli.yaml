@@ -12,6 +12,10 @@ capabilities:
   live_logs: true
   mcp_tools: true
   subagents: true
+constraints:
+  requires_local_runtime: true
+  default_network_mode: deny-by-default
+  supports_no_write_rehearsal: true
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true

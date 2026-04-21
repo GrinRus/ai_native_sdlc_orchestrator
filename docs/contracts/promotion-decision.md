@@ -13,3 +13,10 @@ Durable decision record that moves a platform asset or route between draft, cand
 
 ## Notes
 Promotion decisions should always point to certification evidence and approver context when needed.
+
+For MVP validation, `from_channel` and `to_channel` use this closed set:
+- `draft`
+- `candidate`
+- `stable`
+- `frozen`
+- `demoted`

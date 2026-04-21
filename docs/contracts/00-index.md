@@ -29,3 +29,6 @@
 - `live-run-event.md`
 - `live-e2e-profile.md`
 - `control-plane-api.md`
+
+## Loader coverage
+See `contract-loader-coverage.md` for the contract-to-loader mapping table and current limitation status.

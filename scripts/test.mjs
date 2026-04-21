@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -109,3 +110,15 @@ for (const file of waveFiles) {
 }
 
 console.log(`backlog consistency ok: ${waveSliceIds.length} slices across ${waveFiles.length} waves`);
+
+const contractsTestPath = path.join(root, "packages/contracts/test/contracts-loader.test.mjs");
+const contractsTestRun = spawnSync(process.execPath, ["--test", contractsTestPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (contractsTestRun.status !== 0) {
+  process.exit(contractsTestRun.status ?? 1);
+}
+
+console.log("contracts loader tests ok: coverage, validation, and index mapping");

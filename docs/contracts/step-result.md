@@ -14,3 +14,11 @@ Normalized output of one step regardless of whether that step was an artifact, p
 
 ## Notes
 Step results make routing, validation, and quality logic consistent across the lifecycle.
+
+For MVP validation, `step_class` is a closed set:
+- `artifact`
+- `planner`
+- `runner`
+- `repair`
+- `eval`
+- `harness`
