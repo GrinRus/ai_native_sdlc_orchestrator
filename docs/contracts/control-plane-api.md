@@ -62,6 +62,16 @@ Reconnect and backpressure baseline:
 - bounded replay window (do not allow unbounded buffers);
 - preserve monotonic per-run event ordering via payload sequence.
 
+## API/UI alignment notes (W5-S04 baseline)
+- The detachable web console reads run and evidence state from the same query families used by CLI:
+  - run list: `GET /api/projects/:projectId/runs`;
+  - run detail packets and evidence: `GET /api/projects/:projectId/packets`, `GET /api/projects/:projectId/step-results`, `GET /api/projects/:projectId/quality-artifacts`.
+- Live follow in web mode reuses the same stream endpoint and parameters:
+  - `GET /api/projects/:projectId/runs/:runId/events?after_event_id=...&max_replay=...`.
+- Detach behavior is UI-local only:
+  - detaching unsubscribes the web listener;
+  - active runs and runtime artifacts remain owned by orchestrator runtime, not by UI process.
+
 ## Key design rules
 - keep the API usable without the web UI;
 - keep ids and references visible in responses;

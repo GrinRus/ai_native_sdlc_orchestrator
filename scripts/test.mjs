@@ -255,6 +255,20 @@ if (apiTestRun.status !== 0) {
 
 console.log("api tests ok: control-plane read surface smoke endpoints");
 
+const webTests = [
+  path.join(root, "apps/web/test/operator-console.test.mjs"),
+];
+const webTestRun = spawnSync(process.execPath, ["--test", ...webTests], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (webTestRun.status !== 0) {
+  process.exit(webTestRun.status ?? 1);
+}
+
+console.log("web tests ok: detachable operator console baseline smoke paths");
+
 const providerRoutingTests = [
   path.join(root, "packages/provider-routing/test/route-resolution.test.mjs"),
 ];
