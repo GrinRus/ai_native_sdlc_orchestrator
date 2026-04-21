@@ -36,6 +36,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--route-overrides <step=route_id,...> (optional)",
+      "--policy-overrides <step=policy_id,...> (optional)",
       "--help",
     ],
     outputs: [
@@ -47,6 +48,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "route_resolution_steps",
       "asset_resolution_file",
       "asset_resolution_steps",
+      "policy_resolution_file",
+      "policy_resolution_steps",
       "contract_families",
       "command_catalog_alignment",
     ],

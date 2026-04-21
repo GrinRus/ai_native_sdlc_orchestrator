@@ -50,7 +50,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S02 — Wrapper, prompt-bundle, and asset loader runtime
 - **Epic:** EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Load wrappers and prompt bundles as first-class runtime assets instead of embedding prompts directly in code paths.
 - **Primary modules:** `packages/orchestrator-core`, `packages/contracts`, `examples/wrappers/**`, `examples/prompts/**`
 - **Hard dependencies:** W2-S01

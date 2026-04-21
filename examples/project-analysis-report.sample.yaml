@@ -53,6 +53,30 @@ asset_resolution:
         wrapper_ref: wrapper.planner.default@v1
       prompt_bundle:
         prompt_bundle_ref: prompt-bundle://planner-default@v1
+policy_resolution:
+  policies_root: examples/policies
+  applied_overrides: {}
+  matrix:
+    - step_class: planning
+      route:
+        resolved_route_id: route.plan.default
+      policy:
+        policy_id: policy.step.planner.default
+      resolved_bounds:
+        budget:
+          max_cost_usd: 4
+          timeout_sec: 300
+        retry:
+          max_attempts: 1
+          on:
+            - provider-timeout
+        command_constraints:
+          allowed_commands:
+            - pnpm lint
+            - pnpm test
+            - pnpm build
+        writeback_mode:
+          mode: pull-request
 service_boundaries:
   - service_id: api
     paths:

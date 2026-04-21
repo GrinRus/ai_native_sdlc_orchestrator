@@ -190,6 +190,8 @@ test("project analyze writes durable analysis report under runtime root", () => 
       projectRoot,
       "--route-overrides",
       "planning=route.plan.default",
+      "--policy-overrides",
+      "planning=policy.step.planner.default",
     ]);
 
     assert.equal(result.exitCode, 0, result.stderr);
@@ -203,18 +205,27 @@ test("project analyze writes durable analysis report under runtime root", () => 
     assert.equal(fs.existsSync(parsed.asset_resolution_file), true);
     assert.ok(Array.isArray(parsed.asset_resolution_steps));
     assert.equal(parsed.asset_resolution_steps.length, 10);
+    assert.equal(fs.existsSync(parsed.policy_resolution_file), true);
+    assert.ok(Array.isArray(parsed.policy_resolution_steps));
+    assert.equal(parsed.policy_resolution_steps.length, 10);
     const planningRoute = parsed.route_resolution_steps.find((step) => step.step_class === "planning");
     assert.ok(planningRoute);
     assert.equal(planningRoute.resolution_source.kind, "step-override");
     const planningAssets = parsed.asset_resolution_steps.find((step) => step.step_class === "planning");
     assert.ok(planningAssets);
     assert.equal(planningAssets.wrapper.wrapper_ref, "wrapper.planner.default@v1");
+    const planningPolicy = parsed.policy_resolution_steps.find((step) => step.step_class === "planning");
+    assert.ok(planningPolicy);
+    assert.equal(planningPolicy.policy.policy_id, "policy.step.planner.default");
+    assert.equal(planningPolicy.policy.resolution_source.kind, "step-override");
+    assert.equal(planningPolicy.resolved_bounds.writeback_mode.mode, "pull-request");
 
     const report = JSON.parse(fs.readFileSync(parsed.analysis_report_file, "utf8"));
     assert.equal(report.project_id, "aor-core");
     assert.equal(report.status, "ready-for-bootstrap");
     assert.equal(report.route_resolution.matrix.length, 10);
     assert.equal(report.asset_resolution.matrix.length, 10);
+    assert.equal(report.policy_resolution.matrix.length, 10);
   });
 });
 

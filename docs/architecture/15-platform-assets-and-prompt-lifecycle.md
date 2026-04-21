@@ -40,3 +40,15 @@ Asset resolution for a step is deterministic and follows this order:
 4. emit one asset bundle with route, wrapper, prompt bundle, and provenance refs.
 
 If any source is missing or conflicts with the step class, resolution fails before execution.
+
+## Policy loading order and guardrails (W2-S03)
+Policy resolution is deterministic and runs before any adapter invocation:
+1. resolve route for the step (`project default` or `step override`);
+2. resolve step policy id (`step override` first, then `project default` by route class);
+3. merge bounds in one path:
+   - budget and timeout: `route constraints` then `project budget defaults`;
+   - command constraints: `policy command constraints`, otherwise `route constraints`, otherwise `project repo command allowlist`;
+   - write-back mode: `policy override`, then `route constraints`, then `project writeback defaults`;
+4. persist guardrails (`approval_required`, allowlist enforcement, redaction, blocking rules) into step planning metadata.
+
+Any missing or conflicting required policy source must fail deterministically before runner execution starts.
