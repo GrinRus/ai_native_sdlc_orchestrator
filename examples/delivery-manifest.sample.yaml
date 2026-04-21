@@ -3,6 +3,7 @@ project_id: aor-core
 ticket_id: WAVE-004
 run_refs:
   - RUN-101
+step_ref: RUN-101:delivery.apply
 delivery_mode: pull-request
 execution_isolation:
   mode: workspace-clone
@@ -37,4 +38,17 @@ repo_deliveries:
 verification_refs:
   - evidence://reports/RUN-101/tests.xml
   - evidence://evaluation/RUN-101/release-suite.json
+approval_context:
+  approved_handoff:
+    status: present
+    ref: evidence://packets/handoff-wave-004.yaml
+  promotion_evidence:
+    status: present
+    refs:
+      - evidence://packets/promotion-decision-wrapper-pass.yaml
+evidence_root: /workspace/aor-core/.aor/projects/aor-core/reports
+source_refs:
+  delivery_plan_ref: evidence://packets/delivery-plan-implement-fork-first-pr.yaml
+  delivery_transcript_ref: evidence://reports/delivery-transcript-fork-first-pr-run-101.json
 status: submitted
+created_at: '2026-04-21T14:20:00.000Z'

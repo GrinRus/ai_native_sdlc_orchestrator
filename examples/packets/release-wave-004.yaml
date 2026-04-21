@@ -10,6 +10,17 @@ impacted_repos:
 verification_refs:
   - evidence://reports/RUN-101/tests.xml
   - evidence://evaluation/RUN-101/release-suite.json
+delivery_manifest_ref: evidence://release/REL-004/delivery-manifest.yaml
+evidence_lineage:
+  handoff_refs:
+    - evidence://packets/handoff-wave-004.yaml
+  promotion_refs:
+    - evidence://packets/promotion-decision-wrapper-pass.yaml
+  execution_refs:
+    - evidence://reports/step-result-routed-implement.json
+    - evidence://reports/delivery-transcript-fork-first-pr-run-101.json
+  delivery_output_refs:
+    - evidence://release/REL-004/delivery-manifest.yaml
 residual_risks:
   - Runtime implementation is still scaffold-only.
 rollback_notes: >
@@ -17,4 +28,4 @@ rollback_notes: >
 signoff_refs:
   - approval://APP-910
 status: ready-for-close
-delivery_manifest_ref: evidence://release/REL-004/delivery-manifest.yaml
+created_at: '2026-04-21T14:21:00.000Z'

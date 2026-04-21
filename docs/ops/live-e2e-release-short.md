@@ -58,6 +58,18 @@ aor live-e2e start   --profile ./examples/live-e2e/release-short.yaml
 - delivery manifest exists;
 - write-back target is patch, local branch, or fork.
 
+## Post-run artifact inspection
+Inspect the latest materialized artifacts:
+```bash
+ls -1 .aor/projects/<project_id>/artifacts/delivery-manifest-*.json | tail -n 1
+ls -1 .aor/projects/<project_id>/artifacts/release-packet-*.json | tail -n 1
+```
+Confirm delivery lineage and approval context:
+```bash
+jq '.delivery_mode, .approval_context, .repo_deliveries[0].changed_paths' <delivery-manifest-file>
+jq '.delivery_manifest_ref, .evidence_lineage' <release-packet-file>
+```
+
 Evidence fixtures for W4-S03 baseline:
 - `examples/live-e2e/fixtures/w4-s03/delivery-patch.sample.patch`
 - `examples/live-e2e/fixtures/w4-s03/delivery-local-branch-transcript.sample.json`
