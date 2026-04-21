@@ -13,9 +13,6 @@ export const DEFAULT_PATHS = {
     "docs/backlog/wave-3-implementation-slices.md",
     "docs/backlog/wave-4-implementation-slices.md",
     "docs/backlog/wave-5-implementation-slices.md",
-    "docs/backlog/wave-6-implementation-slices.md",
-    "docs/backlog/wave-7-implementation-slices.md",
-    "docs/backlog/wave-8-implementation-slices.md",
   ],
 };
 

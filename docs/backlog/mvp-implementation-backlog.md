@@ -14,7 +14,7 @@ This is the master index for the implementation slices across all defined waves.
 | W0-S01 | Workspace and package build baseline | EPIC-0 | ready | root workspace files, `apps/**`, `packages/**` | none |
 | W0-S02 | Contracts package and schema loader baseline | EPIC-0 | done | `packages/contracts`, `docs/contracts/**`, `examples/**` | W0-S01 |
 | W0-S03 | Example and reference integrity checks | EPIC-0 | done | `packages/contracts`, `examples/**`, root validation scripts | W0-S02 |
-| W0-S04 | Agent guidance and backlog workflow baseline | EPIC-0 | ready | root `AGENTS.md`, `docs/backlog/**`, `.agents/skills/**` | none |
+| W0-S04 | Agent guidance and backlog workflow baseline | EPIC-0 | done | root `AGENTS.md`, `docs/backlog/**`, `.agents/skills/**` | none |
 | W0-S05 | Live E2E profile registry and no-write preflight | EPIC-7 | blocked | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/orchestrator-core` | W0-S02, W0-S03 |
 | W0-S06 | Repository CI and acceptance gates | EPIC-0 | blocked | root CI config, validation scripts, `docs/**`, community health files | W0-S01, W0-S03, W0-S04, W0-S05 |
 

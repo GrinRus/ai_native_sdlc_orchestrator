@@ -219,6 +219,18 @@ if (contractsTestRun.status !== 0) {
 
 console.log("contracts loader tests ok: coverage, validation, and index mapping");
 
+const sliceCycleTestsPath = path.join(root, "scripts/test/slice-cycle.test.mjs");
+const sliceCycleTestRun = spawnSync(process.execPath, ["--test", sliceCycleTestsPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (sliceCycleTestRun.status !== 0) {
+  process.exit(sliceCycleTestRun.status ?? 1);
+}
+
+console.log("slice cycle tests ok: selection, state sync, and plan extraction");
+
 const referenceIntegrityCheckPath = path.join(root, "scripts/reference-integrity.mjs");
 const referenceIntegrityRun = spawnSync(process.execPath, [referenceIntegrityCheckPath], {
   cwd: root,
