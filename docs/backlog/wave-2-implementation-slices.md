@@ -112,7 +112,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S04 — Adapter SDK and mock adapter baseline
 - **Epic:** EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Create a runner-agnostic adapter surface that can start with deterministic mocks before real providers are wired in.
 - **Primary modules:** `packages/adapter-sdk`, `packages/orchestrator-core`, `examples/adapters/**`
 - **Hard dependencies:** W2-S01
@@ -143,7 +143,7 @@ Introduce the first real routed execution path across routes, wrappers, prompt b
 
 ## W2-S05 — Routed step execution engine and durable step results
 - **Epic:** EPIC-3 Routed execution
-- **State:** done
+- **State:** ready
 - **Outcome:** Execute routed steps end to end in bounded mode and persist normalized step results with asset and policy provenance.
 - **Primary modules:** `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `packages/adapter-sdk`
 - **Hard dependencies:** W2-S02, W2-S03, W2-S04, W1-S06

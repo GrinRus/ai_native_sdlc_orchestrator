@@ -129,6 +129,37 @@ test("project verify resolves runtime root and contract metadata", () => {
   });
 });
 
+test("project verify supports routed dry-run smoke execution and durable routed step-result output", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const result = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--routed-dry-run-step",
+      "implement",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(typeof parsed.routed_step_result_id, "string");
+    assert.equal(fs.existsSync(parsed.routed_step_result_file), true);
+    assert.ok(parsed.step_result_files.includes(parsed.routed_step_result_file));
+
+    const routedStepResult = JSON.parse(fs.readFileSync(parsed.routed_step_result_file, "utf8"));
+    assert.equal(routedStepResult.step_class, "runner");
+    assert.equal(routedStepResult.status, "passed");
+    assert.equal(routedStepResult.routed_execution.mode, "dry-run");
+    assert.equal(routedStepResult.routed_execution.no_write_enforced, true);
+    assert.equal(routedStepResult.routed_execution.route_resolution.step_class, "implement");
+    assert.equal(routedStepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
+    assert.equal(routedStepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
+  });
+});
+
 test("project init discovers repo root from cwd and materializes runtime layout idempotently", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });

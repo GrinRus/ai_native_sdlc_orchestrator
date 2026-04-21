@@ -10,6 +10,7 @@ import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/p
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { validateProjectRuntime } from "../../../packages/orchestrator-core/src/project-validate.mjs";
 import { verifyProjectRuntime } from "../../../packages/orchestrator-core/src/project-verify.mjs";
+import { executeRoutedStep } from "../../../packages/orchestrator-core/src/step-execution-engine.mjs";
 
 import {
   RUNTIME_ROOT_DIRNAME,
@@ -120,6 +121,7 @@ function formatCommandHelp(definition) {
         ? [
             "- --project-ref must point to an existing directory.",
             "- --require-validation-pass enforces validation gate before verify can proceed.",
+            "- --routed-dry-run-step executes one routed dry-run step and writes a durable step-result artifact.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
           ]
       : definition.command === "handoff prepare"
@@ -423,6 +425,8 @@ function executeImplementedCommand(command, flags, cwd) {
   let artifactPacketFile = null;
   let verifySummaryFile = null;
   let verifyStepResultFiles = null;
+  let routedStepResultId = null;
+  let routedStepResultFile = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -518,6 +522,22 @@ function executeImplementedCommand(command, flags, cwd) {
     validationGateStatus = verifyResult.validationGateStatus;
     verifySummaryFile = verifyResult.verifySummaryPath;
     verifyStepResultFiles = verifyResult.stepResultFiles;
+
+    const routedDryRunStep = resolveOptionalStringFlag("routed-dry-run-step", flags["routed-dry-run-step"]);
+    if (routedDryRunStep) {
+      const routedResult = executeRoutedStep({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        stepClass: routedDryRunStep,
+        dryRun: true,
+      });
+
+      routedStepResultId = routedResult.stepResultId;
+      routedStepResultFile = routedResult.stepResultPath;
+      verifyStepResultFiles = [...verifyResult.stepResultFiles, routedResult.stepResultPath];
+    }
   } else if (command === "handoff prepare") {
     ensureRequiredFlags(command, flags);
 
@@ -623,6 +643,8 @@ function executeImplementedCommand(command, flags, cwd) {
     artifact_packet_file: artifactPacketFile,
     verify_summary_file: verifySummaryFile,
     step_result_files: verifyStepResultFiles,
+    routed_step_result_id: routedStepResultId,
+    routed_step_result_file: routedStepResultFile,
     contract_families: resolvedFamilies,
     command_catalog_alignment: "docs/architecture/14-cli-command-catalog.md",
   };
