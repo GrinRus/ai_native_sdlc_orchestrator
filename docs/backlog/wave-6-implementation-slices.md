@@ -1,19 +1,17 @@
 # W6 implementation slices
 
 ## Wave objective
-Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, delivery/release preparation, incident/audit operations, and context-aware routed execution foundations.
+Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, delivery/release preparation, and incident/audit operations.
 
 ## Wave exit criteria
 - backlog tooling and consistency checks can schedule and validate `W6+` slices without manual wave-list edits
 - planned intake/discovery/spec/wave commands are implemented with contract-backed artifacts
 - run control commands are implemented with explicit policy and audit semantics
-- routed execution compiles deterministic working context and injects non-empty context/input refs into adapter requests
 - UI attach/detach commands preserve headless-first operation while enabling controlled web lifecycle
 - delivery/release prepare commands and incident/audit commands produce durable evidence linked to runs
 
 ## Parallel start and sequencing notes
 - `W6-S01` must land first because all subsequent slices depend on post-W5 backlog tooling support.
-- `W6-S07` can progress in parallel with command-pack slices after `W6-S01` and routed-execution baseline dependencies are satisfied.
 - `W6-S04`, `W6-S05`, and `W6-S06` can progress in parallel after `W6-S03` is complete.
 - Keep each command pack traceable to its target user-story cluster and contract family.
 
@@ -109,40 +107,6 @@ Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, 
 ### Out of scope
 - UI attach/detach command lifecycle
 - delivery/release and incident command packs
-
----
-
-## W6-S07 — Prompt/context compiler and skill-injected adapter context kernel
-- **Epic:** EPIC-3 Routed execution
-- **State:** ready
-- **Outcome:** Upgrade deterministic asset resolution into a working-context compiler that injects compiled context and resolved packet refs into adapter requests.
-- **Primary modules:** `packages/orchestrator-core`, `packages/contracts`, `packages/harness`, `apps/cli`, `docs/contracts/**`, `examples/skills/**`
-- **Hard dependencies:** W6-S01, W2-S05, W3-S01
-- **Primary user-story surfaces:** delivery engineer, AI platform owner, reviewer / QA
-
-### Local tasks
-1. Add context-compiler runtime that composes prompt instructions, wrapper bootstrap, required-input resolution, guardrails, and provenance.
-2. Add first-class skill profile contract/registry and deterministic selection (project defaults by route class, step-level overrides by route step).
-3. Inject non-empty `context` and resolved `input_packet_refs` into adapter request envelopes for routed dry-run execution.
-4. Extend step-result diagnostics and harness compatibility metadata with compiled-context fingerprint and skill refs.
-5. Add contract/unit/integration/CLI smoke coverage for missing-input, missing-skill, and incompatible-skill deterministic failures.
-
-### Acceptance criteria
-1. Routed dry-run execution writes adapter requests with non-empty `context` and non-empty `input_packet_refs`.
-2. Context compilation fails deterministically on missing required inputs, missing skill refs, and incompatible skill step class.
-3. `step-result.routed_execution.context_compilation` includes included sources, dropped sources with reasons, and compiled-context fingerprint.
-4. Harness replay blocks on compiled-context compatibility drift and reports mismatch fields explicitly.
-5. Contracts/docs/examples stay aligned for `skill-profile` and project skill-ref fields.
-
-### Done evidence
-- routed step-result fixture with context-compilation diagnostics
-- contract and reference-integrity tests covering skill refs
-- harness compatibility tests covering context fingerprint drift
-- CLI smoke transcript for `project verify --routed-dry-run-step implement`
-
-### Out of scope
-- provider-specific prompt formatting inside orchestrator core
-- package-manager/registry supply-chain governance and publish workflows
 
 ---
 

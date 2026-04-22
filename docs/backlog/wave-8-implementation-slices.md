@@ -84,11 +84,11 @@ Close later-maturity user stories for strategic operator visibility, governance 
 - **State:** blocked
 - **Outcome:** Add later-stage route/policy governance required for delivery and security maturity stories.
 - **Primary modules:** `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**`
-- **Hard dependencies:** W6-S03, W6-S07, W7-S05
+- **Hard dependencies:** W6-S03, W7-S05
 - **Primary user-story surfaces:** delivery engineer, security / compliance
 
 ### Local tasks
-1. Add stronger route governance checks for high-risk delivery operations on top of compiled-context diagnostics from W6-S07.
+1. Add stronger route governance checks for high-risk delivery operations.
 2. Extend policy resolution to expose explicit denial and escalation reasoning.
 3. Align security docs with later-stage governance semantics.
 4. Add tests for stricter allowlist/redaction/escalation paths.
@@ -115,11 +115,11 @@ Close later-maturity user stories for strategic operator visibility, governance 
 - **State:** blocked
 - **Outcome:** Expand operator event and policy-inspection surfaces for later SRE maturity stories.
 - **Primary modules:** `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**`
-- **Hard dependencies:** W6-S03, W6-S07, W7-S05
+- **Hard dependencies:** W6-S03, W7-S05
 - **Primary user-story surfaces:** operator / SRE
 
 ### Local tasks
-1. Extend run/event visibility to include later-stage policy decision context and context-compilation metadata from W6-S07.
+1. Extend run/event visibility to include later-stage policy decision context.
 2. Add operator query paths for route/policy history on selected runs.
 3. Update ops docs for later-stage troubleshooting flow.
 4. Add smoke tests for enriched event/policy visibility.
@@ -146,11 +146,11 @@ Close later-maturity user stories for strategic operator visibility, governance 
 - **State:** blocked
 - **Outcome:** Close later QA and AI platform stories with stronger baseline comparison and regression triage coverage.
 - **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**`
-- **Hard dependencies:** W6-S07, W7-S01, W7-S02
+- **Hard dependencies:** W7-S01, W7-S02
 - **Primary user-story surfaces:** reviewer / QA, AI platform owner
 
 ### Local tasks
-1. Expand suite comparison semantics for later-stage baseline governance, including compiled-context fingerprint and skill-ref compatibility.
+1. Expand suite comparison semantics for later-stage baseline governance.
 2. Add richer regression triage metadata for QA and platform owners.
 3. Update quality docs and examples to reflect the expanded comparison model.
 4. Add tests for baseline drift, flaky handling, and controlled promotion outcomes.

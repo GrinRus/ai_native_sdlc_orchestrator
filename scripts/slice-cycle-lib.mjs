@@ -6,15 +6,49 @@ export const VALID_STATES = new Set(["ready", "blocked", "active", "done"]);
 export const DEFAULT_PATHS = {
   masterBacklog: "docs/backlog/mvp-implementation-backlog.md",
   dependencyGraph: "docs/backlog/slice-dependency-graph.md",
-  waveFiles: [
-    "docs/backlog/wave-0-implementation-slices.md",
-    "docs/backlog/wave-1-implementation-slices.md",
-    "docs/backlog/wave-2-implementation-slices.md",
-    "docs/backlog/wave-3-implementation-slices.md",
-    "docs/backlog/wave-4-implementation-slices.md",
-    "docs/backlog/wave-5-implementation-slices.md",
-  ],
+  backlogDir: "docs/backlog",
 };
+
+export function discoverWaveFiles(rootDir) {
+  const backlogDir = path.join(rootDir, DEFAULT_PATHS.backlogDir);
+  const entries = fs
+    .readdirSync(backlogDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .map((name) => {
+      const match = /^wave-(\d+)-implementation-slices\.md$/.exec(name);
+      if (!match) return null;
+      return {
+        waveIndex: Number(match[1]),
+        name,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.waveIndex !== b.waveIndex) return a.waveIndex - b.waveIndex;
+      return a.name.localeCompare(b.name);
+    });
+
+  if (entries.length === 0) {
+    throw new Error("Could not find any wave implementation documents under docs/backlog/.");
+  }
+
+  if (entries[0].waveIndex !== 0) {
+    throw new Error("Wave documents must start at wave-0-implementation-slices.md.");
+  }
+
+  for (let index = 1; index < entries.length; index += 1) {
+    const previous = entries[index - 1];
+    const current = entries[index];
+    if (current.waveIndex !== previous.waveIndex + 1) {
+      throw new Error(
+        `Wave document numbering gap detected between ${previous.name} and ${current.name}.`,
+      );
+    }
+  }
+
+  return entries.map((entry) => path.posix.join(DEFAULT_PATHS.backlogDir, entry.name));
+}
 
 function ensureState(state, context) {
   if (!VALID_STATES.has(state)) {
@@ -189,13 +223,14 @@ export function parseWaveSlices(content, waveFile) {
 export function loadBacklogModel(rootDir) {
   const masterBacklogContent = readMarkdown(rootDir, DEFAULT_PATHS.masterBacklog);
   const dependencyGraphContent = readMarkdown(rootDir, DEFAULT_PATHS.dependencyGraph);
+  const waveFiles = discoverWaveFiles(rootDir);
 
   const masterSlices = parseMasterBacklog(masterBacklogContent);
   const dependencyRows = parseDependencyRows(dependencyGraphContent);
   const order = parseTopologicalOrder(dependencyGraphContent);
 
   const waveSlices = new Map();
-  for (const waveFile of DEFAULT_PATHS.waveFiles) {
+  for (const waveFile of waveFiles) {
     const waveContent = readMarkdown(rootDir, waveFile);
     const parsedWaveSlices = parseWaveSlices(waveContent, waveFile);
     for (const [sliceId, waveSlice] of parsedWaveSlices.entries()) {
@@ -277,6 +312,7 @@ export function loadBacklogModel(rootDir) {
 
   return {
     rootDir,
+    waveFiles,
     order,
     orderIndex,
     slices,
