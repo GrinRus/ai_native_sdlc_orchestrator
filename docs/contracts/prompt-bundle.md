@@ -13,7 +13,7 @@ First-class guidance asset for a step class. It defines role instructions, prior
 
 ## Notes
 Prompt bundles should stay lightweight, versioned, and independently certifiable.
-Runtime asset resolution should use wrapper `prompt_bundle_ref` unless a step-level prompt override is provided.
+Runtime asset resolution should use `project-profile.default_prompt_bundles.<step>` unless a step-level prompt override is provided.
 
 ## Example
 See `examples/prompts/*.yaml`.

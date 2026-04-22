@@ -25,7 +25,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 
 **Slices by wave:**
 - **W2:** `W2-S01` Route registry and step resolution kernel; `W2-S02` Wrapper, prompt-bundle, and asset loader runtime; `W2-S03` Step policy resolution, budgets, and guardrails; `W2-S04` Adapter SDK and mock adapter baseline; `W2-S05` Routed step execution engine and durable step results
-- **W8:** `W8-S03` Later delivery and security route-governance maturity
+- **W8:** `W8-S03` Later delivery and security route-governance maturity; `W8-S08` Runtime context compiler and adapter-context injection
 
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -34,7 +34,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W1:** `W1-S04` Deterministic project validate flow
 - **W3:** `W3-S01` Validation kernel generalization and asset graph checks; `W3-S02` Dataset and evaluation suite registry; `W3-S03` Eval runner and scorer interface; `W3-S04` Harness capture and replay runtime; `W3-S05` Certification and promotion decision baseline
 - **W7:** `W7-S01` Governance quality guardrails and evidence parity; `W7-S02` AI platform promotion/freeze maturity pack
-- **W8:** `W8-S05` Later QA and AI platform baseline comparison maturity
+- **W8:** `W8-S05` Later QA and AI platform baseline comparison maturity; `W8-S09` Context asset lifecycle and quality-gated update flow
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.

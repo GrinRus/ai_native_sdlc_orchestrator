@@ -186,19 +186,26 @@ function resolveAssetBundleForStepWithRegistry(options) {
     );
   }
 
+  const defaultPromptBundles = asRecord(profile.default_prompt_bundles);
   const promptBundleOverrides = asRecord(options.promptBundleOverrides ?? {});
   const promptOverrideRef = promptBundleOverrides[options.stepClass];
+  const defaultPromptRef = defaultPromptBundles[options.stepClass];
   const wrapperPromptRef = wrapperEntry.profile.prompt_bundle_ref;
+  const usePromptOverride = typeof promptOverrideRef === "string" && promptOverrideRef.length > 0;
+  const useProjectDefault = typeof defaultPromptRef === "string" && defaultPromptRef.length > 0;
+  const useLegacyWrapperPrompt = typeof wrapperPromptRef === "string" && wrapperPromptRef.length > 0;
   const promptBundleRef =
-    typeof promptOverrideRef === "string" && promptOverrideRef.length > 0
+    usePromptOverride
       ? promptOverrideRef
-      : typeof wrapperPromptRef === "string" && wrapperPromptRef.length > 0
+      : useProjectDefault
+        ? defaultPromptRef
+        : useLegacyWrapperPrompt
         ? wrapperPromptRef
         : null;
 
   if (!promptBundleRef) {
     throw new Error(
-      `Asset resolution failed for step '${options.stepClass}': wrapper '${wrapperRef}' has no prompt_bundle_ref and no step-level prompt override was provided.`,
+      `Asset resolution failed for step '${options.stepClass}': missing prompt bundle source in step override and default_prompt_bundles.${options.stepClass}.`,
     );
   }
 
@@ -234,20 +241,25 @@ function resolveAssetBundleForStepWithRegistry(options) {
         wrapper_id: wrapperEntry.profile.wrapper_id,
         version: wrapperEntry.profile.version,
         step_class: wrapperEntry.profile.step_class,
-        prompt_bundle_ref: wrapperEntry.profile.prompt_bundle_ref,
+        prompt_bundle_ref:
+          typeof wrapperEntry.profile.prompt_bundle_ref === "string" ? wrapperEntry.profile.prompt_bundle_ref : null,
       },
     },
     prompt_bundle: {
       prompt_bundle_ref: promptBundleRef,
       resolution_source: {
         kind:
-          typeof promptOverrideRef === "string" && promptOverrideRef.length > 0
+          usePromptOverride
             ? "step-override"
-            : "wrapper-default",
+            : useProjectDefault
+              ? "project-default"
+              : "wrapper-default-legacy",
         field:
-          typeof promptOverrideRef === "string" && promptOverrideRef.length > 0
+          usePromptOverride
             ? `prompt_bundle_overrides.${options.stepClass}`
-            : "wrapper.prompt_bundle_ref",
+            : useProjectDefault
+              ? `default_prompt_bundles.${options.stepClass}`
+              : "wrapper.prompt_bundle_ref",
       },
       profile_source: promptEntry.source,
       profile: {

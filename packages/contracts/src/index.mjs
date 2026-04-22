@@ -1178,6 +1178,117 @@ export function validateExampleReferences(options = {}) {
         }
       }
 
+      const defaultPromptBundles = document.default_prompt_bundles;
+      if (isPlainObject(defaultPromptBundles)) {
+        for (const [key, rawValue] of Object.entries(defaultPromptBundles)) {
+          checkedReferences += 1;
+          const field = `default_prompt_bundles.${key}`;
+          const reference = asReferenceString(rawValue, { issues, source, field });
+          if (!reference || isExternalReference(reference)) continue;
+          if (!isPromptBundleRef(reference)) {
+            issues.push(
+              referenceIssue({
+                code: "reference_format_invalid",
+                source,
+                field,
+                reference,
+                expected: "prompt-bundle://prompt_bundle_id@vN",
+                actual: reference,
+                message: `Field '${field}' must use prompt-bundle://prompt_bundle_id@vN format.`,
+              }),
+            );
+            continue;
+          }
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing prompt-bundle://prompt_bundle_id@vN",
+            expectedFamily: "prompt-bundle",
+            expectedSet: registry.promptBundleRefs,
+            registry,
+          });
+
+          const promptBundle = registry.promptBundlesByRef.get(reference);
+          if (!promptBundle?.stepClass || !isPlainObject(defaultRouteProfiles)) continue;
+          const routeRefValue = defaultRouteProfiles[key];
+          if (typeof routeRefValue !== "string") continue;
+          const routeProfile = registry.routeProfilesById.get(routeRefValue);
+          if (!routeProfile?.routeClass) continue;
+          checkedCompatibility += 1;
+          if (promptBundle.stepClass === routeProfile.routeClass) continue;
+          issues.push(
+            referenceIssue({
+              code: "reference_target_incompatible",
+              source,
+              field,
+              reference,
+              expected: `prompt bundle step_class '${routeProfile.routeClass}'`,
+              actual: promptBundle.stepClass,
+              message: `Step '${key}' maps to route class '${routeProfile.routeClass}', which is incompatible with prompt bundle '${reference}' step_class '${promptBundle.stepClass}'.`,
+            }),
+          );
+        }
+      }
+
+      const defaultContextBundles = document.default_context_bundles;
+      if (isPlainObject(defaultContextBundles)) {
+        for (const [key, rawValue] of Object.entries(defaultContextBundles)) {
+          const references = asStringArray(rawValue, {
+            issues,
+            source,
+            field: `default_context_bundles.${key}`,
+          });
+          references.forEach((reference, index) => {
+            checkedReferences += 1;
+            const field = `default_context_bundles.${key}[${index}]`;
+            if (isExternalReference(reference)) return;
+            if (!isContextBundleRef(reference)) {
+              issues.push(
+                referenceIssue({
+                  code: "reference_format_invalid",
+                  source,
+                  field,
+                  reference,
+                  expected: "context-bundle://context_bundle_id@vN",
+                  actual: reference,
+                  message: `Field '${field}' must use context-bundle://context_bundle_id@vN format.`,
+                }),
+              );
+              return;
+            }
+            validateReferenceTarget({
+              issues,
+              source,
+              field,
+              reference,
+              expected: "existing context-bundle://context_bundle_id@vN",
+              expectedFamily: "context-bundle",
+              expectedSet: registry.contextBundleRefs,
+              registry,
+            });
+
+            const contextBundle = registry.contextBundlesByRef.get(reference);
+            if (!contextBundle || contextBundle.steps.size === 0) return;
+            checkedCompatibility += 1;
+            if (contextBundle.steps.has(key)) return;
+            const actual = [...contextBundle.steps].sort().join(", ");
+            issues.push(
+              referenceIssue({
+                code: "reference_target_incompatible",
+                source,
+                field,
+                reference,
+                expected: `context bundle includes step '${key}'`,
+                actual: actual.length > 0 ? actual : "no applies_to.steps",
+                message: `Context bundle '${reference}' is selected for step '${key}' but does not include it in applies_to.steps.`,
+              }),
+            );
+          });
+        }
+      }
+
       const defaultStepPolicies = document.default_step_policies;
       if (isPlainObject(defaultStepPolicies)) {
         for (const [key, rawValue] of Object.entries(defaultStepPolicies)) {
@@ -1284,55 +1395,6 @@ export function validateExampleReferences(options = {}) {
 
     if (result.family === "provider-route-profile") {
       checkedReferences += 1;
-      const field = "wrapper_profile_ref";
-      const reference = asReferenceString(document.wrapper_profile_ref, { issues, source, field });
-      if (reference && !isExternalReference(reference)) {
-        if (!isVersionedRef(reference)) {
-          issues.push(
-            referenceIssue({
-              code: "reference_format_invalid",
-              source,
-              field,
-              reference,
-              expected: "wrapper_id@vN",
-              actual: reference,
-              message: "wrapper_profile_ref must use wrapper_id@vN format.",
-            }),
-          );
-        } else {
-          validateReferenceTarget({
-            issues,
-            source,
-            field,
-            reference,
-            expected: "existing wrapper_id@vN",
-            expectedFamily: "wrapper-profile",
-            expectedSet: registry.wrapperRefs,
-            registry,
-          });
-
-          const wrapperProfile = registry.wrapperProfilesByRef.get(reference);
-          const routeClass = typeof document.route_class === "string" ? document.route_class : null;
-          if (wrapperProfile?.stepClass && routeClass) {
-            checkedCompatibility += 1;
-            if (wrapperProfile.stepClass !== routeClass) {
-              issues.push(
-                referenceIssue({
-                  code: "reference_target_incompatible",
-                  source,
-                  field,
-                  reference,
-                  expected: `wrapper step_class '${routeClass}'`,
-                  actual: wrapperProfile.stepClass,
-                  message: `Route class '${routeClass}' is incompatible with wrapper '${reference}' step_class '${wrapperProfile.stepClass}'.`,
-                }),
-              );
-            }
-          }
-        }
-      }
-
-      checkedReferences += 1;
       const primaryAdapterField = "primary.adapter";
       const primaryAdapterValue = isPlainObject(document.primary) ? document.primary.adapter : undefined;
       const primaryAdapterRef = asReferenceString(primaryAdapterValue, {
@@ -1414,57 +1476,6 @@ export function validateExampleReferences(options = {}) {
               message: `Adapter '${adapterRef.adapterId}' does not satisfy required route capabilities.`,
             }),
           );
-        }
-      }
-    }
-
-    if (result.family === "wrapper-profile") {
-      checkedReferences += 1;
-      const field = "prompt_bundle_ref";
-      const reference = asReferenceString(document.prompt_bundle_ref, { issues, source, field });
-      if (reference && !isExternalReference(reference)) {
-        if (!isPromptBundleRef(reference)) {
-          issues.push(
-            referenceIssue({
-              code: "reference_format_invalid",
-              source,
-              field,
-              reference,
-              expected: "prompt-bundle://prompt_bundle_id@vN",
-              actual: reference,
-              message: "prompt_bundle_ref must use prompt-bundle://prompt_bundle_id@vN format.",
-            }),
-          );
-        } else {
-          validateReferenceTarget({
-            issues,
-            source,
-            field,
-            reference,
-            expected: "existing prompt-bundle://prompt_bundle_id@vN",
-            expectedFamily: "prompt-bundle",
-            expectedSet: registry.promptBundleRefs,
-            registry,
-          });
-
-          const wrapperStepClass = typeof document.step_class === "string" ? document.step_class : null;
-          const promptBundle = registry.promptBundlesByRef.get(reference);
-          if (wrapperStepClass && promptBundle?.stepClass) {
-            checkedCompatibility += 1;
-            if (promptBundle.stepClass !== wrapperStepClass) {
-              issues.push(
-                referenceIssue({
-                  code: "reference_target_incompatible",
-                  source,
-                  field,
-                  reference,
-                  expected: `prompt bundle step_class '${wrapperStepClass}'`,
-                  actual: promptBundle.stepClass,
-                  message: `Wrapper step_class '${wrapperStepClass}' is incompatible with prompt bundle '${reference}' step_class '${promptBundle.stepClass}'.`,
-                }),
-              );
-            }
-          }
         }
       }
     }
@@ -1846,6 +1857,14 @@ function isPromptBundleRef(value) {
  * @param {string} value
  * @returns {boolean}
  */
+function isContextBundleRef(value) {
+  return /^context-bundle:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
 function isDatasetRef(value) {
   return /^dataset:\/\/[A-Za-z0-9._-]+@[^@\s]+$/.test(value);
 }
@@ -1947,11 +1966,13 @@ function extractRouteAdapterRefs(routeProfile) {
  *   suiteRefs: Set<string>,
  *   datasetRefs: Set<string>,
  *   liveE2eProfileRefs: Set<string>,
+ *   contextBundleRefs: Set<string>,
  *   promptBundleRefs: Set<string>,
  *   adapterIds: Set<string>,
- *   routeProfilesById: Map<string, { source: string, step: string | null, adapters: Array<{ field: string, adapterId: string }> }>,
+ *   routeProfilesById: Map<string, { source: string, step: string | null, routeClass: string | null, adapters: Array<{ field: string, adapterId: string }> }>,
  *   wrapperProfilesByRef: Map<string, { source: string, stepClass: string | null }>,
  *   policyProfilesById: Map<string, { source: string, stepClass: string | null }>,
+ *   contextBundlesByRef: Map<string, { source: string, steps: Set<string> }>,
  *   promptBundlesByRef: Map<string, { source: string, stepClass: string | null }>,
  *   datasetsByRef: Map<string, { source: string, subjectType: string | null }>,
  *   adapterProfilesById: Map<string, { source: string, capabilities: Set<string> }>,
@@ -1965,14 +1986,17 @@ function buildReferenceRegistry(results, workspaceRoot) {
   const suiteRefs = new Set();
   const datasetRefs = new Set();
   const liveE2eProfileRefs = new Set();
+  const contextBundleRefs = new Set();
   const promptBundleRefs = new Set();
   const adapterIds = new Set();
-  /** @type {Map<string, { source: string, step: string | null, adapters: Array<{ field: string, adapterId: string }> }>} */
+  /** @type {Map<string, { source: string, step: string | null, routeClass: string | null, adapters: Array<{ field: string, adapterId: string }> }>} */
   const routeProfilesById = new Map();
   /** @type {Map<string, { source: string, stepClass: string | null }>} */
   const wrapperProfilesByRef = new Map();
   /** @type {Map<string, { source: string, stepClass: string | null }>} */
   const policyProfilesById = new Map();
+  /** @type {Map<string, { source: string, steps: Set<string> }>} */
+  const contextBundlesByRef = new Map();
   /** @type {Map<string, { source: string, stepClass: string | null }>} */
   const promptBundlesByRef = new Map();
   /** @type {Map<string, { source: string, subjectType: string | null }>} */
@@ -1997,6 +2021,7 @@ function buildReferenceRegistry(results, workspaceRoot) {
           routeProfilesById.set(routeId, {
             source: result.source,
             step: typeof document.step === "string" ? document.step : null,
+            routeClass: typeof document.route_class === "string" ? document.route_class : null,
             adapters: extractRouteAdapterRefs(document),
           });
         }
@@ -2062,6 +2087,27 @@ function buildReferenceRegistry(results, workspaceRoot) {
         }
         break;
       }
+      case "context-bundle": {
+        const bundleId = document.context_bundle_id;
+        const version = document.version;
+        if (typeof bundleId === "string" && typeof version === "number") {
+          const bundleRef = `context-bundle://${bundleId}@v${version}`;
+          contextBundleRefs.add(bundleRef);
+          registerKnownReference(knownReferenceFamilies, bundleRef, "context-bundle");
+          const steps = isPlainObject(document.applies_to)
+            ? new Set(
+                Array.isArray(document.applies_to.steps)
+                  ? document.applies_to.steps.filter((step) => typeof step === "string")
+                  : [],
+              )
+            : new Set();
+          contextBundlesByRef.set(bundleRef, {
+            source: result.source,
+            steps,
+          });
+        }
+        break;
+      }
       case "prompt-bundle": {
         const bundleId = document.prompt_bundle_id;
         const version = document.version;
@@ -2110,11 +2156,13 @@ function buildReferenceRegistry(results, workspaceRoot) {
     suiteRefs,
     datasetRefs,
     liveE2eProfileRefs,
+    contextBundleRefs,
     promptBundleRefs,
     adapterIds,
     routeProfilesById,
     wrapperProfilesByRef,
     policyProfilesById,
+    contextBundlesByRef,
     promptBundlesByRef,
     datasetsByRef,
     adapterProfilesById,

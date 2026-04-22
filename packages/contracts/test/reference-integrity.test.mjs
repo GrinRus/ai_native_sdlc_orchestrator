@@ -50,10 +50,11 @@ test("reference integrity passes for current examples graph", () => {
   assert.ok(result.checkedCompatibility > 0, "expected validator to check at least one compatibility edge");
 });
 
-test("missing route wrapper reference fails with reference_target_missing", () => {
+test("missing default wrapper profile reference fails with reference_target_missing", () => {
   withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/routes/implement-default.yaml", (document) => {
-      document.wrapper_profile_ref = "wrapper.missing@v1";
+    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
+      const defaultWrapperProfiles = /** @type {Record<string, unknown>} */ (document.default_wrapper_profiles);
+      defaultWrapperProfiles.runner = "wrapper.missing@v1";
     });
 
     const result = validateExampleReferences({ workspaceRoot: tempRoot });
@@ -62,17 +63,18 @@ test("missing route wrapper reference fails with reference_target_missing", () =
     const issue = result.issues.find(
       (candidate) =>
         candidate.code === "reference_target_missing" &&
-        candidate.field === "wrapper_profile_ref" &&
+        candidate.field === "default_wrapper_profiles.runner" &&
         candidate.reference === "wrapper.missing@v1",
     );
     assert.ok(issue, "expected missing wrapper reference issue");
   });
 });
 
-test("missing wrapper prompt bundle reference fails with reference_target_missing", () => {
+test("missing default prompt bundle reference fails with reference_target_missing", () => {
   withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/wrappers/wrapper-runner-default.yaml", (document) => {
-      document.prompt_bundle_ref = "prompt-bundle://missing@v1";
+    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
+      const defaultPromptBundles = /** @type {Record<string, unknown>} */ (document.default_prompt_bundles);
+      defaultPromptBundles.implement = "prompt-bundle://missing@v1";
     });
 
     const result = validateExampleReferences({ workspaceRoot: tempRoot });
@@ -81,7 +83,7 @@ test("missing wrapper prompt bundle reference fails with reference_target_missin
     const issue = result.issues.find(
       (candidate) =>
         candidate.code === "reference_target_missing" &&
-        candidate.field === "prompt_bundle_ref" &&
+        candidate.field === "default_prompt_bundles.implement" &&
         candidate.reference === "prompt-bundle://missing@v1",
     );
     assert.ok(issue, "expected missing prompt bundle reference issue");
@@ -147,10 +149,11 @@ test("wrong-family suite ref fails with reference_target_type_mismatch", () => {
   });
 });
 
-test("route class and wrapper step_class mismatch fails with reference_target_incompatible", () => {
+test("route class and default wrapper profile step_class mismatch fails with reference_target_incompatible", () => {
   withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/routes/implement-default.yaml", (document) => {
-      document.route_class = "eval";
+    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
+      const defaultWrapperProfiles = /** @type {Record<string, unknown>} */ (document.default_wrapper_profiles);
+      defaultWrapperProfiles.runner = "wrapper.eval.default@v1";
     });
 
     const result = validateExampleReferences({ workspaceRoot: tempRoot });
@@ -159,17 +162,18 @@ test("route class and wrapper step_class mismatch fails with reference_target_in
     const issue = result.issues.find(
       (candidate) =>
         candidate.code === "reference_target_incompatible" &&
-        candidate.field === "wrapper_profile_ref" &&
-        candidate.reference === "wrapper.runner.default@v3",
+        candidate.field === "default_wrapper_profiles.runner" &&
+        candidate.reference === "wrapper.eval.default@v1",
     );
     assert.ok(issue, "expected route/wrapper step_class compatibility issue");
   });
 });
 
-test("wrapper and prompt bundle step_class mismatch fails with reference_target_incompatible", () => {
+test("route class and default prompt bundle step_class mismatch fails with reference_target_incompatible", () => {
   withTempWorkspace((tempRoot) => {
-    mutateYamlFile(tempRoot, "examples/prompts/runner-default.yaml", (document) => {
-      document.step_class = "eval";
+    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
+      const defaultPromptBundles = /** @type {Record<string, unknown>} */ (document.default_prompt_bundles);
+      defaultPromptBundles.implement = "prompt-bundle://eval-default@v1";
     });
 
     const result = validateExampleReferences({ workspaceRoot: tempRoot });
@@ -178,10 +182,10 @@ test("wrapper and prompt bundle step_class mismatch fails with reference_target_
     const issue = result.issues.find(
       (candidate) =>
         candidate.code === "reference_target_incompatible" &&
-        candidate.field === "prompt_bundle_ref" &&
-        candidate.reference === "prompt-bundle://runner-default@v3",
+        candidate.field === "default_prompt_bundles.implement" &&
+        candidate.reference === "prompt-bundle://eval-default@v1",
     );
-    assert.ok(issue, "expected wrapper/prompt step_class compatibility issue");
+    assert.ok(issue, "expected route/prompt step_class compatibility issue");
   });
 });
 

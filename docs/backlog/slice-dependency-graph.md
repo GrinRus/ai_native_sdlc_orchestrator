@@ -62,6 +62,8 @@ flowchart TB
   W8S05[W8-S05 Later QA and AI platform baseline comparison maturity]
   W8S06[W8-S06 Later incident and platform recertification maturity]
   W8S07[W8-S07 Later multi-repo, bootstrap, and delivery rerun maturity]
+  W8S08[W8-S08 Runtime context compiler and adapter-context injection]
+  W8S09[W8-S09 Context asset lifecycle and quality-gated update flow]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -161,8 +163,10 @@ flowchart TB
   W7S05 --> W8S02
   W6S03 --> W8S03
   W7S05 --> W8S03
+  W8S08 --> W8S03
   W6S03 --> W8S04
   W7S05 --> W8S04
+  W8S08 --> W8S04
   W7S01 --> W8S05
   W7S02 --> W8S05
   W7S03 --> W8S06
@@ -172,6 +176,11 @@ flowchart TB
   W6S02 --> W8S07
   W8S04 --> W8S07
   W8S06 --> W8S07
+  W6S03 --> W8S08
+  W7S05 --> W8S08
+  W8S08 --> W8S09
+  W7S02 --> W8S09
+  W8S05 --> W8S09
 ```
 
 ## W0 hard dependencies
@@ -260,11 +269,13 @@ flowchart TB
 |---|---|
 | W8-S01 | W7-S05 |
 | W8-S02 | W6-S02, W7-S05 |
-| W8-S03 | W6-S03, W7-S05 |
-| W8-S04 | W6-S03, W7-S05 |
+| W8-S03 | W6-S03, W7-S05, W8-S08 |
+| W8-S04 | W6-S03, W7-S05, W8-S08 |
 | W8-S05 | W7-S01, W7-S02 |
 | W8-S06 | W7-S03, W7-S04, W7-S05 |
 | W8-S07 | W6-S05, W6-S02, W8-S04, W8-S06 |
+| W8-S08 | W6-S03, W7-S05 |
+| W8-S09 | W8-S08, W7-S02, W8-S05 |
 
 ## Topological order
 1. W0-S01
@@ -319,10 +330,12 @@ flowchart TB
 50. W7-S05
 51. W8-S01
 52. W8-S02
-53. W8-S03
-54. W8-S04
-55. W8-S06
-56. W8-S07
+53. W8-S08
+54. W8-S03
+55. W8-S04
+56. W8-S06
+57. W8-S09
+58. W8-S07
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.
