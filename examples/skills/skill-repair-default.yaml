@@ -1,0 +1,22 @@
+skill_id: skill.repair.default
+version: 1
+step_class: repair
+summary: remediation workflow for bounded post-failure repair loops
+activation_hints:
+  - repair
+workflow:
+  - id: isolate-failure
+    instruction: identify failure cause and confirm required repair scope
+  - id: apply-minimal-fix
+    instruction: change only what is needed to address the cited failure
+  - id: revalidate
+    instruction: rerun required checks and capture remaining risk
+required_inputs:
+  packets:
+    - handoff
+    - validation-report
+expected_outputs:
+  - diff
+  - validation-report
+change_notes:
+  - baseline repair skill for context compiler

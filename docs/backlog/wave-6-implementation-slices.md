@@ -1,216 +1,238 @@
 # W6 implementation slices
 
 ## Wave objective
-Introduce a first-class runtime context foundation for compiled prompt/context flows across every step class and remove AGENTS/legacy leakage from the runtime model.
+Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, delivery/release preparation, incident/audit operations, and context-aware routed execution foundations.
 
 ## Wave exit criteria
-- backlog, roadmap, epic map, and dependency graph consistently distinguish development guidance from runtime context
-- runtime context asset families and registry roots are contract-defined and referenced by project profiles
-- prompt/context compilation is deterministic and no longer owned by wrapper profiles
-- routed execution, project analysis, step results, and harness captures carry prompt/context lineage through the dry-run/mock execution path
-- all step classes consume compiled prompt/context inputs and runtime references to `AGENTS.md`, `.agents/**`, and legacy aliases are removed
+- backlog tooling and consistency checks can schedule and validate `W6+` slices without manual wave-list edits
+- planned intake/discovery/spec/wave commands are implemented with contract-backed artifacts
+- run control commands are implemented with explicit policy and audit semantics
+- routed execution compiles deterministic working context and injects non-empty context/input refs into adapter requests
+- UI attach/detach commands preserve headless-first operation while enabling controlled web lifecycle
+- delivery/release prepare commands and incident/audit commands produce durable evidence linked to runs
 
 ## Parallel start and sequencing notes
-- `W6-S01` lands first because the rest of W6 depends on the rebased planning model and terminology.
-- `W6-S02` must close before compiler work starts; do not build a context compiler against the old wrapper-owned prompt model.
-- insert an explicit architecture review checkpoint after `W6-S02` closes and before `W6-S03` starts; confirm the singular ownership model for route, wrapper, prompt, and context before compiler implementation begins.
-- `W6-S06` lands last so legacy removal happens only after compiled-context flow integration is real across all step classes.
-- W6 proves compiled-context injection only through dry-run/mock adapter paths; live provider-backed execution remains out of scope for this wave.
+- `W6-S01` must land first because all subsequent slices depend on post-W5 backlog tooling support.
+- `W6-S07` can progress in parallel with command-pack slices after `W6-S01` and routed-execution baseline dependencies are satisfied.
+- `W6-S04`, `W6-S05`, and `W6-S06` can progress in parallel after `W6-S03` is complete.
+- Keep each command pack traceable to its target user-story cluster and contract family.
 
 ---
 
-## W6-S01 — Backlog and runtime-context terminology rebaseline
+## W6-S01 — Backlog and slice-cycle extensibility for W6+
 - **Epic:** EPIC-0 Repository development system
-- **State:** done
-- **Outcome:** Rebaseline W6-W8 shared planning around runtime context management and close the drift between implemented tooling and shared backlog language.
-- **Primary modules:** `docs/backlog/**`, `docs/product/**`, `docs/architecture/**`, `examples/project-analysis-report.sample.yaml`
+- **State:** ready
+- **Outcome:** Extend backlog planning and validation tooling so wave files beyond W5 participate in the normal slice loop.
+- **Primary modules:** `docs/backlog/**`, `scripts/**`
 - **Hard dependencies:** W5-S06
-- **Primary user-story surfaces:** architect / tech lead, engineering manager / planner, repository / multirepo owner
+- **Primary user-story surfaces:** engineering manager / planner, repository owner
 
 ### Local tasks
-1. Rewrite `mvp-roadmap`, `mvp-implementation-backlog`, `orchestrator-epics`, `slice-dependency-graph`, and the `W6-W8` wave docs around runtime context management instead of command-pack expansion.
-2. Update product and architecture source-of-truth docs to separate repository-development guidance from runtime context.
-3. Remove AGENTS-centric runtime language from project-analysis samples and supporting docs.
-4. Prove that slice tooling still parses the rebased backlog and selects the correct next slice.
+1. Update `slice-cycle` loader logic to discover wave files beyond W5.
+2. Update repo integrity scripts so backlog consistency checks include newly discovered wave files.
+3. Add W6-W8 planning docs and keep roadmap/backlog/graph/epic alignment deterministic.
+4. Prove that `pnpm slice:status` and `pnpm slice:next -- --json` can select W6 slices.
 
 ### Acceptance criteria
-1. Shared backlog docs agree on W6-W8 objectives, slice titles, hard dependencies, and wave exit criteria.
-2. Product and architecture docs state that `AGENTS.md` and `.agents/**` are development-only guidance and not runtime inputs.
-3. The project-analysis sample no longer recommends AGENTS-style runtime guidance.
-4. `pnpm slice:status` and `pnpm slice:next -- --json` stay coherent after the rebaseline.
-5. `pnpm slice:gate` passes with the rebased planning model.
+1. Backlog tooling discovers wave files dynamically and can parse W6-W8 slices.
+2. `pnpm slice:status` reports W6 slices and keeps state counts coherent.
+3. `pnpm slice:next -- --json` selects `W6-S01` as the next slice.
+4. Root gate remains green after the planning-tooling change.
 
 ### Done evidence
-- rebased `docs/backlog/**` planning set for W6-W8
-- updated product and architecture docs for runtime-context terminology
-- `pnpm slice:status`
-- `pnpm slice:next -- --json`
-- `pnpm slice:gate`
+- `pnpm slice:status` output with W6 slices
+- `pnpm slice:next -- --json` output selecting `W6-S01`
+- `pnpm slice:gate` passing output
 
 ### Out of scope
-- implementation of runtime context contracts or compiler logic
-- adapter-envelope or step-result schema changes
+- implementation of planned command handlers
+- runtime API behavior changes beyond tooling compatibility
 
 ---
 
-## W6-S02 — Context asset contracts and registry foundation
-- **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** done
-- **Outcome:** Define versioned runtime context asset families, committed registry roots, and a single ownership model for route, wrapper, prompt, and context defaults so project profiles become the only default source for runtime asset selection.
-- **Primary modules:** `docs/contracts/**`, `packages/contracts`, `packages/orchestrator-core`, `examples/context/**`
+## W6-S02 — Intake/discovery/spec/wave command pack
+- **Epic:** EPIC-6 Operator surface
+- **State:** blocked
+- **Outcome:** Implement `aor intake create`, `aor discovery run`, `aor spec build`, and `aor wave create` as durable command-surface flows.
+- **Primary modules:** `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**`
 - **Hard dependencies:** W6-S01
-- **Primary user-story surfaces:** architect / tech lead, project bootstrap / onboarding, AI platform owner
+- **Primary user-story surfaces:** product sponsor / owner, discovery / research, project bootstrap / onboarding
 
 ### Local tasks
-1. Add contract families for `context-doc`, `context-rule`, `context-skill`, `context-bundle`, and `compiled-context-artifact`.
-2. Extend project-profile contracts with committed asset roots plus `default_prompt_bundles` and `default_context_bundles` alongside the existing wrapper defaults.
-3. Remove `provider-route-profile.wrapper_profile_ref`, `wrapper.prompt_bundle_ref`, and `wrapper.session_bootstrap` from the target contract model and document the new ownership boundaries.
-4. Add example assets under committed AOR roots and wire the new project-profile refs plus context families into contract-loader and reference-integrity coverage.
+1. Implement the four planned command handlers with contract-backed output artifacts.
+2. Align command catalog docs and help semantics with runtime behavior.
+3. Add smoke tests and transcript fixtures for each new command.
+4. Verify story traceability for sponsor/discovery/bootstrap story IDs.
 
 ### Acceptance criteria
-1. The new context asset families are defined in source-of-truth contracts with committed example coverage.
-2. Project profiles can deterministically resolve wrapper, prompt, and context defaults without route-owned wrapper refs or wrapper-owned prompt refs.
-3. Loader and reference-integrity coverage can resolve the new project-profile refs and context asset graph from committed asset roots without treating legacy fields as supported runtime shape.
-4. Committed examples cover `context-doc`, `context-rule`, `context-skill`, `context-bundle`, and `compiled-context-artifact`.
-5. No runtime contract requires `AGENTS.md` or `.agents/**` as a context source.
+1. All four commands move from planned to implemented in the command catalog.
+2. Each command writes durable artifacts under `.aor/` with documented contract families.
+3. CLI help and docs match actual inputs/outputs and status semantics.
+4. Smoke tests cover success and required-flag failure paths.
 
 ### Done evidence
-- new context contract docs and examples
-- loader/reference-integrity coverage updates for context assets and new project-profile refs
-- project-profile examples referencing default prompt/context bundles
+- updated `command-catalog.mjs` and architecture catalog docs
+- CLI tests and command transcript fixtures
+- contract/packet artifact samples for intake/discovery/spec/wave flows
 
 ### Out of scope
-- prompt/context compilation logic
-- adapter-envelope changes
-- live adapter execution
+- run-control commands
+- delivery/release and incident/audit commands
 
 ---
 
-## W6-S03 — Prompt/context compiler kernel
+## W6-S03 — Run-control command pack with policy and audit guardrails
+- **Epic:** EPIC-6 Operator surface
+- **State:** blocked
+- **Outcome:** Implement `aor run start`, `pause`, `resume`, `steer`, and `cancel` with explicit policy gating and audit traces.
+- **Primary modules:** `apps/cli`, `apps/api`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`
+- **Hard dependencies:** W6-S01, W5-S03
+- **Primary user-story surfaces:** engineering manager / planner, delivery engineer, operator / SRE, security / compliance
+
+### Local tasks
+1. Implement run-control command handlers and shared API/control-plane integration.
+2. Enforce policy and approval checks before high-risk control actions.
+3. Emit auditable control events linked to run IDs and evidence roots.
+4. Add API/CLI smoke tests and fixtures for control transitions.
+
+### Acceptance criteria
+1. Run-control commands are implemented and callable through CLI with deterministic semantics.
+2. Policy/approval guardrails block unauthorized or out-of-scope control operations.
+3. Every control action emits durable audit evidence linked to the affected run.
+4. Tests cover command success, blocked operations, and invalid transition handling.
+
+### Done evidence
+- API and CLI tests for run-control lifecycle
+- control-event fixtures tied to run IDs
+- updated ops docs for start/pause/resume/steer/cancel semantics
+
+### Out of scope
+- UI attach/detach command lifecycle
+- delivery/release and incident command packs
+
+---
+
+## W6-S07 — Prompt/context compiler and skill-injected adapter context kernel
 - **Epic:** EPIC-3 Routed execution
 - **State:** ready
-- **Outcome:** Add a deterministic compiler kernel that assembles prompt bundles, selected runtime context assets, packet refs, and project-analysis facts into one bounded runtime artifact and owns compile policy.
-- **Primary modules:** `packages/context-engine`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**`
-- **Hard dependencies:** W6-S02
-- **Primary user-story surfaces:** AI platform owner, delivery engineer, security / compliance
+- **Outcome:** Upgrade deterministic asset resolution into a working-context compiler that injects compiled context and resolved packet refs into adapter requests.
+- **Primary modules:** `packages/orchestrator-core`, `packages/contracts`, `packages/harness`, `apps/cli`, `docs/contracts/**`, `examples/skills/**`
+- **Hard dependencies:** W6-S01, W2-S05, W3-S01
+- **Primary user-story surfaces:** delivery engineer, AI platform owner, reviewer / QA
 
 ### Local tasks
-1. Introduce `packages/context-engine` as the single compile point for prompt/context assembly.
-2. Formalize compile precedence across prompt bundle, always-on rules, predicate-selected docs/skills, packet refs, and project-analysis facts.
-3. Define deterministic budgeting, truncation, hash inputs, and the shape of `dropped_inputs`, then emit compiled-context artifacts with hashes, dropped inputs, budget decisions, and provenance refs.
-4. Document compiler semantics, fail-fast conditions for missing required packet/context sources, and the explicit exclusion of `AGENTS.md` and `.agents/**` from compile inputs.
+1. Add context-compiler runtime that composes prompt instructions, wrapper bootstrap, required-input resolution, guardrails, and provenance.
+2. Add first-class skill profile contract/registry and deterministic selection (project defaults by route class, step-level overrides by route step).
+3. Inject non-empty `context` and resolved `input_packet_refs` into adapter request envelopes for routed dry-run execution.
+4. Extend step-result diagnostics and harness compatibility metadata with compiled-context fingerprint and skill refs.
+5. Add contract/unit/integration/CLI smoke coverage for missing-input, missing-skill, and incompatible-skill deterministic failures.
 
 ### Acceptance criteria
-1. A shared compiler kernel exists and is the only supported path for prompt/context assembly and compile policy.
-2. The compile pipeline is deterministic for identical inputs and selections, including identical `compiled_prompt`, `compiled_context`, `prompt_hash`, and `context_hash`.
-3. Compiled-context artifacts persist selected assets, packet refs, dropped inputs, budget decisions, hashes, and provenance.
-4. Architecture and contract docs explain compile order, budgeting/truncation, hash inputs, and fail-fast conditions.
-5. Compiler inputs are limited to AOR-owned runtime assets, packet refs, and project-analysis facts; `AGENTS.md` and `.agents/**` are not compile sources.
+1. Routed dry-run execution writes adapter requests with non-empty `context` and non-empty `input_packet_refs`.
+2. Context compilation fails deterministically on missing required inputs, missing skill refs, and incompatible skill step class.
+3. `step-result.routed_execution.context_compilation` includes included sources, dropped sources with reasons, and compiled-context fingerprint.
+4. Harness replay blocks on compiled-context compatibility drift and reports mismatch fields explicitly.
+5. Contracts/docs/examples stay aligned for `skill-profile` and project skill-ref fields.
 
 ### Done evidence
-- `packages/context-engine`
-- compile artifact examples and determinism tests
-- architecture docs for prompt/context compilation and compile policy
+- routed step-result fixture with context-compilation diagnostics
+- contract and reference-integrity tests covering skill refs
+- harness compatibility tests covering context fingerprint drift
+- CLI smoke transcript for `project verify --routed-dry-run-step implement`
 
 ### Out of scope
-- step-execution integration
-- all-step-class adoption
+- provider-specific prompt formatting inside orchestrator core
+- package-manager/registry supply-chain governance and publish workflows
 
 ---
 
-## W6-S04 — Routed execution integration for compiled context
-- **Epic:** EPIC-3 Routed execution
+## W6-S04 — UI attach/detach lifecycle command pack
+- **Epic:** EPIC-6 Operator surface
 - **State:** blocked
-- **Outcome:** Rewire routed execution so project analysis, step execution, adapter envelopes, and harness captures all carry compiled prompt/context lineage on the dry-run/mock execution path.
-- **Primary modules:** `packages/orchestrator-core`, `packages/adapter-sdk`, `packages/harness`, `docs/contracts/**`
-- **Hard dependencies:** W6-S02, W6-S03
-- **Primary user-story surfaces:** engineering manager / planner, delivery engineer, operator / SRE
+- **Outcome:** Implement `aor ui attach` and `aor ui detach` so web console lifecycle is explicit, bounded, and operationally traceable.
+- **Primary modules:** `apps/cli`, `apps/web`, `apps/api`, `docs/ops/**`
+- **Hard dependencies:** W6-S03, W5-S04
+- **Primary user-story surfaces:** delivery engineer, architect / tech lead, operator / SRE
 
 ### Local tasks
-1. Update asset loading so project-profile owns wrapper/prompt/context defaults and prompt selection is independent from wrapper ownership.
-2. Call the context compiler before adapter invocation and extend the adapter request envelope with explicit `prompt_resolution`, `compiled_prompt`, `compiled_context_ref`, `compiled_context_summary`, and real `input_packet_refs`.
-3. Split project-analysis reporting into `prompt_resolution` and `context_resolution`, then extend step results and harness compatibility with prompt bundle refs, context bundle refs, compiler revision, and prompt/context hashes.
-4. Remove the old `asset_resolution` shape as the only execution trace and add tests for compiled-context injection, lineage persistence, and failure handling.
+1. Implement attach/detach command handlers and lifecycle state reporting.
+2. Keep headless CLI and API operation unaffected when UI is detached.
+3. Add detachable web smoke tests and CLI transcript fixtures.
+4. Document attach/detach operational guidance and failure handling.
 
 ### Acceptance criteria
-1. Routed execution no longer depends on wrapper-owned prompt selection or route-owned wrapper refs.
-2. Adapter requests in dry-run carry compiled prompt/context data and real packet refs.
-3. Project-analysis exposes compile-readiness through explicit `prompt_resolution` and `context_resolution` rather than only wrapper/prompt registry layout.
-4. Step-result and harness artifacts expose prompt/context lineage, and harness replay compares compile lineage rather than only `route/wrapper/prompt/policy/adapter`.
-5. Tests cover compiled-context success, missing-asset failure, lineage persistence, and dry-run adapter-envelope shaping.
+1. `aor ui attach` and `aor ui detach` are implemented and deterministic.
+2. Headless-first operation still works when UI is not attached.
+3. Attach/detach state is visible through operator surfaces.
+4. Tests cover attach, detach, idempotent retry, and disconnected UI paths.
 
 ### Done evidence
-- updated routed execution and adapter-envelope tests
-- step-result and harness examples with compile lineage and compatibility fields
-- project-analysis examples showing prompt/context readiness
+- CLI tests and transcript fixtures for attach/detach commands
+- web/API smoke tests covering attached and detached modes
+- updated operator runbook for UI lifecycle
 
 ### Out of scope
-- live adapter execution
-- provider-specific session wiring
-- operator/API visibility beyond artifact persistence
-- later-wave delivery/security maturity
+- new multi-tenant auth hardening
+- run-control feature expansion beyond W6-S03 scope
 
 ---
 
-## W6-S05 — All-step-class compiled-context flow integration
-- **Epic:** EPIC-3 Routed execution
+## W6-S05 — Delivery/release prepare command pack
+- **Epic:** EPIC-5 Delivery and release
 - **State:** blocked
-- **Outcome:** Run the compiled-context model through discovery, research, spec, planning, implement, review, QA, repair, eval, and harness flows with explicit per-step compile input contracts so packets and project analysis become real runtime inputs.
-- **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/contracts/**`, `docs/architecture/**`
-- **Hard dependencies:** W6-S04
-- **Primary user-story surfaces:** discovery / research, engineering manager / planner, reviewer / QA, repository / multirepo owner, delivery engineer
+- **Outcome:** Implement `aor deliver prepare` and `aor release prepare` as policy-bounded command entrypoints linked to manifests and release packets.
+- **Primary modules:** `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`
+- **Hard dependencies:** W6-S03, W4-S05
+- **Primary user-story surfaces:** delivery transaction / Git / PR flow, repository / multirepo owner
 
 ### Local tasks
-1. Thread compiled-context resolution through every supported step class.
-2. Document packet/context requirements for each supported step class, including where project-analysis facts are mandatory versus optional.
-3. Replace side metadata with real packet and project-analysis inputs for the compiler and align all step classes to one compile-contract vocabulary.
-4. Rebase future command assumptions and flow docs on the compiled-context model, then add end-to-end tests that cover all step classes from analyze through routed dry-run.
+1. Implement `deliver prepare` and `release prepare` handlers on top of existing delivery artifact foundations.
+2. Enforce write-back and release policy checks before manifest/release materialization.
+3. Emit command outputs that link directly to delivery manifests and release packets.
+4. Add tests and runbook coverage for bounded preparation paths.
 
 ### Acceptance criteria
-1. Every supported step class resolves prompt/context through the shared compiler path.
-2. Every supported step class has a documented compile input matrix that names packet/context requirements and project-analysis expectations.
-3. Packet refs and project-analysis facts are actual runtime inputs rather than detached metadata.
-4. Flow and command docs no longer describe the old wrapper/bootstrap context model.
-5. End-to-end tests cover all step classes on the compiled-context foundation.
+1. Both commands are implemented and no longer listed as planned.
+2. Command outputs reference durable delivery-manifest and release-packet artifacts.
+3. Policy checks prevent bypass of existing write-back guardrails.
+4. Tests cover no-write, branch/fork policy modes, and release precondition failures.
 
 ### Done evidence
-- all-step-class execution tests
-- documented compile input matrix for all supported step classes
-- updated architecture docs for step-class integration
-- routed dry-run artifacts with compiled-context refs
+- updated command catalog and CLI tests for delivery/release prepare
+- manifest and release-packet fixtures from command execution
+- updated release and delivery runbook sections
 
 ### Out of scope
-- legacy cleanup
-- later-wave operator and delivery maturity
+- direct upstream write automation defaults
+- incident/audit query surface changes
 
 ---
 
-## W6-S06 — Legacy purge and fixture migration
-- **Epic:** EPIC-0 Repository development system
+## W6-S06 — Incident and audit command pack
+- **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** blocked
-- **Outcome:** Remove legacy runtime aliases, AGENTS-based runtime references, and obsolete fixture shapes so the compiled-context model becomes the only supported runtime path and old shapes are explicitly rejected.
-- **Primary modules:** `packages/orchestrator-core`, `packages/contracts`, `packages/harness`, `examples/**`, `docs/contracts/**`
-- **Hard dependencies:** W6-S04, W6-S05
-- **Primary user-story surfaces:** repository / multirepo owner, incident / improvement owner, AI platform owner
+- **Outcome:** Implement `aor incident open`, `aor incident show`, and `aor audit runs` as first-class operational commands.
+- **Primary modules:** `apps/cli`, `apps/api`, `packages/observability`, `docs/contracts/**`, `docs/ops/**`
+- **Hard dependencies:** W6-S03, W5-S06
+- **Primary user-story surfaces:** incident / improvement owner, finance / audit / hygiene
 
 ### Local tasks
-1. Remove legacy delivery aliases and old route/wrapper/prompt refs from validators, examples, fixtures, contract-loader coverage, runtime code, and docs.
-2. Remove runtime references to `AGENTS.md` and `.agents/**` from contracts, examples, fixtures, and tests.
-3. Regenerate live-e2e fixtures, harness captures, and examples to the compiled-context shape.
-4. Add explicit rejection paths for old or foreign compile-lineage artifacts.
+1. Implement incident create/read command handlers with contract-backed incident artifacts.
+2. Implement audit query command surface for run-centric operational evidence.
+3. Link incident/audit outputs to run, scorecard, and promotion evidence roots.
+4. Add smoke tests and docs for bounded incident/audit workflows.
 
 ### Acceptance criteria
-1. Legacy aliases and compatibility shims are removed from supported runtime contracts, validator coverage, and code paths.
-2. No runtime example, fixture, or contract treats `AGENTS.md` or `.agents/**` as runtime context.
-3. Harness and replay flows reject obsolete capture shapes without compile lineage instead of silently ignoring them.
-4. Old legacy contract refs do not pass supported runtime validation.
-5. Fixture regeneration and regression tests pass on the new runtime model only.
+1. Incident open/show and audit runs commands are implemented and documented.
+2. Incident and audit outputs are durable and contract-compliant.
+3. Command output links make run-to-incident and run-to-audit traceability explicit.
+4. Tests cover open/show/audit success and invalid lookup paths.
 
 ### Done evidence
-- regenerated fixtures and examples
-- legacy-removal diffs in contracts/runtime code and validator coverage
-- replay and regression tests proving old shapes are rejected
+- CLI/API tests for incident and audit command flows
+- incident-report and audit fixture artifacts
+- learning-loop/backlog handoff notes linked from command output
 
 ### Out of scope
-- later-wave visibility or delivery maturity features
-- preserving backwards compatibility for deprecated runtime shapes
+- automated backlog reprioritization
+- production billing and tenant-level analytics

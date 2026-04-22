@@ -765,6 +765,16 @@ test("project verify supports routed dry-run smoke execution and durable routed 
       true,
     );
     assert.equal(routedStepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
+    assert.equal(
+      typeof routedStepResult.routed_execution.adapter_request.context.compiled_context_fingerprint,
+      "string",
+    );
+    assert.ok(Array.isArray(routedStepResult.routed_execution.adapter_request.input_packet_refs));
+    assert.ok(routedStepResult.routed_execution.adapter_request.input_packet_refs.length > 0);
+    assert.equal(routedStepResult.routed_execution.context_compilation.required_inputs_status, "ready");
+    assert.deepEqual(routedStepResult.routed_execution.context_compilation.skill_refs, [
+      "skill.runner.implement@v1",
+    ]);
     assert.equal(routedStepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
   });
 });

@@ -41,8 +41,8 @@ Repository contributor guidance such as `AGENTS.md` and `.agents/**` belongs to 
 2. analyze or verify the project if required;
 3. materialize the next packet boundary;
 4. request human approval if the policy requires it;
-5. resolve route, wrapper, prompt bundle, context bundle, and step policy from project-profile defaults plus explicit step overrides;
-6. compile packet refs, project-analysis facts, and selected runtime context into a bounded prompt/context artifact;
+5. resolve route, wrapper, prompt bundle, context bundle, skill refs, and step policy from project-profile defaults plus explicit step overrides;
+6. compile working context and inject it into the adapter request envelope;
 7. execute the step through the selected adapter;
 8. collect evidence and normalize the step result;
 9. run validation;

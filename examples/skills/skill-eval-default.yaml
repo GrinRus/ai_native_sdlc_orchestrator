@@ -1,0 +1,22 @@
+skill_id: skill.eval.default
+version: 1
+step_class: eval
+summary: deterministic eval workflow for suite/dataset scoring and reporting
+activation_hints:
+  - eval
+workflow:
+  - id: load-suite
+    instruction: verify suite and dataset compatibility before scoring
+  - id: run-graders
+    instruction: execute deterministic and judge graders in declared order
+  - id: summarize
+    instruction: record metrics, thresholds, and blocking outcomes
+required_inputs:
+  packets:
+    - subject
+    - suite
+    - dataset
+expected_outputs:
+  - evaluation-report
+change_notes:
+  - baseline eval skill for context compiler

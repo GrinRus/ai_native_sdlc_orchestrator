@@ -17,22 +17,24 @@ For each step AOR resolves:
 2. route profile
 3. wrapper profile
 4. prompt bundle
-5. step policy
-6. adapter/provider/model execution
+5. skill profiles
+6. step policy
+7. adapter/provider/model execution
 
 ## Standard step phases
 1. load context and required packets
-2. resolve policy and route
-3. pre-validate prerequisites
-4. execute the step
-5. normalize output into a step result
-6. run post-validation
-7. optionally run eval or harness
-8. retry, repair, escalate, or close
+2. resolve route, wrappers, prompt bundle, and policy
+3. compile working context from prompt instructions, wrapper bootstrap, resolved required inputs, guardrails, and skill workflows
+4. pre-validate prerequisites
+5. execute the step
+6. normalize output into a step result
+7. run post-validation
+8. optionally run eval or harness
+9. retry, repair, escalate, or close
 
 ## Adapter SDK baseline (W2-S04)
 Adapter invocation uses one stable envelope pair:
-- request envelope: `request_id`, `run_id`, `step_id`, `step_class`, resolved route/asset/policy bundles, input packet refs, and dry-run flag;
+- request envelope: `request_id`, `run_id`, `step_id`, `step_class`, resolved route/asset/policy bundles, non-empty input packet refs, compiled context, and dry-run flag;
 - response envelope: `request_id`, `adapter_id`, `status`, summary, normalized output payload, evidence refs, and tool traces.
 
 Shared lifecycle hooks are explicit and adapter-agnostic:
@@ -43,10 +45,11 @@ The first routed execution baseline runs one deterministic path:
 1. resolve route;
 2. resolve wrapper + prompt bundle;
 3. resolve policy bounds and guardrails;
-4. negotiate adapter capabilities;
-5. invoke deterministic mock adapter in dry-run mode.
+4. compile context (prompt instruction set, wrapper bootstrap, required input resolution, guardrails, skill refs, provenance);
+5. negotiate adapter capabilities;
+6. invoke deterministic mock adapter in dry-run mode.
 
-The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with selected route/assets/policy/adapter metadata and evidence refs.
+The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with selected route/assets/policy/adapter metadata, context-compilation diagnostics, and evidence refs.
 
 ## Why one model matters
 A single step model keeps:

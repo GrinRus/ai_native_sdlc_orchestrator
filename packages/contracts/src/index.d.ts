@@ -24,6 +24,7 @@ export type ContractFamily =
   | "context-bundle"
   | "step-policy-profile"
   | "adapter-capability-profile"
+  | "skill-profile"
   | "live-run-event"
   | "live-e2e-profile"
   | "control-plane-api";

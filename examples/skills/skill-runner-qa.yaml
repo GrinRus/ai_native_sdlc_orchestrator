@@ -1,0 +1,22 @@
+skill_id: skill.runner.qa
+version: 1
+step_class: runner
+summary: QA-focused runner workflow for deterministic validation and evidence packaging
+activation_hints:
+  - qa
+workflow:
+  - id: align-acceptance
+    instruction: map QA checks to acceptance criteria and policy gate requirements
+  - id: execute-validation
+    instruction: run deterministic tests first and classify failures with repro notes
+  - id: package-evidence
+    instruction: publish pass/fail summary with explicit evidence references
+required_inputs:
+  packets:
+    - handoff
+    - validation-report
+expected_outputs:
+  - qa-summary
+  - validation-report
+change_notes:
+  - step override skill for qa

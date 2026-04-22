@@ -46,6 +46,32 @@ function requireString(field, value) {
 }
 
 /**
+ * @param {Record<string, unknown>} context
+ */
+function assertCompiledContextShape(context) {
+  const requiredObjectFields = [
+    "instruction_set",
+    "session_bootstrap",
+    "required_inputs_resolved",
+    "guardrails",
+    "provenance",
+  ];
+  for (const field of requiredObjectFields) {
+    const value = context[field];
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      throw new Error(`Adapter envelope field 'context.${field}' must be an object.`);
+    }
+  }
+
+  const fingerprint = context.compiled_context_fingerprint;
+  if (typeof fingerprint !== "string" || fingerprint.trim().length === 0) {
+    throw new Error(
+      "Adapter envelope field 'context.compiled_context_fingerprint' must be a non-empty string.",
+    );
+  }
+}
+
+/**
  * @param {{
  *   adaptersRoot: string,
  * }} options
@@ -272,10 +298,16 @@ export function resolveAdapterMatrix(options) {
  *   policy_bundle: Record<string, unknown>,
  *   input_packet_refs?: string[],
  *   dry_run?: boolean,
- *   context?: Record<string, unknown>,
+ *   context: Record<string, unknown>,
  * }} input
  */
 export function createAdapterRequestEnvelope(input) {
+  const context = asRecord(input.context);
+  if (Object.keys(context).length === 0) {
+    throw new Error("Adapter envelope field 'context' must be a non-empty object.");
+  }
+  assertCompiledContextShape(context);
+
   return {
     request_id: requireString("request_id", input.request_id),
     run_id: requireString("run_id", input.run_id),
@@ -286,7 +318,7 @@ export function createAdapterRequestEnvelope(input) {
     policy_bundle: asRecord(input.policy_bundle),
     input_packet_refs: asStringArray(input.input_packet_refs),
     dry_run: Boolean(input.dry_run),
-    context: asRecord(input.context),
+    context,
   };
 }
 
@@ -343,7 +375,7 @@ export function createMockAdapter(options = {}) {
      *   policy_bundle: Record<string, unknown>,
      *   input_packet_refs?: string[],
      *   dry_run?: boolean,
-     *   context?: Record<string, unknown>,
+     *   context: Record<string, unknown>,
      * }} request
      */
     execute(request) {

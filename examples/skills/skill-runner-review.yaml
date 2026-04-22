@@ -1,0 +1,22 @@
+skill_id: skill.runner.review
+version: 1
+step_class: runner
+summary: review-focused runner workflow for deterministic risk surfacing
+activation_hints:
+  - review
+workflow:
+  - id: inspect-changes
+    instruction: assess contract alignment, regression risks, and missing evidence
+  - id: classify-findings
+    instruction: prioritize issues by severity and identify blocking outcomes
+  - id: report-review
+    instruction: produce concise findings with file-level references and gaps
+required_inputs:
+  packets:
+    - handoff
+    - previous-step-result
+expected_outputs:
+  - review-findings
+  - validation-report
+change_notes:
+  - step override skill for review

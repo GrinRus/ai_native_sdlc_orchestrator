@@ -34,6 +34,17 @@ function withTempRepo(callback) {
   }
 }
 
+function compiledContextFixture(fingerprint = "ctx-fingerprint-1") {
+  return {
+    instruction_set: { objective: "test" },
+    session_bootstrap: { include_files: [], include_packets: [] },
+    required_inputs_resolved: { packets: {}, files: {}, status: "ready" },
+    guardrails: { policy_id: "policy.step.runner.default" },
+    provenance: { source: "test" },
+    compiled_context_fingerprint: fingerprint,
+  };
+}
+
 test("buildAdapterRegistry loads adapter capability profiles through shared contracts path", () => {
   withTempRepo((repoRoot) => {
     const registry = buildAdapterRegistry({
@@ -123,11 +134,13 @@ test("adapter request and response envelopes enforce stable required fields", ()
     policy_bundle: { policy_id: "policy.step.runner.default" },
     input_packet_refs: ["packet://handoff"],
     dry_run: true,
+    context: compiledContextFixture("ctx-fingerprint-1"),
   });
 
   assert.equal(request.request_id, "req-1");
   assert.equal(request.dry_run, true);
   assert.deepEqual(request.input_packet_refs, ["packet://handoff"]);
+  assert.equal(request.context.compiled_context_fingerprint, "ctx-fingerprint-1");
 
   const response = createAdapterResponseEnvelope({
     request_id: "req-1",
@@ -150,6 +163,35 @@ test("adapter request and response envelopes enforce stable required fields", ()
       }),
     /must be one of: success, failed, blocked/i,
   );
+
+  assert.throws(
+    () =>
+      createAdapterRequestEnvelope({
+        request_id: "req-1",
+        run_id: "run-1",
+        step_id: "step-1",
+        step_class: "implement",
+        route: {},
+        asset_bundle: {},
+        policy_bundle: {},
+      }),
+    /field 'context' must be a non-empty object/i,
+  );
+
+  assert.throws(
+    () =>
+      createAdapterRequestEnvelope({
+        request_id: "req-1",
+        run_id: "run-1",
+        step_id: "step-1",
+        step_class: "implement",
+        route: {},
+        asset_bundle: {},
+        policy_bundle: {},
+        context: { compiled_context_fingerprint: "missing-shape" },
+      }),
+    /context\.instruction_set' must be an object/i,
+  );
 });
 
 test("mock adapter executes deterministic dry-run outputs for rehearsal coverage", () => {
@@ -163,6 +205,7 @@ test("mock adapter executes deterministic dry-run outputs for rehearsal coverage
     asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
     policy_bundle: { policy_id: "policy.step.runner.default" },
     dry_run: true,
+    context: compiledContextFixture("ctx-fingerprint-mock"),
   };
 
   const first = mockAdapter.execute(request);

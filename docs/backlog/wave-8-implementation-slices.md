@@ -1,46 +1,46 @@
 # W8 implementation slices
 
 ## Wave objective
-Rebuild later-maturity operator, delivery, and multi-repo flows on top of compiled-context foundations.
+Close later-maturity user stories for strategic operator visibility, governance hardening, and multi-repo delivery maturity.
 
 ## Wave exit criteria
-- operator surfaces expose selected prompt/context assets, compile hashes, dropped inputs, and policy reasoning
-- later discovery, bootstrap, delivery, and security flows consume AOR-native runtime context rather than repository-local guidance files
-- baseline comparison and platform recertification flows can compare context bundles, compiler revisions, and resolved docs/rules/skills
-- multi-repo and rerun orchestration use repo-aware compiled-context scope with bounded artifacts and audit traces
-- later-maturity visibility, delivery, and incident workflows stay aligned with the quality and lineage model introduced in W6-W7
+- sponsor/planner visibility stories are supported by durable operator surfaces
+- later discovery/architecture/security maturity stories are implemented with explicit contracts and policies
+- later QA and AI platform comparison stories are executable and auditable
+- incident and platform recertification maturity is integrated with learning-loop evidence
+- multi-repo and rerun maturity flows are bounded, reproducible, and policy-safe
 
 ## Parallel start and sequencing notes
-- `W8-S01` and `W8-S02` can progress in parallel once `W7-S05` closes.
-- `W8-S03` and `W8-S04` share the same compiled-context lineage base and can progress in parallel after W7 closure.
-- `W8-S07` is the wave closer because multi-repo and rerun maturity depend on delivery, operator, and incident lineage surfaces.
+- `W8-S01` and `W8-S02` can progress in parallel once `W7-S05` exists.
+- `W8-S03` and `W8-S04` share the same base dependency and can run in parallel.
+- `W8-S07` closes the wave after operator and incident maturity slices (`W8-S04`, `W8-S06`) are complete.
 
 ---
 
-## W8-S01 — Strategic operator visibility on compiled context
+## W8-S01 — Sponsor and planner strategic visibility expansion
 - **Epic:** EPIC-6 Operator surface
 - **State:** blocked
-- **Outcome:** Give sponsors and planners strategic visibility into selected context assets, compile lineage, dropped inputs, and policy posture.
+- **Outcome:** Add strategic run and risk visibility surfaces for sponsor/manager later-stage planning stories.
 - **Primary modules:** `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**`
 - **Hard dependencies:** W7-S05
 - **Primary user-story surfaces:** product sponsor / owner, engineering manager / planner
 
 ### Local tasks
-1. Extend operator read surfaces with strategic views of prompt/context selection and compile status by reading existing runtime artifacts rather than introducing parallel stores.
-2. Add sponsor/planner-friendly summaries for blocked inputs, dropped context, and policy posture.
-3. Update operational docs for interpreting strategic context-lineage signals.
+1. Expand operator read surfaces with strategic wave/risk snapshots.
+2. Add sponsor/planner oriented CLI or web views backed by existing contracts.
+3. Document operational use of strategic visibility surfaces.
 4. Add smoke tests for strategic visibility retrieval.
 
 ### Acceptance criteria
-1. Strategic operator surfaces expose prompt/context lineage without raw file inspection and without inventing hidden parallel state stores.
-2. Sponsors and planners can see why a run used or dropped specific context assets.
-3. Docs define the intent and limits of strategic compiled-context visibility.
-4. Smoke tests cover happy-path and missing-data retrieval.
+1. Strategic visibility data is available through operator surfaces.
+2. Sponsor/planner workflows can inspect wave/risk state without ad hoc file inspection.
+3. Docs define expected interpretation and limits of these surfaces.
+4. Smoke tests cover read paths and missing-data behavior.
 
 ### Done evidence
-- API/web/CLI fixtures for strategic context visibility
-- runbook updates for sponsor/planner review
-- smoke tests for strategic visibility
+- API/web/CLI visibility fixtures
+- updated sponsor/planner runbook guidance
+- smoke tests for strategic visibility endpoints
 
 ### Out of scope
 - custom BI dashboards
@@ -48,30 +48,30 @@ Rebuild later-maturity operator, delivery, and multi-repo flows on top of compil
 
 ---
 
-## W8-S02 — Discovery, spec, and bootstrap maturity on runtime context assets
+## W8-S02 — Later discovery and architecture maturity pack
 - **Epic:** EPIC-1 Bootstrap and onboarding
 - **State:** blocked
-- **Outcome:** Make later-stage discovery, specification, and bootstrap flows depend on AOR-native runtime context assets instead of repository-local guidance files.
+- **Outcome:** Close later discovery and architecture stories with stronger completeness and architecture-traceability checks.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**`
-- **Hard dependencies:** W6-S05, W7-S05
-- **Primary user-story surfaces:** discovery / research, architect / tech lead, project bootstrap / onboarding
+- **Hard dependencies:** W6-S02, W7-S05
+- **Primary user-story surfaces:** discovery / research, architect / tech lead
 
 ### Local tasks
-1. Extend discovery/spec/bootstrap flows to resolve runtime context assets through project-profile references.
-2. Add completeness checks for missing context coverage in discovery and planning artifacts.
-3. Update product and contract docs so bootstrap recommendations point to AOR-native assets, not AGENTS files, and remove any AGENTS fallback semantics.
-4. Add tests for discovery/spec/bootstrap behavior on the new runtime-context model.
+1. Extend discovery/spec command flows for later-stage completeness checks.
+2. Add architecture-traceability linkage into generated planning artifacts.
+3. Update docs and command semantics for later discovery/architecture workflows.
+4. Add tests for new completeness and architecture-linking behavior.
 
 ### Acceptance criteria
-1. Discovery, spec, and bootstrap flows select runtime context through project-profile and committed assets.
-2. Generated artifacts expose missing-context readiness explicitly.
-3. Docs and examples no longer recommend AGENTS-style runtime guidance or fallback behavior for these flows.
-4. Tests cover complete and incomplete runtime-context coverage paths.
+1. Later discovery and architecture checks are executable through command surfaces.
+2. Generated artifacts include explicit architecture-traceability data.
+3. Docs and examples match runtime behavior.
+4. Tests cover pass/fail completeness scenarios.
 
 ### Done evidence
-- discovery/spec/bootstrap fixtures on runtime context assets
-- updated product and contract docs for bootstrap maturity
-- tests for context-coverage checks
+- discovery/spec artifact fixtures with architecture links
+- updated docs for later maturity discovery flow
+- test coverage for completeness enforcement
 
 ### Out of scope
 - automatic ADR authoring beyond bounded templates
@@ -79,30 +79,30 @@ Rebuild later-maturity operator, delivery, and multi-repo flows on top of compil
 
 ---
 
-## W8-S03 — Delivery and security context governance maturity
+## W8-S03 — Later delivery and security route-governance maturity
 - **Epic:** EPIC-3 Routed execution
 - **State:** blocked
-- **Outcome:** Make delivery and security governance context-aware so high-risk operations depend on certified context/compiler state and explicit escalation reasons.
-- **Primary modules:** `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`
-- **Hard dependencies:** W6-S04, W7-S03, W7-S05
-- **Primary user-story surfaces:** delivery engineer, security / compliance, finance / audit / hygiene
+- **Outcome:** Add later-stage route/policy governance required for delivery and security maturity stories.
+- **Primary modules:** `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**`
+- **Hard dependencies:** W6-S03, W6-S07, W7-S05
+- **Primary user-story surfaces:** delivery engineer, security / compliance
 
 ### Local tasks
-1. Extend policy resolution with compiled-context-aware deny and escalation reasoning tied to certified context/compiler state.
-2. Require certified context/compiler state before high-risk delivery operations proceed and persist explicit deny reasons when they do not.
-3. Update security and delivery docs for context-aware governance behavior.
-4. Add tests for allow, deny, and escalation outcomes driven by context lineage.
+1. Add stronger route governance checks for high-risk delivery operations on top of compiled-context diagnostics from W6-S07.
+2. Extend policy resolution to expose explicit denial and escalation reasoning.
+3. Align security docs with later-stage governance semantics.
+4. Add tests for stricter allowlist/redaction/escalation paths.
 
 ### Acceptance criteria
-1. Policy outputs expose explicit deny and escalation reasons tied to prompt/context lineage and certified context/compiler state.
-2. High-risk delivery is blocked when context assets or compiler state are uncertified.
-3. Security and delivery docs align with the runtime governance behavior.
-4. Tests cover allow, deny, escalation, and uncertified-state scenarios.
+1. Later-stage route governance checks are enforced before high-risk operations.
+2. Policy outputs include explicit denial/escalation reasons.
+3. Security/compliance docs and examples are aligned with runtime behavior.
+4. Tests cover allow, deny, and escalation scenarios.
 
 ### Done evidence
-- policy-resolution fixtures with context-aware escalation reasons
-- delivery/security governance tests
-- updated runbooks for context-aware delivery gating
+- policy resolution fixtures with escalation reasons
+- security governance test cases
+- updated compliance runbook references
 
 ### Out of scope
 - external IAM integration
@@ -110,30 +110,30 @@ Rebuild later-maturity operator, delivery, and multi-repo flows on top of compil
 
 ---
 
-## W8-S04 — Event and history visibility for compiled context
+## W8-S04 — Later operator event and policy visibility expansion
 - **Epic:** EPIC-6 Operator surface
 - **State:** blocked
-- **Outcome:** Extend run-event and history surfaces so operators can inspect context decisions, compile traces, and policy history without digging through raw artifacts.
-- **Primary modules:** `apps/api`, `apps/web`, `apps/cli`, `packages/observability`, `docs/ops/**`
-- **Hard dependencies:** W6-S04, W7-S05
-- **Primary user-story surfaces:** operator / SRE, engineering manager / planner
+- **Outcome:** Expand operator event and policy-inspection surfaces for later SRE maturity stories.
+- **Primary modules:** `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**`
+- **Hard dependencies:** W6-S03, W6-S07, W7-S05
+- **Primary user-story surfaces:** operator / SRE
 
 ### Local tasks
-1. Extend run/event streams with compile hashes, selected assets, dropped inputs, and policy explanations by reading existing runtime artifacts rather than introducing parallel stores.
-2. Add operator query paths for prompt/context history on selected runs from persisted lineage-aware artifacts.
-3. Update troubleshooting runbooks for lineage-aware history inspection.
-4. Add smoke tests for enriched event and history surfaces.
+1. Extend run/event visibility to include later-stage policy decision context and context-compilation metadata from W6-S07.
+2. Add operator query paths for route/policy history on selected runs.
+3. Update ops docs for later-stage troubleshooting flow.
+4. Add smoke tests for enriched event/policy visibility.
 
 ### Acceptance criteria
-1. Operators can inspect compile traces and policy history from first-class surfaces backed by existing runtime artifacts.
-2. Event and history queries remove the need for raw log scraping in common troubleshooting paths.
-3. Runbooks describe the expected inspection sequence for compiled-context incidents.
-4. Smoke tests cover event streaming and history retrieval with compile lineage.
+1. Operators can inspect enriched policy context from run/event surfaces.
+2. Query paths support later-stage troubleshooting without raw log scraping.
+3. Ops docs define expected troubleshooting sequence.
+4. Smoke tests cover event history and policy-context retrieval.
 
 ### Done evidence
-- API/web/CLI fixtures for event and history visibility
-- troubleshooting runbook updates
-- smoke tests for lineage-aware event/history retrieval
+- API/web operator visibility fixtures
+- updated troubleshooting runbook
+- smoke tests for policy-aware event inspection
 
 ### Out of scope
 - full observability platform migration
@@ -141,30 +141,30 @@ Rebuild later-maturity operator, delivery, and multi-repo flows on top of compil
 
 ---
 
-## W8-S05 — Baseline comparison maturity for compiler and context revisions
+## W8-S05 — Later QA and AI platform baseline comparison maturity
 - **Epic:** EPIC-4 Quality platform
 - **State:** blocked
-- **Outcome:** Compare compiler revisions and runtime context selections as first-class baseline subjects for QA and AI platform workflows.
+- **Outcome:** Close later QA and AI platform stories with stronger baseline comparison and regression triage coverage.
 - **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**`
-- **Hard dependencies:** W7-S02, W7-S05
+- **Hard dependencies:** W6-S07, W7-S01, W7-S02
 - **Primary user-story surfaces:** reviewer / QA, AI platform owner
 
 ### Local tasks
-1. Extend baseline-comparison semantics to compare compiler revisions, resolved docs/rules/skills, and compiled outputs rather than only lifecycle IDs.
-2. Add richer triage metadata for context-selection regressions and compile drift.
-3. Update quality docs and examples to reflect the expanded baseline model.
+1. Expand suite comparison semantics for later-stage baseline governance, including compiled-context fingerprint and skill-ref compatibility.
+2. Add richer regression triage metadata for QA and platform owners.
+3. Update quality docs and examples to reflect the expanded comparison model.
 4. Add tests for baseline drift, flaky handling, and controlled promotion outcomes.
 
 ### Acceptance criteria
-1. Baseline comparisons can distinguish regressions caused by context or compiler changes at both resolved-asset and compiled-output layers.
-2. Quality artifacts expose triage metadata for resolved docs/rules/skills, compile revisions, and compiled outputs.
-3. Docs and examples align with the lineage-aware comparison model.
-4. Tests cover drift, flake handling, and promotion-gated comparison outcomes.
+1. Later-stage baseline comparisons are executable and auditable.
+2. Regression triage metadata is present in quality artifacts.
+3. Docs and examples align with comparison and triage runtime behavior.
+4. Tests cover baseline drift and flaky-case handling paths.
 
 ### Done evidence
-- expanded eval/comparison fixtures for context and compiler revisions
-- quality examples with lineage-aware triage metadata
-- automated tests for drift and flaky workflows
+- expanded eval/comparison fixtures
+- quality artifact examples with triage metadata
+- automated tests for baseline and flaky workflows
 
 ### Out of scope
 - proprietary judge-model orchestration
@@ -172,30 +172,30 @@ Rebuild later-maturity operator, delivery, and multi-repo flows on top of compil
 
 ---
 
-## W8-S06 — Incident and platform recertification maturity with full lineage
+## W8-S06 — Later incident and platform recertification maturity
 - **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** blocked
-- **Outcome:** Close later incident and platform recertification stories with full route, prompt/context, compiler, and policy lineage.
+- **Outcome:** Close later incident and AI platform recertification stories with integrated evidence and decision controls.
 - **Primary modules:** `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W7-S03, W7-S04, W7-S05
-- **Primary user-story surfaces:** incident / improvement owner, AI platform owner, finance / audit / hygiene
+- **Primary user-story surfaces:** incident / improvement owner, AI platform owner
 
 ### Local tasks
-1. Extend recertification decisions with full lineage across route, wrapper, prompt/context, compiler, and policy.
-2. Ensure incident workflows surface the evidence needed to re-enable or keep frozen problematic assets.
-3. Update runbooks for integrated incident-platform recertification with full lineage.
+1. Extend incident recertification with platform-level freeze/demote linkage.
+2. Ensure recertification decisions include finance and quality evidence references.
+3. Update runbooks for integrated incident-platform recertification workflow.
 4. Add tests for blocked, approved, and rollback recertification outcomes.
 
 ### Acceptance criteria
-1. Recertification decisions carry full lineage across all runtime asset layers.
-2. Incident workflows consistently reference the evidence needed for freeze, demote, and re-enable outcomes.
-3. Ops docs define integrated recertification and rollback behavior on the full-lineage model.
-4. Tests cover blocked, approved, demoted, and rollback paths.
+1. Incident and platform recertification decisions are linked and auditable.
+2. Decisions reference finance and quality evidence roots consistently.
+3. Ops docs define integrated recertification workflow and rollback behavior.
+4. Tests cover all major recertification branches.
 
 ### Done evidence
-- integrated incident/platform recertification fixtures with full lineage
-- updated incident and learning-loop runbooks
-- tests for decision branches and rollback behavior
+- integrated incident/platform recertification fixtures
+- updated learning-loop and incident runbook docs
+- tests for decision branches and rollback paths
 
 ### Out of scope
 - automatic route re-enable without approval
@@ -203,29 +203,29 @@ Rebuild later-maturity operator, delivery, and multi-repo flows on top of compil
 
 ---
 
-## W8-S07 — Multi-repo and rerun maturity on compiled-context scope
+## W8-S07 — Later multi-repo, bootstrap, and delivery rerun maturity
 - **Epic:** EPIC-5 Delivery and release
 - **State:** blocked
-- **Outcome:** Make multi-repo delivery and rerun orchestration repo-aware at the compiled-context layer so bounded recovery works across coordinated repositories.
+- **Outcome:** Close later repository/multirepo/bootstrap/delivery rerun stories with bounded orchestration semantics.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**`
-- **Hard dependencies:** W6-S05, W8-S03, W8-S04, W8-S06
-- **Primary user-story surfaces:** repository / multirepo owner, delivery transaction / Git / PR flow, project bootstrap / onboarding
+- **Hard dependencies:** W6-S05, W6-S02, W8-S04, W8-S06
+- **Primary user-story surfaces:** repository / multirepo owner, project bootstrap / onboarding, delivery transaction / Git / PR flow, finance / audit / hygiene
 
 ### Local tasks
-1. Extend rerun and recovery semantics with repo-aware compiled-context scope defined per participating repository.
-2. Add multi-repo coordination metadata to delivery and release artifacts.
-3. Update bootstrap and delivery docs with bounded rerun expectations on the new model.
-4. Add tests for multi-repo compiled-context recovery and policy-safe reruns.
+1. Extend delivery rerun semantics for packet-boundary and failed-step recovery in later-stage flows.
+2. Add multi-repo coordination metadata requirements to delivery/release preparation outputs.
+3. Update bootstrap and delivery docs with later maturity constraints and evidence expectations.
+4. Add tests for multi-repo bounded rerun and recovery-safe policy enforcement.
 
 ### Acceptance criteria
-1. Multi-repo reruns are bounded by per-repo compiled-context scope and are auditable.
-2. Delivery and release artifacts expose coordination metadata for participating repositories.
-3. Bootstrap and delivery docs match the implemented rerun behavior.
-4. Tests cover recovery, cross-repo coordination, and policy-blocked rerun cases.
+1. Later-stage rerun flows are bounded by packet/step semantics and auditable.
+2. Multi-repo coordination evidence is present in delivery/release artifacts.
+3. Bootstrap and delivery docs match implemented later-maturity behavior.
+4. Tests cover rerun recovery, cross-repo coordination, and policy-blocked cases.
 
 ### Done evidence
-- multi-repo rerun fixtures with compiled-context scope
-- updated bootstrap and delivery runbooks
+- multi-repo delivery and rerun fixtures
+- updated bootstrap/delivery runbooks for later maturity
 - tests validating bounded rerun and coordination evidence
 
 ### Out of scope

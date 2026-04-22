@@ -8,6 +8,7 @@ AOR manages these platform assets:
 - context skills
 - context bundles
 - wrappers
+- skills
 - route profiles
 - step policies
 - adapter capability profiles
@@ -29,7 +30,8 @@ Ownership is singular:
 - **Context rule** — always-on team, security, or operating constraints
 - **Context skill** — relevance-triggered workflow instructions for a step class
 - **Context bundle** — reusable selection of context docs, rules, and skills for one runtime use case
-- **Wrapper** — execution envelope, allowed tools, verification section, redaction
+- **Wrapper** — execution envelope, allowed tools, included files, verification section, redaction
+- **Skill profile** — reusable step-class workflow with explicit activation and output intent
 - **Route** — adapter/provider/model selection plus constraints
 - **Step policy** — validators, retries, repair, escalation, blocking rules
 - **Adapter profile** — what a runner can actually do
@@ -49,6 +51,7 @@ Ownership is singular:
 - certify prompt-bundle, context, and compiler changes independently when possible;
 - keep baseline references explicit;
 - preserve incident and promotion history for every platform asset.
+- keep `AGENTS.md` guidance thin and operator-oriented; execution context source-of-truth lives in versioned platform assets (prompt bundles, wrappers, skills, policies, routes).
 
 ## Target runtime loading order (W6+)
 Asset resolution and compilation for a step is deterministic and follows this order:
@@ -56,10 +59,11 @@ Asset resolution and compilation for a step is deterministic and follows this or
 2. choose wrapper profile (`step override` first, then `project default` by route class);
 3. choose prompt bundle (`step override` first, then project-profile default by step class);
 4. choose context bundles (`step override` first, then project-profile defaults by step class);
-5. expand the selected context bundle into always-on rules plus predicate-selected docs and skills;
-6. ingest packet refs and project-analysis facts required by the prompt bundle and policy;
-7. compile one bounded prompt/context artifact with hashes, dropped inputs, and provenance refs;
-8. emit one runtime asset bundle with route, wrapper, prompt bundle, context bundle, and compiled-context refs.
+5. choose skill refs (`step override` first, then `project default` by route class);
+6. expand selected context bundles into always-on rules plus predicate-selected docs and skills;
+7. ingest packet refs and project-analysis facts required by prompt bundle and policy;
+8. compile one bounded working-context artifact with hashes, dropped inputs, and provenance refs;
+9. emit one runtime asset bundle with route, wrapper, prompt bundle, context bundles, and compiled-context refs.
 
 If any source is missing or conflicts with the step class, resolution fails before execution.
 
