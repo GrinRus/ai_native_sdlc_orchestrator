@@ -1249,6 +1249,89 @@ test("live-e2e standard runner supports start observe report and bounded abort s
   });
 });
 
+test("live-e2e W7 governance profile links quality, incident, and finance evidence for closure smoke", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init", "-b", "main"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "ci@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "CI Test"] });
+    runGitChecked({ cwd: projectRoot, args: ["add", "examples"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "fixture init"] });
+
+    const startResult = invokeCli([
+      "live-e2e",
+      "start",
+      "--project-ref",
+      projectRoot,
+      "--profile",
+      path.join(workspaceRoot, "examples/live-e2e/w7-governance-integration.yaml"),
+    ]);
+    assert.equal(startResult.exitCode, 0, startResult.stderr);
+    const startPayload = JSON.parse(startResult.stdout);
+    assert.equal(startPayload.live_e2e_run_status, "pass");
+    assert.equal(fs.existsSync(startPayload.live_e2e_run_summary_file), true);
+
+    const summary = JSON.parse(fs.readFileSync(startPayload.live_e2e_run_summary_file, "utf8"));
+    assert.equal(fs.existsSync(summary.incident_report_file), true);
+    assert.equal(fs.existsSync(summary.learning_loop_handoff_file), true);
+    assert.equal(fs.existsSync(summary.artifacts.promotion_decision_file), true);
+    assert.equal(fs.existsSync(summary.artifacts.release_packet_file), true);
+
+    const handoff = JSON.parse(fs.readFileSync(summary.learning_loop_handoff_file, "utf8"));
+    assert.ok(Array.isArray(handoff.backlog_refs));
+    assert.ok(handoff.backlog_refs.includes("docs/backlog/wave-7-implementation-slices.md"));
+    assert.ok(Array.isArray(handoff.evidence_refs));
+    assert.ok(handoff.evidence_refs.some((entry) => String(entry).includes("promotion-decision")));
+
+    const auditResult = invokeCli([
+      "audit",
+      "runs",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      startPayload.live_e2e_run_id,
+    ]);
+    assert.equal(auditResult.exitCode, 0, auditResult.stderr);
+    const auditPayload = JSON.parse(auditResult.stdout);
+    assert.equal(Array.isArray(auditPayload.run_audit_records), true);
+    assert.equal(auditPayload.run_audit_records.length, 1);
+
+    const runAuditRecord = auditPayload.run_audit_records[0];
+    assert.ok(Array.isArray(runAuditRecord.incident_refs));
+    assert.ok(runAuditRecord.incident_refs.length >= 1);
+    assert.ok(Array.isArray(runAuditRecord.promotion_refs));
+    assert.ok(runAuditRecord.promotion_refs.length >= 1);
+    assert.equal(typeof runAuditRecord.finance_evidence, "object");
+    assert.equal(typeof runAuditRecord.finance_evidence.baseline_pass_rate, "number");
+    assert.equal(typeof runAuditRecord.finance_evidence.candidate_pass_rate, "number");
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "live-e2e-w7-governance-transcript.json"), "utf8"),
+    );
+    const transcriptSubset = {
+      start: {
+        status: startPayload.status,
+        live_e2e_run_status: startPayload.live_e2e_run_status,
+      },
+      summary: {
+        has_incident_report: fs.existsSync(summary.incident_report_file),
+        has_promotion_decision: fs.existsSync(summary.artifacts.promotion_decision_file),
+        has_release_packet: fs.existsSync(summary.artifacts.release_packet_file),
+        has_wave7_backlog_ref: handoff.backlog_refs.includes("docs/backlog/wave-7-implementation-slices.md"),
+        has_promotion_evidence_ref: handoff.evidence_refs.some((entry) => String(entry).includes("promotion-decision")),
+      },
+      audit: {
+        record_count: auditPayload.run_audit_records.length,
+        has_incident_refs: runAuditRecord.incident_refs.length > 0,
+        has_promotion_refs: runAuditRecord.promotion_refs.length > 0,
+        has_finance_baseline: typeof runAuditRecord.finance_evidence.baseline_pass_rate === "number",
+        has_finance_candidate: typeof runAuditRecord.finance_evidence.candidate_pass_rate === "number",
+      },
+    };
+    assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
 test("project verify resolves runtime root and contract metadata", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });

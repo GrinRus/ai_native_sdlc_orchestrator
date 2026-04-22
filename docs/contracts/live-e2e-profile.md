@@ -32,5 +32,9 @@ Profiles should encode no-write preflight behavior as machine-readable data unde
 
 Profiles may also include a scenario identifier, a task brief, and explicit verification commands. Public-repo defaults should prefer patch or fork-first output and disable upstream write-back.
 
+Profiles may optionally include a `learning_loop` object to shape closure linkage behavior:
+- `learning_loop.force_incident` — force incident artifact materialization even when run status is `pass`;
+- `learning_loop.backlog_refs[]` — override default backlog/runbook refs embedded in generated learning-loop handoff artifacts.
+
 ## Example
 See `examples/live-e2e/*.yaml`.

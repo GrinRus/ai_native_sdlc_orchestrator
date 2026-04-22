@@ -147,7 +147,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S05 — Later QA and AI platform baseline comparison maturity
 - **Epic:** EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Close later QA and AI platform stories with stronger baseline comparison and regression triage coverage.
 - **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**`
 - **Hard dependencies:** W7-S01, W7-S02

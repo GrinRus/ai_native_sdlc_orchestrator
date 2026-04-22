@@ -1,0 +1,20 @@
+{
+  "start": {
+    "status": "implemented",
+    "live_e2e_run_status": "pass"
+  },
+  "summary": {
+    "has_incident_report": true,
+    "has_promotion_decision": true,
+    "has_release_packet": true,
+    "has_wave7_backlog_ref": true,
+    "has_promotion_evidence_ref": true
+  },
+  "audit": {
+    "record_count": 1,
+    "has_incident_refs": true,
+    "has_promotion_refs": true,
+    "has_finance_baseline": true,
+    "has_finance_candidate": true
+  }
+}

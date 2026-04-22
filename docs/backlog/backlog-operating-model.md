@@ -129,6 +129,17 @@ When live operations produce learning artifacts (`learning-loop-scorecard-*`, `i
 3. Add backlog changes only at slice granularity in the owning wave and master backlog docs.
 4. Keep run id traceability in the backlog note so improvement work can be audited back to runtime evidence.
 
+## W7 closure evidence expectations
+
+When closing `W7-S05`, treat one integrated rehearsal as required evidence and keep these links explicit:
+
+1. Quality governance evidence (`evaluation-report-*`, `harness-capture-*`, `harness-replay-*`, `promotion-decision-*`).
+2. Incident evidence (`incident-report-*`) linked to the same run id.
+3. Finance evidence from promotion or audit surfaces (`finance_signals` or `run_audit_records[].finance_evidence`).
+4. Learning-loop handoff (`learning-loop-handoff-*`) that references both backlog and quality follow-up surfaces.
+
+Use `docs/ops/live-e2e-w7-governance-closure.md` as the canonical closure rehearsal path.
+
 ## When creating or changing slices
 
 If you add, remove, split, or merge a slice, update all of the following together:

@@ -163,6 +163,16 @@ function uniqueStrings(values) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function asStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
+    : [];
+}
+
+/**
  * @param {string} value
  * @returns {boolean}
  */
@@ -277,6 +287,9 @@ export function startStandardLiveE2ERun(options) {
   for (const stage of getProfileStages(profile)) {
     markStage(stageMap, stage, "pending");
   }
+  const learningLoopProfile = /** @type {Record<string, unknown>} */ (profile.learning_loop ?? {});
+  const learningLoopBacklogRefs = asStringArray(learningLoopProfile.backlog_refs);
+  const learningLoopForceIncident = learningLoopProfile.force_incident === true;
 
   const startedAt = nowIso();
   appendRunEvent({
@@ -391,7 +404,13 @@ export function startStandardLiveE2ERun(options) {
         subjectRef: "wrapper://wrapper.eval.default@v1",
         suiteRef: "suite.cert.core@v4",
         stepClass: "implement",
+        runRef: runId,
       });
+      artifacts.promotion_decision_file = promotionDecision.decisionPath;
+      artifacts.promotion_evaluation_report_file = promotionDecision.evaluationReportPath;
+      artifacts.promotion_harness_capture_file = promotionDecision.harnessCapturePath;
+      artifacts.promotion_harness_replay_file = promotionDecision.harnessReplayPath;
+      artifacts.promotion_replay_evaluation_report_file = promotionDecision.replayEvaluationReportPath;
 
       const preferredDeliveryModeRaw = String(profile.output_policy?.preferred_delivery_mode ?? "patch-only");
       const preferredDeliveryMode =
@@ -561,11 +580,15 @@ export function startStandardLiveE2ERun(options) {
     evalSuiteRefs: Array.isArray(profile.verification?.eval_suites)
       ? profile.verification.eval_suites.filter((entry) => typeof entry === "string")
       : [],
-    backlogRefs: [
-      "docs/backlog/mvp-implementation-backlog.md",
-      "docs/backlog/wave-5-implementation-slices.md",
-      "docs/ops/live-e2e-standard-runner.md",
-    ],
+    backlogRefs:
+      learningLoopBacklogRefs.length > 0
+        ? learningLoopBacklogRefs
+        : [
+            "docs/backlog/mvp-implementation-backlog.md",
+            "docs/backlog/wave-5-implementation-slices.md",
+            "docs/ops/live-e2e-standard-runner.md",
+          ],
+    forceIncident: learningLoopForceIncident,
     incidentSummary: errorMessage ?? undefined,
   });
   summary.learning_loop_scorecard_file = learningLoop.scorecardFile;
@@ -654,6 +677,17 @@ export function abortStandardLiveE2ERun(options) {
   });
   const current = readStandardLiveE2ERun(options);
   const summary = { ...current.summary };
+  const profileRef = typeof summary.profile_ref === "string" ? summary.profile_ref : "";
+  let profile = {};
+  if (profileRef) {
+    try {
+      profile = loadLiveE2EProfile(cwd, profileRef).profile;
+    } catch {
+      profile = {};
+    }
+  }
+  const learningLoopProfile = /** @type {Record<string, unknown>} */ (profile.learning_loop ?? {});
+  const learningLoopBacklogRefs = asStringArray(learningLoopProfile.backlog_refs);
 
   if (TERMINAL_RUN_STATUSES.has(String(summary.status))) {
     return {
@@ -692,11 +726,14 @@ export function abortStandardLiveE2ERun(options) {
       ),
     ]),
     linkedScorecardRefs: scorecardFiles,
-    backlogRefs: [
-      "docs/backlog/mvp-implementation-backlog.md",
-      "docs/backlog/wave-5-implementation-slices.md",
-      "docs/ops/live-e2e-standard-runner.md",
-    ],
+    backlogRefs:
+      learningLoopBacklogRefs.length > 0
+        ? learningLoopBacklogRefs
+        : [
+            "docs/backlog/mvp-implementation-backlog.md",
+            "docs/backlog/wave-5-implementation-slices.md",
+            "docs/ops/live-e2e-standard-runner.md",
+          ],
     forceIncident: true,
     incidentSummary: String(summary.abort_reason),
   });

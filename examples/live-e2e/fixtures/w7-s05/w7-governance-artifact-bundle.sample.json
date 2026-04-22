@@ -1,0 +1,27 @@
+{
+  "run_id": "live-e2e.w7.governance.integration.run-202604221230",
+  "quality_evidence_refs": [
+    "evidence://projects/aor-core/reports/evaluation-report-suite.release.short-v1-20260422123010.json",
+    "evidence://projects/aor-core/reports/harness-capture-aor-core.harness.capture.20260422123022.json",
+    "evidence://projects/aor-core/reports/harness-replay-aor-core.harness.replay.20260422123024.json",
+    "evidence://projects/aor-core/artifacts/promotion-decision-wrapper-wrapper.eval.default-v1-20260422123025.json"
+  ],
+  "incident_ref": "evidence://projects/aor-core/reports/incident-report-aor-core.incident.live-e2e.w7.governance.integration.run-202604221230.20260422123030.json",
+  "finance_evidence": {
+    "source": "run_audit_records[0].finance_evidence",
+    "route_ids": [
+      "route.implement.default"
+    ],
+    "wrapper_refs": [
+      "wrapper://wrapper.eval.default@v1"
+    ],
+    "adapter_ids": [
+      "codex-cli"
+    ],
+    "max_cost_usd": 25,
+    "timeout_sec": 180,
+    "baseline_pass_rate": 1,
+    "candidate_pass_rate": 1
+  },
+  "learning_loop_handoff_ref": "evidence://projects/aor-core/reports/learning-loop-handoff-live-e2e.w7.governance.integration.run-202604221230-aor-core.incident.live-e2e.w7.governance.integration.run-202604221230.20260422123030.json"
+}

@@ -452,6 +452,7 @@ export function resolveCertificationDecisionStatus(options) {
  *  stepClass?: string,
  *  fromChannel?: string,
  *  toChannel?: string,
+ *  runRef?: string,
  * }} options
  */
 export function certifyAssetPromotion(options) {
@@ -587,6 +588,8 @@ export function certifyAssetPromotion(options) {
   const decision = {
     decision_id: decisionId,
     subject_ref: options.assetRef,
+    run_id: options.runRef ?? null,
+    linked_run_refs: options.runRef ? [`run://${options.runRef}`] : [],
     from_channel: fromChannel,
     to_channel: toChannel,
     evidence_refs: [

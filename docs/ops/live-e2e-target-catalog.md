@@ -20,6 +20,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
 - Best scenarios:
   - `regress short`
   - `release short`
+  - `w7 governance integration`
 - Suggested rehearsal task:
   - add or adjust one narrow regression test;
   - make the smallest source change needed;

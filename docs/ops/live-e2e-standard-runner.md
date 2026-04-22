@@ -9,6 +9,7 @@ Use only the canonical profiles from `examples/live-e2e/`:
 - `regress-long.yaml` for the `httpie/cli` deeper regression scenario.
 - `release-short.yaml` for the `sindresorhus/ky` short release-shaped rehearsal.
 - `release-long.yaml` for the `belgattitude/nextjs-monorepo-example` long release-shaped rehearsal.
+- `w7-governance-integration.yaml` for integrated quality + incident + finance closure evidence in W7.
 
 This mapping stays aligned with `docs/ops/live-e2e-target-catalog.md`.
 
@@ -36,6 +37,8 @@ The run summary also carries learning-loop linkage fields:
 - `learning_loop_scorecard_file`
 - `learning_loop_handoff_file`
 - `incident_report_file` (for failed or aborted runs)
+
+For profiles that set `learning_loop.force_incident=true`, `incident_report_file` is emitted even on `status=pass` so closure evidence stays linked.
 
 ## Observe
 ```bash
@@ -71,3 +74,4 @@ Expected abort behavior:
 - `aor run status --run-id <RUN_ID> --follow true` can observe the same run stream.
 - CLI-only operation remains valid with web UI detached.
 - Use `live-e2e-learning-loop.md` to hand off incidents and scorecards into backlog and quality follow-up.
+- Use `live-e2e-w7-governance-closure.md` for wave-level governance closure rehearsal and smoke checks.

@@ -9,6 +9,7 @@
 - `live-e2e-release-long.md` — long monorepo release rehearsal with stronger gates.
 - `live-e2e-standard-runner.md` — standard start/status/report/abort surfaces for catalog profiles.
 - `live-e2e-learning-loop.md` — repeatable scorecard/incident capture and backlog-quality handoff flow.
+- `live-e2e-w7-governance-closure.md` — integrated W7 governance closure rehearsal and wave-level smoke checks.
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
 - `live-run-event-stream.md` — replay-safe stream behavior, reconnect flow, and backpressure baseline.
 
@@ -24,3 +25,4 @@
 - Need a stronger regression signal: `regress long`
 - Need a quick release-shaped rehearsal: `release short`
 - Need a production-like monorepo rehearsal: `release long`
+- Need integrated W7 governance closure evidence: `w7 governance integration`
