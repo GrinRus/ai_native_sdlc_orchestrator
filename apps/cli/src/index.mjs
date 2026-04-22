@@ -147,7 +147,7 @@ function formatCommandHelp(definition) {
         : definition.command === "deliver prepare" || definition.command === "release prepare"
           ? "Status: implemented in delivery/release shell (W6-S05)"
         : definition.command === "incident recertify"
-          ? "Status: implemented in incident recertification shell (W7-S03)"
+          ? "Status: implemented in incident recertification shell (W8-S06)"
         : definition.command === "incident open" ||
             definition.command === "incident show" ||
             definition.command === "audit runs"
@@ -319,7 +319,8 @@ function formatCommandHelp(definition) {
                   ? [
                       "- Incident recertify updates one incident-report with recertify/hold/re-enable transitions.",
                       "- Re-enable requires explicit promotion evidence with status=pass.",
-                      "- Recertification updates preserve run-linked and promotion-linked evidence refs.",
+                      "- Freeze/demote rollout actions trigger rollback-safe hold instead of direct re-enable.",
+                      "- Recertification updates preserve run-linked, finance, and quality evidence refs with explicit roots.",
                     ]
                 : definition.command === "incident show"
                   ? [
@@ -841,6 +842,13 @@ function executeImplementedCommand(command, flags, cwd) {
   let incidentRecertificationToStatus = null;
   let incidentRecertificationPromotionRef = null;
   let incidentRecertificationGate = null;
+  let incidentRecertificationPlatformAction = null;
+  let incidentRecertificationPlatformLinkage = null;
+  let incidentRecertificationRollbackRequired = null;
+  let incidentRecertificationFinanceEvidenceRefs = null;
+  let incidentRecertificationQualityEvidenceRefs = null;
+  let incidentRecertificationFinanceEvidenceRoot = null;
+  let incidentRecertificationQualityEvidenceRoot = null;
   let incidentRecords = null;
   let runAuditRecords = null;
   let auditEvidenceRefs = null;
@@ -1667,6 +1675,16 @@ function executeImplementedCommand(command, flags, cwd) {
       );
     }
     const runId = incidentRun ? normalizeRunRef(incidentRun) : null;
+    const runSummariesForIncident = runId
+      ? listRuns({
+          cwd,
+          projectRef: /** @type {string} */ (flags["project-ref"]),
+          runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        })
+      : [];
+    const runSummaryForIncident = runId
+      ? runSummariesForIncident.find((entry) => entry.run_id === runId) ?? null
+      : null;
 
     const promotions = qualityArtifacts.filter((artifact) => artifact.family === "promotion-decision");
     let promotionArtifact = null;
@@ -1675,16 +1693,10 @@ function executeImplementedCommand(command, flags, cwd) {
       if (!promotionArtifact) {
         throw new CliUsageError(`Promotion decision '${promotionRef}' was not found.`);
       }
-    } else if (runId) {
-      const runSummaries = listRuns({
-        cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-      });
-      const runSummary = runSummaries.find((entry) => entry.run_id === runId);
-      const linkedPromotionRefs = runSummary
-        ? runSummary.quality_refs.filter((ref) => ref.includes("promotion-decision"))
-        : [];
+    } else if (runSummaryForIncident) {
+      const linkedPromotionRefs = runSummaryForIncident.quality_refs.filter((ref) =>
+        ref.includes("promotion-decision"),
+      );
       promotionArtifact =
         promotions.find((artifact) => linkedPromotionRefs.includes(artifact.artifact_ref)) ?? null;
     }
@@ -1693,7 +1705,38 @@ function executeImplementedCommand(command, flags, cwd) {
       promotionArtifact && typeof promotionArtifact.document.status === "string"
         ? promotionArtifact.document.status
         : null;
+    const rolloutDecision =
+      promotionArtifact &&
+      typeof promotionArtifact.document.rollout_decision === "object" &&
+      promotionArtifact.document.rollout_decision !== null &&
+      !Array.isArray(promotionArtifact.document.rollout_decision)
+        ? promotionArtifact.document.rollout_decision
+        : null;
+    const requestedTransition =
+      rolloutDecision &&
+      typeof rolloutDecision.requested_transition === "object" &&
+      rolloutDecision.requested_transition !== null &&
+      !Array.isArray(rolloutDecision.requested_transition)
+        ? rolloutDecision.requested_transition
+        : null;
+    const platformRolloutAction =
+      rolloutDecision && typeof rolloutDecision.action === "string" ? rolloutDecision.action : null;
+    const platformFromChannel =
+      requestedTransition && typeof requestedTransition.from_channel === "string"
+        ? requestedTransition.from_channel
+        : promotionArtifact && typeof promotionArtifact.document.from_channel === "string"
+          ? promotionArtifact.document.from_channel
+          : null;
+    const platformToChannel =
+      requestedTransition && typeof requestedTransition.to_channel === "string"
+        ? requestedTransition.to_channel
+        : promotionArtifact && typeof promotionArtifact.document.to_channel === "string"
+          ? promotionArtifact.document.to_channel
+          : null;
+    const rollbackRequired = platformRolloutAction === "freeze" || platformRolloutAction === "demote";
+    const platformLinkage = promotionArtifact ? (rollbackRequired ? "rollback" : "linked") : "unlinked";
 
+    let nextStatus = decision === "re-enable" ? "re-enabled" : decision;
     if (decision === "re-enable") {
       if (!promotionArtifact) {
         throw new CliUsageError(
@@ -1705,20 +1748,40 @@ function executeImplementedCommand(command, flags, cwd) {
           `Re-enable is blocked: promotion decision '${promotionArtifact.artifact_ref}' has status '${promotionStatus ?? "unknown"}' (requires pass).`,
         );
       }
-      incidentRecertificationGate = "allow";
+      incidentRecertificationGate = rollbackRequired ? "rollback" : "allow";
     } else if (decision === "recertify") {
-      incidentRecertificationGate = promotionStatus === "pass" ? "allow" : "hold";
+      incidentRecertificationGate = rollbackRequired ? "rollback" : promotionStatus === "pass" ? "allow" : "hold";
     } else {
-      incidentRecertificationGate = "hold";
+      incidentRecertificationGate = rollbackRequired ? "rollback" : "hold";
     }
 
-    const nextStatus = decision === "re-enable" ? "re-enabled" : decision;
-    const linkedEvidenceRefs = uniqueStrings([
-      ...asStringArray(incidentArtifact.document.linked_asset_refs),
+    if (incidentRecertificationGate === "rollback") {
+      nextStatus = "hold";
+    }
+
+    const financeEvidenceRefs = uniqueStrings([
+      ...(runSummaryForIncident
+        ? [...runSummaryForIncident.step_result_refs, ...runSummaryForIncident.packet_refs]
+        : []),
+      ...(promotionArtifact ? asStringArray(promotionArtifact.document.evidence_refs) : []),
+    ]);
+    const qualityEvidenceRefs = uniqueStrings([
+      incidentArtifact.artifact_ref,
+      ...(runSummaryForIncident ? runSummaryForIncident.quality_refs : []),
       ...(promotionArtifact
         ? [promotionArtifact.artifact_ref, ...asStringArray(promotionArtifact.document.evidence_refs)]
         : []),
     ]);
+    const linkedEvidenceRefs = uniqueStrings([
+      ...asStringArray(incidentArtifact.document.linked_asset_refs),
+      ...financeEvidenceRefs,
+      ...qualityEvidenceRefs,
+    ]);
+    const recertificationReason =
+      reason ??
+      (incidentRecertificationGate === "rollback"
+        ? `Platform rollout action '${platformRolloutAction ?? "unknown"}' requires rollback-safe hold.`
+        : undefined);
 
     const recertified = applyIncidentRecertification({
       projectRoot: projectState.project_root,
@@ -1727,10 +1790,24 @@ function executeImplementedCommand(command, flags, cwd) {
       decision: /** @type {"recertify" | "hold" | "re-enable"} */ (decision),
       nextStatus,
       runRef: incidentRun ?? undefined,
-      reason: reason ?? undefined,
+      reason: recertificationReason,
       promotionDecisionRef: promotionArtifact?.artifact_ref,
       promotionDecisionStatus: promotionStatus ?? undefined,
       evidenceRefs: linkedEvidenceRefs,
+      financeEvidenceRefs,
+      qualityEvidenceRefs,
+      financeEvidenceRoot: projectState.runtime_layout.reports_root,
+      qualityEvidenceRoot: projectState.runtime_layout.reports_root,
+      platformRecertification: promotionArtifact
+        ? {
+            linkage_status: platformLinkage,
+            rollback_required: rollbackRequired,
+            rollout_action: platformRolloutAction ?? undefined,
+            promotion_decision_ref: promotionArtifact.artifact_ref,
+            from_channel: platformFromChannel ?? undefined,
+            to_channel: platformToChannel ?? undefined,
+          }
+        : undefined,
     });
 
     incidentId = incidentIdValue;
@@ -1749,6 +1826,43 @@ function executeImplementedCommand(command, flags, cwd) {
         ? recertified.recertification.to_status
         : nextStatus;
     incidentRecertificationPromotionRef = promotionArtifact?.artifact_ref ?? null;
+    incidentRecertificationPlatformAction =
+      recertified.recertification &&
+      typeof recertified.recertification.platform_recertification === "object" &&
+      recertified.recertification.platform_recertification !== null &&
+      !Array.isArray(recertified.recertification.platform_recertification) &&
+      typeof recertified.recertification.platform_recertification.rollout_action === "string"
+        ? recertified.recertification.platform_recertification.rollout_action
+        : null;
+    incidentRecertificationPlatformLinkage =
+      recertified.recertification &&
+      typeof recertified.recertification.platform_recertification === "object" &&
+      recertified.recertification.platform_recertification !== null &&
+      !Array.isArray(recertified.recertification.platform_recertification) &&
+      typeof recertified.recertification.platform_recertification.linkage_status === "string"
+        ? recertified.recertification.platform_recertification.linkage_status
+        : null;
+    incidentRecertificationRollbackRequired =
+      recertified.recertification &&
+      typeof recertified.recertification.platform_recertification === "object" &&
+      recertified.recertification.platform_recertification !== null &&
+      !Array.isArray(recertified.recertification.platform_recertification)
+        ? recertified.recertification.platform_recertification.rollback_required === true
+        : null;
+    incidentRecertificationFinanceEvidenceRefs = asStringArray(
+      recertified.recertification.finance_evidence_refs,
+    );
+    incidentRecertificationQualityEvidenceRefs = asStringArray(
+      recertified.recertification.quality_evidence_refs,
+    );
+    incidentRecertificationFinanceEvidenceRoot =
+      typeof recertified.recertification.finance_evidence_root === "string"
+        ? recertified.recertification.finance_evidence_root
+        : null;
+    incidentRecertificationQualityEvidenceRoot =
+      typeof recertified.recertification.quality_evidence_root === "string"
+        ? recertified.recertification.quality_evidence_root
+        : null;
     auditEvidenceRefs = linkedEvidenceRefs;
     readOnly = false;
     futureControlHooks = runId
@@ -1811,6 +1925,16 @@ function executeImplementedCommand(command, flags, cwd) {
       linked_run_refs: asStringArray(artifact.document.linked_run_refs),
       linked_asset_refs: asStringArray(artifact.document.linked_asset_refs),
       linked_backlog_refs: asStringArray(artifact.document.linked_backlog_refs),
+      recertification:
+        typeof artifact.document.recertification === "object" &&
+        artifact.document.recertification !== null &&
+        !Array.isArray(artifact.document.recertification)
+          ? artifact.document.recertification
+          : null,
+      recertification_updated_at:
+        typeof artifact.document.recertification_updated_at === "string"
+          ? artifact.document.recertification_updated_at
+          : null,
       created_at: typeof artifact.document.created_at === "string" ? artifact.document.created_at : null,
     }));
     auditEvidenceRefs = uniqueStrings(incidentRecords.flatMap((record) => record.linked_asset_refs));
@@ -2194,6 +2318,13 @@ function executeImplementedCommand(command, flags, cwd) {
     incident_recertification_to_status: incidentRecertificationToStatus,
     incident_recertification_promotion_ref: incidentRecertificationPromotionRef,
     incident_recertification_gate: incidentRecertificationGate,
+    incident_recertification_platform_action: incidentRecertificationPlatformAction,
+    incident_recertification_platform_linkage: incidentRecertificationPlatformLinkage,
+    incident_recertification_rollback_required: incidentRecertificationRollbackRequired,
+    incident_recertification_finance_evidence_refs: incidentRecertificationFinanceEvidenceRefs,
+    incident_recertification_quality_evidence_refs: incidentRecertificationQualityEvidenceRefs,
+    incident_recertification_finance_evidence_root: incidentRecertificationFinanceEvidenceRoot,
+    incident_recertification_quality_evidence_root: incidentRecertificationQualityEvidenceRoot,
     incident_records: incidentRecords,
     run_audit_records: runAuditRecords,
     audit_evidence_refs: auditEvidenceRefs,

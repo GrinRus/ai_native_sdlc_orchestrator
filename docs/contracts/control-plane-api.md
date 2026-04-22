@@ -109,7 +109,9 @@ Incident show baseline:
 Incident recertify baseline (W7-S03):
 - `incident recertify` applies one of `recertify|hold|re-enable` to a durable `incident-report`;
 - re-enable is blocked unless linked promotion evidence is present with `status=pass`;
-- recertification updates persist transition provenance (`from_status`, `to_status`, run/promotion refs, evidence root).
+- freeze/demote platform rollout actions force rollback-safe `hold` (no direct re-enable);
+- recertification updates persist transition provenance (`from_status`, `to_status`, run/promotion refs, evidence root);
+- recertification output includes explicit platform linkage (`platform_action`, `platform_linkage`, `rollback_required`) plus finance/quality evidence refs and roots.
 
 Audit runs baseline:
 - emits run-centric snapshots of packet, step-result, quality, incident, and promotion refs;

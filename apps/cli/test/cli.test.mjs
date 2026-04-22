@@ -163,10 +163,11 @@ test("incident and audit command help documents run-linked operational semantics
 
   assert.equal(recertifyHelp.exitCode, 0);
   assert.equal(recertifyHelp.stderr, "");
-  assert.match(recertifyHelp.stdout, /Status: implemented in incident recertification shell \(W7-S03\)/);
+  assert.match(recertifyHelp.stdout, /Status: implemented in incident recertification shell \(W8-S06\)/);
   assert.match(recertifyHelp.stdout, /--incident-id <id>/);
   assert.match(recertifyHelp.stdout, /--decision <recertify\|hold\|re-enable>/);
   assert.match(recertifyHelp.stdout, /Re-enable requires explicit promotion evidence with status=pass/);
+  assert.match(recertifyHelp.stdout, /Freeze\/demote rollout actions trigger rollback-safe hold/);
 
   assert.equal(auditHelp.exitCode, 0);
   assert.equal(auditHelp.stderr, "");
@@ -917,6 +918,42 @@ test("W6 incident and audit command pack links run evidence to durable incident 
       },
     });
     const blockedPromotionRef = `evidence://${path.relative(projectRoot, blockedPromotionFile).replace(/\\/g, "/")}`;
+    const rollbackPromotionFile = path.join(
+      artifactsRoot,
+      `promotion-decision-finance-audit-rollback-${runId.replace(/[^\w.-]+/g, "-")}.json`,
+    );
+    writeContractFixture({
+      family: "promotion-decision",
+      filePath: rollbackPromotionFile,
+      document: {
+        decision_id: `fixture.promotion.finance.rollback.${runId}`,
+        run_id: runId,
+        subject_ref: "wrapper://wrapper.finance.audit@v1",
+        from_channel: "stable",
+        to_channel: "demoted",
+        evidence_refs: [verifyPayload.routed_step_result_file],
+        evidence_summary: {
+          finance_signals: {
+            capture_latency_sec: 0.4,
+            replay_latency_sec: 0.5,
+            total_latency_sec: 0.9,
+          },
+          baseline_comparison: {
+            baseline_pass_rate: 0.92,
+            candidate_pass_rate: 0.52,
+          },
+        },
+        status: "pass",
+        rollout_decision: {
+          action: "demote",
+          requested_transition: {
+            from_channel: "stable",
+            to_channel: "demoted",
+          },
+        },
+      },
+    });
+    const rollbackPromotionRef = `evidence://${path.relative(projectRoot, rollbackPromotionFile).replace(/\\/g, "/")}`;
 
     const incidentOpenResult = invokeCli([
       "incident",
@@ -942,6 +979,9 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     const incidentDocument = JSON.parse(fs.readFileSync(incidentOpenPayload.incident_file, "utf8"));
     const incidentFixture = JSON.parse(
       fs.readFileSync(path.join(fixturesDir, "incident-report.fixture.json"), "utf8"),
+    );
+    const recertificationFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "incident-recertification-branches.fixture.json"), "utf8"),
     );
     const incidentSubset = {
       severity: incidentDocument.severity,
@@ -1008,8 +1048,66 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     const approvedRecertifyPayload = JSON.parse(approvedRecertifyResult.stdout);
     assert.equal(approvedRecertifyPayload.incident_status, "re-enabled");
     assert.equal(approvedRecertifyPayload.incident_recertification_decision, "re-enable");
-    assert.equal(approvedRecertifyPayload.incident_recertification_gate, "allow");
+    assert.equal(approvedRecertifyPayload.incident_recertification_gate, recertificationFixture.approved.gate);
     assert.equal(approvedRecertifyPayload.incident_recertification_promotion_ref, promotionDecisionRef);
+    assert.equal(
+      approvedRecertifyPayload.incident_recertification_platform_linkage,
+      recertificationFixture.approved.platform_linkage,
+    );
+    assert.equal(
+      approvedRecertifyPayload.incident_recertification_rollback_required,
+      recertificationFixture.approved.rollback_required,
+    );
+    assert.equal(approvedRecertifyPayload.incident_recertification_finance_evidence_root, reportsRoot);
+    assert.equal(approvedRecertifyPayload.incident_recertification_quality_evidence_root, reportsRoot);
+    assert.ok(approvedRecertifyPayload.incident_recertification_finance_evidence_refs.length >= 1);
+    assert.ok(approvedRecertifyPayload.incident_recertification_quality_evidence_refs.length >= 1);
+
+    const rollbackRecertifyResult = invokeCli([
+      "incident",
+      "recertify",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      incidentOpenPayload.incident_id,
+      "--decision",
+      "re-enable",
+      "--promotion-ref",
+      rollbackPromotionRef,
+    ]);
+    assert.equal(rollbackRecertifyResult.exitCode, 0, rollbackRecertifyResult.stderr);
+    const rollbackRecertifyPayload = JSON.parse(rollbackRecertifyResult.stdout);
+    assert.equal(rollbackRecertifyPayload.incident_status, recertificationFixture.rollback.incident_status);
+    assert.equal(rollbackRecertifyPayload.incident_recertification_decision, "re-enable");
+    assert.equal(rollbackRecertifyPayload.incident_recertification_gate, recertificationFixture.rollback.gate);
+    assert.equal(
+      rollbackRecertifyPayload.incident_recertification_platform_action,
+      recertificationFixture.rollback.platform_action,
+    );
+    assert.equal(
+      rollbackRecertifyPayload.incident_recertification_platform_linkage,
+      recertificationFixture.rollback.platform_linkage,
+    );
+    assert.equal(
+      rollbackRecertifyPayload.incident_recertification_rollback_required,
+      recertificationFixture.rollback.rollback_required,
+    );
+    assert.equal(
+      rollbackRecertifyPayload.incident_recertification_to_status,
+      recertificationFixture.rollback.to_status,
+    );
+    assert.equal(rollbackRecertifyPayload.incident_recertification_finance_evidence_root, reportsRoot);
+    assert.equal(rollbackRecertifyPayload.incident_recertification_quality_evidence_root, reportsRoot);
+    assert.ok(rollbackRecertifyPayload.incident_recertification_finance_evidence_refs.length >= 1);
+    assert.ok(rollbackRecertifyPayload.incident_recertification_quality_evidence_refs.length >= 1);
+
+    const rollbackIncidentDocument = JSON.parse(fs.readFileSync(rollbackRecertifyPayload.incident_file, "utf8"));
+    assert.equal(rollbackIncidentDocument.status, "hold");
+    assert.equal(rollbackIncidentDocument.recertification.platform_recertification.rollout_action, "demote");
+    assert.equal(rollbackIncidentDocument.recertification.platform_recertification.linkage_status, "rollback");
+    assert.equal(rollbackIncidentDocument.recertification.platform_recertification.rollback_required, true);
+    assert.equal(rollbackIncidentDocument.recertification.finance_evidence_root, reportsRoot);
+    assert.equal(rollbackIncidentDocument.recertification.quality_evidence_root, reportsRoot);
 
     const incidentShowResult = invokeCli([
       "incident",

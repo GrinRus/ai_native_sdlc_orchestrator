@@ -34,6 +34,17 @@ Recertification and controlled re-enable updates may add:
 - `promotion_decision_status` (optional)
 - `evidence_refs`
 - `evidence_root`
+- `finance_evidence_refs` (finance lineage used by the recertification decision)
+- `quality_evidence_refs` (quality lineage used by the recertification decision)
+- `finance_evidence_root`
+- `quality_evidence_root`
+- `platform_recertification` (optional object with platform linkage controls)
+- `platform_recertification.linkage_status` (`linked|rollback|unlinked`)
+- `platform_recertification.rollback_required` (boolean)
+- `platform_recertification.rollout_action` (`promote|hold|reject|freeze|demote`, optional)
+- `platform_recertification.promotion_decision_ref` (optional mirror for platform decision linkage)
+- `platform_recertification.from_channel` (optional)
+- `platform_recertification.to_channel` (optional)
 - `reason` (optional)
 - `updated_at`
 
@@ -43,6 +54,10 @@ Recertification and controlled re-enable updates may add:
 - `hold`
 - `re-enabled`
 - `closed`
+
+Rollback-safe recertification behavior:
+- when linked platform rollout action is `freeze` or `demote`, recertification should persist `platform_recertification.rollback_required=true`;
+- direct `re-enable` must be converted to `hold` until rollback conditions are resolved.
 
 ## Notes
 An incident report should be able to backfill a dataset case, trigger recertification, and point to backlog planning surfaces for follow-up slices.

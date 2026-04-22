@@ -1,0 +1,15 @@
+{
+  "approved": {
+    "gate": "allow",
+    "platform_linkage": "linked",
+    "rollback_required": false
+  },
+  "rollback": {
+    "incident_status": "hold",
+    "gate": "rollback",
+    "platform_action": "demote",
+    "platform_linkage": "rollback",
+    "rollback_required": true,
+    "to_status": "hold"
+  }
+}

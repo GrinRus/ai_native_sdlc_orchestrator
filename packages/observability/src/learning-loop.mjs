@@ -337,6 +337,18 @@ export function listIncidentReports(options) {
  *   promotionDecisionRef?: string,
  *   promotionDecisionStatus?: string,
  *   evidenceRefs?: string[],
+ *   financeEvidenceRefs?: string[],
+ *   qualityEvidenceRefs?: string[],
+ *   financeEvidenceRoot?: string,
+ *   qualityEvidenceRoot?: string,
+ *   platformRecertification?: {
+ *     linkage_status?: string,
+ *     rollback_required?: boolean,
+ *     rollout_action?: string,
+ *     promotion_decision_ref?: string,
+ *     from_channel?: string,
+ *     to_channel?: string,
+ *   },
  *   timestamp?: string,
  * }} options
  */
@@ -354,10 +366,50 @@ export function applyIncidentRecertification(options) {
   const fromStatus = typeof target.document.status === "string" ? target.document.status : "open";
   const evidenceRoot = resolveReportsRoot(options.runtimeLayout) ?? options.projectRoot;
   const normalizedEvidenceRefs = normalizeEvidenceRefs(options.projectRoot, asStringArray(options.evidenceRefs));
+  const financeEvidenceRefs = normalizeEvidenceRefs(options.projectRoot, asStringArray(options.financeEvidenceRefs));
+  const qualityEvidenceRefs = normalizeEvidenceRefs(options.projectRoot, asStringArray(options.qualityEvidenceRefs));
+  const financeEvidenceRoot =
+    typeof options.financeEvidenceRoot === "string" && options.financeEvidenceRoot.trim().length > 0
+      ? options.financeEvidenceRoot
+      : evidenceRoot;
+  const qualityEvidenceRoot =
+    typeof options.qualityEvidenceRoot === "string" && options.qualityEvidenceRoot.trim().length > 0
+      ? options.qualityEvidenceRoot
+      : evidenceRoot;
   const linkedAssetRefs = normalizeEvidenceRefs(options.projectRoot, [
     ...asStringArray(target.document.linked_asset_refs),
     ...normalizedEvidenceRefs,
+    ...financeEvidenceRefs,
+    ...qualityEvidenceRefs,
   ]);
+  const platformRecertification =
+    options.platformRecertification &&
+    typeof options.platformRecertification === "object" &&
+    !Array.isArray(options.platformRecertification)
+      ? {
+          linkage_status:
+            typeof options.platformRecertification.linkage_status === "string"
+              ? options.platformRecertification.linkage_status
+              : null,
+          rollback_required: options.platformRecertification.rollback_required === true,
+          rollout_action:
+            typeof options.platformRecertification.rollout_action === "string"
+              ? options.platformRecertification.rollout_action
+              : null,
+          promotion_decision_ref:
+            typeof options.platformRecertification.promotion_decision_ref === "string"
+              ? options.platformRecertification.promotion_decision_ref
+              : options.promotionDecisionRef ?? null,
+          from_channel:
+            typeof options.platformRecertification.from_channel === "string"
+              ? options.platformRecertification.from_channel
+              : null,
+          to_channel:
+            typeof options.platformRecertification.to_channel === "string"
+              ? options.platformRecertification.to_channel
+              : null,
+        }
+      : null;
   const recertification = {
     decision: options.decision,
     from_status: fromStatus,
@@ -367,6 +419,11 @@ export function applyIncidentRecertification(options) {
     promotion_decision_status: options.promotionDecisionStatus ?? null,
     evidence_refs: linkedAssetRefs,
     evidence_root: evidenceRoot,
+    finance_evidence_refs: financeEvidenceRefs,
+    quality_evidence_refs: qualityEvidenceRefs,
+    finance_evidence_root: financeEvidenceRoot,
+    quality_evidence_root: qualityEvidenceRoot,
+    platform_recertification: platformRecertification,
     reason: options.reason ?? null,
     updated_at: updatedAt,
   };

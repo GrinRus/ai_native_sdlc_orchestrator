@@ -61,12 +61,26 @@ aor incident recertify \
   --incident-id <INCIDENT_ID> \
   --decision re-enable \
   --promotion-ref <PROMOTION_DECISION_REF>
+
+# rollback-safe hold when platform rollout action is freeze/demote
+aor incident recertify \
+  --project-ref <PROJECT_ROOT> \
+  --incident-id <INCIDENT_ID> \
+  --decision re-enable \
+  --promotion-ref <PROMOTION_DECISION_WITH_FREEZE_OR_DEMOTE_ACTION_REF>
 ```
 
 Expected signals:
 - `incident_status` transitions to `recertify`, `hold`, or `re-enabled`.
 - output includes `incident_recertification_from_status`, `incident_recertification_to_status`, and gate result.
 - re-enable fails with an explicit blocked error when promotion evidence is missing or non-pass.
+- rollback-safe transitions emit:
+  - `incident_recertification_platform_action`
+  - `incident_recertification_platform_linkage` (`linked|rollback|unlinked`)
+  - `incident_recertification_rollback_required`
+  - `incident_recertification_finance_evidence_refs` and `incident_recertification_quality_evidence_refs`
+  - `incident_recertification_finance_evidence_root` and `incident_recertification_quality_evidence_root`
+- if platform action is `freeze` or `demote`, gate becomes `rollback` and resulting `incident_status` is `hold`.
 
 ## Audit runs
 ```bash
