@@ -257,10 +257,10 @@ flowchart TB
 ## W7 hard dependencies
 | Slice ID | Depends on |
 |---|---|
-| W7-S01 | W6-S03, W3-S04 |
-| W7-S02 | W7-S01, W3-S05 |
-| W7-S03 | W7-S02, W6-S06 |
-| W7-S04 | W6-S06 |
+| W7-S01 | W6-S04, W6-S06 |
+| W7-S02 | W7-S01, W6-S05 |
+| W7-S03 | W7-S01, W7-S02 |
+| W7-S04 | W7-S03, W6-S06 |
 | W7-S05 | W7-S02, W7-S03, W7-S04 |
 
 ## W8 hard dependencies

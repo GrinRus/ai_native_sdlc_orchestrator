@@ -6,7 +6,7 @@ import {
   createMockAdapter,
   resolveAdapterForRoute,
 } from "../../adapter-sdk/src/index.mjs";
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
 import { resolveAssetBundleForStep } from "./asset-loader.mjs";
@@ -36,6 +36,50 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function canonicalPacketRef(value) {
+  if (value.startsWith("packet://")) {
+    return value;
+  }
+  return `packet://${value}`;
+}
+
+/**
+ * @param {Record<string, unknown> | null} assetResolution
+ * @returns {string[]}
+ */
+function inferPromptRequiredPacketRefs(assetResolution) {
+  const promptResolution = asRecord(asRecord(assetResolution).prompt_bundle);
+  const profileSource = promptResolution.profile_source;
+  if (typeof profileSource !== "string" || profileSource.length === 0) {
+    return [];
+  }
+
+  const loaded = loadContractFile({
+    filePath: profileSource,
+    family: "prompt-bundle",
+  });
+  if (!loaded.ok) {
+    return [];
+  }
+
+  const promptBundle = asRecord(loaded.document);
+  const requiredInputs = asRecord(promptBundle.required_inputs);
+  const packetInputs = asRecord(requiredInputs.packets);
+  return asStringArray(packetInputs.required).map((packetName) => canonicalPacketRef(packetName));
 }
 
 /**
@@ -189,6 +233,12 @@ export function executeRoutedStep(options) {
       policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
     });
 
+    const explicitInputPacketRefs = asStringArray(options.inputPacketRefs);
+    const inferredPromptPacketRefs = dryRun
+      ? inferPromptRequiredPacketRefs(/** @type {Record<string, unknown>} */ (assetResolution))
+      : [];
+    const resolvedInputPacketRefs = [...new Set([...explicitInputPacketRefs, ...inferredPromptPacketRefs])];
+
     const compiledContextResult = compileStepContext({
       projectRoot: init.projectRoot,
       projectProfilePath: init.projectProfilePath,
@@ -196,7 +246,7 @@ export function executeRoutedStep(options) {
       routeResolution: /** @type {Record<string, unknown>} */ (routeResolution),
       assetResolution: /** @type {Record<string, unknown>} */ (assetResolution),
       policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
-      inputPacketRefs: options.inputPacketRefs,
+      inputPacketRefs: resolvedInputPacketRefs,
       runtimeEvidenceRefs: [
         ...asStringArray(options.runtimeEvidenceRefs),
         init.projectProfilePath,
