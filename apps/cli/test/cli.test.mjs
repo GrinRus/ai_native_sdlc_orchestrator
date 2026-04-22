@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -22,6 +23,18 @@ function withTempProject(callback) {
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+}
+
+/**
+ * @param {{ cwd: string, args: string[] }} options
+ */
+function runGitChecked(options) {
+  const run = spawnSync("git", options.args, { cwd: options.cwd, encoding: "utf8" });
+  assert.equal(
+    run.status,
+    0,
+    `git ${options.args.join(" ")} failed: ${(run.stderr ?? run.stdout ?? "").trim()}`,
+  );
 }
 
 test("global help transcript matches fixture", () => {
@@ -108,6 +121,21 @@ test("ui lifecycle command help documents attach and detach semantics", () => {
   assert.match(result.stdout, /--control-plane is optional/);
 });
 
+test("delivery and release command help documents bounded policy semantics", () => {
+  const deliverHelp = invokeCli(["deliver", "prepare", "--help"]);
+  const releaseHelp = invokeCli(["release", "prepare", "--help"]);
+
+  assert.equal(deliverHelp.exitCode, 0);
+  assert.equal(deliverHelp.stderr, "");
+  assert.match(deliverHelp.stdout, /Status: implemented in delivery\/release shell \(W6-S05\)/);
+  assert.match(deliverHelp.stdout, /--promotion-evidence-refs <ref\[,ref...\]> \(optional\)/);
+  assert.match(deliverHelp.stdout, /Non-no-write modes require approved handoff and promotion evidence refs/);
+
+  assert.equal(releaseHelp.exitCode, 0);
+  assert.equal(releaseHelp.stderr, "");
+  assert.match(releaseHelp.stdout, /Release prepare enforces release preconditions before delivery\/release artifact materialization\./);
+});
+
 test("unknown command fails clearly", () => {
   const result = invokeCli(["project", "unknown"]);
 
@@ -133,11 +161,11 @@ test("invalid project-ref fails clearly", () => {
 });
 
 test("planned commands report not implemented status", () => {
-  const result = invokeCli(["deliver", "prepare"]);
+  const result = invokeCli(["harness", "replay"]);
 
   assert.equal(result.exitCode, 1);
   assert.equal(result.stdout, "");
-  assert.match(result.stderr, /Command 'aor deliver prepare' is planned and not implemented yet\./);
+  assert.match(result.stderr, /Command 'aor harness replay' is planned and not implemented yet\./);
 });
 
 test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () => {
@@ -462,6 +490,166 @@ test("W6 ui attach/detach command pack reports lifecycle state and preserves hea
         ui_lifecycle_action: attachDisconnectedPayload.ui_lifecycle_action,
         ui_lifecycle_connection_state: attachDisconnectedPayload.ui_lifecycle_connection_state,
         ui_lifecycle_headless_safe: attachDisconnectedPayload.ui_lifecycle_headless_safe,
+      },
+    };
+    assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("W6 delivery/release prepare command pack enforces policy guardrails and emits durable artifacts", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+    runGitChecked({ cwd: projectRoot, args: ["remote", "add", "origin", "https://github.com/openai/openai.git"] });
+
+    const targetFile = path.join(projectRoot, "examples/project.aor.yaml");
+
+    const noWriteResult = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "w6-deliver-no-write",
+      "--mode",
+      "no-write",
+    ]);
+    assert.equal(noWriteResult.exitCode, 0, noWriteResult.stderr);
+    const noWritePayload = JSON.parse(noWriteResult.stdout);
+    assert.equal(noWritePayload.delivery_mode, "no-write");
+    assert.equal(noWritePayload.delivery_writeback_result, "no-write-confirmed");
+    assert.equal(noWritePayload.delivery_blocking, false);
+    assert.equal(noWritePayload.release_packet_status, "ready-for-close");
+    assert.equal(fs.existsSync(noWritePayload.delivery_manifest_file), true);
+    assert.equal(fs.existsSync(noWritePayload.release_packet_file), true);
+    const noWriteManifest = JSON.parse(fs.readFileSync(noWritePayload.delivery_manifest_file, "utf8"));
+    const noWriteReleasePacket = JSON.parse(fs.readFileSync(noWritePayload.release_packet_file, "utf8"));
+    const manifestFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "delivery-prepare-manifest.fixture.json"), "utf8"),
+    );
+    const releasePacketFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "release-prepare-packet.fixture.json"), "utf8"),
+    );
+    const manifestSubset = {
+      delivery_mode: noWriteManifest.delivery_mode,
+      status: noWriteManifest.status,
+      writeback_mode: noWriteManifest.writeback_policy?.mode,
+      writeback_result: noWriteManifest.repo_deliveries?.[0]?.writeback_result,
+    };
+    const releasePacketSubset = {
+      status: noWriteReleasePacket.status,
+      delivery_manifest_ref_present: typeof noWriteReleasePacket.delivery_manifest_ref === "string",
+    };
+    assert.deepEqual(manifestSubset, manifestFixture);
+    assert.deepEqual(releasePacketSubset, releasePacketFixture);
+
+    fs.appendFileSync(targetFile, "\n# w6-s05 local-branch prepare smoke\n", "utf8");
+    const branchResult = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "w6-deliver-local-branch",
+      "--mode",
+      "local-branch",
+      "--approved-handoff-ref",
+      "evidence://handoff/local-branch",
+      "--promotion-evidence-refs",
+      "evidence://promotion/local-branch",
+      "--branch-name",
+      "aor/w6-s05-local-branch",
+      "--commit-message",
+      "W6-S05 local branch prepare smoke",
+    ]);
+    assert.equal(branchResult.exitCode, 0, branchResult.stderr);
+    const branchPayload = JSON.parse(branchResult.stdout);
+    assert.equal(branchPayload.delivery_mode, "local-branch");
+    assert.equal(branchPayload.delivery_writeback_result, "local-branch-committed");
+    assert.equal(branchPayload.delivery_blocking, false);
+    assert.equal(branchPayload.release_packet_status, "ready-for-close");
+    assert.equal(fs.existsSync(branchPayload.delivery_manifest_file), true);
+    assert.equal(fs.existsSync(branchPayload.release_packet_file), true);
+    const branchName = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    }).stdout.trim();
+    assert.equal(branchName, "aor/w6-s05-local-branch");
+
+    fs.appendFileSync(targetFile, "\n# w6-s05 fork-first prepare smoke\n", "utf8");
+    const forkResult = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "w6-deliver-fork-first",
+      "--mode",
+      "fork-first-pr",
+      "--approved-handoff-ref",
+      "evidence://handoff/fork-first",
+      "--promotion-evidence-refs",
+      "evidence://promotion/fork-first",
+      "--fork-owner",
+      "aor-bot",
+      "--branch-name",
+      "aor/w6-s05-fork-first",
+      "--pr-title",
+      "W6-S05 fork-first smoke",
+    ]);
+    assert.equal(forkResult.exitCode, 0, forkResult.stderr);
+    const forkPayload = JSON.parse(forkResult.stdout);
+    assert.equal(forkPayload.delivery_mode, "fork-first-pr");
+    assert.equal(forkPayload.delivery_writeback_result, "fork-pr-planned");
+    assert.equal(forkPayload.delivery_blocking, false);
+    assert.equal(forkPayload.release_packet_status, "ready-for-close");
+    assert.equal(fs.existsSync(forkPayload.delivery_manifest_file), true);
+    assert.equal(fs.existsSync(forkPayload.release_packet_file), true);
+
+    const releaseBlockedResult = invokeCli([
+      "release",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "w6-release-blocked",
+      "--mode",
+      "patch-only",
+    ]);
+    assert.equal(releaseBlockedResult.exitCode, 1);
+    assert.equal(releaseBlockedResult.stdout, "");
+    assert.match(releaseBlockedResult.stderr, /Release preconditions failed: /);
+    assert.match(releaseBlockedResult.stderr, /approved-handoff-required/);
+    assert.match(releaseBlockedResult.stderr, /promotion-evidence-required/);
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "delivery-release-prepare-transcript.json"), "utf8"),
+    );
+    const transcriptSubset = {
+      deliver_no_write: {
+        command: noWritePayload.command,
+        status: noWritePayload.status,
+        delivery_mode: noWritePayload.delivery_mode,
+        delivery_writeback_result: noWritePayload.delivery_writeback_result,
+        release_packet_status: noWritePayload.release_packet_status,
+      },
+      deliver_local_branch: {
+        command: branchPayload.command,
+        status: branchPayload.status,
+        delivery_mode: branchPayload.delivery_mode,
+        delivery_writeback_result: branchPayload.delivery_writeback_result,
+        release_packet_status: branchPayload.release_packet_status,
+      },
+      deliver_fork_first: {
+        command: forkPayload.command,
+        status: forkPayload.status,
+        delivery_mode: forkPayload.delivery_mode,
+        delivery_writeback_result: forkPayload.delivery_writeback_result,
+        release_packet_status: forkPayload.release_packet_status,
       },
     };
     assert.deepEqual(transcriptSubset, transcriptFixture);

@@ -61,6 +61,27 @@ Durable audit baseline:
 - every control action writes one durable `run-control-event-*.json` record under runtime reports;
 - control records must include `run_id`, `action`, transition snapshot, guardrail decision, and `evidence_root`.
 
+## Delivery/release command endpoints (W6-S05 baseline)
+- `POST /api/projects/:projectId/delivery/prepare`
+- `POST /api/projects/:projectId/release/prepare`
+
+Delivery/release payload baseline:
+- `run_id` (optional command-scoped run identity; deterministic fallback when omitted);
+- `step_class` (optional, defaults to `implement`);
+- `mode` (optional override; canonicalized aliases map to `no-write | patch-only | local-branch | fork-first-pr`);
+- `approved_handoff_ref` (optional evidence ref required by non-`no-write` preconditions);
+- `promotion_evidence_refs` (optional comma/list refs required by non-`no-write` preconditions).
+
+Delivery/release guardrail baseline:
+- resolve policy bounds before materializing delivery/release artifacts;
+- non-`no-write` flows must remain blocked when approved handoff or promotion evidence is missing;
+- `release prepare` must fail fast with explicit precondition blocking reasons and must not bypass delivery-plan guardrails.
+
+Delivery/release response baseline:
+- `delivery_plan_file` and `delivery_plan_status` for policy traceability;
+- `delivery_manifest_file` and `release_packet_file` as durable evidence outputs;
+- `delivery_writeback_result` to distinguish `no-write-confirmed`, `patch-materialized`, `local-branch-committed`, and `fork-pr-planned`.
+
 ## UI lifecycle endpoints (W6-S04 baseline)
 - `POST /api/projects/:projectId/ui/attach`
 - `POST /api/projects/:projectId/ui/detach`

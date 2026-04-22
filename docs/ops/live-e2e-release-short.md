@@ -54,6 +54,30 @@ aor live-e2e start \
   --profile ./examples/live-e2e/release-short.yaml
 ```
 
+## Delivery/release prepare command pack (W6-S05)
+Use this explicit command sequence when release rehearsal needs direct command-level control:
+
+```bash
+aor deliver prepare \
+  --project-ref <TARGET_ROOT> \
+  --run-id <RUN_ID> \
+  --mode fork-first-pr \
+  --approved-handoff-ref evidence://handoff/<RUN_ID> \
+  --promotion-evidence-refs evidence://promotion/<RUN_ID> \
+  --fork-owner <GITHUB_FORK_OWNER> \
+  --branch-name aor/<RUN_ID>-fork-first
+
+aor release prepare \
+  --project-ref <TARGET_ROOT> \
+  --run-id <RUN_ID> \
+  --mode fork-first-pr \
+  --approved-handoff-ref evidence://handoff/<RUN_ID> \
+  --promotion-evidence-refs evidence://promotion/<RUN_ID>
+```
+
+Guardrail expectation:
+- omit `--approved-handoff-ref` or `--promotion-evidence-refs` in non-`no-write` mode and `release prepare` must fail with explicit precondition blocking reasons.
+
 ## Expected verification
 - setup command `npm install` succeeds;
 - setup command `npx playwright install` succeeds;

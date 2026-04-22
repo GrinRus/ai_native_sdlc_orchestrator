@@ -1,0 +1,6 @@
+{
+  "delivery_mode": "no-write",
+  "status": "submitted",
+  "writeback_mode": "no-write",
+  "writeback_result": "no-write-confirmed"
+}

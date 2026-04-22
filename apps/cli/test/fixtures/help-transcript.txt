@@ -19,6 +19,8 @@ Implemented commands:
   - aor run steer
   - aor run cancel
   - aor run status
+  - aor deliver prepare
+  - aor release prepare
   - aor packet show
   - aor evidence show
   - aor live-e2e start
@@ -31,8 +33,6 @@ Planned commands (not implemented yet):
   - aor harness replay
   - aor asset promote
   - aor asset freeze
-  - aor deliver prepare
-  - aor release prepare
   - aor incident open
   - aor incident show
   - aor audit runs

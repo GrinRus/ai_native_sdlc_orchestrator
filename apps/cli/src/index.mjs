@@ -21,7 +21,13 @@ import {
   prepareHandoffArtifacts,
 } from "../../../packages/orchestrator-core/src/handoff-packets.mjs";
 import { certifyAssetPromotion } from "../../../packages/orchestrator-core/src/certification-decision.mjs";
+import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
+import {
+  materializeDeliveryPlan,
+  normalizeDeliveryMode,
+} from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
 import { runEvaluationSuite } from "../../../packages/orchestrator-core/src/eval-runner.mjs";
+import { resolveStepPolicyForStep } from "../../../packages/orchestrator-core/src/policy-resolution.mjs";
 import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { validateProjectRuntime } from "../../../packages/orchestrator-core/src/project-validate.mjs";
@@ -134,6 +140,8 @@ function formatCommandHelp(definition) {
             definition.command === "packet show" ||
             definition.command === "evidence show"
           ? "Status: implemented in operator shell (W5-S03)"
+        : definition.command === "deliver prepare" || definition.command === "release prepare"
+          ? "Status: implemented in delivery/release shell (W6-S05)"
         : definition.command === "ui attach" || definition.command === "ui detach"
           ? "Status: implemented in UI lifecycle shell (W6-S04)"
           : definition.command === "live-e2e start" ||
@@ -260,12 +268,24 @@ function formatCommandHelp(definition) {
                 "- --follow=true requires --run-id and reuses the shared live-run event stream protocol.",
                 "- Use run start/pause/resume/steer/cancel for bounded control actions.",
               ]
-          : definition.command === "packet show"
+      : definition.command === "packet show"
             ? [
                 "- This command is read-only and resolves packet artifacts through the API read surface.",
                 "- --family filters contract families (artifact-packet, wave-ticket, handoff-packet, delivery-plan, delivery-manifest, release-packet).",
-                "- Future control hooks remain planned: deliver prepare, release prepare.",
+                "- Use deliver/release prepare to materialize policy-bounded delivery and release artifacts.",
               ]
+            : definition.command === "deliver prepare"
+              ? [
+                  "- Delivery prepare resolves policy bounds and materializes a delivery-plan before driver execution.",
+                  "- --mode supports aliases (read-only -> no-write, patch -> patch-only, branch -> local-branch, fork-pr -> fork-first-pr).",
+                  "- Non-no-write modes require approved handoff and promotion evidence refs to pass guardrails.",
+                ]
+              : definition.command === "release prepare"
+                ? [
+                    "- Release prepare enforces release preconditions before delivery/release artifact materialization.",
+                    "- If preconditions are blocked, the command fails with explicit blocking reasons.",
+                    "- Successful execution links delivery-manifest and release-packet outputs for audit lineage.",
+                  ]
             : definition.command === "evidence show"
               ? [
                   "- This command is read-only and aggregates step, quality, and delivery evidence.",
@@ -417,6 +437,29 @@ function resolveOptionalIntegerFlag(flagName, value, options = {}) {
   }
 
   return parsed;
+}
+
+/**
+ * @param {string} flagName
+ * @param {string | true | undefined} value
+ * @returns {string[]}
+ */
+function resolveOptionalCsvFlag(flagName, value) {
+  if (value === undefined) return [];
+  if (value === true) {
+    throw new CliUsageError(`Flag '--${flagName}' requires a value.`);
+  }
+
+  const parsed = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  if (parsed.length === 0) {
+    throw new CliUsageError(`Flag '--${flagName}' cannot be empty.`);
+  }
+
+  return Array.from(new Set(parsed));
 }
 
 /**
@@ -684,6 +727,19 @@ function executeImplementedCommand(command, flags, cwd) {
   let uiLifecycleIdempotent = null;
   let uiLifecycleConnectionState = null;
   let uiLifecycleHeadlessSafe = null;
+  let deliveryPlanId = null;
+  let deliveryPlanFile = null;
+  let deliveryPlanStatus = null;
+  let deliveryMode = null;
+  let deliveryBlocking = null;
+  let deliveryBlockingReasons = null;
+  let deliveryTranscriptFile = null;
+  let deliveryManifestId = null;
+  let deliveryManifestFile = null;
+  let releasePacketId = null;
+  let releasePacketFile = null;
+  let releasePacketStatus = null;
+  let deliveryWritebackResult = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -1112,6 +1168,134 @@ function executeImplementedCommand(command, flags, cwd) {
 
     readOnly = true;
     futureControlHooks = ["run start", "run pause", "run resume", "run steer", "run cancel"];
+  } else if (command === "deliver prepare" || command === "release prepare") {
+    ensureRequiredFlags(command, flags);
+    const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
+    const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
+
+    const init = initializeProjectRuntime({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    resolvedProjectRef = init.projectRoot;
+    resolvedRuntimeRoot = init.runtimeRoot;
+    runtimeLayout = init.runtimeLayout;
+    runtimeStateFile = init.stateFile;
+    projectProfileRef = init.projectProfileRef;
+
+    const stepClass = resolveOptionalStringFlag("step-class", flags["step-class"]) ?? "implement";
+    const runId =
+      resolveOptionalStringFlag("run-id", flags["run-id"]) ??
+      `${init.projectId}.${command === "deliver prepare" ? "delivery" : "release"}.prepare.v1`;
+    const resolvedPolicy = resolveStepPolicyForStep({
+      projectProfilePath: init.projectProfilePath,
+      routesRoot: path.join(init.projectRoot, "examples/routes"),
+      policiesRoot: path.join(init.projectRoot, "examples/policies"),
+      stepClass,
+      routeOverrides,
+      policyOverrides,
+    });
+    const requestedMode = resolveOptionalStringFlag("mode", flags.mode);
+    if (requestedMode) {
+      const canonicalMode = normalizeDeliveryMode(requestedMode);
+      resolvedPolicy.resolved_bounds.writeback_mode.mode = canonicalMode;
+      resolvedPolicy.resolved_bounds.writeback_mode.resolution_source = {
+        kind: "step-override",
+        field: "--mode",
+      };
+    }
+
+    const approvedHandoffRef = resolveOptionalStringFlag(
+      "approved-handoff-ref",
+      flags["approved-handoff-ref"],
+    );
+    const promotionEvidenceRefs = resolveOptionalCsvFlag(
+      "promotion-evidence-refs",
+      flags["promotion-evidence-refs"],
+    );
+    const planResult = materializeDeliveryPlan({
+      runtimeLayout: init.runtimeLayout,
+      projectId: init.projectId,
+      runId,
+      stepClass,
+      policyResolution: resolvedPolicy,
+      handoffApproval: approvedHandoffRef
+        ? {
+            status: "pass",
+            ref: approvedHandoffRef,
+          }
+        : {
+            status: "missing",
+            ref: null,
+          },
+      promotionEvidenceRefs,
+    });
+
+    deliveryPlanId =
+      typeof planResult.deliveryPlan.plan_id === "string" ? planResult.deliveryPlan.plan_id : null;
+    deliveryPlanFile = planResult.deliveryPlanFile;
+    deliveryPlanStatus =
+      typeof planResult.deliveryPlan.status === "string" ? planResult.deliveryPlan.status : null;
+    deliveryMode =
+      typeof planResult.deliveryPlan.delivery_mode === "string" ? planResult.deliveryPlan.delivery_mode : null;
+    deliveryBlocking = deliveryPlanStatus !== "ready";
+    deliveryBlockingReasons = Array.isArray(planResult.deliveryPlan.blocking_reasons)
+      ? planResult.deliveryPlan.blocking_reasons
+          .filter((reason) => typeof reason === "string" && reason.trim().length > 0)
+          .map((reason) => reason.trim())
+      : [];
+
+    if (command === "release prepare" && deliveryPlanStatus !== "ready") {
+      const reasons = deliveryBlockingReasons.length > 0
+        ? deliveryBlockingReasons.join(", ")
+        : "delivery-plan-blocked";
+      throw new CliUsageError(`Release preconditions failed: ${reasons}.`);
+    }
+
+    const deliveryResult = runDeliveryDriver({
+      projectRef: init.projectRoot,
+      cwd,
+      runtimeRoot: init.runtimeRoot,
+      runId,
+      stepId: command === "deliver prepare" ? "deliver.prepare" : "release.prepare",
+      mode: deliveryMode ?? undefined,
+      branchName: resolveOptionalStringFlag("branch-name", flags["branch-name"]),
+      commitMessage: resolveOptionalStringFlag("commit-message", flags["commit-message"]),
+      forkOwner: resolveOptionalStringFlag("fork-owner", flags["fork-owner"]),
+      baseRef: resolveOptionalStringFlag("base-ref", flags["base-ref"]),
+      prTitle: resolveOptionalStringFlag("pr-title", flags["pr-title"]),
+      prBody: resolveOptionalStringFlag("pr-body", flags["pr-body"]),
+      ticketId: resolveOptionalStringFlag("ticket-id", flags["ticket-id"]),
+      deliveryPlanPath: planResult.deliveryPlanFile,
+    });
+
+    deliveryBlocking = deliveryResult.blocking;
+    deliveryTranscriptFile = deliveryResult.transcriptFile;
+    deliveryManifestId =
+      typeof deliveryResult.deliveryManifest.manifest_id === "string"
+        ? deliveryResult.deliveryManifest.manifest_id
+        : null;
+    deliveryManifestFile = deliveryResult.deliveryManifestFile;
+    releasePacketId =
+      typeof deliveryResult.releasePacket.packet_id === "string" ? deliveryResult.releasePacket.packet_id : null;
+    releasePacketFile = deliveryResult.releasePacketFile;
+    releasePacketStatus =
+      typeof deliveryResult.releasePacket.status === "string" ? deliveryResult.releasePacket.status : null;
+    const repoDeliveries = Array.isArray(deliveryResult.deliveryManifest.repo_deliveries)
+      ? deliveryResult.deliveryManifest.repo_deliveries
+      : [];
+    const firstRepoDelivery = repoDeliveries.length > 0 && typeof repoDeliveries[0] === "object" ? repoDeliveries[0] : null;
+    if (firstRepoDelivery && typeof firstRepoDelivery.writeback_result === "string") {
+      deliveryWritebackResult = firstRepoDelivery.writeback_result;
+    }
+    readOnly = false;
+    futureControlHooks = [
+      "packet show --family delivery-manifest",
+      "packet show --family release-packet",
+      `evidence show --run-id ${runId}`,
+    ];
   } else if (command === "packet show") {
     ensureRequiredFlags(command, flags);
     const family = resolveOptionalStringFlag("family", flags.family) ?? "all";
@@ -1448,6 +1632,19 @@ function executeImplementedCommand(command, flags, cwd) {
     ui_lifecycle_idempotent: uiLifecycleIdempotent,
     ui_lifecycle_connection_state: uiLifecycleConnectionState,
     ui_lifecycle_headless_safe: uiLifecycleHeadlessSafe,
+    delivery_plan_id: deliveryPlanId,
+    delivery_plan_file: deliveryPlanFile,
+    delivery_plan_status: deliveryPlanStatus,
+    delivery_mode: deliveryMode,
+    delivery_blocking: deliveryBlocking,
+    delivery_blocking_reasons: deliveryBlockingReasons,
+    delivery_transcript_file: deliveryTranscriptFile,
+    delivery_manifest_id: deliveryManifestId,
+    delivery_manifest_file: deliveryManifestFile,
+    release_packet_id: releasePacketId,
+    release_packet_file: releasePacketFile,
+    release_packet_status: releasePacketStatus,
+    delivery_writeback_result: deliveryWritebackResult,
     run_summaries: runSummaries,
     follow_mode: followMode,
     stream_protocol: streamProtocol,

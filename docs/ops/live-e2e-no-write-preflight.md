@@ -101,6 +101,27 @@ Evidence fixtures captured for this procedure:
 - `examples/live-e2e/fixtures/w3-s06/artifacts/ky/*`
 - `examples/live-e2e/fixtures/w3-s06/artifacts/httpie-cli/*`
 
+## Delivery command pack smoke (W6-S05 baseline)
+Use this command path when you need explicit delivery/release packet materialization while keeping no-write safety:
+
+```bash
+aor deliver prepare \
+  --project-ref <TARGET_ROOT> \
+  --run-id <RUN_ID> \
+  --mode no-write
+
+aor release prepare \
+  --project-ref <TARGET_ROOT> \
+  --run-id <RUN_ID> \
+  --mode no-write
+```
+
+Expected no-write command signals:
+- `delivery_plan_status=ready`;
+- `delivery_mode=no-write`;
+- `delivery_writeback_result=no-write-confirmed`;
+- `delivery_manifest_file` and `release_packet_file` are both materialized.
+
 ## Required target annotations
 Each profile and runbook must provide:
 - prerequisites;

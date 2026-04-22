@@ -1,0 +1,23 @@
+{
+  "deliver_no_write": {
+    "command": "deliver prepare",
+    "status": "implemented",
+    "delivery_mode": "no-write",
+    "delivery_writeback_result": "no-write-confirmed",
+    "release_packet_status": "ready-for-close"
+  },
+  "deliver_local_branch": {
+    "command": "deliver prepare",
+    "status": "implemented",
+    "delivery_mode": "local-branch",
+    "delivery_writeback_result": "local-branch-committed",
+    "release_packet_status": "ready-for-close"
+  },
+  "deliver_fork_first": {
+    "command": "deliver prepare",
+    "status": "implemented",
+    "delivery_mode": "fork-first-pr",
+    "delivery_writeback_result": "fork-pr-planned",
+    "release_packet_status": "ready-for-close"
+  }
+}

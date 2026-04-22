@@ -24,6 +24,8 @@ This catalog separates bootstrap commands implemented in the current shell from 
 | `aor run steer` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>`; `--target-step <step_class>` (required by guardrail); `--reason <text>` (optional); `--approval-ref <ref>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `run_control_action`, `run_control_run_id`, `run_control_state`, `run_control_state_file`, `run_control_audit_id`, `run_control_audit_file`, `run_control_blocked`, `run_control_guardrails`, `run_control_transition`, `primary_event_id`, `evidence_event_id`, `stream_log_file`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event` |
 | `aor run cancel` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>`; `--reason <text>` (optional); `--approval-ref <ref>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `run_control_action`, `run_control_run_id`, `run_control_state`, `run_control_state_file`, `run_control_audit_id`, `run_control_audit_file`, `run_control_blocked`, `run_control_guardrails`, `run_control_transition`, `primary_event_id`, `evidence_event_id`, `stream_log_file`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event` |
 | `aor run status` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--follow <true\|false>` (optional); `--after-event-id <event_id>` (optional); `--max-replay <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `run_summaries`, `follow_mode`, `stream_protocol`, `stream_backpressure`, `replay_events`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event`, `step-result`, `delivery-manifest`, `release-packet`, `promotion-decision` |
+| `aor deliver prepare` | implemented | `--project-ref <path>`; `--project-profile <path>` (optional); `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--step-class <step_class>` (optional); `--mode <mode>` (optional); `--approved-handoff-ref <ref>` (optional); `--promotion-evidence-refs <ref[,ref...]>` (optional); `--route-overrides <step=route_id,...>` (optional); `--policy-overrides <step=policy_id,...>` (optional); `--ticket-id <id>` (optional); `--branch-name <name>` (optional); `--commit-message <text>` (optional); `--fork-owner <owner>` (optional); `--base-ref <ref>` (optional); `--pr-title <text>` (optional); `--pr-body <text>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `delivery_plan_id`, `delivery_plan_file`, `delivery_plan_status`, `delivery_mode`, `delivery_blocking`, `delivery_blocking_reasons`, `delivery_transcript_file`, `delivery_manifest_id`, `delivery_manifest_file`, `release_packet_id`, `release_packet_file`, `release_packet_status`, `delivery_writeback_result`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `delivery-plan`, `delivery-manifest`, `release-packet` |
+| `aor release prepare` | implemented | `--project-ref <path>`; `--project-profile <path>` (optional); `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--step-class <step_class>` (optional); `--mode <mode>` (optional); `--approved-handoff-ref <ref>` (optional); `--promotion-evidence-refs <ref[,ref...]>` (optional); `--route-overrides <step=route_id,...>` (optional); `--policy-overrides <step=policy_id,...>` (optional); `--ticket-id <id>` (optional); `--branch-name <name>` (optional); `--commit-message <text>` (optional); `--fork-owner <owner>` (optional); `--base-ref <ref>` (optional); `--pr-title <text>` (optional); `--pr-body <text>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `delivery_plan_id`, `delivery_plan_file`, `delivery_plan_status`, `delivery_mode`, `delivery_blocking`, `delivery_blocking_reasons`, `delivery_transcript_file`, `delivery_manifest_id`, `delivery_manifest_file`, `release_packet_id`, `release_packet_file`, `release_packet_status`, `delivery_writeback_result`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `delivery-plan`, `delivery-manifest`, `release-packet` |
 | `aor packet show` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--family <contract_family\|all>` (optional); `--limit <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `packet_artifacts`, `selected_family`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `artifact-packet`, `wave-ticket`, `handoff-packet`, `delivery-plan`, `delivery-manifest`, `release-packet` |
 | `aor evidence show` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `step_results`, `quality_artifacts`, `delivery_manifests`, `promotion_decisions`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `step-result`, `validation-report`, `evaluation-report`, `incident-report`, `promotion-decision`, `delivery-manifest`, `release-packet` |
 | `aor live-e2e start` | implemented | `--project-ref <path>`; `--profile <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--hold-open <true\|false>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_profile_ref`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecard_files`, `live_e2e_abort_supported`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-e2e-profile`, `live-run-event`, `incident-report`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
@@ -41,9 +43,6 @@ The following commands remain planned and are intentionally not implemented in t
 - `aor asset promote`
 - `aor asset freeze`
 
-- `aor deliver prepare`
-- `aor release prepare`
-
 - `aor incident open`
 - `aor incident show`
 - `aor audit runs`
@@ -53,8 +52,9 @@ The following commands remain planned and are intentionally not implemented in t
 - `aor run status --follow` reuses the shared live-run stream contract and backpressure semantics from the control-plane event stream.
 - Run-control command pack is implemented in W6-S03:
   - `aor run start`, `aor run pause`, `aor run resume`, `aor run steer`, `aor run cancel`
+- Delivery/release command pack is implemented in W6-S05:
+  - `aor deliver prepare`, `aor release prepare`
 - Remaining planned control hooks:
-  - delivery control: `aor deliver prepare`, `aor release prepare`
   - incident/audit control: `aor incident open`, `aor incident show`, `aor audit runs`
 
 ## Standard live E2E semantics for W5-S05
@@ -78,3 +78,7 @@ The following commands remain planned and are intentionally not implemented in t
 ## Story traceability for W6-S04
 - `aor ui attach` supports delivery engineer and operator workflows by recording explicit UI lifecycle attachment state.
 - `aor ui detach` preserves headless-first operation while keeping lifecycle state auditable and queryable through operator surfaces.
+
+## Story traceability for W6-S05
+- `aor deliver prepare` supports delivery transaction / Git / PR flow by resolving write-back mode through policy and emitting durable delivery-manifest plus release-packet lineage.
+- `aor release prepare` supports repository and release owners by enforcing handoff/promotion preconditions before release artifact materialization.

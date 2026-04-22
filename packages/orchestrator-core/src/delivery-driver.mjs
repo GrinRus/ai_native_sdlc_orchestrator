@@ -7,7 +7,7 @@ import { materializeLearningLoopArtifacts } from "../../observability/src/index.
 
 import { initializeProjectRuntime } from "./project-init.mjs";
 
-const SUPPORTED_DELIVERY_MODES = new Set(["patch-only", "local-branch", "fork-first-pr"]);
+const SUPPORTED_DELIVERY_MODES = new Set(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
 
 /**
  * @param {unknown} value
@@ -270,7 +270,7 @@ function loadDeliveryPlan(options) {
 /**
  * @param {Record<string, unknown>} deliveryPlan
  * @param {string | undefined} requestedMode
- * @returns {"patch-only" | "local-branch" | "fork-first-pr"}
+ * @returns {"no-write" | "patch-only" | "local-branch" | "fork-first-pr"}
  */
 function resolveDeliveryMode(deliveryPlan, requestedMode) {
   const status = asString(deliveryPlan.status);
@@ -288,7 +288,7 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
   const mode = asString(deliveryPlan.delivery_mode);
   if (!mode || !SUPPORTED_DELIVERY_MODES.has(mode)) {
     throw new Error(
-      `Delivery mode '${String(deliveryPlan.delivery_mode)}' is not supported in this slice. Expected one of: patch-only, local-branch, fork-first-pr.`,
+      `Delivery mode '${String(deliveryPlan.delivery_mode)}' is not supported in this slice. Expected one of: no-write, patch-only, local-branch, fork-first-pr.`,
     );
   }
 
@@ -296,7 +296,7 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
     throw new Error(`Requested delivery mode '${requestedMode}' does not match plan mode '${mode}'.`);
   }
 
-  return /** @type {"patch-only" | "local-branch" | "fork-first-pr"} */ (mode);
+  return /** @type {"no-write" | "patch-only" | "local-branch" | "fork-first-pr"} */ (mode);
 }
 
 /**
@@ -367,7 +367,12 @@ export function runDeliveryDriver(options = {}) {
   let recoverySteps = null;
 
   try {
-    if (mode === "patch-only") {
+    if (mode === "no-write") {
+      outputs = {
+        no_write: true,
+        summary: "No-write mode selected; delivery transcript, manifest, and release packet are materialized only.",
+      };
+    } else if (mode === "patch-only") {
       commands.push("git diff --binary HEAD");
       const patchBody = runGitChecked({
         cwd: executionRoot,
@@ -628,7 +633,9 @@ export function runDeliveryDriver(options = {}) {
 
   const writebackResult =
     status === "success"
-      ? mode === "patch-only"
+      ? mode === "no-write"
+        ? "no-write-confirmed"
+        : mode === "patch-only"
         ? "patch-materialized"
         : mode === "local-branch"
           ? "local-branch-committed"
