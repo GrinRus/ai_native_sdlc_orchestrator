@@ -16,6 +16,8 @@ const ROUTE_STEP_VALUES = [
   "harness",
 ];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
+const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
+const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "closed"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
 const LIVE_RUN_EVENT_TYPE_VALUES = [
@@ -342,7 +344,10 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       linked_asset_refs: "array",
       status: "string",
     },
-    enumChecks: [],
+    enumChecks: [
+      { field: "severity", allowedValues: INCIDENT_SEVERITY_VALUES },
+      { field: "status", allowedValues: INCIDENT_STATUS_VALUES },
+    ],
   },
   {
     family: "step-result",

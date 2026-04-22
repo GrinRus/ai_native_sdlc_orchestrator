@@ -102,6 +102,11 @@ Incident show baseline:
 - supports bounded lookup by `incident_id` or `run_id`;
 - missing lookup targets return explicit not-found errors for operator diagnostics.
 
+Incident recertify baseline (W7-S03):
+- `incident recertify` applies one of `recertify|hold|re-enable` to a durable `incident-report`;
+- re-enable is blocked unless linked promotion evidence is present with `status=pass`;
+- recertification updates persist transition provenance (`from_status`, `to_status`, run/promotion refs, evidence root).
+
 Audit runs baseline:
 - emits run-centric snapshots of packet, step-result, quality, incident, and promotion refs;
 - emits `run_audit_records.finance_evidence` with route/wrapper/adapter IDs plus bounded cost/timeout/latency summaries;

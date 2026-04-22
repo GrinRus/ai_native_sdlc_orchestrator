@@ -39,6 +39,35 @@ Expected signals:
 - `incident_records` is returned.
 - each record includes `incident_ref`, `linked_run_refs`, and `linked_asset_refs`.
 
+## Recertify and re-enable
+```bash
+# mark incident for recertification
+aor incident recertify \
+  --project-ref <PROJECT_ROOT> \
+  --incident-id <INCIDENT_ID> \
+  --decision recertify \
+  --reason "waiting for certification evidence"
+
+# hold transition when evidence is incomplete
+aor incident recertify \
+  --project-ref <PROJECT_ROOT> \
+  --incident-id <INCIDENT_ID> \
+  --decision hold \
+  --reason "promotion evidence still blocked"
+
+# verified re-enable with explicit promotion decision evidence
+aor incident recertify \
+  --project-ref <PROJECT_ROOT> \
+  --incident-id <INCIDENT_ID> \
+  --decision re-enable \
+  --promotion-ref <PROMOTION_DECISION_REF>
+```
+
+Expected signals:
+- `incident_status` transitions to `recertify`, `hold`, or `re-enabled`.
+- output includes `incident_recertification_from_status`, `incident_recertification_to_status`, and gate result.
+- re-enable fails with an explicit blocked error when promotion evidence is missing or non-pass.
+
 ## Audit runs
 ```bash
 # one run

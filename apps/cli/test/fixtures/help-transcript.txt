@@ -24,6 +24,7 @@ Implemented commands:
   - aor packet show
   - aor evidence show
   - aor incident open
+  - aor incident recertify
   - aor incident show
   - aor audit runs
   - aor live-e2e start

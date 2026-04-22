@@ -9,6 +9,11 @@
     "status": "implemented",
     "record_count": 1
   },
+  "incident_recertify": {
+    "command": "incident recertify",
+    "status": "implemented",
+    "incident_status": "re-enabled"
+  },
   "audit_runs": {
     "command": "audit runs",
     "status": "implemented",

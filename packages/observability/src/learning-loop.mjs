@@ -126,6 +126,20 @@ function incidentLinksRun(incident, runId) {
 }
 
 /**
+ * @param {{ reportsRoot?: unknown, reports_root?: unknown }} runtimeLayout
+ * @returns {string | null}
+ */
+function resolveReportsRoot(runtimeLayout) {
+  if (typeof runtimeLayout.reportsRoot === "string" && runtimeLayout.reportsRoot.trim().length > 0) {
+    return runtimeLayout.reportsRoot;
+  }
+  if (typeof runtimeLayout.reports_root === "string" && runtimeLayout.reports_root.trim().length > 0) {
+    return runtimeLayout.reports_root;
+  }
+  return null;
+}
+
+/**
  * @param {{
  *   projectId: string,
  *   projectRoot: string,
@@ -267,18 +281,19 @@ export function materializeLearningLoopArtifacts(options) {
 }
 
 /**
- * @param {{ projectRoot: string, runtimeLayout: { reportsRoot: string }, runId?: string }} options
+ * @param {{ projectRoot: string, runtimeLayout: { reportsRoot?: string, reports_root?: string }, runId?: string }} options
  */
 export function listIncidentReports(options) {
-  if (!fs.existsSync(options.runtimeLayout.reportsRoot)) {
+  const reportsRoot = resolveReportsRoot(options.runtimeLayout);
+  if (!reportsRoot || !fs.existsSync(reportsRoot)) {
     return [];
   }
 
   const runId = typeof options.runId === "string" && options.runId.trim().length > 0 ? options.runId.trim() : null;
   const files = fs
-    .readdirSync(options.runtimeLayout.reportsRoot)
+    .readdirSync(reportsRoot)
     .filter((entry) => INCIDENT_REPORT_REGEX.test(entry))
-    .map((entry) => path.join(options.runtimeLayout.reportsRoot, entry))
+    .map((entry) => path.join(reportsRoot, entry))
     .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
 
   /** @type {Array<{ file: string, artifact_ref: string, document: Record<string, unknown> }>} */
@@ -308,4 +323,77 @@ export function listIncidentReports(options) {
   }
 
   return reports;
+}
+
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   runtimeLayout: { reportsRoot?: string, reports_root?: string },
+ *   incidentId: string,
+ *   decision: "recertify" | "hold" | "re-enable",
+ *   nextStatus: string,
+ *   runRef?: string,
+ *   reason?: string,
+ *   promotionDecisionRef?: string,
+ *   promotionDecisionStatus?: string,
+ *   evidenceRefs?: string[],
+ *   timestamp?: string,
+ * }} options
+ */
+export function applyIncidentRecertification(options) {
+  const reports = listIncidentReports({
+    projectRoot: options.projectRoot,
+    runtimeLayout: options.runtimeLayout,
+  });
+  const target = reports.find((entry) => entry.document.incident_id === options.incidentId);
+  if (!target) {
+    throw new Error(`Incident '${options.incidentId}' was not found.`);
+  }
+
+  const updatedAt = options.timestamp ?? nowIso();
+  const fromStatus = typeof target.document.status === "string" ? target.document.status : "open";
+  const evidenceRoot = resolveReportsRoot(options.runtimeLayout) ?? options.projectRoot;
+  const normalizedEvidenceRefs = normalizeEvidenceRefs(options.projectRoot, asStringArray(options.evidenceRefs));
+  const linkedAssetRefs = normalizeEvidenceRefs(options.projectRoot, [
+    ...asStringArray(target.document.linked_asset_refs),
+    ...normalizedEvidenceRefs,
+  ]);
+  const recertification = {
+    decision: options.decision,
+    from_status: fromStatus,
+    to_status: options.nextStatus,
+    run_ref: options.runRef ?? null,
+    promotion_decision_ref: options.promotionDecisionRef ?? null,
+    promotion_decision_status: options.promotionDecisionStatus ?? null,
+    evidence_refs: linkedAssetRefs,
+    evidence_root: evidenceRoot,
+    reason: options.reason ?? null,
+    updated_at: updatedAt,
+  };
+
+  const updatedIncident = {
+    ...target.document,
+    status: options.nextStatus,
+    linked_asset_refs: linkedAssetRefs,
+    recertification,
+    recertification_updated_at: updatedAt,
+  };
+  const validation = validateContractDocument({
+    family: "incident-report",
+    document: updatedIncident,
+    source: "runtime://incident-report-recertify",
+  });
+  if (!validation.ok) {
+    const issues = validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Generated incident recertification update failed contract validation: ${issues}`);
+  }
+
+  writeJson(target.file, updatedIncident);
+
+  return {
+    incident: updatedIncident,
+    incidentFile: target.file,
+    incidentRef: target.artifact_ref,
+    recertification,
+  };
 }

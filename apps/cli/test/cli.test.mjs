@@ -152,6 +152,7 @@ test("delivery and release command help documents bounded policy semantics", () 
 
 test("incident and audit command help documents run-linked operational semantics", () => {
   const incidentHelp = invokeCli(["incident", "open", "--help"]);
+  const recertifyHelp = invokeCli(["incident", "recertify", "--help"]);
   const auditHelp = invokeCli(["audit", "runs", "--help"]);
 
   assert.equal(incidentHelp.exitCode, 0);
@@ -159,6 +160,13 @@ test("incident and audit command help documents run-linked operational semantics
   assert.match(incidentHelp.stdout, /Status: implemented in incident\/audit shell \(W6-S06\)/);
   assert.match(incidentHelp.stdout, /--run-id <id>/);
   assert.match(incidentHelp.stdout, /writes one contract-valid incident-report/);
+
+  assert.equal(recertifyHelp.exitCode, 0);
+  assert.equal(recertifyHelp.stderr, "");
+  assert.match(recertifyHelp.stdout, /Status: implemented in incident recertification shell \(W7-S03\)/);
+  assert.match(recertifyHelp.stdout, /--incident-id <id>/);
+  assert.match(recertifyHelp.stdout, /--decision <recertify\|hold\|re-enable>/);
+  assert.match(recertifyHelp.stdout, /Re-enable requires explicit promotion evidence with status=pass/);
 
   assert.equal(auditHelp.exitCode, 0);
   assert.equal(auditHelp.stderr, "");
@@ -747,9 +755,13 @@ test("W6 incident and audit command pack links run evidence to durable incident 
       },
     });
 
+    const promotionDecisionFile = path.join(
+      artifactsRoot,
+      `promotion-decision-finance-audit-${runId.replace(/[^\w.-]+/g, "-")}.json`,
+    );
     writeContractFixture({
       family: "promotion-decision",
-      filePath: path.join(artifactsRoot, `promotion-decision-finance-audit-${runId.replace(/[^\w.-]+/g, "-")}.json`),
+      filePath: promotionDecisionFile,
       document: {
         decision_id: `fixture.promotion.finance.${runId}`,
         run_id: runId,
@@ -771,6 +783,36 @@ test("W6 incident and audit command pack links run evidence to durable incident 
         status: "pass",
       },
     });
+    const promotionDecisionRef = `evidence://${path.relative(projectRoot, promotionDecisionFile).replace(/\\/g, "/")}`;
+    const blockedPromotionFile = path.join(
+      artifactsRoot,
+      `promotion-decision-finance-audit-blocked-${runId.replace(/[^\w.-]+/g, "-")}.json`,
+    );
+    writeContractFixture({
+      family: "promotion-decision",
+      filePath: blockedPromotionFile,
+      document: {
+        decision_id: `fixture.promotion.finance.blocked.${runId}`,
+        run_id: runId,
+        subject_ref: "wrapper://wrapper.finance.audit@v1",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [verifyPayload.routed_step_result_file],
+        evidence_summary: {
+          finance_signals: {
+            capture_latency_sec: 0.9,
+            replay_latency_sec: 0.8,
+            total_latency_sec: 1.7,
+          },
+          baseline_comparison: {
+            baseline_pass_rate: 0.8,
+            candidate_pass_rate: 0.6,
+          },
+        },
+        status: "hold",
+      },
+    });
+    const blockedPromotionRef = `evidence://${path.relative(projectRoot, blockedPromotionFile).replace(/\\/g, "/")}`;
 
     const incidentOpenResult = invokeCli([
       "incident",
@@ -808,6 +850,62 @@ test("W6 incident and audit command pack links run evidence to durable incident 
         : false,
     };
     assert.deepEqual(incidentSubset, incidentFixture);
+
+    const blockedRecertifyResult = invokeCli([
+      "incident",
+      "recertify",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      incidentOpenPayload.incident_id,
+      "--decision",
+      "re-enable",
+      "--promotion-ref",
+      blockedPromotionRef,
+    ]);
+    assert.equal(blockedRecertifyResult.exitCode, 1);
+    assert.equal(blockedRecertifyResult.stdout, "");
+    assert.match(
+      blockedRecertifyResult.stderr,
+      /Re-enable is blocked: promotion decision '.*' has status 'hold' \(requires pass\)\./,
+    );
+
+    const holdRecertifyResult = invokeCli([
+      "incident",
+      "recertify",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      incidentOpenPayload.incident_id,
+      "--decision",
+      "hold",
+      "--reason",
+      "waiting for approved recertification evidence",
+    ]);
+    assert.equal(holdRecertifyResult.exitCode, 0, holdRecertifyResult.stderr);
+    const holdRecertifyPayload = JSON.parse(holdRecertifyResult.stdout);
+    assert.equal(holdRecertifyPayload.incident_status, "hold");
+    assert.equal(holdRecertifyPayload.incident_recertification_decision, "hold");
+    assert.equal(holdRecertifyPayload.incident_recertification_to_status, "hold");
+
+    const approvedRecertifyResult = invokeCli([
+      "incident",
+      "recertify",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      incidentOpenPayload.incident_id,
+      "--decision",
+      "re-enable",
+      "--promotion-ref",
+      promotionDecisionRef,
+    ]);
+    assert.equal(approvedRecertifyResult.exitCode, 0, approvedRecertifyResult.stderr);
+    const approvedRecertifyPayload = JSON.parse(approvedRecertifyResult.stdout);
+    assert.equal(approvedRecertifyPayload.incident_status, "re-enabled");
+    assert.equal(approvedRecertifyPayload.incident_recertification_decision, "re-enable");
+    assert.equal(approvedRecertifyPayload.incident_recertification_gate, "allow");
+    assert.equal(approvedRecertifyPayload.incident_recertification_promotion_ref, promotionDecisionRef);
 
     const incidentShowResult = invokeCli([
       "incident",
@@ -902,6 +1000,11 @@ test("W6 incident and audit command pack links run evidence to durable incident 
         command: incidentShowPayload.command,
         status: incidentShowPayload.status,
         record_count: incidentShowPayload.incident_records.length,
+      },
+      incident_recertify: {
+        command: approvedRecertifyPayload.command,
+        status: approvedRecertifyPayload.status,
+        incident_status: approvedRecertifyPayload.incident_status,
       },
       audit_runs: {
         command: auditPayload.command,

@@ -27,6 +27,7 @@ import {
   normalizeDeliveryMode,
 } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
 import { runEvaluationSuite } from "../../../packages/orchestrator-core/src/eval-runner.mjs";
+import { applyIncidentRecertification } from "../../../packages/observability/src/index.mjs";
 import { resolveStepPolicyForStep } from "../../../packages/orchestrator-core/src/policy-resolution.mjs";
 import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
@@ -142,6 +143,8 @@ function formatCommandHelp(definition) {
           ? "Status: implemented in operator shell (W5-S03)"
         : definition.command === "deliver prepare" || definition.command === "release prepare"
           ? "Status: implemented in delivery/release shell (W6-S05)"
+        : definition.command === "incident recertify"
+          ? "Status: implemented in incident recertification shell (W7-S03)"
         : definition.command === "incident open" ||
             definition.command === "incident show" ||
             definition.command === "audit runs"
@@ -304,6 +307,12 @@ function formatCommandHelp(definition) {
                     "- --run-id and --summary are required to preserve explicit operator intent and run lineage.",
                     "- Command links run packet, step, quality, and explicit linked-asset refs into one incident record.",
                   ]
+                : definition.command === "incident recertify"
+                  ? [
+                      "- Incident recertify updates one incident-report with recertify/hold/re-enable transitions.",
+                      "- Re-enable requires explicit promotion evidence with status=pass.",
+                      "- Recertification updates preserve run-linked and promotion-linked evidence refs.",
+                    ]
                 : definition.command === "incident show"
                   ? [
                       "- Incident show is read-only and supports lookup by --incident-id or --run-id.",
@@ -518,6 +527,14 @@ function normalizeForId(value) {
  */
 function toRunRef(runId) {
   return runId.startsWith("run://") ? runId : `run://${runId}`;
+}
+
+/**
+ * @param {string} runRef
+ * @returns {string}
+ */
+function normalizeRunRef(runRef) {
+  return runRef.startsWith("run://") ? runRef.slice("run://".length) : runRef;
 }
 
 /**
@@ -803,6 +820,11 @@ function executeImplementedCommand(command, flags, cwd) {
   let incidentStatus = null;
   let incidentRunRef = null;
   let incidentLinkedAssetRefs = null;
+  let incidentRecertificationDecision = null;
+  let incidentRecertificationFromStatus = null;
+  let incidentRecertificationToStatus = null;
+  let incidentRecertificationPromotionRef = null;
+  let incidentRecertificationGate = null;
   let incidentRecords = null;
   let runAuditRecords = null;
   let auditEvidenceRefs = null;
@@ -1545,9 +1567,144 @@ function executeImplementedCommand(command, flags, cwd) {
     readOnly = false;
     futureControlHooks = [
       `incident show --incident-id ${incidentDocument.incident_id}`,
+      `incident recertify --incident-id ${incidentDocument.incident_id} --decision recertify`,
       `audit runs --run-id ${runId}`,
       `evidence show --run-id ${runId}`,
     ];
+  } else if (command === "incident recertify") {
+    ensureRequiredFlags(command, flags);
+    const incidentIdValue = /** @type {string} */ (resolveOptionalStringFlag("incident-id", flags["incident-id"]));
+    const decisionInput = (resolveOptionalStringFlag("decision", flags.decision) ?? "recertify").toLowerCase();
+    const decision = decisionInput === "reenable" ? "re-enable" : decisionInput;
+    const reason = resolveOptionalStringFlag("reason", flags.reason);
+    const promotionRef = resolveOptionalStringFlag("promotion-ref", flags["promotion-ref"]);
+    const explicitRunId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+
+    if (!["recertify", "hold", "re-enable"].includes(decision)) {
+      throw new CliUsageError("Flag '--decision' must be one of recertify, hold, or re-enable.");
+    }
+
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    resolvedProjectRef = projectState.project_root;
+    resolvedRuntimeRoot = projectState.runtime_root;
+    runtimeLayout = projectState.runtime_layout;
+    runtimeStateFile = projectState.state_file;
+    projectProfileRef = projectState.project_profile_ref;
+
+    const qualityArtifacts = listQualityArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const incidents = qualityArtifacts.filter((artifact) => artifact.family === "incident-report");
+    const incidentArtifact = incidents.find((artifact) => artifact.document.incident_id === incidentIdValue);
+    if (!incidentArtifact) {
+      throw new CliUsageError(`Incident '${incidentIdValue}' was not found.`);
+    }
+
+    const linkedRunRefs = asStringArray(incidentArtifact.document.linked_run_refs);
+    const incidentRun = linkedRunRefs.length > 0 ? linkedRunRefs[0] : explicitRunId ? toRunRef(explicitRunId) : null;
+    if (explicitRunId && incidentRun && normalizeRunRef(incidentRun) !== explicitRunId) {
+      throw new CliUsageError(
+        `Incident '${incidentIdValue}' is linked to '${incidentRun}', not '${toRunRef(explicitRunId)}'.`,
+      );
+    }
+    const runId = incidentRun ? normalizeRunRef(incidentRun) : null;
+
+    const promotions = qualityArtifacts.filter((artifact) => artifact.family === "promotion-decision");
+    let promotionArtifact = null;
+    if (promotionRef) {
+      promotionArtifact = promotions.find((artifact) => artifact.artifact_ref === promotionRef) ?? null;
+      if (!promotionArtifact) {
+        throw new CliUsageError(`Promotion decision '${promotionRef}' was not found.`);
+      }
+    } else if (runId) {
+      const runSummaries = listRuns({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      });
+      const runSummary = runSummaries.find((entry) => entry.run_id === runId);
+      const linkedPromotionRefs = runSummary
+        ? runSummary.quality_refs.filter((ref) => ref.includes("promotion-decision"))
+        : [];
+      promotionArtifact =
+        promotions.find((artifact) => linkedPromotionRefs.includes(artifact.artifact_ref)) ?? null;
+    }
+
+    const promotionStatus =
+      promotionArtifact && typeof promotionArtifact.document.status === "string"
+        ? promotionArtifact.document.status
+        : null;
+
+    if (decision === "re-enable") {
+      if (!promotionArtifact) {
+        throw new CliUsageError(
+          "Re-enable is blocked: no run-linked promotion decision was found. Provide --promotion-ref with pass evidence.",
+        );
+      }
+      if (promotionStatus !== "pass") {
+        throw new CliUsageError(
+          `Re-enable is blocked: promotion decision '${promotionArtifact.artifact_ref}' has status '${promotionStatus ?? "unknown"}' (requires pass).`,
+        );
+      }
+      incidentRecertificationGate = "allow";
+    } else if (decision === "recertify") {
+      incidentRecertificationGate = promotionStatus === "pass" ? "allow" : "hold";
+    } else {
+      incidentRecertificationGate = "hold";
+    }
+
+    const nextStatus = decision === "re-enable" ? "re-enabled" : decision;
+    const linkedEvidenceRefs = uniqueStrings([
+      ...asStringArray(incidentArtifact.document.linked_asset_refs),
+      ...(promotionArtifact
+        ? [promotionArtifact.artifact_ref, ...asStringArray(promotionArtifact.document.evidence_refs)]
+        : []),
+    ]);
+
+    const recertified = applyIncidentRecertification({
+      projectRoot: projectState.project_root,
+      runtimeLayout: projectState.runtime_layout,
+      incidentId: incidentIdValue,
+      decision: /** @type {"recertify" | "hold" | "re-enable"} */ (decision),
+      nextStatus,
+      runRef: incidentRun ?? undefined,
+      reason: reason ?? undefined,
+      promotionDecisionRef: promotionArtifact?.artifact_ref,
+      promotionDecisionStatus: promotionStatus ?? undefined,
+      evidenceRefs: linkedEvidenceRefs,
+    });
+
+    incidentId = incidentIdValue;
+    incidentFile = recertified.incidentFile;
+    incidentStatus =
+      typeof recertified.incident.status === "string" ? recertified.incident.status : nextStatus;
+    incidentRunRef = incidentRun;
+    incidentLinkedAssetRefs = asStringArray(recertified.incident.linked_asset_refs);
+    incidentRecertificationDecision = decision;
+    incidentRecertificationFromStatus =
+      typeof recertified.recertification.from_status === "string"
+        ? recertified.recertification.from_status
+        : null;
+    incidentRecertificationToStatus =
+      typeof recertified.recertification.to_status === "string"
+        ? recertified.recertification.to_status
+        : nextStatus;
+    incidentRecertificationPromotionRef = promotionArtifact?.artifact_ref ?? null;
+    auditEvidenceRefs = linkedEvidenceRefs;
+    readOnly = false;
+    futureControlHooks = runId
+      ? [
+          `incident show --incident-id ${incidentIdValue}`,
+          `audit runs --run-id ${runId}`,
+          `evidence show --run-id ${runId}`,
+        ]
+      : [`incident show --incident-id ${incidentIdValue}`, "audit runs"];
   } else if (command === "incident show") {
     ensureRequiredFlags(command, flags);
     const incidentIdFilter = resolveOptionalStringFlag("incident-id", flags["incident-id"]);
@@ -1606,8 +1763,15 @@ function executeImplementedCommand(command, flags, cwd) {
     auditEvidenceRefs = uniqueStrings(incidentRecords.flatMap((record) => record.linked_asset_refs));
     readOnly = true;
     futureControlHooks = runIdFilter
-      ? [`audit runs --run-id ${runIdFilter}`]
-      : ["audit runs", "incident open --run-id <id> --summary <text>"];
+      ? [
+          `audit runs --run-id ${runIdFilter}`,
+          "incident recertify --incident-id <id> --decision recertify",
+        ]
+      : [
+          "audit runs",
+          "incident open --run-id <id> --summary <text>",
+          "incident recertify --incident-id <id> --decision recertify",
+        ];
   } else if (command === "audit runs") {
     ensureRequiredFlags(command, flags);
     const runIdFilter = resolveOptionalStringFlag("run-id", flags["run-id"]);
@@ -1692,8 +1856,16 @@ function executeImplementedCommand(command, flags, cwd) {
     auditEvidenceRefs = uniqueStrings(runAuditRecords.flatMap((record) => record.evidence_refs));
     readOnly = true;
     futureControlHooks = runIdFilter
-      ? [`incident open --run-id ${runIdFilter} --summary <text>`, `incident show --run-id ${runIdFilter}`]
-      : ["incident open --run-id <id> --summary <text>", "incident show --run-id <id>"];
+      ? [
+          `incident open --run-id ${runIdFilter} --summary <text>`,
+          `incident show --run-id ${runIdFilter}`,
+          "incident recertify --incident-id <id> --decision recertify",
+        ]
+      : [
+          "incident open --run-id <id> --summary <text>",
+          "incident show --run-id <id>",
+          "incident recertify --incident-id <id> --decision recertify",
+        ];
   } else if (command === "live-e2e start") {
     ensureRequiredFlags(command, flags);
     const holdOpen = resolveOptionalBooleanFlag("hold-open", flags["hold-open"]);
@@ -1959,6 +2131,11 @@ function executeImplementedCommand(command, flags, cwd) {
     incident_status: incidentStatus,
     incident_run_ref: incidentRunRef,
     incident_linked_asset_refs: incidentLinkedAssetRefs,
+    incident_recertification_decision: incidentRecertificationDecision,
+    incident_recertification_from_status: incidentRecertificationFromStatus,
+    incident_recertification_to_status: incidentRecertificationToStatus,
+    incident_recertification_promotion_ref: incidentRecertificationPromotionRef,
+    incident_recertification_gate: incidentRecertificationGate,
     incident_records: incidentRecords,
     run_audit_records: runAuditRecords,
     audit_evidence_refs: auditEvidenceRefs,
