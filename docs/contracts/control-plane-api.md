@@ -31,6 +31,8 @@ The API exposes command, query, and live-stream surfaces for AOR.
 - `GET /api/projects/:projectId/promotion-decisions` — promotion-decision artifacts.
 - `GET /api/projects/:projectId/quality-artifacts` — validation/evaluation reports, incident reports, and promotion decisions.
 - `GET /api/projects/:projectId/runs` — aggregated run-level view derived from packet, step-result, and quality artifact references.
+- `GET /api/projects/:projectId/runs/:runId/events/history` — bounded event history for one run, including replay-safe sequence metadata and policy context snapshots when available.
+- `GET /api/projects/:projectId/runs/:runId/policy-history` — route/policy/governance decision history for one run derived from durable step-result and delivery-plan evidence.
 
 All read responses must reuse existing contract families and IDs rather than API-only parallel shapes.
 
@@ -162,6 +164,9 @@ Reconnect and backpressure baseline:
 - The detachable web console reads run and evidence state from the same query families used by CLI:
   - run list: `GET /api/projects/:projectId/runs`;
   - run detail packets and evidence: `GET /api/projects/:projectId/packets`, `GET /api/projects/:projectId/step-results`, `GET /api/projects/:projectId/quality-artifacts`.
+- Later-stage troubleshooting on one selected run uses explicit query paths instead of raw log scraping:
+  - run event history: `GET /api/projects/:projectId/runs/:runId/events/history`;
+  - run policy history: `GET /api/projects/:projectId/runs/:runId/policy-history`.
 - Live follow in web mode reuses the same stream endpoint and parameters:
   - `GET /api/projects/:projectId/runs/:runId/events?after_event_id=...&max_replay=...`.
 - Detach behavior is UI-local only:

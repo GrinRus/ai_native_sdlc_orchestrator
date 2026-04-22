@@ -3,6 +3,8 @@ export {
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
+  readRunEventHistory,
+  readRunPolicyHistory,
   listRuns,
   listStepResults,
   readStrategicSnapshot,

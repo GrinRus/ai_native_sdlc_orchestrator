@@ -3,6 +3,8 @@ import {
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
+  readRunEventHistory,
+  readRunPolicyHistory,
   listRuns,
   listStepResults,
   openRunEventStream,
@@ -78,6 +80,20 @@ export function buildOperatorConsoleSnapshot(options) {
   const promotionDecisions = listPromotionDecisions(options);
   const strategicSnapshot = readStrategicSnapshot(options);
   const selectedRunId = selectRunId(runs, options.runId);
+  const selectedRunEventHistory = selectedRunId
+    ? readRunEventHistory({
+        ...options,
+        runId: selectedRunId,
+        limit: 50,
+      })
+    : null;
+  const selectedRunPolicyHistory = selectedRunId
+    ? readRunPolicyHistory({
+        ...options,
+        runId: selectedRunId,
+        limit: 100,
+      })
+    : null;
 
   return {
     project: state,
@@ -97,6 +113,8 @@ export function buildOperatorConsoleSnapshot(options) {
       quality_artifacts: filterArtifactsByRunId(qualityArtifacts, selectedRunId),
       delivery_manifests: filterArtifactsByRunId(deliveryManifests, selectedRunId),
       promotion_decisions: filterArtifactsByRunId(promotionDecisions, selectedRunId),
+      event_history: selectedRunEventHistory,
+      policy_history: selectedRunPolicyHistory,
     },
     api_ui_contract_alignment: {
       read_model: [
@@ -104,6 +122,8 @@ export function buildOperatorConsoleSnapshot(options) {
         "GET /api/projects/:projectId/packets",
         "GET /api/projects/:projectId/step-results",
         "GET /api/projects/:projectId/quality-artifacts",
+        "GET /api/projects/:projectId/runs/:runId/events/history",
+        "GET /api/projects/:projectId/runs/:runId/policy-history",
       ],
       live_stream: "GET /api/projects/:projectId/runs/:runId/events",
       event_contract_family: "live-run-event",
@@ -133,6 +153,29 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
           String(entry.artifact_ref),
         )}</a></li>`,
     )
+    .join("\n");
+  const policyHistoryEntries = Array.isArray(snapshot.run_detail.policy_history?.entries)
+    ? snapshot.run_detail.policy_history.entries
+    : [];
+  const policyHistoryLinks = policyHistoryEntries
+    .map((entry) => {
+      const source = escapeHtml(String(entry.source ?? "unknown"));
+      const routeId = escapeHtml(String(entry.route_id ?? "n/a"));
+      const policyId = escapeHtml(String(entry.policy_id ?? "n/a"));
+      const decision = escapeHtml(String(entry.governance_decision ?? "n/a"));
+      return `<li><code>${source}</code> route=<code>${routeId}</code> policy=<code>${policyId}</code> decision=<code>${decision}</code></li>`;
+    })
+    .join("\n");
+  const eventHistoryEntries = Array.isArray(snapshot.run_detail.event_history?.events)
+    ? snapshot.run_detail.event_history.events
+    : [];
+  const eventHistoryLinks = eventHistoryEntries
+    .map((entry) => {
+      const eventType = escapeHtml(String(entry.event_type ?? "unknown"));
+      const sequence = escapeHtml(String(entry.sequence ?? "n/a"));
+      const policyRisk = escapeHtml(String(entry.policy_context?.risk_tier ?? "n/a"));
+      return `<li><code>${eventType}</code> seq=<code>${sequence}</code> risk=<code>${policyRisk}</code></li>`;
+    })
     .join("\n");
 
   return `<!doctype html>
@@ -198,6 +241,10 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
     <section class="panel">
       <h2>Run detail evidence links</h2>
       <ul>${detailLinks || "<li>No step-result artifacts for selected run.</li>"}</ul>
+      <p>Policy history entries: <code>${String(snapshot.run_detail.policy_history?.entry_count ?? 0)}</code></p>
+      <ul>${policyHistoryLinks || "<li>No policy history for selected run.</li>"}</ul>
+      <p>Event history entries: <code>${String(snapshot.run_detail.event_history?.total_events ?? 0)}</code></p>
+      <ul>${eventHistoryLinks || "<li>No event history for selected run.</li>"}</ul>
       <p>Stream backpressure: <code>${escapeHtml(
         JSON.stringify(options.streamBackpressure ?? { policy: "not-following" }),
       )}</code></p>

@@ -10,12 +10,14 @@ import { validateContractDocument } from "../../../packages/contracts/src/index.
 import { materializeDeliveryPlan } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
 import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
-import { attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../src/index.mjs";
+import { appendRunEvent, attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../src/index.mjs";
 import {
   listDeliveryManifests,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
+  readRunEventHistory,
+  readRunPolicyHistory,
   listRuns,
   readStrategicSnapshot,
   listStepResults,
@@ -484,6 +486,166 @@ test("listRuns aggregates finance evidence across multiple run profiles", () => 
     });
     assert.equal(beta.finance_evidence.baseline_pass_rate, 0.95);
     assert.equal(beta.finance_evidence.candidate_pass_rate, 0.95);
+  });
+});
+
+test("selected-run history surfaces expose policy and event troubleshooting context", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const runId = "run.operator.policy.visibility.v1";
+
+    writeContractFile({
+      family: "step-result",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "step-result-policy-visibility.json"),
+      document: {
+        step_result_id: `${runId}.step.policy.visibility`,
+        run_id: runId,
+        step_id: "routed.implement",
+        step_class: "runner",
+        status: "passed",
+        summary: "Policy visibility fixture step",
+        evidence_refs: [init.stateFile],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:00.000Z",
+          finished_at: "2026-01-01T00:00:04.000Z",
+          route_resolution: {
+            resolved_route_id: "route.implement.default",
+          },
+          policy_resolution: {
+            policy: {
+              policy_id: "policy.step.runner.default",
+            },
+            resolved_bounds: {
+              writeback_mode: {
+                mode: "fork-first-pr",
+              },
+            },
+            guardrails: {
+              approval_required: true,
+            },
+            governance_decision: {
+              decision: "escalate",
+              reasons: [
+                {
+                  code: "high-risk-human-approval-required",
+                  severity: "escalate",
+                  message: "Explicit human approval is required.",
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    writeContractFile({
+      family: "delivery-plan",
+      filePath: path.join(init.runtimeLayout.artifactsRoot, "delivery-plan-policy-visibility.json"),
+      document: {
+        plan_id: `${init.projectId}.delivery-plan.policy.visibility`,
+        project_id: init.projectId,
+        run_id: runId,
+        step_class: "implement",
+        delivery_mode: "fork-first-pr",
+        mode_source: {
+          resolved_mode: "pull-request",
+          canonical_mode: "fork-first-pr",
+          resolution_kind: "project-default",
+          resolution_field: "writeback_policy.default_delivery_mode",
+        },
+        preconditions: {
+          approved_handoff: {
+            required: true,
+            status: "missing",
+            ref: null,
+          },
+          promotion_evidence: {
+            required: true,
+            status: "missing",
+            refs: [],
+          },
+        },
+        governance: {
+          decision: "escalate",
+          route_risk_tier: "high",
+          high_risk_delivery: true,
+          reasons: [
+            {
+              code: "high-risk-security-review-required",
+              severity: "escalate",
+              message: "Security review required before write-back.",
+            },
+          ],
+        },
+        writeback_allowed: false,
+        blocking_reasons: ["high-risk-security-review-required"],
+        status: "blocked",
+        evidence_refs: [init.stateFile],
+        created_at: "2026-01-02T00:00:00.000Z",
+      },
+    });
+
+    appendRunEvent({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      eventType: "warning.raised",
+      payload: {
+        summary: "Run-control action blocked pending approval.",
+        control_action: "steer",
+        policy_context: {
+          action: "steer",
+          risk_tier: "high",
+          high_risk: true,
+          approval_required: true,
+          approval_ref_present: false,
+        },
+      },
+    });
+    appendRunEvent({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      eventType: "step.updated",
+      payload: {
+        step_id: "routed.implement",
+        status: "running",
+      },
+    });
+
+    const runs = listRuns({ projectRef: repoRoot, cwd: repoRoot });
+    const runSummary = runs.find((run) => run.run_id === runId);
+    assert.ok(runSummary);
+    assert.ok(runSummary.policy_context.route_ids.includes("route.implement.default"));
+    assert.ok(runSummary.policy_context.policy_ids.includes("policy.step.runner.default"));
+    assert.ok(runSummary.policy_context.governance_decisions.includes("escalate"));
+    assert.equal(runSummary.policy_context.approval_required, true);
+
+    const eventHistory = readRunEventHistory({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      limit: 10,
+    });
+    assert.equal(eventHistory.run_id, runId);
+    assert.equal(eventHistory.total_events, 2);
+    assert.equal(eventHistory.events[0].event_type, "warning.raised");
+    assert.equal(eventHistory.events[0].policy_context.risk_tier, "high");
+
+    const policyHistory = readRunPolicyHistory({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      limit: 10,
+    });
+    assert.equal(policyHistory.run_id, runId);
+    assert.equal(policyHistory.entry_count, 2);
+    assert.ok(policyHistory.entries.some((entry) => entry.source === "step-result"));
+    assert.ok(policyHistory.entries.some((entry) => entry.source === "delivery-plan"));
+    const stepHistory = policyHistory.entries.find((entry) => entry.source === "step-result");
+    assert.equal(stepHistory.route_id, "route.implement.default");
+    assert.equal(stepHistory.policy_id, "policy.step.runner.default");
+    assert.equal(stepHistory.governance_reasons[0].code, "high-risk-human-approval-required");
   });
 });
 

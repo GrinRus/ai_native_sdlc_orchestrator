@@ -150,6 +150,9 @@ test("run-control API emits deterministic control events and durable audit evide
     assert.equal(started.state?.status, "running");
     assert.equal(started.primaryEvent.event_type, "run.started");
     assert.equal(started.evidenceEvent.event_type, "evidence.linked");
+    assert.equal(started.primaryEvent.payload.policy_context.approval_required, false);
+    assert.equal(started.primaryEvent.payload.policy_context.high_risk, false);
+    assert.equal(started.evidenceEvent.payload.policy_context.action, "start");
     assert.equal(fs.existsSync(started.auditFile), true);
     assert.equal(fs.existsSync(started.stateFile), true);
 
@@ -161,6 +164,8 @@ test("run-control API emits deterministic control events and durable audit evide
     });
     assert.equal(blockedSteer.blocked, true);
     assert.equal(blockedSteer.primaryEvent.event_type, "warning.raised");
+    assert.equal(blockedSteer.primaryEvent.payload.policy_context.approval_required, true);
+    assert.equal(blockedSteer.primaryEvent.payload.policy_context.high_risk, true);
     assert.equal(blockedSteer.auditRecord.blocked_reason.code, "scope.target_step_required");
     assert.equal(fs.existsSync(blockedSteer.auditFile), true);
 
@@ -175,6 +180,8 @@ test("run-control API emits deterministic control events and durable audit evide
     assert.equal(canceled.state?.status, "canceled");
     assert.equal(canceled.primaryEvent.event_type, "run.terminal");
     assert.equal(canceled.evidenceEvent.event_type, "evidence.linked");
+    assert.equal(canceled.primaryEvent.payload.policy_context.approval_required, true);
+    assert.equal(canceled.primaryEvent.payload.policy_context.approval_ref_present, true);
 
     const stateSnapshot = readRunControlState({
       projectRef: repoRoot,

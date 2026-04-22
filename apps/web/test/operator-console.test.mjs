@@ -97,6 +97,9 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.ok(snapshot.runs.some((run) => run.run_id === runId));
     assert.ok(snapshot.packet_artifacts.length >= 1);
     assert.ok(snapshot.run_detail.step_results.length >= 1);
+    assert.equal(snapshot.run_detail.event_history.run_id, runId);
+    assert.equal(snapshot.run_detail.event_history.total_events, 0);
+    assert.ok(snapshot.run_detail.policy_history.entry_count >= 1);
     assert.ok(snapshot.quality_artifacts.length >= 1);
     assert.equal(typeof snapshot.strategic_snapshot, "object");
     assert.ok(Array.isArray(snapshot.strategic_snapshot.wave_snapshot.waves));
@@ -104,6 +107,16 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.equal(
       snapshot.api_ui_contract_alignment.live_stream,
       "GET /api/projects/:projectId/runs/:runId/events",
+    );
+    assert.ok(
+      snapshot.api_ui_contract_alignment.read_model.includes(
+        "GET /api/projects/:projectId/runs/:runId/events/history",
+      ),
+    );
+    assert.ok(
+      snapshot.api_ui_contract_alignment.read_model.includes(
+        "GET /api/projects/:projectId/runs/:runId/policy-history",
+      ),
     );
 
     const html = renderOperatorConsoleHtml(snapshot, {
@@ -114,6 +127,8 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.match(html, /AOR Operator Console/);
     assert.match(html, new RegExp(runId));
     assert.match(html, /Run detail evidence links/);
+    assert.match(html, /Policy history entries/);
+    assert.match(html, /Event history entries/);
     assert.match(html, /Strategic Snapshot/);
     assert.match(html, /High-risk runs/);
   });
@@ -151,6 +166,8 @@ test("web console follow mode reuses shared stream and detach is non-disruptive"
     assert.equal(session.stream_protocol, "sse");
     assert.equal(session.stream_backpressure.policy, "bounded-replay-window");
     assert.equal(session.replay_events.length, 2);
+    assert.equal(session.snapshot.run_detail.event_history.total_events, 2);
+    assert.ok(session.snapshot.run_detail.policy_history.entry_count >= 1);
 
     const streamedEvent = new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error("timed out waiting for web follow event")), 3000);
@@ -273,6 +290,9 @@ test("operator console smoke script renders html and emits transcript summary", 
       follow_enabled: summary.follow_enabled,
       stream_protocol: summary.stream_protocol,
       detached: summary.detached,
+      policy_history_path_present: Array.isArray(summary.contract_alignment.read_model)
+        ? summary.contract_alignment.read_model.includes("GET /api/projects/:projectId/runs/:runId/policy-history")
+        : false,
     };
     assert.deepEqual(subset, fixture);
   });

@@ -3,7 +3,9 @@
     "command": "run status",
     "status": "implemented",
     "read_only": true,
-    "stream_protocol": "sse"
+    "stream_protocol": "sse",
+    "run_event_history_total": 2,
+    "run_policy_history_entries": 2
   },
   "packet_show": {
     "command": "packet show",

@@ -25,9 +25,36 @@ function resolveLiveEventType(action, blocked) {
 
 /**
  * @param {ReturnType<typeof applyRunControlActionCore>} result
+ * @returns {{
+ *   action: string,
+ *   risk_tier: string | null,
+ *   high_risk: boolean,
+ *   approval_required: boolean,
+ *   approval_ref_present: boolean,
+ * }}
+ */
+function buildPolicyContext(result) {
+  const guardrails =
+    typeof result.guardrails === "object" && result.guardrails !== null
+      ? /** @type {Record<string, unknown>} */ (result.guardrails)
+      : {};
+  const approvalRef = typeof guardrails.approval_ref === "string" ? guardrails.approval_ref.trim() : "";
+  return {
+    action: typeof guardrails.action === "string" ? guardrails.action : result.action,
+    risk_tier: typeof guardrails.risk_tier === "string" ? guardrails.risk_tier : null,
+    high_risk: guardrails.high_risk === true,
+    approval_required: guardrails.approval_required === true,
+    approval_ref_present: approvalRef.length > 0,
+  };
+}
+
+/**
+ * @param {ReturnType<typeof applyRunControlActionCore>} result
  * @returns {Record<string, unknown>}
  */
 function buildPrimaryPayload(result) {
+  const policyContext = buildPolicyContext(result);
+
   if (result.blocked) {
     return {
       code: result.blockedReason?.code ?? "run_control.blocked",
@@ -35,6 +62,7 @@ function buildPrimaryPayload(result) {
       control_action: result.action,
       blocked: true,
       audit_id: result.auditRecord.audit_id,
+      policy_context: policyContext,
     };
   }
 
@@ -44,6 +72,7 @@ function buildPrimaryPayload(result) {
       control_action: result.action,
       summary: "Run-control lifecycle started.",
       audit_id: result.auditRecord.audit_id,
+      policy_context: policyContext,
     };
   }
 
@@ -53,6 +82,7 @@ function buildPrimaryPayload(result) {
       control_action: result.action,
       summary: "Run-control lifecycle canceled.",
       audit_id: result.auditRecord.audit_id,
+      policy_context: policyContext,
     };
   }
 
@@ -63,6 +93,7 @@ function buildPrimaryPayload(result) {
     target_step: result.state?.current_step ?? null,
     summary: `Run-control action '${result.action}' applied.`,
     audit_id: result.auditRecord.audit_id,
+    policy_context: policyContext,
   };
 }
 
@@ -102,6 +133,7 @@ export function applyRunControlAction(options) {
       control_state_file: result.stateFile,
       blocked: result.blocked,
       evidence_root: result.runtimeLayout.reportsRoot,
+      policy_context: buildPolicyContext(result),
     },
   });
 

@@ -9,6 +9,8 @@ import {
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
+  readRunEventHistory,
+  readRunPolicyHistory,
   listRuns,
   listStepResults,
   readStrategicSnapshot,
@@ -278,6 +280,7 @@ function formatCommandHelp(definition) {
             ? [
                 "- This command is read-only. It does not mutate run state.",
                 "- --follow=true requires --run-id and reuses the shared live-run event stream protocol.",
+                "- When --run-id is set, output includes run_event_history and run_policy_history for troubleshooting.",
                 "- Use run start/pause/resume/steer/cancel for bounded control actions.",
               ]
       : definition.command === "packet show"
@@ -773,6 +776,8 @@ function executeImplementedCommand(command, flags, cwd) {
   let certificationHarnessCaptureFile = null;
   let certificationHarnessReplayFile = null;
   let runSummaries = null;
+  let runEventHistory = null;
+  let runPolicyHistory = null;
   let strategicSnapshot = null;
   let followMode = null;
   let streamProtocol = null;
@@ -1254,6 +1259,21 @@ function executeImplementedCommand(command, flags, cwd) {
       projectRef: /** @type {string} */ (flags["project-ref"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
+    if (runId) {
+      runEventHistory = readRunEventHistory({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId,
+        limit: maxReplay ?? 50,
+      });
+      runPolicyHistory = readRunPolicyHistory({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId,
+      });
+    }
 
     followMode = {
       enabled: follow,
@@ -2178,6 +2198,8 @@ function executeImplementedCommand(command, flags, cwd) {
     run_audit_records: runAuditRecords,
     audit_evidence_refs: auditEvidenceRefs,
     run_summaries: runSummaries,
+    run_event_history: runEventHistory,
+    run_policy_history: runPolicyHistory,
     strategic_snapshot: strategicSnapshot,
     follow_mode: followMode,
     stream_protocol: streamProtocol,

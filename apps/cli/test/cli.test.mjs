@@ -1180,6 +1180,19 @@ test("operator commands inspect runs, packets, and evidence through shared contr
       runStatusPayload.replay_events.map((event) => event.event_type),
       ["run.started", "step.updated"],
     );
+    assert.equal(runStatusPayload.run_event_history.run_id, runId);
+    assert.equal(runStatusPayload.run_event_history.total_events, 2);
+    assert.equal(runStatusPayload.run_policy_history.run_id, runId);
+    assert.ok(runStatusPayload.run_policy_history.entry_count >= 1);
+    assert.ok(
+      runStatusPayload.run_policy_history.entries.some(
+        (entry) => entry.route_id === "route.implement.default" && entry.policy_id === "policy.step.runner.default",
+      ),
+    );
+    const selectedRunSummary = runStatusPayload.run_summaries.find((summary) => summary.run_id === runId);
+    assert.ok(selectedRunSummary);
+    assert.ok(Array.isArray(selectedRunSummary.policy_context.policy_ids));
+    assert.ok(selectedRunSummary.policy_context.policy_ids.includes("policy.step.runner.default"));
     assert.equal(typeof runStatusPayload.strategic_snapshot, "object");
     assert.ok(Array.isArray(runStatusPayload.strategic_snapshot.wave_snapshot.waves));
     assert.equal(typeof runStatusPayload.strategic_snapshot.risk_snapshot.level_totals.high, "number");
@@ -1250,6 +1263,8 @@ test("operator commands inspect runs, packets, and evidence through shared contr
         status: runStatusPayload.status,
         read_only: runStatusPayload.read_only,
         stream_protocol: runStatusPayload.stream_protocol,
+        run_event_history_total: runStatusPayload.run_event_history.total_events,
+        run_policy_history_entries: runStatusPayload.run_policy_history.entry_count,
       },
       packet_show: {
         command: packetPayload.command,

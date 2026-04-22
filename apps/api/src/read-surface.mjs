@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
+import { readRunEvents } from "./live-event-stream.mjs";
 
 const ARTIFACT_PACKET_REGEX = /^[^.]+\.(artifact)\.[^.]+\.[^.]+\.json$/;
 const WAVE_TICKET_REGEX = /^wave-ticket-.*\.json$/;
@@ -216,6 +217,14 @@ function asRecord(value) {
 
 /**
  * @param {unknown} value
+ * @returns {boolean}
+ */
+function asBoolean(value) {
+  return value === true;
+}
+
+/**
+ * @param {unknown} value
  * @returns {number | null}
  */
 function asNumber(value) {
@@ -279,6 +288,38 @@ function summarizeSamples(samples) {
  */
 function normalizeRunRef(runRef) {
   return runRef.startsWith("run://") ? runRef.slice("run://".length) : runRef;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Array<{ code: string, severity: string, message: string }>}
+ */
+function toGovernanceReasons(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((entry) => typeof entry === "object" && entry !== null)
+    .map((entry) => {
+      const reason = asRecord(entry);
+      const code = asString(reason.code) ?? "governance-unknown";
+      const severity = asString(reason.severity) ?? "unknown";
+      const message = asString(reason.message) ?? "No governance message provided.";
+      return { code, severity, message };
+    });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number}
+ */
+function toTimelineMs(value) {
+  if (typeof value !== "string") {
+    return Number.POSITIVE_INFINITY;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
 }
 
 /**
@@ -430,9 +471,9 @@ export function listRuns(options = {}) {
    *   run_id: string,
    *   packet_refs: string[],
    *   step_result_refs: string[],
-   *   quality_refs: string[],
-   *   finance_evidence: {
-   *     route_ids: string[],
+ *   quality_refs: string[],
+ *   finance_evidence: {
+ *     route_ids: string[],
    *     wrapper_refs: string[],
    *     adapter_ids: string[],
    *     max_cost_usd: number | null,
@@ -441,11 +482,19 @@ export function listRuns(options = {}) {
    *     timeout_sources: string[],
    *     step_latency_samples_sec: number[],
    *     certification_latency_samples_sec: number[],
-   *     baseline_pass_rate: number | null,
-   *     candidate_pass_rate: number | null,
-   *   },
-   * }} RunSummaryEntry
-   */
+ *     baseline_pass_rate: number | null,
+ *     candidate_pass_rate: number | null,
+ *   },
+ *   policy_context: {
+ *     route_ids: string[],
+ *     policy_ids: string[],
+ *     writeback_modes: string[],
+ *     governance_decisions: string[],
+ *     governance_reason_codes: string[],
+ *     approval_required: boolean,
+ *   },
+ * }} RunSummaryEntry
+ */
 
   /** @type {Map<string, RunSummaryEntry>} */
   const runMap = new Map();
@@ -474,16 +523,50 @@ export function listRuns(options = {}) {
           baseline_pass_rate: null,
           candidate_pass_rate: null,
         },
+        policy_context: {
+          route_ids: [],
+          policy_ids: [],
+          writeback_modes: [],
+          governance_decisions: [],
+          governance_reason_codes: [],
+          approval_required: false,
+        },
       });
     }
     return /** @type {RunSummaryEntry} */ (runMap.get(runId));
   }
 
   for (const packet of packets) {
-    const runRefs = asStringArray(packet.document.run_refs).map((runRef) => normalizeRunRef(runRef));
+    const runRefs = [
+      ...asStringArray(packet.document.run_refs).map((runRef) => normalizeRunRef(runRef)),
+      ...(typeof packet.document.run_id === "string" ? [normalizeRunRef(packet.document.run_id)] : []),
+    ];
     for (const runRef of runRefs) {
       const run = ensureRun(runRef);
       run.packet_refs.push(packet.artifact_ref);
+
+      if (packet.family !== "delivery-plan") {
+        continue;
+      }
+
+      const governance = asRecord(packet.document.governance);
+      const decision = asString(governance.decision);
+      if (decision) {
+        run.policy_context.governance_decisions.push(decision);
+      }
+      const reasons = toGovernanceReasons(governance.reasons);
+      for (const reason of reasons) {
+        run.policy_context.governance_reason_codes.push(reason.code);
+      }
+      const mode = asString(packet.document.delivery_mode);
+      if (mode) {
+        run.policy_context.writeback_modes.push(mode);
+      }
+
+      const approvedHandoff = asRecord(asRecord(packet.document.preconditions).approved_handoff);
+      if (asBoolean(approvedHandoff.required)) {
+        run.policy_context.approval_required = true;
+      }
     }
   }
 
@@ -504,11 +587,27 @@ export function listRuns(options = {}) {
     const budget = asRecord(resolvedBounds.budget);
 
     const routeId = asString(routeResolution.resolved_route_id);
-    if (routeId) run.finance_evidence.route_ids.push(routeId);
+    if (routeId) {
+      run.finance_evidence.route_ids.push(routeId);
+      run.policy_context.route_ids.push(routeId);
+    }
     const wrapperRef = asString(wrapperResolution.wrapper_ref);
     if (wrapperRef) run.finance_evidence.wrapper_refs.push(wrapperRef);
     const adapterId = asString(adapter.adapter_id);
     if (adapterId) run.finance_evidence.adapter_ids.push(adapterId);
+    const policyId = asString(asRecord(policyResolution.policy).policy_id);
+    if (policyId) run.policy_context.policy_ids.push(policyId);
+    const writebackMode = asString(asRecord(resolvedBounds.writeback_mode).mode);
+    if (writebackMode) run.policy_context.writeback_modes.push(writebackMode);
+    const governanceDecision = asString(asRecord(policyResolution.governance_decision).decision);
+    if (governanceDecision) run.policy_context.governance_decisions.push(governanceDecision);
+    const governanceReasons = toGovernanceReasons(asRecord(policyResolution.governance_decision).reasons);
+    for (const reason of governanceReasons) {
+      run.policy_context.governance_reason_codes.push(reason.code);
+    }
+    if (asBoolean(asRecord(policyResolution.guardrails).approval_required)) {
+      run.policy_context.approval_required = true;
+    }
 
     const maxCostUsd = asNumber(budget.max_cost_usd);
     if (maxCostUsd !== null) {
@@ -590,7 +689,180 @@ export function listRuns(options = {}) {
       baseline_pass_rate: entry.finance_evidence.baseline_pass_rate,
       candidate_pass_rate: entry.finance_evidence.candidate_pass_rate,
     },
+    policy_context: {
+      route_ids: Array.from(new Set(entry.policy_context.route_ids)),
+      policy_ids: Array.from(new Set(entry.policy_context.policy_ids)),
+      writeback_modes: Array.from(new Set(entry.policy_context.writeback_modes)),
+      governance_decisions: Array.from(new Set(entry.policy_context.governance_decisions)),
+      governance_reason_codes: Array.from(new Set(entry.policy_context.governance_reason_codes)),
+      approval_required: entry.policy_context.approval_required,
+    },
   }));
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   runId: string,
+ *   limit?: number,
+ * }} options
+ */
+export function readRunEventHistory(options) {
+  const runId = asString(options.runId);
+  if (!runId) {
+    throw new Error("readRunEventHistory requires runId.");
+  }
+
+  const normalizedRunId = normalizeRunRef(runId);
+  const limitRaw = asNumber(options.limit);
+  const limit = limitRaw !== null && limitRaw >= 0 ? Math.floor(limitRaw) : 50;
+  const events = readRunEvents({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+    runId: normalizedRunId,
+  });
+
+  const mappedEvents = events.map((event) => {
+    const payload = asRecord(event.payload);
+    const policyContext = asRecord(payload.policy_context);
+    return {
+      event_id: asString(event.event_id) ?? "",
+      timestamp: asString(event.timestamp) ?? null,
+      event_type: asString(event.event_type) ?? "unknown",
+      sequence: asNumber(payload.sequence),
+      summary: asString(payload.summary),
+      control_action: asString(payload.control_action),
+      step_id: asString(payload.step_id),
+      status: asString(payload.status),
+      policy_context:
+        Object.keys(policyContext).length > 0
+          ? {
+              action: asString(policyContext.action),
+              risk_tier: asString(policyContext.risk_tier),
+              high_risk: asBoolean(policyContext.high_risk),
+              approval_required: asBoolean(policyContext.approval_required),
+              approval_ref_present: asBoolean(policyContext.approval_ref_present),
+            }
+          : null,
+    };
+  });
+
+  return {
+    run_id: normalizedRunId,
+    total_events: mappedEvents.length,
+    events: limit === 0 ? [] : mappedEvents.slice(-limit),
+  };
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   runId: string,
+ *   limit?: number,
+ * }} options
+ */
+export function readRunPolicyHistory(options) {
+  const runId = asString(options.runId);
+  if (!runId) {
+    throw new Error("readRunPolicyHistory requires runId.");
+  }
+
+  const normalizedRunId = normalizeRunRef(runId);
+  const limitRaw = asNumber(options.limit);
+  const limit = limitRaw !== null && limitRaw >= 0 ? Math.floor(limitRaw) : 200;
+
+  /** @type {Array<{ timeline_ms: number, artifact_ref: string, entry: Record<string, unknown> }>} */
+  const timelineEntries = [];
+
+  for (const stepResult of listStepResults(options)) {
+    const stepRunId = asString(stepResult.document.run_id);
+    if (!stepRunId || normalizeRunRef(stepRunId) !== normalizedRunId) {
+      continue;
+    }
+
+    const routedExecution = asRecord(stepResult.document.routed_execution);
+    const policyResolution = asRecord(routedExecution.policy_resolution);
+    const routeResolution = asRecord(routedExecution.route_resolution);
+    const resolvedBounds = asRecord(policyResolution.resolved_bounds);
+    const governance = asRecord(policyResolution.governance_decision);
+    const governanceReasons = toGovernanceReasons(governance.reasons);
+    const timelineAt =
+      asString(routedExecution.finished_at) ?? asString(routedExecution.started_at) ?? asString(stepResult.document.created_at);
+
+    timelineEntries.push({
+      timeline_ms: toTimelineMs(timelineAt),
+      artifact_ref: stepResult.artifact_ref,
+      entry: {
+        source: "step-result",
+        artifact_ref: stepResult.artifact_ref,
+        step_result_id: asString(stepResult.document.step_result_id),
+        step_id: asString(stepResult.document.step_id),
+        step_class: asString(stepResult.document.step_class),
+        status: asString(stepResult.document.status),
+        summary: asString(stepResult.document.summary),
+        timeline_at: timelineAt,
+        route_id: asString(routeResolution.resolved_route_id),
+        policy_id: asString(asRecord(policyResolution.policy).policy_id),
+        writeback_mode: asString(asRecord(resolvedBounds.writeback_mode).mode),
+        approval_required: asBoolean(asRecord(policyResolution.guardrails).approval_required),
+        governance_decision: asString(governance.decision),
+        governance_reasons: governanceReasons,
+      },
+    });
+  }
+
+  for (const packet of listPacketArtifacts(options)) {
+    if (packet.family !== "delivery-plan") {
+      continue;
+    }
+    const packetRunId = asString(packet.document.run_id);
+    if (!packetRunId || normalizeRunRef(packetRunId) !== normalizedRunId) {
+      continue;
+    }
+
+    const governance = asRecord(packet.document.governance);
+    const governanceReasons = toGovernanceReasons(governance.reasons);
+    const timelineAt = asString(packet.document.created_at);
+
+    timelineEntries.push({
+      timeline_ms: toTimelineMs(timelineAt),
+      artifact_ref: packet.artifact_ref,
+      entry: {
+        source: "delivery-plan",
+        artifact_ref: packet.artifact_ref,
+        plan_id: asString(packet.document.plan_id),
+        step_class: asString(packet.document.step_class),
+        status: asString(packet.document.status),
+        timeline_at: timelineAt,
+        writeback_mode: asString(packet.document.delivery_mode),
+        governance_decision: asString(governance.decision),
+        governance_reasons: governanceReasons,
+      },
+    });
+  }
+
+  const sorted = timelineEntries
+    .sort((left, right) => {
+      if (left.timeline_ms !== right.timeline_ms) {
+        return left.timeline_ms - right.timeline_ms;
+      }
+      return left.artifact_ref.localeCompare(right.artifact_ref);
+    })
+    .map((entry) => entry.entry);
+
+  return {
+    run_id: normalizedRunId,
+    entry_count: sorted.length,
+    entries: limit === 0 ? [] : sorted.slice(-limit),
+  };
 }
 
 /**

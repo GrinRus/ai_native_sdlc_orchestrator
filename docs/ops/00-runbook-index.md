@@ -17,6 +17,7 @@
 - `run-control-lifecycle.md` — start/pause/resume/steer/cancel commands, guardrails, and audit checks.
 - `incident-audit-operations.md` — incident open/show and audit runs command flow with run-linked evidence checks.
 - `operator-strategic-visibility.md` — sponsor/planner wave progress and run-risk snapshots from operator surfaces.
+- `operator-policy-troubleshooting.md` — selected-run event and policy history inspection sequence for later-stage operator triage.
 - `security-route-governance.md` — allow/deny/escalate checks for delivery/release route governance decisions.
 
 ## UI lifecycle

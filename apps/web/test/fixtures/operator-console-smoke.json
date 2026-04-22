@@ -2,5 +2,6 @@
   "mode": "detachable-web-console",
   "follow_enabled": true,
   "stream_protocol": "sse",
-  "detached": true
+  "detached": true,
+  "policy_history_path_present": true
 }
