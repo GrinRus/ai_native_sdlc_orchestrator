@@ -32,12 +32,16 @@ Before switching from stubbed planning to real network write:
 1. Confirm latest `delivery-manifest-*.json` captures:
    - `delivery_mode`,
    - `repo_deliveries[].changed_paths`,
+   - `coordination.required`, `coordination.status`, and `coordination.evidence_refs`,
+   - `rerun_recovery` (`rerun_of_run_ref`, `failed_step_ref`, `packet_boundary`, `status`),
    - `approval_context`,
    - `source_refs.delivery_transcript_ref`.
 2. Confirm latest `release-packet-*.json` captures:
    - `delivery_manifest_ref`,
    - `evidence_lineage.handoff_refs`,
    - `evidence_lineage.promotion_refs`,
+   - `evidence_lineage.coordination_refs`,
+   - `evidence_lineage.rerun_refs`,
    - `evidence_lineage.execution_refs`.
 3. If any checkpoint is missing, stop and rerun rehearsal in no-write mode.
 4. Only after all checkpoints pass may operators request policy change for real network write-back.
@@ -45,9 +49,11 @@ Before switching from stubbed planning to real network write:
 ## Recovery checkpoints
 On delivery failure:
 1. Inspect the latest delivery transcript `error` and `recovery_steps`.
-2. Confirm release packet status is `blocked`.
-3. Restore repository state according to transcript guidance.
-4. Re-run no-write rehearsal before any policy change request.
+2. Verify transcript `recovery_scope` still matches one failed-step retry boundary.
+3. If rerun is needed, keep `rerun_of_run_ref` and `failed_step_ref` explicit in the next delivery/release prepare command context.
+4. Confirm release packet status is `blocked`.
+5. Restore repository state according to transcript guidance.
+6. Re-run no-write rehearsal before any policy change request.
 
 ## Evidence outputs (W4-S04)
 - Fork target metadata (`upstream_repo`, `fork_repo`)

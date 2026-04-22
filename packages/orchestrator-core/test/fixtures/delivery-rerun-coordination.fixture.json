@@ -1,0 +1,14 @@
+{
+  "coordination_required": true,
+  "coordination_repo_ids": [
+    "main",
+    "docs"
+  ],
+  "rerun": {
+    "requested": true,
+    "status": "ready",
+    "packet_boundary": "delivery-manifest",
+    "failed_step_ref": "deliver.prepare",
+    "rerun_of_run_ref": "run://run.delivery.previous.failed.v1"
+  }
+}

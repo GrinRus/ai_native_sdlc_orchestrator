@@ -336,6 +336,38 @@ export function runDeliveryDriver(options = {}) {
     deliveryPlan: options.deliveryPlan,
   });
   const mode = resolveDeliveryMode(deliveryPlan, asString(options.mode) ?? undefined);
+  const coordination = asRecord(deliveryPlan.coordination);
+  const coordinationRepoIds = asStringArray(coordination.repo_ids);
+  const coordinationEvidenceRefs = asStringArray(coordination.evidence_refs);
+  const coordinationMetadata = {
+    required: coordination.required === true,
+    status: asString(coordination.status) ?? "not-required",
+    repo_ids: coordinationRepoIds,
+    evidence_refs: coordinationEvidenceRefs,
+  };
+  const rerunRecovery = asRecord(deliveryPlan.rerun_recovery);
+  const rerunMetadata = {
+    requested: rerunRecovery.requested === true,
+    status: asString(rerunRecovery.status) ?? "not-requested",
+    rerun_of_run_ref: asString(rerunRecovery.rerun_of_run_ref),
+    failed_step_ref: asString(rerunRecovery.failed_step_ref),
+    packet_boundary: asString(rerunRecovery.packet_boundary) ?? "delivery-manifest",
+    strategy: asString(rerunRecovery.strategy),
+    blocking_reasons: asStringArray(rerunRecovery.blocking_reasons),
+  };
+  /** @type {string[]} */
+  const rerunPreflightIssues = [];
+  if (rerunMetadata.requested && rerunMetadata.status !== "ready") {
+    const reasons = rerunMetadata.blocking_reasons.length > 0
+      ? rerunMetadata.blocking_reasons.join(", ")
+      : "rerun-context-blocked";
+    rerunPreflightIssues.push(`Delivery plan rerun recovery is blocked: ${reasons}.`);
+  }
+  if (rerunMetadata.requested && rerunMetadata.failed_step_ref && rerunMetadata.failed_step_ref !== stepId) {
+    rerunPreflightIssues.push(
+      `Delivery plan rerun failed_step_ref '${rerunMetadata.failed_step_ref}' does not match executing step '${stepId}'.`,
+    );
+  }
 
   const transcriptId = `${init.projectId}.delivery-transcript.${normalizeForId(mode)}.${Date.now()}`;
   const transcriptFile = path.join(
@@ -367,6 +399,10 @@ export function runDeliveryDriver(options = {}) {
   let recoverySteps = null;
 
   try {
+    if (rerunPreflightIssues.length > 0) {
+      throw new Error(rerunPreflightIssues.join(" "));
+    }
+
     if (mode === "no-write") {
       outputs = {
         no_write: true,
@@ -601,6 +637,8 @@ export function runDeliveryDriver(options = {}) {
       source_run_id: asString(deliveryPlan.run_id),
       source_step_class: asString(deliveryPlan.step_class),
     },
+    coordination: coordinationMetadata,
+    recovery_scope: rerunMetadata,
     git: {
       head_before: gitHeadBefore,
       head_after: gitHeadAfter,
@@ -651,6 +689,11 @@ export function runDeliveryDriver(options = {}) {
     diff_totals: diffStats.totals,
     commit_refs: typeof outputs.commit_sha === "string" ? [outputs.commit_sha] : [],
     writeback_result: writebackResult,
+    coordination: {
+      required: coordinationMetadata.required,
+      status: coordinationMetadata.status,
+      repo_ids: coordinationMetadata.repo_ids,
+    },
   };
   if (mode === "fork-first-pr" && asRecord(outputs.pr_draft).title) {
     repoDelivery.pr_draft = {
@@ -682,8 +725,11 @@ export function runDeliveryDriver(options = {}) {
     approval_context: {
       approved_handoff: asRecord(asRecord(deliveryPlan.preconditions).approved_handoff),
       promotion_evidence: asRecord(asRecord(deliveryPlan.preconditions).promotion_evidence),
+      coordination_evidence: asRecord(asRecord(deliveryPlan.preconditions).coordination_evidence),
       evidence_refs: deliveryPlanEvidenceRefs,
     },
+    coordination: coordinationMetadata,
+    rerun_recovery: rerunMetadata,
     evidence_root: init.runtimeLayout.reportsRoot,
     source_refs: {
       delivery_plan_ref: planRef,
@@ -724,8 +770,12 @@ export function runDeliveryDriver(options = {}) {
       handoff_refs: evidenceGroups.handoffRefs,
       promotion_refs: evidenceGroups.promotionRefs,
       execution_refs: executionRefs,
+      coordination_refs: coordinationMetadata.evidence_refs,
+      rerun_refs: rerunMetadata.rerun_of_run_ref ? [rerunMetadata.rerun_of_run_ref] : [],
       delivery_output_refs: uniqueStrings([deliveryManifestRef, ...deliveryOutputRefs]),
     },
+    coordination: coordinationMetadata,
+    rerun_recovery: rerunMetadata,
     status: status === "success" ? "ready-for-close" : "blocked",
     created_at: finishedAt,
   };

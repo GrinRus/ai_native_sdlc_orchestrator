@@ -18,7 +18,11 @@ import {
   readUiLifecycleState,
   readProjectState,
 } from "../../api/src/index.mjs";
-import { getContractFamilyIndex, validateContractDocument } from "../../../packages/contracts/src/index.mjs";
+import {
+  getContractFamilyIndex,
+  loadContractFile,
+  validateContractDocument,
+} from "../../../packages/contracts/src/index.mjs";
 import {
   approveHandoffArtifacts,
   prepareHandoffArtifacts,
@@ -294,12 +298,15 @@ function formatCommandHelp(definition) {
                   "- Delivery prepare resolves policy bounds and materializes a delivery-plan before driver execution.",
                   "- --mode supports aliases (read-only -> no-write, patch -> patch-only, branch -> local-branch, fork-pr -> fork-first-pr).",
                   "- Non-no-write modes require approved handoff and promotion evidence refs to pass guardrails.",
+                  "- Multi-repo plans require --coordination-evidence-refs in non-no-write modes.",
+                  "- Optional rerun flags persist packet-boundary and failed-step recovery scope for auditable retries.",
                   "- Output includes delivery_governance_decision with explicit allow/deny/escalate reasons.",
                 ]
               : definition.command === "release prepare"
                 ? [
                     "- Release prepare enforces release preconditions before delivery/release artifact materialization.",
                     "- If preconditions are blocked, the command fails with explicit blocking reasons.",
+                    "- Optional rerun flags keep failed-step recovery bounded by explicit packet boundary metadata.",
                     "- Governance deny/escalate reasons are surfaced as machine-readable blocking codes.",
                     "- Successful execution links delivery-manifest and release-packet outputs for audit lineage.",
                   ]
@@ -825,6 +832,8 @@ function executeImplementedCommand(command, flags, cwd) {
   let deliveryBlocking = null;
   let deliveryBlockingReasons = null;
   let deliveryGovernanceDecision = null;
+  let deliveryCoordination = null;
+  let deliveryRerunRecovery = null;
   let deliveryTranscriptFile = null;
   let deliveryManifestId = null;
   let deliveryManifestFile = null;
@@ -1360,6 +1369,37 @@ function executeImplementedCommand(command, flags, cwd) {
       "promotion-evidence-refs",
       flags["promotion-evidence-refs"],
     );
+    const coordinationEvidenceRefs = resolveOptionalCsvFlag(
+      "coordination-evidence-refs",
+      flags["coordination-evidence-refs"],
+    );
+    const rerunOfRunId = resolveOptionalStringFlag("rerun-of-run-id", flags["rerun-of-run-id"]);
+    const rerunFailedStep = resolveOptionalStringFlag("rerun-failed-step", flags["rerun-failed-step"]);
+    const rerunPacketBoundary = resolveOptionalStringFlag(
+      "rerun-packet-boundary",
+      flags["rerun-packet-boundary"],
+    );
+    const loadedProjectProfile = loadContractFile({
+      filePath: init.projectProfilePath,
+      family: "project-profile",
+    });
+    if (!loadedProjectProfile.ok) {
+      const issues = loadedProjectProfile.validation.issues.map((issue) => issue.message).join("; ");
+      throw new CliUsageError(`Project profile '${init.projectProfilePath}' failed validation: ${issues}`);
+    }
+    const coordinationRepos = Array.isArray(loadedProjectProfile.document.repos)
+      ? loadedProjectProfile.document.repos
+          .filter((repo) => typeof repo === "object" && repo !== null)
+          .map((repo) => {
+            const repoRecord = /** @type {Record<string, unknown>} */ (repo);
+            return {
+              repo_id: typeof repoRecord.repo_id === "string" ? repoRecord.repo_id : null,
+              role: typeof repoRecord.role === "string" ? repoRecord.role : null,
+              default_branch: typeof repoRecord.default_branch === "string" ? repoRecord.default_branch : null,
+            };
+          })
+          .filter((repo) => typeof repo.repo_id === "string")
+      : [];
     const planResult = materializeDeliveryPlan({
       runtimeLayout: init.runtimeLayout,
       projectId: init.projectId,
@@ -1372,10 +1412,15 @@ function executeImplementedCommand(command, flags, cwd) {
             ref: approvedHandoffRef,
           }
         : {
-            status: "missing",
-            ref: null,
-          },
+          status: "missing",
+          ref: null,
+        },
       promotionEvidenceRefs,
+      coordinationRepos,
+      coordinationEvidenceRefs,
+      rerunOfRunRef: rerunOfRunId ? toRunRef(rerunOfRunId) : undefined,
+      rerunFailedStepRef: rerunFailedStep ?? undefined,
+      rerunPacketBoundary: rerunPacketBoundary ?? undefined,
     });
 
     deliveryPlanId =
@@ -1394,6 +1439,14 @@ function executeImplementedCommand(command, flags, cwd) {
     deliveryGovernanceDecision =
       typeof planResult.deliveryPlan.governance === "object" && planResult.deliveryPlan.governance
         ? planResult.deliveryPlan.governance
+        : null;
+    deliveryCoordination =
+      typeof planResult.deliveryPlan.coordination === "object" && planResult.deliveryPlan.coordination
+        ? planResult.deliveryPlan.coordination
+        : null;
+    deliveryRerunRecovery =
+      typeof planResult.deliveryPlan.rerun_recovery === "object" && planResult.deliveryPlan.rerun_recovery
+        ? planResult.deliveryPlan.rerun_recovery
         : null;
 
     if (command === "release prepare" && deliveryPlanStatus !== "ready") {
@@ -1439,6 +1492,14 @@ function executeImplementedCommand(command, flags, cwd) {
     if (firstRepoDelivery && typeof firstRepoDelivery.writeback_result === "string") {
       deliveryWritebackResult = firstRepoDelivery.writeback_result;
     }
+    deliveryCoordination =
+      typeof deliveryResult.deliveryManifest.coordination === "object" && deliveryResult.deliveryManifest.coordination
+        ? deliveryResult.deliveryManifest.coordination
+        : deliveryCoordination;
+    deliveryRerunRecovery =
+      typeof deliveryResult.deliveryManifest.rerun_recovery === "object" && deliveryResult.deliveryManifest.rerun_recovery
+        ? deliveryResult.deliveryManifest.rerun_recovery
+        : deliveryRerunRecovery;
     readOnly = false;
     futureControlHooks = [
       "packet show --family delivery-manifest",
@@ -2301,6 +2362,8 @@ function executeImplementedCommand(command, flags, cwd) {
     delivery_blocking: deliveryBlocking,
     delivery_blocking_reasons: deliveryBlockingReasons,
     delivery_governance_decision: deliveryGovernanceDecision,
+    delivery_coordination: deliveryCoordination,
+    delivery_rerun_recovery: deliveryRerunRecovery,
     delivery_transcript_file: deliveryTranscriptFile,
     delivery_manifest_id: deliveryManifestId,
     delivery_manifest_file: deliveryManifestFile,

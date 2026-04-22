@@ -14,6 +14,7 @@ import { initializeProjectRuntime } from "../src/project-init.mjs";
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
 const workspaceRoot = path.resolve(currentDir, "../../..");
+const fixturesDir = path.join(currentDir, "fixtures");
 
 /**
  * @param {{ cwd: string, args: string[] }} options
@@ -51,6 +52,11 @@ function withTempRepo(callback) {
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   runId: string,
  *   mode: "patch-only" | "local-branch" | "fork-first-pr",
+ *   coordinationRepos?: Array<{ repo_id: string, role?: string, default_branch?: string }>,
+ *   coordinationEvidenceRefs?: string[],
+ *   rerunOfRunRef?: string,
+ *   rerunFailedStepRef?: string,
+ *   rerunPacketBoundary?: string,
  * }} options
  * @returns {{ deliveryPlanFile: string }}
  */
@@ -78,6 +84,11 @@ function createReadyPlan(options) {
     promotionEvidenceRefs: [
       path.join(options.init.runtimeLayout.reportsRoot, "promotion-decision-wrapper-wrapper.runner.default-v3.json"),
     ],
+    coordinationRepos: options.coordinationRepos,
+    coordinationEvidenceRefs: options.coordinationEvidenceRefs,
+    rerunOfRunRef: options.rerunOfRunRef,
+    rerunFailedStepRef: options.rerunFailedStepRef,
+    rerunPacketBoundary: options.rerunPacketBoundary,
   });
 
   return {
@@ -282,6 +293,88 @@ test("runDeliveryDriver builds fork-first PR metadata in stubbed network mode", 
     assert.equal(transcript.mode, "fork-first-pr");
     assert.equal(transcript.git.commands.some((command) => command.includes("push")), false);
     assertDeliveryArtifacts(result);
+  });
+});
+
+test("runDeliveryDriver persists multi-repo coordination and bounded rerun metadata", () => {
+  withTempRepo((repoRoot) => {
+    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
+    fs.appendFileSync(targetFile, "\n# w8-s07 coordination rerun metadata\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const fixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "delivery-rerun-coordination.fixture.json"), "utf8"),
+    );
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.rerun.coordination.v1",
+      mode: "patch-only",
+      coordinationRepos: [
+        { repo_id: "main", role: "application", default_branch: "main" },
+        { repo_id: "docs", role: "documentation", default_branch: "main" },
+      ],
+      coordinationEvidenceRefs: ["evidence://coordination/w8-s07"],
+      rerunOfRunRef: fixture.rerun.rerun_of_run_ref,
+      rerunFailedStepRef: fixture.rerun.failed_step_ref,
+      rerunPacketBoundary: fixture.rerun.packet_boundary,
+    });
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.rerun.coordination.v1",
+      stepId: "deliver.prepare",
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "success");
+    assert.equal(result.deliveryManifest.coordination.required, fixture.coordination_required);
+    assert.deepEqual(result.deliveryManifest.coordination.repo_ids, fixture.coordination_repo_ids);
+    assert.equal(result.deliveryManifest.rerun_recovery.requested, fixture.rerun.requested);
+    assert.equal(result.deliveryManifest.rerun_recovery.status, fixture.rerun.status);
+    assert.equal(result.deliveryManifest.rerun_recovery.packet_boundary, fixture.rerun.packet_boundary);
+    assert.equal(result.deliveryManifest.rerun_recovery.failed_step_ref, fixture.rerun.failed_step_ref);
+    assert.ok(result.releasePacket.evidence_lineage.coordination_refs.includes("evidence://coordination/w8-s07"));
+    assert.ok(result.releasePacket.evidence_lineage.rerun_refs.includes(fixture.rerun.rerun_of_run_ref));
+
+    const transcript = JSON.parse(fs.readFileSync(result.transcriptFile, "utf8"));
+    assert.equal(transcript.coordination.required, fixture.coordination_required);
+    assert.equal(transcript.recovery_scope.packet_boundary, fixture.rerun.packet_boundary);
+    assert.equal(transcript.recovery_scope.failed_step_ref, fixture.rerun.failed_step_ref);
+  });
+});
+
+test("runDeliveryDriver fails safely when rerun failed-step scope does not match executing step", () => {
+  withTempRepo((repoRoot) => {
+    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
+    fs.appendFileSync(targetFile, "\n# w8-s07 rerun mismatch\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.rerun.mismatch.v1",
+      mode: "patch-only",
+      rerunOfRunRef: "run://run.delivery.previous.failed.v1",
+      rerunFailedStepRef: "release.prepare",
+      rerunPacketBoundary: "release-packet",
+    });
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.rerun.mismatch.v1",
+      stepId: "deliver.prepare",
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "failed");
+    const transcript = JSON.parse(fs.readFileSync(result.transcriptFile, "utf8"));
+    assert.equal(transcript.status, "failed");
+    assert.match(String(transcript.error), /failed_step_ref/i);
+    assert.equal(transcript.recovery_scope.failed_step_ref, "release.prepare");
+    assert.equal(result.releasePacket.status, "blocked");
   });
 });
 

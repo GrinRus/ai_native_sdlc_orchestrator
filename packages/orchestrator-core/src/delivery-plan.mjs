@@ -21,6 +21,7 @@ const DELIVERY_MODE_ALIASES = Object.freeze({
   "fork-pr": "fork-first-pr",
   "pull-request": "fork-first-pr",
 });
+const RERUN_PACKET_BOUNDARIES = new Set(["delivery-manifest", "release-packet"]);
 
 /**
  * @param {unknown} value
@@ -46,6 +47,14 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {string[]} values
+ * @returns {string[]}
+ */
+function uniqueStrings(values) {
+  return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
 }
 
 /**
@@ -132,6 +141,11 @@ function resolveGovernanceSource(policyResolution) {
  *   policyResolution: Record<string, unknown>,
  *   handoffApproval?: { status?: string, ref?: string | null },
  *   promotionEvidenceRefs?: string[],
+ *   coordinationRepos?: Array<{ repo_id?: string, role?: string, default_branch?: string }>,
+ *   coordinationEvidenceRefs?: string[],
+ *   rerunOfRunRef?: string,
+ *   rerunFailedStepRef?: string,
+ *   rerunPacketBoundary?: string,
  * }} options
  * @returns {{
  *   deliveryPlan: Record<string, unknown>,
@@ -150,6 +164,49 @@ export function materializeDeliveryPlan(options) {
 
   const promotionEvidenceRefs = [...new Set(asStringArray(options.promotionEvidenceRefs ?? []))];
   const promotionStatus = promotionEvidenceRefs.length > 0 ? "present" : "missing";
+  const coordinationRepos = Array.isArray(options.coordinationRepos)
+    ? options.coordinationRepos
+        .filter((repo) => typeof repo === "object" && repo !== null)
+        .map((repo) => ({
+          repo_id: asString(asRecord(repo).repo_id),
+          role: asString(asRecord(repo).role),
+          default_branch: asString(asRecord(repo).default_branch),
+        }))
+        .filter((repo) => typeof repo.repo_id === "string")
+    : [];
+  const coordinationRepoIds = uniqueStrings(
+    coordinationRepos.map((repo) => /** @type {string} */ (repo.repo_id)),
+  );
+  const coordinationEvidenceRefs = uniqueStrings(asStringArray(options.coordinationEvidenceRefs ?? []));
+  const multiRepoRequired = coordinationRepoIds.length > 1;
+  const coordinationStatus = multiRepoRequired
+    ? coordinationEvidenceRefs.length > 0
+      ? "present"
+      : "missing"
+    : "not-required";
+
+  const rerunOfRunRef = asString(options.rerunOfRunRef);
+  const rerunFailedStepRef = asString(options.rerunFailedStepRef);
+  const rerunPacketBoundaryInput = asString(options.rerunPacketBoundary);
+  const rerunRequested = Boolean(rerunOfRunRef || rerunFailedStepRef || rerunPacketBoundaryInput);
+  const rerunPacketBoundary = rerunPacketBoundaryInput ?? "delivery-manifest";
+  /** @type {string[]} */
+  const rerunBlockingReasons = [];
+  if (rerunRequested && !rerunOfRunRef) {
+    rerunBlockingReasons.push("rerun-run-ref-required");
+  }
+  if (rerunRequested && !rerunFailedStepRef) {
+    rerunBlockingReasons.push("rerun-failed-step-required");
+  }
+  if (rerunRequested && !RERUN_PACKET_BOUNDARIES.has(rerunPacketBoundary)) {
+    rerunBlockingReasons.push("rerun-packet-boundary-unsupported");
+  }
+  const rerunStatus = !rerunRequested ? "not-requested" : rerunBlockingReasons.length === 0 ? "ready" : "blocked";
+  const rerunStrategy = !rerunRequested
+    ? null
+    : rerunPacketBoundary === "release-packet"
+      ? "rebuild-release-packet"
+      : "resume-failed-step";
 
   /** @type {string[]} */
   const blockingReasons = [];
@@ -158,6 +215,12 @@ export function materializeDeliveryPlan(options) {
   }
   if (nonReadOnlyMode && promotionStatus !== "present") {
     blockingReasons.push("promotion-evidence-required");
+  }
+  if (nonReadOnlyMode && multiRepoRequired && coordinationStatus !== "present") {
+    blockingReasons.push("multi-repo-coordination-evidence-required");
+  }
+  if (rerunStatus === "blocked") {
+    blockingReasons.push(...rerunBlockingReasons);
   }
   if (nonReadOnlyMode && governance.decision === "deny") {
     blockingReasons.push(
@@ -208,12 +271,33 @@ export function materializeDeliveryPlan(options) {
         status: nonReadOnlyMode ? promotionStatus : "not-required",
         refs: promotionEvidenceRefs,
       },
+      coordination_evidence: {
+        required: nonReadOnlyMode && multiRepoRequired,
+        status: nonReadOnlyMode && multiRepoRequired ? coordinationStatus : "not-required",
+        refs: coordinationEvidenceRefs,
+      },
     },
     governance,
+    coordination: {
+      required: multiRepoRequired,
+      status: coordinationStatus,
+      repo_ids: coordinationRepoIds,
+      repos: coordinationRepos,
+      evidence_refs: coordinationEvidenceRefs,
+    },
+    rerun_recovery: {
+      requested: rerunRequested,
+      status: rerunStatus,
+      rerun_of_run_ref: rerunOfRunRef,
+      failed_step_ref: rerunFailedStepRef,
+      packet_boundary: rerunPacketBoundary,
+      strategy: rerunStrategy,
+      blocking_reasons: rerunBlockingReasons,
+    },
     writeback_allowed: writebackAllowed,
     blocking_reasons: blockingReasons,
     status,
-    evidence_refs: evidenceRefs,
+    evidence_refs: uniqueStrings([...evidenceRefs, ...coordinationEvidenceRefs]),
     created_at: createdAt,
   };
 

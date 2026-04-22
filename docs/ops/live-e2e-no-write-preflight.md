@@ -108,18 +108,28 @@ Use this command path when you need explicit delivery/release packet materializa
 aor deliver prepare \
   --project-ref <TARGET_ROOT> \
   --run-id <RUN_ID> \
-  --mode no-write
+  --mode no-write \
+  --coordination-evidence-refs evidence://coordination/<RUN_ID> \
+  --rerun-of-run-id <FAILED_RUN_ID> \
+  --rerun-failed-step deliver.prepare \
+  --rerun-packet-boundary delivery-manifest
 
 aor release prepare \
   --project-ref <TARGET_ROOT> \
   --run-id <RUN_ID> \
-  --mode no-write
+  --mode no-write \
+  --coordination-evidence-refs evidence://coordination/<RUN_ID> \
+  --rerun-of-run-id <FAILED_RUN_ID> \
+  --rerun-failed-step release.prepare \
+  --rerun-packet-boundary release-packet
 ```
 
 Expected no-write command signals:
 - `delivery_plan_status=ready`;
 - `delivery_mode=no-write`;
 - `delivery_writeback_result=no-write-confirmed`;
+- `delivery_coordination` reports repo scope and coordination evidence status;
+- `delivery_rerun_recovery` preserves explicit failed-step and packet-boundary retry scope;
 - `delivery_manifest_file` and `release_packet_file` are both materialized.
 
 ## Required target annotations

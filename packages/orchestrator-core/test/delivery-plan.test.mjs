@@ -193,3 +193,80 @@ test("materializeDeliveryPlan blocks delivery when governance decision escalates
     assert.ok(result.deliveryPlan.blocking_reasons.includes("high-risk-human-approval-required"));
   });
 });
+
+test("materializeDeliveryPlan requires coordination evidence for non-read-only multi-repo flows", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const policyResolution = resolveStepPolicyForStep({
+      projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      policiesRoot: path.join(repoRoot, "examples/policies"),
+      stepClass: "implement",
+    });
+
+    const result = materializeDeliveryPlan({
+      runtimeLayout: init.runtimeLayout,
+      projectId: init.projectId,
+      runId: "run.delivery.plan.coordination.v1",
+      stepClass: "implement",
+      policyResolution,
+      handoffApproval: { status: "pass", ref: "evidence://handoff/approved" },
+      promotionEvidenceRefs: ["evidence://promotion/pass"],
+      coordinationRepos: [
+        { repo_id: "main", role: "application", default_branch: "main" },
+        { repo_id: "docs", role: "documentation", default_branch: "main" },
+      ],
+    });
+
+    assert.equal(result.deliveryPlan.coordination.required, true);
+    assert.equal(result.deliveryPlan.coordination.status, "missing");
+    assert.deepEqual(result.deliveryPlan.coordination.repo_ids, ["main", "docs"]);
+    assert.equal(result.deliveryPlan.status, "blocked");
+    assert.ok(result.deliveryPlan.blocking_reasons.includes("multi-repo-coordination-evidence-required"));
+  });
+});
+
+test("materializeDeliveryPlan keeps rerun recovery bounded by run-ref, failed-step, and packet boundary", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const policyResolution = resolveStepPolicyForStep({
+      projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      policiesRoot: path.join(repoRoot, "examples/policies"),
+      stepClass: "implement",
+    });
+
+    const blocked = materializeDeliveryPlan({
+      runtimeLayout: init.runtimeLayout,
+      projectId: init.projectId,
+      runId: "run.delivery.plan.rerun.blocked.v1",
+      stepClass: "implement",
+      policyResolution,
+      handoffApproval: { status: "pass", ref: "evidence://handoff/approved" },
+      promotionEvidenceRefs: ["evidence://promotion/pass"],
+      rerunOfRunRef: "run://run.delivery.plan.failed.v1",
+      rerunPacketBoundary: "delivery-manifest",
+    });
+    assert.equal(blocked.deliveryPlan.rerun_recovery.requested, true);
+    assert.equal(blocked.deliveryPlan.rerun_recovery.status, "blocked");
+    assert.ok(blocked.deliveryPlan.blocking_reasons.includes("rerun-failed-step-required"));
+
+    const ready = materializeDeliveryPlan({
+      runtimeLayout: init.runtimeLayout,
+      projectId: init.projectId,
+      runId: "run.delivery.plan.rerun.ready.v1",
+      stepClass: "implement",
+      policyResolution,
+      handoffApproval: { status: "pass", ref: "evidence://handoff/approved" },
+      promotionEvidenceRefs: ["evidence://promotion/pass"],
+      rerunOfRunRef: "run://run.delivery.plan.failed.v1",
+      rerunFailedStepRef: "deliver.prepare",
+      rerunPacketBoundary: "delivery-manifest",
+    });
+    assert.equal(ready.deliveryPlan.rerun_recovery.requested, true);
+    assert.equal(ready.deliveryPlan.rerun_recovery.status, "ready");
+    assert.equal(ready.deliveryPlan.rerun_recovery.failed_step_ref, "deliver.prepare");
+    assert.equal(ready.deliveryPlan.rerun_recovery.packet_boundary, "delivery-manifest");
+    assert.equal(ready.deliveryPlan.status, "ready");
+  });
+});

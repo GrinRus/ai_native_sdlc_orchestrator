@@ -735,6 +735,85 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
   });
 });
 
+test("delivery and release outputs enforce multi-repo coordination evidence and preserve rerun scope", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+
+    const profilePath = path.join(projectRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    fs.writeFileSync(
+      profilePath,
+      profileContent.replace(
+        "repo_graph: []",
+        [
+          "  - repo_id: docs",
+          "    name: docs",
+          "    source:",
+          "      kind: local",
+          "      root: docs",
+          "    default_branch: main",
+          "    role: documentation",
+          "repo_graph: []",
+        ].join("\n"),
+      ),
+      "utf8",
+    );
+
+    const blockedRelease = invokeCli([
+      "release",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "w8-release-coordination-blocked",
+      "--mode",
+      "patch-only",
+      "--approved-handoff-ref",
+      "evidence://handoff/w8-release-coordination-blocked",
+      "--promotion-evidence-refs",
+      "evidence://promotion/w8-release-coordination-blocked",
+    ]);
+    assert.equal(blockedRelease.exitCode, 1);
+    assert.equal(blockedRelease.stdout, "");
+    assert.match(blockedRelease.stderr, /multi-repo-coordination-evidence-required/);
+
+    const deliverResult = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "w8-deliver-rerun-coordination",
+      "--mode",
+      "no-write",
+      "--coordination-evidence-refs",
+      "evidence://coordination/w8-deliver-rerun-coordination",
+      "--rerun-of-run-id",
+      "w8-deliver-previous-failed",
+      "--rerun-failed-step",
+      "deliver.prepare",
+      "--rerun-packet-boundary",
+      "delivery-manifest",
+    ]);
+    assert.equal(deliverResult.exitCode, 0, deliverResult.stderr);
+    const deliverPayload = JSON.parse(deliverResult.stdout);
+    assert.equal(deliverPayload.delivery_mode, "no-write");
+    assert.equal(deliverPayload.delivery_coordination.required, true);
+    assert.deepEqual(deliverPayload.delivery_coordination.repo_ids, ["main", "docs"]);
+    assert.equal(deliverPayload.delivery_coordination.status, "present");
+    assert.equal(deliverPayload.delivery_rerun_recovery.requested, true);
+    assert.equal(deliverPayload.delivery_rerun_recovery.status, "ready");
+    assert.equal(deliverPayload.delivery_rerun_recovery.failed_step_ref, "deliver.prepare");
+    assert.equal(deliverPayload.delivery_rerun_recovery.packet_boundary, "delivery-manifest");
+    assert.ok(deliverPayload.delivery_rerun_recovery.rerun_of_run_ref.includes("w8-deliver-previous-failed"));
+  });
+});
+
 test("delivery and release surfaces explicit governance deny/escalation reasons for high-risk policy paths", () => {
   withTempProject((projectRoot) => {
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });

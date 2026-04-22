@@ -25,6 +25,8 @@ Manifest materialization should happen only after a `delivery-plan` artifact is 
 Delivery-capable runs should include execution isolation metadata (mode, checkout root, and cleanup policy/outcome) so write-back provenance is replayable.
 `repo_deliveries[].changed_paths` is the canonical file-level delta list for the delivery run.
 `approval_context` should preserve handoff and promotion evidence references that justified write-back eligibility.
+`coordination` should capture multi-repo coordination requirement/status and evidence refs used to unblock write-back.
+`rerun_recovery` should keep retry scope bounded by one failed step and explicit packet boundary.
 
 ## Example
 See `examples/delivery-manifest.sample.yaml`.
