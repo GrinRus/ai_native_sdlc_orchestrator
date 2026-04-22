@@ -39,12 +39,14 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Separate discovery from delivery.
 - Validate discovery completeness before planning.
 - Produce ADR-ready research output with evidence.
+- Use explicit discovery completeness checks from command outputs before spec handoff.
 
 ### Architect / tech lead
 - Define non-functional requirements, repo scope, risk tiers, and allowed commands.
 - Inspect the chosen route, wrapper, policy, and runner for each step.
 - Separate deterministic validation from rubric-based evaluation.
 - Define certification and freeze paths for platform assets, runtime context assets, and compiler revisions.
+- Trace planning artifacts back to architecture docs and contract references without ad hoc file inspection.
 
 ### Engineering manager / planner
 - Convert approved scope into wave tickets and handoff packets.

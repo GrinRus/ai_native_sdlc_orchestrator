@@ -228,6 +228,10 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     assert.equal(discoveryPayload.command, "discovery run");
     assert.equal(fs.existsSync(discoveryPayload.analysis_report_file), true);
     assert.equal(fs.existsSync(discoveryPayload.route_resolution_file), true);
+    assert.equal(discoveryPayload.discovery_completeness_status, "pass");
+    assert.equal(discoveryPayload.discovery_completeness_blocking, false);
+    assert.ok(Array.isArray(discoveryPayload.discovery_completeness_checks));
+    assert.equal(typeof discoveryPayload.architecture_traceability, "object");
 
     const specResult = invokeCli(["spec", "build", "--project-ref", projectRoot]);
     assert.equal(specResult.exitCode, 0, specResult.stderr);
@@ -235,8 +239,14 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     assert.equal(specPayload.command, "spec build");
     assert.equal(typeof specPayload.routed_step_result_id, "string");
     assert.equal(fs.existsSync(specPayload.routed_step_result_file), true);
+    assert.equal(specPayload.discovery_completeness_status, "pass");
+    assert.equal(specPayload.discovery_completeness_blocking, false);
+    assert.ok(Array.isArray(specPayload.discovery_completeness_checks));
+    assert.equal(typeof specPayload.architecture_traceability, "object");
     const specStepResult = JSON.parse(fs.readFileSync(specPayload.routed_step_result_file, "utf8"));
     assert.equal(specStepResult.step_class, "artifact");
+    assert.equal(specStepResult.routed_execution.discovery_completeness_gate.status, "pass");
+    assert.equal(specStepResult.routed_execution.architecture_traceability.selected_step.step_class, "spec");
 
     const waveResult = invokeCli(["wave", "create", "--project-ref", projectRoot]);
     assert.equal(waveResult.exitCode, 0, waveResult.stderr);
@@ -259,11 +269,13 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
         command: discoveryPayload.command,
         status: discoveryPayload.status,
         analysis_report_id: discoveryPayload.analysis_report_id,
+        discovery_completeness_status: discoveryPayload.discovery_completeness_status,
       },
       spec_build: {
         command: specPayload.command,
         status: specPayload.status,
         routed_step_result_id: specPayload.routed_step_result_id,
+        discovery_completeness_status: specPayload.discovery_completeness_status,
       },
       wave_create: {
         command: wavePayload.command,
@@ -273,6 +285,32 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
       },
     };
     assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("spec build blocks when discovery completeness checks fail", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    fs.rmSync(path.join(projectRoot, "examples", "eval"), { recursive: true, force: true });
+
+    const discoveryResult = invokeCli(["discovery", "run", "--project-ref", projectRoot]);
+    assert.equal(discoveryResult.exitCode, 0, discoveryResult.stderr);
+    const discoveryPayload = JSON.parse(discoveryResult.stdout);
+    assert.equal(discoveryPayload.discovery_completeness_status, "fail");
+    assert.equal(discoveryPayload.discovery_completeness_blocking, true);
+
+    const specResult = invokeCli(["spec", "build", "--project-ref", projectRoot]);
+    assert.equal(specResult.exitCode, 0, specResult.stderr);
+    const specPayload = JSON.parse(specResult.stdout);
+    assert.equal(specPayload.discovery_completeness_status, "fail");
+    assert.equal(specPayload.discovery_completeness_blocking, true);
+    assert.equal(fs.existsSync(specPayload.routed_step_result_file), true);
+
+    const specStepResult = JSON.parse(fs.readFileSync(specPayload.routed_step_result_file, "utf8"));
+    assert.equal(specStepResult.status, "failed");
+    assert.match(specStepResult.summary, /Spec build blocked by discovery completeness checks/i);
+    assert.equal(specStepResult.routed_execution.discovery_completeness_gate.status, "fail");
   });
 });
 
@@ -1596,6 +1634,10 @@ test("project analyze writes durable analysis report under runtime root", () => 
     assert.ok(Array.isArray(parsed.evaluation_registry_datasets));
     assert.ok(parsed.evaluation_registry_suites.length > 0);
     assert.ok(parsed.evaluation_registry_datasets.length > 0);
+    assert.equal(parsed.discovery_completeness_status, "pass");
+    assert.equal(parsed.discovery_completeness_blocking, false);
+    assert.ok(Array.isArray(parsed.discovery_completeness_checks));
+    assert.equal(typeof parsed.architecture_traceability, "object");
     const planningRoute = parsed.route_resolution_steps.find((step) => step.step_class === "planning");
     assert.ok(planningRoute);
     assert.equal(planningRoute.resolution_source.kind, "step-override");
@@ -1616,6 +1658,10 @@ test("project analyze writes durable analysis report under runtime root", () => 
     assert.equal(report.policy_resolution.matrix.length, 10);
     assert.ok(Array.isArray(report.evaluation_registry.suite_refs));
     assert.ok(Array.isArray(report.evaluation_registry.dataset_refs));
+    assert.equal(report.discovery_completeness.status, "pass");
+    assert.equal(report.discovery_completeness.blocking, false);
+    assert.ok(Array.isArray(report.architecture_traceability.step_linkage));
+    assert.ok(report.architecture_traceability.step_linkage.some((entry) => entry.step_class === "planning"));
   });
 });
 

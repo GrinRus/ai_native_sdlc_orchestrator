@@ -94,6 +94,32 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.equal(reloaded.route_resolution.matrix.length, 10);
     assert.equal(reloaded.asset_resolution.matrix.length, 10);
     assert.equal(reloaded.policy_resolution.matrix.length, 10);
+    assert.equal(reloaded.discovery_completeness.status, "pass");
+    assert.equal(reloaded.discovery_completeness.blocking, false);
+    assert.ok(Array.isArray(reloaded.discovery_completeness.checks));
+    assert.ok(reloaded.discovery_completeness.checks.every((check) => check.status === "pass"));
+    assert.ok(Array.isArray(reloaded.architecture_traceability.architecture_doc_refs));
+    assert.ok(reloaded.architecture_traceability.architecture_doc_refs.includes("docs/architecture/14-cli-command-catalog.md"));
+    assert.ok(Array.isArray(reloaded.architecture_traceability.step_linkage));
+    assert.ok(reloaded.architecture_traceability.step_linkage.some((entry) => entry.step_class === "spec"));
+  });
+});
+
+test("analyzeProjectRuntime reports blocking discovery completeness when evaluation registry coverage is missing", () => {
+  withTempRepo((repoRoot) => {
+    fs.rmSync(path.join(repoRoot, "examples", "eval"), { recursive: true, force: true });
+
+    const result = analyzeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+
+    assert.equal(result.report.status, "discovery-incomplete");
+    assert.equal(result.report.discovery_completeness.status, "fail");
+    assert.equal(result.report.discovery_completeness.blocking, true);
+    const registryCheck = result.report.discovery_completeness.checks.find(
+      (check) => check.check_id === "evaluation-registry-coverage",
+    );
+    assert.ok(registryCheck);
+    assert.equal(registryCheck.status, "fail");
+    assert.match(String(registryCheck.actual), /datasets=0, suites=0/);
   });
 });
 

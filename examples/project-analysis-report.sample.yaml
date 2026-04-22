@@ -96,6 +96,60 @@ evaluation_registry:
       subject_type: run
       dataset_ref: dataset://run-regression@2026-04-20T08:00:00Z
       source: examples/eval/suite-release-core.yaml
+discovery_completeness:
+  status: pass
+  blocking: false
+  checks:
+    - check_id: route-matrix-coverage
+      status: pass
+      blocking: true
+      expected: 10
+      actual: 10
+      summary: Route matrix includes every supported step class.
+    - check_id: asset-matrix-coverage
+      status: pass
+      blocking: true
+      expected: 10
+      actual: 10
+      summary: Asset matrix includes wrapper and prompt provenance for every supported step class.
+    - check_id: policy-matrix-coverage
+      status: pass
+      blocking: true
+      expected: 10
+      actual: 10
+      summary: Policy matrix includes deterministic bounds for every supported step class.
+    - check_id: evaluation-registry-coverage
+      status: pass
+      blocking: true
+      expected: at least one dataset and one suite
+      actual: datasets=1, suites=1
+      summary: Evaluation registry exposes suite and dataset refs for downstream quality flows.
+architecture_traceability:
+  architecture_doc_refs:
+    - docs/architecture/04-system-of-record-and-core-entities.md
+    - docs/architecture/12-orchestrator-operating-model.md
+    - docs/architecture/14-cli-command-catalog.md
+  contract_refs:
+    - docs/contracts/project-analysis-report.md
+    - docs/contracts/step-result.md
+    - docs/contracts/wave-ticket.md
+    - docs/contracts/handoff-packet.md
+  planning_artifact_families:
+    - project-analysis-report
+    - step-result
+    - wave-ticket
+    - handoff-packet
+  step_linkage:
+    - step_class: planning
+      route_id: route.plan.default
+      wrapper_ref: wrapper.planner.default@v1
+      prompt_bundle_ref: prompt-bundle://planner-default@v1
+      policy_id: policy.step.planner.default
+  evaluation_refs:
+    suite_refs:
+      - suite.release.core@v1
+    dataset_refs:
+      - dataset://run-regression@2026-04-20T08:00:00Z
 service_boundaries:
   - service_id: api
     paths:

@@ -15,6 +15,7 @@ Normalized output of one step regardless of whether that step was an artifact, p
 ## Notes
 Step results make routing, validation, and quality logic consistent across the lifecycle.
 Execution engines may add replay metadata (for example route/asset/policy/adapter selections, timestamps, dry-run mode, and blocked-next-step guidance) as optional fields.
+For later discovery/architecture maturity flows, `routed_execution` may include `discovery_completeness_gate` and `architecture_traceability` payloads so planning handoff is auditable.
 
 For MVP validation, `step_class` is a closed set:
 - `artifact`

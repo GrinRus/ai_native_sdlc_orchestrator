@@ -229,12 +229,14 @@ function formatCommandHelp(definition) {
                 "- --project-ref must point to an existing directory.",
                 "- Discovery run materializes project-analysis plus route/asset/policy/eval registry reports.",
                 "- --route-overrides and --policy-overrides accept comma-separated step overrides.",
+                "- Output includes discovery completeness checks and architecture traceability linkage for planning handoff.",
               ]
             : definition.command === "spec build"
               ? [
                   "- --project-ref must point to an existing directory.",
                   "- Spec build runs routed dry-run step execution for step_class 'spec'.",
                   "- Output includes a durable step-result artifact under runtime reports.",
+                  "- Spec build enforces discovery completeness gate and blocks when required checks fail.",
                 ]
               : definition.command === "wave create"
                 ? [
@@ -731,6 +733,10 @@ function executeImplementedCommand(command, flags, cwd) {
   let evaluationRegistryFile = null;
   let evaluationRegistrySuites = null;
   let evaluationRegistryDatasets = null;
+  let discoveryCompletenessStatus = null;
+  let discoveryCompletenessBlocking = null;
+  let discoveryCompletenessChecks = null;
+  let architectureTraceability = null;
   let validationReportId = null;
   let validationReportFile = null;
   let validationStatus = null;
@@ -892,6 +898,10 @@ function executeImplementedCommand(command, flags, cwd) {
     evaluationRegistryFile = analyzeResult.evaluationRegistryPath;
     evaluationRegistrySuites = analyzeResult.evaluationRegistry.suites;
     evaluationRegistryDatasets = analyzeResult.evaluationRegistry.datasets;
+    discoveryCompletenessStatus = analyzeResult.report.discovery_completeness?.status ?? null;
+    discoveryCompletenessBlocking = analyzeResult.report.discovery_completeness?.blocking ?? null;
+    discoveryCompletenessChecks = analyzeResult.report.discovery_completeness?.checks ?? null;
+    architectureTraceability = analyzeResult.report.architecture_traceability ?? null;
   } else if (command === "discovery run") {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
@@ -922,6 +932,10 @@ function executeImplementedCommand(command, flags, cwd) {
     evaluationRegistryFile = discoveryResult.evaluationRegistryPath;
     evaluationRegistrySuites = discoveryResult.evaluationRegistry.suites;
     evaluationRegistryDatasets = discoveryResult.evaluationRegistry.datasets;
+    discoveryCompletenessStatus = discoveryResult.report.discovery_completeness?.status ?? null;
+    discoveryCompletenessBlocking = discoveryResult.report.discovery_completeness?.blocking ?? null;
+    discoveryCompletenessChecks = discoveryResult.report.discovery_completeness?.checks ?? null;
+    architectureTraceability = discoveryResult.report.architecture_traceability ?? null;
   } else if (command === "project validate") {
     ensureRequiredFlags(command, flags);
     handoffGateEnforced = resolveOptionalBooleanFlag(
@@ -1002,6 +1016,7 @@ function executeImplementedCommand(command, flags, cwd) {
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       stepClass: "spec",
       dryRun: true,
+      requireDiscoveryCompleteness: true,
       routeOverrides,
       policyOverrides,
     });
@@ -1014,6 +1029,10 @@ function executeImplementedCommand(command, flags, cwd) {
     routedStepResultId = specResult.stepResultId;
     routedStepResultFile = specResult.stepResultPath;
     verifyStepResultFiles = [specResult.stepResultPath];
+    discoveryCompletenessStatus = specResult.stepResult.routed_execution.discovery_completeness_gate?.status ?? null;
+    discoveryCompletenessBlocking = specResult.stepResult.routed_execution.discovery_completeness_gate?.blocking ?? null;
+    discoveryCompletenessChecks = specResult.stepResult.routed_execution.discovery_completeness_gate?.checks ?? null;
+    architectureTraceability = specResult.stepResult.routed_execution.architecture_traceability ?? null;
   } else if (command === "eval run") {
     ensureRequiredFlags(command, flags);
 
@@ -2070,6 +2089,10 @@ function executeImplementedCommand(command, flags, cwd) {
     evaluation_registry_file: evaluationRegistryFile,
     evaluation_registry_suites: evaluationRegistrySuites,
     evaluation_registry_datasets: evaluationRegistryDatasets,
+    discovery_completeness_status: discoveryCompletenessStatus,
+    discovery_completeness_blocking: discoveryCompletenessBlocking,
+    discovery_completeness_checks: discoveryCompletenessChecks,
+    architecture_traceability: architectureTraceability,
     validation_report_id: validationReportId,
     validation_report_file: validationReportFile,
     validation_status: validationStatus,

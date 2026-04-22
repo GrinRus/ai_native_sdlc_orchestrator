@@ -46,6 +46,30 @@
       }
     }
   ],
+  "evaluation_registry_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/evaluation-registry-report.json",
+  "evaluation_registry_suites": [
+    {
+      "suite_ref": "suite.release.core@v1"
+    }
+  ],
+  "evaluation_registry_datasets": [
+    {
+      "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z"
+    }
+  ],
+  "discovery_completeness_status": "pass",
+  "discovery_completeness_blocking": false,
+  "discovery_completeness_checks": [
+    {
+      "check_id": "route-matrix-coverage",
+      "status": "pass"
+    }
+  ],
+  "architecture_traceability": {
+    "architecture_doc_refs": [
+      "docs/architecture/14-cli-command-catalog.md"
+    ]
+  },
   "contract_families": [
     {
       "family": "project-analysis-report",

@@ -23,6 +23,29 @@ const LANGUAGE_BY_EXTENSION = Object.freeze({
   ".kt": "kotlin",
   ".swift": "swift",
 });
+const STEP_CLASS_ORDER = Object.freeze([
+  "discovery",
+  "research",
+  "spec",
+  "planning",
+  "implement",
+  "review",
+  "qa",
+  "repair",
+  "eval",
+  "harness",
+]);
+const ARCHITECTURE_DOC_REFS = Object.freeze([
+  "docs/architecture/04-system-of-record-and-core-entities.md",
+  "docs/architecture/12-orchestrator-operating-model.md",
+  "docs/architecture/14-cli-command-catalog.md",
+]);
+const ARCHITECTURE_CONTRACT_REFS = Object.freeze([
+  "docs/contracts/project-analysis-report.md",
+  "docs/contracts/step-result.md",
+  "docs/contracts/wave-ticket.md",
+  "docs/contracts/handoff-packet.md",
+]);
 
 /**
  * @param {{ field: string, reason: string, unknownFacts: Array<{ field: string, confidence: "low", value: "unknown", reason: string }> }} options
@@ -266,6 +289,109 @@ function createVerificationPlan(commands, unknownFacts) {
 
 /**
  * @param {{
+ *   routeResolutionMatrix: Array<{ step_class: string }>,
+ *   assetResolutionMatrix: Array<{ step_class: string }>,
+ *   policyResolutionMatrix: Array<{ step_class: string }>,
+ *   evaluationRegistry: { datasets: Array<{ dataset_ref: string }>, suites: Array<{ suite_ref: string }> },
+ * }} options
+ */
+function resolveDiscoveryCompleteness(options) {
+  const expectedStepCount = STEP_CLASS_ORDER.length;
+  const routeCoverage = new Set(options.routeResolutionMatrix.map((entry) => entry.step_class)).size;
+  const assetCoverage = new Set(options.assetResolutionMatrix.map((entry) => entry.step_class)).size;
+  const policyCoverage = new Set(options.policyResolutionMatrix.map((entry) => entry.step_class)).size;
+
+  const checks = [
+    {
+      check_id: "route-matrix-coverage",
+      status: routeCoverage === expectedStepCount ? "pass" : "fail",
+      blocking: true,
+      expected: expectedStepCount,
+      actual: routeCoverage,
+      summary:
+        routeCoverage === expectedStepCount
+          ? "Route matrix includes every supported step class."
+          : "Route matrix is missing one or more supported step classes.",
+    },
+    {
+      check_id: "asset-matrix-coverage",
+      status: assetCoverage === expectedStepCount ? "pass" : "fail",
+      blocking: true,
+      expected: expectedStepCount,
+      actual: assetCoverage,
+      summary:
+        assetCoverage === expectedStepCount
+          ? "Asset matrix includes wrapper and prompt provenance for every supported step class."
+          : "Asset matrix is missing wrapper/prompt provenance for one or more step classes.",
+    },
+    {
+      check_id: "policy-matrix-coverage",
+      status: policyCoverage === expectedStepCount ? "pass" : "fail",
+      blocking: true,
+      expected: expectedStepCount,
+      actual: policyCoverage,
+      summary:
+        policyCoverage === expectedStepCount
+          ? "Policy matrix includes deterministic bounds for every supported step class."
+          : "Policy matrix is missing deterministic bounds for one or more step classes.",
+    },
+    {
+      check_id: "evaluation-registry-coverage",
+      status:
+        options.evaluationRegistry.datasets.length > 0 && options.evaluationRegistry.suites.length > 0 ? "pass" : "fail",
+      blocking: true,
+      expected: "at least one dataset and one suite",
+      actual: `datasets=${options.evaluationRegistry.datasets.length}, suites=${options.evaluationRegistry.suites.length}`,
+      summary:
+        options.evaluationRegistry.datasets.length > 0 && options.evaluationRegistry.suites.length > 0
+          ? "Evaluation registry exposes suite and dataset refs for downstream quality flows."
+          : "Evaluation registry does not expose both suite and dataset refs for downstream quality flows.",
+    },
+  ];
+  const blocking = checks.some((check) => check.blocking && check.status === "fail");
+
+  return {
+    status: blocking ? "fail" : "pass",
+    blocking,
+    checks,
+  };
+}
+
+/**
+ * @param {{
+ *   routeResolutionMatrix: Array<{ step_class: string, resolved_route_id: string }>,
+ *   assetResolutionMatrix: Array<{ step_class: string, wrapper: { wrapper_ref: string }, prompt_bundle: { prompt_bundle_ref: string } }>,
+ *   policyResolutionMatrix: Array<{ step_class: string, policy: { policy_id: string } }>,
+ *   evaluationRegistry: { datasets: Array<{ dataset_ref: string }>, suites: Array<{ suite_ref: string }> },
+ * }} options
+ */
+function resolveArchitectureTraceability(options) {
+  return {
+    architecture_doc_refs: [...ARCHITECTURE_DOC_REFS],
+    contract_refs: [...ARCHITECTURE_CONTRACT_REFS],
+    planning_artifact_families: ["project-analysis-report", "step-result", "wave-ticket", "handoff-packet"],
+    step_linkage: STEP_CLASS_ORDER.map((stepClass) => {
+      const route = options.routeResolutionMatrix.find((entry) => entry.step_class === stepClass) ?? null;
+      const assets = options.assetResolutionMatrix.find((entry) => entry.step_class === stepClass) ?? null;
+      const policy = options.policyResolutionMatrix.find((entry) => entry.step_class === stepClass) ?? null;
+
+      return {
+        step_class: stepClass,
+        route_id: route?.resolved_route_id ?? null,
+        wrapper_ref: assets?.wrapper?.wrapper_ref ?? null,
+        prompt_bundle_ref: assets?.prompt_bundle?.prompt_bundle_ref ?? null,
+        policy_id: policy?.policy?.policy_id ?? null,
+      };
+    }),
+    evaluation_refs: {
+      suite_refs: options.evaluationRegistry.suites.map((suite) => suite.suite_ref),
+      dataset_refs: options.evaluationRegistry.datasets.map((dataset) => dataset.dataset_ref),
+    },
+  };
+}
+
+/**
+ * @param {{
  *  cwd?: string,
  *  projectRef?: string,
  *  projectProfile?: string,
@@ -396,6 +522,18 @@ export function analyzeProjectRuntime(options = {}) {
       .join("; ");
     throw new Error(`Evaluation registry validation failed: ${issueSummary}`);
   }
+  const discoveryCompleteness = resolveDiscoveryCompleteness({
+    routeResolutionMatrix,
+    assetResolutionMatrix,
+    policyResolutionMatrix,
+    evaluationRegistry,
+  });
+  const architectureTraceability = resolveArchitectureTraceability({
+    routeResolutionMatrix,
+    assetResolutionMatrix,
+    policyResolutionMatrix,
+    evaluationRegistry,
+  });
 
   const report = {
     report_id: `${init.projectId}.analysis.v1`,
@@ -437,8 +575,10 @@ export function analyzeProjectRuntime(options = {}) {
       datasets: evaluationRegistry.datasets,
       suites: evaluationRegistry.suites,
     },
+    discovery_completeness: discoveryCompleteness,
+    architecture_traceability: architectureTraceability,
     verification_plan: verificationPlan,
-    status: "ready-for-bootstrap",
+    status: discoveryCompleteness.blocking ? "discovery-incomplete" : "ready-for-bootstrap",
     unknown_facts: unknownFacts,
   };
 

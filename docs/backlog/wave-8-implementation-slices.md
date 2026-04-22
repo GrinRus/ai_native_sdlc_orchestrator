@@ -23,7 +23,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S01 — Sponsor and planner strategic visibility expansion
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Add strategic run and risk visibility surfaces for sponsor/manager later-stage planning stories.
 - **Primary modules:** `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**`
 - **Hard dependencies:** W7-S05

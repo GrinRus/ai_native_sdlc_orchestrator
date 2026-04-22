@@ -7,12 +7,14 @@
   "discovery_run": {
     "command": "discovery run",
     "status": "implemented",
-    "analysis_report_id": "aor-core.analysis.v1"
+    "analysis_report_id": "aor-core.analysis.v1",
+    "discovery_completeness_status": "pass"
   },
   "spec_build": {
     "command": "spec build",
     "status": "implemented",
-    "routed_step_result_id": "aor-core.routed-execution.v1.step.spec"
+    "routed_step_result_id": "aor-core.routed-execution.v1.step.spec",
+    "discovery_completeness_status": "pass"
   },
   "wave_create": {
     "command": "wave create",

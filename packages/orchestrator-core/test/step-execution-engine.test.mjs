@@ -50,6 +50,52 @@ test("executeRoutedStep resolves route/assets/policy/adapter and writes durable 
     assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
     assert.ok(Array.isArray(result.stepResult.evidence_refs));
     assert.ok(result.stepResult.evidence_refs.length > 0);
+    assert.ok(Array.isArray(result.stepResult.routed_execution.architecture_traceability.contract_refs));
+    assert.ok(result.stepResult.routed_execution.architecture_traceability.contract_refs.includes("docs/contracts/step-result.md"));
+  });
+});
+
+test("executeRoutedStep enforces discovery completeness gate for spec build and carries architecture traceability", () => {
+  withTempRepo((repoRoot) => {
+    const result = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "spec",
+      dryRun: true,
+      requireDiscoveryCompleteness: true,
+    });
+
+    assert.equal(result.stepResult.status, "passed");
+    assert.equal(result.stepResult.routed_execution.discovery_completeness_gate.status, "pass");
+    assert.equal(result.stepResult.routed_execution.discovery_completeness_gate.blocking, false);
+    assert.equal(typeof result.stepResult.routed_execution.discovery_completeness_gate.analysis_report_id, "string");
+    assert.equal(fs.existsSync(result.stepResult.routed_execution.discovery_completeness_gate.analysis_report_file), true);
+    assert.equal(result.stepResult.routed_execution.architecture_traceability.selected_step.step_class, "spec");
+    assert.equal(typeof result.stepResult.routed_execution.architecture_traceability.selected_step.route_id, "string");
+  });
+});
+
+test("executeRoutedStep blocks spec build when discovery completeness gate fails", () => {
+  withTempRepo((repoRoot) => {
+    fs.rmSync(path.join(repoRoot, "examples", "eval"), { recursive: true, force: true });
+
+    const result = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "spec",
+      dryRun: true,
+      requireDiscoveryCompleteness: true,
+    });
+
+    assert.equal(result.stepResult.status, "failed");
+    assert.match(result.stepResult.summary, /Spec build blocked by discovery completeness checks/i);
+    assert.equal(result.stepResult.routed_execution.discovery_completeness_gate.status, "fail");
+    assert.equal(result.stepResult.routed_execution.discovery_completeness_gate.blocking, true);
+    assert.equal(result.stepResult.routed_execution.route_resolution, null);
+    assert.match(
+      String(result.stepResult.routed_execution.blocked_next_step),
+      /close failing completeness checks before executing spec build/i,
+    );
   });
 });
 
