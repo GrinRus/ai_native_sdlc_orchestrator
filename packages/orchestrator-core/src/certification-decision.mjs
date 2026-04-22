@@ -9,6 +9,8 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 import { validateProjectRuntime } from "./project-validate.mjs";
 
 const PROMOTION_CHANNEL_VALUES = new Set(["draft", "candidate", "stable", "frozen", "demoted"]);
+const FLAKY_PASS_RATE_DELTA_THRESHOLD = 0.02;
+const MAJOR_DRIFT_DELTA_THRESHOLD = 0.1;
 
 /**
  * @param {string} value
@@ -116,7 +118,7 @@ function resolveGovernanceFinanceSignals(options) {
  *  replayResult: Record<string, unknown>,
  * }} options
  */
-function resolveBaselineComparison(options) {
+export function resolveBaselineComparison(options) {
   const replayReport = asRecord(options.replayResult.replayReport);
   const baselineSnapshot = asRecord(replayReport.baseline_snapshot);
   const replaySnapshot = asRecord(replayReport.replay_snapshot);
@@ -129,20 +131,85 @@ function resolveBaselineComparison(options) {
 
   const comparisonReady =
     baselineStatus !== null && baselinePassRate !== null && candidateStatus !== null && candidatePassRate !== null;
+  const passRateDelta =
+    comparisonReady && baselinePassRate !== null && candidatePassRate !== null
+      ? Math.round((candidatePassRate - baselinePassRate) * 1000) / 1000
+      : null;
+  const driftDetected = passRateDelta !== null && passRateDelta < 0;
+  const driftMagnitude = passRateDelta !== null ? Math.abs(passRateDelta) : null;
+  const flakyDetected =
+    driftDetected &&
+    driftMagnitude !== null &&
+    driftMagnitude > 0 &&
+    driftMagnitude <= FLAKY_PASS_RATE_DELTA_THRESHOLD;
   const regressionDetected =
-    options.replayStatus === "fail" ||
-    (comparisonReady && baselinePassRate !== null && candidatePassRate !== null && candidatePassRate < baselinePassRate);
+    options.replayStatus === "fail"
+      ? comparisonReady
+        ? driftDetected && !flakyDetected
+        : true
+      : driftDetected && !flakyDetected;
+  const driftSeverity =
+    driftDetected && driftMagnitude !== null
+      ? driftMagnitude >= MAJOR_DRIFT_DELTA_THRESHOLD
+        ? "major"
+        : "minor"
+      : "none";
+  const triageRecommendation = regressionDetected
+    ? "block-and-triage"
+    : flakyDetected
+      ? "collect-replay-samples"
+      : comparisonReady
+        ? "promote"
+        : "complete-baseline-evidence";
+  const escalationRequired = regressionDetected && driftSeverity === "major";
 
   return {
     baseline_status: baselineStatus,
     baseline_pass_rate: baselinePassRate,
     candidate_status: candidateStatus,
     candidate_pass_rate: candidatePassRate,
+    pass_rate_delta: passRateDelta,
     comparable,
     comparison_ready: comparisonReady,
+    drift_detected: driftDetected,
+    drift_severity: driftSeverity,
+    flaky_detected: flakyDetected,
     regression_detected: regressionDetected,
+    triage_recommendation: triageRecommendation,
+    escalation_required: escalationRequired,
     baseline_evaluation_report_ref: asString(options.captureResult.evaluationReportPath),
     replay_evaluation_report_ref: asString(replaySnapshot.evaluation_report_ref),
+  };
+}
+
+/**
+ * @param {{
+ *  baselineComparison: Record<string, unknown>,
+ *  toChannel: string,
+ *  replayStatus: string | null,
+ * }} options
+ */
+export function resolveRegressionTriage(options) {
+  const baselineComparison = asRecord(options.baselineComparison);
+  const passRateDelta = asNumber(baselineComparison.pass_rate_delta);
+  const driftDetected = baselineComparison.drift_detected === true;
+  const driftSeverity = asString(baselineComparison.drift_severity) ?? "none";
+  const flakyDetected = baselineComparison.flaky_detected === true;
+  const regressionDetected = baselineComparison.regression_detected === true;
+  const triageRecommendation = asString(baselineComparison.triage_recommendation) ?? "complete-baseline-evidence";
+  const escalationRequired = baselineComparison.escalation_required === true;
+
+  return {
+    compared_metric: "aggregate_pass_rate",
+    pass_rate_delta: passRateDelta,
+    drift_detected: driftDetected,
+    drift_severity: driftSeverity,
+    flaky_detected: flakyDetected,
+    regression_detected: regressionDetected,
+    triage_recommendation: triageRecommendation,
+    escalation_required: escalationRequired,
+    escalation_channel: options.toChannel,
+    replay_status: options.replayStatus,
   };
 }
 
@@ -193,9 +260,11 @@ function resolveRolloutDecision(options) {
  *  replayStatus: string | null,
  *  evidenceComplete: boolean,
  *  financeSignalsComplete: boolean,
-  *  qualityGateRequired: boolean,
+ *  qualityGateRequired: boolean,
  *  baselineComparisonRequired: boolean,
  *  baselineComparisonComplete: boolean,
+ *  regressionDetected: boolean,
+ *  flakyDetected: boolean,
  *  freezeGuardrailStatus: "pass" | "hold",
  *  missingEvidenceKinds: string[],
  * }} options
@@ -205,6 +274,14 @@ function buildGovernanceChecks(options) {
   const checks = [];
   const deterministicStatus =
     options.validationStatus === "fail" ? "fail" : options.validationStatus === "warn" ? "hold" : "pass";
+  const replayCheckStatus =
+    options.replayStatus === "pass"
+      ? "pass"
+      : options.replayStatus === "fail"
+        ? options.flakyDetected
+          ? "hold"
+          : "fail"
+        : "hold";
 
   checks.push({
     check_id: "deterministic-validation",
@@ -228,13 +305,15 @@ function buildGovernanceChecks(options) {
 
   checks.push({
     check_id: "harness-replay",
-    status: options.replayStatus === "pass" ? "pass" : options.replayStatus === "fail" ? "fail" : "hold",
+    status: replayCheckStatus,
     summary:
-      options.replayStatus === "pass"
+      replayCheckStatus === "pass"
         ? "Harness replay is compatible with baseline evidence."
-        : options.replayStatus === "fail"
-          ? "Harness replay introduced a regression against baseline evidence."
-          : "Harness replay is not yet comparable with baseline evidence.",
+        : replayCheckStatus === "hold" && options.replayStatus === "fail"
+          ? "Harness replay drift is within flaky tolerance; collect replay samples before promotion."
+          : options.replayStatus === "fail"
+            ? "Harness replay introduced a regression against baseline evidence."
+            : "Harness replay is not yet comparable with baseline evidence.",
   });
 
   checks.push({
@@ -251,6 +330,16 @@ function buildGovernanceChecks(options) {
     summary: options.financeSignalsComplete
       ? "Cost and latency guardrail signals are present."
       : "Cost and latency guardrail signals are incomplete for governance review.",
+  });
+
+  checks.push({
+    check_id: "regression-triage",
+    status: options.regressionDetected ? "fail" : options.flakyDetected ? "hold" : "pass",
+    summary: options.regressionDetected
+      ? "Baseline drift requires regression triage before promotion."
+      : options.flakyDetected
+        ? "Baseline drift is within flaky tolerance; collect replay samples before promotion."
+        : "Regression triage signals do not require escalation.",
   });
 
   checks.push({
@@ -299,6 +388,7 @@ function buildGovernanceChecks(options) {
  *  qualityGateRequired?: boolean,
  *  baselineComparisonRequired?: boolean,
  *  baselineComparisonComplete?: boolean,
+ *  flakyDetected?: boolean,
  *  freezeGuardrailStatus?: "pass" | "hold",
  * }} options
  * @returns {"pass" | "hold" | "fail"}
@@ -307,7 +397,14 @@ export function resolveCertificationDecisionStatus(options) {
   const deterministicStatus =
     options.validationStatus === "fail" ? "fail" : options.validationStatus === "warn" ? "hold" : "pass";
   const evaluativeStatus = options.evaluationStatus === "pass" ? "pass" : "fail";
-  const replayEvidenceStatus = options.replayStatus === "pass" ? "pass" : options.replayStatus === "fail" ? "fail" : "hold";
+  const replayEvidenceStatus =
+    options.replayStatus === "pass"
+      ? "pass"
+      : options.replayStatus === "fail"
+        ? options.flakyDetected === true
+          ? "hold"
+          : "fail"
+        : "hold";
   const evidenceStatus = options.evidenceComplete === false ? "hold" : "pass";
   const financeStatus = options.financeSignalsComplete === false ? "hold" : "pass";
   const baselineStatus =
@@ -433,11 +530,15 @@ export function certifyAssetPromotion(options) {
   });
   const baselineComparisonRequired = toChannel === "stable" || toChannel === "frozen" || toChannel === "demoted";
   const baselineComparisonComplete = baselineComparison.comparison_ready === true;
+  const regressionTriage = resolveRegressionTriage({
+    baselineComparison: baselineComparison,
+    toChannel,
+    replayStatus,
+  });
   const freezeGuardrailRequired = toChannel === "frozen";
   const freezeGuardrailSatisfied =
     !freezeGuardrailRequired ||
     evaluationStatus !== "pass" ||
-    replayStatus === "fail" ||
     baselineComparison.regression_detected === true;
   const freezeGuardrailStatus = freezeGuardrailSatisfied ? "pass" : "hold";
   const financeSignalsComplete =
@@ -455,6 +556,8 @@ export function certifyAssetPromotion(options) {
     qualityGateRequired,
     baselineComparisonRequired,
     baselineComparisonComplete,
+    regressionDetected: baselineComparison.regression_detected === true,
+    flakyDetected: baselineComparison.flaky_detected === true,
     freezeGuardrailStatus,
     missingEvidenceKinds,
   });
@@ -467,6 +570,7 @@ export function certifyAssetPromotion(options) {
     qualityGateRequired,
     baselineComparisonRequired,
     baselineComparisonComplete,
+    flakyDetected: baselineComparison.flaky_detected === true,
     freezeGuardrailStatus,
   });
   const rolloutDecision = resolveRolloutDecision({
@@ -506,6 +610,7 @@ export function certifyAssetPromotion(options) {
       harness_replay_status: replayStatus,
       evaluation_status: evaluationStatus,
       baseline_comparison: baselineComparison,
+      regression_triage: regressionTriage,
       rollout_decision: rolloutDecision,
       governance_checks: governanceChecks,
       finance_signals: financeSignals,
@@ -516,7 +621,7 @@ export function certifyAssetPromotion(options) {
           "harness-capture",
           "harness-replay",
           "finance-signals",
-          ...(baselineComparisonRequired ? ["baseline-comparison"] : []),
+          ...(baselineComparisonRequired ? ["baseline-comparison", "regression-triage"] : []),
           ...(freezeGuardrailRequired ? ["freeze-guardrail"] : []),
         ],
         satisfied: [
@@ -526,6 +631,9 @@ export function certifyAssetPromotion(options) {
           "harness-replay",
           financeSignalsComplete ? "finance-signals" : null,
           baselineComparisonComplete ? "baseline-comparison" : null,
+          baselineComparison.regression_detected === false && baselineComparison.flaky_detected === false
+            ? "regression-triage"
+            : null,
           freezeGuardrailSatisfied ? "freeze-guardrail" : null,
           replayResult.replayEvaluationReportPath ? "replay-evaluation-report" : null,
         ].filter((entry) => entry !== null),

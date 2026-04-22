@@ -36,6 +36,9 @@ evidence_summary:
     - check_id: finance-signals
       status: pass
       summary: Cost and latency guardrail signals are present.
+    - check_id: regression-triage
+      status: pass
+      summary: Regression triage signals do not require escalation.
     - check_id: baseline-comparison
       status: pass
       summary: Baseline comparison evidence is present for channel transition.
@@ -50,11 +53,28 @@ evidence_summary:
     baseline_pass_rate: 1
     candidate_status: pass
     candidate_pass_rate: 1
+    pass_rate_delta: 0
     comparable: true
     comparison_ready: true
+    drift_detected: false
+    drift_severity: none
+    flaky_detected: false
     regression_detected: false
+    triage_recommendation: promote
+    escalation_required: false
     baseline_evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4.json
     replay_evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4-replay.json
+  regression_triage:
+    compared_metric: aggregate_pass_rate
+    pass_rate_delta: 0
+    drift_detected: false
+    drift_severity: none
+    flaky_detected: false
+    regression_detected: false
+    triage_recommendation: promote
+    escalation_required: false
+    escalation_channel: stable
+    replay_status: pass
   rollout_decision:
     action: promote
     requested_transition:
@@ -80,6 +100,7 @@ evidence_summary:
       - harness-replay
       - finance-signals
       - baseline-comparison
+      - regression-triage
     satisfied:
       - validation-report
       - evaluation-report
@@ -87,5 +108,6 @@ evidence_summary:
       - harness-replay
       - finance-signals
       - baseline-comparison
+      - regression-triage
       - replay-evaluation-report
 status: pass

@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 
 import {
   certifyAssetPromotion,
+  resolveBaselineComparison,
   resolveCertificationDecisionStatus,
+  resolveRegressionTriage,
 } from "../src/certification-decision.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -71,6 +73,21 @@ test("resolveCertificationDecisionStatus maps pass/hold/fail semantics determini
       freezeGuardrailStatus: "pass",
     }),
     "fail",
+  );
+  assert.equal(
+    resolveCertificationDecisionStatus({
+      validationStatus: "pass",
+      evaluationStatus: "pass",
+      replayStatus: "fail",
+      evidenceComplete: true,
+      financeSignalsComplete: true,
+      qualityGateRequired: true,
+      baselineComparisonRequired: true,
+      baselineComparisonComplete: true,
+      flakyDetected: true,
+      freezeGuardrailStatus: "pass",
+    }),
+    "hold",
   );
   assert.equal(
     resolveCertificationDecisionStatus({
@@ -144,6 +161,83 @@ test("resolveCertificationDecisionStatus maps pass/hold/fail semantics determini
   );
 });
 
+test("resolveBaselineComparison classifies flaky drift without escalation", () => {
+  const baselineComparison = resolveBaselineComparison({
+    evaluationStatus: "pass",
+    replayStatus: "fail",
+    captureResult: {
+      evaluationReportPath: "runtime://reports/evaluation-report-suite.cert.core-v4.json",
+    },
+    replayResult: {
+      replayReport: {
+        baseline_snapshot: {
+          status: "pass",
+          aggregate_pass_rate: 1,
+        },
+        replay_snapshot: {
+          aggregate_pass_rate: 0.99,
+          comparable: false,
+          evaluation_report_ref: "runtime://reports/evaluation-report-suite.cert.core-v4-replay.json",
+        },
+      },
+    },
+  });
+  const triage = resolveRegressionTriage({
+    baselineComparison,
+    toChannel: "stable",
+    replayStatus: "fail",
+  });
+
+  assert.equal(baselineComparison.pass_rate_delta, -0.01);
+  assert.equal(baselineComparison.drift_detected, true);
+  assert.equal(baselineComparison.drift_severity, "minor");
+  assert.equal(baselineComparison.flaky_detected, true);
+  assert.equal(baselineComparison.regression_detected, false);
+  assert.equal(baselineComparison.triage_recommendation, "collect-replay-samples");
+  assert.equal(baselineComparison.escalation_required, false);
+  assert.equal(triage.regression_detected, false);
+  assert.equal(triage.flaky_detected, true);
+  assert.equal(triage.triage_recommendation, "collect-replay-samples");
+});
+
+test("resolveBaselineComparison escalates major drift regression", () => {
+  const baselineComparison = resolveBaselineComparison({
+    evaluationStatus: "pass",
+    replayStatus: "fail",
+    captureResult: {
+      evaluationReportPath: "runtime://reports/evaluation-report-suite.cert.core-v4.json",
+    },
+    replayResult: {
+      replayReport: {
+        baseline_snapshot: {
+          status: "pass",
+          aggregate_pass_rate: 1,
+        },
+        replay_snapshot: {
+          aggregate_pass_rate: 0.85,
+          comparable: false,
+          evaluation_report_ref: "runtime://reports/evaluation-report-suite.cert.core-v4-replay.json",
+        },
+      },
+    },
+  });
+  const triage = resolveRegressionTriage({
+    baselineComparison,
+    toChannel: "stable",
+    replayStatus: "fail",
+  });
+
+  assert.equal(baselineComparison.pass_rate_delta, -0.15);
+  assert.equal(baselineComparison.drift_detected, true);
+  assert.equal(baselineComparison.drift_severity, "major");
+  assert.equal(baselineComparison.flaky_detected, false);
+  assert.equal(baselineComparison.regression_detected, true);
+  assert.equal(baselineComparison.triage_recommendation, "block-and-triage");
+  assert.equal(baselineComparison.escalation_required, true);
+  assert.equal(triage.regression_detected, true);
+  assert.equal(triage.escalation_required, true);
+});
+
 test("certifyAssetPromotion combines eval and harness evidence into durable promotion decision", () => {
   withTempRepo((repoRoot) => {
     const result = certifyAssetPromotion({
@@ -168,9 +262,19 @@ test("certifyAssetPromotion combines eval and harness evidence into durable prom
     assert.equal(result.decision.evidence_summary.evaluation_status, "pass");
     assert.equal(result.decision.evidence_summary.harness_replay_status, "pass");
     assert.equal(result.decision.evidence_summary.baseline_comparison.comparison_ready, true);
+    assert.equal(result.decision.evidence_summary.baseline_comparison.pass_rate_delta, 0);
+    assert.equal(result.decision.evidence_summary.baseline_comparison.drift_detected, false);
+    assert.equal(result.decision.evidence_summary.baseline_comparison.flaky_detected, false);
+    assert.equal(result.decision.evidence_summary.baseline_comparison.triage_recommendation, "promote");
+    assert.equal(result.decision.evidence_summary.regression_triage.compared_metric, "aggregate_pass_rate");
+    assert.equal(result.decision.evidence_summary.regression_triage.regression_detected, false);
     assert.equal(result.decision.evidence_summary.rollout_decision.action, "promote");
     assert.ok(Array.isArray(result.decision.evidence_summary.governance_checks));
     assert.equal(result.decision.evidence_summary.governance_checks.length >= 5, true);
+    const regressionTriageCheck = result.decision.evidence_summary.governance_checks.find(
+      (entry) => entry.check_id === "regression-triage",
+    );
+    assert.equal(regressionTriageCheck?.status, "pass");
     assert.equal(result.decision.evidence_summary.finance_signals.max_cost_usd > 0, true);
     assert.equal(result.decision.evidence_summary.finance_signals.timeout_sec > 0, true);
     assert.equal(result.decision.evidence_summary.finance_signals.capture_latency_sec >= 0, true);
@@ -182,6 +286,7 @@ test("certifyAssetPromotion combines eval and harness evidence into durable prom
       "harness-replay",
       "finance-signals",
       "baseline-comparison",
+      "regression-triage",
     ]);
   });
 });

@@ -33,6 +33,7 @@ Governance guardrail semantics should be explicit and reproducible:
 - `governance_checks[]` should include per-check `check_id`, `status` (`pass|hold|fail`), and a stable summary.
 - include `policy-quality-gate` so blocked decisions are traceable to policy, not just final status.
 - include `baseline-comparison` when moving into `stable`, `frozen`, or `demoted`.
+- include `regression-triage` when baseline comparison is required.
 - include `freeze-channel-guardrail` when `to_channel=frozen`.
 
 Baseline comparison evidence should be explicit for maturity decisions:
@@ -40,10 +41,28 @@ Baseline comparison evidence should be explicit for maturity decisions:
 - `baseline_comparison.baseline_pass_rate`
 - `baseline_comparison.candidate_status`
 - `baseline_comparison.candidate_pass_rate`
+- `baseline_comparison.pass_rate_delta`
 - `baseline_comparison.comparison_ready`
+- `baseline_comparison.drift_detected`
+- `baseline_comparison.drift_severity` (`none|minor|major`)
+- `baseline_comparison.flaky_detected`
 - `baseline_comparison.regression_detected`
+- `baseline_comparison.triage_recommendation`
+- `baseline_comparison.escalation_required`
 - `baseline_comparison.baseline_evaluation_report_ref`
 - `baseline_comparison.replay_evaluation_report_ref` (optional if replay is blocked)
+
+Regression triage metadata should be explicit for operator review:
+- `regression_triage.compared_metric`
+- `regression_triage.pass_rate_delta`
+- `regression_triage.drift_detected`
+- `regression_triage.drift_severity`
+- `regression_triage.flaky_detected`
+- `regression_triage.regression_detected`
+- `regression_triage.triage_recommendation`
+- `regression_triage.escalation_required`
+- `regression_triage.escalation_channel`
+- `regression_triage.replay_status`
 
 Controlled rollout semantics should be explicit:
 - `rollout_decision.action` should be one of `promote`, `hold`, `reject`, `freeze`, or `demote`.
@@ -61,6 +80,7 @@ Finance evidence parity should be carried in decision evidence:
 `evidence_bar.required` should include deterministic validation, evaluative artifacts, and finance signals when policy quality gate is required.
 For maturity transitions:
 - include `baseline-comparison` for `stable`, `frozen`, and `demoted`;
+- include `regression-triage` for `stable`, `frozen`, and `demoted`;
 - include `freeze-guardrail` for `frozen`.
 
 For MVP validation, `from_channel` and `to_channel` use this closed set:

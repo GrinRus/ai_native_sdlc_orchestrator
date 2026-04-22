@@ -81,7 +81,7 @@ Close remaining MVP+ governance and quality stories across certification control
 
 ## W7-S03 — Incident recertification and controlled re-enable flow
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Add a controlled incident recertification path before re-enabling problematic routes and assets.
 - **Primary modules:** `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W7-S02, W6-S06
@@ -143,7 +143,7 @@ Close remaining MVP+ governance and quality stories across certification control
 
 ## W7-S05 — MVP+ governance and learning-loop integration closure
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Close W7 as a coherent governance wave by integrating quality, incident, and finance evidence into a repeatable learning loop.
 - **Primary modules:** `docs/backlog/**`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`
 - **Hard dependencies:** W7-S02, W7-S03, W7-S04

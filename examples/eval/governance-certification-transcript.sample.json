@@ -12,8 +12,19 @@
       "evidence-completeness:pass",
       "finance-signals:pass",
       "baseline-comparison:pass",
+      "regression-triage:pass",
       "policy-quality-gate:pass"
-    ]
+    ],
+    "regression_triage": {
+      "compared_metric": "aggregate_pass_rate",
+      "pass_rate_delta": 0,
+      "drift_detected": false,
+      "drift_severity": "none",
+      "flaky_detected": false,
+      "regression_detected": false,
+      "triage_recommendation": "promote",
+      "escalation_required": false
+    }
   },
   "blocked_flow": {
     "command": "aor harness certify",
@@ -25,6 +36,17 @@
     ],
     "blocked_reason": "Policy quality gate blocked by failing governance checks."
   },
+  "flaky_hold_flow": {
+    "command": "aor harness certify",
+    "promotion_decision_status": "hold",
+    "decision_ref": "runtime://artifacts/promotion-decision-wrapper.eval.default-v1.json",
+    "governance_checks": [
+      "harness-replay:hold",
+      "regression-triage:hold",
+      "policy-quality-gate:hold"
+    ],
+    "triage_recommendation": "collect-replay-samples"
+  },
   "freeze_flow": {
     "command": "aor harness certify --from-channel stable --to-channel frozen",
     "promotion_decision_status": "fail",
@@ -32,6 +54,7 @@
     "baseline_comparison_ref": "runtime://reports/harness-replay-aor-core.json#baseline_snapshot",
     "governance_checks": [
       "baseline-comparison:pass",
+      "regression-triage:fail",
       "freeze-channel-guardrail:pass",
       "policy-quality-gate:fail"
     ]
