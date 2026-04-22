@@ -39,16 +39,17 @@ AOR is the durable SDLC control plane that coordinates:
 2. analyze or verify the project if required;
 3. materialize the next packet boundary;
 4. request human approval if the policy requires it;
-5. resolve route, wrapper, prompt bundle, and step policy;
-6. execute the step through the selected adapter;
-7. collect evidence and normalize the step result;
-8. run validation;
-9. run eval or harness if the step policy requires it;
-10. decide whether to close, retry, repair, escalate, or block;
-11. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
-12. only if the delivery plan is ready, materialize a delivery manifest;
-13. if the flow reaches release, materialize a release packet;
-14. if the flow fails materially, open or update an incident path.
+5. resolve route, wrapper, prompt bundle, skill refs, and step policy;
+6. compile working context and inject it into the adapter request envelope;
+7. execute the step through the selected adapter;
+8. collect evidence and normalize the step result;
+9. run validation;
+10. run eval or harness if the step policy requires it;
+11. decide whether to close, retry, repair, escalate, or block;
+12. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
+13. only if the delivery plan is ready, materialize a delivery manifest;
+14. if the flow reaches release, materialize a release packet;
+15. if the flow fails materially, open or update an incident path.
 
 ## Delivery model
 AOR should support these delivery modes:

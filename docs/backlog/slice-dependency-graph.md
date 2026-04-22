@@ -47,6 +47,7 @@ flowchart TB
   W6S01[W6-S01 Backlog and slice-cycle extensibility for W6+]
   W6S02[W6-S02 Intake/discovery/spec/wave command pack]
   W6S03[W6-S03 Run-control command pack with policy and audit guardrails]
+  W6S07[W6-S07 Prompt/context compiler and skill-injected adapter context kernel]
   W6S04[W6-S04 UI attach/detach lifecycle command pack]
   W6S05[W6-S05 Delivery/release prepare command pack]
   W6S06[W6-S06 Incident and audit command pack]
@@ -139,6 +140,9 @@ flowchart TB
   W5S06 --> W6S01
   W6S01 --> W6S02
   W6S01 --> W6S03
+  W6S01 --> W6S07
+  W2S05 --> W6S07
+  W3S01 --> W6S07
   W5S03 --> W6S03
   W6S03 --> W6S04
   W5S04 --> W6S04
@@ -160,9 +164,12 @@ flowchart TB
   W6S02 --> W8S02
   W7S05 --> W8S02
   W6S03 --> W8S03
+  W6S07 --> W8S03
   W7S05 --> W8S03
   W6S03 --> W8S04
+  W6S07 --> W8S04
   W7S05 --> W8S04
+  W6S07 --> W8S05
   W7S01 --> W8S05
   W7S02 --> W8S05
   W7S03 --> W8S06
@@ -242,6 +249,7 @@ flowchart TB
 | W6-S01 | W5-S06 |
 | W6-S02 | W6-S01 |
 | W6-S03 | W6-S01, W5-S03 |
+| W6-S07 | W6-S01, W2-S05, W3-S01 |
 | W6-S04 | W6-S03, W5-S04 |
 | W6-S05 | W6-S03, W4-S05 |
 | W6-S06 | W6-S03, W5-S06 |
@@ -260,9 +268,9 @@ flowchart TB
 |---|---|
 | W8-S01 | W7-S05 |
 | W8-S02 | W6-S02, W7-S05 |
-| W8-S03 | W6-S03, W7-S05 |
-| W8-S04 | W6-S03, W7-S05 |
-| W8-S05 | W7-S01, W7-S02 |
+| W8-S03 | W6-S03, W6-S07, W7-S05 |
+| W8-S04 | W6-S03, W6-S07, W7-S05 |
+| W8-S05 | W6-S07, W7-S01, W7-S02 |
 | W8-S06 | W7-S03, W7-S04, W7-S05 |
 | W8-S07 | W6-S05, W6-S02, W8-S04, W8-S06 |
 
@@ -308,21 +316,22 @@ flowchart TB
 39. W6-S01
 40. W6-S02
 41. W6-S03
-42. W6-S04
-43. W6-S05
-44. W6-S06
-45. W7-S01
-46. W7-S02
-47. W7-S04
-48. W7-S03
-49. W8-S05
-50. W7-S05
-51. W8-S01
-52. W8-S02
-53. W8-S03
-54. W8-S04
-55. W8-S06
-56. W8-S07
+42. W6-S07
+43. W6-S04
+44. W6-S05
+45. W6-S06
+46. W7-S01
+47. W7-S02
+48. W7-S04
+49. W7-S03
+50. W8-S05
+51. W7-S05
+52. W8-S01
+53. W8-S02
+54. W8-S03
+55. W8-S04
+56. W8-S06
+57. W8-S07
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

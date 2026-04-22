@@ -50,6 +50,26 @@ default_wrapper_profiles:
   repair: wrapper.repair.default@v1
   eval: wrapper.eval.default@v1
   harness: wrapper.harness.default@v1
+default_skill_profiles:
+  artifact:
+    - skill.artifact.default@v1
+  planner:
+    - skill.planner.default@v1
+  runner:
+    - skill.runner.default@v1
+  repair:
+    - skill.repair.default@v1
+  eval:
+    - skill.eval.default@v1
+  harness:
+    - skill.harness.default@v1
+skill_overrides:
+  implement:
+    - skill.runner.implement@v1
+  review:
+    - skill.runner.review@v1
+  qa:
+    - skill.runner.qa@v1
 budget_policy:
   default_cost_limit_usd: 50
   default_timeout_sec: 3600

@@ -1,0 +1,22 @@
+skill_id: skill.runner.implement
+version: 1
+step_class: runner
+summary: implementation-focused runner workflow with explicit contract and verification order
+activation_hints:
+  - implement
+workflow:
+  - id: contract-first
+    instruction: confirm contract and interface changes before implementation details
+  - id: apply-change
+    instruction: implement bounded changes and keep route, policy, and evidence alignment explicit
+  - id: verify
+    instruction: run required checks and capture outputs for delivery/harness reuse
+required_inputs:
+  packets:
+    - handoff
+    - spec
+expected_outputs:
+  - diff
+  - validation-report
+change_notes:
+  - step override skill for implement

@@ -16,7 +16,7 @@ The authoritative planning model for implementation lives in:
 | W3 | Build the validation, eval, harness, certification, and promotion stack that makes AOR quality-native by default. | 6 | EPIC-4, EPIC-7 | `docs/backlog/wave-3-implementation-slices.md` |
 | W4 | Add safe write-back modes, manifests, and release artifacts so AOR can move from rehearsal to controlled delivery. | 6 | EPIC-5, EPIC-7 | `docs/backlog/wave-4-implementation-slices.md` |
 | W5 | Expose operator-grade APIs, live views, and standardized live E2E orchestration for the full control plane. | 6 | EPIC-6, EPIC-7 | `docs/backlog/wave-5-implementation-slices.md` |
-| W6 | Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, delivery/release prep, and incident/audit flows. | 6 | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-6-implementation-slices.md` |
+| W6 | Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, delivery/release prep, incident/audit flows, and context-aware routed execution foundations. | 7 | EPIC-0, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-6-implementation-slices.md` |
 | W7 | Close MVP+ governance and quality stories for certification, finance evidence, and learning-loop integration. | 5 | EPIC-4, EPIC-7 | `docs/backlog/wave-7-implementation-slices.md` |
 | W8 | Close later-maturity stories for strategic operator visibility, governance hardening, and multi-repo delivery maturity. | 7 | EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-8-implementation-slices.md` |
 
@@ -26,6 +26,7 @@ The authoritative planning model for implementation lives in:
 | W6-S01 | enablement slice (no direct story closure) |
 | W6-S02 | PSO-07, DIS-07, PBO-06, PBO-07 |
 | W6-S03 | EMP-07, DEV-09, OPS-09, SEC-05 |
+| W6-S07 | enablement slice for context compilation and skill-aware routed execution |
 | W6-S04 | DEV-08, ARC-06 |
 | W6-S05 | DTX-06, DTX-07, RMO-05 |
 | W6-S06 | INC-05 |
@@ -115,12 +116,13 @@ The authoritative planning model for implementation lives in:
 **Detailed slices:** `docs/backlog/wave-5-implementation-slices.md`
 
 ## W6 — command-surface expansion
-**Goal:** Expand the control plane from read-only operations into bounded command execution and operational controls.
+**Goal:** Expand the control plane from read-only operations into bounded command execution, operational controls, and context-aware routed execution.
 
 **Exit criteria:**
 - backlog tooling can discover and schedule `W6+` slices without manual script edits
 - planned command contracts for intake/discovery/spec/wave are implemented and tested
 - run lifecycle controls are implemented with explicit policy and audit traceability
+- routed execution compiles deterministic working context with skill refs and injects it into adapter requests
 - UI attach/detach lifecycle commands are implemented without breaking headless-first operation
 - delivery/release prepare and incident/audit command packs materialize durable artifacts
 

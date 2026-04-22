@@ -4,6 +4,7 @@
 AOR manages these platform assets:
 - prompt bundles
 - wrappers
+- skills
 - route profiles
 - step policies
 - adapter capability profiles
@@ -15,6 +16,7 @@ Prompt guidance should not be buried inside wrappers or scattered across docs. A
 ## Separation of concerns
 - **Prompt bundle** — task guidance and output expectations
 - **Wrapper** — execution envelope, allowed tools, included files, verification section, redaction
+- **Skill profile** — reusable step-class workflow with explicit activation and output intent
 - **Route** — adapter/provider/model selection plus constraints
 - **Step policy** — validators, retries, repair, escalation, blocking rules
 - **Adapter profile** — what a runner can actually do
@@ -31,13 +33,15 @@ Prompt guidance should not be buried inside wrappers or scattered across docs. A
 - certify prompt-bundle changes independently when possible;
 - keep baseline references explicit;
 - preserve incident and promotion history for every platform asset.
+- keep `AGENTS.md` guidance thin and operator-oriented; execution context source-of-truth lives in versioned platform assets (prompt bundles, wrappers, skills, policies, routes).
 
 ## Runtime loading order (W2-S02)
 Asset resolution for a step is deterministic and follows this order:
 1. resolve route profile for the step class;
 2. choose wrapper profile (`step override` first, then `project default` by route class);
 3. choose prompt bundle (`step override` first, then wrapper `prompt_bundle_ref`);
-4. emit one asset bundle with route, wrapper, prompt bundle, and provenance refs.
+4. choose skill refs (`step override` first, then `project default` by route class);
+5. compile one working context with instruction set, bootstrap, required-input resolution, guardrails, and provenance refs.
 
 If any source is missing or conflicts with the step class, resolution fails before execution.
 

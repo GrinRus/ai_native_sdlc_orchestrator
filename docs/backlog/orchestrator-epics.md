@@ -25,6 +25,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 
 **Slices by wave:**
 - **W2:** `W2-S01` Route registry and step resolution kernel; `W2-S02` Wrapper, prompt-bundle, and asset loader runtime; `W2-S03` Step policy resolution, budgets, and guardrails; `W2-S04` Adapter SDK and mock adapter baseline; `W2-S05` Routed step execution engine and durable step results
+- **W6:** `W6-S07` Prompt/context compiler and skill-injected adapter context kernel
 - **W8:** `W8-S03` Later delivery and security route-governance maturity
 
 ## EPIC-4 Quality platform

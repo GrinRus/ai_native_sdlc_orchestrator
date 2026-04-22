@@ -24,6 +24,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Platform assets | `prompt-bundle.md` | `prompt-bundle` | `examples/prompts/*.yaml` | implemented | Includes closed-set enum check for `step_class`. |
 | Platform assets | `step-policy-profile.md` | `step-policy-profile` | `examples/policies/*.yaml` | implemented | Includes closed-set enum check for `step_class`. |
 | Platform assets | `adapter-capability-profile.md` | `adapter-capability-profile` | `examples/adapters/*.yaml` | implemented | Required fields + top-level type checks, including deterministic `mock-runner` baseline profile. |
+| Platform assets | `skill-profile.md` | `skill-profile` | `examples/skills/*.yaml` | implemented | Includes closed-set enum check for `step_class`; registry refs use `skill_id@vN`. |
 | Operations | `live-run-event.md` | `live-run-event` | none | implemented | Contract is loader-covered with closed-set `event_type` validation; no YAML example in this repo yet. |
 | Operations | `live-e2e-profile.md` | `live-e2e-profile` | `examples/live-e2e/*.yaml` | implemented | Required fields + top-level type checks, including `preflight` no-write shape. |
 | Operations | `control-plane-api.md` | `control-plane-api` | none | limitation | Narrative contract; no YAML schema in `W0-S02`. TODO: add machine-loadable shape in a dedicated schema slice. |
@@ -37,6 +38,8 @@ The reference-integrity validator checks only local example graph refs and inten
 | `project-profile` | `default_route_profiles.*` | existing `route_id` (`provider-route-profile`) |
 | `project-profile` | `default_wrapper_profiles.*` | existing `wrapper_id@vN` (`wrapper-profile`) |
 | `project-profile` | `default_step_policies.*` | existing `policy_id` (`step-policy-profile`) |
+| `project-profile` | `default_skill_profiles.*[]` | existing `skill_id@vN` (`skill-profile`) |
+| `project-profile` | `skill_overrides.*[]` | existing `skill_id@vN` (`skill-profile`) |
 | `project-profile` | `eval_policy.default_release_suite_ref` | existing `suite_id@vN` (`evaluation-suite`) |
 | `project-profile` | `live_e2e_defaults.profiles.*` | existing `profile_id@vN` (`live-e2e-profile`) |
 | `provider-route-profile` | `wrapper_profile_ref` | existing `wrapper_id@vN` (`wrapper-profile`) |
@@ -56,6 +59,8 @@ The validator also enforces deterministic asset-graph compatibility after refere
 - route slot key (`project.default_route_profiles.<step>`) must match referenced route `step`;
 - wrapper slot key (`project.default_wrapper_profiles.<step_class>`) must match wrapper `step_class`;
 - policy slot key (`project.default_step_policies.<step_class>`) must match policy `step_class`;
+- skill default slot key (`project.default_skill_profiles.<step_class>`) must match skill `step_class`;
+- skill override slot (`project.skill_overrides.<step>`) must match the default route class for that step;
 - route `route_class` must match referenced wrapper `step_class`;
 - wrapper `step_class` must match referenced prompt-bundle `step_class`;
 - suite `subject_type` must match referenced dataset `subject_type`;

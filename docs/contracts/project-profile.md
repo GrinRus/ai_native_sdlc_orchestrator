@@ -13,6 +13,8 @@ Persistent configuration for one target project, including repos, allowed provid
 - `default_route_profiles`
 - `default_step_policies`
 - `default_wrapper_profiles`
+- `default_skill_profiles`
+- `skill_overrides`
 - `budget_policy`
 - `approval_policy`
 - `security_policy`
@@ -21,6 +23,9 @@ Persistent configuration for one target project, including repos, allowed provid
 
 ## Notes
 Use the project profile as the durable source of truth for execution defaults. Live E2E profiles may override specific target-repo details without replacing the full project profile.
+
+`default_skill_profiles` maps route classes (`artifact`, `planner`, `runner`, `repair`, `eval`, `harness`) to ordered skill refs (`skill_id@vN`).
+`skill_overrides` maps route step slots (`discovery`, `research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`, `harness`) to ordered skill refs and has higher precedence than defaults.
 
 `runtime_defaults.workspace_mode` controls execution isolation:
 - `ephemeral` — run inside the primary checkout;

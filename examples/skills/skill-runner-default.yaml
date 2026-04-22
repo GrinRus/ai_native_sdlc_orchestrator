@@ -1,0 +1,24 @@
+skill_id: skill.runner.default
+version: 1
+step_class: runner
+summary: deterministic bounded execution workflow for implementation-class runner steps
+activation_hints:
+  - implement
+  - review
+  - qa
+workflow:
+  - id: confirm-bounds
+    instruction: verify handoff scope, allowed commands, and required evidence before edits
+  - id: execute-bounded-work
+    instruction: apply minimal scoped changes and run declared deterministic checks
+  - id: report-evidence
+    instruction: summarize changes, verification results, and residual risks
+required_inputs:
+  packets:
+    - handoff
+    - spec
+expected_outputs:
+  - diff
+  - validation-report
+change_notes:
+  - baseline runner skill for context compiler

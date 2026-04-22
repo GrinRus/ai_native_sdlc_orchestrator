@@ -76,6 +76,7 @@ This is the master index for the implementation slices across all defined waves.
 | W6-S01 | Backlog and slice-cycle extensibility for W6+ | EPIC-0 | ready | `docs/backlog/**`, `scripts/**` | W5-S06 |
 | W6-S02 | Intake/discovery/spec/wave command pack | EPIC-6 | blocked | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**` | W6-S01 |
 | W6-S03 | Run-control command pack with policy and audit guardrails | EPIC-6 | blocked | `apps/cli`, `apps/api`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**` | W6-S01, W5-S03 |
+| W6-S07 | Prompt/context compiler and skill-injected adapter context kernel | EPIC-3 | ready | `packages/orchestrator-core`, `packages/contracts`, `packages/harness`, `apps/cli`, `docs/contracts/**`, `examples/skills/**` | W6-S01, W2-S05, W3-S01 |
 | W6-S04 | UI attach/detach lifecycle command pack | EPIC-6 | blocked | `apps/cli`, `apps/web`, `apps/api`, `docs/ops/**` | W6-S03, W5-S04 |
 | W6-S05 | Delivery/release prepare command pack | EPIC-5 | blocked | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W6-S03, W4-S05 |
 | W6-S06 | Incident and audit command pack | EPIC-7 | blocked | `apps/cli`, `apps/api`, `packages/observability`, `docs/contracts/**`, `docs/ops/**` | W6-S03, W5-S06 |
@@ -94,9 +95,9 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W8-S01 | Sponsor and planner strategic visibility expansion | EPIC-6 | blocked | `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W7-S05 |
 | W8-S02 | Later discovery and architecture maturity pack | EPIC-1 | blocked | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**` | W6-S02, W7-S05 |
-| W8-S03 | Later delivery and security route-governance maturity | EPIC-3 | blocked | `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**` | W6-S03, W7-S05 |
-| W8-S04 | Later operator event and policy visibility expansion | EPIC-6 | blocked | `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W6-S03, W7-S05 |
-| W8-S05 | Later QA and AI platform baseline comparison maturity | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**` | W7-S01, W7-S02 |
+| W8-S03 | Later delivery and security route-governance maturity | EPIC-3 | blocked | `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**` | W6-S03, W6-S07, W7-S05 |
+| W8-S04 | Later operator event and policy visibility expansion | EPIC-6 | blocked | `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W6-S03, W6-S07, W7-S05 |
+| W8-S05 | Later QA and AI platform baseline comparison maturity | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**` | W6-S07, W7-S01, W7-S02 |
 | W8-S06 | Later incident and platform recertification maturity | EPIC-7 | blocked | `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W7-S03, W7-S04, W7-S05 |
 | W8-S07 | Later multi-repo, bootstrap, and delivery rerun maturity | EPIC-5 | blocked | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**` | W6-S05, W6-S02, W8-S04, W8-S06 |
 

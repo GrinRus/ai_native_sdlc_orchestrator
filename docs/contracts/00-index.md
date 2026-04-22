@@ -25,6 +25,7 @@
 - `prompt-bundle.md`
 - `step-policy-profile.md`
 - `adapter-capability-profile.md`
+- `skill-profile.md`
 
 ## Operations
 - `live-run-event.md`

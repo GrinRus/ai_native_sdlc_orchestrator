@@ -1,0 +1,22 @@
+skill_id: skill.artifact.default
+version: 1
+step_class: artifact
+summary: deterministic artifact workflow for discovery, research, and specification outputs
+activation_hints:
+  - discovery
+  - research
+  - spec
+workflow:
+  - id: gather-facts
+    instruction: collect only evidence-backed facts and unresolved assumptions
+  - id: structure-artifact
+    instruction: produce machine-usable sections for objective, constraints, and open questions
+  - id: record-evidence
+    instruction: attach source references and unresolved risks explicitly
+required_inputs:
+  packets:
+    - step-input-context
+expected_outputs:
+  - artifact-packet
+change_notes:
+  - baseline artifact skill for context compiler

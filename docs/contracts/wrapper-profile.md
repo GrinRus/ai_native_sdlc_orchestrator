@@ -14,6 +14,7 @@ Execution envelope around a runner session: included files, included packets, to
 ## Notes
 Keep wrapper concerns separate from route selection and prompt-bundle content.
 Runtime asset resolution should use `project-profile.default_wrapper_profiles` by route class unless a step-level wrapper override is provided.
+`session_bootstrap.include_files` and `session_bootstrap.include_packets` are consumed by the context compiler and emitted in `compiled_context.session_bootstrap`.
 
 ## Example
 See `examples/wrappers/*.yaml`.
