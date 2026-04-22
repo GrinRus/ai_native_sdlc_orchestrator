@@ -129,6 +129,123 @@ test("returns actionable error when explicit enum value is invalid", () => {
   );
 });
 
+test("project profile requires default prompt and context bundle defaults", () => {
+  const source = path.join(workspaceRoot, "examples/project.aor.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "project-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  delete candidate.default_prompt_bundles;
+
+  const validation = validateContractDocument({
+    family: "project-profile",
+    document: candidate,
+    source: "test://missing-default-prompt-bundles",
+  });
+
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "default_prompt_bundles",
+    ),
+    "expected required field error for default_prompt_bundles",
+  );
+});
+
+test("provider-route-profile rejects legacy wrapper ownership field", () => {
+  const source = path.join(workspaceRoot, "examples/routes/implement-default.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "provider-route-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.wrapper_profile_ref = "wrapper.runner.default@v3";
+
+  const validation = validateContractDocument({
+    family: "provider-route-profile",
+    document: candidate,
+    source: "test://legacy-route-wrapper-field",
+  });
+
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some(
+      (problem) => problem.code === "unsupported_field_present" && problem.field === "wrapper_profile_ref",
+    ),
+    "expected unsupported_field_present for wrapper_profile_ref",
+  );
+});
+
+test("wrapper-profile rejects legacy prompt and session bootstrap fields", () => {
+  const source = path.join(workspaceRoot, "examples/wrappers/wrapper-runner-default.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "wrapper-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.prompt_bundle_ref = "prompt-bundle://runner-default@v3";
+  candidate.session_bootstrap = { include_files: ["README.md"] };
+
+  const validation = validateContractDocument({
+    family: "wrapper-profile",
+    document: candidate,
+    source: "test://legacy-wrapper-fields",
+  });
+
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some(
+      (problem) => problem.code === "unsupported_field_present" && problem.field === "prompt_bundle_ref",
+    ),
+    "expected unsupported_field_present for prompt_bundle_ref",
+  );
+  assert.ok(
+    validation.issues.some(
+      (problem) => problem.code === "unsupported_field_present" && problem.field === "session_bootstrap",
+    ),
+    "expected unsupported_field_present for session_bootstrap",
+  );
+});
+
+test("new runtime context family examples load through the shared contract path", () => {
+  const examples = [
+    [path.join(workspaceRoot, "examples/context/docs/repo-map-core.yaml"), "context-doc"],
+    [path.join(workspaceRoot, "examples/context/rules/public-repo-safety.yaml"), "context-rule"],
+    [path.join(workspaceRoot, "examples/context/skills/runner-verification-default.yaml"), "context-skill"],
+    [path.join(workspaceRoot, "examples/context/bundles/runner-foundation.yaml"), "context-bundle"],
+    [path.join(workspaceRoot, "examples/context/compiled/implement-runner-default.sample.yaml"), "compiled-context-artifact"],
+  ];
+
+  for (const [filePath, family] of examples) {
+    const loaded = loadContractFile({ filePath, family });
+    assert.equal(loaded.ok, true, `expected ${family} example to load`);
+  }
+});
+
+test("context assets require metadata and source reference fields in the supported shape", () => {
+  const source = path.join(workspaceRoot, "examples/context/skills/runner-verification-default.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "context-skill" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  delete candidate.metadata;
+  delete candidate.source_refs;
+
+  const validation = validateContractDocument({
+    family: "context-skill",
+    document: candidate,
+    source: "test://context-skill-missing-metadata-source-refs",
+  });
+
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some((problem) => problem.code === "required_field_missing" && problem.field === "metadata"),
+    "expected required field error for metadata",
+  );
+  assert.ok(
+    validation.issues.some((problem) => problem.code === "required_field_missing" && problem.field === "source_refs"),
+    "expected required field error for source_refs",
+  );
+});
+
 test("returns explicit limitation for unsupported narrative-only contract families", () => {
   const validation = validateContractDocument({
     family: "control-plane-api",

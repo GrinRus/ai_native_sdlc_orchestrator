@@ -10,7 +10,6 @@ fallback:
   - adapter: claude-code
     provider: anthropic
     model: coding-fallback
-wrapper_profile_ref: wrapper.runner.default@v3
 required_adapter_capabilities:
   - repo_write
   - shell_commands

@@ -5,12 +5,15 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 
 **Slices by wave:**
 - **W0:** `W0-S01` Workspace and package build baseline; `W0-S02` Contracts package and schema loader baseline; `W0-S03` Example and reference integrity checks; `W0-S04` Agent guidance and backlog workflow baseline; `W0-S06` Repository CI and acceptance gates
+- **W6:** `W6-S01` Backlog and runtime-context terminology rebaseline; `W6-S06` Legacy purge and fixture migration
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
 
 **Slices by wave:**
 - **W1:** `W1-S02` Project init and profile loading runtime; `W1-S03` Project analysis engine and durable analysis report; `W1-S05` Project verify flow and bounded preflight execution
+- **W6:** `W6-S02` Context asset contracts and registry foundation
+- **W8:** `W8-S02` Discovery, spec, and bootstrap maturity on runtime context assets
 
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
@@ -23,6 +26,8 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 
 **Slices by wave:**
 - **W2:** `W2-S01` Route registry and step resolution kernel; `W2-S02` Wrapper, prompt-bundle, and asset loader runtime; `W2-S03` Step policy resolution, budgets, and guardrails; `W2-S04` Adapter SDK and mock adapter baseline; `W2-S05` Routed step execution engine and durable step results
+- **W6:** `W6-S03` Prompt/context compiler kernel; `W6-S04` Routed execution integration for compiled context; `W6-S05` All-step-class compiled-context flow integration
+- **W8:** `W8-S03` Delivery and security context governance maturity
 
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -30,12 +35,15 @@ Implement validation, eval, harness, certification, and promotion.
 **Slices by wave:**
 - **W1:** `W1-S04` Deterministic project validate flow
 - **W3:** `W3-S01` Validation kernel generalization and asset graph checks; `W3-S02` Dataset and evaluation suite registry; `W3-S03` Eval runner and scorer interface; `W3-S04` Harness capture and replay runtime; `W3-S05` Certification and promotion decision baseline
+- **W7:** `W7-S01` Validation and compatibility graph for context assets; `W7-S02` Eval and harness coverage for context candidates; `W7-S03` Promotion, freeze, and demotion lifecycle for context assets
+- **W8:** `W8-S05` Baseline comparison maturity for compiler and context revisions
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
 
 **Slices by wave:**
 - **W4:** `W4-S01` Isolated worktree and workspace execution foundation; `W4-S02` Delivery planning and write-back mode policy; `W4-S03` Patch and local branch delivery driver; `W4-S04` Fork-first GitHub PR delivery driver; `W4-S05` Delivery manifest and release packet materialization
+- **W8:** `W8-S07` Multi-repo and rerun maturity on compiled-context scope
 
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
@@ -43,6 +51,7 @@ Expose CLI, API, live events, and detachable UI flows.
 **Slices by wave:**
 - **W1:** `W1-S01` Bootstrap CLI shell and command contracts
 - **W5:** `W5-S01` Control plane API read surface; `W5-S02` Live run event stream; `W5-S03` CLI operator commands beyond bootstrap; `W5-S04` Detachable web UI baseline
+- **W8:** `W8-S01` Strategic operator visibility on compiled context; `W8-S04` Event and history visibility for compiled context
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -54,3 +63,5 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W3:** `W3-S06` Quality rehearsal on selected public targets
 - **W4:** `W4-S06` Delivery rehearsal and recovery-safe operations
 - **W5:** `W5-S05` Standard live E2E orchestration runner; `W5-S06` Scorecards, incident capture, and learning-loop handoff
+- **W7:** `W7-S04` Incident recertification and drift governance; `W7-S05` Live E2E context-lineage integration closure
+- **W8:** `W8-S06` Incident and platform recertification maturity with full lineage

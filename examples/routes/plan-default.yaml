@@ -10,7 +10,6 @@ fallback:
   - adapter: none
     provider: anthropic
     model: planning-fallback
-wrapper_profile_ref: wrapper.planner.default@v1
 required_adapter_capabilities: []
 validation_profile_ref: validate.plan.default
 retry_policy_ref: retry.transient.default

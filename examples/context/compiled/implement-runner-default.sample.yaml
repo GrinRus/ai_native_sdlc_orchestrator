@@ -1,0 +1,21 @@
+compiled_context_id: compiled-context.aor-core.implement.runner-default
+version: 1
+step: implement
+prompt_bundle_ref: prompt-bundle://runner-default@v3
+context_bundle_refs:
+  - context-bundle://context.bundle.runner.foundation@v1
+context_doc_refs:
+  - context-doc://context.doc.repo-map.core@v1
+context_rule_refs:
+  - context-rule://context.rule.public-repo-safety@v1
+context_skill_refs:
+  - context-skill://context.skill.runner-verification.default@v1
+packet_refs:
+  - packet://handoff/aor-core.wave-004
+  - packet://spec/aor-core.wave-004
+hashes:
+  prompt_hash: sha256:prompt-runner-default-sample
+  context_hash: sha256:context-runner-default-sample
+provenance:
+  compiler_revision_ref: compiler://runtime-context-foundation@draft
+  project_profile_ref: examples/project.aor.yaml

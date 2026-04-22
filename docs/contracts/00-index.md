@@ -18,11 +18,16 @@
 - `dataset.md`
 - `evaluation-suite.md`
 - `promotion-decision.md`
+- `compiled-context-artifact.md`
 
 ## Platform assets
 - `provider-route-profile.md`
 - `wrapper-profile.md`
 - `prompt-bundle.md`
+- `context-doc.md`
+- `context-rule.md`
+- `context-skill.md`
+- `context-bundle.md`
 - `step-policy-profile.md`
 - `adapter-capability-profile.md`
 
@@ -32,4 +37,4 @@
 - `control-plane-api.md`
 
 ## Loader coverage
-See `contract-loader-coverage.md` for the contract-to-loader mapping table, current limitation status, and W0-S03 reference-integrity failure shapes.
+See `contract-loader-coverage.md` for the contract-to-loader mapping table, supported reference-integrity rules, and current limitations.

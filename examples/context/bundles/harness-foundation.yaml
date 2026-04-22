@@ -1,0 +1,23 @@
+context_bundle_id: context.bundle.harness.foundation
+version: 1
+title: Harness workflow foundation
+metadata:
+  owner: ai-platform
+  lifecycle: draft
+  tags:
+    - harness
+    - foundation
+applies_to:
+  steps:
+    - harness
+context_doc_refs:
+  - context-doc://context.doc.repo-map.core@v1
+context_rule_refs:
+  - context-rule://context.rule.public-repo-safety@v1
+context_skill_refs: []
+source_refs:
+  - docs/architecture/15-platform-assets-and-prompt-lifecycle.md
+selection_policy:
+  rules: always-on
+  docs: pull-when-relevant
+  skills: disabled

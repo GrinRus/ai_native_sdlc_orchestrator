@@ -14,9 +14,14 @@ export type ContractFamily =
   | "dataset"
   | "evaluation-suite"
   | "promotion-decision"
+  | "compiled-context-artifact"
   | "provider-route-profile"
   | "wrapper-profile"
   | "prompt-bundle"
+  | "context-doc"
+  | "context-rule"
+  | "context-skill"
+  | "context-bundle"
   | "step-policy-profile"
   | "adapter-capability-profile"
   | "live-run-event"
@@ -31,6 +36,7 @@ export type ContractValidationIssueCode =
   | "document_type_invalid"
   | "required_field_missing"
   | "field_type_mismatch"
+  | "unsupported_field_present"
   | "enum_value_invalid"
   | "yaml_parse_error";
 
@@ -63,6 +69,7 @@ export interface ContractFamilyIndexEntry {
   status: "implemented" | "limitation";
   limitation?: string;
   requiredFields: string[];
+  forbiddenFields?: string[];
   fieldTypes: Record<string, ContractFieldType>;
   enumChecks: ContractEnumCheck[];
 }
@@ -97,7 +104,8 @@ export type ReferenceValidationIssueCode =
   | "reference_format_invalid"
   | "reference_target_missing"
   | "reference_target_type_mismatch"
-  | "reference_target_incompatible";
+  | "reference_target_incompatible"
+  | "unsupported_field_present";
 
 export interface ReferenceValidationIssue {
   code: ReferenceValidationIssueCode;

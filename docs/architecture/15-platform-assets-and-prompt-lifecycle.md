@@ -1,23 +1,39 @@
-# Platform assets and prompt lifecycle
+# Platform assets and runtime context lifecycle
 
 ## Asset types
 AOR manages these platform assets:
 - prompt bundles
+- context docs
+- context rules
+- context skills
+- context bundles
 - wrappers
 - route profiles
 - step policies
 - adapter capability profiles
+- compiler revisions
 - datasets and suites
 
-## Why prompt bundles are first-class
-Prompt guidance should not be buried inside wrappers or scattered across docs. A prompt bundle is the durable instruction asset for a step class.
+## Why prompt bundles and context assets are first-class
+Prompt guidance should not be buried inside wrappers, and runtime context should not be scattered across repository-local notes. Prompt bundles and context assets are the durable building blocks for one routed step.
+
+Ownership is singular:
+- routes select provider, adapter, model, and route constraints;
+- wrappers define execution envelopes only;
+- project profiles own default wrapper, prompt, and context selection;
+- context bundles expand into docs, rules, and skills later at compile time.
 
 ## Separation of concerns
 - **Prompt bundle** — task guidance and output expectations
-- **Wrapper** — execution envelope, allowed tools, included files, verification section, redaction
+- **Context doc** — pull-on-demand reference material for a library, repo area, or workflow domain
+- **Context rule** — always-on team, security, or operating constraints
+- **Context skill** — relevance-triggered workflow instructions for a step class
+- **Context bundle** — reusable selection of context docs, rules, and skills for one runtime use case
+- **Wrapper** — execution envelope, allowed tools, verification section, redaction
 - **Route** — adapter/provider/model selection plus constraints
 - **Step policy** — validators, retries, repair, escalation, blocking rules
 - **Adapter profile** — what a runner can actually do
+- **Compiled context artifact** — the resolved prompt/context payload, packet refs, and provenance for one step
 
 ## Lifecycle
 1. draft
@@ -27,17 +43,23 @@ Prompt guidance should not be buried inside wrappers or scattered across docs. A
 5. freeze or demotion if incidents or regressions appear
 
 ## Rules
-- do not merge prompt guidance and execution envelope into one opaque file;
-- certify prompt-bundle changes independently when possible;
+- do not merge prompt guidance, runtime context, and execution envelope into one opaque file;
+- `AGENTS.md` and `.agents/**` are repository-development guidance, not runtime assets;
+- committed registry roots contain source assets and static samples only; runtime-emitted compiled artifacts still belong under `.aor/`;
+- certify prompt-bundle, context, and compiler changes independently when possible;
 - keep baseline references explicit;
 - preserve incident and promotion history for every platform asset.
 
-## Runtime loading order (W2-S02)
-Asset resolution for a step is deterministic and follows this order:
+## Target runtime loading order (W6+)
+Asset resolution and compilation for a step is deterministic and follows this order:
 1. resolve route profile for the step class;
 2. choose wrapper profile (`step override` first, then `project default` by route class);
-3. choose prompt bundle (`step override` first, then wrapper `prompt_bundle_ref`);
-4. emit one asset bundle with route, wrapper, prompt bundle, and provenance refs.
+3. choose prompt bundle (`step override` first, then project-profile default by step class);
+4. choose context bundles (`step override` first, then project-profile defaults by step class);
+5. expand the selected context bundle into always-on rules plus predicate-selected docs and skills;
+6. ingest packet refs and project-analysis facts required by the prompt bundle and policy;
+7. compile one bounded prompt/context artifact with hashes, dropped inputs, and provenance refs;
+8. emit one runtime asset bundle with route, wrapper, prompt bundle, context bundle, and compiled-context refs.
 
 If any source is missing or conflicts with the step class, resolution fails before execution.
 
@@ -50,7 +72,7 @@ Policy resolution is deterministic and runs before any adapter invocation:
    - command constraints: `policy command constraints`, otherwise `route constraints`, otherwise `project repo command allowlist`;
    - write-back mode: `policy override`, then `route constraints`, then `project writeback defaults`;
 4. normalize write-back mode into delivery-plan modes (`no-write`, `patch-only`, `local-branch`, `fork-first-pr`);
-5. persist guardrails (`approval_required`, allowlist enforcement, redaction, blocking rules) into step planning metadata.
+5. persist guardrails (`approval_required`, allowlist enforcement, redaction, blocking rules) into step planning metadata together with compile-lineage refs.
 6. persist a delivery-plan artifact before write-back, and block non-read-only modes without approved handoff and promotion evidence.
 
 Any missing or conflicting required policy source must fail deterministically before runner execution starts.

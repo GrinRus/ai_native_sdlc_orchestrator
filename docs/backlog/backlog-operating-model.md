@@ -70,6 +70,7 @@ Use these states in the backlog docs:
 - Use **hard dependencies** when the slice cannot be accepted without another slice landing first.
 - Keep the shared backlog biased toward hard dependencies. Soft dependencies can live in local notes.
 - If a change modifies a contract and runtime behavior, put the contract-bearing slice first.
+- Keep development guidance and runtime context separate. Changes to `AGENTS.md` or `.agents/**` do not satisfy runtime-context work unless the matching AOR-owned runtime assets and contracts change too.
 - If a change modifies docs, examples, and code for one outcome, keep it as one slice unless independent acceptance is possible.
 
 ## Local-task rules
@@ -148,5 +149,8 @@ The repo now carries detailed wave documents for all currently defined waves:
 - `wave-3-implementation-slices.md`
 - `wave-4-implementation-slices.md`
 - `wave-5-implementation-slices.md`
+- `wave-6-implementation-slices.md`
+- `wave-7-implementation-slices.md`
+- `wave-8-implementation-slices.md`
 
 The implementation order is still constrained by hard dependencies. A later-wave slice can be described in detail and still remain blocked until earlier-wave slices close.

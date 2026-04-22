@@ -1,11 +1,6 @@
 wrapper_id: wrapper.eval.default
 version: 1
 step_class: eval
-prompt_bundle_ref: prompt-bundle://eval-default@v1
-session_bootstrap:
-  include_packets:
-    - handoff
-    - release
 tool_policy:
   allow_repo_write: false
   allow_shell: false

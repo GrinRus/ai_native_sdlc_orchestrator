@@ -16,7 +16,7 @@ AOR is a packet-driven control plane for the full SDLC.
 10. Learning loop from incidents back into datasets and suites.
 
 ## System planes
-- **Knowledge plane** — project profile, project analysis, packet chain, rules and skills.
+- **Context plane** — project profile, project analysis, prompt bundles, runtime context docs/rules/skills/bundles, and compiled-context artifacts.
 - **Workflow plane** — long-running workflows, approvals, orchestration decisions.
 - **Execution plane** — checkout, workspace, route resolution, adapters, runner sessions, delivery.
 - **Quality plane** — validation, eval, harness, certification, promotion.
@@ -38,8 +38,11 @@ AOR is a packet-driven control plane for the full SDLC.
 ## Main data flow
 1. Bootstrap a project into a machine-usable target.
 2. Materialize packets as discovery, planning, and approval progress.
-3. Resolve route, wrapper, prompt bundle, and step policy for each step.
-4. Execute the bounded step through an adapter-backed runner.
-5. Validate outputs, then evaluate or replay when required.
-6. Materialize delivery and release artifacts.
-7. Feed incidents back into datasets, suites, and promotion decisions.
+3. Resolve route, wrapper, prompt bundle, context bundle, and step policy for each step, with project profiles as the only default owner for wrapper/prompt/context selection.
+4. Compile packet refs, project-analysis facts, and selected runtime context assets into a bounded prompt/context artifact.
+5. Execute the bounded step through an adapter-backed runner.
+6. Validate outputs, then evaluate or replay when required.
+7. Materialize delivery and release artifacts.
+8. Feed incidents back into datasets, suites, and promotion decisions.
+
+`AGENTS.md` and `.agents/**` are contributor-facing development guidance for the AOR repository. They are not part of the runtime context plane and must not be treated as injectible runtime assets.
