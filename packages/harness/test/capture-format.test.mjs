@@ -27,10 +27,18 @@ function fixtureStepResult() {
       },
       adapter_request: {
         request_id: "request-001",
+        context: {
+          compiled_context_fingerprint: "abc123fingerprint",
+          skill_refs: ["skill.runner.default@v1"],
+        },
       },
       adapter_response: {
         output_ref: "evidence://step-result/output.json",
-        tool_trace: [{ tool: "bash", command: "pnpm test" }],
+        tool_traces: [{ tool: "bash", command: "pnpm test" }],
+      },
+      context_compilation: {
+        compiled_context_fingerprint: "abc123fingerprint",
+        skill_refs: ["skill.runner.default@v1"],
       },
     },
   };
@@ -62,11 +70,34 @@ test("createHarnessCapture records step input, assets, tool activity, and normal
   assert.equal(capture.capture_id, "capture-001");
   assert.equal(capture.schema_version, 1);
   assert.equal(capture.compatibility.route_id, "route.implement.default");
+  assert.equal(capture.compatibility.compiled_context_fingerprint, "abc123fingerprint");
+  assert.deepEqual(capture.compatibility.skill_refs, ["skill.runner.default@v1"]);
   assert.equal(capture.trace.step_input.request_id, "request-001");
   assert.equal(capture.trace.selected_assets.asset_resolution.wrapper.wrapper_ref, "wrapper.runner.default@v3");
   assert.equal(capture.trace.tool_activity.length, 1);
   assert.equal(capture.trace.normalized_output.output_ref, "evidence://step-result/output.json");
   assert.equal(capture.scoring_snapshot.summary_metrics.aggregate_pass_rate, 1);
+});
+
+test("createHarnessCapture keeps backward compatibility with legacy adapter_response.tool_trace", () => {
+  const stepResult = fixtureStepResult();
+  stepResult.routed_execution.adapter_response = {
+    output_ref: "evidence://step-result/output.json",
+    tool_trace: [{ tool: "bash", command: "pnpm lint" }],
+  };
+
+  const capture = createHarnessCapture({
+    captureId: "capture-legacy-tool-trace",
+    projectProfileRef: "examples/project.aor.yaml",
+    stepResultRef: "runtime://step-result-001",
+    evaluationReportRef: "runtime://evaluation-report-001",
+    stepResult,
+    evaluationReport: fixtureEvaluationReport(),
+    createdAt: "2026-04-21T00:00:00.000Z",
+  });
+
+  assert.equal(capture.trace.tool_activity.length, 1);
+  assert.equal(capture.trace.tool_activity[0].command, "pnpm lint");
 });
 
 test("compareHarnessCompatibility passes when runtime assets match capture metadata", () => {
@@ -99,4 +130,24 @@ test("compareHarnessCompatibility reports explicit mismatch when runtime assets 
 
   assert.equal(comparison.compatible, false);
   assert.ok(comparison.mismatches.some((entry) => entry.field === "wrapper_ref"));
+});
+
+test("compareHarnessCompatibility reports context fingerprint drift", () => {
+  const stepResult = fixtureStepResult();
+  const driftedStepResult = fixtureStepResult();
+  driftedStepResult.routed_execution.context_compilation.compiled_context_fingerprint =
+    "different-context-fingerprint";
+
+  const capture = {
+    compatibility: extractHarnessCompatibility(stepResult),
+  };
+  const comparison = compareHarnessCompatibility({
+    capture,
+    currentStepResult: driftedStepResult,
+  });
+
+  assert.equal(comparison.compatible, false);
+  assert.ok(
+    comparison.mismatches.some((entry) => entry.field === "compiled_context_fingerprint"),
+  );
 });

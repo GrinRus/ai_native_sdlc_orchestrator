@@ -1,0 +1,23 @@
+skill_id: skill.planner.default
+version: 1
+step_class: planner
+summary: deterministic planning workflow for wave tickets and handoff packets
+activation_hints:
+  - planning
+workflow:
+  - id: map-objective
+    instruction: align planning outputs with approved discovery and spec context
+  - id: split-scope
+    instruction: define bounded tasks, dependencies, and acceptance evidence
+  - id: materialize-handoff
+    instruction: produce explicit repo scope, command policy, and verification plan
+required_inputs:
+  packets:
+    - discovery
+    - research
+    - spec
+expected_outputs:
+  - wave-ticket
+  - handoff-packet
+change_notes:
+  - baseline planner skill for context compiler

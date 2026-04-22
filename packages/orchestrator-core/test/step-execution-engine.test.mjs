@@ -47,6 +47,17 @@ test("executeRoutedStep resolves route/assets/policy/adapter and writes durable 
     assert.equal(result.stepResult.routed_execution.delivery_plan.status, "blocked");
     assert.equal(fs.existsSync(result.stepResult.routed_execution.delivery_plan.delivery_plan_file), true);
     assert.equal(result.stepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
+    assert.ok(Array.isArray(result.stepResult.routed_execution.adapter_request.input_packet_refs));
+    assert.ok(result.stepResult.routed_execution.adapter_request.input_packet_refs.length > 0);
+    assert.equal(typeof result.stepResult.routed_execution.adapter_request.context, "object");
+    assert.equal(
+      typeof result.stepResult.routed_execution.adapter_request.context.compiled_context_fingerprint,
+      "string",
+    );
+    assert.equal(result.stepResult.routed_execution.context_compilation.required_inputs_status, "ready");
+    assert.deepEqual(result.stepResult.routed_execution.context_compilation.skill_refs, [
+      "skill.runner.implement@v1",
+    ]);
     assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
     assert.ok(Array.isArray(result.stepResult.evidence_refs));
     assert.ok(result.stepResult.evidence_refs.length > 0);
@@ -71,6 +82,22 @@ test("executeRoutedStep still writes failed step-result when routed resolution f
     assert.match(result.stepResult.summary, /missing capabilities \[live_logs\]/i);
     assert.equal(result.stepResult.routed_execution.route_resolution.step_class, "implement");
     assert.equal(result.stepResult.routed_execution.adapter_response, null);
+    assert.equal(result.stepResult.routed_execution.context_compilation.required_inputs_status, "ready");
     assert.equal(result.stepResult.routed_execution.no_write_enforced, true);
+  });
+});
+
+test("executeRoutedStep preserves explicit inputPacketRefs in adapter request", () => {
+  withTempRepo((repoRoot) => {
+    const result = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+      inputPacketRefs: ["packet://custom-extra"],
+    });
+
+    assert.equal(result.stepResult.status, "passed");
+    assert.ok(result.stepResult.routed_execution.adapter_request.input_packet_refs.includes("packet://custom-extra"));
   });
 });

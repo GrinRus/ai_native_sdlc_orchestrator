@@ -79,6 +79,59 @@ test("returns actionable error when required field is missing", () => {
   );
 });
 
+test("project profile requires default skill refs and step overrides maps", () => {
+  const source = path.join(workspaceRoot, "examples/project.aor.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "project-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  delete candidate.default_skill_profiles;
+  delete candidate.skill_overrides;
+
+  const validation = validateContractDocument({
+    family: "project-profile",
+    document: candidate,
+    source: "test://missing-skill-maps",
+  });
+
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "default_skill_profiles",
+    ),
+    "expected required field error for default_skill_profiles",
+  );
+  assert.ok(
+    validation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "skill_overrides",
+    ),
+    "expected required field error for skill_overrides",
+  );
+});
+
+test("skill profile requires workflow field", () => {
+  const source = path.join(workspaceRoot, "examples/skills/skill-runner-default.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "skill-profile" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  delete candidate.workflow;
+
+  const validation = validateContractDocument({
+    family: "skill-profile",
+    document: candidate,
+    source: "test://skill-profile-missing-workflow",
+  });
+
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "workflow",
+    ),
+    "expected required field error for workflow",
+  );
+});
+
 test("returns actionable error when field type mismatches", () => {
   const source = path.join(workspaceRoot, "examples/project.aor.yaml");
   const loaded = loadContractFile({ filePath: source, family: "project-profile" });

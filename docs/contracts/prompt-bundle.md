@@ -12,11 +12,9 @@ First-class guidance asset for a step class. It defines role instructions, prior
 - `required_inputs`
 
 ## Notes
-Prompt bundles stay lightweight, versioned, and independently certifiable.
-
-Prompt selection is project-owned and resolves through `project-profile.default_prompt_bundles`, not through wrapper profiles.
-
-Prompt bundles may declare required packet or artifact inputs, but they do not own repository guidance selection, file bootstrap, or runtime context expansion. Those concerns belong to project-profile defaults and the future context compiler.
+Prompt bundles should stay lightweight, versioned, and independently certifiable.
+Runtime asset resolution should use project-owned `project-profile.default_prompt_bundles` unless a step-level prompt override is provided.
+Context compilation consumes prompt bundle `instructions`, `required_inputs`, and output hints to produce `compiled_context.instruction_set` and `compiled_context.required_inputs_resolved`.
 
 ## Example
 See `examples/prompts/*.yaml`.

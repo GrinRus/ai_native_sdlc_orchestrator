@@ -3,6 +3,18 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
 const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
+const ROUTE_STEP_VALUES = [
+  "discovery",
+  "research",
+  "spec",
+  "planning",
+  "implement",
+  "review",
+  "qa",
+  "repair",
+  "eval",
+  "harness",
+];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
@@ -48,6 +60,8 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       "default_wrapper_profiles",
       "default_prompt_bundles",
       "default_context_bundles",
+      "default_skill_profiles",
+      "skill_overrides",
       "budget_policy",
       "approval_policy",
       "security_policy",
@@ -67,6 +81,8 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       default_wrapper_profiles: "object",
       default_prompt_bundles: "object",
       default_context_bundles: "object",
+      default_skill_profiles: "object",
+      skill_overrides: "object",
       budget_policy: "object",
       approval_policy: "object",
       security_policy: "object",
@@ -673,6 +689,22 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
     enumChecks: [],
   },
   {
+    family: "skill-profile",
+    familyGroup: "platform-assets",
+    sourceContract: "docs/contracts/skill-profile.md",
+    exampleGlob: "examples/skills/*.yaml",
+    status: "implemented",
+    requiredFields: ["skill_id", "version", "step_class", "summary", "workflow"],
+    fieldTypes: {
+      skill_id: "string",
+      version: "number",
+      step_class: "string",
+      summary: "string",
+      workflow: "array",
+    },
+    enumChecks: [{ field: "step_class", allowedValues: STEP_CLASS_VALUES }],
+  },
+  {
     family: "live-run-event",
     familyGroup: "operations",
     sourceContract: "docs/contracts/live-run-event.md",
@@ -766,6 +798,7 @@ const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/project[^/]*\.aor\.ya?ml$/, family: "project-profile" },
   { regex: /^examples\/prompts\/[^/]+\.ya?ml$/, family: "prompt-bundle" },
   { regex: /^examples\/routes\/[^/]+\.ya?ml$/, family: "provider-route-profile" },
+  { regex: /^examples\/skills\/[^/]+\.ya?ml$/, family: "skill-profile" },
   { regex: /^examples\/wrappers\/[^/]+\.ya?ml$/, family: "wrapper-profile" },
 ]);
 
@@ -1043,6 +1076,7 @@ export function validateExampleReferences(options = {}) {
           : [],
       );
       const defaultRouteProfiles = document.default_route_profiles;
+      const defaultRouteProfilesRecord = isPlainObject(defaultRouteProfiles) ? defaultRouteProfiles : {};
       if (isPlainObject(defaultRouteProfiles)) {
         for (const [key, rawValue] of Object.entries(defaultRouteProfiles)) {
           checkedReferences += 1;
@@ -1285,6 +1319,161 @@ export function validateExampleReferences(options = {}) {
               message: `Policy '${reference}' has step_class '${policyProfile.stepClass}', which does not match profile slot '${key}'.`,
             }),
           );
+        }
+      }
+
+      const defaultSkillProfiles = document.default_skill_profiles;
+      if (isPlainObject(defaultSkillProfiles)) {
+        for (const [key, rawValue] of Object.entries(defaultSkillProfiles)) {
+          const field = `default_skill_profiles.${key}`;
+          if (!STEP_CLASS_VALUES.includes(key)) {
+            checkedCompatibility += 1;
+            issues.push(
+              referenceIssue({
+                code: "reference_target_incompatible",
+                source,
+                field,
+                reference: null,
+                expected: STEP_CLASS_VALUES.join("|"),
+                actual: key,
+                message: `Field '${field}' uses unsupported step_class slot '${key}'.`,
+              }),
+            );
+            continue;
+          }
+
+          const references = asStringArray(rawValue, {
+            issues,
+            source,
+            field,
+          });
+
+          for (const reference of references) {
+            checkedReferences += 1;
+            if (isExternalReference(reference)) {
+              continue;
+            }
+            if (!isVersionedRef(reference)) {
+              issues.push(
+                referenceIssue({
+                  code: "reference_format_invalid",
+                  source,
+                  field,
+                  reference,
+                  expected: "skill_id@vN",
+                  actual: reference,
+                  message: `Field '${field}' entries must use skill_id@vN format.`,
+                }),
+              );
+              continue;
+            }
+
+            validateReferenceTarget({
+              issues,
+              source,
+              field,
+              reference,
+              expected: "existing skill_id@vN",
+              expectedFamily: "skill-profile",
+              expectedSet: registry.skillRefs,
+              registry,
+            });
+
+            const skillProfile = registry.skillProfilesByRef.get(reference);
+            if (!skillProfile || !skillProfile.stepClass) continue;
+            checkedCompatibility += 1;
+            if (skillProfile.stepClass === key) continue;
+            issues.push(
+              referenceIssue({
+                code: "reference_target_incompatible",
+                source,
+                field,
+                reference,
+                expected: `skill step_class '${key}'`,
+                actual: skillProfile.stepClass,
+                message: `Skill '${reference}' has step_class '${skillProfile.stepClass}', which does not match profile slot '${key}'.`,
+              }),
+            );
+          }
+        }
+      }
+
+      const skillOverrides = document.skill_overrides;
+      if (isPlainObject(skillOverrides)) {
+        for (const [key, rawValue] of Object.entries(skillOverrides)) {
+          const field = `skill_overrides.${key}`;
+          if (!ROUTE_STEP_VALUES.includes(key)) {
+            checkedCompatibility += 1;
+            issues.push(
+              referenceIssue({
+                code: "reference_target_incompatible",
+                source,
+                field,
+                reference: null,
+                expected: ROUTE_STEP_VALUES.join("|"),
+                actual: key,
+                message: `Field '${field}' uses unsupported route-step slot '${key}'.`,
+              }),
+            );
+            continue;
+          }
+
+          const references = asStringArray(rawValue, {
+            issues,
+            source,
+            field,
+          });
+          const routeRefRaw = defaultRouteProfilesRecord[key];
+          const routeRef = typeof routeRefRaw === "string" ? routeRefRaw : null;
+          const expectedRouteClass = routeRef ? registry.routeProfilesById.get(routeRef)?.routeClass ?? null : null;
+
+          for (const reference of references) {
+            checkedReferences += 1;
+            if (isExternalReference(reference)) {
+              continue;
+            }
+            if (!isVersionedRef(reference)) {
+              issues.push(
+                referenceIssue({
+                  code: "reference_format_invalid",
+                  source,
+                  field,
+                  reference,
+                  expected: "skill_id@vN",
+                  actual: reference,
+                  message: `Field '${field}' entries must use skill_id@vN format.`,
+                }),
+              );
+              continue;
+            }
+
+            validateReferenceTarget({
+              issues,
+              source,
+              field,
+              reference,
+              expected: "existing skill_id@vN",
+              expectedFamily: "skill-profile",
+              expectedSet: registry.skillRefs,
+              registry,
+            });
+
+            const skillProfile = registry.skillProfilesByRef.get(reference);
+            if (!skillProfile || !skillProfile.stepClass || !expectedRouteClass) continue;
+            checkedCompatibility += 1;
+            if (skillProfile.stepClass === expectedRouteClass) continue;
+            issues.push(
+              referenceIssue({
+                code: "reference_target_incompatible",
+                source,
+                field,
+                reference,
+                expected: `skill step_class '${expectedRouteClass}'`,
+                actual: skillProfile.stepClass,
+                message: `Skill '${reference}' has step_class '${skillProfile.stepClass}', which is incompatible with '${key}' route class '${expectedRouteClass}'.`,
+              }),
+            );
+          }
         }
       }
 
@@ -2205,6 +2394,7 @@ function extractRouteAdapterRefs(routeProfile) {
  *   routeIds: Set<string>,
  *   wrapperRefs: Set<string>,
  *   policyIds: Set<string>,
+ *   skillRefs: Set<string>,
  *   suiteRefs: Set<string>,
  *   datasetRefs: Set<string>,
  *   liveE2eProfileRefs: Set<string>,
@@ -2217,6 +2407,7 @@ function extractRouteAdapterRefs(routeProfile) {
  *   routeProfilesById: Map<string, { source: string, step: string | null, routeClass: string | null, adapters: Array<{ field: string, adapterId: string }> }>,
  *   wrapperProfilesByRef: Map<string, { source: string, stepClass: string | null }>,
  *   policyProfilesById: Map<string, { source: string, stepClass: string | null }>,
+ *   skillProfilesByRef: Map<string, { source: string, stepClass: string | null }>,
  *   promptBundlesByRef: Map<string, { source: string, stepClass: string | null }>,
  *   contextBundlesByRef: Map<string, { source: string, appliesToSteps: Set<string> }>,
  *   datasetsByRef: Map<string, { source: string, subjectType: string | null }>,
@@ -2228,6 +2419,7 @@ function buildReferenceRegistry(results, workspaceRoot) {
   const routeIds = new Set();
   const wrapperRefs = new Set();
   const policyIds = new Set();
+  const skillRefs = new Set();
   const suiteRefs = new Set();
   const datasetRefs = new Set();
   const liveE2eProfileRefs = new Set();
@@ -2243,6 +2435,8 @@ function buildReferenceRegistry(results, workspaceRoot) {
   const wrapperProfilesByRef = new Map();
   /** @type {Map<string, { source: string, stepClass: string | null }>} */
   const policyProfilesById = new Map();
+  /** @type {Map<string, { source: string, stepClass: string | null }>} */
+  const skillProfilesByRef = new Map();
   /** @type {Map<string, { source: string, stepClass: string | null }>} */
   const promptBundlesByRef = new Map();
   /** @type {Map<string, { source: string, appliesToSteps: Set<string> }>} */
@@ -2295,6 +2489,20 @@ function buildReferenceRegistry(results, workspaceRoot) {
           policyIds.add(policyId);
           registerKnownReference(knownReferenceFamilies, policyId, "step-policy-profile");
           policyProfilesById.set(policyId, {
+            source: result.source,
+            stepClass: typeof document.step_class === "string" ? document.step_class : null,
+          });
+        }
+        break;
+      }
+      case "skill-profile": {
+        const skillId = document.skill_id;
+        const version = document.version;
+        if (typeof skillId === "string" && typeof version === "number") {
+          const skillRef = `${skillId}@v${version}`;
+          skillRefs.add(skillRef);
+          registerKnownReference(knownReferenceFamilies, skillRef, "skill-profile");
+          skillProfilesByRef.set(skillRef, {
             source: result.source,
             stepClass: typeof document.step_class === "string" ? document.step_class : null,
           });
@@ -2436,6 +2644,7 @@ function buildReferenceRegistry(results, workspaceRoot) {
     routeIds,
     wrapperRefs,
     policyIds,
+    skillRefs,
     suiteRefs,
     datasetRefs,
     liveE2eProfileRefs,
@@ -2448,6 +2657,7 @@ function buildReferenceRegistry(results, workspaceRoot) {
     routeProfilesById,
     wrapperProfilesByRef,
     policyProfilesById,
+    skillProfilesByRef,
     promptBundlesByRef,
     contextBundlesByRef,
     datasetsByRef,

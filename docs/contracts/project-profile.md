@@ -16,6 +16,8 @@ Persistent configuration for one target project, including repos, allowed provid
 - `default_wrapper_profiles`
 - `default_prompt_bundles`
 - `default_context_bundles`
+- `default_skill_profiles`
+- `skill_overrides`
 - `budget_policy`
 - `approval_policy`
 - `security_policy`
@@ -37,6 +39,9 @@ Committed registry roots are source assets and static samples only. Runtime-gene
 `default_prompt_bundles` is keyed by workflow step and resolves one prompt bundle ref per step.
 `default_context_bundles` is keyed by workflow step and resolves one or more context bundle refs per step.
 These fields declare deterministic defaults only. Actual context selection, expansion, and prompt/context assembly begin in `W6-S03`.
+
+`default_skill_profiles` maps route classes (`artifact`, `planner`, `runner`, `repair`, `eval`, `harness`) to ordered skill refs (`skill_id@vN`).
+`skill_overrides` maps route step slots (`discovery`, `research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`, `harness`) to ordered skill refs and has higher precedence than defaults.
 
 `runtime_defaults.workspace_mode` controls execution isolation:
 - `ephemeral` — run inside the primary checkout;

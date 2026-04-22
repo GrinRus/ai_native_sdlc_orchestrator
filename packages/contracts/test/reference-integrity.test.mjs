@@ -245,3 +245,43 @@ test("project default route using non-allowed adapter fails with reference_targe
     assert.ok(issue, "expected project route adapter allowlist compatibility issue");
   });
 });
+
+test("missing default skill ref fails with reference_target_missing", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
+      const defaultSkills = /** @type {Record<string, unknown>} */ (document.default_skill_profiles);
+      defaultSkills.runner = ["skill.runner.missing@v1"];
+    });
+
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_missing" &&
+        candidate.field === "default_skill_profiles.runner" &&
+        candidate.reference === "skill.runner.missing@v1",
+    );
+    assert.ok(issue, "expected missing default skill reference issue");
+  });
+});
+
+test("skill override with incompatible step class fails with reference_target_incompatible", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/project.aor.yaml", (document) => {
+      const overrides = /** @type {Record<string, unknown>} */ (document.skill_overrides);
+      overrides.implement = ["skill.eval.default@v1"];
+    });
+
+    const result = validateExampleReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_incompatible" &&
+        candidate.field === "skill_overrides.implement" &&
+        candidate.reference === "skill.eval.default@v1",
+    );
+    assert.ok(issue, "expected skill override compatibility issue");
+  });
+});

@@ -1,0 +1,21 @@
+skill_id: skill.harness.default
+version: 1
+step_class: harness
+summary: deterministic harness workflow for replay, compatibility checks, and baseline comparison
+activation_hints:
+  - harness
+workflow:
+  - id: load-capture
+    instruction: load baseline capture and validate compatibility constraints
+  - id: replay
+    instruction: replay under matched context and record comparison diagnostics
+  - id: certify
+    instruction: emit replay status with baseline and candidate evidence links
+required_inputs:
+  packets:
+    - step-result
+    - evaluation-report
+expected_outputs:
+  - harness-report
+change_notes:
+  - baseline harness skill for context compiler

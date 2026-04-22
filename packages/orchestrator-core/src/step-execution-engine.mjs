@@ -6,10 +6,11 @@ import {
   createMockAdapter,
   resolveAdapterForRoute,
 } from "../../adapter-sdk/src/index.mjs";
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
 import { resolveAssetBundleForStep } from "./asset-loader.mjs";
+import { compileStepContext } from "./context-compiler.mjs";
 import { materializeDeliveryPlan } from "./delivery-plan.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
@@ -35,6 +36,50 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function canonicalPacketRef(value) {
+  if (value.startsWith("packet://")) {
+    return value;
+  }
+  return `packet://${value}`;
+}
+
+/**
+ * @param {Record<string, unknown> | null} assetResolution
+ * @returns {string[]}
+ */
+function inferPromptRequiredPacketRefs(assetResolution) {
+  const promptResolution = asRecord(asRecord(assetResolution).prompt_bundle);
+  const profileSource = promptResolution.profile_source;
+  if (typeof profileSource !== "string" || profileSource.length === 0) {
+    return [];
+  }
+
+  const loaded = loadContractFile({
+    filePath: profileSource,
+    family: "prompt-bundle",
+  });
+  if (!loaded.ok) {
+    return [];
+  }
+
+  const promptBundle = asRecord(loaded.document);
+  const requiredInputs = asRecord(promptBundle.required_inputs);
+  const packetInputs = asRecord(requiredInputs.packets);
+  return asStringArray(packetInputs.required).map((packetName) => canonicalPacketRef(packetName));
 }
 
 /**
@@ -75,11 +120,15 @@ function writeStepResult(options) {
  *   promptBundleOverrides?: Record<string, string>,
  *   policyOverrides?: Record<string, string>,
  *   adapterOverrides?: Record<string, string>,
+ *   skillOverrides?: Record<string, string[]>,
+ *   inputPacketRefs?: string[],
+ *   runtimeEvidenceRefs?: string[],
  *   routesRoot?: string,
  *   wrappersRoot?: string,
  *   promptsRoot?: string,
- *   policiesRoot?: string,
- *   adaptersRoot?: string,
+  *   policiesRoot?: string,
+  *   adaptersRoot?: string,
+ *   skillsRoot?: string,
  * }} options
  */
 export function executeRoutedStep(options) {
@@ -110,6 +159,11 @@ export function executeRoutedStep(options) {
       ? options.adaptersRoot
       : path.resolve(init.projectRoot, options.adaptersRoot)
     : path.join(init.projectRoot, "examples/adapters");
+  const skillsRoot = options.skillsRoot
+    ? path.isAbsolute(options.skillsRoot)
+      ? options.skillsRoot
+      : path.resolve(init.projectRoot, options.skillsRoot)
+    : path.join(init.projectRoot, "examples/skills");
 
   const requestedStepClass = options.stepClass;
   const resultStepClass = STEP_CLASS_TO_RESULT_CLASS[requestedStepClass] ?? "runner";
@@ -134,6 +188,8 @@ export function executeRoutedStep(options) {
   let adapterRequest = null;
   /** @type {Record<string, unknown> | null} */
   let adapterResponse = null;
+  /** @type {Record<string, unknown> | null} */
+  let contextCompilation = null;
   /** @type {string[]} */
   let evidenceRefs = [init.projectProfilePath];
   /** @type {"passed" | "failed"} */
@@ -177,6 +233,30 @@ export function executeRoutedStep(options) {
       policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
     });
 
+    const explicitInputPacketRefs = asStringArray(options.inputPacketRefs);
+    const inferredPromptPacketRefs = dryRun
+      ? inferPromptRequiredPacketRefs(/** @type {Record<string, unknown>} */ (assetResolution))
+      : [];
+    const resolvedInputPacketRefs = [...new Set([...explicitInputPacketRefs, ...inferredPromptPacketRefs])];
+
+    const compiledContextResult = compileStepContext({
+      projectRoot: init.projectRoot,
+      projectProfilePath: init.projectProfilePath,
+      stepClass: requestedStepClass,
+      routeResolution: /** @type {Record<string, unknown>} */ (routeResolution),
+      assetResolution: /** @type {Record<string, unknown>} */ (assetResolution),
+      policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
+      inputPacketRefs: resolvedInputPacketRefs,
+      runtimeEvidenceRefs: [
+        ...asStringArray(options.runtimeEvidenceRefs),
+        init.projectProfilePath,
+        ...(deliveryPlanResult ? [deliveryPlanResult.deliveryPlanFile] : []),
+      ],
+      skillsRoot,
+      skillOverrides: options.skillOverrides,
+    });
+    contextCompilation = compiledContextResult.context_compilation;
+
     adapterResolution = resolveAdapterForRoute({
       routeResolution: /** @type {any} */ (routeResolution),
       adaptersRoot,
@@ -202,8 +282,9 @@ export function executeRoutedStep(options) {
         route: routeResolution,
         asset_bundle: assetResolution,
         policy_bundle: policyResolution,
-        input_packet_refs: [],
+        input_packet_refs: asStringArray(contextCompilation?.resolved_input_packet_refs),
         dry_run: true,
+        context: compiledContextResult.compiled_context,
       });
 
       const mockAdapter = createMockAdapter();
@@ -254,6 +335,7 @@ export function executeRoutedStep(options) {
       adapter_resolution: adapterResolution,
       adapter_request: adapterRequest,
       adapter_response: adapterResponse,
+      context_compilation: contextCompilation,
       blocked_next_step: blockedNextStep,
       evidence_root: init.runtimeLayout.reportsRoot,
     },
