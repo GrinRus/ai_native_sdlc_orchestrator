@@ -19,7 +19,7 @@ Close remaining MVP+ governance and quality stories across certification control
 
 ## W7-S01 — Governance quality guardrails and evidence parity
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Expand quality governance checks so deterministic validation, eval evidence, and finance signals stay consistent.
 - **Primary modules:** `packages/orchestrator-core`, `packages/harness`, `docs/contracts/**`, `examples/eval/**`
 - **Hard dependencies:** W6-S03, W3-S04

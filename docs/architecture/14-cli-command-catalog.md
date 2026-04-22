@@ -29,6 +29,8 @@ This catalog separates bootstrap commands implemented in the current shell from 
 | `aor live-e2e start` | implemented | `--project-ref <path>`; `--profile <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--hold-open <true\|false>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_profile_ref`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecard_files`, `live_e2e_abort_supported`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-e2e-profile`, `live-run-event`, `incident-report`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
 | `aor live-e2e status` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>`; `--abort <true\|false>` (optional); `--reason <text>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecards`, `live_e2e_abort_applied`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event`, `incident-report`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
 | `aor live-e2e report` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecards`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `incident-report`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
+| `aor ui attach` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--control-plane <url>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `ui_lifecycle_action`, `ui_lifecycle_state`, `ui_lifecycle_state_file`, `ui_lifecycle_idempotent`, `ui_lifecycle_connection_state`, `ui_lifecycle_headless_safe`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event` |
+| `aor ui detach` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `ui_lifecycle_action`, `ui_lifecycle_state`, `ui_lifecycle_state_file`, `ui_lifecycle_idempotent`, `ui_lifecycle_connection_state`, `ui_lifecycle_headless_safe`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event` |
 
 `aor eval run` (W3-S03) and `aor harness certify` (W3-S05) provide the quality-runtime baseline: durable eval output plus durable certification and promotion-decision artifacts.
 
@@ -45,9 +47,6 @@ The following commands remain planned and are intentionally not implemented in t
 - `aor incident open`
 - `aor incident show`
 - `aor audit runs`
-
-- `aor ui attach`
-- `aor ui detach`
 
 ## Operator semantics for W5-S03
 - `aor run status`, `aor packet show`, and `aor evidence show` are read-only operator commands.
@@ -75,3 +74,7 @@ The following commands remain planned and are intentionally not implemented in t
 - `aor run pause` and `aor run resume` support deterministic intervention without breaking headless control-plane operation.
 - `aor run steer` supports planner/delivery intervention with explicit scope (`target-step`) and policy/approval guardrails.
 - `aor run cancel` supports high-risk stop semantics with mandatory approval evidence when guardrails require it.
+
+## Story traceability for W6-S04
+- `aor ui attach` supports delivery engineer and operator workflows by recording explicit UI lifecycle attachment state.
+- `aor ui detach` preserves headless-first operation while keeping lifecycle state auditable and queryable through operator surfaces.

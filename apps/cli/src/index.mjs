@@ -3,6 +3,8 @@ import path from "node:path";
 
 import {
   applyRunControlAction,
+  attachUiLifecycle,
+  detachUiLifecycle,
   listDeliveryManifests,
   listPacketArtifacts,
   listPromotionDecisions,
@@ -10,6 +12,7 @@ import {
   listRuns,
   listStepResults,
   openRunEventStream,
+  readUiLifecycleState,
   readProjectState,
 } from "../../api/src/index.mjs";
 import { getContractFamilyIndex } from "../../../packages/contracts/src/index.mjs";
@@ -131,6 +134,8 @@ function formatCommandHelp(definition) {
             definition.command === "packet show" ||
             definition.command === "evidence show"
           ? "Status: implemented in operator shell (W5-S03)"
+        : definition.command === "ui attach" || definition.command === "ui detach"
+          ? "Status: implemented in UI lifecycle shell (W6-S04)"
           : definition.command === "live-e2e start" ||
               definition.command === "live-e2e status" ||
               definition.command === "live-e2e report"
@@ -279,12 +284,24 @@ function formatCommandHelp(definition) {
                       "- --abort=true issues a bounded abort request for a non-terminal run.",
                       "- Abort uses the same live-run-event contract and does not require web UI attachment.",
                     ]
-                  : definition.command === "live-e2e report"
+                : definition.command === "live-e2e report"
+                  ? [
+                      "- This command is read-only and returns run summary plus per-target scorecards.",
+                      "- Report output is durable and sourced from runtime report artifacts.",
+                      "- Use status --abort for intervention; report itself is observation-only.",
+                    ]
+                  : definition.command === "ui attach"
                     ? [
-                        "- This command is read-only and returns run summary plus per-target scorecards.",
-                        "- Report output is durable and sourced from runtime report artifacts.",
-                        "- Use status --abort for intervention; report itself is observation-only.",
+                        "- Attach records explicit UI lifecycle state in runtime state artifacts.",
+                        "- --control-plane is optional; omit it to record disconnected/read-model mode.",
+                        "- Repeating the same attach input is idempotent and reports ui_lifecycle_idempotent=true.",
                       ]
+                    : definition.command === "ui detach"
+                      ? [
+                          "- Detach never stops active workflows and preserves headless CLI/API operation.",
+                          "- Repeating detach on an already detached state is idempotent.",
+                          "- Detached lifecycle state remains visible through operator surfaces.",
+                        ]
       : [
           "- --project-ref must point to an existing directory.",
           `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
@@ -661,6 +678,12 @@ function executeImplementedCommand(command, flags, cwd) {
   let primaryEventId = null;
   let evidenceEventId = null;
   let streamLogFile = null;
+  let uiLifecycleAction = null;
+  let uiLifecycleState = null;
+  let uiLifecycleStateFile = null;
+  let uiLifecycleIdempotent = null;
+  let uiLifecycleConnectionState = null;
+  let uiLifecycleHeadlessSafe = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -1042,6 +1065,16 @@ function executeImplementedCommand(command, flags, cwd) {
     runtimeLayout = projectState.runtime_layout;
     runtimeStateFile = projectState.state_file;
     projectProfileRef = projectState.project_profile_ref;
+    const uiState = readUiLifecycleState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    uiLifecycleState = uiState.state;
+    uiLifecycleStateFile = uiState.stateFile;
+    uiLifecycleConnectionState =
+      typeof uiState.state.connection_state === "string" ? uiState.state.connection_state : null;
+    uiLifecycleHeadlessSafe = uiState.state.headless_safe === true;
 
     runSummaries = listRuns({
       cwd,
@@ -1276,6 +1309,53 @@ function executeImplementedCommand(command, flags, cwd) {
     liveE2EAbortSupported = true;
     readOnly = true;
     futureControlHooks = ["live-e2e status --abort true", "ui attach", "ui detach"];
+  } else if (command === "ui attach") {
+    ensureRequiredFlags(command, flags);
+    const uiAttachResult = attachUiLifecycle({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId: resolveOptionalStringFlag("run-id", flags["run-id"]),
+      controlPlane: resolveOptionalStringFlag("control-plane", flags["control-plane"]),
+    });
+
+    resolvedProjectRef = uiAttachResult.projectRoot;
+    resolvedRuntimeRoot = uiAttachResult.runtimeRoot;
+    runtimeLayout = uiAttachResult.runtimeLayout;
+    runtimeStateFile = uiAttachResult.stateFile;
+    projectProfileRef = uiAttachResult.projectProfileRef;
+    uiLifecycleAction = uiAttachResult.action;
+    uiLifecycleState = uiAttachResult.state;
+    uiLifecycleStateFile = uiAttachResult.stateFile;
+    uiLifecycleIdempotent = uiAttachResult.idempotent;
+    uiLifecycleConnectionState =
+      typeof uiAttachResult.state.connection_state === "string" ? uiAttachResult.state.connection_state : null;
+    uiLifecycleHeadlessSafe = uiAttachResult.state.headless_safe === true;
+    readOnly = false;
+    futureControlHooks = ["ui detach", "run status --follow true"];
+  } else if (command === "ui detach") {
+    ensureRequiredFlags(command, flags);
+    const uiDetachResult = detachUiLifecycle({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId: resolveOptionalStringFlag("run-id", flags["run-id"]),
+    });
+
+    resolvedProjectRef = uiDetachResult.projectRoot;
+    resolvedRuntimeRoot = uiDetachResult.runtimeRoot;
+    runtimeLayout = uiDetachResult.runtimeLayout;
+    runtimeStateFile = uiDetachResult.stateFile;
+    projectProfileRef = uiDetachResult.projectProfileRef;
+    uiLifecycleAction = uiDetachResult.action;
+    uiLifecycleState = uiDetachResult.state;
+    uiLifecycleStateFile = uiDetachResult.stateFile;
+    uiLifecycleIdempotent = uiDetachResult.idempotent;
+    uiLifecycleConnectionState =
+      typeof uiDetachResult.state.connection_state === "string" ? uiDetachResult.state.connection_state : null;
+    uiLifecycleHeadlessSafe = uiDetachResult.state.headless_safe === true;
+    readOnly = false;
+    futureControlHooks = ["ui attach", "run status --follow true"];
   } else {
     ensureRequiredFlags(command, flags);
 
@@ -1362,6 +1442,12 @@ function executeImplementedCommand(command, flags, cwd) {
     run_control_transition: runControlTransition,
     primary_event_id: primaryEventId,
     evidence_event_id: evidenceEventId,
+    ui_lifecycle_action: uiLifecycleAction,
+    ui_lifecycle_state: uiLifecycleState,
+    ui_lifecycle_state_file: uiLifecycleStateFile,
+    ui_lifecycle_idempotent: uiLifecycleIdempotent,
+    ui_lifecycle_connection_state: uiLifecycleConnectionState,
+    ui_lifecycle_headless_safe: uiLifecycleHeadlessSafe,
     run_summaries: runSummaries,
     follow_mode: followMode,
     stream_protocol: streamProtocol,

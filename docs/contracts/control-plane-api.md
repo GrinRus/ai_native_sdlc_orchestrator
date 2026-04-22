@@ -61,6 +61,21 @@ Durable audit baseline:
 - every control action writes one durable `run-control-event-*.json` record under runtime reports;
 - control records must include `run_id`, `action`, transition snapshot, guardrail decision, and `evidence_root`.
 
+## UI lifecycle endpoints (W6-S04 baseline)
+- `POST /api/projects/:projectId/ui/attach`
+- `POST /api/projects/:projectId/ui/detach`
+- `GET /api/projects/:projectId/ui/state`
+
+UI lifecycle payload baseline:
+- `run_id` (optional operator context);
+- `control_plane` (optional URL for connected mode).
+
+UI lifecycle response baseline:
+- `ui_attached` boolean;
+- `connection_state` in `connected | disconnected | detached`;
+- `idempotent` marker for repeated attach/detach retries;
+- `headless_safe=true` to assert CLI/API paths remain usable while UI is detached.
+
 ## Authentication and permission assumptions
 - Baseline assumption for local/operator rehearsals: trusted local operator context behind workspace access controls.
 - Read endpoints are read-only and must not mutate runtime artifacts.

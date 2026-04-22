@@ -190,6 +190,44 @@ test("web console follow mode reuses shared stream and detach is non-disruptive"
   });
 });
 
+test("web snapshot reflects ui attach/detach lifecycle while headless reads remain available", async () => {
+  await withTempProject(async (projectRoot) => {
+    const runId = seedOperatorArtifacts(projectRoot);
+
+    const attachResult = invokeCli([
+      "ui",
+      "attach",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+      "--control-plane",
+      "http://localhost:8080",
+    ]);
+    assert.equal(attachResult.exitCode, 0, attachResult.stderr);
+
+    const attachedSnapshot = buildOperatorConsoleSnapshot({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      runId,
+    });
+    assert.equal(attachedSnapshot.ui_lifecycle.ui_attached, true);
+    assert.equal(attachedSnapshot.ui_lifecycle.connection_state, "connected");
+
+    const detachResult = invokeCli(["ui", "detach", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(detachResult.exitCode, 0, detachResult.stderr);
+
+    const detachedSnapshot = buildOperatorConsoleSnapshot({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      runId,
+    });
+    assert.equal(detachedSnapshot.ui_lifecycle.ui_attached, false);
+    assert.equal(detachedSnapshot.ui_lifecycle.connection_state, "detached");
+    assert.ok(detachedSnapshot.runs.some((run) => run.run_id === runId));
+  });
+});
+
 test("operator console smoke script renders html and emits transcript summary", async () => {
   await withTempProject(async (projectRoot) => {
     const runId = seedOperatorArtifacts(projectRoot);

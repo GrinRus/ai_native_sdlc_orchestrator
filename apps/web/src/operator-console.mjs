@@ -6,6 +6,7 @@ import {
   listRuns,
   listStepResults,
   openRunEventStream,
+  readUiLifecycleState,
   readProjectState,
 } from "../../api/src/index.mjs";
 
@@ -67,6 +68,7 @@ function selectRunId(runs, requestedRunId) {
  */
 export function buildOperatorConsoleSnapshot(options) {
   const state = readProjectState(options);
+  const uiLifecycle = readUiLifecycleState(options);
   const runs = listRuns(options).sort((left, right) => left.run_id.localeCompare(right.run_id));
   const packets = listPacketArtifacts(options);
   const stepResults = listStepResults(options);
@@ -77,6 +79,8 @@ export function buildOperatorConsoleSnapshot(options) {
 
   return {
     project: state,
+    ui_lifecycle: uiLifecycle.state,
+    ui_lifecycle_state_file: uiLifecycle.stateFile,
     runs,
     selected_run_id: selectedRunId,
     packet_artifacts: packets,
@@ -172,6 +176,7 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
       <h1>AOR Operator Console</h1>
       <p>Project: <code>${escapeHtml(snapshot.project.project_id)}</code></p>
       <p>Selected run: <code>${escapeHtml(snapshot.selected_run_id ?? "none")}</code></p>
+      <p>UI lifecycle: <code>${escapeHtml(String(snapshot.ui_lifecycle.connection_state ?? "detached"))}</code></p>
       <p>Stream protocol: <code>${escapeHtml(options.streamProtocol ?? "disabled")}</code></p>
       <p>Live events in session: <code>${String(options.liveEventCount ?? 0)}</code></p>
     </section>

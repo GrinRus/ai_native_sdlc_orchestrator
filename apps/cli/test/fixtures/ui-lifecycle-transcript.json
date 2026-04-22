@@ -1,0 +1,23 @@
+{
+  "attach_connected": {
+    "command": "ui attach",
+    "status": "implemented",
+    "ui_lifecycle_action": "attach",
+    "ui_lifecycle_connection_state": "connected",
+    "ui_lifecycle_idempotent": false
+  },
+  "detach": {
+    "command": "ui detach",
+    "status": "implemented",
+    "ui_lifecycle_action": "detach",
+    "ui_lifecycle_connection_state": "detached",
+    "ui_lifecycle_idempotent": false
+  },
+  "attach_disconnected": {
+    "command": "ui attach",
+    "status": "implemented",
+    "ui_lifecycle_action": "attach",
+    "ui_lifecycle_connection_state": "disconnected",
+    "ui_lifecycle_headless_safe": true
+  }
+}

@@ -1,45 +1,58 @@
 # UI attach / detach
 
-AOR is headless-first. The web UI is an optional operator surface that can attach to a running system and detach without interrupting active work.
+AOR is headless-first. The web UI is optional and its lifecycle is explicit through `aor ui attach` and `aor ui detach`.
 
 ## Attach
-Use the UI when you need:
-- a live run timeline;
-- packet and evidence inspection;
-- approval and incident views;
-- live E2E dashboards.
-
-Typical attach flow:
+Connected attach:
 ```bash
-aor ui attach --run RUN-201 --control-plane http://localhost:8080
+aor ui attach \
+  --project-ref <AOR_WORKSPACE> \
+  --run-id <RUN_ID> \
+  --control-plane http://localhost:8080
 ```
 
-Local detachable web console smoke path:
+Disconnected/read-model attach (no control-plane URL):
+```bash
+aor ui attach \
+  --project-ref <AOR_WORKSPACE> \
+  --run-id <RUN_ID>
+```
+
+Expected output checks:
+- `ui_lifecycle_action: "attach"`;
+- `ui_lifecycle_state.ui_attached: true`;
+- `ui_lifecycle_connection_state: "connected"` or `"disconnected"`;
+- repeated identical attach returns `ui_lifecycle_idempotent: true`.
+
+## Detach
+```bash
+aor ui detach \
+  --project-ref <AOR_WORKSPACE> \
+  --run-id <RUN_ID>
+```
+
+Expected output checks:
+- `ui_lifecycle_action: "detach"`;
+- `ui_lifecycle_state.ui_attached: false`;
+- `ui_lifecycle_connection_state: "detached"`;
+- repeated detach returns `ui_lifecycle_idempotent: true`.
+
+## Headless safety checks
+After detach, verify headless paths still work:
+```bash
+aor run status --project-ref <AOR_WORKSPACE> --run-id <RUN_ID> --follow true
+```
+
+For local detachable web smoke path:
 ```bash
 node apps/web/scripts/operator-console-smoke.mjs \
-  --project-ref . \
-  --run-id RUN-201 \
+  --project-ref <AOR_WORKSPACE> \
+  --run-id <RUN_ID> \
   --follow true \
-  --output-html .aor/web/operator-console-RUN-201.html
+  --output-html .aor/web/operator-console-<RUN_ID>.html
 ```
 
 Expected smoke outcome:
-- emits a JSON transcript with `mode=detachable-web-console`;
-- renders an HTML console snapshot under `.aor/web/`;
-- follows live events through the shared control-plane stream contract.
-
-## Detach
-Detaching the UI must not:
-- stop workflows;
-- block API access;
-- remove logs or evidence;
-- change workflow state.
-
-When using the local smoke script, detach is explicit and always reported in the JSON summary (`detached: true`).
-
-## Operator checks
-Before calling UI behavior done, confirm that:
-- the API still responds with live state;
-- SSE or event streams continue while the UI is disconnected;
-- reconnecting the UI can catch up from the read model plus live stream.
-- headless CLI paths (for example `aor run status --follow`) still work with the web UI stopped.
+- JSON summary reports `mode=detachable-web-console` and `detached=true`;
+- rendered HTML exists under `.aor/web/`;
+- run/evidence read surfaces stay available with UI detached.

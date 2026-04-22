@@ -98,6 +98,16 @@ test("run-control command help documents guardrails and audit semantics", () => 
   assert.match(result.stdout, /requires --approval-ref when policy guardrails demand approval/);
 });
 
+test("ui lifecycle command help documents attach and detach semantics", () => {
+  const result = invokeCli(["ui", "attach", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in UI lifecycle shell \(W6-S04\)/);
+  assert.match(result.stdout, /Attach records explicit UI lifecycle state/);
+  assert.match(result.stdout, /--control-plane is optional/);
+});
+
 test("unknown command fails clearly", () => {
   const result = invokeCli(["project", "unknown"]);
 
@@ -333,6 +343,125 @@ test("W6 run-control command pack enforces guardrails, transitions, and durable 
         status: cancelPayload.status,
         run_control_action: cancelPayload.run_control_action,
         run_control_blocked: cancelPayload.run_control_blocked,
+      },
+    };
+    assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("W6 ui attach/detach command pack reports lifecycle state and preserves headless operation", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const runStartResult = invokeCli(["run", "start", "--project-ref", projectRoot, "--run-id", "ui-lifecycle-smoke"]);
+    assert.equal(runStartResult.exitCode, 0, runStartResult.stderr);
+
+    const attachConnected = invokeCli([
+      "ui",
+      "attach",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "ui-lifecycle-smoke",
+      "--control-plane",
+      "http://localhost:8080",
+    ]);
+    assert.equal(attachConnected.exitCode, 0, attachConnected.stderr);
+    const attachConnectedPayload = JSON.parse(attachConnected.stdout);
+    assert.equal(attachConnectedPayload.ui_lifecycle_action, "attach");
+    assert.equal(attachConnectedPayload.ui_lifecycle_state.ui_attached, true);
+    assert.equal(attachConnectedPayload.ui_lifecycle_connection_state, "connected");
+    assert.equal(attachConnectedPayload.ui_lifecycle_idempotent, false);
+
+    const attachRetry = invokeCli([
+      "ui",
+      "attach",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "ui-lifecycle-smoke",
+      "--control-plane",
+      "http://localhost:8080",
+    ]);
+    assert.equal(attachRetry.exitCode, 0, attachRetry.stderr);
+    const attachRetryPayload = JSON.parse(attachRetry.stdout);
+    assert.equal(attachRetryPayload.ui_lifecycle_idempotent, true);
+
+    const detachResult = invokeCli(["ui", "detach", "--project-ref", projectRoot, "--run-id", "ui-lifecycle-smoke"]);
+    assert.equal(detachResult.exitCode, 0, detachResult.stderr);
+    const detachPayload = JSON.parse(detachResult.stdout);
+    assert.equal(detachPayload.ui_lifecycle_action, "detach");
+    assert.equal(detachPayload.ui_lifecycle_state.ui_attached, false);
+    assert.equal(detachPayload.ui_lifecycle_connection_state, "detached");
+    assert.equal(detachPayload.ui_lifecycle_idempotent, false);
+
+    const detachRetry = invokeCli(["ui", "detach", "--project-ref", projectRoot, "--run-id", "ui-lifecycle-smoke"]);
+    assert.equal(detachRetry.exitCode, 0, detachRetry.stderr);
+    const detachRetryPayload = JSON.parse(detachRetry.stdout);
+    assert.equal(detachRetryPayload.ui_lifecycle_idempotent, true);
+
+    const attachDisconnected = invokeCli([
+      "ui",
+      "attach",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "ui-lifecycle-smoke",
+    ]);
+    assert.equal(attachDisconnected.exitCode, 0, attachDisconnected.stderr);
+    const attachDisconnectedPayload = JSON.parse(attachDisconnected.stdout);
+    assert.equal(attachDisconnectedPayload.ui_lifecycle_connection_state, "disconnected");
+    assert.equal(attachDisconnectedPayload.ui_lifecycle_headless_safe, true);
+    assert.equal(fs.existsSync(attachDisconnectedPayload.ui_lifecycle_state_file), true);
+
+    const detachAfterDisconnected = invokeCli([
+      "ui",
+      "detach",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "ui-lifecycle-smoke",
+    ]);
+    assert.equal(detachAfterDisconnected.exitCode, 0, detachAfterDisconnected.stderr);
+
+    const headlessRunStatus = invokeCli([
+      "run",
+      "status",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "ui-lifecycle-smoke",
+    ]);
+    assert.equal(headlessRunStatus.exitCode, 0, headlessRunStatus.stderr);
+    const headlessStatusPayload = JSON.parse(headlessRunStatus.stdout);
+    assert.ok(headlessStatusPayload.run_summaries.some((summary) => summary.run_id === "ui-lifecycle-smoke"));
+    assert.equal(headlessStatusPayload.ui_lifecycle_state.connection_state, "detached");
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "ui-lifecycle-transcript.json"), "utf8"),
+    );
+    const transcriptSubset = {
+      attach_connected: {
+        command: attachConnectedPayload.command,
+        status: attachConnectedPayload.status,
+        ui_lifecycle_action: attachConnectedPayload.ui_lifecycle_action,
+        ui_lifecycle_connection_state: attachConnectedPayload.ui_lifecycle_connection_state,
+        ui_lifecycle_idempotent: attachConnectedPayload.ui_lifecycle_idempotent,
+      },
+      detach: {
+        command: detachPayload.command,
+        status: detachPayload.status,
+        ui_lifecycle_action: detachPayload.ui_lifecycle_action,
+        ui_lifecycle_connection_state: detachPayload.ui_lifecycle_connection_state,
+        ui_lifecycle_idempotent: detachPayload.ui_lifecycle_idempotent,
+      },
+      attach_disconnected: {
+        command: attachDisconnectedPayload.command,
+        status: attachDisconnectedPayload.status,
+        ui_lifecycle_action: attachDisconnectedPayload.ui_lifecycle_action,
+        ui_lifecycle_connection_state: attachDisconnectedPayload.ui_lifecycle_connection_state,
+        ui_lifecycle_headless_safe: attachDisconnectedPayload.ui_lifecycle_headless_safe,
       },
     };
     assert.deepEqual(transcriptSubset, transcriptFixture);

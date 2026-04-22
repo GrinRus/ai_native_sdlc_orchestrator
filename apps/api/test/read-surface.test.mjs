@@ -10,6 +10,7 @@ import { validateContractDocument } from "../../../packages/contracts/src/index.
 import { materializeDeliveryPlan } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
 import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
+import { attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../src/index.mjs";
 import {
   listDeliveryManifests,
   listPacketArtifacts,
@@ -250,5 +251,62 @@ test("listRuns includes run-control state snapshots even before packet/report ar
     assert.deepEqual(controlRun.packet_refs, []);
     assert.deepEqual(controlRun.step_result_refs, []);
     assert.deepEqual(controlRun.quality_refs, []);
+  });
+});
+
+test("ui lifecycle API supports attach/detach idempotency and disconnected mode", () => {
+  withTempRepo((repoRoot) => {
+    const attached = attachUiLifecycle({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "ui-api-smoke",
+      controlPlane: "http://localhost:8080",
+    });
+    assert.equal(attached.action, "attach");
+    assert.equal(attached.idempotent, false);
+    assert.equal(attached.state.ui_attached, true);
+    assert.equal(attached.state.connection_state, "connected");
+    assert.equal(fs.existsSync(attached.stateFile), true);
+
+    const attachedRetry = attachUiLifecycle({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "ui-api-smoke",
+      controlPlane: "http://localhost:8080",
+    });
+    assert.equal(attachedRetry.idempotent, true);
+
+    const detached = detachUiLifecycle({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "ui-api-smoke",
+    });
+    assert.equal(detached.action, "detach");
+    assert.equal(detached.idempotent, false);
+    assert.equal(detached.state.ui_attached, false);
+    assert.equal(detached.state.connection_state, "detached");
+
+    const detachedRetry = detachUiLifecycle({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "ui-api-smoke",
+    });
+    assert.equal(detachedRetry.idempotent, true);
+
+    const disconnectedAttach = attachUiLifecycle({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "ui-api-smoke",
+    });
+    assert.equal(disconnectedAttach.state.connection_state, "disconnected");
+    assert.equal(disconnectedAttach.state.headless_safe, true);
+
+    const lifecycle = readUiLifecycleState({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+    });
+    assert.equal(lifecycle.state.ui_attached, true);
+    assert.equal(lifecycle.state.connection_state, "disconnected");
+    assert.equal(lifecycle.state.headless_safe, true);
   });
 });
