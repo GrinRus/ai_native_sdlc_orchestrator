@@ -1,0 +1,28 @@
+context_skill_id: context.skill.runner-verification.default
+version: 1
+title: Runner verification workflow
+metadata:
+  owner: ai-platform
+  lifecycle: draft
+  tags:
+    - verification
+    - runner
+objective: Apply deterministic verification before claiming step completion.
+workflow:
+  stages:
+    - inspect packet and repo scope
+    - execute only project-approved verification commands
+    - capture diff and validation evidence
+    - stop on scope expansion or missing prerequisites
+source_refs:
+  - docs/contracts/handoff-packet.md
+  - docs/contracts/step-policy-profile.md
+applies_to:
+  steps:
+    - implement
+    - review
+    - qa
+    - repair
+  route_classes:
+    - runner
+    - repair

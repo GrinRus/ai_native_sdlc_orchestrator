@@ -20,6 +20,8 @@ const EXTERNAL_REFERENCE_PREFIXES = [
   "incident://",
   "review://",
   "redact://",
+  "packet://",
+  "compiler://",
   "validate.",
   "retry.",
   "repair.",
@@ -40,9 +42,12 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       "repos",
       "allowed_providers",
       "allowed_adapters",
+      "registry_roots",
       "default_route_profiles",
       "default_step_policies",
       "default_wrapper_profiles",
+      "default_prompt_bundles",
+      "default_context_bundles",
       "budget_policy",
       "approval_policy",
       "security_policy",
@@ -56,9 +61,12 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       repos: "array",
       allowed_providers: "array",
       allowed_adapters: "array",
+      registry_roots: "object",
       default_route_profiles: "object",
       default_step_policies: "object",
       default_wrapper_profiles: "object",
+      default_prompt_bundles: "object",
+      default_context_bundles: "object",
       budget_policy: "object",
       approval_policy: "object",
       security_policy: "object",
@@ -454,19 +462,53 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
     ],
   },
   {
+    family: "compiled-context-artifact",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/compiled-context-artifact.md",
+    exampleGlob: "examples/context/compiled/*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "compiled_context_id",
+      "version",
+      "step",
+      "prompt_bundle_ref",
+      "context_bundle_refs",
+      "context_doc_refs",
+      "context_rule_refs",
+      "context_skill_refs",
+      "packet_refs",
+      "hashes",
+      "provenance",
+    ],
+    fieldTypes: {
+      compiled_context_id: "string",
+      version: "number",
+      step: "string",
+      prompt_bundle_ref: "string",
+      context_bundle_refs: "array",
+      context_doc_refs: "array",
+      context_rule_refs: "array",
+      context_skill_refs: "array",
+      packet_refs: "array",
+      hashes: "object",
+      provenance: "object",
+    },
+    enumChecks: [],
+  },
+  {
     family: "provider-route-profile",
     familyGroup: "platform-assets",
     sourceContract: "docs/contracts/provider-route-profile.md",
     exampleGlob: "examples/routes/*.yaml",
     status: "implemented",
-    requiredFields: ["route_id", "step", "route_class", "risk_tier", "primary", "wrapper_profile_ref"],
+    requiredFields: ["route_id", "step", "route_class", "risk_tier", "primary"],
+    forbiddenFields: ["wrapper_profile_ref"],
     fieldTypes: {
       route_id: "string",
       step: "string",
       route_class: "string",
       risk_tier: "string",
       primary: "object",
-      wrapper_profile_ref: "string",
     },
     enumChecks: [],
   },
@@ -476,12 +518,12 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
     sourceContract: "docs/contracts/wrapper-profile.md",
     exampleGlob: "examples/wrappers/*.yaml",
     status: "implemented",
-    requiredFields: ["wrapper_id", "version", "step_class", "prompt_bundle_ref", "tool_policy", "command_policy"],
+    requiredFields: ["wrapper_id", "version", "step_class", "tool_policy", "command_policy"],
+    forbiddenFields: ["prompt_bundle_ref", "session_bootstrap"],
     fieldTypes: {
       wrapper_id: "string",
       version: "number",
       step_class: "string",
-      prompt_bundle_ref: "string",
       tool_policy: "object",
       command_policy: "object",
     },
@@ -503,6 +545,101 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       required_inputs: "object",
     },
     enumChecks: [{ field: "step_class", allowedValues: STEP_CLASS_VALUES }],
+  },
+  {
+    family: "context-doc",
+    familyGroup: "platform-assets",
+    sourceContract: "docs/contracts/context-doc.md",
+    exampleGlob: "examples/context/docs/*.yaml",
+    status: "implemented",
+    requiredFields: ["context_doc_id", "version", "title", "metadata", "source", "applies_to"],
+    fieldTypes: {
+      context_doc_id: "string",
+      version: "number",
+      title: "string",
+      metadata: "object",
+      source: "object",
+      applies_to: "object",
+    },
+    enumChecks: [],
+  },
+  {
+    family: "context-rule",
+    familyGroup: "platform-assets",
+    sourceContract: "docs/contracts/context-rule.md",
+    exampleGlob: "examples/context/rules/*.yaml",
+    status: "implemented",
+    requiredFields: ["context_rule_id", "version", "title", "metadata", "instruction", "source_refs", "applies_to"],
+    fieldTypes: {
+      context_rule_id: "string",
+      version: "number",
+      title: "string",
+      metadata: "object",
+      instruction: "string",
+      source_refs: "array",
+      applies_to: "object",
+    },
+    enumChecks: [],
+  },
+  {
+    family: "context-skill",
+    familyGroup: "platform-assets",
+    sourceContract: "docs/contracts/context-skill.md",
+    exampleGlob: "examples/context/skills/*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "context_skill_id",
+      "version",
+      "title",
+      "metadata",
+      "objective",
+      "workflow",
+      "source_refs",
+      "applies_to",
+    ],
+    fieldTypes: {
+      context_skill_id: "string",
+      version: "number",
+      title: "string",
+      metadata: "object",
+      objective: "string",
+      workflow: "object",
+      source_refs: "array",
+      applies_to: "object",
+    },
+    enumChecks: [],
+  },
+  {
+    family: "context-bundle",
+    familyGroup: "platform-assets",
+    sourceContract: "docs/contracts/context-bundle.md",
+    exampleGlob: "examples/context/bundles/*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "context_bundle_id",
+      "version",
+      "title",
+      "metadata",
+      "applies_to",
+      "context_doc_refs",
+      "context_rule_refs",
+      "context_skill_refs",
+      "source_refs",
+      "selection_policy",
+    ],
+    fieldTypes: {
+      context_bundle_id: "string",
+      version: "number",
+      title: "string",
+      metadata: "object",
+      applies_to: "object",
+      context_doc_refs: "array",
+      context_rule_refs: "array",
+      context_skill_refs: "array",
+      source_refs: "array",
+      selection_policy: "object",
+    },
+    enumChecks: [],
   },
   {
     family: "step-policy-profile",
@@ -609,6 +746,11 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
 
 const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/adapters\/[^/]+\.ya?ml$/, family: "adapter-capability-profile" },
+  { regex: /^examples\/context\/bundles\/[^/]+\.ya?ml$/, family: "context-bundle" },
+  { regex: /^examples\/context\/compiled\/[^/]+\.ya?ml$/, family: "compiled-context-artifact" },
+  { regex: /^examples\/context\/docs\/[^/]+\.ya?ml$/, family: "context-doc" },
+  { regex: /^examples\/context\/rules\/[^/]+\.ya?ml$/, family: "context-rule" },
+  { regex: /^examples\/context\/skills\/[^/]+\.ya?ml$/, family: "context-skill" },
   { regex: /^examples\/delivery-manifest[^/]*\.ya?ml$/, family: "delivery-manifest" },
   { regex: /^examples\/packets\/delivery-plan-[^/]+\.ya?ml$/, family: "delivery-plan" },
   { regex: /^examples\/eval\/dataset-[^/]+\.ya?ml$/, family: "dataset" },
@@ -727,6 +869,23 @@ export function validateContractDocument({ family, document, source = "<in-memor
         }),
       );
     }
+  }
+
+  for (const field of entry.forbiddenFields ?? []) {
+    if (!(field in document)) {
+      continue;
+    }
+
+    issues.push(
+      issue({
+        code: "unsupported_field_present",
+        source,
+        field,
+        expected: "field omitted",
+        actual: "present",
+        message: `Field '${field}' is not supported in the current contract shape.`,
+      }),
+    );
   }
 
   for (const enumCheck of entry.enumChecks) {
@@ -988,6 +1147,111 @@ export function validateExampleReferences(options = {}) {
         }
       }
 
+      const defaultPromptBundles = document.default_prompt_bundles;
+      if (isPlainObject(defaultPromptBundles)) {
+        for (const [key, rawValue] of Object.entries(defaultPromptBundles)) {
+          checkedReferences += 1;
+          const field = `default_prompt_bundles.${key}`;
+          const reference = asReferenceString(rawValue, { issues, source, field });
+          if (!reference || isExternalReference(reference)) continue;
+          if (!isPromptBundleRef(reference)) {
+            issues.push(
+              referenceIssue({
+                code: "reference_format_invalid",
+                source,
+                field,
+                reference,
+                expected: "prompt-bundle://prompt_bundle_id@vN",
+                actual: reference,
+                message: `Field '${field}' must use prompt-bundle://prompt_bundle_id@vN format.`,
+              }),
+            );
+            continue;
+          }
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing prompt-bundle://prompt_bundle_id@vN",
+            expectedFamily: "prompt-bundle",
+            expectedSet: registry.promptBundleRefs,
+            registry,
+          });
+
+          const routeProfileRef = isPlainObject(defaultRouteProfiles) ? defaultRouteProfiles[key] : undefined;
+          const routeProfile =
+            typeof routeProfileRef === "string" ? registry.routeProfilesById.get(routeProfileRef) : null;
+          const promptBundle = registry.promptBundlesByRef.get(reference);
+          if (!routeProfile?.routeClass || !promptBundle?.stepClass) continue;
+          checkedCompatibility += 1;
+          if (promptBundle.stepClass === routeProfile.routeClass) continue;
+          issues.push(
+            referenceIssue({
+              code: "reference_target_incompatible",
+              source,
+              field,
+              reference,
+              expected: `prompt bundle step_class '${routeProfile.routeClass}'`,
+              actual: promptBundle.stepClass,
+              message: `Prompt bundle '${reference}' is incompatible with default route class '${routeProfile.routeClass}' for step '${key}'.`,
+            }),
+          );
+        }
+      }
+
+      const defaultContextBundles = document.default_context_bundles;
+      if (isPlainObject(defaultContextBundles)) {
+        for (const [key, rawValue] of Object.entries(defaultContextBundles)) {
+          const references = asStringArray(rawValue, { issues, source, field: `default_context_bundles.${key}` });
+          references.forEach((reference, index) => {
+            checkedReferences += 1;
+            const field = `default_context_bundles.${key}[${index}]`;
+            if (isExternalReference(reference)) return;
+            if (!isContextBundleRef(reference)) {
+              issues.push(
+                referenceIssue({
+                  code: "reference_format_invalid",
+                  source,
+                  field,
+                  reference,
+                  expected: "context-bundle://context_bundle_id@vN",
+                  actual: reference,
+                  message: `Field '${field}' must use context-bundle://context_bundle_id@vN format.`,
+                }),
+              );
+              return;
+            }
+            validateReferenceTarget({
+              issues,
+              source,
+              field,
+              reference,
+              expected: "existing context-bundle://context_bundle_id@vN",
+              expectedFamily: "context-bundle",
+              expectedSet: registry.contextBundleRefs,
+              registry,
+            });
+
+            const contextBundle = registry.contextBundlesByRef.get(reference);
+            if (!contextBundle) return;
+            checkedCompatibility += 1;
+            if (contextBundle.appliesToSteps.has(key)) return;
+            issues.push(
+              referenceIssue({
+                code: "reference_target_incompatible",
+                source,
+                field,
+                reference,
+                expected: `context bundle applies_to.steps includes '${key}'`,
+                actual: [...contextBundle.appliesToSteps].join(", ") || "none",
+                message: `Context bundle '${reference}' does not apply to workflow step '${key}'.`,
+              }),
+            );
+          });
+        }
+      }
+
       const defaultStepPolicies = document.default_step_policies;
       if (isPlainObject(defaultStepPolicies)) {
         for (const [key, rawValue] of Object.entries(defaultStepPolicies)) {
@@ -1094,55 +1358,6 @@ export function validateExampleReferences(options = {}) {
 
     if (result.family === "provider-route-profile") {
       checkedReferences += 1;
-      const field = "wrapper_profile_ref";
-      const reference = asReferenceString(document.wrapper_profile_ref, { issues, source, field });
-      if (reference && !isExternalReference(reference)) {
-        if (!isVersionedRef(reference)) {
-          issues.push(
-            referenceIssue({
-              code: "reference_format_invalid",
-              source,
-              field,
-              reference,
-              expected: "wrapper_id@vN",
-              actual: reference,
-              message: "wrapper_profile_ref must use wrapper_id@vN format.",
-            }),
-          );
-        } else {
-          validateReferenceTarget({
-            issues,
-            source,
-            field,
-            reference,
-            expected: "existing wrapper_id@vN",
-            expectedFamily: "wrapper-profile",
-            expectedSet: registry.wrapperRefs,
-            registry,
-          });
-
-          const wrapperProfile = registry.wrapperProfilesByRef.get(reference);
-          const routeClass = typeof document.route_class === "string" ? document.route_class : null;
-          if (wrapperProfile?.stepClass && routeClass) {
-            checkedCompatibility += 1;
-            if (wrapperProfile.stepClass !== routeClass) {
-              issues.push(
-                referenceIssue({
-                  code: "reference_target_incompatible",
-                  source,
-                  field,
-                  reference,
-                  expected: `wrapper step_class '${routeClass}'`,
-                  actual: wrapperProfile.stepClass,
-                  message: `Route class '${routeClass}' is incompatible with wrapper '${reference}' step_class '${wrapperProfile.stepClass}'.`,
-                }),
-              );
-            }
-          }
-        }
-      }
-
-      checkedReferences += 1;
       const primaryAdapterField = "primary.adapter";
       const primaryAdapterValue = isPlainObject(document.primary) ? document.primary.adapter : undefined;
       const primaryAdapterRef = asReferenceString(primaryAdapterValue, {
@@ -1228,20 +1443,127 @@ export function validateExampleReferences(options = {}) {
       }
     }
 
-    if (result.family === "wrapper-profile") {
-      checkedReferences += 1;
-      const field = "prompt_bundle_ref";
-      const reference = asReferenceString(document.prompt_bundle_ref, { issues, source, field });
-      if (reference && !isExternalReference(reference)) {
-        if (!isPromptBundleRef(reference)) {
+    if (result.family === "context-bundle") {
+      const contextDocRefs = asStringArray(document.context_doc_refs, {
+        issues,
+        source,
+        field: "context_doc_refs",
+      });
+      contextDocRefs.forEach((reference, index) => {
+        checkedReferences += 1;
+        const field = `context_doc_refs[${index}]`;
+        if (isExternalReference(reference)) return;
+        if (!isContextDocRef(reference)) {
           issues.push(
             referenceIssue({
               code: "reference_format_invalid",
               source,
               field,
               reference,
-              expected: "prompt-bundle://prompt_bundle_id@vN",
+              expected: "context-doc://context_doc_id@vN",
               actual: reference,
+              message: `${field} must use context-doc://context_doc_id@vN format.`,
+            }),
+          );
+          return;
+        }
+        validateReferenceTarget({
+          issues,
+          source,
+          field,
+          reference,
+          expected: "existing context-doc://context_doc_id@vN",
+          expectedFamily: "context-doc",
+          expectedSet: registry.contextDocRefs,
+          registry,
+        });
+      });
+
+      const contextRuleRefs = asStringArray(document.context_rule_refs, {
+        issues,
+        source,
+        field: "context_rule_refs",
+      });
+      contextRuleRefs.forEach((reference, index) => {
+        checkedReferences += 1;
+        const field = `context_rule_refs[${index}]`;
+        if (isExternalReference(reference)) return;
+        if (!isContextRuleRef(reference)) {
+          issues.push(
+            referenceIssue({
+              code: "reference_format_invalid",
+              source,
+              field,
+              reference,
+              expected: "context-rule://context_rule_id@vN",
+              actual: reference,
+              message: `${field} must use context-rule://context_rule_id@vN format.`,
+            }),
+          );
+          return;
+        }
+        validateReferenceTarget({
+          issues,
+          source,
+          field,
+          reference,
+          expected: "existing context-rule://context_rule_id@vN",
+          expectedFamily: "context-rule",
+          expectedSet: registry.contextRuleRefs,
+          registry,
+        });
+      });
+
+      const contextSkillRefs = asStringArray(document.context_skill_refs, {
+        issues,
+        source,
+        field: "context_skill_refs",
+      });
+      contextSkillRefs.forEach((reference, index) => {
+        checkedReferences += 1;
+        const field = `context_skill_refs[${index}]`;
+        if (isExternalReference(reference)) return;
+        if (!isContextSkillRef(reference)) {
+          issues.push(
+            referenceIssue({
+              code: "reference_format_invalid",
+              source,
+              field,
+              reference,
+              expected: "context-skill://context_skill_id@vN",
+              actual: reference,
+              message: `${field} must use context-skill://context_skill_id@vN format.`,
+            }),
+          );
+          return;
+        }
+        validateReferenceTarget({
+          issues,
+          source,
+          field,
+          reference,
+          expected: "existing context-skill://context_skill_id@vN",
+          expectedFamily: "context-skill",
+          expectedSet: registry.contextSkillRefs,
+          registry,
+        });
+      });
+    }
+
+    if (result.family === "compiled-context-artifact") {
+      checkedReferences += 1;
+      const promptBundleField = "prompt_bundle_ref";
+      const promptBundleRef = asReferenceString(document.prompt_bundle_ref, { issues, source, field: promptBundleField });
+      if (promptBundleRef && !isExternalReference(promptBundleRef)) {
+        if (!isPromptBundleRef(promptBundleRef)) {
+          issues.push(
+            referenceIssue({
+              code: "reference_format_invalid",
+              source,
+              field: promptBundleField,
+              reference: promptBundleRef,
+              expected: "prompt-bundle://prompt_bundle_id@vN",
+              actual: promptBundleRef,
               message: "prompt_bundle_ref must use prompt-bundle://prompt_bundle_id@vN format.",
             }),
           );
@@ -1249,34 +1571,60 @@ export function validateExampleReferences(options = {}) {
           validateReferenceTarget({
             issues,
             source,
-            field,
-            reference,
+            field: promptBundleField,
+            reference: promptBundleRef,
             expected: "existing prompt-bundle://prompt_bundle_id@vN",
             expectedFamily: "prompt-bundle",
             expectedSet: registry.promptBundleRefs,
             registry,
           });
-
-          const wrapperStepClass = typeof document.step_class === "string" ? document.step_class : null;
-          const promptBundle = registry.promptBundlesByRef.get(reference);
-          if (wrapperStepClass && promptBundle?.stepClass) {
-            checkedCompatibility += 1;
-            if (promptBundle.stepClass !== wrapperStepClass) {
-              issues.push(
-                referenceIssue({
-                  code: "reference_target_incompatible",
-                  source,
-                  field,
-                  reference,
-                  expected: `prompt bundle step_class '${wrapperStepClass}'`,
-                  actual: promptBundle.stepClass,
-                  message: `Wrapper step_class '${wrapperStepClass}' is incompatible with prompt bundle '${reference}' step_class '${promptBundle.stepClass}'.`,
-                }),
-              );
-            }
-          }
         }
       }
+
+      validatePrefixedReferenceArray({
+        issues,
+        source,
+        field: "context_bundle_refs",
+        values: document.context_bundle_refs,
+        expectedFormat: "context-bundle://context_bundle_id@vN",
+        isExpectedRef: isContextBundleRef,
+        expectedFamily: "context-bundle",
+        expectedSet: registry.contextBundleRefs,
+        registry,
+      });
+      validatePrefixedReferenceArray({
+        issues,
+        source,
+        field: "context_doc_refs",
+        values: document.context_doc_refs,
+        expectedFormat: "context-doc://context_doc_id@vN",
+        isExpectedRef: isContextDocRef,
+        expectedFamily: "context-doc",
+        expectedSet: registry.contextDocRefs,
+        registry,
+      });
+      validatePrefixedReferenceArray({
+        issues,
+        source,
+        field: "context_rule_refs",
+        values: document.context_rule_refs,
+        expectedFormat: "context-rule://context_rule_id@vN",
+        isExpectedRef: isContextRuleRef,
+        expectedFamily: "context-rule",
+        expectedSet: registry.contextRuleRefs,
+        registry,
+      });
+      validatePrefixedReferenceArray({
+        issues,
+        source,
+        field: "context_skill_refs",
+        values: document.context_skill_refs,
+        expectedFormat: "context-skill://context_skill_id@vN",
+        isExpectedRef: isContextSkillRef,
+        expectedFamily: "context-skill",
+        expectedSet: registry.contextSkillRefs,
+        registry,
+      });
     }
 
     if (result.family === "evaluation-suite") {
@@ -1656,6 +2004,38 @@ function isPromptBundleRef(value) {
  * @param {string} value
  * @returns {boolean}
  */
+function isContextDocRef(value) {
+  return /^context-doc:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isContextRuleRef(value) {
+  return /^context-rule:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isContextSkillRef(value) {
+  return /^context-skill:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isContextBundleRef(value) {
+  return /^context-bundle:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
 function isDatasetRef(value) {
   return /^dataset:\/\/[A-Za-z0-9._-]+@[^@\s]+$/.test(value);
 }
@@ -1714,6 +2094,77 @@ function asStringArray(value, { issues, source, field }) {
 }
 
 /**
+ * @param {Record<string, unknown>} document
+ * @returns {string[]}
+ */
+function extractAppliesToSteps(document) {
+  if (!isPlainObject(document.applies_to) || !Array.isArray(document.applies_to.steps)) {
+    return [];
+  }
+
+  return document.applies_to.steps.filter((value) => typeof value === "string");
+}
+
+/**
+ * @param {{
+ *   issues: import("./index.d.ts").ReferenceValidationIssue[],
+ *   source: string,
+ *   field: string,
+ *   values: unknown,
+ *   expectedFormat: string,
+ *   isExpectedRef: (value: string) => boolean,
+ *   expectedFamily: import("./index.d.ts").ContractFamily,
+ *   expectedSet: Set<string>,
+ *   registry: { knownReferenceFamilies: Map<string, Set<import("./index.d.ts").ContractFamily>> }
+ * }} options
+ */
+function validatePrefixedReferenceArray({
+  issues,
+  source,
+  field,
+  values,
+  expectedFormat,
+  isExpectedRef,
+  expectedFamily,
+  expectedSet,
+  registry,
+}) {
+  const references = asStringArray(values, { issues, source, field });
+  references.forEach((reference, index) => {
+    const indexedField = `${field}[${index}]`;
+    if (isExternalReference(reference)) {
+      return;
+    }
+
+    if (!isExpectedRef(reference)) {
+      issues.push(
+        referenceIssue({
+          code: "reference_format_invalid",
+          source,
+          field: indexedField,
+          reference,
+          expected: expectedFormat,
+          actual: reference,
+          message: `${indexedField} must use ${expectedFormat} format.`,
+        }),
+      );
+      return;
+    }
+
+    validateReferenceTarget({
+      issues,
+      source,
+      field: indexedField,
+      reference,
+      expected: `existing ${expectedFormat}`,
+      expectedFamily,
+      expectedSet,
+      registry,
+    });
+  });
+}
+
+/**
  * @param {Record<string, unknown>} routeProfile
  * @returns {Array<{ field: string, adapterId: string }>}
  */
@@ -1758,11 +2209,16 @@ function extractRouteAdapterRefs(routeProfile) {
  *   datasetRefs: Set<string>,
  *   liveE2eProfileRefs: Set<string>,
  *   promptBundleRefs: Set<string>,
+ *   contextDocRefs: Set<string>,
+ *   contextRuleRefs: Set<string>,
+ *   contextSkillRefs: Set<string>,
+ *   contextBundleRefs: Set<string>,
  *   adapterIds: Set<string>,
- *   routeProfilesById: Map<string, { source: string, step: string | null, adapters: Array<{ field: string, adapterId: string }> }>,
+ *   routeProfilesById: Map<string, { source: string, step: string | null, routeClass: string | null, adapters: Array<{ field: string, adapterId: string }> }>,
  *   wrapperProfilesByRef: Map<string, { source: string, stepClass: string | null }>,
  *   policyProfilesById: Map<string, { source: string, stepClass: string | null }>,
  *   promptBundlesByRef: Map<string, { source: string, stepClass: string | null }>,
+ *   contextBundlesByRef: Map<string, { source: string, appliesToSteps: Set<string> }>,
  *   datasetsByRef: Map<string, { source: string, subjectType: string | null }>,
  *   adapterProfilesById: Map<string, { source: string, capabilities: Set<string> }>,
  *   knownReferenceFamilies: Map<string, Set<import("./index.d.ts").ContractFamily>>,
@@ -1776,8 +2232,12 @@ function buildReferenceRegistry(results, workspaceRoot) {
   const datasetRefs = new Set();
   const liveE2eProfileRefs = new Set();
   const promptBundleRefs = new Set();
+  const contextDocRefs = new Set();
+  const contextRuleRefs = new Set();
+  const contextSkillRefs = new Set();
+  const contextBundleRefs = new Set();
   const adapterIds = new Set();
-  /** @type {Map<string, { source: string, step: string | null, adapters: Array<{ field: string, adapterId: string }> }>} */
+  /** @type {Map<string, { source: string, step: string | null, routeClass: string | null, adapters: Array<{ field: string, adapterId: string }> }>} */
   const routeProfilesById = new Map();
   /** @type {Map<string, { source: string, stepClass: string | null }>} */
   const wrapperProfilesByRef = new Map();
@@ -1785,6 +2245,8 @@ function buildReferenceRegistry(results, workspaceRoot) {
   const policyProfilesById = new Map();
   /** @type {Map<string, { source: string, stepClass: string | null }>} */
   const promptBundlesByRef = new Map();
+  /** @type {Map<string, { source: string, appliesToSteps: Set<string> }>} */
+  const contextBundlesByRef = new Map();
   /** @type {Map<string, { source: string, subjectType: string | null }>} */
   const datasetsByRef = new Map();
   /** @type {Map<string, { source: string, capabilities: Set<string> }>} */
@@ -1807,6 +2269,7 @@ function buildReferenceRegistry(results, workspaceRoot) {
           routeProfilesById.set(routeId, {
             source: result.source,
             step: typeof document.step === "string" ? document.step : null,
+            routeClass: typeof document.route_class === "string" ? document.route_class : null,
             adapters: extractRouteAdapterRefs(document),
           });
         }
@@ -1886,6 +2349,62 @@ function buildReferenceRegistry(results, workspaceRoot) {
         }
         break;
       }
+      case "context-doc": {
+        const contextDocId = document.context_doc_id;
+        const version = document.version;
+        if (typeof contextDocId === "string" && typeof version === "number") {
+          const contextDocRef = `context-doc://${contextDocId}@v${version}`;
+          contextDocRefs.add(contextDocRef);
+          registerKnownReference(knownReferenceFamilies, contextDocRef, "context-doc");
+        }
+        break;
+      }
+      case "context-rule": {
+        const contextRuleId = document.context_rule_id;
+        const version = document.version;
+        if (typeof contextRuleId === "string" && typeof version === "number") {
+          const contextRuleRef = `context-rule://${contextRuleId}@v${version}`;
+          contextRuleRefs.add(contextRuleRef);
+          registerKnownReference(knownReferenceFamilies, contextRuleRef, "context-rule");
+        }
+        break;
+      }
+      case "context-skill": {
+        const contextSkillId = document.context_skill_id;
+        const version = document.version;
+        if (typeof contextSkillId === "string" && typeof version === "number") {
+          const contextSkillRef = `context-skill://${contextSkillId}@v${version}`;
+          contextSkillRefs.add(contextSkillRef);
+          registerKnownReference(knownReferenceFamilies, contextSkillRef, "context-skill");
+        }
+        break;
+      }
+      case "context-bundle": {
+        const contextBundleId = document.context_bundle_id;
+        const version = document.version;
+        if (typeof contextBundleId === "string" && typeof version === "number") {
+          const contextBundleRef = `context-bundle://${contextBundleId}@v${version}`;
+          contextBundleRefs.add(contextBundleRef);
+          registerKnownReference(knownReferenceFamilies, contextBundleRef, "context-bundle");
+          contextBundlesByRef.set(contextBundleRef, {
+            source: result.source,
+            appliesToSteps: new Set(extractAppliesToSteps(document)),
+          });
+        }
+        break;
+      }
+      case "compiled-context-artifact": {
+        const compiledContextId = document.compiled_context_id;
+        const version = document.version;
+        if (typeof compiledContextId === "string" && typeof version === "number") {
+          registerKnownReference(
+            knownReferenceFamilies,
+            `compiled-context://${compiledContextId}@v${version}`,
+            "compiled-context-artifact",
+          );
+        }
+        break;
+      }
       case "adapter-capability-profile": {
         const adapterId = document.adapter_id;
         if (typeof adapterId === "string") {
@@ -1921,11 +2440,16 @@ function buildReferenceRegistry(results, workspaceRoot) {
     datasetRefs,
     liveE2eProfileRefs,
     promptBundleRefs,
+    contextDocRefs,
+    contextRuleRefs,
+    contextSkillRefs,
+    contextBundleRefs,
     adapterIds,
     routeProfilesById,
     wrapperProfilesByRef,
     policyProfilesById,
     promptBundlesByRef,
+    contextBundlesByRef,
     datasetsByRef,
     adapterProfilesById,
     knownReferenceFamilies,

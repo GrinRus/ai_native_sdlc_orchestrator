@@ -1,0 +1,24 @@
+context_bundle_id: context.bundle.repair.foundation
+version: 1
+title: Repair workflow foundation
+metadata:
+  owner: ai-platform
+  lifecycle: draft
+  tags:
+    - repair
+    - foundation
+applies_to:
+  steps:
+    - repair
+context_doc_refs:
+  - context-doc://context.doc.repo-map.core@v1
+context_rule_refs:
+  - context-rule://context.rule.public-repo-safety@v1
+context_skill_refs:
+  - context-skill://context.skill.runner-verification.default@v1
+source_refs:
+  - docs/architecture/15-platform-assets-and-prompt-lifecycle.md
+selection_policy:
+  rules: always-on
+  docs: pull-when-relevant
+  skills: predicate-selected

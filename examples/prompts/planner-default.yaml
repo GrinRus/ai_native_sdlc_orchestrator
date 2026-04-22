@@ -22,9 +22,7 @@ required_inputs:
       - project-analysis-report
       - previous-wave
   files:
-    recommended:
-      - README.md
-      - AGENTS.md
+    recommended: []
 output_contract_hints:
   format: structured-markdown
   required_sections:

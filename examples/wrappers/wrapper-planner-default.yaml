@@ -1,15 +1,6 @@
 wrapper_id: wrapper.planner.default
 version: 1
 step_class: planner
-prompt_bundle_ref: prompt-bundle://planner-default@v1
-session_bootstrap:
-  include_files:
-    - README.md
-    - AGENTS.md
-  include_packets:
-    - discovery
-    - research
-    - spec
 tool_policy:
   allow_repo_write: false
   allow_shell: false

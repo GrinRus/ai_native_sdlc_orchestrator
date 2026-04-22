@@ -30,6 +30,9 @@ const requiredFiles = [
   "scripts/test/slice-cycle.test.mjs",
   "docs/backlog/wave-0-implementation-slices.md",
   "docs/backlog/wave-5-implementation-slices.md",
+  "docs/backlog/wave-6-implementation-slices.md",
+  "docs/backlog/wave-7-implementation-slices.md",
+  "docs/backlog/wave-8-implementation-slices.md",
 ];
 
 const missing = requiredFiles.filter((file) => !exists(file));

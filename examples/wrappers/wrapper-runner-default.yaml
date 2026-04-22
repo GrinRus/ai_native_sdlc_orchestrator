@@ -1,14 +1,6 @@
 wrapper_id: wrapper.runner.default
 version: 3
 step_class: runner
-prompt_bundle_ref: prompt-bundle://runner-default@v3
-session_bootstrap:
-  include_files:
-    - README.md
-    - AGENTS.md
-  include_packets:
-    - handoff
-    - spec
 tool_policy:
   allow_repo_write: true
   allow_shell: true

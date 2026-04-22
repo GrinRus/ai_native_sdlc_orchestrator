@@ -9,7 +9,7 @@ AOR is not trying to replace every coding agent. It is the coordination layer ar
 The product owns:
 - project bootstrap and machine-usable context;
 - packet lifecycle and approval boundaries;
-- route, wrapper, prompt, and policy resolution;
+- route, wrapper, prompt, context, and policy resolution;
 - execution, review, QA, delivery, and release orchestration;
 - validation, eval, harness, and certification;
 - incident learning and promotion decisions.
@@ -31,7 +31,9 @@ The runners own:
 ## Core product objects
 - **Project profile** — persistent configuration of repos, routes, policies, budgets, and write-back rules.
 - **Project analysis report** — materialized bootstrap knowledge about the target repository.
+- **Runtime context assets** — versioned docs, rules, skills, and bundles used to assemble step-specific context.
 - **Packets** — durable artifacts that carry intent and decisions across the lifecycle.
+- **Compiled context artifact** — the resolved prompt/context payload and provenance for one routed step.
 - **Step results** — normalized outputs of execution and non-execution steps.
 - **Quality evidence** — validation reports, evaluation reports, harness traces, logs, diffs, and screenshots.
 - **Delivery manifest** — the durable link between execution and actual delivery output.
@@ -72,14 +74,16 @@ AOR must work with:
 
 Runner integration is handled through adapters and capability profiles, not by hard-coding provider behavior into core workflows.
 
-## Prompt and wrapper evolution
-AOR treats prompt bundles, wrappers, routes, policies, and adapters as platform assets.
+## Prompt and runtime-context evolution
+AOR treats prompt bundles, runtime context assets, wrappers, routes, policies, adapters, and compiler revisions as platform assets.
 
 That means:
 - they can change independently;
 - they can be evaluated independently;
 - they can be promoted or frozen independently;
 - they can be traced back to incidents and regressions.
+
+Repository contributor guidance such as `AGENTS.md` and `.agents/**` stays outside that runtime asset graph. Those files are for developing AOR itself, not for runtime context injection.
 
 ## Monolith and multirepo support
 AOR must work for:
@@ -111,4 +115,4 @@ AOR v1 is successful when the repo can demonstrate that:
 - a routed runner can execute bounded work;
 - validation, eval, and harness are part of the default flow;
 - delivery output is materialized as a manifest;
-- platform asset changes can be certified on real repositories.
+- platform and runtime-context asset changes can be certified on real repositories.

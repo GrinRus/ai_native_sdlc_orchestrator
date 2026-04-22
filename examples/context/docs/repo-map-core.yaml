@@ -1,0 +1,31 @@
+context_doc_id: context.doc.repo-map.core
+version: 1
+title: Core repository map and execution boundaries
+metadata:
+  owner: ai-platform
+  lifecycle: draft
+  tags:
+    - repo-map
+    - runtime-context
+source:
+  kind: internal-markdown
+  ref: docs/architecture/12-orchestrator-operating-model.md
+applies_to:
+  steps:
+    - discovery
+    - research
+    - spec
+    - planning
+    - implement
+    - review
+    - qa
+    - repair
+    - eval
+    - harness
+  route_classes:
+    - artifact
+    - planner
+    - runner
+    - repair
+    - eval
+    - harness

@@ -70,5 +70,35 @@ This is the master index for the implementation slices across all defined waves.
 | W5-S05 | Standard live E2E orchestration runner | EPIC-7 | done | `apps/cli`, `apps/api`, `docs/ops/**`, `examples/live-e2e/**` | W5-S03, W4-S06, W3-S06 |
 | W5-S06 | Scorecards, incident capture, and learning-loop handoff | EPIC-7 | done | `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/backlog/**` | W5-S05, W3-S05 |
 
+## W6 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W6-S01 | Backlog and runtime-context terminology rebaseline | EPIC-0 | done | `docs/backlog/**`, `docs/product/**`, `docs/architecture/**`, `examples/project-analysis-report.sample.yaml` | W5-S06 |
+| W6-S02 | Context asset contracts and registry foundation | EPIC-1 | done | `docs/contracts/**`, `packages/contracts`, `packages/orchestrator-core`, `examples/context/**` | W6-S01 |
+| W6-S03 | Prompt/context compiler kernel | EPIC-3 | ready | `packages/context-engine`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**` | W6-S02 |
+| W6-S04 | Routed execution integration for compiled context | EPIC-3 | blocked | `packages/orchestrator-core`, `packages/adapter-sdk`, `packages/harness`, `docs/contracts/**` | W6-S02, W6-S03 |
+| W6-S05 | All-step-class compiled-context flow integration | EPIC-3 | blocked | `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/contracts/**`, `docs/architecture/**` | W6-S04 |
+| W6-S06 | Legacy purge and fixture migration | EPIC-0 | blocked | `packages/orchestrator-core`, `packages/contracts`, `packages/harness`, `examples/**`, `docs/contracts/**` | W6-S04, W6-S05 |
+
+## W7 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W7-S01 | Validation and compatibility graph for context assets | EPIC-4 | blocked | `packages/contracts`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/context/**` | W6-S04, W6-S06 |
+| W7-S02 | Eval and harness coverage for context candidates | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**` | W7-S01, W6-S05 |
+| W7-S03 | Promotion, freeze, and demotion lifecycle for context assets | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `apps/cli` | W7-S01, W7-S02 |
+| W7-S04 | Incident recertification and drift governance | EPIC-7 | blocked | `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `docs/ops/**` | W7-S03, W6-S06 |
+| W7-S05 | Live E2E context-lineage integration closure | EPIC-7 | blocked | `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`, `docs/backlog/**` | W7-S02, W7-S03, W7-S04 |
+
+## W8 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W8-S01 | Strategic operator visibility on compiled context | EPIC-6 | blocked | `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W7-S05 |
+| W8-S02 | Discovery, spec, and bootstrap maturity on runtime context assets | EPIC-1 | blocked | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**` | W6-S05, W7-S05 |
+| W8-S03 | Delivery and security context governance maturity | EPIC-3 | blocked | `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W6-S04, W7-S03, W7-S05 |
+| W8-S04 | Event and history visibility for compiled context | EPIC-6 | blocked | `apps/api`, `apps/web`, `apps/cli`, `packages/observability`, `docs/ops/**` | W6-S04, W7-S05 |
+| W8-S05 | Baseline comparison maturity for compiler and context revisions | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**` | W7-S02, W7-S05 |
+| W8-S06 | Incident and platform recertification maturity with full lineage | EPIC-7 | blocked | `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W7-S03, W7-S04, W7-S05 |
+| W8-S07 | Multi-repo and rerun maturity on compiled-context scope | EPIC-5 | blocked | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**` | W6-S05, W8-S03, W8-S04, W8-S06 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

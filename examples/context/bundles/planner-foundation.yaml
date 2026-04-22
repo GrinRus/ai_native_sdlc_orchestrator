@@ -1,0 +1,23 @@
+context_bundle_id: context.bundle.planner.foundation
+version: 1
+title: Planner workflow foundation
+metadata:
+  owner: ai-platform
+  lifecycle: draft
+  tags:
+    - planner
+    - foundation
+applies_to:
+  steps:
+    - planning
+context_doc_refs:
+  - context-doc://context.doc.repo-map.core@v1
+context_rule_refs:
+  - context-rule://context.rule.public-repo-safety@v1
+context_skill_refs: []
+source_refs:
+  - docs/architecture/15-platform-assets-and-prompt-lifecycle.md
+selection_policy:
+  rules: always-on
+  docs: pull-when-relevant
+  skills: disabled

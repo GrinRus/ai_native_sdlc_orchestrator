@@ -27,6 +27,14 @@ allowed_adapters:
   - claude-code
   - open-code
   - mock-runner
+registry_roots:
+  routes: examples/routes
+  wrappers: examples/wrappers
+  prompts: examples/prompts
+  context_docs: examples/context/docs
+  context_rules: examples/context/rules
+  context_skills: examples/context/skills
+  context_bundles: examples/context/bundles
 default_route_profiles:
   discovery: route.discovery.default
   research: route.research.default
@@ -52,6 +60,38 @@ default_wrapper_profiles:
   repair: wrapper.repair.default@v1
   eval: wrapper.eval.default@v1
   harness: wrapper.harness.default@v1
+default_prompt_bundles:
+  discovery: prompt-bundle://artifact-default@v1
+  research: prompt-bundle://artifact-default@v1
+  spec: prompt-bundle://artifact-default@v1
+  planning: prompt-bundle://planner-default@v1
+  implement: prompt-bundle://runner-default@v3
+  review: prompt-bundle://runner-default@v3
+  qa: prompt-bundle://runner-default@v3
+  repair: prompt-bundle://repair-default@v1
+  eval: prompt-bundle://eval-default@v1
+  harness: prompt-bundle://harness-default@v1
+default_context_bundles:
+  discovery:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  research:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  spec:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  planning:
+    - context-bundle://context.bundle.planner.foundation@v1
+  implement:
+    - context-bundle://context.bundle.runner.foundation@v1
+  review:
+    - context-bundle://context.bundle.runner.foundation@v1
+  qa:
+    - context-bundle://context.bundle.runner.foundation@v1
+  repair:
+    - context-bundle://context.bundle.repair.foundation@v1
+  eval:
+    - context-bundle://context.bundle.eval.foundation@v1
+  harness:
+    - context-bundle://context.bundle.harness.foundation@v1
 budget_policy:
   default_cost_limit_usd: 75
   default_timeout_sec: 5400

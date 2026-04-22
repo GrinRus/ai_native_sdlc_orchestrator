@@ -35,7 +35,7 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Track wave status, quality gates, and delivery risk.
 
 ### Discovery / research
-- Build discovery packets from repository content, docs, AGENTS guidance, and external research.
+- Build discovery packets from repository content, project analysis, AOR-owned runtime context assets, and external research.
 - Separate discovery from delivery.
 - Validate discovery completeness before planning.
 - Produce ADR-ready research output with evidence.
@@ -44,7 +44,7 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Define non-functional requirements, repo scope, risk tiers, and allowed commands.
 - Inspect the chosen route, wrapper, policy, and runner for each step.
 - Separate deterministic validation from rubric-based evaluation.
-- Define certification and freeze paths for platform assets.
+- Define certification and freeze paths for platform assets, runtime context assets, and compiler revisions.
 
 ### Engineering manager / planner
 - Convert approved scope into wave tickets and handoff packets.
@@ -56,7 +56,7 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Execute approved work through runner-agnostic routes.
 - Support Codex CLI, Claude Code, OpenCode, and mock adapters.
 - Run self-review, QA, retry, and repair inside the same orchestration model.
-- Inspect diffs, logs, tool traces, validation reports, and delivery artifacts.
+- Inspect diffs, logs, tool traces, compiled prompt/context lineage, validation reports, and delivery artifacts.
 
 ### Reviewer / QA
 - Review structured review packets with risk notes and evidence.
@@ -65,14 +65,14 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Manage flaky cases and escalation paths.
 
 ### AI platform owner
-- Manage prompt bundles, wrappers, routes, policies, and adapters as platform assets.
+- Manage prompt bundles, context docs/rules/skills/bundles, wrappers, routes, policies, adapters, and compiler revisions as platform assets.
 - Run certification before promotion.
 - Compare new candidates against stable baselines.
 - Freeze or demote problematic platform assets.
 
 ### Operator / SRE
 - Watch live run state in CLI or web.
-- Tail logs, view live events, and inspect policy decisions.
+- Tail logs, view live events, and inspect policy plus compile decisions.
 - Approve risky actions and replay failures through harness.
 - Run standard live E2E profiles on real repositories.
 
@@ -91,13 +91,13 @@ This document groups the AOR user-story surface into role clusters. The current 
 ### Incident / improvement owner
 - Open incident reports from failed releases or production feedback.
 - Backfill incidents into datasets and suites.
-- See which routes, wrappers, or adapters correlate with incidents.
+- See which routes, prompt/context assets, wrappers, adapters, or compiler revisions correlate with incidents.
 - Force recertification before re-enabling a problematic route.
 
 ### Project bootstrap / onboarding
 - Run `project analyze`, `project validate`, and `project verify`.
-- Materialize project-analysis reports with commands, service boundaries, and risk zones.
-- Generate repository guidance recommendations such as local AGENTS files and skills.
+- Materialize project-analysis reports with commands, service boundaries, risk zones, and runtime-context readiness.
+- Recommend missing AOR-native runtime context assets and project-profile coverage.
 - Block execution if prerequisites are missing.
 
 ### Delivery transaction / Git / PR flow
@@ -107,7 +107,7 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Rerun from a packet boundary or a failed step.
 
 ### Finance / audit / hygiene
-- Track cost and latency by route, wrapper, adapter, and project.
+- Track cost and latency by route, prompt/context bundle, compiler revision, adapter, and project.
 - Preserve durable evidence for reviews and audits.
 - Distinguish production monitoring from offline certification.
 - Keep platform hygiene visible through promotion, freeze, and regression signals.
