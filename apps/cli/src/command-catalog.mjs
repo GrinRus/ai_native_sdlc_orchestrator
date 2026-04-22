@@ -541,6 +541,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "resolved_project_ref",
       "resolved_runtime_root",
       "run_summaries",
+      "strategic_snapshot",
       "follow_mode",
       "stream_protocol",
       "stream_backpressure",

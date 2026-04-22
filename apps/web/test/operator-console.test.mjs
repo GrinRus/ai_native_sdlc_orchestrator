@@ -98,6 +98,9 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.ok(snapshot.packet_artifacts.length >= 1);
     assert.ok(snapshot.run_detail.step_results.length >= 1);
     assert.ok(snapshot.quality_artifacts.length >= 1);
+    assert.equal(typeof snapshot.strategic_snapshot, "object");
+    assert.ok(Array.isArray(snapshot.strategic_snapshot.wave_snapshot.waves));
+    assert.equal(typeof snapshot.strategic_snapshot.risk_snapshot.level_totals.high, "number");
     assert.equal(
       snapshot.api_ui_contract_alignment.live_stream,
       "GET /api/projects/:projectId/runs/:runId/events",
@@ -111,6 +114,8 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.match(html, /AOR Operator Console/);
     assert.match(html, new RegExp(runId));
     assert.match(html, /Run detail evidence links/);
+    assert.match(html, /Strategic Snapshot/);
+    assert.match(html, /High-risk runs/);
   });
 });
 

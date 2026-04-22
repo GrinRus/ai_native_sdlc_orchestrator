@@ -1076,6 +1076,9 @@ test("operator commands inspect runs, packets, and evidence through shared contr
       runStatusPayload.replay_events.map((event) => event.event_type),
       ["run.started", "step.updated"],
     );
+    assert.equal(typeof runStatusPayload.strategic_snapshot, "object");
+    assert.ok(Array.isArray(runStatusPayload.strategic_snapshot.wave_snapshot.waves));
+    assert.equal(typeof runStatusPayload.strategic_snapshot.risk_snapshot.level_totals.high, "number");
     assert.equal(runStatusPayload.read_only, true);
     assert.ok(runStatusPayload.future_control_hooks.includes("run pause"));
 

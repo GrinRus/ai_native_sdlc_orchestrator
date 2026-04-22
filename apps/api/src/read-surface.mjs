@@ -16,6 +16,7 @@ const VALIDATION_REPORT_REGEX = /^validation-report.*\.json$/;
 const EVALUATION_REPORT_REGEX = /^evaluation-report.*\.json$/;
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
 const RUN_CONTROL_STATE_REGEX = /^run-control-state-.*\.json$/;
+const MASTER_BACKLOG_FILE = path.join("docs", "backlog", "mvp-implementation-backlog.md");
 
 /**
  * @param {string} value
@@ -281,6 +282,105 @@ function normalizeRunRef(runRef) {
 }
 
 /**
+ * @param {string} markdown
+ * @returns {Array<{ slice_id: string, wave_id: string, state: "ready" | "blocked" | "active" | "done" }>}
+ */
+function parseBacklogRows(markdown) {
+  const linePattern = /^\|\s*(W\d+-S\d+)\s*\|(?:[^|]*\|){2}\s*(ready|blocked|active|done)\s*\|/i;
+  /** @type {Array<{ slice_id: string, wave_id: string, state: "ready" | "blocked" | "active" | "done" }>} */
+  const rows = [];
+
+  for (const rawLine of markdown.split(/\r?\n/)) {
+    const match = rawLine.match(linePattern);
+    if (!match) {
+      continue;
+    }
+    const sliceId = match[1];
+    rows.push({
+      slice_id: sliceId,
+      wave_id: sliceId.split("-")[0],
+      state: /** @type {"ready" | "blocked" | "active" | "done"} */ (match[2].toLowerCase()),
+    });
+  }
+
+  return rows;
+}
+
+/**
+ * @param {Array<{ wave_id: string, state: "ready" | "blocked" | "active" | "done" }>} rows
+ */
+function summarizeWaveProgress(rows) {
+  /** @type {Map<string, { total: number, done: number, ready: number, blocked: number, active: number }>} */
+  const waveMap = new Map();
+
+  for (const row of rows) {
+    if (!waveMap.has(row.wave_id)) {
+      waveMap.set(row.wave_id, {
+        total: 0,
+        done: 0,
+        ready: 0,
+        blocked: 0,
+        active: 0,
+      });
+    }
+    const wave = /** @type {{ total: number, done: number, ready: number, blocked: number, active: number }} */ (
+      waveMap.get(row.wave_id)
+    );
+    wave.total += 1;
+    wave[row.state] += 1;
+  }
+
+  return [...waveMap.entries()]
+    .sort((left, right) => Number.parseInt(left[0].slice(1), 10) - Number.parseInt(right[0].slice(1), 10))
+    .map(([waveId, summary]) => ({
+      wave_id: waveId,
+      total_slices: summary.total,
+      done_slices: summary.done,
+      ready_slices: summary.ready,
+      blocked_slices: summary.blocked,
+      active_slices: summary.active,
+      completion_ratio: summary.total > 0 ? Math.round((summary.done / summary.total) * 1000) / 1000 : 0,
+    }));
+}
+
+/**
+ * @param {{
+ *   run_id: string,
+ *   packet_refs: string[],
+ *   quality_refs: string[],
+ *   finance_evidence: { baseline_pass_rate: number | null, candidate_pass_rate: number | null },
+ * }} run
+ */
+function classifyRunRisk(run) {
+  const hasIncident = run.quality_refs.some((ref) => ref.includes("incident-report"));
+  const baseline = run.finance_evidence.baseline_pass_rate;
+  const candidate = run.finance_evidence.candidate_pass_rate;
+  const hasRegression = baseline !== null && candidate !== null && candidate < baseline;
+
+  if (hasIncident || hasRegression) {
+    return {
+      level: "high",
+      hasIncident,
+      hasRegression,
+    };
+  }
+
+  if (run.quality_refs.length === 0 || run.packet_refs.length === 0) {
+    return {
+      level: "medium",
+      hasIncident: false,
+      hasRegression: false,
+    };
+  }
+
+  return {
+    level: "low",
+    hasIncident: false,
+    hasRegression: false,
+  };
+}
+
+/**
  * @param {{
  *   cwd?: string,
  *   projectRef?: string,
@@ -491,4 +591,76 @@ export function listRuns(options = {}) {
       candidate_pass_rate: entry.finance_evidence.candidate_pass_rate,
     },
   }));
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ */
+export function readStrategicSnapshot(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const backlogPath = path.join(init.projectRoot, MASTER_BACKLOG_FILE);
+  const backlogRows =
+    fs.existsSync(backlogPath) && fs.statSync(backlogPath).isFile()
+      ? parseBacklogRows(fs.readFileSync(backlogPath, "utf8"))
+      : [];
+  const waveProgress = summarizeWaveProgress(backlogRows);
+  const runs = listRuns(options);
+
+  const highRiskRunIds = [];
+  const mediumRiskRunIds = [];
+  const lowRiskRunIds = [];
+  let incidentLinkedRuns = 0;
+  let regressionRuns = 0;
+
+  for (const run of runs) {
+    const risk = classifyRunRisk(run);
+    if (risk.hasIncident) {
+      incidentLinkedRuns += 1;
+    }
+    if (risk.hasRegression) {
+      regressionRuns += 1;
+    }
+    if (risk.level === "high") {
+      highRiskRunIds.push(run.run_id);
+    } else if (risk.level === "medium") {
+      mediumRiskRunIds.push(run.run_id);
+    } else {
+      lowRiskRunIds.push(run.run_id);
+    }
+  }
+
+  return {
+    generated_at: new Date().toISOString(),
+    wave_snapshot: {
+      source_backlog_ref: MASTER_BACKLOG_FILE,
+      total_slices: backlogRows.length,
+      state_totals: {
+        done: backlogRows.filter((row) => row.state === "done").length,
+        ready: backlogRows.filter((row) => row.state === "ready").length,
+        blocked: backlogRows.filter((row) => row.state === "blocked").length,
+        active: backlogRows.filter((row) => row.state === "active").length,
+      },
+      waves: waveProgress,
+    },
+    risk_snapshot: {
+      run_count: runs.length,
+      level_totals: {
+        high: highRiskRunIds.length,
+        medium: mediumRiskRunIds.length,
+        low: lowRiskRunIds.length,
+      },
+      high_risk_run_ids: highRiskRunIds,
+      medium_risk_run_ids: mediumRiskRunIds,
+      low_risk_run_ids: lowRiskRunIds,
+      signal_totals: {
+        incident_linked_runs: incidentLinkedRuns,
+        regression_runs: regressionRuns,
+      },
+    },
+  };
 }

@@ -17,6 +17,7 @@ import {
   listPromotionDecisions,
   listQualityArtifacts,
   listRuns,
+  readStrategicSnapshot,
   listStepResults,
   readProjectState,
 } from "../src/read-surface.mjs";
@@ -483,6 +484,72 @@ test("listRuns aggregates finance evidence across multiple run profiles", () => 
     });
     assert.equal(beta.finance_evidence.baseline_pass_rate, 0.95);
     assert.equal(beta.finance_evidence.candidate_pass_rate, 0.95);
+  });
+});
+
+test("readStrategicSnapshot reports wave progress from backlog state", () => {
+  const snapshot = readStrategicSnapshot({ projectRef: workspaceRoot, cwd: workspaceRoot });
+
+  assert.equal(typeof snapshot.generated_at, "string");
+  assert.equal(snapshot.wave_snapshot.source_backlog_ref, "docs/backlog/mvp-implementation-backlog.md");
+  assert.ok(snapshot.wave_snapshot.total_slices > 0);
+  assert.ok(Array.isArray(snapshot.wave_snapshot.waves));
+  assert.ok(snapshot.wave_snapshot.waves.some((wave) => wave.wave_id === "W8"));
+  assert.equal(typeof snapshot.risk_snapshot.level_totals.high, "number");
+});
+
+test("readStrategicSnapshot keeps risk reporting available when backlog file is missing", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const runId = "run.strategic.risk.v1";
+
+    writeContractFile({
+      family: "incident-report",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "incident-report-strategic.json"),
+      document: {
+        incident_id: `${init.projectId}.incident.strategic`,
+        project_id: init.projectId,
+        severity: "high",
+        summary: "Strategic snapshot risk fixture",
+        linked_run_refs: [`run://${runId}`],
+        linked_asset_refs: [init.stateFile],
+        status: "open",
+      },
+    });
+
+    writeContractFile({
+      family: "promotion-decision",
+      filePath: path.join(init.runtimeLayout.artifactsRoot, "promotion-decision-strategic.json"),
+      document: {
+        decision_id: `${init.projectId}.promotion.strategic`,
+        subject_ref: "wrapper://wrapper.eval.default@v1",
+        run_id: runId,
+        linked_run_refs: [`run://${runId}`],
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [init.stateFile],
+        evidence_summary: {
+          baseline_comparison: {
+            baseline_pass_rate: 0.95,
+            candidate_pass_rate: 0.8,
+          },
+          finance_signals: {
+            capture_latency_sec: 0.2,
+            replay_latency_sec: 0.2,
+          },
+        },
+        status: "fail",
+      },
+    });
+
+    const snapshot = readStrategicSnapshot({ projectRef: repoRoot, cwd: repoRoot });
+    assert.equal(snapshot.wave_snapshot.total_slices, 0);
+    assert.equal(snapshot.wave_snapshot.waves.length, 0);
+    assert.equal(snapshot.risk_snapshot.run_count, 1);
+    assert.equal(snapshot.risk_snapshot.level_totals.high, 1);
+    assert.equal(snapshot.risk_snapshot.signal_totals.incident_linked_runs, 1);
+    assert.equal(snapshot.risk_snapshot.signal_totals.regression_runs, 1);
+    assert.deepEqual(snapshot.risk_snapshot.high_risk_run_ids, [runId]);
   });
 });
 

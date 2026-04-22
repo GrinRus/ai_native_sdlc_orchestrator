@@ -23,7 +23,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S01 — Sponsor and planner strategic visibility expansion
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Add strategic run and risk visibility surfaces for sponsor/manager later-stage planning stories.
 - **Primary modules:** `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**`
 - **Hard dependencies:** W7-S05
@@ -54,7 +54,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S02 — Later discovery and architecture maturity pack
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Close later discovery and architecture stories with stronger completeness and architecture-traceability checks.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**`
 - **Hard dependencies:** W6-S02, W7-S05
@@ -85,7 +85,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S03 — Later delivery and security route-governance maturity
 - **Epic:** EPIC-3 Routed execution
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Add later-stage route/policy governance required for delivery and security maturity stories.
 - **Primary modules:** `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**`
 - **Hard dependencies:** W6-S03, W7-S05, W8-S08
@@ -116,7 +116,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S04 — Later operator event and policy visibility expansion
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Expand operator event and policy-inspection surfaces for later SRE maturity stories.
 - **Primary modules:** `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**`
 - **Hard dependencies:** W6-S03, W7-S05, W8-S08
@@ -178,7 +178,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S06 — Later incident and platform recertification maturity
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Close later incident and AI platform recertification stories with integrated evidence and decision controls.
 - **Primary modules:** `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W7-S03, W7-S04, W7-S05

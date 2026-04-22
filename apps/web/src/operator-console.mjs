@@ -6,6 +6,7 @@ import {
   listRuns,
   listStepResults,
   openRunEventStream,
+  readStrategicSnapshot,
   readUiLifecycleState,
   readProjectState,
 } from "../../api/src/index.mjs";
@@ -75,6 +76,7 @@ export function buildOperatorConsoleSnapshot(options) {
   const qualityArtifacts = listQualityArtifacts(options);
   const deliveryManifests = listDeliveryManifests(options);
   const promotionDecisions = listPromotionDecisions(options);
+  const strategicSnapshot = readStrategicSnapshot(options);
   const selectedRunId = selectRunId(runs, options.runId);
 
   return {
@@ -88,6 +90,7 @@ export function buildOperatorConsoleSnapshot(options) {
     quality_artifacts: qualityArtifacts,
     delivery_manifests: deliveryManifests,
     promotion_decisions: promotionDecisions,
+    strategic_snapshot: strategicSnapshot,
     run_detail: {
       packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
       step_results: filterArtifactsByRunId(stepResults, selectedRunId),
@@ -179,6 +182,14 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
       <p>UI lifecycle: <code>${escapeHtml(String(snapshot.ui_lifecycle.connection_state ?? "detached"))}</code></p>
       <p>Stream protocol: <code>${escapeHtml(options.streamProtocol ?? "disabled")}</code></p>
       <p>Live events in session: <code>${String(options.liveEventCount ?? 0)}</code></p>
+    </section>
+    <section class="panel">
+      <h2>Strategic Snapshot</h2>
+      <p>Backlog slices tracked: <code>${String(snapshot.strategic_snapshot.wave_snapshot.total_slices)}</code></p>
+      <p>Ready slices: <code>${String(snapshot.strategic_snapshot.wave_snapshot.state_totals.ready)}</code></p>
+      <p>Blocked slices: <code>${String(snapshot.strategic_snapshot.wave_snapshot.state_totals.blocked)}</code></p>
+      <p>High-risk runs: <code>${String(snapshot.strategic_snapshot.risk_snapshot.level_totals.high)}</code></p>
+      <p>Medium-risk runs: <code>${String(snapshot.strategic_snapshot.risk_snapshot.level_totals.medium)}</code></p>
     </section>
     <section class="panel">
       <h2>Run list</h2>

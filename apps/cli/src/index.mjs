@@ -11,6 +11,7 @@ import {
   listQualityArtifacts,
   listRuns,
   listStepResults,
+  readStrategicSnapshot,
   openRunEventStream,
   readUiLifecycleState,
   readProjectState,
@@ -764,6 +765,7 @@ function executeImplementedCommand(command, flags, cwd) {
   let certificationHarnessCaptureFile = null;
   let certificationHarnessReplayFile = null;
   let runSummaries = null;
+  let strategicSnapshot = null;
   let followMode = null;
   let streamProtocol = null;
   let streamBackpressure = null;
@@ -1225,6 +1227,11 @@ function executeImplementedCommand(command, flags, cwd) {
       projectRef: /** @type {string} */ (flags["project-ref"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     }).filter((summary) => !runId || summary.run_id === runId);
+    strategicSnapshot = readStrategicSnapshot({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
 
     followMode = {
       enabled: follow,
@@ -2140,6 +2147,7 @@ function executeImplementedCommand(command, flags, cwd) {
     run_audit_records: runAuditRecords,
     audit_evidence_refs: auditEvidenceRefs,
     run_summaries: runSummaries,
+    strategic_snapshot: strategicSnapshot,
     follow_mode: followMode,
     stream_protocol: streamProtocol,
     stream_backpressure: streamBackpressure,
