@@ -14,6 +14,10 @@ This catalog separates bootstrap commands implemented in the current shell from 
 | `aor harness certify` | implemented | `--project-ref <path>`; `--project-profile <path>` (optional); `--runtime-root <path>` (optional); `--asset-ref <asset://target>`; `--subject-ref <subject_type://target>`; `--suite-ref <suite_id@vN>` (optional); `--step-class <step_class>` (optional); `--from-channel <channel>` (optional); `--to-channel <channel>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `promotion_decision_id`, `promotion_decision_file`, `promotion_decision_status`, `certification_evaluation_report_file`, `certification_harness_capture_file`, `certification_harness_replay_file`, `contract_families`, `command_catalog_alignment` | `promotion-decision` |
 | `aor handoff prepare` | implemented | `--project-ref <path>`; `--project-profile <path>` (optional); `--runtime-root <path>` (optional); `--ticket-id <id>` (optional); `--approved-artifact <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `wave_ticket_id`, `wave_ticket_file`, `handoff_packet_id`, `handoff_packet_file`, `handoff_status`, `handoff_approval_state`, `contract_families`, `command_catalog_alignment` | `wave-ticket`, `handoff-packet` |
 | `aor handoff approve` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--handoff-packet <path>` (optional); `--approval-ref <ref>` | `resolved_project_ref`, `resolved_runtime_root`, `handoff_packet_id`, `handoff_packet_file`, `handoff_status`, `handoff_approval_state`, `contract_families`, `command_catalog_alignment` | `handoff-packet` |
+| `aor intake create` | implemented | `--project-ref <path>`; `--project-profile <path>` (optional); `--runtime-root <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `project_profile_ref`, `runtime_layout`, `runtime_state_file`, `artifact_packet_id`, `artifact_packet_file`, `contract_families`, `command_catalog_alignment` | `artifact-packet` |
+| `aor discovery run` | implemented | `--project-ref <path>`; `--project-profile <path>` (optional); `--runtime-root <path>` (optional); `--route-overrides <step=route_id,...>` (optional); `--policy-overrides <step=policy_id,...>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `analysis_report_id`, `analysis_report_file`, `route_resolution_file`, `route_resolution_steps`, `asset_resolution_file`, `asset_resolution_steps`, `policy_resolution_file`, `policy_resolution_steps`, `evaluation_registry_file`, `evaluation_registry_suites`, `evaluation_registry_datasets`, `contract_families`, `command_catalog_alignment` | `project-analysis-report` |
+| `aor spec build` | implemented | `--project-ref <path>`; `--project-profile <path>` (optional); `--runtime-root <path>` (optional); `--route-overrides <step=route_id,...>` (optional); `--policy-overrides <step=policy_id,...>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `routed_step_result_id`, `routed_step_result_file`, `step_result_files`, `contract_families`, `command_catalog_alignment` | `step-result` |
+| `aor wave create` | implemented | `--project-ref <path>`; `--project-profile <path>` (optional); `--runtime-root <path>` (optional); `--ticket-id <id>` (optional); `--approved-artifact <path>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `wave_ticket_id`, `wave_ticket_file`, `handoff_packet_id`, `handoff_packet_file`, `handoff_status`, `handoff_approval_state`, `contract_families`, `command_catalog_alignment` | `wave-ticket`, `handoff-packet` |
 | `aor run status` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--follow <true\|false>` (optional); `--after-event-id <event_id>` (optional); `--max-replay <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `run_summaries`, `follow_mode`, `stream_protocol`, `stream_backpressure`, `replay_events`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event`, `step-result`, `delivery-manifest`, `release-packet`, `promotion-decision` |
 | `aor packet show` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--family <contract_family\|all>` (optional); `--limit <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `packet_artifacts`, `selected_family`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `artifact-packet`, `wave-ticket`, `handoff-packet`, `delivery-plan`, `delivery-manifest`, `release-packet` |
 | `aor evidence show` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `step_results`, `quality_artifacts`, `delivery_manifests`, `promotion_decisions`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `step-result`, `validation-report`, `evaluation-report`, `incident-report`, `promotion-decision`, `delivery-manifest`, `release-packet` |
@@ -25,11 +29,6 @@ This catalog separates bootstrap commands implemented in the current shell from 
 
 ## Planned command contracts
 The following commands remain planned and are intentionally not implemented in the bootstrap shell yet.
-
-- `aor intake create`
-- `aor discovery run`
-- `aor spec build`
-- `aor wave create`
 
 - `aor run start`
 - `aor run pause`
@@ -64,3 +63,9 @@ The following commands remain planned and are intentionally not implemented in t
 - `aor live-e2e status` is observe-first and supports bounded abort (`--abort=true`) for non-terminal runs.
 - `aor live-e2e report` is read-only and returns durable run summary plus per-target scorecards.
 - Learning-loop artifacts (`learning-loop-scorecard-*`, `learning-loop-handoff-*`, optional `incident-report-*`) are materialized under runtime reports for backlog and quality handoff.
+
+## Story traceability for W6-S02
+- `aor intake create` supports sponsor/owner intake start from approved repository context and produces durable bootstrap intake artifacts.
+- `aor discovery run` supports discovery/research outcomes by materializing analysis, route, asset, and policy evidence.
+- `aor spec build` supports discovery-to-planning closure with a durable `step-result` artifact for the `spec` step.
+- `aor wave create` supports planner outcomes by materializing `wave-ticket` and `handoff-packet` artifacts for bounded execution handoff.

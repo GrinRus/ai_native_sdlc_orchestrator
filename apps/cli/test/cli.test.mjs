@@ -120,6 +120,93 @@ test("planned commands report not implemented status", () => {
   assert.match(result.stderr, /Command 'aor run start' is planned and not implemented yet\./);
 });
 
+test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify({ name: "fixture", scripts: { lint: "eslint .", test: "node --test", build: "tsc -b" } }, null, 2),
+      "utf8",
+    );
+    fs.writeFileSync(path.join(projectRoot, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\\n", "utf8");
+
+    const intakeResult = invokeCli(["intake", "create", "--project-ref", projectRoot]);
+    assert.equal(intakeResult.exitCode, 0, intakeResult.stderr);
+    const intakePayload = JSON.parse(intakeResult.stdout);
+    assert.equal(intakePayload.command, "intake create");
+    assert.equal(fs.existsSync(intakePayload.artifact_packet_file), true);
+
+    const discoveryResult = invokeCli(["discovery", "run", "--project-ref", projectRoot]);
+    assert.equal(discoveryResult.exitCode, 0, discoveryResult.stderr);
+    const discoveryPayload = JSON.parse(discoveryResult.stdout);
+    assert.equal(discoveryPayload.command, "discovery run");
+    assert.equal(fs.existsSync(discoveryPayload.analysis_report_file), true);
+    assert.equal(fs.existsSync(discoveryPayload.route_resolution_file), true);
+
+    const specResult = invokeCli(["spec", "build", "--project-ref", projectRoot]);
+    assert.equal(specResult.exitCode, 0, specResult.stderr);
+    const specPayload = JSON.parse(specResult.stdout);
+    assert.equal(specPayload.command, "spec build");
+    assert.equal(typeof specPayload.routed_step_result_id, "string");
+    assert.equal(fs.existsSync(specPayload.routed_step_result_file), true);
+    const specStepResult = JSON.parse(fs.readFileSync(specPayload.routed_step_result_file, "utf8"));
+    assert.equal(specStepResult.step_class, "artifact");
+
+    const waveResult = invokeCli(["wave", "create", "--project-ref", projectRoot]);
+    assert.equal(waveResult.exitCode, 0, waveResult.stderr);
+    const wavePayload = JSON.parse(waveResult.stdout);
+    assert.equal(wavePayload.command, "wave create");
+    assert.equal(fs.existsSync(wavePayload.wave_ticket_file), true);
+    assert.equal(fs.existsSync(wavePayload.handoff_packet_file), true);
+    assert.equal(wavePayload.handoff_status, "pending-approval");
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "intake-discovery-spec-wave-transcript.json"), "utf8"),
+    );
+    const transcriptSubset = {
+      intake_create: {
+        command: intakePayload.command,
+        status: intakePayload.status,
+        artifact_packet_id: intakePayload.artifact_packet_id,
+      },
+      discovery_run: {
+        command: discoveryPayload.command,
+        status: discoveryPayload.status,
+        analysis_report_id: discoveryPayload.analysis_report_id,
+      },
+      spec_build: {
+        command: specPayload.command,
+        status: specPayload.status,
+        routed_step_result_id: specPayload.routed_step_result_id,
+      },
+      wave_create: {
+        command: wavePayload.command,
+        status: wavePayload.status,
+        wave_ticket_id: wavePayload.wave_ticket_id,
+        handoff_status: wavePayload.handoff_status,
+      },
+    };
+    assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("W6 intake/discovery/spec/wave commands require --project-ref", () => {
+  const commands = [
+    ["intake", "create"],
+    ["discovery", "run"],
+    ["spec", "build"],
+    ["wave", "create"],
+  ];
+
+  for (const [group, verb] of commands) {
+    const result = invokeCli([group, verb]);
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /Missing required flag '--project-ref'/);
+  }
+});
+
 test("operator commands inspect runs, packets, and evidence through shared control-plane surfaces", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });

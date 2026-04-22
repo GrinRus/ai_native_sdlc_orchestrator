@@ -115,6 +115,11 @@ function formatCommandHelp(definition) {
       ? "Status: implemented in quality shell (W3-S03)"
       : definition.command === "harness certify"
         ? "Status: implemented in quality shell (W3-S05)"
+        : definition.command === "intake create" ||
+            definition.command === "discovery run" ||
+            definition.command === "spec build" ||
+            definition.command === "wave create"
+          ? "Status: implemented in intake and planning shell (W6-S02)"
         : definition.command === "run status" ||
             definition.command === "packet show" ||
             definition.command === "evidence show"
@@ -183,10 +188,34 @@ function formatCommandHelp(definition) {
             "- --handoff-packet is optional and defaults to bootstrap handoff packet path.",
             "- Approval sets handoff status to approved for downstream execution validation gates.",
           ]
-        : definition.command === "run status"
+        : definition.command === "intake create"
           ? [
-              "- This command is read-only. It does not mutate run state.",
-              "- --follow=true requires --run-id and reuses the shared live-run event stream protocol.",
+              "- --project-ref must point to an existing directory.",
+              "- Intake create initializes runtime layout and writes the bootstrap artifact-packet.",
+              `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+            ]
+          : definition.command === "discovery run"
+            ? [
+                "- --project-ref must point to an existing directory.",
+                "- Discovery run materializes project-analysis plus route/asset/policy/eval registry reports.",
+                "- --route-overrides and --policy-overrides accept comma-separated step overrides.",
+              ]
+            : definition.command === "spec build"
+              ? [
+                  "- --project-ref must point to an existing directory.",
+                  "- Spec build runs routed dry-run step execution for step_class 'spec'.",
+                  "- Output includes a durable step-result artifact under runtime reports.",
+                ]
+              : definition.command === "wave create"
+                ? [
+                    "- --project-ref must point to an existing directory.",
+                    "- Wave create writes wave-ticket and pending handoff-packet artifacts.",
+                    "- Use 'aor handoff approve' to promote approval_state before execution-style flows.",
+                  ]
+          : definition.command === "run status"
+            ? [
+                "- This command is read-only. It does not mutate run state.",
+                "- --follow=true requires --run-id and reuses the shared live-run event stream protocol.",
               "- Future control hooks remain planned: run pause, run resume, run steer, run cancel.",
             ]
           : definition.command === "packet show"
@@ -599,6 +628,22 @@ function executeImplementedCommand(command, flags, cwd) {
     projectProfileRef = initResult.projectProfileRef;
     artifactPacketId = initResult.artifactPacketId;
     artifactPacketFile = initResult.artifactPacketFile;
+  } else if (command === "intake create") {
+    ensureRequiredFlags(command, flags);
+    const intakeResult = initializeProjectRuntime({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+
+    resolvedProjectRef = intakeResult.projectRoot;
+    resolvedRuntimeRoot = intakeResult.runtimeRoot;
+    runtimeLayout = intakeResult.runtimeLayout;
+    runtimeStateFile = intakeResult.stateFile;
+    projectProfileRef = intakeResult.projectProfileRef;
+    artifactPacketId = intakeResult.artifactPacketId;
+    artifactPacketFile = intakeResult.artifactPacketFile;
   } else if (command === "project analyze") {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
@@ -629,6 +674,36 @@ function executeImplementedCommand(command, flags, cwd) {
     evaluationRegistryFile = analyzeResult.evaluationRegistryPath;
     evaluationRegistrySuites = analyzeResult.evaluationRegistry.suites;
     evaluationRegistryDatasets = analyzeResult.evaluationRegistry.datasets;
+  } else if (command === "discovery run") {
+    ensureRequiredFlags(command, flags);
+    const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
+    const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
+
+    const discoveryResult = analyzeProjectRuntime({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      routeOverrides,
+      policyOverrides,
+    });
+
+    resolvedProjectRef = discoveryResult.projectRoot;
+    resolvedRuntimeRoot = discoveryResult.runtimeRoot;
+    runtimeLayout = discoveryResult.runtimeLayout;
+    runtimeStateFile = discoveryResult.stateFile;
+    projectProfileRef = discoveryResult.projectProfileRef;
+    analysisReportId = discoveryResult.report.report_id;
+    analysisReportFile = discoveryResult.reportPath;
+    routeResolutionFile = discoveryResult.routeResolutionPath;
+    routeResolutionSteps = discoveryResult.routeResolutionMatrix;
+    assetResolutionFile = discoveryResult.assetResolutionPath;
+    assetResolutionSteps = discoveryResult.assetResolutionMatrix;
+    policyResolutionFile = discoveryResult.policyResolutionPath;
+    policyResolutionSteps = discoveryResult.policyResolutionMatrix;
+    evaluationRegistryFile = discoveryResult.evaluationRegistryPath;
+    evaluationRegistrySuites = discoveryResult.evaluationRegistry.suites;
+    evaluationRegistryDatasets = discoveryResult.evaluationRegistry.datasets;
   } else if (command === "project validate") {
     ensureRequiredFlags(command, flags);
     handoffGateEnforced = resolveOptionalBooleanFlag(
@@ -697,6 +772,30 @@ function executeImplementedCommand(command, flags, cwd) {
       routedStepResultFile = routedResult.stepResultPath;
       verifyStepResultFiles = [...verifyResult.stepResultFiles, routedResult.stepResultPath];
     }
+  } else if (command === "spec build") {
+    ensureRequiredFlags(command, flags);
+    const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
+    const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
+
+    const specResult = executeRoutedStep({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      stepClass: "spec",
+      dryRun: true,
+      routeOverrides,
+      policyOverrides,
+    });
+
+    resolvedProjectRef = specResult.projectRoot;
+    resolvedRuntimeRoot = specResult.runtimeRoot;
+    runtimeLayout = specResult.runtimeLayout;
+    runtimeStateFile = specResult.stateFile;
+    projectProfileRef = specResult.projectProfileRef;
+    routedStepResultId = specResult.stepResultId;
+    routedStepResultFile = specResult.stepResultPath;
+    verifyStepResultFiles = [specResult.stepResultPath];
   } else if (command === "eval run") {
     ensureRequiredFlags(command, flags);
 
@@ -773,6 +872,29 @@ function executeImplementedCommand(command, flags, cwd) {
     handoffPacketFile = prepareResult.handoffPacketFile;
     handoffStatus = prepareResult.handoffPacket.status;
     handoffApprovalState = prepareResult.handoffPacket.approval_state;
+  } else if (command === "wave create") {
+    ensureRequiredFlags(command, flags);
+
+    const waveResult = prepareHandoffArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      ticketId: resolveOptionalStringFlag("ticket-id", flags["ticket-id"]),
+      approvedArtifactPath: resolveOptionalStringFlag("approved-artifact", flags["approved-artifact"]),
+    });
+
+    resolvedProjectRef = waveResult.projectRoot;
+    resolvedRuntimeRoot = waveResult.runtimeRoot;
+    runtimeLayout = waveResult.runtimeLayout;
+    runtimeStateFile = waveResult.stateFile;
+    projectProfileRef = waveResult.projectProfileRef;
+    waveTicketId = waveResult.waveTicket.ticket_id;
+    waveTicketFile = waveResult.waveTicketFile;
+    handoffPacketId = waveResult.handoffPacket.packet_id;
+    handoffPacketFile = waveResult.handoffPacketFile;
+    handoffStatus = waveResult.handoffPacket.status;
+    handoffApprovalState = waveResult.handoffPacket.approval_state;
   } else if (command === "handoff approve") {
     ensureRequiredFlags(command, flags);
     const approvalRef = resolveOptionalStringFlag("approval-ref", flags["approval-ref"]);

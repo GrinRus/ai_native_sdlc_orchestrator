@@ -9,6 +9,10 @@ Implemented commands:
   - aor harness certify
   - aor handoff prepare
   - aor handoff approve
+  - aor intake create
+  - aor discovery run
+  - aor spec build
+  - aor wave create
   - aor run status
   - aor packet show
   - aor evidence show
@@ -17,10 +21,6 @@ Implemented commands:
   - aor live-e2e report
 
 Planned commands (not implemented yet):
-  - aor intake create
-  - aor discovery run
-  - aor spec build
-  - aor wave create
   - aor run start
   - aor run pause
   - aor run resume

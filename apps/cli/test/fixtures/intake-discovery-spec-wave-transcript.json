@@ -1,0 +1,23 @@
+{
+  "intake_create": {
+    "command": "intake create",
+    "status": "implemented",
+    "artifact_packet_id": "aor-core.artifact.bootstrap.v1"
+  },
+  "discovery_run": {
+    "command": "discovery run",
+    "status": "implemented",
+    "analysis_report_id": "aor-core.analysis.v1"
+  },
+  "spec_build": {
+    "command": "spec build",
+    "status": "implemented",
+    "routed_step_result_id": "aor-core.routed-execution.v1.step.spec"
+  },
+  "wave_create": {
+    "command": "wave create",
+    "status": "implemented",
+    "wave_ticket_id": "aor-core.wave.bootstrap.v1",
+    "handoff_status": "pending-approval"
+  }
+}

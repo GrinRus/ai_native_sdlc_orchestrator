@@ -50,7 +50,7 @@ Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, 
 
 ## W6-S02 — Intake/discovery/spec/wave command pack
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Implement `aor intake create`, `aor discovery run`, `aor spec build`, and `aor wave create` as durable command-surface flows.
 - **Primary modules:** `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**`
 - **Hard dependencies:** W6-S01
@@ -81,7 +81,7 @@ Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, 
 
 ## W6-S03 — Run-control command pack with policy and audit guardrails
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Implement `aor run start`, `pause`, `resume`, `steer`, and `cancel` with explicit policy gating and audit traces.
 - **Primary modules:** `apps/cli`, `apps/api`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`
 - **Hard dependencies:** W6-S01, W5-S03
