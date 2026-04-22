@@ -11,11 +11,18 @@ Materialized bootstrap output describing the target repository: topology, comman
 - `repo_facts`
 - `toolchain_facts`
 - `command_catalog`
+- `route_resolution`
+- `asset_resolution`
+- `policy_resolution`
 - `verification_plan`
 - `status`
 
 ## Notes
 The analysis report should be repeatable and durable. It feeds validate/verify, live E2E preflight, and onboarding guidance recommendations.
+`route_resolution` must expose deterministic default-route and override application for every supported step class.
+`asset_resolution` must expose the wrapper and prompt-bundle provenance attached to each resolved route.
+`policy_resolution` must expose deterministic policy merge precedence and resolved bounds before any adapter invocation.
+`evaluation_registry` should expose discoverable suite and dataset refs so eval/certification flows can resolve assets by ID without ad hoc file lookups.
 
 ## Example
 See `examples/project-analysis-report.sample.yaml`.

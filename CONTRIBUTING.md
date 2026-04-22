@@ -26,6 +26,8 @@ Read these in order:
 
 If the change is implementation work, find the owning slice first. Do not start by writing broad code without a slice boundary.
 
+For live E2E dependency requirements, use `docs/ops/live-e2e-dependency-matrix.md` as the source of truth.
+
 ## Development workflow
 
 1. Fork the repository and create a topic branch.
@@ -41,6 +43,41 @@ If the change is implementation work, find the owning slice first. Do not start 
    pnpm build
    ```
 7. Open a focused pull request with the evidence needed to review the slice.
+
+## Continuous slice loop
+
+Use the slice helper commands to keep one-slice-at-a-time delivery explicit:
+
+```bash
+pnpm slice:status
+pnpm slice:next -- --json
+pnpm slice:plan -- W0-S04
+pnpm slice:sync-ready -- --apply
+pnpm slice:gate
+pnpm slice:complete -- W0-S04 --apply
+```
+
+Notes:
+
+- `slice:sync-ready` recalculates `ready` and `blocked` from hard dependencies.
+- `slice:complete` updates both the master backlog and the owning wave doc state.
+- `slice:gate` runs the mandatory pre-commit gate (`lint`, `test`, `build`, `check`).
+
+## CI acceptance gates
+
+The repository uses a single workflow: `.github/workflows/ci.yml`.
+
+It runs on:
+- pull requests;
+- pushes to `main`;
+- manual `workflow_dispatch`.
+
+What it proves today:
+- `pnpm lint` validates guidance coverage and required repo files;
+- `pnpm test` validates backlog consistency, contracts loading, reference integrity, and slice-cycle behavior;
+- `pnpm build` validates scaffold integrity and workflow/community-file conventions.
+
+If CI fails, the failing step maps directly to one of these root checks so the remediation path stays explicit.
 
 ## Repo-specific rules
 

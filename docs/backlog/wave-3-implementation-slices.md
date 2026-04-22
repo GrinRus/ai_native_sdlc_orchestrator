@@ -19,7 +19,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S01 — Validation kernel generalization and asset graph checks
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Expand validation from bootstrap-only checks into a reusable asset-graph validator for the whole control plane.
 - **Primary modules:** `packages/contracts`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/**`
 - **Hard dependencies:** W2-S05, W1-S04
@@ -50,7 +50,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S02 — Dataset and evaluation suite registry
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Turn datasets and suites into governed runtime assets rather than loose examples.
 - **Primary modules:** `packages/contracts`, `packages/orchestrator-core`, `examples/eval/**`
 - **Hard dependencies:** W3-S01
@@ -81,7 +81,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S03 — Eval runner and scorer interface
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Create the first repeatable offline eval runtime for wrappers, prompt bundles, routes, and step behavior.
 - **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli`
 - **Hard dependencies:** W3-S02, W2-S04, W2-S05
@@ -112,7 +112,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S04 — Harness capture and replay runtime
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Make step execution evidence replayable so platform changes can be tested against real traces rather than intuition.
 - **Primary modules:** `packages/harness`, `packages/observability`, `packages/orchestrator-core`
 - **Hard dependencies:** W3-S02, W2-S05
@@ -143,7 +143,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S05 — Certification and promotion decision baseline
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Convert eval and harness output into an explicit certification and promotion gate for platform assets.
 - **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `apps/cli`
 - **Hard dependencies:** W3-S03, W3-S04
@@ -174,7 +174,7 @@ Build the validation, eval, harness, certification, and promotion stack that mak
 
 ## W3-S06 — Quality rehearsal on selected public targets
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Prove that eval, harness, and certification work on real repositories before delivery automation expands.
 - **Primary modules:** `docs/ops/**`, `examples/live-e2e/**`, `packages/harness`, `apps/cli`
 - **Hard dependencies:** W3-S05, W0-S05

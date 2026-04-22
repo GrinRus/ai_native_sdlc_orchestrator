@@ -26,3 +26,26 @@ Routing chooses how a step is executed without hard-coding provider behavior int
 - do not select routes whose required capabilities are missing;
 - never bypass project allowlists;
 - respect frozen or demoted assets.
+
+## Deterministic precedence (W2-S01)
+1. Start from `project-profile.default_route_profiles.<step_class>`.
+2. Apply an explicit step override when provided.
+3. Resolve the final `route_id` from the route registry.
+4. Fail deterministically when the resolved profile is missing or points to a different `step`.
+
+The route-resolution output should include selected source (`project-default` or `step-override`) so CLI/API surfaces can explain why a route was chosen.
+
+## Route-to-policy handoff (W2-S03)
+Route resolution feeds policy resolution directly:
+- `route_class` selects the default policy source in `project-profile.default_step_policies`;
+- `constraints.timeout_sec` and `constraints.max_cost_usd` become route-level defaults for execution bounds;
+- route-level policy references (`retry_policy_ref`, `repair_policy_ref`) require compatible retry/repair fields in the resolved step policy.
+
+If this handoff cannot resolve a complete policy envelope, execution planning must fail before any adapter call.
+
+## Adapter capability negotiation (W2-S04)
+After route resolution selects `primary.adapter`, adapter negotiation checks:
+1. adapter profile exists in `examples/adapters` (or configured adapter registry);
+2. every `required_adapter_capabilities[]` entry in the route is declared as `true` by the selected adapter.
+
+If either check fails, route planning fails deterministically before execution starts.

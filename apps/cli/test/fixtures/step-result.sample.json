@@ -1,0 +1,16 @@
+{
+  "step_result_id": "aor-core.verify.v1.step.1",
+  "run_id": "aor-core.verify.v1",
+  "step_id": "verify.command.1",
+  "step_class": "runner",
+  "status": "passed",
+  "summary": "Verification command 'pnpm lint' passed under owner 'main'.",
+  "evidence_refs": [
+    "<PROJECT_ROOT>/.aor/projects/aor-core/reports/verify-command-1.log"
+  ],
+  "repo_scope": "main",
+  "command": "pnpm lint",
+  "command_owner": "main",
+  "missing_prerequisites": [],
+  "blocked_next_step": null
+}

@@ -28,6 +28,74 @@ command_catalog:
   required_for_smoke_verify:
     - pnpm lint
     - pnpm test -- --runInBand
+route_resolution:
+  routes_root: examples/routes
+  applied_overrides: {}
+  matrix:
+    - step_class: discovery
+      resolved_route_id: route.discovery.default
+      resolution_source:
+        kind: project-default
+        field: default_route_profiles.discovery
+    - step_class: planning
+      resolved_route_id: route.plan.default
+      resolution_source:
+        kind: project-default
+        field: default_route_profiles.planning
+asset_resolution:
+  wrappers_root: examples/wrappers
+  prompts_root: examples/prompts
+  matrix:
+    - step_class: planning
+      route:
+        resolved_route_id: route.plan.default
+      wrapper:
+        wrapper_ref: wrapper.planner.default@v1
+      prompt_bundle:
+        prompt_bundle_ref: prompt-bundle://planner-default@v1
+policy_resolution:
+  policies_root: examples/policies
+  applied_overrides: {}
+  matrix:
+    - step_class: planning
+      route:
+        resolved_route_id: route.plan.default
+      policy:
+        policy_id: policy.step.planner.default
+      resolved_bounds:
+        budget:
+          max_cost_usd: 4
+          timeout_sec: 300
+        retry:
+          max_attempts: 1
+          on:
+            - provider-timeout
+        command_constraints:
+          allowed_commands:
+            - pnpm lint
+            - pnpm test
+            - pnpm build
+        writeback_mode:
+          mode: pull-request
+evaluation_registry:
+  examples_root: examples
+  dataset_refs:
+    - dataset://run-regression@2026-04-20T08:00:00Z
+  suite_refs:
+    - suite.release.core@v1
+  datasets:
+    - dataset_ref: dataset://run-regression@2026-04-20T08:00:00Z
+      dataset_id: run-regression
+      version: 2026-04-20T08:00:00Z
+      subject_type: run
+      source: examples/eval/dataset-run-regression.yaml
+  suites:
+    - suite_ref: suite.release.core@v1
+      suite_id: suite.release.core
+      version: 1
+      subject_type: run
+      dataset_ref: dataset://run-regression@2026-04-20T08:00:00Z
+      source: examples/eval/suite-release-core.yaml
 service_boundaries:
   - service_id: api
     paths:

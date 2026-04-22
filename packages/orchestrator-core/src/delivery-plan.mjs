@@ -1,0 +1,189 @@
+import fs from "node:fs";
+import path from "node:path";
+
+import { validateContractDocument } from "../../contracts/src/index.mjs";
+
+export const CANONICAL_DELIVERY_MODES = Object.freeze([
+  "no-write",
+  "patch-only",
+  "local-branch",
+  "fork-first-pr",
+]);
+
+const DELIVERY_MODE_ALIASES = Object.freeze({
+  "no-write": "no-write",
+  "read-only": "no-write",
+  patch: "patch-only",
+  "patch-only": "patch-only",
+  "local-branch": "local-branch",
+  branch: "local-branch",
+  "fork-first-pr": "fork-first-pr",
+  "fork-pr": "fork-first-pr",
+  "pull-request": "fork-first-pr",
+});
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function asString(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function asStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
+    : [];
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeForId(value) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/**
+ * @param {string} mode
+ * @returns {string}
+ */
+export function normalizeDeliveryMode(mode) {
+  const normalized = DELIVERY_MODE_ALIASES[mode];
+  if (!normalized) {
+    throw new Error(
+      `Unsupported delivery mode '${mode}'. Expected one of: ${Object.keys(DELIVERY_MODE_ALIASES).sort().join(", ")}.`,
+    );
+  }
+  return normalized;
+}
+
+/**
+ * @param {Record<string, unknown>} policyResolution
+ * @returns {{ resolvedMode: string, resolutionKind: string, resolutionField: string }}
+ */
+function resolveModeSource(policyResolution) {
+  const resolvedBounds = asRecord(policyResolution.resolved_bounds);
+  const writebackMode = asRecord(resolvedBounds.writeback_mode);
+  const resolvedMode = asString(writebackMode.mode);
+  if (!resolvedMode) {
+    throw new Error("Delivery plan requires policy resolution with resolved_bounds.writeback_mode.mode.");
+  }
+
+  const resolutionSource = asRecord(writebackMode.resolution_source);
+  const resolutionKind = asString(resolutionSource.kind) ?? "unknown";
+  const resolutionField = asString(resolutionSource.field) ?? "unknown";
+
+  return {
+    resolvedMode,
+    resolutionKind,
+    resolutionField,
+  };
+}
+
+/**
+ * @param {{
+ *   runtimeLayout: { artifactsRoot: string },
+ *   projectId: string,
+ *   runId: string,
+ *   stepClass: string,
+ *   policyResolution: Record<string, unknown>,
+ *   handoffApproval?: { status?: string, ref?: string | null },
+ *   promotionEvidenceRefs?: string[],
+ * }} options
+ * @returns {{
+ *   deliveryPlan: Record<string, unknown>,
+ *   deliveryPlanFile: string,
+ * }}
+ */
+export function materializeDeliveryPlan(options) {
+  const modeSource = resolveModeSource(asRecord(options.policyResolution));
+  const canonicalMode = normalizeDeliveryMode(modeSource.resolvedMode);
+  const nonReadOnlyMode = canonicalMode !== "no-write";
+
+  const handoffStatusRaw = asString(asRecord(options.handoffApproval ?? {}).status);
+  const handoffRef = asString(asRecord(options.handoffApproval ?? {}).ref);
+  const handoffStatus = handoffStatusRaw === "pass" ? "present" : "missing";
+
+  const promotionEvidenceRefs = [...new Set(asStringArray(options.promotionEvidenceRefs ?? []))];
+  const promotionStatus = promotionEvidenceRefs.length > 0 ? "present" : "missing";
+
+  /** @type {string[]} */
+  const blockingReasons = [];
+  if (nonReadOnlyMode && handoffStatus !== "present") {
+    blockingReasons.push("approved-handoff-required");
+  }
+  if (nonReadOnlyMode && promotionStatus !== "present") {
+    blockingReasons.push("promotion-evidence-required");
+  }
+
+  const writebackAllowed = blockingReasons.length === 0;
+  const status = writebackAllowed ? "ready" : "blocked";
+
+  const evidenceRefs = [...new Set([...(handoffRef ? [handoffRef] : []), ...promotionEvidenceRefs])];
+  const planId = `${options.projectId}.delivery-plan.${normalizeForId(options.stepClass)}.${Date.now()}`;
+  const createdAt = new Date().toISOString();
+  const deliveryPlan = {
+    plan_id: planId,
+    project_id: options.projectId,
+    run_id: options.runId,
+    step_class: options.stepClass,
+    delivery_mode: canonicalMode,
+    mode_source: {
+      resolved_mode: modeSource.resolvedMode,
+      canonical_mode: canonicalMode,
+      resolution_kind: modeSource.resolutionKind,
+      resolution_field: modeSource.resolutionField,
+    },
+    preconditions: {
+      approved_handoff: {
+        required: nonReadOnlyMode,
+        status: nonReadOnlyMode ? handoffStatus : "not-required",
+        ref: handoffRef,
+      },
+      promotion_evidence: {
+        required: nonReadOnlyMode,
+        status: nonReadOnlyMode ? promotionStatus : "not-required",
+        refs: promotionEvidenceRefs,
+      },
+    },
+    writeback_allowed: writebackAllowed,
+    blocking_reasons: blockingReasons,
+    status,
+    evidence_refs: evidenceRefs,
+    created_at: createdAt,
+  };
+
+  const validation = validateContractDocument({
+    family: "delivery-plan",
+    document: deliveryPlan,
+    source: "runtime://delivery-plan",
+  });
+  if (!validation.ok) {
+    const issues = validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Generated delivery plan failed contract validation: ${issues}`);
+  }
+
+  const deliveryPlanFile = path.join(
+    options.runtimeLayout.artifactsRoot,
+    `delivery-plan-${normalizeForId(options.stepClass)}-${Date.now()}.json`,
+  );
+  fs.writeFileSync(deliveryPlanFile, `${JSON.stringify(deliveryPlan, null, 2)}\n`, "utf8");
+
+  return {
+    deliveryPlan,
+    deliveryPlanFile,
+  };
+}

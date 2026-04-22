@@ -1,0 +1,28 @@
+[
+  {
+    "family": "artifact-packet",
+    "artifact_ref": "evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.bootstrap.v1.json",
+    "document": {
+      "packet_id": "aor-core.artifact.bootstrap.v1",
+      "status": "ready"
+    }
+  },
+  {
+    "family": "delivery-manifest",
+    "artifact_ref": "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-run.api.read.v1.json",
+    "document": {
+      "manifest_id": "aor-core.delivery-manifest.patch-only.1776798000000",
+      "delivery_mode": "patch-only",
+      "status": "submitted"
+    }
+  },
+  {
+    "family": "release-packet",
+    "artifact_ref": "evidence://.aor/projects/aor-core/artifacts/release-packet-patch-only-run.api.read.v1.json",
+    "document": {
+      "packet_id": "aor-core.release-packet.patch-only.1776798000001",
+      "delivery_manifest_ref": "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-run.api.read.v1.json",
+      "status": "ready-for-close"
+    }
+  }
+]

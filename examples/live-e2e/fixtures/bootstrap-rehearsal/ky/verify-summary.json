@@ -1,0 +1,36 @@
+{
+  "run_id": "ky-target.verify.v1",
+  "status": "failed",
+  "validation_gate_status": "pass",
+  "preflight_safety": {
+    "mode": "no-write",
+    "sequence": [
+      "clone",
+      "inspect",
+      "analyze",
+      "validate",
+      "verify",
+      "stop"
+    ],
+    "writeback_policy": {
+      "allow_direct_write": false
+    },
+    "workspace_mode": "ephemeral",
+    "network_mode": "deny-by-default"
+  },
+  "step_result_refs": [
+    "<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/step-result-1.json",
+    "<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/step-result-2.json",
+    "<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/step-result-3.json"
+  ],
+  "command_owners": [
+    "main"
+  ],
+  "reusable_by": {
+    "bootstrap_rehearsal": true,
+    "quality_rehearsal": true,
+    "delivery_rehearsal": true,
+    "source_runbook": "docs/ops/live-e2e-no-write-preflight.md"
+  },
+  "blocked_next_step": "Inspect failed step-result files and fix missing prerequisites before rerunning verify."
+}

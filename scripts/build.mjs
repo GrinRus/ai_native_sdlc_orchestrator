@@ -25,6 +25,9 @@ const requiredFiles = [
   "scripts/lint.mjs",
   "scripts/test.mjs",
   "scripts/build.mjs",
+  "scripts/slice-cycle.mjs",
+  "scripts/slice-cycle-lib.mjs",
+  "scripts/test/slice-cycle.test.mjs",
   "docs/backlog/wave-0-implementation-slices.md",
   "docs/backlog/wave-5-implementation-slices.md",
 ];

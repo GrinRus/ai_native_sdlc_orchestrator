@@ -1,0 +1,6 @@
+{
+  "mode": "detachable-web-console",
+  "follow_enabled": true,
+  "stream_protocol": "sse",
+  "detached": true
+}

@@ -1,0 +1,21 @@
+{
+  "command": "project verify",
+  "status": "implemented",
+  "resolved_project_ref": "<PROJECT_ROOT>",
+  "resolved_runtime_root": "<PROJECT_ROOT>/.aor",
+  "validation_gate_enforced": true,
+  "validation_gate_status": "pass|warn",
+  "verify_summary_file": "<PROJECT_ROOT>/.aor/projects/aor-core/reports/verify-summary.json",
+  "step_result_files": [
+    "<PROJECT_ROOT>/.aor/projects/aor-core/reports/step-result-1.json"
+  ],
+  "contract_families": [
+    {
+      "family": "step-result",
+      "group": "execution-and-quality",
+      "source_contract": "docs/contracts/step-result.md",
+      "status": "implemented"
+    }
+  ],
+  "command_catalog_alignment": "docs/architecture/14-cli-command-catalog.md"
+}

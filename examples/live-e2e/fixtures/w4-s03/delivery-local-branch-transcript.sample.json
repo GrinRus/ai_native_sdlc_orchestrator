@@ -1,0 +1,59 @@
+{
+  "transcript_id": "aor-core.delivery-transcript.local-branch.1776794900000",
+  "project_id": "aor-core",
+  "run_id": "run.delivery.branch.v1",
+  "step_id": "delivery.apply",
+  "mode": "local-branch",
+  "status": "success",
+  "started_at": "2026-04-21T00:00:00.000Z",
+  "finished_at": "2026-04-21T00:00:02.000Z",
+  "execution_root": "/tmp/aor-w4-s03-sample",
+  "delivery_plan_ref": "runtime://delivery-plan-input",
+  "ownership": {
+    "source_run_id": "run.delivery.branch.v1",
+    "source_step_class": "implement"
+  },
+  "git": {
+    "head_before": {
+      "branch": "main",
+      "commit": "1111111111111111111111111111111111111111"
+    },
+    "head_after": {
+      "branch": "aor/w4-s03-local-branch",
+      "commit": "2222222222222222222222222222222222222222"
+    },
+    "commands": [
+      "git checkout -B aor/w4-s03-local-branch",
+      "git add -A",
+      "git diff --cached --quiet",
+      "git commit -m \"AOR delivery run.delivery.branch.v1\" --no-verify",
+      "git rev-parse HEAD",
+      "git show --name-only --pretty=format: HEAD",
+      "git show --numstat --format= HEAD"
+    ]
+  },
+  "changed_paths": [
+    "examples/project.aor.yaml"
+  ],
+  "diff_stats": {
+    "files": [
+      {
+        "path": "examples/project.aor.yaml",
+        "added": 1,
+        "deleted": 0
+      }
+    ],
+    "totals": {
+      "files": 1,
+      "added": 1,
+      "deleted": 0
+    }
+  },
+  "outputs": {
+    "branch_name": "aor/w4-s03-local-branch",
+    "commit_sha": "2222222222222222222222222222222222222222",
+    "commit_message": "AOR delivery run.delivery.branch.v1"
+  },
+  "error": null,
+  "recovery_steps": null
+}

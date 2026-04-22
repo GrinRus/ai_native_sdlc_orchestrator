@@ -1,0 +1,26 @@
+[
+  {
+    "family": "validation-report",
+    "artifact_ref": "evidence://.aor/projects/aor-core/reports/validation-report-runtime.json",
+    "document": {
+      "report_id": "aor-core.validation.runtime",
+      "status": "pass"
+    }
+  },
+  {
+    "family": "evaluation-report",
+    "artifact_ref": "evidence://.aor/projects/aor-core/reports/evaluation-report-runtime.json",
+    "document": {
+      "report_id": "aor-core.evaluation.runtime",
+      "status": "pass"
+    }
+  },
+  {
+    "family": "promotion-decision",
+    "artifact_ref": "evidence://.aor/projects/aor-core/artifacts/promotion-decision-seed.json",
+    "document": {
+      "decision_id": "aor-core.promotion.seed",
+      "status": "pass"
+    }
+  }
+]

@@ -2,6 +2,8 @@
 
 This catalog defines the public repositories AOR uses for live end-to-end rehearsals.
 
+For canonical setup and verification dependency details per profile, use `docs/ops/live-e2e-dependency-matrix.md`.
+
 ## Safety policy
 - Default to **read-only bootstrap and patch output**.
 - Never push to upstream public repositories by default.
@@ -22,6 +24,15 @@ This catalog defines the public repositories AOR uses for live end-to-end rehear
   - add or adjust one narrow regression test;
   - make the smallest source change needed;
   - stop at patch, local branch, or fork PR draft.
+- Prerequisites:
+  - Node `>=22` and npm available;
+  - network access for clone, npm install, and Playwright browser download.
+- Failure-safe defaults:
+  - keep `write_back_to_remote=false`;
+  - keep delivery mode in `patch-only`.
+- Abort conditions:
+  - checkout or install fails;
+  - `npm test` fails during preflight.
 
 ## Target 2 — `httpie/cli`
 - Shape: medium Python CLI project.
@@ -36,6 +47,15 @@ This catalog defines the public repositories AOR uses for live end-to-end rehear
   - implement a bounded bug fix or UX improvement in one CLI surface;
   - add or update tests;
   - verify with `make test` and `make codestyle`.
+- Prerequisites:
+  - Python, pip, and `make` available;
+  - network access for clone and dependency setup.
+- Failure-safe defaults:
+  - keep `write_back_to_remote=false`;
+  - stop at patch output or fork-local branch only.
+- Abort conditions:
+  - checkout or setup path fails;
+  - `make test` or `make codestyle` fails during preflight.
 
 ## Target 3 — `belgattitude/nextjs-monorepo-example`
 - Shape: public Next.js/Turborepo/Yarn monorepo with apps and packages.
@@ -50,6 +70,16 @@ This catalog defines the public repositories AOR uses for live end-to-end rehear
   - update one shared package and one consuming app;
   - run workspace lint, typecheck, and unit tests;
   - materialize release packet and delivery manifest for a fork or local mirror.
+- Prerequisites:
+  - Node + corepack + yarn available;
+  - network access for clone and workspace install;
+  - shell resources suitable for monorepo checks.
+- Failure-safe defaults:
+  - keep `write_back_to_remote=false`;
+  - keep delivery mode in `fork-first-pr` unless policy explicitly changes.
+- Abort conditions:
+  - checkout or workspace install fails;
+  - `yarn g:lint`, `yarn g:typecheck`, or `yarn g:test-unit` fails.
 
 ## Why these targets
 Together these targets cover:
@@ -58,3 +88,14 @@ Together these targets cover:
 - monorepo release-shaped delivery;
 - more than one language/runtime;
 - both short and long rehearsal budgets.
+
+## Shared no-write preflight baseline
+All targets must reuse the same baseline sequence before execution-style stages:
+1. clone
+2. inspect
+3. analyze
+4. validate
+5. verify
+6. stop or continue only when no-write safety gates pass
+
+See `docs/ops/live-e2e-no-write-preflight.md` for the reusable procedure used by bootstrap, quality, and delivery rehearsals.

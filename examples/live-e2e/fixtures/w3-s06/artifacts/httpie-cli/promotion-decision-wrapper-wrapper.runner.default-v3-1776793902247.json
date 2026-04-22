@@ -1,0 +1,37 @@
+{
+  "decision_id": "aor-core.promotion.wrapper-wrapper.runner.default-v3.1776793902247",
+  "subject_ref": "wrapper://wrapper.runner.default@v3",
+  "from_channel": "candidate",
+  "to_channel": "stable",
+  "evidence_refs": [
+    "/tmp/aor-w3-s06/httpie-cli/.aor/projects/aor-core/reports/evaluation-report-suite.regress.short-v1-1776793902212.json",
+    "/tmp/aor-w3-s06/httpie-cli/.aor/projects/aor-core/reports/harness-capture-aor-core.harness.capture.1776793902212.json",
+    "/tmp/aor-w3-s06/httpie-cli/.aor/projects/aor-core/reports/harness-replay-aor-core.harness.replay.1776793902247.json",
+    "/tmp/aor-w3-s06/httpie-cli/.aor/projects/aor-core/reports/evaluation-report-suite.regress.short-v1-1776793902247.json"
+  ],
+  "evidence_summary": {
+    "asset_ref": "wrapper://wrapper.runner.default@v3",
+    "subject_ref": "run://httpie-main",
+    "suite_ref": "suite.regress.short@v1",
+    "evaluation_report_ref": "/tmp/aor-w3-s06/httpie-cli/.aor/projects/aor-core/reports/evaluation-report-suite.regress.short-v1-1776793902212.json",
+    "harness_capture_ref": "/tmp/aor-w3-s06/httpie-cli/.aor/projects/aor-core/reports/harness-capture-aor-core.harness.capture.1776793902212.json",
+    "harness_replay_ref": "/tmp/aor-w3-s06/httpie-cli/.aor/projects/aor-core/reports/harness-replay-aor-core.harness.replay.1776793902247.json",
+    "replay_evaluation_report_ref": "/tmp/aor-w3-s06/httpie-cli/.aor/projects/aor-core/reports/evaluation-report-suite.regress.short-v1-1776793902247.json",
+    "harness_replay_status": "pass",
+    "evaluation_status": "pass",
+    "evidence_bar": {
+      "required": [
+        "evaluation-report",
+        "harness-capture",
+        "harness-replay"
+      ],
+      "satisfied": [
+        "evaluation-report",
+        "harness-capture",
+        "harness-replay",
+        "replay-evaluation-report"
+      ]
+    }
+  },
+  "status": "pass"
+}

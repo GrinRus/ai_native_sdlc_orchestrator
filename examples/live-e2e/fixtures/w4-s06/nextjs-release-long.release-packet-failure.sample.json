@@ -1,0 +1,37 @@
+{
+  "packet_id": "aor-core.release-packet.fork-first-pr.1776795100002",
+  "project_id": "aor-core",
+  "ticket_id": "WAVE-004",
+  "run_refs": [
+    "live-e2e.release.long.run-002"
+  ],
+  "change_summary": "Delivery mode 'fork-first-pr' produced 2 changed file(s), +12/-3.",
+  "verification_refs": [
+    "evidence://reports/live-e2e.release.long.run-002/project-verify.json",
+    "evidence://reports/live-e2e.release.long.run-002/eval-report.json",
+    "evidence://artifacts/delivery-manifest-fork-first-pr-live-e2e.release.long.run-002.json"
+  ],
+  "delivery_manifest_ref": "evidence://artifacts/delivery-manifest-fork-first-pr-live-e2e.release.long.run-002.json",
+  "evidence_lineage": {
+    "handoff_refs": [
+      "evidence://artifacts/handoff-wave-004.json"
+    ],
+    "promotion_refs": [
+      "evidence://reports/live-e2e.release.long.run-002/promotion-decision.json"
+    ],
+    "execution_refs": [
+      "evidence://artifacts/delivery-plan-implement-1776795100000.json",
+      "evidence://reports/live-e2e.release.long.run-002/delivery-transcript-fork-first-pr.json"
+    ],
+    "delivery_output_refs": [
+      "evidence://artifacts/delivery-manifest-fork-first-pr-live-e2e.release.long.run-002.json",
+      "evidence://artifacts/fork-first-intent-live-e2e.release.long.run-002.json"
+    ]
+  },
+  "status": "blocked",
+  "created_at": "2026-04-21T15:32:11.000Z",
+  "residual_risks": [
+    "Fork owner cannot push refs to fork repository without additional permission grant."
+  ],
+  "rollback_notes": "Keep no-write policy active, fix credentials, then rerun fork-first rehearsal."
+}

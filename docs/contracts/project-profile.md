@@ -22,5 +22,20 @@ Persistent configuration for one target project, including repos, allowed provid
 ## Notes
 Use the project profile as the durable source of truth for execution defaults. Live E2E profiles may override specific target-repo details without replacing the full project profile.
 
+`runtime_defaults.workspace_mode` controls execution isolation:
+- `ephemeral` — run inside the primary checkout;
+- `workspace-clone` — run in an isolated filesystem clone;
+- `worktree` — run in an isolated worktree-style root.
+
+Optional `runtime_defaults.workspace_cleanup` can define `on_success`, `on_abort`, and `on_failure` actions (`delete`, `retain`, or `none`) for isolated roots.
+
+`writeback_policy.default_delivery_mode` should resolve to one of the delivery-plan modes:
+- `no-write`
+- `patch-only`
+- `local-branch`
+- `fork-first-pr`
+
+Legacy aliases (`patch`, `pull-request`) may still appear in older fixtures, but runtime planning normalizes them to canonical delivery-plan modes before write-back policy checks.
+
 ## Example
 See `examples/project.aor.yaml and examples/project.github.aor.yaml`.

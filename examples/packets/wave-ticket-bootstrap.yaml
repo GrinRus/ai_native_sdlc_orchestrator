@@ -1,0 +1,15 @@
+ticket_id: WAVE-BOOTSTRAP-001
+project_id: aor-core
+objective: >
+  Establish the first bounded handoff packet from bootstrap artifacts before execution flows.
+scope:
+  repo_scopes:
+    - main
+  allowed_paths:
+    - docs/**
+    - packages/orchestrator-core/**
+dependencies:
+  - aor-core.artifact.bootstrap.v1
+risk_tier: medium
+status: ready-for-handoff
+approved_input_ref: evidence://bootstrap/artifact-packet/aor-core.artifact.bootstrap.v1

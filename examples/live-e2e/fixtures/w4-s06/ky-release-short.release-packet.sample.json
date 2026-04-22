@@ -1,0 +1,33 @@
+{
+  "packet_id": "aor-core.release-packet.patch-only.1776795000001",
+  "project_id": "aor-core",
+  "ticket_id": "WAVE-004",
+  "run_refs": [
+    "live-e2e.release.short.run-001"
+  ],
+  "change_summary": "Delivery mode 'patch-only' produced 2 changed file(s), +12/-3.",
+  "verification_refs": [
+    "evidence://reports/live-e2e.release.short.run-001/project-verify.json",
+    "evidence://reports/live-e2e.release.short.run-001/eval-report.json",
+    "evidence://artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-001.json"
+  ],
+  "delivery_manifest_ref": "evidence://artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-001.json",
+  "evidence_lineage": {
+    "handoff_refs": [
+      "evidence://artifacts/handoff-wave-004.json"
+    ],
+    "promotion_refs": [
+      "evidence://reports/live-e2e.release.short.run-001/promotion-decision.json"
+    ],
+    "execution_refs": [
+      "evidence://artifacts/delivery-plan-implement-1776795000000.json",
+      "evidence://reports/live-e2e.release.short.run-001/delivery-transcript-patch-only.json"
+    ],
+    "delivery_output_refs": [
+      "evidence://artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-001.json",
+      "evidence://artifacts/delivery-patch-live-e2e.release.short.run-001.patch"
+    ]
+  },
+  "status": "ready-for-close",
+  "created_at": "2026-04-21T15:10:01.000Z"
+}

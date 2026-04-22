@@ -1,0 +1,17 @@
+[
+  {
+    "run_id": "run.api.read.v1",
+    "packet_refs": [
+      "evidence://.aor/projects/aor-core/artifacts/delivery-plan-implement-1776797999999.json",
+      "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-run.api.read.v1.json",
+      "evidence://.aor/projects/aor-core/artifacts/release-packet-patch-only-run.api.read.v1.json"
+    ],
+    "step_result_refs": [
+      "evidence://.aor/projects/aor-core/reports/step-result-routed-implement.json"
+    ],
+    "quality_refs": [
+      "evidence://.aor/projects/aor-core/reports/validation-report-runtime.json",
+      "evidence://.aor/projects/aor-core/reports/evaluation-report-runtime.json"
+    ]
+  }
+]

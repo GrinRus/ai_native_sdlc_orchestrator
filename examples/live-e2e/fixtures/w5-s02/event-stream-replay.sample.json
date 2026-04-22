@@ -1,0 +1,26 @@
+{
+  "protocol": "sse",
+  "run_id": "run.live.stream.v1",
+  "reconnect_after_ms": 1000,
+  "backpressure": {
+    "policy": "bounded-replay-window",
+    "max_replay_events": 200
+  },
+  "after_event_id": "run.live.stream.v1.event.000001",
+  "replay_events": [
+    {
+      "event_id": "run.live.stream.v1.event.000002",
+      "event_type": "step.updated",
+      "payload": {
+        "sequence": 2
+      }
+    },
+    {
+      "event_id": "run.live.stream.v1.event.000003",
+      "event_type": "evidence.linked",
+      "payload": {
+        "sequence": 3
+      }
+    }
+  ]
+}

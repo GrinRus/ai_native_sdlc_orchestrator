@@ -10,6 +10,32 @@ target_repo:
   ref: master
   checkout_strategy: shallow
   write_target: patch-or-fork
+preflight:
+  mode: no-write
+  sequence:
+  - clone
+  - inspect
+  - analyze
+  - validate
+  - verify
+  - stop
+  prerequisites:
+  - python and pip available for local setup
+  - make command available for repository workflow
+  - network access for shallow clone and dependency install
+  repo_shape_notes:
+  - medium Python CLI repository using a make-driven developer workflow
+  failure_safe_defaults:
+  - keep output_policy.write_back_to_remote set to false
+  - stop at patch output or fork-local branch only
+  abort_conditions:
+  - repository clone fails or ref cannot be resolved
+  - make test or make codestyle fails during preflight verification
+  - any command requests upstream write-back
+  reusable_assumptions:
+    bootstrap: repository setup and analysis run with no-write delivery defaults
+    quality: verify stage gates long regression scope before evaluation or harness
+    delivery: delivery rehearsal can reuse patch-or-fork constraints without upstream push
 runtime:
   mode: ephemeral
   runtime_root: .aor
@@ -40,6 +66,8 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+  - "python -m pip install -e \".[dev]\""
   commands:
   - make test
   - make codestyle

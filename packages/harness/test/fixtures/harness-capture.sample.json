@@ -1,0 +1,78 @@
+{
+  "capture_id": "aor-core.harness.capture.sample",
+  "schema_version": 1,
+  "captured_at": "2026-04-21T08:00:00.000Z",
+  "capture_kind": "harness-step-execution",
+  "project_profile_ref": "examples/project.aor.yaml",
+  "subject_ref": "run://sample-candidate",
+  "suite_ref": "suite.release.core@v1",
+  "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z",
+  "source_refs": {
+    "step_result_ref": "runtime://reports/step-result-routed-implement.json",
+    "evaluation_report_ref": "runtime://reports/evaluation-report-suite.release.core-v1.json"
+  },
+  "compatibility": {
+    "step_class": "implement",
+    "route_id": "route.implement.default",
+    "wrapper_ref": "wrapper.runner.default@v3",
+    "prompt_bundle_ref": "prompt-bundle://prompt.runner.default@v2",
+    "policy_id": "policy.step.runner.default",
+    "adapter_id": "codex-cli"
+  },
+  "trace": {
+    "step_input": {
+      "request_id": "sample-request-id"
+    },
+    "selected_assets": {
+      "route_resolution": {
+        "resolved_route_id": "route.implement.default"
+      },
+      "asset_resolution": {
+        "wrapper": {
+          "wrapper_ref": "wrapper.runner.default@v3"
+        }
+      },
+      "policy_resolution": {
+        "policy": {
+          "policy_id": "policy.step.runner.default"
+        }
+      },
+      "adapter_resolution": {
+        "adapter": {
+          "adapter_id": "codex-cli"
+        }
+      }
+    },
+    "tool_activity": [
+      {
+        "tool": "bash",
+        "command": "pnpm test"
+      }
+    ],
+    "normalized_output": {
+      "adapter_id": "mock-runner",
+      "status": "success"
+    }
+  },
+  "scoring_snapshot": {
+    "status": "pass",
+    "scorer_metadata": [
+      {
+        "scorer_id": "deterministic",
+        "scorer_mode": "deterministic"
+      }
+    ],
+    "grader_results": {
+      "deterministic": {
+        "status": "pass"
+      }
+    },
+    "summary_metrics": {
+      "aggregate_pass_rate": 1
+    }
+  },
+  "evidence_refs": [
+    "runtime://reports/step-result-routed-implement.json",
+    "runtime://reports/evaluation-report-suite.release.core-v1.json"
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "report_id": "aor-core.validation.v1",
+  "subject_ref": "examples/project.aor.yaml",
+  "validators": [
+    {
+      "validator_id": "profile-contract",
+      "status": "pass",
+      "summary": "Project profile contract validation passed."
+    },
+    {
+      "validator_id": "profile-default-refs",
+      "status": "pass",
+      "summary": "Project profile default refs are present.",
+      "details": {
+        "default_route_profiles": "object",
+        "default_step_policies": "object",
+        "default_wrapper_profiles": "object"
+      }
+    },
+    {
+      "validator_id": "runtime-defaults",
+      "status": "pass",
+      "summary": "runtime_defaults.runtime_root is configured.",
+      "details": {
+        "runtime_root": ".aor"
+      }
+    },
+    {
+      "validator_id": "writeback-safety",
+      "status": "pass",
+      "summary": "Write-back safety defaults keep direct writes disabled.",
+      "details": {
+        "allow_direct_write": false
+      }
+    },
+    {
+      "validator_id": "analysis-report-presence",
+      "status": "pass",
+      "summary": "project-analysis-report is present and reusable.",
+      "details": {
+        "status": "ready-for-bootstrap"
+      }
+    },
+    {
+      "validator_id": "asset-reference-integrity",
+      "status": "pass",
+      "summary": "Example reference integrity checks passed.",
+      "details": {
+        "checked_references": 88,
+        "issues": []
+      }
+    },
+    {
+      "validator_id": "handoff-approval-gate",
+      "status": "pass",
+      "summary": "Approved handoff packet is present for execution-style flows.",
+      "details": {
+        "handoff_status": "approved",
+        "approval_state": "approved",
+        "approval_refs": [
+          "approval://W2-S06-REHEARSAL"
+        ],
+        "enforced": true,
+        "handoff_packet_file": "<AOR_WORKSPACE>/.aor/w2-s06-rehearsal/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json"
+      }
+    }
+  ],
+  "status": "pass",
+  "evidence_refs": [
+    "<AOR_WORKSPACE>/.aor/w2-s06-rehearsal/projects/aor-core/state/project-init-state.json",
+    "<AOR_WORKSPACE>/.aor/w2-s06-rehearsal/projects/aor-core/reports/project-analysis-report.json",
+    "reference-integrity:88",
+    "<AOR_WORKSPACE>/.aor/w2-s06-rehearsal/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json"
+  ]
+}

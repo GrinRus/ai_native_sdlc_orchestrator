@@ -19,7 +19,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S01 — Workspace and package build baseline
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Replace the echo-only scaffold with an honest root command surface that can host real apps, packages, and repo checks.
 - **Primary modules:** root workspace files, `apps/**`, `packages/**`
 - **Hard dependencies:** none
@@ -50,7 +50,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S02 — Contracts package and schema loader baseline
 - **Epic:** EPIC-0 Repository development system
-- **State:** blocked
+- **State:** done
 - **Outcome:** Make the documented contracts machine-loadable so profiles, packets, reports, and live E2E assets can be validated through one shared path.
 - **Primary modules:** `packages/contracts`, `docs/contracts/**`, `examples/**`
 - **Hard dependencies:** W0-S01
@@ -81,7 +81,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S03 — Example and reference integrity checks
 - **Epic:** EPIC-0 Repository development system
-- **State:** blocked
+- **State:** done
 - **Outcome:** Prevent docs, examples, and contract references from drifting apart before implementation volume increases.
 - **Primary modules:** `packages/contracts`, `examples/**`, root validation scripts
 - **Hard dependencies:** W0-S02
@@ -112,7 +112,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S04 — Agent guidance and backlog workflow baseline
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Make the repo legible to coding agents and humans by default, with a clear backlog operating model and local guidance hierarchy.
 - **Primary modules:** root `AGENTS.md`, `docs/backlog/**`, `.agents/skills/**`
 - **Hard dependencies:** none
@@ -143,7 +143,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S05 — Live E2E profile registry and no-write preflight
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Standardize live rehearsal targets and prove that public-repo runs can be prepared safely before any write-back feature exists.
 - **Primary modules:** `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/orchestrator-core`
 - **Hard dependencies:** W0-S02, W0-S03
@@ -174,7 +174,7 @@ Turn the design package into a contributor-safe and machine-validated repository
 
 ## W0-S06 — Repository CI and acceptance gates
 - **Epic:** EPIC-0 Repository development system
-- **State:** blocked
+- **State:** done
 - **Outcome:** Put repo hygiene, guidance coverage, and backlog integrity under continuous enforcement before implementation velocity increases.
 - **Primary modules:** root CI config, validation scripts, `docs/**`, community health files
 - **Hard dependencies:** W0-S01, W0-S03, W0-S04, W0-S05

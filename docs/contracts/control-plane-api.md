@@ -23,8 +23,54 @@ The API exposes command, query, and live-stream surfaces for AOR.
 - incidents and promotion decisions
 - live E2E reports
 
+## Read endpoints (W5-S01 baseline)
+- `GET /api/projects/:projectId/state` — project runtime state and layout references.
+- `GET /api/projects/:projectId/packets` — packet artifacts (`artifact-packet`, `wave-ticket`, `handoff-packet`, `delivery-plan`, `delivery-manifest`, `release-packet`).
+- `GET /api/projects/:projectId/step-results` — `step-result` artifacts from reports.
+- `GET /api/projects/:projectId/manifests` — delivery-manifest artifacts.
+- `GET /api/projects/:projectId/promotion-decisions` — promotion-decision artifacts.
+- `GET /api/projects/:projectId/quality-artifacts` — validation/evaluation reports, incident reports, and promotion decisions.
+- `GET /api/projects/:projectId/runs` — aggregated run-level view derived from packet, step-result, and quality artifact references.
+
+All read responses must reuse existing contract families and IDs rather than API-only parallel shapes.
+
+## Authentication and permission assumptions
+- Baseline assumption for local/operator rehearsals: trusted local operator context behind workspace access controls.
+- Read endpoints are read-only and must not mutate runtime artifacts.
+- Production deployments should require authenticated identity with project-scoped read permissions before exposing packet or evidence references.
+- Endpoint responses should preserve `evidence://` or runtime-relative refs for audit traceability; do not return secrets or raw credential material.
+
 ## Streaming
 The API should provide SSE-first live events so CLI and web can observe active work without owning workflow state.
+
+## Streaming endpoint (W5-S02 baseline)
+- `GET /api/projects/:projectId/runs/:runId/events`
+  - transport: SSE (or equivalent stream abstraction with the same event contract);
+  - event contract: `live-run-event`;
+  - query: `after_event_id` for replay from the last acknowledged event;
+  - query: `max_replay` for bounded catch-up window.
+
+Expected event types:
+- `run.started`
+- `step.updated`
+- `evidence.linked`
+- `warning.raised`
+- `run.terminal`
+
+Reconnect and backpressure baseline:
+- replay from `after_event_id` when provided;
+- bounded replay window (do not allow unbounded buffers);
+- preserve monotonic per-run event ordering via payload sequence.
+
+## API/UI alignment notes (W5-S04 baseline)
+- The detachable web console reads run and evidence state from the same query families used by CLI:
+  - run list: `GET /api/projects/:projectId/runs`;
+  - run detail packets and evidence: `GET /api/projects/:projectId/packets`, `GET /api/projects/:projectId/step-results`, `GET /api/projects/:projectId/quality-artifacts`.
+- Live follow in web mode reuses the same stream endpoint and parameters:
+  - `GET /api/projects/:projectId/runs/:runId/events?after_event_id=...&max_replay=...`.
+- Detach behavior is UI-local only:
+  - detaching unsubscribes the web listener;
+  - active runs and runtime artifacts remain owned by orchestrator runtime, not by UI process.
 
 ## Key design rules
 - keep the API usable without the web UI;

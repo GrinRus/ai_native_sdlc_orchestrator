@@ -1,0 +1,14 @@
+{
+  "project_id": "aor-core",
+  "display_name": "AOR Core",
+  "project_root": "/workspace/aor-core",
+  "project_profile_ref": "examples/project.aor.yaml",
+  "runtime_root": "/workspace/aor-core/.aor",
+  "runtime_layout": {
+    "project_runtime_root": "/workspace/aor-core/.aor/projects/aor-core",
+    "artifacts_root": "/workspace/aor-core/.aor/projects/aor-core/artifacts",
+    "reports_root": "/workspace/aor-core/.aor/projects/aor-core/reports",
+    "state_root": "/workspace/aor-core/.aor/projects/aor-core/state"
+  },
+  "state_file": "/workspace/aor-core/.aor/projects/aor-core/state/project-init-state.json"
+}

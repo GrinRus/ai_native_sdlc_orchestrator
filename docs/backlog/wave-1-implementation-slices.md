@@ -19,7 +19,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S01 — Bootstrap CLI shell and command contracts
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Define the first stable command surface for bootstrap work without yet implementing the full control plane.
 - **Primary modules:** `apps/cli`, `docs/architecture/14-cli-command-catalog.md`, `docs/contracts/**`
 - **Hard dependencies:** W0-S01, W0-S02
@@ -50,7 +50,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S02 — Project init and profile loading runtime
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** blocked
+- **State:** done
 - **Outcome:** Create the first real project-aware runtime path from a repo root to durable AOR state.
 - **Primary modules:** `apps/cli`, `packages/contracts`, `packages/orchestrator-core`
 - **Hard dependencies:** W1-S01
@@ -81,7 +81,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S03 — Project analysis engine and durable analysis report
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** blocked
+- **State:** done
 - **Outcome:** Materialize repeatable knowledge about a target repository instead of relying on ad hoc interpretation.
 - **Primary modules:** `packages/orchestrator-core`, `packages/contracts`, `apps/cli`
 - **Hard dependencies:** W1-S02
@@ -112,7 +112,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S04 — Deterministic project validate flow
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Create the first objective gate in the system before judge-based evals or runner execution exist.
 - **Primary modules:** `packages/contracts`, `packages/orchestrator-core`, `apps/cli`
 - **Hard dependencies:** W1-S02, W0-S03
@@ -143,7 +143,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S05 — Project verify flow and bounded preflight execution
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** blocked
+- **State:** done
 - **Outcome:** Prove that a target project is runnable under bounded local rules before orchestration attempts delivery work.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `packages/observability`
 - **Hard dependencies:** W1-S03, W1-S04, W0-S05
@@ -174,7 +174,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S06 — Runtime store and artifact packet materialization
 - **Epic:** EPIC-2 Packet lifecycle
-- **State:** blocked
+- **State:** done
 - **Outcome:** Give bootstrap flows a durable artifact path so later SDLC stages inherit a consistent packet model.
 - **Primary modules:** `packages/orchestrator-core`, `packages/contracts`, `apps/cli`
 - **Hard dependencies:** W1-S02
@@ -205,7 +205,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S07 — Wave ticket and handoff packet foundation
 - **Epic:** EPIC-2 Packet lifecycle
-- **State:** blocked
+- **State:** done
 - **Outcome:** Establish the durable approval boundary that later execution work will consume.
 - **Primary modules:** `packages/orchestrator-core`, `packages/contracts`, `examples/packets/**`
 - **Hard dependencies:** W1-S04, W1-S06
@@ -236,7 +236,7 @@ Make project bootstrap and early packet materialization work end to end in headl
 
 ## W1-S08 — Bootstrap end-to-end rehearsal
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Prove that the Wave 1 baseline closes as one bounded flow on real inputs before moving on to routed execution.
 - **Primary modules:** `apps/cli`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`
 - **Hard dependencies:** W1-S03, W1-S04, W1-S05, W1-S07

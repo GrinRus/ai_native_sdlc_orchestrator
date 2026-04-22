@@ -1,0 +1,23 @@
+projects/
+  aor-core/
+    artifacts/
+      aor-core.artifact.bootstrap.v1.body.json
+      aor-core.artifact.bootstrap.v1.json
+      aor-core.handoff.bootstrap.v1.json
+      wave-ticket-aor-core.wave.bootstrap.v1.json
+    reports/
+      asset-resolution-report.json
+      policy-resolution-report.json
+      project-analysis-report.json
+      route-resolution-report.json
+      step-result-1.json
+      step-result-2.json
+      step-result-3.json
+      step-result-routed-implement.json
+      validation-report.json
+      verify-command-1.log
+      verify-command-2.log
+      verify-command-3.log
+      verify-summary.json
+    state/
+      project-init-state.json

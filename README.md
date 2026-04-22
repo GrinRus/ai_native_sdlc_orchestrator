@@ -28,13 +28,15 @@ What exists today:
 - contributor guidance through `AGENTS.md`, nested `AGENTS.md` files, and reusable root skills;
 - root repository-integrity commands and CI for roadmap, guidance, and community-file consistency;
 - a documented live E2E target catalog built around public GitHub repositories.
+- implemented W5 operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and standard live E2E runner commands.
+- completed implementation backlog baseline (`38/38` slices marked `done`) with a green root gate baseline.
 
 What does **not** exist yet:
 
 - a production-ready orchestrator runtime;
 - real provider adapters for Codex, Claude, or OpenCode;
 - delivery write-back automation to upstream repositories;
-- operator-grade API and UI surfaces.
+- full planned command surface and production hardening for all operator/delivery controls.
 
 Use the backlog docs for the implementation roadmap.
 
@@ -49,6 +51,7 @@ Start here if you want to understand the project before implementing anything:
 5. `docs/backlog/backlog-operating-model.md`
 6. `docs/backlog/mvp-roadmap.md`
 7. `docs/ops/live-e2e-target-catalog.md`
+8. `docs/ops/live-e2e-dependency-matrix.md`
 
 ## Contributor quickstart
 
@@ -65,9 +68,11 @@ pnpm check
 What these commands do today:
 
 - `pnpm lint` checks contributor-guidance coverage and required repo files.
-- `pnpm test` checks backlog consistency across wave docs, the master backlog, the dependency graph, and the epic map.
+- `pnpm test` checks backlog consistency and runs package/app test suites (contracts, CLI, API, web, routing, adapter SDK, harness, orchestrator core, and reference integrity).
 - `pnpm build` checks scaffold integrity for community files, workflow conventions, and root package settings.
 - `pnpm check` runs all of the above in sequence.
+
+CI runs the same gate on pull requests, pushes to `main`, and manual workflow dispatch through `.github/workflows/ci.yml`.
 
 Suggested implementation workflow:
 
@@ -77,7 +82,16 @@ Suggested implementation workflow:
 4. Update docs, examples, contracts, and code together.
 5. Run the root checks before opening a PR.
 
+Useful helpers for the slice loop:
+
+- `pnpm slice:status`
+- `pnpm slice:next -- --json`
+- `pnpm slice:plan -- <SLICE_ID>`
+- `pnpm slice:gate`
+
 For the repo-specific rules, read `CONTRIBUTING.md` and the nearest `AGENTS.md`.
+
+For live rehearsal dependency requirements, see `docs/ops/live-e2e-dependency-matrix.md`.
 
 ## How AOR works
 
@@ -107,23 +121,54 @@ At a high level, AOR is intended to work like this:
 8. **Feed learning back into the platform**  
    Turn live E2E output, scorecards, and incidents into new evals, harness captures, and backlog work.
 
-## Planned command surface
+## Command surface status
 
-The planned product command surface includes flows such as:
+The CLI command surface currently includes **14 implemented** commands and **19 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
+
+Implemented commands:
 
 ```bash
-aor project init
-aor project analyze
-aor project validate
-aor project verify
-aor run step
-aor eval run
-aor harness replay
-aor delivery plan
-aor delivery apply
+aor project init [--project-ref <path>] [--project-profile <path>] [--runtime-root <path>]
+aor project analyze --project-ref <path> [--project-profile <path>] [--runtime-root <path>]
+aor project validate --project-ref <path> [--project-profile <path>] [--runtime-root <path>]
+aor project verify --project-ref <path> [--project-profile <path>] [--runtime-root <path>] [--require-validation-pass]
+aor eval run --project-ref <path> --subject-ref <subject_type://target> [--suite-ref <suite_id@vN>] [--subject-version <version>] [--project-profile <path>] [--runtime-root <path>]
+aor harness certify --project-ref <path> --asset-ref <asset://target> --subject-ref <subject_type://target> [--suite-ref <suite_id@vN>] [--step-class <step_class>] [--from-channel <channel>] [--to-channel <channel>] [--project-profile <path>] [--runtime-root <path>]
+aor handoff prepare --project-ref <path> [--project-profile <path>] [--runtime-root <path>] [--ticket-id <id>] [--approved-artifact <path>]
+aor handoff approve --project-ref <path> [--runtime-root <path>] [--handoff-packet <path>] --approval-ref <ref>
+aor run status --project-ref <path> [--runtime-root <path>] [--run-id <id>] [--follow <true|false>]
+aor packet show --project-ref <path> [--runtime-root <path>] [--family <contract_family|all>] [--limit <number>]
+aor evidence show --project-ref <path> [--runtime-root <path>] [--run-id <id>]
+aor live-e2e start --project-ref <path> --profile <path> [--runtime-root <path>] [--run-id <id>] [--hold-open <true|false>]
+aor live-e2e status --project-ref <path> --run-id <id> [--runtime-root <path>] [--abort <true|false>] [--reason <text>]
+aor live-e2e report --project-ref <path> --run-id <id> [--runtime-root <path>]
 ```
 
-These commands are part of the roadmap. The current repository package does **not** implement the full runtime yet.
+Planned command contracts:
+
+```bash
+aor intake create
+aor discovery run
+aor spec build
+aor wave create
+aor run start
+aor run pause
+aor run resume
+aor run steer
+aor run cancel
+aor harness replay
+aor asset promote
+aor asset freeze
+aor deliver prepare
+aor release prepare
+aor incident open
+aor incident show
+aor audit runs
+aor ui attach
+aor ui detach
+```
+
+Planned commands remain explicit roadmap items and are not fully implemented runtime flows yet.
 
 ## Repository map
 
@@ -145,14 +190,17 @@ These commands are part of the roadmap. The current repository package does **no
 - `examples/**` — project profiles, routes, wrappers, prompt bundles, policies, adapters, packets, eval assets, and live E2E profiles.
 
 ### Code scaffold
-- `apps/api/` — planned control-plane API surface.
-- `apps/cli/` — planned CLI surface.
-- `apps/web/` — planned detachable operator UI.
-- `packages/**` — planned shared runtime modules.
+- `apps/api/` — implemented control-plane read/event baseline with roadmap extensions for broader command/control surfaces.
+- `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, and live E2E command baseline with planned extensions.
+- `apps/web/` — implemented detachable operator console baseline with planned production-hardening extensions.
+- `packages/**` — implemented shared runtime modules (contracts, orchestrator core, routing, adapter SDK, harness, observability) with roadmap extensions.
 
 ### Contributor support
 - `.agents/skills/**` — reusable repo skills for agents.
-- `.github/**` — CI and GitHub community-health assets.
+- `.github/workflows/ci.yml` — pinned, least-privilege CI workflow for repo integrity checks.
+- `.github/ISSUE_TEMPLATE/bug-report.md` — bug-report template.
+- `.github/ISSUE_TEMPLATE/feature-request.md` — feature-request template.
+- `.github/PULL_REQUEST_TEMPLATE.md` — pull-request checklist template.
 - `scripts/**` — root repository-integrity checks used by local commands and CI.
 
 ## Live E2E target projects

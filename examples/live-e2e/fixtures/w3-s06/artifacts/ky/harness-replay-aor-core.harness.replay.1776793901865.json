@@ -1,0 +1,41 @@
+{
+  "replay_id": "aor-core.harness.replay.1776793901865",
+  "capture_id": "aor-core.harness.capture.1776793901829",
+  "status": "pass",
+  "compatibility": {
+    "compatible": true,
+    "mismatches": [],
+    "expected": {
+      "step_class": "implement",
+      "route_id": "route.implement.default",
+      "wrapper_ref": "wrapper.runner.default@v3",
+      "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+      "policy_id": "policy.step.runner.default",
+      "adapter_id": "codex-cli"
+    },
+    "actual": {
+      "step_class": "implement",
+      "route_id": "route.implement.default",
+      "wrapper_ref": "wrapper.runner.default@v3",
+      "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+      "policy_id": "policy.step.runner.default",
+      "adapter_id": "codex-cli"
+    }
+  },
+  "baseline_snapshot": {
+    "status": "pass",
+    "aggregate_pass_rate": 1
+  },
+  "replay_snapshot": {
+    "evaluation_report_id": "aor-core.evaluation.suite.regress.short-v1.1776793901864",
+    "evaluation_report_ref": "/tmp/aor-w3-s06/ky/.aor/projects/aor-core/reports/evaluation-report-suite.regress.short-v1-1776793901864.json",
+    "aggregate_pass_rate": 1,
+    "comparable": true
+  },
+  "blocked_next_step": null,
+  "evidence_refs": [
+    "/tmp/aor-w3-s06/ky/.aor/projects/aor-core/reports/harness-capture-aor-core.harness.capture.1776793901829.json",
+    "/tmp/aor-w3-s06/ky/.aor/projects/aor-core/reports/step-result-routed-implement.json",
+    "/tmp/aor-w3-s06/ky/.aor/projects/aor-core/reports/evaluation-report-suite.regress.short-v1-1776793901864.json"
+  ]
+}

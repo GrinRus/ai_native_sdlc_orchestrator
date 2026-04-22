@@ -1,0 +1,79 @@
+{
+  "transcript_id": "aor-core.delivery-transcript.fork-first-pr.1776795100000",
+  "project_id": "aor-core",
+  "run_id": "live-e2e.release.long.run-002",
+  "step_id": "delivery.apply",
+  "mode": "fork-first-pr",
+  "status": "failed",
+  "started_at": "2026-04-21T15:30:00.000Z",
+  "finished_at": "2026-04-21T15:32:10.000Z",
+  "execution_root": "/workspace/nextjs-monorepo-example",
+  "delivery_plan_ref": "evidence://artifacts/delivery-plan-implement-1776795100000.json",
+  "ownership": {
+    "source_run_id": "live-e2e.release.long.run-002",
+    "source_step_class": "implement"
+  },
+  "git": {
+    "head_before": {
+      "branch": "main",
+      "commit": "6cd385214fcb8cc4164a9028421134f936f8f53d"
+    },
+    "head_after": {
+      "branch": "main",
+      "commit": "6cd385214fcb8cc4164a9028421134f936f8f53d"
+    },
+    "commands": [
+      "git remote get-url origin",
+      "git diff --name-only HEAD",
+      "git diff --numstat HEAD"
+    ]
+  },
+  "changed_paths": [
+    "packages/shared/src/logger.ts",
+    "apps/web/src/app/page.tsx"
+  ],
+  "diff_stats": {
+    "files": [
+      {
+        "path": "packages/shared/src/logger.ts",
+        "added": 7,
+        "deleted": 1
+      },
+      {
+        "path": "apps/web/src/app/page.tsx",
+        "added": 5,
+        "deleted": 2
+      }
+    ],
+    "totals": {
+      "files": 2,
+      "added": 12,
+      "deleted": 3
+    }
+  },
+  "outputs": {
+    "fork_target": {
+      "host": "github.com",
+      "upstream_repo": "belgattitude/nextjs-monorepo-example",
+      "fork_repo": "aor-bot/nextjs-monorepo-example"
+    },
+    "branch_ref": {
+      "base_ref": "main",
+      "head_ref": "refs/heads/aor/live-e2e-release-long-run-002",
+      "head_branch": "aor/live-e2e-release-long-run-002"
+    },
+    "pr_draft": {
+      "title": "AOR delivery live-e2e.release.long.run-002",
+      "is_draft": true
+    },
+    "network_mode": "stubbed",
+    "delivery_manifest_file": ".aor/projects/aor-core/artifacts/delivery-manifest-fork-first-pr-live-e2e.release.long.run-002.json",
+    "release_packet_file": ".aor/projects/aor-core/artifacts/release-packet-fork-first-pr-live-e2e.release.long.run-002.json"
+  },
+  "error": "fork push permission is missing for owner 'aor-bot' (simulated rehearsal fault)",
+  "recovery_steps": [
+    "Inspect fork_target, branch_ref, and pr_draft metadata in transcript outputs.",
+    "Validate GitHub credentials and permissions before executing real network write-back.",
+    "Retry fork-first planning with explicit --fork-owner / --base-ref overrides if required."
+  ]
+}

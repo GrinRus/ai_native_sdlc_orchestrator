@@ -10,6 +10,32 @@ target_repo:
   ref: main
   checkout_strategy: shallow
   write_target: patch-or-fork
+preflight:
+  mode: no-write
+  sequence:
+  - clone
+  - inspect
+  - analyze
+  - validate
+  - verify
+  - stop
+  prerequisites:
+  - node and corepack available for yarn workspace setup
+  - network access for shallow clone and yarn install
+  - shell resources suitable for monorepo lint, typecheck, and test runs
+  repo_shape_notes:
+  - Next.js/Turborepo monorepo with apps and shared packages
+  failure_safe_defaults:
+  - keep output_policy.write_back_to_remote set to false
+  - keep delivery mode in fork-first-pr for long public-target rehearsals
+  abort_conditions:
+  - repository clone fails or ref cannot be resolved
+  - yarn g:lint, g:typecheck, or g:test-unit fails during preflight verification
+  - changed-file budget or wall-clock budget is exceeded before delivery stage
+  reusable_assumptions:
+    bootstrap: workspace graph discovery and analysis run in no-write mode
+    quality: verify stage confirms workspace safety before eval/harness reuse
+    delivery: delivery and release artifacts remain valid under fork-or-patch defaults
 runtime:
   mode: ephemeral
   runtime_root: .aor
@@ -42,6 +68,8 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+  - yarn install --immutable
   commands:
   - yarn g:lint
   - yarn g:typecheck
@@ -60,7 +88,7 @@ approvals:
 output_policy:
   materialize_release_packet: true
   write_back_to_remote: false
-  preferred_delivery_mode: patch
+  preferred_delivery_mode: fork-first-pr
 ui:
   attachable: true
   default_scope: run

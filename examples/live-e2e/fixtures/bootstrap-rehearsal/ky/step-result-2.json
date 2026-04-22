@@ -1,0 +1,18 @@
+{
+  "step_result_id": "ky-target.verify.v1.step.2",
+  "run_id": "ky-target.verify.v1",
+  "step_id": "verify.command.2",
+  "step_class": "runner",
+  "status": "failed",
+  "summary": "Verification command 'npm test' failed: missing prerequisite(s) detected.",
+  "evidence_refs": [
+    "<KY_TARGET_ROOT>/.aor/projects/ky-target/reports/verify-command-2.log"
+  ],
+  "repo_scope": "main",
+  "command": "npm test",
+  "command_owner": "main",
+  "missing_prerequisites": [
+    "command 'npm' is not available in the verification environment"
+  ],
+  "blocked_next_step": "Resolve missing prerequisites (command 'npm' is not available in the verification environment), then rerun verify."
+}

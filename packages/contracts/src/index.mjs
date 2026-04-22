@@ -4,6 +4,26 @@ import { parse as parseYaml } from "yaml";
 
 const STEP_CLASS_VALUES = ["artifact", "planner", "runner", "repair", "eval", "harness"];
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
+const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
+const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
+const LIVE_RUN_EVENT_TYPE_VALUES = [
+  "run.started",
+  "step.updated",
+  "evidence.linked",
+  "warning.raised",
+  "run.terminal",
+];
+const EXTERNAL_REFERENCE_PREFIXES = [
+  "evidence://",
+  "schema://",
+  "approval://",
+  "incident://",
+  "review://",
+  "redact://",
+  "validate.",
+  "retry.",
+  "repair.",
+];
 
 /** @type {ReadonlyArray<import("./index.d.ts").ContractFamilyIndexEntry>} */
 const CONTRACT_FAMILY_INDEX = Object.freeze([
@@ -61,6 +81,10 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       "repo_facts",
       "toolchain_facts",
       "command_catalog",
+      "route_resolution",
+      "asset_resolution",
+      "policy_resolution",
+      "evaluation_registry",
       "verification_plan",
       "status",
     ],
@@ -72,6 +96,10 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       repo_facts: "object",
       toolchain_facts: "object",
       command_catalog: "object",
+      route_resolution: "object",
+      asset_resolution: "object",
+      policy_resolution: "object",
+      evaluation_registry: "object",
       verification_plan: "object",
       status: "string",
     },
@@ -99,9 +127,18 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
     family: "wave-ticket",
     familyGroup: "core-packets-and-profiles",
     sourceContract: "docs/contracts/wave-ticket.md",
-    exampleGlob: "none",
+    exampleGlob: "examples/packets/wave-ticket-*.yaml",
     status: "implemented",
-    requiredFields: ["ticket_id", "project_id", "objective", "scope", "dependencies", "risk_tier", "status"],
+    requiredFields: [
+      "ticket_id",
+      "project_id",
+      "objective",
+      "scope",
+      "dependencies",
+      "risk_tier",
+      "status",
+      "approved_input_ref",
+    ],
     fieldTypes: {
       ticket_id: "string",
       project_id: "string",
@@ -110,6 +147,7 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       dependencies: "array",
       risk_tier: "string",
       status: "string",
+      approved_input_ref: "string",
     },
     enumChecks: [],
   },
@@ -131,6 +169,10 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       "allowed_paths",
       "allowed_commands",
       "verification_plan",
+      "scope_constraints",
+      "command_policy",
+      "writeback_mode",
+      "approval_state",
     ],
     fieldTypes: {
       packet_id: "string",
@@ -144,6 +186,10 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       allowed_paths: "array",
       allowed_commands: "array",
       verification_plan: "object",
+      scope_constraints: "object",
+      command_policy: "object",
+      writeback_mode: "string",
+      approval_state: "object",
     },
     enumChecks: [],
   },
@@ -153,7 +199,18 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
     sourceContract: "docs/contracts/release-packet.md",
     exampleGlob: "examples/packets/release-*.yaml",
     status: "implemented",
-    requiredFields: ["packet_id", "project_id", "ticket_id", "run_refs", "change_summary", "verification_refs", "status"],
+    requiredFields: [
+      "packet_id",
+      "project_id",
+      "ticket_id",
+      "run_refs",
+      "change_summary",
+      "verification_refs",
+      "delivery_manifest_ref",
+      "evidence_lineage",
+      "status",
+      "created_at",
+    ],
     fieldTypes: {
       packet_id: "string",
       project_id: "string",
@@ -161,9 +218,51 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       run_refs: "array",
       change_summary: "string",
       verification_refs: "array",
+      delivery_manifest_ref: "string",
+      evidence_lineage: "object",
       status: "string",
+      created_at: "string",
     },
     enumChecks: [],
+  },
+  {
+    family: "delivery-plan",
+    familyGroup: "core-packets-and-profiles",
+    sourceContract: "docs/contracts/delivery-plan.md",
+    exampleGlob: "examples/packets/delivery-plan-*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "plan_id",
+      "project_id",
+      "run_id",
+      "step_class",
+      "delivery_mode",
+      "mode_source",
+      "preconditions",
+      "writeback_allowed",
+      "blocking_reasons",
+      "status",
+      "evidence_refs",
+      "created_at",
+    ],
+    fieldTypes: {
+      plan_id: "string",
+      project_id: "string",
+      run_id: "string",
+      step_class: "string",
+      delivery_mode: "string",
+      mode_source: "object",
+      preconditions: "object",
+      writeback_allowed: "boolean",
+      blocking_reasons: "array",
+      status: "string",
+      evidence_refs: "array",
+      created_at: "string",
+    },
+    enumChecks: [
+      { field: "delivery_mode", allowedValues: DELIVERY_MODE_VALUES },
+      { field: "status", allowedValues: DELIVERY_PLAN_STATUS_VALUES },
+    ],
   },
   {
     family: "delivery-manifest",
@@ -176,22 +275,32 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       "project_id",
       "ticket_id",
       "run_refs",
+      "step_ref",
       "delivery_mode",
       "writeback_policy",
       "repo_deliveries",
       "verification_refs",
+      "approval_context",
+      "evidence_root",
+      "source_refs",
       "status",
+      "created_at",
     ],
     fieldTypes: {
       manifest_id: "string",
       project_id: "string",
       ticket_id: "string",
       run_refs: "array",
+      step_ref: "string",
       delivery_mode: "string",
       writeback_policy: "object",
       repo_deliveries: "array",
       verification_refs: "array",
+      approval_context: "object",
+      evidence_root: "string",
+      source_refs: "object",
       status: "string",
+      created_at: "string",
     },
     enumChecks: [],
   },
@@ -251,14 +360,31 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
     family: "evaluation-report",
     familyGroup: "execution-and-quality",
     sourceContract: "docs/contracts/evaluation-report.md",
-    exampleGlob: "none",
+    exampleGlob: "examples/eval/report-*.sample.yaml",
     status: "implemented",
-    requiredFields: ["report_id", "subject_ref", "suite_ref", "grader_results", "status", "evidence_refs"],
+    requiredFields: [
+      "report_id",
+      "subject_ref",
+      "subject_type",
+      "subject_fingerprint",
+      "suite_ref",
+      "dataset_ref",
+      "scorer_metadata",
+      "grader_results",
+      "summary_metrics",
+      "status",
+      "evidence_refs",
+    ],
     fieldTypes: {
       report_id: "string",
       subject_ref: "string",
+      subject_type: "string",
+      subject_fingerprint: "string",
       suite_ref: "string",
+      dataset_ref: "string",
+      scorer_metadata: "array",
       grader_results: "object",
+      summary_metrics: "object",
       status: "string",
       evidence_refs: "array",
     },
@@ -301,20 +427,30 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
     family: "promotion-decision",
     familyGroup: "execution-and-quality",
     sourceContract: "docs/contracts/promotion-decision.md",
-    exampleGlob: "none",
+    exampleGlob: "examples/packets/promotion-decision-*.yaml",
     status: "implemented",
-    requiredFields: ["decision_id", "subject_ref", "from_channel", "to_channel", "evidence_refs", "status"],
+    requiredFields: [
+      "decision_id",
+      "subject_ref",
+      "from_channel",
+      "to_channel",
+      "evidence_refs",
+      "evidence_summary",
+      "status",
+    ],
     fieldTypes: {
       decision_id: "string",
       subject_ref: "string",
       from_channel: "string",
       to_channel: "string",
       evidence_refs: "array",
+      evidence_summary: "object",
       status: "string",
     },
     enumChecks: [
       { field: "from_channel", allowedValues: PROMOTION_CHANNEL_VALUES },
       { field: "to_channel", allowedValues: PROMOTION_CHANNEL_VALUES },
+      { field: "status", allowedValues: ["pass", "hold", "fail"] },
     ],
   },
   {
@@ -413,7 +549,7 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       event_type: "string",
       payload: "object",
     },
-    enumChecks: [],
+    enumChecks: [{ field: "event_type", allowedValues: LIVE_RUN_EVENT_TYPE_VALUES }],
   },
   {
     family: "live-e2e-profile",
@@ -428,6 +564,7 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       "duration_class",
       "project_profile_template_ref",
       "target_repo",
+      "preflight",
       "runtime",
       "objective",
       "stages",
@@ -444,6 +581,7 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       duration_class: "string",
       project_profile_template_ref: "string",
       target_repo: "object",
+      preflight: "object",
       runtime: "object",
       objective: "object",
       stages: "array",
@@ -472,10 +610,14 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
 const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/adapters\/[^/]+\.ya?ml$/, family: "adapter-capability-profile" },
   { regex: /^examples\/delivery-manifest[^/]*\.ya?ml$/, family: "delivery-manifest" },
+  { regex: /^examples\/packets\/delivery-plan-[^/]+\.ya?ml$/, family: "delivery-plan" },
   { regex: /^examples\/eval\/dataset-[^/]+\.ya?ml$/, family: "dataset" },
+  { regex: /^examples\/eval\/report-[^/]+\.sample\.ya?ml$/, family: "evaluation-report" },
   { regex: /^examples\/eval\/suite-[^/]+\.ya?ml$/, family: "evaluation-suite" },
   { regex: /^examples\/live-e2e\/[^/]+\.ya?ml$/, family: "live-e2e-profile" },
+  { regex: /^examples\/packets\/wave-ticket-[^/]+\.ya?ml$/, family: "wave-ticket" },
   { regex: /^examples\/packets\/handoff-[^/]+\.ya?ml$/, family: "handoff-packet" },
+  { regex: /^examples\/packets\/promotion-decision-[^/]+\.ya?ml$/, family: "promotion-decision" },
   { regex: /^examples\/packets\/release-[^/]+\.ya?ml$/, family: "release-packet" },
   { regex: /^examples\/policies\/[^/]+\.ya?ml$/, family: "step-policy-profile" },
   { regex: /^examples\/project-analysis-report\.sample\.ya?ml$/, family: "project-analysis-report" },
@@ -716,6 +858,636 @@ export function loadExampleContracts(options = {}) {
 }
 
 /**
+ * @param {{ workspaceRoot?: string, examplesRoot?: string }} [options]
+ * @returns {import("./index.d.ts").ReferenceValidationResult}
+ */
+export function validateExampleReferences(options = {}) {
+  const loaded = loadExampleContracts(options);
+  const registry = buildReferenceRegistry(loaded.results, loaded.workspaceRoot);
+  /** @type {import("./index.d.ts").ReferenceValidationIssue[]} */
+  const issues = [];
+  let checkedReferences = 0;
+  let checkedCompatibility = 0;
+
+  for (const result of loaded.results) {
+    if (!result.ok || !result.family || !isPlainObject(result.document)) {
+      continue;
+    }
+
+    const document = result.document;
+    const source = result.source;
+
+    if (result.family === "project-profile") {
+      const allowedAdapters = new Set(
+        Array.isArray(document.allowed_adapters)
+          ? document.allowed_adapters.filter((value) => typeof value === "string")
+          : [],
+      );
+      const defaultRouteProfiles = document.default_route_profiles;
+      if (isPlainObject(defaultRouteProfiles)) {
+        for (const [key, rawValue] of Object.entries(defaultRouteProfiles)) {
+          checkedReferences += 1;
+          const field = `default_route_profiles.${key}`;
+          const reference = asReferenceString(rawValue, { issues, source, field });
+          if (!reference || isExternalReference(reference)) continue;
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing route_id",
+            expectedFamily: "provider-route-profile",
+            expectedSet: registry.routeIds,
+            registry,
+          });
+
+          const routeProfile = registry.routeProfilesById.get(reference);
+          if (!routeProfile) continue;
+
+          checkedCompatibility += 1;
+          if (routeProfile.step && routeProfile.step !== key) {
+            issues.push(
+              referenceIssue({
+                code: "reference_target_incompatible",
+                source,
+                field,
+                reference,
+                expected: `route step '${key}'`,
+                actual: routeProfile.step,
+                message: `Route '${reference}' has step '${routeProfile.step}', which does not match profile slot '${key}'.`,
+              }),
+            );
+          }
+
+          if (allowedAdapters.size === 0) continue;
+          for (const adapterRef of routeProfile.adapters) {
+            checkedCompatibility += 1;
+            if (allowedAdapters.has(adapterRef.adapterId)) continue;
+            issues.push(
+              referenceIssue({
+                code: "reference_target_incompatible",
+                source,
+                field,
+                reference,
+                expected: "route adapters included in allowed_adapters",
+                actual: `${adapterRef.adapterId} is not allowed`,
+                message: `Route '${reference}' uses adapter '${adapterRef.adapterId}', which is not listed in allowed_adapters.`,
+              }),
+            );
+          }
+        }
+      }
+
+      const defaultWrapperProfiles = document.default_wrapper_profiles;
+      if (isPlainObject(defaultWrapperProfiles)) {
+        for (const [key, rawValue] of Object.entries(defaultWrapperProfiles)) {
+          checkedReferences += 1;
+          const field = `default_wrapper_profiles.${key}`;
+          const reference = asReferenceString(rawValue, { issues, source, field });
+          if (!reference || isExternalReference(reference)) continue;
+          if (!isVersionedRef(reference)) {
+            issues.push(
+              referenceIssue({
+                code: "reference_format_invalid",
+                source,
+                field,
+                reference,
+                expected: "wrapper_id@vN",
+                actual: reference,
+                message: `Field '${field}' must use wrapper_id@vN format.`,
+              }),
+            );
+            continue;
+          }
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing wrapper_id@vN",
+            expectedFamily: "wrapper-profile",
+            expectedSet: registry.wrapperRefs,
+            registry,
+          });
+
+          const wrapperProfile = registry.wrapperProfilesByRef.get(reference);
+          if (!wrapperProfile || !wrapperProfile.stepClass) continue;
+          checkedCompatibility += 1;
+          if (wrapperProfile.stepClass === key) continue;
+          issues.push(
+            referenceIssue({
+              code: "reference_target_incompatible",
+              source,
+              field,
+              reference,
+              expected: `wrapper step_class '${key}'`,
+              actual: wrapperProfile.stepClass,
+              message: `Wrapper '${reference}' has step_class '${wrapperProfile.stepClass}', which does not match profile slot '${key}'.`,
+            }),
+          );
+        }
+      }
+
+      const defaultStepPolicies = document.default_step_policies;
+      if (isPlainObject(defaultStepPolicies)) {
+        for (const [key, rawValue] of Object.entries(defaultStepPolicies)) {
+          checkedReferences += 1;
+          const field = `default_step_policies.${key}`;
+          const reference = asReferenceString(rawValue, { issues, source, field });
+          if (!reference || isExternalReference(reference)) continue;
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing policy_id",
+            expectedFamily: "step-policy-profile",
+            expectedSet: registry.policyIds,
+            registry,
+          });
+
+          const policyProfile = registry.policyProfilesById.get(reference);
+          if (!policyProfile || !policyProfile.stepClass) continue;
+          checkedCompatibility += 1;
+          if (policyProfile.stepClass === key) continue;
+          issues.push(
+            referenceIssue({
+              code: "reference_target_incompatible",
+              source,
+              field,
+              reference,
+              expected: `policy step_class '${key}'`,
+              actual: policyProfile.stepClass,
+              message: `Policy '${reference}' has step_class '${policyProfile.stepClass}', which does not match profile slot '${key}'.`,
+            }),
+          );
+        }
+      }
+
+      const defaultReleaseSuiteRef = document.eval_policy?.default_release_suite_ref;
+      if (defaultReleaseSuiteRef !== undefined) {
+        checkedReferences += 1;
+        const field = "eval_policy.default_release_suite_ref";
+        const reference = asReferenceString(defaultReleaseSuiteRef, { issues, source, field });
+        if (reference && !isExternalReference(reference)) {
+          if (!isVersionedRef(reference)) {
+            issues.push(
+              referenceIssue({
+                code: "reference_format_invalid",
+                source,
+                field,
+                reference,
+                expected: "suite_id@vN",
+                actual: reference,
+                message: "default_release_suite_ref must use suite_id@vN format.",
+              }),
+            );
+          } else {
+            validateReferenceTarget({
+              issues,
+              source,
+              field,
+              reference,
+              expected: "existing suite_id@vN",
+              expectedFamily: "evaluation-suite",
+              expectedSet: registry.suiteRefs,
+              registry,
+            });
+          }
+        }
+      }
+
+      const liveE2eProfiles = document.live_e2e_defaults?.profiles;
+      if (isPlainObject(liveE2eProfiles)) {
+        for (const [key, rawValue] of Object.entries(liveE2eProfiles)) {
+          checkedReferences += 1;
+          const field = `live_e2e_defaults.profiles.${key}`;
+          const reference = asReferenceString(rawValue, { issues, source, field });
+          if (!reference || isExternalReference(reference)) continue;
+          if (!isVersionedRef(reference)) {
+            issues.push(
+              referenceIssue({
+                code: "reference_format_invalid",
+                source,
+                field,
+                reference,
+                expected: "profile_id@vN",
+                actual: reference,
+                message: `Field '${field}' must use profile_id@vN format.`,
+              }),
+            );
+            continue;
+          }
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing profile_id@vN",
+            expectedFamily: "live-e2e-profile",
+            expectedSet: registry.liveE2eProfileRefs,
+            registry,
+          });
+        }
+      }
+    }
+
+    if (result.family === "provider-route-profile") {
+      checkedReferences += 1;
+      const field = "wrapper_profile_ref";
+      const reference = asReferenceString(document.wrapper_profile_ref, { issues, source, field });
+      if (reference && !isExternalReference(reference)) {
+        if (!isVersionedRef(reference)) {
+          issues.push(
+            referenceIssue({
+              code: "reference_format_invalid",
+              source,
+              field,
+              reference,
+              expected: "wrapper_id@vN",
+              actual: reference,
+              message: "wrapper_profile_ref must use wrapper_id@vN format.",
+            }),
+          );
+        } else {
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing wrapper_id@vN",
+            expectedFamily: "wrapper-profile",
+            expectedSet: registry.wrapperRefs,
+            registry,
+          });
+
+          const wrapperProfile = registry.wrapperProfilesByRef.get(reference);
+          const routeClass = typeof document.route_class === "string" ? document.route_class : null;
+          if (wrapperProfile?.stepClass && routeClass) {
+            checkedCompatibility += 1;
+            if (wrapperProfile.stepClass !== routeClass) {
+              issues.push(
+                referenceIssue({
+                  code: "reference_target_incompatible",
+                  source,
+                  field,
+                  reference,
+                  expected: `wrapper step_class '${routeClass}'`,
+                  actual: wrapperProfile.stepClass,
+                  message: `Route class '${routeClass}' is incompatible with wrapper '${reference}' step_class '${wrapperProfile.stepClass}'.`,
+                }),
+              );
+            }
+          }
+        }
+      }
+
+      checkedReferences += 1;
+      const primaryAdapterField = "primary.adapter";
+      const primaryAdapterValue = isPlainObject(document.primary) ? document.primary.adapter : undefined;
+      const primaryAdapterRef = asReferenceString(primaryAdapterValue, {
+        issues,
+        source,
+        field: primaryAdapterField,
+      });
+      if (
+        primaryAdapterRef &&
+        !isExternalReference(primaryAdapterRef) &&
+        !isPlaceholderAdapterReference(primaryAdapterRef)
+      ) {
+        validateReferenceTarget({
+          issues,
+          source,
+          field: primaryAdapterField,
+          reference: primaryAdapterRef,
+          expected: "existing adapter_id",
+          expectedFamily: "adapter-capability-profile",
+          expectedSet: registry.adapterIds,
+          registry,
+        });
+      }
+
+      const fallback = document.fallback;
+      if (Array.isArray(fallback)) {
+        fallback.forEach((candidate, index) => {
+          checkedReferences += 1;
+          const fallbackAdapterField = `fallback[${index}].adapter`;
+          const fallbackAdapterValue = isPlainObject(candidate) ? candidate.adapter : candidate;
+          const fallbackAdapterRef = asReferenceString(fallbackAdapterValue, {
+            issues,
+            source,
+            field: fallbackAdapterField,
+          });
+          if (
+            !fallbackAdapterRef ||
+            isExternalReference(fallbackAdapterRef) ||
+            isPlaceholderAdapterReference(fallbackAdapterRef)
+          ) {
+            return;
+          }
+          validateReferenceTarget({
+            issues,
+            source,
+            field: fallbackAdapterField,
+            reference: fallbackAdapterRef,
+            expected: "existing adapter_id",
+            expectedFamily: "adapter-capability-profile",
+            expectedSet: registry.adapterIds,
+            registry,
+          });
+        });
+      }
+
+      const requiredAdapterCapabilities = asStringArray(document.required_adapter_capabilities, {
+        issues,
+        source,
+        field: "required_adapter_capabilities",
+      });
+      if (requiredAdapterCapabilities.length > 0) {
+        const routeAdapterRefs = extractRouteAdapterRefs(document);
+        for (const adapterRef of routeAdapterRefs) {
+          const adapterProfile = registry.adapterProfilesById.get(adapterRef.adapterId);
+          if (!adapterProfile) continue;
+          checkedCompatibility += 1;
+          const missingCapabilities = requiredAdapterCapabilities.filter(
+            (capability) => !adapterProfile.capabilities.has(capability),
+          );
+          if (missingCapabilities.length === 0) continue;
+          issues.push(
+            referenceIssue({
+              code: "reference_target_incompatible",
+              source,
+              field: adapterRef.field,
+              reference: adapterRef.adapterId,
+              expected: `adapter with capabilities: ${requiredAdapterCapabilities.join(", ")}`,
+              actual: `missing capabilities: ${missingCapabilities.join(", ")}`,
+              message: `Adapter '${adapterRef.adapterId}' does not satisfy required route capabilities.`,
+            }),
+          );
+        }
+      }
+    }
+
+    if (result.family === "wrapper-profile") {
+      checkedReferences += 1;
+      const field = "prompt_bundle_ref";
+      const reference = asReferenceString(document.prompt_bundle_ref, { issues, source, field });
+      if (reference && !isExternalReference(reference)) {
+        if (!isPromptBundleRef(reference)) {
+          issues.push(
+            referenceIssue({
+              code: "reference_format_invalid",
+              source,
+              field,
+              reference,
+              expected: "prompt-bundle://prompt_bundle_id@vN",
+              actual: reference,
+              message: "prompt_bundle_ref must use prompt-bundle://prompt_bundle_id@vN format.",
+            }),
+          );
+        } else {
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing prompt-bundle://prompt_bundle_id@vN",
+            expectedFamily: "prompt-bundle",
+            expectedSet: registry.promptBundleRefs,
+            registry,
+          });
+
+          const wrapperStepClass = typeof document.step_class === "string" ? document.step_class : null;
+          const promptBundle = registry.promptBundlesByRef.get(reference);
+          if (wrapperStepClass && promptBundle?.stepClass) {
+            checkedCompatibility += 1;
+            if (promptBundle.stepClass !== wrapperStepClass) {
+              issues.push(
+                referenceIssue({
+                  code: "reference_target_incompatible",
+                  source,
+                  field,
+                  reference,
+                  expected: `prompt bundle step_class '${wrapperStepClass}'`,
+                  actual: promptBundle.stepClass,
+                  message: `Wrapper step_class '${wrapperStepClass}' is incompatible with prompt bundle '${reference}' step_class '${promptBundle.stepClass}'.`,
+                }),
+              );
+            }
+          }
+        }
+      }
+    }
+
+    if (result.family === "evaluation-suite") {
+      checkedReferences += 1;
+      const field = "dataset_ref";
+      const reference = asReferenceString(document.dataset_ref, { issues, source, field });
+      if (reference && !isExternalReference(reference)) {
+        if (!isDatasetRef(reference)) {
+          issues.push(
+            referenceIssue({
+              code: "reference_format_invalid",
+              source,
+              field,
+              reference,
+              expected: "dataset://dataset_id@version",
+              actual: reference,
+              message: "dataset_ref must use dataset://dataset_id@version format.",
+            }),
+          );
+        } else {
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing dataset://dataset_id@version",
+            expectedFamily: "dataset",
+            expectedSet: registry.datasetRefs,
+            registry,
+          });
+
+          const suiteSubjectType = typeof document.subject_type === "string" ? document.subject_type : null;
+          const dataset = registry.datasetsByRef.get(reference);
+          if (suiteSubjectType && dataset?.subjectType) {
+            checkedCompatibility += 1;
+            if (dataset.subjectType !== suiteSubjectType) {
+              issues.push(
+                referenceIssue({
+                  code: "reference_target_incompatible",
+                  source,
+                  field,
+                  reference,
+                  expected: `dataset subject_type '${suiteSubjectType}'`,
+                  actual: dataset.subjectType,
+                  message: `Suite subject_type '${suiteSubjectType}' is incompatible with dataset '${reference}' subject_type '${dataset.subjectType}'.`,
+                }),
+              );
+            }
+          }
+        }
+      }
+    }
+
+    if (result.family === "step-policy-profile") {
+      const suiteRef = document.quality_gate?.suite_ref;
+      if (suiteRef !== undefined) {
+        checkedReferences += 1;
+        const field = "quality_gate.suite_ref";
+        const reference = asReferenceString(suiteRef, { issues, source, field });
+        if (reference && !isExternalReference(reference)) {
+          if (!isVersionedRef(reference)) {
+            issues.push(
+              referenceIssue({
+                code: "reference_format_invalid",
+                source,
+                field,
+                reference,
+                expected: "suite_id@vN",
+                actual: reference,
+                message: "quality_gate.suite_ref must use suite_id@vN format.",
+              }),
+            );
+          } else {
+            validateReferenceTarget({
+              issues,
+              source,
+              field,
+              reference,
+              expected: "existing suite_id@vN",
+              expectedFamily: "evaluation-suite",
+              expectedSet: registry.suiteRefs,
+              registry,
+            });
+          }
+        }
+      }
+    }
+
+    if (result.family === "prompt-bundle") {
+      const defaultSuiteRefs = document.certification_hints?.default_suite_refs;
+      if (Array.isArray(defaultSuiteRefs)) {
+        defaultSuiteRefs.forEach((rawValue, index) => {
+          checkedReferences += 1;
+          const field = `certification_hints.default_suite_refs[${index}]`;
+          const reference = asReferenceString(rawValue, { issues, source, field });
+          if (!reference || isExternalReference(reference)) return;
+          if (!isVersionedRef(reference)) {
+            issues.push(
+              referenceIssue({
+                code: "reference_format_invalid",
+                source,
+                field,
+                reference,
+                expected: "suite_id@vN",
+                actual: reference,
+                message: `${field} must use suite_id@vN format.`,
+              }),
+            );
+            return;
+          }
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing suite_id@vN",
+            expectedFamily: "evaluation-suite",
+            expectedSet: registry.suiteRefs,
+            registry,
+          });
+        });
+      }
+    }
+
+    if (result.family === "live-e2e-profile") {
+      checkedReferences += 1;
+      const projectProfileField = "project_profile_template_ref";
+      const projectProfileRef = asReferenceString(document.project_profile_template_ref, {
+        issues,
+        source,
+        field: projectProfileField,
+      });
+      if (projectProfileRef && !isExternalReference(projectProfileRef)) {
+        const resolvedProjectProfilePath = path.resolve(loaded.workspaceRoot, projectProfileRef);
+        if (!fs.existsSync(resolvedProjectProfilePath)) {
+          issues.push(
+            referenceIssue({
+              code: "reference_target_missing",
+              source,
+              field: projectProfileField,
+              reference: projectProfileRef,
+              expected: "existing project-profile file",
+              actual: "missing file",
+              message: `Referenced project profile file '${projectProfileRef}' does not exist.`,
+            }),
+          );
+        } else {
+          const loadedProjectProfile = loadContractFile({ filePath: resolvedProjectProfilePath });
+          if (loadedProjectProfile.family !== "project-profile") {
+            issues.push(
+              referenceIssue({
+                code: "reference_target_type_mismatch",
+                source,
+                field: projectProfileField,
+                reference: projectProfileRef,
+                expected: "project-profile",
+                actual: loadedProjectProfile.family ?? "unknown",
+                message: `Reference '${projectProfileRef}' does not point to a project-profile example.`,
+              }),
+            );
+          }
+        }
+      }
+
+      const evalSuites = document.verification?.eval_suites;
+      if (Array.isArray(evalSuites)) {
+        evalSuites.forEach((rawValue, index) => {
+          checkedReferences += 1;
+          const field = `verification.eval_suites[${index}]`;
+          const reference = asReferenceString(rawValue, { issues, source, field });
+          if (!reference || isExternalReference(reference)) return;
+          if (!isVersionedRef(reference)) {
+            issues.push(
+              referenceIssue({
+                code: "reference_format_invalid",
+                source,
+                field,
+                reference,
+                expected: "suite_id@vN",
+                actual: reference,
+                message: `${field} must use suite_id@vN format.`,
+              }),
+            );
+            return;
+          }
+          validateReferenceTarget({
+            issues,
+            source,
+            field,
+            reference,
+            expected: "existing suite_id@vN",
+            expectedFamily: "evaluation-suite",
+            expectedSet: registry.suiteRefs,
+            registry,
+          });
+        });
+      }
+    }
+  }
+
+  return {
+    ok: issues.length === 0,
+    workspaceRoot: loaded.workspaceRoot,
+    examplesRoot: loaded.examplesRoot,
+    checkedReferences,
+    checkedCompatibility,
+    issues,
+  };
+}
+
+/**
  * @param {string} filePath
  * @returns {import("./index.d.ts").ContractFamily | null}
  */
@@ -830,6 +1602,410 @@ function issue({ code, source, field = null, expected = null, actual = null, mes
  */
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+/**
+ * @param {unknown} value
+ * @param {{ issues: import("./index.d.ts").ReferenceValidationIssue[], source: string, field: string }} options
+ * @returns {string | null}
+ */
+function asReferenceString(value, { issues, source, field }) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  issues.push(
+    referenceIssue({
+      code: "reference_format_invalid",
+      source,
+      field,
+      reference: null,
+      expected: "string reference",
+      actual: describeActualType(value),
+      message: `Field '${field}' must be a string reference.`,
+    }),
+  );
+  return null;
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isExternalReference(value) {
+  return EXTERNAL_REFERENCE_PREFIXES.some((prefix) => value.startsWith(prefix));
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isVersionedRef(value) {
+  return /^[A-Za-z0-9._-]+@v\d+$/.test(value);
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isPromptBundleRef(value) {
+  return /^prompt-bundle:\/\/[A-Za-z0-9._-]+@v\d+$/.test(value);
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isDatasetRef(value) {
+  return /^dataset:\/\/[A-Za-z0-9._-]+@[^@\s]+$/.test(value);
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isPlaceholderAdapterReference(value) {
+  return value === "none";
+}
+
+/**
+ * @param {unknown} value
+ * @param {{ issues: import("./index.d.ts").ReferenceValidationIssue[], source: string, field: string }} options
+ * @returns {string[]}
+ */
+function asStringArray(value, { issues, source, field }) {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    issues.push(
+      referenceIssue({
+        code: "reference_format_invalid",
+        source,
+        field,
+        expected: "array of strings",
+        actual: describeActualType(value),
+        message: `Field '${field}' must be an array of string values.`,
+      }),
+    );
+    return [];
+  }
+
+  /** @type {string[]} */
+  const values = [];
+  value.forEach((entry, index) => {
+    if (typeof entry === "string") {
+      values.push(entry);
+      return;
+    }
+    issues.push(
+      referenceIssue({
+        code: "reference_format_invalid",
+        source,
+        field: `${field}[${index}]`,
+        expected: "string",
+        actual: describeActualType(entry),
+        message: `Field '${field}[${index}]' must be a string.`,
+      }),
+    );
+  });
+  return values;
+}
+
+/**
+ * @param {Record<string, unknown>} routeProfile
+ * @returns {Array<{ field: string, adapterId: string }>}
+ */
+function extractRouteAdapterRefs(routeProfile) {
+  /** @type {Array<{ field: string, adapterId: string }>} */
+  const references = [];
+
+  const primary = routeProfile.primary;
+  if (
+    isPlainObject(primary) &&
+    typeof primary.adapter === "string" &&
+    !isPlaceholderAdapterReference(primary.adapter)
+  ) {
+    references.push({ field: "primary.adapter", adapterId: primary.adapter });
+  }
+
+  const fallback = routeProfile.fallback;
+  if (Array.isArray(fallback)) {
+    fallback.forEach((candidate, index) => {
+      if (
+        !isPlainObject(candidate) ||
+        typeof candidate.adapter !== "string" ||
+        isPlaceholderAdapterReference(candidate.adapter)
+      ) {
+        return;
+      }
+      references.push({ field: `fallback[${index}].adapter`, adapterId: candidate.adapter });
+    });
+  }
+
+  return references;
+}
+
+/**
+ * @param {import("./index.d.ts").LoadedContractFile[]} results
+ * @param {string} workspaceRoot
+ * @returns {{
+ *   routeIds: Set<string>,
+ *   wrapperRefs: Set<string>,
+ *   policyIds: Set<string>,
+ *   suiteRefs: Set<string>,
+ *   datasetRefs: Set<string>,
+ *   liveE2eProfileRefs: Set<string>,
+ *   promptBundleRefs: Set<string>,
+ *   adapterIds: Set<string>,
+ *   routeProfilesById: Map<string, { source: string, step: string | null, adapters: Array<{ field: string, adapterId: string }> }>,
+ *   wrapperProfilesByRef: Map<string, { source: string, stepClass: string | null }>,
+ *   policyProfilesById: Map<string, { source: string, stepClass: string | null }>,
+ *   promptBundlesByRef: Map<string, { source: string, stepClass: string | null }>,
+ *   datasetsByRef: Map<string, { source: string, subjectType: string | null }>,
+ *   adapterProfilesById: Map<string, { source: string, capabilities: Set<string> }>,
+ *   knownReferenceFamilies: Map<string, Set<import("./index.d.ts").ContractFamily>>,
+ * }}
+ */
+function buildReferenceRegistry(results, workspaceRoot) {
+  const routeIds = new Set();
+  const wrapperRefs = new Set();
+  const policyIds = new Set();
+  const suiteRefs = new Set();
+  const datasetRefs = new Set();
+  const liveE2eProfileRefs = new Set();
+  const promptBundleRefs = new Set();
+  const adapterIds = new Set();
+  /** @type {Map<string, { source: string, step: string | null, adapters: Array<{ field: string, adapterId: string }> }>} */
+  const routeProfilesById = new Map();
+  /** @type {Map<string, { source: string, stepClass: string | null }>} */
+  const wrapperProfilesByRef = new Map();
+  /** @type {Map<string, { source: string, stepClass: string | null }>} */
+  const policyProfilesById = new Map();
+  /** @type {Map<string, { source: string, stepClass: string | null }>} */
+  const promptBundlesByRef = new Map();
+  /** @type {Map<string, { source: string, subjectType: string | null }>} */
+  const datasetsByRef = new Map();
+  /** @type {Map<string, { source: string, capabilities: Set<string> }>} */
+  const adapterProfilesById = new Map();
+  /** @type {Map<string, Set<import("./index.d.ts").ContractFamily>>} */
+  const knownReferenceFamilies = new Map();
+
+  for (const result of results) {
+    if (!result.ok || !result.family || !isPlainObject(result.document)) {
+      continue;
+    }
+
+    const document = result.document;
+    switch (result.family) {
+      case "provider-route-profile": {
+        const routeId = document.route_id;
+        if (typeof routeId === "string") {
+          routeIds.add(routeId);
+          registerKnownReference(knownReferenceFamilies, routeId, "provider-route-profile");
+          routeProfilesById.set(routeId, {
+            source: result.source,
+            step: typeof document.step === "string" ? document.step : null,
+            adapters: extractRouteAdapterRefs(document),
+          });
+        }
+        break;
+      }
+      case "wrapper-profile": {
+        const wrapperId = document.wrapper_id;
+        const version = document.version;
+        if (typeof wrapperId === "string" && typeof version === "number") {
+          const wrapperRef = `${wrapperId}@v${version}`;
+          wrapperRefs.add(wrapperRef);
+          registerKnownReference(knownReferenceFamilies, wrapperRef, "wrapper-profile");
+          wrapperProfilesByRef.set(wrapperRef, {
+            source: result.source,
+            stepClass: typeof document.step_class === "string" ? document.step_class : null,
+          });
+        }
+        break;
+      }
+      case "step-policy-profile": {
+        const policyId = document.policy_id;
+        if (typeof policyId === "string") {
+          policyIds.add(policyId);
+          registerKnownReference(knownReferenceFamilies, policyId, "step-policy-profile");
+          policyProfilesById.set(policyId, {
+            source: result.source,
+            stepClass: typeof document.step_class === "string" ? document.step_class : null,
+          });
+        }
+        break;
+      }
+      case "evaluation-suite": {
+        const suiteId = document.suite_id;
+        const version = document.version;
+        if (typeof suiteId === "string" && typeof version === "number") {
+          const suiteRef = `${suiteId}@v${version}`;
+          suiteRefs.add(suiteRef);
+          registerKnownReference(knownReferenceFamilies, suiteRef, "evaluation-suite");
+        }
+        break;
+      }
+      case "dataset": {
+        const datasetId = document.dataset_id;
+        const version = document.version;
+        if (typeof datasetId === "string" && typeof version === "string") {
+          const datasetRef = `dataset://${datasetId}@${version}`;
+          datasetRefs.add(datasetRef);
+          registerKnownReference(knownReferenceFamilies, datasetRef, "dataset");
+          datasetsByRef.set(datasetRef, {
+            source: result.source,
+            subjectType: typeof document.subject_type === "string" ? document.subject_type : null,
+          });
+        }
+        break;
+      }
+      case "live-e2e-profile": {
+        const profileId = document.profile_id;
+        const version = document.version;
+        if (typeof profileId === "string" && typeof version === "number") {
+          const profileRef = `${profileId}@v${version}`;
+          liveE2eProfileRefs.add(profileRef);
+          registerKnownReference(knownReferenceFamilies, profileRef, "live-e2e-profile");
+        }
+        break;
+      }
+      case "prompt-bundle": {
+        const bundleId = document.prompt_bundle_id;
+        const version = document.version;
+        if (typeof bundleId === "string" && typeof version === "number") {
+          const bundleRef = `prompt-bundle://${bundleId}@v${version}`;
+          promptBundleRefs.add(bundleRef);
+          registerKnownReference(knownReferenceFamilies, bundleRef, "prompt-bundle");
+          promptBundlesByRef.set(bundleRef, {
+            source: result.source,
+            stepClass: typeof document.step_class === "string" ? document.step_class : null,
+          });
+        }
+        break;
+      }
+      case "adapter-capability-profile": {
+        const adapterId = document.adapter_id;
+        if (typeof adapterId === "string") {
+          adapterIds.add(adapterId);
+          registerKnownReference(knownReferenceFamilies, adapterId, "adapter-capability-profile");
+          const capabilities = new Set(
+            Object.entries(isPlainObject(document.capabilities) ? document.capabilities : {})
+              .filter(([, value]) => value === true)
+              .map(([capability]) => capability),
+          );
+          adapterProfilesById.set(adapterId, {
+            source: result.source,
+            capabilities,
+          });
+        }
+        break;
+      }
+      case "project-profile": {
+        const relativePath = normalizePath(path.relative(workspaceRoot, result.source));
+        registerKnownReference(knownReferenceFamilies, relativePath, "project-profile");
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  return {
+    routeIds,
+    wrapperRefs,
+    policyIds,
+    suiteRefs,
+    datasetRefs,
+    liveE2eProfileRefs,
+    promptBundleRefs,
+    adapterIds,
+    routeProfilesById,
+    wrapperProfilesByRef,
+    policyProfilesById,
+    promptBundlesByRef,
+    datasetsByRef,
+    adapterProfilesById,
+    knownReferenceFamilies,
+  };
+}
+
+/**
+ * @param {{
+ *   issues: import("./index.d.ts").ReferenceValidationIssue[],
+ *   source: string,
+ *   field: string,
+ *   reference: string,
+ *   expected: string,
+ *   expectedFamily: import("./index.d.ts").ContractFamily,
+ *   expectedSet: Set<string>,
+ *   registry: { knownReferenceFamilies: Map<string, Set<import("./index.d.ts").ContractFamily>> }
+ * }} params
+ */
+function validateReferenceTarget({ issues, source, field, reference, expected, expectedFamily, expectedSet, registry }) {
+  if (expectedSet.has(reference)) {
+    return;
+  }
+
+  const knownFamilies = registry.knownReferenceFamilies.get(reference);
+  if (knownFamilies && knownFamilies.size > 0 && !knownFamilies.has(expectedFamily)) {
+    issues.push(
+      referenceIssue({
+        code: "reference_target_type_mismatch",
+        source,
+        field,
+        reference,
+        expected: expectedFamily,
+        actual: [...knownFamilies].join("|"),
+        message: `Reference '${reference}' resolves to a different family than expected.`,
+      }),
+    );
+    return;
+  }
+
+  issues.push(
+    referenceIssue({
+      code: "reference_target_missing",
+      source,
+      field,
+      reference,
+      expected,
+      actual: "missing target",
+      message: `Reference '${reference}' does not resolve to ${expected}.`,
+    }),
+  );
+}
+
+/**
+ * @param {Map<string, Set<import("./index.d.ts").ContractFamily>>} registry
+ * @param {string} reference
+ * @param {import("./index.d.ts").ContractFamily} family
+ */
+function registerKnownReference(registry, reference, family) {
+  const knownFamilies = registry.get(reference);
+  if (knownFamilies) {
+    knownFamilies.add(family);
+    return;
+  }
+  registry.set(reference, new Set([family]));
+}
+
+/**
+ * @param {{ code: import("./index.d.ts").ReferenceValidationIssueCode, source: string, field?: string | null, expected?: string | null, actual?: string | null, reference?: string | null, message: string }} params
+ * @returns {import("./index.d.ts").ReferenceValidationIssue}
+ */
+function referenceIssue({ code, source, field = null, expected = null, actual = null, reference = null, message }) {
+  return {
+    code,
+    source,
+    field,
+    expected,
+    actual,
+    reference,
+    message,
+  };
 }
 
 /**

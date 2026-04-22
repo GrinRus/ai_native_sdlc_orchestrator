@@ -10,6 +10,31 @@ target_repo:
   ref: main
   checkout_strategy: shallow
   write_target: patch-or-fork
+preflight:
+  mode: no-write
+  sequence:
+  - clone
+  - inspect
+  - analyze
+  - validate
+  - verify
+  - stop
+  prerequisites:
+  - node >=22 with npm available
+  - network access for shallow clone, npm install, and playwright browser download
+  repo_shape_notes:
+  - single-package TypeScript library with npm-based checks
+  failure_safe_defaults:
+  - keep output_policy.write_back_to_remote set to false
+  - keep preferred delivery mode in patch-or-fork-safe options only
+  abort_conditions:
+  - repository clone fails or ref cannot be resolved
+  - npm test fails during preflight verification
+  - any command requests upstream write-back
+  reusable_assumptions:
+    bootstrap: clone and profile loading can run without write-back credentials
+    quality: bounded regression verification uses npm test as preflight gate
+    delivery: patch or fork-local artifacts remain sufficient for rehearsal completion
 runtime:
   mode: ephemeral
   runtime_root: .aor
@@ -38,6 +63,9 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+  - npm install
+  - npx playwright install
   commands:
   - npm test
   eval_suites:

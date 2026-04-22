@@ -10,6 +10,31 @@ target_repo:
   ref: main
   checkout_strategy: shallow
   write_target: patch-or-fork
+preflight:
+  mode: no-write
+  sequence:
+  - clone
+  - inspect
+  - analyze
+  - validate
+  - verify
+  - stop
+  prerequisites:
+  - node >=22 with npm available
+  - network access for shallow clone, npm install, and playwright browser download
+  repo_shape_notes:
+  - single-package TypeScript library with fast test verification
+  failure_safe_defaults:
+  - keep output_policy.write_back_to_remote set to false
+  - keep delivery mode in patch-only for short public-target rehearsals
+  abort_conditions:
+  - repository clone fails or ref cannot be resolved
+  - npm test fails during preflight verification
+  - release mode requires upstream writes
+  reusable_assumptions:
+    bootstrap: no-write bootstrap flow is identical to regress-short profile
+    quality: review and qa stages assume verify gate passes before release steps
+    delivery: release packet and manifest can be generated without upstream push
 runtime:
   mode: ephemeral
   runtime_root: .aor
@@ -40,6 +65,9 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+  - npm install
+  - npx playwright install
   commands:
   - npm test
   eval_suites:
@@ -56,7 +84,7 @@ approvals:
 output_policy:
   materialize_release_packet: true
   write_back_to_remote: false
-  preferred_delivery_mode: patch
+  preferred_delivery_mode: patch-only
 ui:
   attachable: true
   default_scope: run

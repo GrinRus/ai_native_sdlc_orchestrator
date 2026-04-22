@@ -4,6 +4,7 @@
 - Repository: `https://github.com/httpie/cli.git`
 - Branch/ref: `master`
 - Goal: deeper regression rehearsal on a Python CLI project
+- Repo shape note: make-driven Python CLI workflow with pytest-based checks
 
 ## When to use it
 - after routing or harness changes that need stronger evidence;
@@ -24,14 +25,39 @@ Confirm that AOR can:
 4. Verify with `make test` and `make codestyle`.
 5. Stop at patch or fork branch unless explicitly configured otherwise.
 
+## No-write preflight
+Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
+1. clone
+2. inspect
+3. analyze
+4. validate
+5. verify
+6. stop unless no-write gates pass
+
+Isolation mode defaults:
+- prefer `worktree` when rehearsing local-branch delivery behavior;
+- prefer `workspace-clone` when rehearsing fork-first delivery behavior on public targets.
+
+## Prerequisites
+- See `docs/ops/live-e2e-dependency-matrix.md` for canonical dependency and command requirements.
+- Local environment must allow Python dependency installation.
+
+## Abort conditions
+- Clone or setup path fails.
+- `make test` fails during preflight verification.
+- `make codestyle` fails during preflight verification.
+- Any requested delivery mode requires upstream write-back.
+
 ## Start command
 ```bash
-aor live-e2e start   --profile ./examples/live-e2e/regress-long.yaml
+aor live-e2e start \
+  --project-ref . \
+  --profile ./examples/live-e2e/regress-long.yaml
 ```
 
 ## Expected verification
 - repository bootstrap succeeds;
-- `make all` or equivalent setup path succeeds;
+- setup command `python -m pip install -e ".[dev]"` succeeds;
 - `make test` and `make codestyle` succeed;
 - review and QA packets are materialized;
 - release packet is not required.

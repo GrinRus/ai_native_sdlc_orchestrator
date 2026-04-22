@@ -1,0 +1,55 @@
+[
+  {
+    "event_id": "run.live.stream.v1.event.000001",
+    "run_id": "run.live.stream.v1",
+    "timestamp": "2026-04-21T17:00:00.000Z",
+    "event_type": "run.started",
+    "payload": {
+      "sequence": 1,
+      "stage": "bootstrap",
+      "status": "started"
+    }
+  },
+  {
+    "event_id": "run.live.stream.v1.event.000002",
+    "run_id": "run.live.stream.v1",
+    "timestamp": "2026-04-21T17:00:05.000Z",
+    "event_type": "step.updated",
+    "payload": {
+      "sequence": 2,
+      "step_id": "bootstrap.clone",
+      "status": "pass"
+    }
+  },
+  {
+    "event_id": "run.live.stream.v1.event.000003",
+    "run_id": "run.live.stream.v1",
+    "timestamp": "2026-04-21T17:00:07.000Z",
+    "event_type": "evidence.linked",
+    "payload": {
+      "sequence": 3,
+      "evidence_ref": "evidence://reports/run.live.stream.v1/step-result-bootstrap.json"
+    }
+  },
+  {
+    "event_id": "run.live.stream.v1.event.000004",
+    "run_id": "run.live.stream.v1",
+    "timestamp": "2026-04-21T17:00:08.000Z",
+    "event_type": "warning.raised",
+    "payload": {
+      "sequence": 4,
+      "code": "budget.near_limit",
+      "summary": "Wall-clock usage exceeded 80 percent."
+    }
+  },
+  {
+    "event_id": "run.live.stream.v1.event.000005",
+    "run_id": "run.live.stream.v1",
+    "timestamp": "2026-04-21T17:00:10.000Z",
+    "event_type": "run.terminal",
+    "payload": {
+      "sequence": 5,
+      "status": "pass"
+    }
+  }
+]

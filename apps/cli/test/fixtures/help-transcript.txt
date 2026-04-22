@@ -1,0 +1,40 @@
+AOR CLI command surface
+
+Implemented commands:
+  - aor project init
+  - aor project analyze
+  - aor project validate
+  - aor project verify
+  - aor eval run
+  - aor harness certify
+  - aor handoff prepare
+  - aor handoff approve
+  - aor run status
+  - aor packet show
+  - aor evidence show
+  - aor live-e2e start
+  - aor live-e2e status
+  - aor live-e2e report
+
+Planned commands (not implemented yet):
+  - aor intake create
+  - aor discovery run
+  - aor spec build
+  - aor wave create
+  - aor run start
+  - aor run pause
+  - aor run resume
+  - aor run steer
+  - aor run cancel
+  - aor harness replay
+  - aor asset promote
+  - aor asset freeze
+  - aor deliver prepare
+  - aor release prepare
+  - aor incident open
+  - aor incident show
+  - aor audit runs
+  - aor ui attach
+  - aor ui detach
+
+Use 'aor <group> <command> --help' for implemented command contracts.

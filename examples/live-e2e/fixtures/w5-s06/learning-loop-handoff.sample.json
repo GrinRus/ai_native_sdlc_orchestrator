@@ -1,0 +1,27 @@
+{
+  "handoff_id": "live-e2e.regress.short.run-202604211600.learning-loop.handoff.v1",
+  "project_id": "aor-core",
+  "run_id": "live-e2e.regress.short.run-202604211600",
+  "run_status": "fail",
+  "source_kind": "live-e2e",
+  "scorecard_ref": "evidence://projects/aor-core/reports/learning-loop-scorecard-live-e2e-live-e2e.regress.short.run-202604211600.json",
+  "incident_ref": "evidence://projects/aor-core/reports/incident-report-aor-core.incident.live-e2e.regress.short.run-202604211600.202604211601.json",
+  "backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/wave-5-implementation-slices.md"
+  ],
+  "quality_refs": [
+    "suite.release.core@v1"
+  ],
+  "evidence_refs": [
+    "evidence://projects/aor-core/reports/live-e2e-run-summary-live-e2e.regress.short.run-202604211600.json",
+    "evidence://projects/aor-core/reports/learning-loop-scorecard-live-e2e-live-e2e.regress.short.run-202604211600.json",
+    "evidence://projects/aor-core/reports/incident-report-aor-core.incident.live-e2e.regress.short.run-202604211600.202604211601.json"
+  ],
+  "next_actions": [
+    "Review learning-loop artifacts and incident context.",
+    "Map follow-up work into docs/backlog/mvp-implementation-backlog.md and the owning wave slice.",
+    "Update eval suites or harness captures before re-enabling risky write-back paths."
+  ],
+  "generated_at": "2026-04-21T16:01:00.000Z"
+}
