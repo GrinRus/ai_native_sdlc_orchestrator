@@ -215,3 +215,40 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     assert.ok(runSummary.quality_refs.length >= 1);
   });
 });
+
+test("listRuns includes run-control state snapshots even before packet/report artifacts exist", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const runId = "run.control.read.v1";
+    const stateFile = path.join(init.runtimeLayout.stateRoot, "run-control-state-run-control-read-v1.json");
+
+    fs.writeFileSync(
+      stateFile,
+      `${JSON.stringify(
+        {
+          schema_version: 1,
+          run_id: runId,
+          status: "running",
+          current_step: null,
+          last_action: "start",
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          action_sequence: 1,
+          approval_refs: [],
+          audit_refs: [],
+          evidence_root: init.runtimeLayout.reportsRoot,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const runs = listRuns({ projectRef: repoRoot, cwd: repoRoot });
+    const controlRun = runs.find((run) => run.run_id === runId);
+    assert.ok(controlRun);
+    assert.deepEqual(controlRun.packet_refs, []);
+    assert.deepEqual(controlRun.step_result_refs, []);
+    assert.deepEqual(controlRun.quality_refs, []);
+  });
+});

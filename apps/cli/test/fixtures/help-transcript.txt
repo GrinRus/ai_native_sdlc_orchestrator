@@ -13,6 +13,11 @@ Implemented commands:
   - aor discovery run
   - aor spec build
   - aor wave create
+  - aor run start
+  - aor run pause
+  - aor run resume
+  - aor run steer
+  - aor run cancel
   - aor run status
   - aor packet show
   - aor evidence show
@@ -21,11 +26,6 @@ Implemented commands:
   - aor live-e2e report
 
 Planned commands (not implemented yet):
-  - aor run start
-  - aor run pause
-  - aor run resume
-  - aor run steer
-  - aor run cancel
   - aor harness replay
   - aor asset promote
   - aor asset freeze

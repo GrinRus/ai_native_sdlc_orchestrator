@@ -75,7 +75,7 @@ test("operator command help documents read-only and future control semantics", (
   assert.equal(result.stderr, "");
   assert.match(result.stdout, /Status: implemented in operator shell \(W5-S03\)/);
   assert.match(result.stdout, /This command is read-only\./);
-  assert.match(result.stdout, /Future control hooks remain planned/);
+  assert.match(result.stdout, /Use run start\/pause\/resume\/steer\/cancel for bounded control actions\./);
 });
 
 test("live-e2e command help documents start observe and abort semantics", () => {
@@ -86,6 +86,16 @@ test("live-e2e command help documents start observe and abort semantics", () => 
   assert.match(result.stdout, /Status: implemented in live E2E shell \(W5-S05\)/);
   assert.match(result.stdout, /standard profile run and emits durable run summary \+ scorecard artifacts/);
   assert.match(result.stdout, /--hold-open=true leaves the run in running state/);
+});
+
+test("run-control command help documents guardrails and audit semantics", () => {
+  const result = invokeCli(["run", "steer", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in run-control shell \(W6-S03\)/);
+  assert.match(result.stdout, /--target-step <step_class>/);
+  assert.match(result.stdout, /requires --approval-ref when policy guardrails demand approval/);
 });
 
 test("unknown command fails clearly", () => {
@@ -113,11 +123,11 @@ test("invalid project-ref fails clearly", () => {
 });
 
 test("planned commands report not implemented status", () => {
-  const result = invokeCli(["run", "start"]);
+  const result = invokeCli(["deliver", "prepare"]);
 
   assert.equal(result.exitCode, 1);
   assert.equal(result.stdout, "");
-  assert.match(result.stderr, /Command 'aor run start' is planned and not implemented yet\./);
+  assert.match(result.stderr, /Command 'aor deliver prepare' is planned and not implemented yet\./);
 });
 
 test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () => {
@@ -205,6 +215,128 @@ test("W6 intake/discovery/spec/wave commands require --project-ref", () => {
     assert.equal(result.stdout, "");
     assert.match(result.stderr, /Missing required flag '--project-ref'/);
   }
+});
+
+test("W6 run-control command pack enforces guardrails, transitions, and durable audit evidence", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const runId = "run-control-smoke";
+
+    const startResult = invokeCli(["run", "start", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(startResult.exitCode, 0, startResult.stderr);
+    const startPayload = JSON.parse(startResult.stdout);
+    assert.equal(startPayload.run_control_action, "start");
+    assert.equal(startPayload.run_control_blocked, false);
+    assert.equal(startPayload.run_control_state.status, "running");
+    assert.equal(fs.existsSync(startPayload.run_control_state_file), true);
+    assert.equal(fs.existsSync(startPayload.run_control_audit_file), true);
+
+    const pauseResult = invokeCli(["run", "pause", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(pauseResult.exitCode, 0, pauseResult.stderr);
+    const pausePayload = JSON.parse(pauseResult.stdout);
+    assert.equal(pausePayload.run_control_action, "pause");
+    assert.equal(pausePayload.run_control_blocked, false);
+    assert.equal(pausePayload.run_control_state.status, "paused");
+    assert.equal(fs.existsSync(pausePayload.run_control_audit_file), true);
+
+    const blockedScopeResult = invokeCli(["run", "steer", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(blockedScopeResult.exitCode, 0, blockedScopeResult.stderr);
+    const blockedScopePayload = JSON.parse(blockedScopeResult.stdout);
+    assert.equal(blockedScopePayload.run_control_action, "steer");
+    assert.equal(blockedScopePayload.run_control_blocked, true);
+    assert.equal(blockedScopePayload.run_control_guardrails.approval_required, true);
+    assert.equal(blockedScopePayload.run_control_transition.from_status, "paused");
+    assert.equal(blockedScopePayload.run_control_transition.to_status, "paused");
+    assert.equal(fs.existsSync(blockedScopePayload.run_control_audit_file), true);
+    const blockedScopeAudit = JSON.parse(fs.readFileSync(blockedScopePayload.run_control_audit_file, "utf8"));
+    assert.equal(blockedScopeAudit.run_id, runId);
+    assert.equal(blockedScopeAudit.blocked, true);
+    assert.equal(blockedScopeAudit.blocked_reason.code, "scope.target_step_required");
+
+    const resumeResult = invokeCli(["run", "resume", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(resumeResult.exitCode, 0, resumeResult.stderr);
+    const resumePayload = JSON.parse(resumeResult.stdout);
+    assert.equal(resumePayload.run_control_blocked, false);
+    assert.equal(resumePayload.run_control_state.status, "running");
+
+    const invalidTransitionResult = invokeCli(["run", "resume", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(invalidTransitionResult.exitCode, 0, invalidTransitionResult.stderr);
+    const invalidTransitionPayload = JSON.parse(invalidTransitionResult.stdout);
+    assert.equal(invalidTransitionPayload.run_control_action, "resume");
+    assert.equal(invalidTransitionPayload.run_control_blocked, true);
+    assert.equal(invalidTransitionPayload.run_control_transition.from_status, "running");
+    assert.equal(invalidTransitionPayload.run_control_transition.to_status, "running");
+
+    const blockedApprovalResult = invokeCli([
+      "run",
+      "cancel",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+    ]);
+    assert.equal(blockedApprovalResult.exitCode, 0, blockedApprovalResult.stderr);
+    const blockedApprovalPayload = JSON.parse(blockedApprovalResult.stdout);
+    assert.equal(blockedApprovalPayload.run_control_action, "cancel");
+    assert.equal(blockedApprovalPayload.run_control_blocked, true);
+    assert.equal(blockedApprovalPayload.run_control_guardrails.approval_required, true);
+    assert.equal(fs.existsSync(blockedApprovalPayload.run_control_audit_file), true);
+
+    const cancelResult = invokeCli([
+      "run",
+      "cancel",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+      "--approval-ref",
+      "approval://RC-1001",
+    ]);
+    assert.equal(cancelResult.exitCode, 0, cancelResult.stderr);
+    const cancelPayload = JSON.parse(cancelResult.stdout);
+    assert.equal(cancelPayload.run_control_blocked, false);
+    assert.equal(cancelPayload.run_control_state.status, "canceled");
+    assert.equal(fs.existsSync(cancelPayload.run_control_audit_file), true);
+
+    const statusResult = invokeCli(["run", "status", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(statusResult.exitCode, 0, statusResult.stderr);
+    const statusPayload = JSON.parse(statusResult.stdout);
+    assert.ok(statusPayload.run_summaries.some((summary) => summary.run_id === runId));
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "run-control-transcript.json"), "utf8"),
+    );
+    const transcriptSubset = {
+      run_start: {
+        command: startPayload.command,
+        status: startPayload.status,
+        run_control_action: startPayload.run_control_action,
+        run_control_blocked: startPayload.run_control_blocked,
+      },
+      run_pause: {
+        command: pausePayload.command,
+        status: pausePayload.status,
+        run_control_action: pausePayload.run_control_action,
+        run_control_blocked: pausePayload.run_control_blocked,
+      },
+      run_steer_blocked: {
+        command: blockedScopePayload.command,
+        status: blockedScopePayload.status,
+        run_control_action: blockedScopePayload.run_control_action,
+        run_control_blocked: blockedScopePayload.run_control_blocked,
+        blocked_reason_code: blockedScopeAudit.blocked_reason.code,
+      },
+      run_cancel: {
+        command: cancelPayload.command,
+        status: cancelPayload.status,
+        run_control_action: cancelPayload.run_control_action,
+        run_control_blocked: cancelPayload.run_control_blocked,
+      },
+    };
+    assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
 });
 
 test("operator commands inspect runs, packets, and evidence through shared control-plane surfaces", () => {

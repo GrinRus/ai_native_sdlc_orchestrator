@@ -34,6 +34,33 @@ The API exposes command, query, and live-stream surfaces for AOR.
 
 All read responses must reuse existing contract families and IDs rather than API-only parallel shapes.
 
+## Run-control command endpoints (W6-S03 baseline)
+- `POST /api/projects/:projectId/runs/:runId/start`
+- `POST /api/projects/:projectId/runs/:runId/pause`
+- `POST /api/projects/:projectId/runs/:runId/resume`
+- `POST /api/projects/:projectId/runs/:runId/steer`
+- `POST /api/projects/:projectId/runs/:runId/cancel`
+
+Command payload baseline:
+- `reason` (optional text summary for operator intent);
+- `target_step` (required for `steer` scope, blocked when missing);
+- `approval_ref` (required by high-risk policy guardrails when applicable).
+
+Deterministic transition baseline:
+- `start` creates/opens `running` lifecycle;
+- `pause` allowed only from `running`;
+- `resume` allowed only from `paused`;
+- `steer` allowed from `running|paused` with explicit target step;
+- `cancel` allowed from `running|paused`, resulting in terminal `canceled`.
+
+Guardrail baseline:
+- high-risk controls (`steer`, `cancel`) must evaluate `approval_policy` + `risk_tiers` before apply;
+- blocked actions must still emit durable audit evidence and warning-style live-run event payloads.
+
+Durable audit baseline:
+- every control action writes one durable `run-control-event-*.json` record under runtime reports;
+- control records must include `run_id`, `action`, transition snapshot, guardrail decision, and `evidence_root`.
+
 ## Authentication and permission assumptions
 - Baseline assumption for local/operator rehearsals: trusted local operator context behind workspace access controls.
 - Read endpoints are read-only and must not mutate runtime artifacts.

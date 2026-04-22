@@ -15,6 +15,7 @@ const STEP_RESULT_REGEX = /^step-result-.*\.json$/;
 const VALIDATION_REPORT_REGEX = /^validation-report.*\.json$/;
 const EVALUATION_REPORT_REGEX = /^evaluation-report.*\.json$/;
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
+const RUN_CONTROL_STATE_REGEX = /^run-control-state-.*\.json$/;
 
 /**
  * @param {string} value
@@ -219,11 +220,43 @@ function normalizeRunRef(runRef) {
  *   projectProfile?: string,
  *   runtimeRoot?: string,
  * }} options
+ * @returns {string[]}
+ */
+function listRunControlStateIds(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const stateFiles = listJsonFiles(init.runtimeLayout.stateRoot).filter((filePath) =>
+    RUN_CONTROL_STATE_REGEX.test(path.basename(filePath)),
+  );
+
+  /** @type {string[]} */
+  const runIds = [];
+  for (const filePath of stateFiles) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      if (typeof parsed?.run_id === "string" && parsed.run_id.trim().length > 0) {
+        runIds.push(parsed.run_id.trim());
+      }
+    } catch {
+      // Ignore malformed runtime state snapshots.
+    }
+  }
+
+  return runIds;
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
  */
 export function listRuns(options = {}) {
   const packets = listPacketArtifacts(options);
   const stepResults = listStepResults(options);
   const quality = listQualityArtifacts(options);
+  const runControlStateIds = listRunControlStateIds(options);
 
   /** @type {Map<string, { run_id: string, packet_refs: string[], step_result_refs: string[], quality_refs: string[] }>} */
   const runMap = new Map();
@@ -270,6 +303,10 @@ export function listRuns(options = {}) {
       const run = ensureRun(runId);
       run.quality_refs.push(artifact.artifact_ref);
     }
+  }
+
+  for (const runId of runControlStateIds) {
+    ensureRun(normalizeRunRef(runId));
   }
 
   return [...runMap.values()].map((entry) => ({

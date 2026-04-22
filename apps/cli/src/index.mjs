@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  applyRunControlAction,
   listDeliveryManifests,
   listPacketArtifacts,
   listPromotionDecisions,
@@ -115,11 +116,17 @@ function formatCommandHelp(definition) {
       ? "Status: implemented in quality shell (W3-S03)"
       : definition.command === "harness certify"
         ? "Status: implemented in quality shell (W3-S05)"
-        : definition.command === "intake create" ||
+      : definition.command === "intake create" ||
             definition.command === "discovery run" ||
             definition.command === "spec build" ||
             definition.command === "wave create"
           ? "Status: implemented in intake and planning shell (W6-S02)"
+        : definition.command === "run start" ||
+            definition.command === "run pause" ||
+            definition.command === "run resume" ||
+            definition.command === "run steer" ||
+            definition.command === "run cancel"
+          ? "Status: implemented in run-control shell (W6-S03)"
         : definition.command === "run status" ||
             definition.command === "packet show" ||
             definition.command === "evidence show"
@@ -212,12 +219,42 @@ function formatCommandHelp(definition) {
                     "- Wave create writes wave-ticket and pending handoff-packet artifacts.",
                     "- Use 'aor handoff approve' to promote approval_state before execution-style flows.",
                   ]
+          : definition.command === "run start"
+            ? [
+                "- Starts one deterministic run-control lifecycle and emits live-run events.",
+                "- --run-id is optional; when omitted, CLI generates a bounded run id.",
+                "- High-risk guardrails still apply when policy requires approval evidence.",
+              ]
+            : definition.command === "run pause"
+              ? [
+                  "- Pause transitions only from running state; repeated pause attempts are blocked.",
+                  "- Command writes durable control audit evidence even when blocked.",
+                  "- Use run resume, run steer, or run cancel for next control actions.",
+                ]
+              : definition.command === "run resume"
+                ? [
+                    "- Resume transitions only from paused state; resume on running run is blocked.",
+                    "- Command writes durable control audit evidence even when blocked.",
+                    "- Use run status --follow for live stream observation after resume.",
+                  ]
+                : definition.command === "run steer"
+                  ? [
+                      "- --target-step is required to keep control scope explicit and auditable.",
+                      "- High-risk steer requires --approval-ref when policy guardrails demand approval.",
+                      "- Successful steer keeps deterministic status while recording target_step intent.",
+                    ]
+                  : definition.command === "run cancel"
+                    ? [
+                        "- Cancel transitions only from running or paused state.",
+                        "- High-risk cancel requires --approval-ref when policy guardrails demand approval.",
+                        "- Command emits terminal control-plane event and durable control audit evidence.",
+                      ]
           : definition.command === "run status"
             ? [
                 "- This command is read-only. It does not mutate run state.",
                 "- --follow=true requires --run-id and reuses the shared live-run event stream protocol.",
-              "- Future control hooks remain planned: run pause, run resume, run steer, run cancel.",
-            ]
+                "- Use run start/pause/resume/steer/cancel for bounded control actions.",
+              ]
           : definition.command === "packet show"
             ? [
                 "- This command is read-only and resolves packet artifacts through the API read surface.",
@@ -612,6 +649,18 @@ function executeImplementedCommand(command, flags, cwd) {
   let liveE2EScorecards = null;
   let liveE2EAbortApplied = null;
   let liveE2EAbortSupported = null;
+  let runControlAction = null;
+  let runControlRunId = null;
+  let runControlState = null;
+  let runControlStateFile = null;
+  let runControlAuditId = null;
+  let runControlAuditFile = null;
+  let runControlBlocked = null;
+  let runControlGuardrails = null;
+  let runControlTransition = null;
+  let primaryEventId = null;
+  let evidenceEventId = null;
+  let streamLogFile = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -919,6 +968,53 @@ function executeImplementedCommand(command, flags, cwd) {
     handoffPacketFile = approveResult.handoffPacketFile;
     handoffStatus = approveResult.handoffPacket.status;
     handoffApprovalState = approveResult.handoffPacket.approval_state;
+  } else if (
+    command === "run start" ||
+    command === "run pause" ||
+    command === "run resume" ||
+    command === "run steer" ||
+    command === "run cancel"
+  ) {
+    ensureRequiredFlags(command, flags);
+
+    const runAction = /** @type {"start" | "pause" | "resume" | "steer" | "cancel"} */ (command.split(" ")[1]);
+    const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    const targetStep = resolveOptionalStringFlag("target-step", flags["target-step"]);
+
+    if (runAction !== "steer" && targetStep) {
+      throw new CliUsageError(`Flag '--target-step' is only valid for 'aor run steer'.`);
+    }
+
+    const controlResult = applyRunControlAction({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId,
+      action: runAction,
+      targetStep,
+      reason: resolveOptionalStringFlag("reason", flags.reason),
+      approvalRef: resolveOptionalStringFlag("approval-ref", flags["approval-ref"]),
+    });
+
+    resolvedProjectRef = controlResult.projectRoot;
+    resolvedRuntimeRoot = controlResult.runtimeRoot;
+    runtimeLayout = controlResult.runtimeLayout;
+    projectProfileRef = controlResult.projectProfileRef;
+    runtimeStateFile = controlResult.stateFile;
+    runControlAction = controlResult.action;
+    runControlRunId = controlResult.runId;
+    runControlState = controlResult.state;
+    runControlStateFile = controlResult.stateFile;
+    runControlAuditId = controlResult.auditRecord.audit_id;
+    runControlAuditFile = controlResult.auditFile;
+    runControlBlocked = controlResult.blocked;
+    runControlGuardrails = controlResult.guardrails;
+    runControlTransition = controlResult.transition;
+    primaryEventId = controlResult.primaryEvent.event_id;
+    evidenceEventId = controlResult.evidenceEvent.event_id;
+    streamLogFile = controlResult.streamLogFile;
+    readOnly = false;
+    futureControlHooks = controlResult.nextActions;
   } else if (command === "run status") {
     ensureRequiredFlags(command, flags);
     const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
@@ -976,12 +1072,13 @@ function executeImplementedCommand(command, flags, cwd) {
         replay_count: stream.replay_events.length,
         stream_log_file: stream.log_file,
       };
+      streamLogFile = stream.log_file;
     } else {
       replayEvents = [];
     }
 
     readOnly = true;
-    futureControlHooks = ["run pause", "run resume", "run steer", "run cancel"];
+    futureControlHooks = ["run start", "run pause", "run resume", "run steer", "run cancel"];
   } else if (command === "packet show") {
     ensureRequiredFlags(command, flags);
     const family = resolveOptionalStringFlag("family", flags.family) ?? "all";
@@ -1254,10 +1351,22 @@ function executeImplementedCommand(command, flags, cwd) {
     certification_evaluation_report_file: certificationEvaluationReportFile,
     certification_harness_capture_file: certificationHarnessCaptureFile,
     certification_harness_replay_file: certificationHarnessReplayFile,
+    run_control_action: runControlAction,
+    run_control_run_id: runControlRunId,
+    run_control_state: runControlState,
+    run_control_state_file: runControlStateFile,
+    run_control_audit_id: runControlAuditId,
+    run_control_audit_file: runControlAuditFile,
+    run_control_blocked: runControlBlocked,
+    run_control_guardrails: runControlGuardrails,
+    run_control_transition: runControlTransition,
+    primary_event_id: primaryEventId,
+    evidence_event_id: evidenceEventId,
     run_summaries: runSummaries,
     follow_mode: followMode,
     stream_protocol: streamProtocol,
     stream_backpressure: streamBackpressure,
+    stream_log_file: streamLogFile,
     replay_events: replayEvents,
     packet_artifacts: packetArtifacts,
     selected_family: selectedFamily,

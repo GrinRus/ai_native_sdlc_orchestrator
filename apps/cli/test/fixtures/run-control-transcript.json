@@ -1,0 +1,27 @@
+{
+  "run_start": {
+    "command": "run start",
+    "status": "implemented",
+    "run_control_action": "start",
+    "run_control_blocked": false
+  },
+  "run_pause": {
+    "command": "run pause",
+    "status": "implemented",
+    "run_control_action": "pause",
+    "run_control_blocked": false
+  },
+  "run_steer_blocked": {
+    "command": "run steer",
+    "status": "implemented",
+    "run_control_action": "steer",
+    "run_control_blocked": true,
+    "blocked_reason_code": "scope.target_step_required"
+  },
+  "run_cancel": {
+    "command": "run cancel",
+    "status": "implemented",
+    "run_control_action": "cancel",
+    "run_control_blocked": false
+  }
+}

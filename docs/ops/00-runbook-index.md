@@ -12,6 +12,9 @@
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
 - `live-run-event-stream.md` — replay-safe stream behavior, reconnect flow, and backpressure baseline.
 
+## Run control
+- `run-control-lifecycle.md` — start/pause/resume/steer/cancel commands, guardrails, and audit checks.
+
 ## UI lifecycle
 - `ui-attach-detach.md` — how to attach or detach the optional web UI from a running AOR system.
 
