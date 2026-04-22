@@ -50,7 +50,7 @@ Expose operator-grade APIs, live views, and standardized live E2E orchestration 
 
 ## W5-S02 — Live run event stream
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Stream run events through a stable event model so operators can follow progress without tailing raw files.
 - **Primary modules:** `apps/api`, `packages/observability`, `docs/contracts/**`
 - **Hard dependencies:** W5-S01, W2-S05

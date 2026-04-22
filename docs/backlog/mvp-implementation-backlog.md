@@ -64,11 +64,11 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W5-S01 | Control plane API read surface | EPIC-6 | done | `apps/api`, `packages/orchestrator-core`, `packages/contracts` | W4-S05, W2-S05 |
-| W5-S02 | Live run event stream | EPIC-6 | ready | `apps/api`, `packages/observability`, `docs/contracts/**` | W5-S01, W2-S05 |
-| W5-S03 | CLI operator commands beyond bootstrap | EPIC-6 | blocked | `apps/cli`, `apps/api`, `docs/architecture/**` | W5-S01, W5-S02 |
-| W5-S04 | Detachable web UI baseline | EPIC-6 | blocked | `apps/web`, `apps/api`, `docs/ops/**` | W5-S01, W5-S02 |
-| W5-S05 | Standard live E2E orchestration runner | EPIC-7 | blocked | `apps/cli`, `apps/api`, `docs/ops/**`, `examples/live-e2e/**` | W5-S03, W4-S06, W3-S06 |
-| W5-S06 | Scorecards, incident capture, and learning-loop handoff | EPIC-7 | blocked | `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/backlog/**` | W5-S05, W3-S05 |
+| W5-S02 | Live run event stream | EPIC-6 | done | `apps/api`, `packages/observability`, `docs/contracts/**` | W5-S01, W2-S05 |
+| W5-S03 | CLI operator commands beyond bootstrap | EPIC-6 | done | `apps/cli`, `apps/api`, `docs/architecture/**` | W5-S01, W5-S02 |
+| W5-S04 | Detachable web UI baseline | EPIC-6 | done | `apps/web`, `apps/api`, `docs/ops/**` | W5-S01, W5-S02 |
+| W5-S05 | Standard live E2E orchestration runner | EPIC-7 | done | `apps/cli`, `apps/api`, `docs/ops/**`, `examples/live-e2e/**` | W5-S03, W4-S06, W3-S06 |
+| W5-S06 | Scorecards, incident capture, and learning-loop handoff | EPIC-7 | done | `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/backlog/**` | W5-S05, W3-S05 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.
