@@ -21,6 +21,7 @@ Policy definition for one step class: validators, quality gates, retry rules, re
 ## Notes
 Step policies decide how the orchestrator reacts after a step finishes.
 Runtime policy resolution merges policy fields with route constraints and project defaults before execution begins.
+Later-maturity governance flows should expose explicit deny/escalation reason codes in resolved policy outputs for delivery/release guardrails.
 
 ## Example
 See `examples/policies/*.yaml`.

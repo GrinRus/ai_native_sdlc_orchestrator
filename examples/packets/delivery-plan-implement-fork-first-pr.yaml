@@ -18,6 +18,11 @@ preconditions:
     status: present
     refs:
       - .aor/projects/aor-core/reports/promotion-decision-wrapper-wrapper.runner.default-v3-1776793902247.json
+governance:
+  decision: allow
+  route_risk_tier: medium
+  high_risk_delivery: false
+  reasons: []
 writeback_allowed: true
 blocking_reasons: []
 status: ready

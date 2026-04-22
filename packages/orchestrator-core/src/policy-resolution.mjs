@@ -42,6 +42,14 @@ function asString(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function asBoolean(value) {
+  return value === true;
+}
+
+/**
  * @param {Record<string, unknown>} projectProfile
  * @returns {string[]}
  */
@@ -60,6 +68,94 @@ function collectProjectCommandAllowlist(projectProfile) {
   }
 
   return [...new Set(commands)];
+}
+
+/**
+ * @param {{
+ *   projectProfile: Record<string, unknown>,
+ *   routeResolution: {
+ *     resolved_route_id: string,
+ *     route_profile: Record<string, unknown>,
+ *   },
+ *   resolvedWritebackMode: string,
+ * }} options
+ */
+function resolveRouteGovernanceDecision(options) {
+  const securityPolicy = asRecord(options.projectProfile.security_policy);
+  const approvalPolicy = asRecord(options.projectProfile.approval_policy);
+  const riskTiers = asRecord(options.projectProfile.risk_tiers);
+  const routeProfile = asRecord(options.routeResolution.route_profile);
+
+  const routeRiskTier = asString(routeProfile.risk_tier) ?? "unknown";
+  const highRiskDelivery = routeRiskTier === "high" && options.resolvedWritebackMode !== "no-write";
+
+  /** @type {Array<{ code: string, severity: "deny" | "escalate", message: string }>} */
+  const reasons = [];
+
+  const providerAllowlistEnforced = asBoolean(securityPolicy.provider_allowlist_enforced);
+  const adapterAllowlistEnforced = Array.isArray(options.projectProfile.allowed_adapters);
+  const allowedProviders = new Set(asStringArray(options.projectProfile.allowed_providers));
+  const allowedAdapters = new Set(asStringArray(options.projectProfile.allowed_adapters));
+
+  const primary = asRecord(routeProfile.primary);
+  const fallbacks = Array.isArray(routeProfile.fallback)
+    ? routeProfile.fallback.filter((entry) => typeof entry === "object" && entry !== null).map((entry) => asRecord(entry))
+    : [];
+  const providers = [asString(primary.provider), ...fallbacks.map((entry) => asString(entry.provider))].filter(Boolean);
+  const adapters = [asString(primary.adapter), ...fallbacks.map((entry) => asString(entry.adapter))]
+    .filter(Boolean)
+    .filter((adapter) => adapter !== "none");
+
+  if (providerAllowlistEnforced) {
+    const nonAllowlistedProviders = providers.filter((provider) => !allowedProviders.has(/** @type {string} */ (provider)));
+    if (nonAllowlistedProviders.length > 0) {
+      reasons.push({
+        code: "provider-not-allowlisted",
+        severity: "deny",
+        message: `Route '${options.routeResolution.resolved_route_id}' references providers outside project allowlist: ${nonAllowlistedProviders.join(", ")}.`,
+      });
+    }
+  }
+
+  if (adapterAllowlistEnforced) {
+    const nonAllowlistedAdapters = adapters.filter((adapter) => !allowedAdapters.has(/** @type {string} */ (adapter)));
+    if (nonAllowlistedAdapters.length > 0) {
+      reasons.push({
+        code: "adapter-not-allowlisted",
+        severity: "deny",
+        message: `Route '${options.routeResolution.resolved_route_id}' references adapters outside project allowlist: ${nonAllowlistedAdapters.join(", ")}.`,
+      });
+    }
+  }
+
+  if (highRiskDelivery) {
+    const tierPolicy = asRecord(riskTiers.high);
+    if (asBoolean(tierPolicy.require_security_review)) {
+      reasons.push({
+        code: "high-risk-security-review-required",
+        severity: "escalate",
+        message: "High-risk delivery route requires explicit security review before write-back.",
+      });
+    }
+    if (asBoolean(approvalPolicy.required_for_execution) || asBoolean(tierPolicy.require_human_approval)) {
+      reasons.push({
+        code: "high-risk-human-approval-required",
+        severity: "escalate",
+        message: "High-risk delivery route requires explicit human approval before write-back.",
+      });
+    }
+  }
+
+  const hasDeny = reasons.some((reason) => reason.severity === "deny");
+  const hasEscalate = reasons.some((reason) => reason.severity === "escalate");
+  const decision = hasDeny ? "deny" : hasEscalate ? "escalate" : "allow";
+
+  return {
+    decision,
+    route_risk_tier: routeRiskTier,
+    high_risk_delivery: highRiskDelivery,
+    reasons,
+  };
 }
 
 /**
@@ -286,6 +382,14 @@ function resolveStepPolicyForStepWithRegistry(options) {
       : typeof requireManifestFromProject === "boolean"
         ? requireManifestFromProject
         : true;
+  const governanceDecision = resolveRouteGovernanceDecision({
+    projectProfile,
+    routeResolution: {
+      resolved_route_id: routeResolution.resolved_route_id,
+      route_profile: routeProfile,
+    },
+    resolvedWritebackMode,
+  });
 
   return {
     step_class: options.stepClass,
@@ -369,6 +473,7 @@ function resolveStepPolicyForStepWithRegistry(options) {
       redact_secrets: Boolean(securityPolicy.redact_secrets),
       blocking_rules: asStringArray(policyEntry.profile.blocking_rules),
     },
+    governance_decision: governanceDecision,
     provenance: {
       project_profile_path: options.projectProfilePath,
       route_profile_source: routeResolution.route_profile_source,

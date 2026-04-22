@@ -31,6 +31,11 @@ escalation:
     - business-ambiguity
     - policy-conflict
     - security-boundary
+  reasons:
+    - code: high-risk-security-review-required
+      message: escalate when high-risk route requires security review
+    - code: high-risk-human-approval-required
+      message: escalate when high-risk route requires human approval
 blocking_rules:
   - approval-missing
   - repo-scope-violation

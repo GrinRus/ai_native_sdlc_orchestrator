@@ -54,7 +54,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S02 — Later discovery and architecture maturity pack
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** ready
+- **State:** done
 - **Outcome:** Close later discovery and architecture stories with stronger completeness and architecture-traceability checks.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**`
 - **Hard dependencies:** W6-S02, W7-S05

@@ -598,6 +598,7 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
     assert.equal(noWritePayload.delivery_mode, "no-write");
     assert.equal(noWritePayload.delivery_writeback_result, "no-write-confirmed");
     assert.equal(noWritePayload.delivery_blocking, false);
+    assert.equal(noWritePayload.delivery_governance_decision.decision, "allow");
     assert.equal(noWritePayload.release_packet_status, "ready-for-close");
     assert.equal(fs.existsSync(noWritePayload.delivery_manifest_file), true);
     assert.equal(fs.existsSync(noWritePayload.release_packet_file), true);
@@ -646,6 +647,7 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
     assert.equal(branchPayload.delivery_mode, "local-branch");
     assert.equal(branchPayload.delivery_writeback_result, "local-branch-committed");
     assert.equal(branchPayload.delivery_blocking, false);
+    assert.equal(branchPayload.delivery_governance_decision.decision, "allow");
     assert.equal(branchPayload.release_packet_status, "ready-for-close");
     assert.equal(fs.existsSync(branchPayload.delivery_manifest_file), true);
     assert.equal(fs.existsSync(branchPayload.release_packet_file), true);
@@ -681,6 +683,7 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
     assert.equal(forkPayload.delivery_mode, "fork-first-pr");
     assert.equal(forkPayload.delivery_writeback_result, "fork-pr-planned");
     assert.equal(forkPayload.delivery_blocking, false);
+    assert.equal(forkPayload.delivery_governance_decision.decision, "allow");
     assert.equal(forkPayload.release_packet_status, "ready-for-close");
     assert.equal(fs.existsSync(forkPayload.delivery_manifest_file), true);
     assert.equal(fs.existsSync(forkPayload.release_packet_file), true);
@@ -728,6 +731,69 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
       },
     };
     assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("delivery and release surfaces explicit governance deny/escalation reasons for high-risk policy paths", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+
+    const profilePath = path.join(projectRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    fs.writeFileSync(
+      profilePath,
+      profileContent.replace("  - openai\n  - anthropic\n  - open-code", "  - anthropic\n  - open-code"),
+      "utf8",
+    );
+
+    const denyResult = invokeCli([
+      "release",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "w8-release-governance-deny",
+      "--mode",
+      "patch-only",
+      "--approved-handoff-ref",
+      "evidence://handoff/approved",
+      "--promotion-evidence-refs",
+      "evidence://promotion/pass",
+    ]);
+    assert.equal(denyResult.exitCode, 1);
+    assert.equal(denyResult.stdout, "");
+    assert.match(denyResult.stderr, /Release preconditions failed:/);
+    assert.match(denyResult.stderr, /provider-not-allowlisted/);
+  });
+
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+
+    const routePath = path.join(projectRoot, "examples/routes/implement-default.yaml");
+    const routeContent = fs.readFileSync(routePath, "utf8");
+    fs.writeFileSync(routePath, routeContent.replace("risk_tier: medium", "risk_tier: high"), "utf8");
+
+    const escalateResult = invokeCli([
+      "release",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "w8-release-governance-escalate",
+      "--mode",
+      "patch-only",
+      "--approved-handoff-ref",
+      "evidence://handoff/approved",
+      "--promotion-evidence-refs",
+      "evidence://promotion/pass",
+    ]);
+    assert.equal(escalateResult.exitCode, 1);
+    assert.equal(escalateResult.stdout, "");
+    assert.match(escalateResult.stderr, /Release preconditions failed:/);
+    assert.match(escalateResult.stderr, /high-risk-security-review-required/);
+    assert.match(escalateResult.stderr, /high-risk-human-approval-required/);
   });
 });
 

@@ -93,7 +93,7 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W8-S01 | Sponsor and planner strategic visibility expansion | EPIC-6 | done | `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W7-S05 |
-| W8-S02 | Later discovery and architecture maturity pack | EPIC-1 | ready | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**` | W6-S02, W7-S05 |
+| W8-S02 | Later discovery and architecture maturity pack | EPIC-1 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**` | W6-S02, W7-S05 |
 | W8-S03 | Later delivery and security route-governance maturity | EPIC-3 | ready | `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**` | W6-S03, W7-S05, W8-S08 |
 | W8-S04 | Later operator event and policy visibility expansion | EPIC-6 | ready | `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W6-S03, W7-S05, W8-S08 |
 | W8-S05 | Later QA and AI platform baseline comparison maturity | EPIC-4 | done | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**` | W7-S01, W7-S02 |

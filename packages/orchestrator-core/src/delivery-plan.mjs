@@ -94,6 +94,36 @@ function resolveModeSource(policyResolution) {
 }
 
 /**
+ * @param {Record<string, unknown>} policyResolution
+ */
+function resolveGovernanceSource(policyResolution) {
+  const governance = asRecord(policyResolution.governance_decision);
+  const decisionRaw = asString(governance.decision);
+  const decision = decisionRaw === "deny" || decisionRaw === "escalate" ? decisionRaw : "allow";
+  const riskTier = asString(governance.route_risk_tier) ?? "unknown";
+  const highRiskDelivery = governance.high_risk_delivery === true;
+  const reasons = Array.isArray(governance.reasons)
+    ? governance.reasons
+        .filter((entry) => typeof entry === "object" && entry !== null)
+        .map((entry) => {
+          const reason = asRecord(entry);
+          const code = asString(reason.code) ?? "governance-unknown";
+          const severityRaw = asString(reason.severity);
+          const severity = severityRaw === "deny" || severityRaw === "escalate" ? severityRaw : "escalate";
+          const message = asString(reason.message) ?? "Policy governance reason.";
+          return { code, severity, message };
+        })
+    : [];
+
+  return {
+    decision,
+    route_risk_tier: riskTier,
+    high_risk_delivery: highRiskDelivery,
+    reasons,
+  };
+}
+
+/**
  * @param {{
  *   runtimeLayout: { artifactsRoot: string },
  *   projectId: string,
@@ -110,6 +140,7 @@ function resolveModeSource(policyResolution) {
  */
 export function materializeDeliveryPlan(options) {
   const modeSource = resolveModeSource(asRecord(options.policyResolution));
+  const governance = resolveGovernanceSource(asRecord(options.policyResolution));
   const canonicalMode = normalizeDeliveryMode(modeSource.resolvedMode);
   const nonReadOnlyMode = canonicalMode !== "no-write";
 
@@ -127,6 +158,25 @@ export function materializeDeliveryPlan(options) {
   }
   if (nonReadOnlyMode && promotionStatus !== "present") {
     blockingReasons.push("promotion-evidence-required");
+  }
+  if (nonReadOnlyMode && governance.decision === "deny") {
+    blockingReasons.push(
+      ...governance.reasons.filter((reason) => reason.severity === "deny").map((reason) => reason.code),
+    );
+  }
+  if (nonReadOnlyMode && governance.decision === "escalate") {
+    blockingReasons.push(
+      ...governance.reasons.filter((reason) => reason.severity === "escalate").map((reason) => reason.code),
+    );
+  }
+  if (
+    nonReadOnlyMode &&
+    (governance.decision === "deny" || governance.decision === "escalate") &&
+    governance.reasons.length === 0
+  ) {
+    blockingReasons.push(
+      governance.decision === "deny" ? "governance-deny-reason-missing" : "governance-escalation-reason-missing",
+    );
   }
 
   const writebackAllowed = blockingReasons.length === 0;
@@ -159,6 +209,7 @@ export function materializeDeliveryPlan(options) {
         refs: promotionEvidenceRefs,
       },
     },
+    governance,
     writeback_allowed: writebackAllowed,
     blocking_reasons: blockingReasons,
     status,

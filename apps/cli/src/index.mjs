@@ -291,11 +291,13 @@ function formatCommandHelp(definition) {
                   "- Delivery prepare resolves policy bounds and materializes a delivery-plan before driver execution.",
                   "- --mode supports aliases (read-only -> no-write, patch -> patch-only, branch -> local-branch, fork-pr -> fork-first-pr).",
                   "- Non-no-write modes require approved handoff and promotion evidence refs to pass guardrails.",
+                  "- Output includes delivery_governance_decision with explicit allow/deny/escalate reasons.",
                 ]
               : definition.command === "release prepare"
                 ? [
                     "- Release prepare enforces release preconditions before delivery/release artifact materialization.",
                     "- If preconditions are blocked, the command fails with explicit blocking reasons.",
+                    "- Governance deny/escalate reasons are surfaced as machine-readable blocking codes.",
                     "- Successful execution links delivery-manifest and release-packet outputs for audit lineage.",
                   ]
             : definition.command === "evidence show"
@@ -816,6 +818,7 @@ function executeImplementedCommand(command, flags, cwd) {
   let deliveryMode = null;
   let deliveryBlocking = null;
   let deliveryBlockingReasons = null;
+  let deliveryGovernanceDecision = null;
   let deliveryTranscriptFile = null;
   let deliveryManifestId = null;
   let deliveryManifestFile = null;
@@ -1360,6 +1363,10 @@ function executeImplementedCommand(command, flags, cwd) {
           .filter((reason) => typeof reason === "string" && reason.trim().length > 0)
           .map((reason) => reason.trim())
       : [];
+    deliveryGovernanceDecision =
+      typeof planResult.deliveryPlan.governance === "object" && planResult.deliveryPlan.governance
+        ? planResult.deliveryPlan.governance
+        : null;
 
     if (command === "release prepare" && deliveryPlanStatus !== "ready") {
       const reasons = deliveryBlockingReasons.length > 0
@@ -2149,6 +2156,7 @@ function executeImplementedCommand(command, flags, cwd) {
     delivery_mode: deliveryMode,
     delivery_blocking: deliveryBlocking,
     delivery_blocking_reasons: deliveryBlockingReasons,
+    delivery_governance_decision: deliveryGovernanceDecision,
     delivery_transcript_file: deliveryTranscriptFile,
     delivery_manifest_id: deliveryManifestId,
     delivery_manifest_file: deliveryManifestFile,

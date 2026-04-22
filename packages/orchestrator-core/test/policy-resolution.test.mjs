@@ -54,6 +54,10 @@ test("resolveStepPolicyMatrix resolves deterministic bounds and guardrails for a
     assert.equal(planning.guardrails.approval_required, true);
     assert.equal(planning.guardrails.provider_allowlist_enforced, true);
     assert.equal(planning.guardrails.redact_secrets, true);
+    assert.equal(planning.governance_decision.decision, "allow");
+    assert.equal(planning.governance_decision.route_risk_tier, "medium");
+    assert.equal(planning.governance_decision.high_risk_delivery, false);
+    assert.deepEqual(planning.governance_decision.reasons, []);
   });
 });
 
@@ -142,6 +146,53 @@ test("resolveStepPolicyForStep fails deterministically on conflicting override s
           },
         }),
       /Policy resolution conflict for step 'planning'/i,
+    );
+  });
+});
+
+test("resolveStepPolicyForStep exposes deny governance reason when route provider violates allowlist", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    fs.writeFileSync(
+      profilePath,
+      profileContent.replace("  - openai\n  - anthropic\n  - open-code", "  - anthropic\n  - open-code"),
+      "utf8",
+    );
+
+    const resolved = resolveStepPolicyForStep({
+      projectProfilePath: profilePath,
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      policiesRoot: path.join(repoRoot, "examples/policies"),
+      stepClass: "implement",
+    });
+
+    assert.equal(resolved.governance_decision.decision, "deny");
+    assert.ok(resolved.governance_decision.reasons.some((reason) => reason.code === "provider-not-allowlisted"));
+  });
+});
+
+test("resolveStepPolicyForStep exposes escalation governance reason for high-risk delivery route", () => {
+  withTempRepo((repoRoot) => {
+    const routePath = path.join(repoRoot, "examples/routes/implement-default.yaml");
+    const routeContent = fs.readFileSync(routePath, "utf8");
+    fs.writeFileSync(routePath, routeContent.replace("risk_tier: medium", "risk_tier: high"), "utf8");
+
+    const resolved = resolveStepPolicyForStep({
+      projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      policiesRoot: path.join(repoRoot, "examples/policies"),
+      stepClass: "implement",
+    });
+
+    assert.equal(resolved.governance_decision.decision, "escalate");
+    assert.equal(resolved.governance_decision.route_risk_tier, "high");
+    assert.equal(resolved.governance_decision.high_risk_delivery, true);
+    assert.ok(
+      resolved.governance_decision.reasons.some((reason) => reason.code === "high-risk-security-review-required"),
+    );
+    assert.ok(
+      resolved.governance_decision.reasons.some((reason) => reason.code === "high-risk-human-approval-required"),
     );
   });
 });

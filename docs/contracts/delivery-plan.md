@@ -29,6 +29,7 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
   - approved handoff evidence;
   - promotion evidence.
 - `status=blocked` means write-back is not allowed for the planned mode yet.
+- `governance` should expose route-governance decision semantics (`allow|deny|escalate`) with explicit reason codes for security/compliance review.
 
 ## Example
 See `examples/packets/delivery-plan-*.yaml`.

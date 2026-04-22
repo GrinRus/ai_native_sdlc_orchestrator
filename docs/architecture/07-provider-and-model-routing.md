@@ -43,6 +43,18 @@ Route resolution feeds policy resolution directly:
 
 If this handoff cannot resolve a complete policy envelope, execution planning must fail before any adapter call.
 
+## High-risk delivery governance (W8-S03)
+Policy resolution now emits `governance_decision` with explicit semantics:
+- `allow` when route/provider/adapter checks pass for the planned write-back mode;
+- `deny` when provider or adapter selections violate project allowlists;
+- `escalate` when high-risk route delivery requires explicit security/human review.
+
+Delivery/release planning must consume these reason codes before write-back:
+- `provider-not-allowlisted`
+- `adapter-not-allowlisted`
+- `high-risk-security-review-required`
+- `high-risk-human-approval-required`
+
 ## Adapter capability negotiation (W2-S04)
 After route resolution selects `primary.adapter`, adapter negotiation checks:
 1. adapter profile exists in `examples/adapters` (or configured adapter registry);

@@ -52,6 +52,7 @@ test("materializeDeliveryPlan blocks non-read-only mode without approved handoff
     assert.equal(result.deliveryPlan.writeback_allowed, false);
     assert.ok(result.deliveryPlan.blocking_reasons.includes("approved-handoff-required"));
     assert.ok(result.deliveryPlan.blocking_reasons.includes("promotion-evidence-required"));
+    assert.equal(result.deliveryPlan.governance.decision, "allow");
   });
 });
 
@@ -88,6 +89,7 @@ test("materializeDeliveryPlan allows non-read-only mode only with approved hando
     assert.equal(result.deliveryPlan.status, "ready");
     assert.equal(result.deliveryPlan.writeback_allowed, true);
     assert.deepEqual(result.deliveryPlan.blocking_reasons, []);
+    assert.equal(result.deliveryPlan.governance.decision, "allow");
     assert.equal(result.deliveryPlan.preconditions.approved_handoff.status, "present");
     assert.equal(result.deliveryPlan.preconditions.promotion_evidence.status, "present");
     assert.ok(result.deliveryPlan.evidence_refs.includes(handoffRef));
@@ -123,5 +125,71 @@ test("materializeDeliveryPlan keeps no-write mode ready without handoff or promo
     assert.deepEqual(result.deliveryPlan.blocking_reasons, []);
     assert.equal(result.deliveryPlan.preconditions.approved_handoff.status, "not-required");
     assert.equal(result.deliveryPlan.preconditions.promotion_evidence.status, "not-required");
+    assert.equal(result.deliveryPlan.governance.decision, "allow");
+  });
+});
+
+test("materializeDeliveryPlan blocks delivery when governance decision is deny", () => {
+  withTempRepo((repoRoot) => {
+    const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const profileContent = fs.readFileSync(profilePath, "utf8");
+    fs.writeFileSync(
+      profilePath,
+      profileContent.replace("  - openai\n  - anthropic\n  - open-code", "  - anthropic\n  - open-code"),
+      "utf8",
+    );
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const policyResolution = resolveStepPolicyForStep({
+      projectProfilePath: profilePath,
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      policiesRoot: path.join(repoRoot, "examples/policies"),
+      stepClass: "implement",
+    });
+
+    const result = materializeDeliveryPlan({
+      runtimeLayout: init.runtimeLayout,
+      projectId: init.projectId,
+      runId: "run.delivery.plan.deny.v1",
+      stepClass: "implement",
+      policyResolution,
+      handoffApproval: { status: "pass", ref: "evidence://handoff/approved" },
+      promotionEvidenceRefs: ["evidence://promotion/pass"],
+    });
+
+    assert.equal(result.deliveryPlan.governance.decision, "deny");
+    assert.equal(result.deliveryPlan.status, "blocked");
+    assert.ok(result.deliveryPlan.blocking_reasons.includes("provider-not-allowlisted"));
+  });
+});
+
+test("materializeDeliveryPlan blocks delivery when governance decision escalates high-risk route", () => {
+  withTempRepo((repoRoot) => {
+    const routePath = path.join(repoRoot, "examples/routes/implement-default.yaml");
+    const routeContent = fs.readFileSync(routePath, "utf8");
+    fs.writeFileSync(routePath, routeContent.replace("risk_tier: medium", "risk_tier: high"), "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const policyResolution = resolveStepPolicyForStep({
+      projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+      routesRoot: path.join(repoRoot, "examples/routes"),
+      policiesRoot: path.join(repoRoot, "examples/policies"),
+      stepClass: "implement",
+    });
+
+    const result = materializeDeliveryPlan({
+      runtimeLayout: init.runtimeLayout,
+      projectId: init.projectId,
+      runId: "run.delivery.plan.escalate.v1",
+      stepClass: "implement",
+      policyResolution,
+      handoffApproval: { status: "pass", ref: "evidence://handoff/approved" },
+      promotionEvidenceRefs: ["evidence://promotion/pass"],
+    });
+
+    assert.equal(result.deliveryPlan.governance.decision, "escalate");
+    assert.equal(result.deliveryPlan.status, "blocked");
+    assert.ok(result.deliveryPlan.blocking_reasons.includes("high-risk-security-review-required"));
+    assert.ok(result.deliveryPlan.blocking_reasons.includes("high-risk-human-approval-required"));
   });
 });

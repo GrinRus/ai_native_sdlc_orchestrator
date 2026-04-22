@@ -75,10 +75,12 @@ Delivery/release payload baseline:
 Delivery/release guardrail baseline:
 - resolve policy bounds before materializing delivery/release artifacts;
 - non-`no-write` flows must remain blocked when approved handoff or promotion evidence is missing;
+- route governance decisions must resolve to `allow|deny|escalate` with explicit reason codes before write-back paths;
 - `release prepare` must fail fast with explicit precondition blocking reasons and must not bypass delivery-plan guardrails.
 
 Delivery/release response baseline:
 - `delivery_plan_file` and `delivery_plan_status` for policy traceability;
+- `delivery_governance_decision` for explicit deny/escalate reasoning;
 - `delivery_manifest_file` and `release_packet_file` as durable evidence outputs;
 - `delivery_writeback_result` to distinguish `no-write-confirmed`, `patch-materialized`, `local-branch-committed`, and `fork-pr-planned`.
 
