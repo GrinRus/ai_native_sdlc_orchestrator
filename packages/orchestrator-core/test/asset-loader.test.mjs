@@ -68,15 +68,15 @@ test("resolveAssetBundleForStep applies wrapper and prompt overrides determinist
   });
 });
 
-test("resolveAssetBundleForStep fails cleanly when wrapper prompt bundle source is missing", () => {
+test("resolveAssetBundleForStep fails cleanly when project default prompt bundle source is missing", () => {
   withTempRepo((repoRoot) => {
-    const wrapperPath = path.join(repoRoot, "examples/wrappers/wrapper-planner-default.yaml");
-    const wrapperContent = fs.readFileSync(wrapperPath, "utf8");
+    const projectProfilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const projectProfileContent = fs.readFileSync(projectProfilePath, "utf8");
     fs.writeFileSync(
-      wrapperPath,
-      wrapperContent.replace(
-        "prompt_bundle_ref: prompt-bundle://planner-default@v1",
-        "prompt_bundle_ref: prompt-bundle://does-not-exist@v1",
+      projectProfilePath,
+      projectProfileContent.replace(
+        "planning: prompt-bundle://planner-default@v1",
+        "planning: prompt-bundle://does-not-exist@v1",
       ),
       "utf8",
     );

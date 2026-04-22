@@ -1,18 +1,22 @@
 # W8 implementation slices
 
 ## Wave objective
-Close later-maturity user stories for strategic operator visibility, governance hardening, and multi-repo delivery maturity.
+Close later-maturity user stories for strategic operator visibility, governance hardening, context lifecycle maturity, and multi-repo delivery maturity.
 
 ## Wave exit criteria
 - sponsor/planner visibility stories are supported by durable operator surfaces
 - later discovery/architecture/security maturity stories are implemented with explicit contracts and policies
 - later QA and AI platform comparison stories are executable and auditable
+- routed execution produces deterministic compiled-context artifacts with adapter-ready context injection
+- context assets are versioned, policy-gated, and promotion-auditable through AOR-owned lifecycle controls
 - incident and platform recertification maturity is integrated with learning-loop evidence
 - multi-repo and rerun maturity flows are bounded, reproducible, and policy-safe
 
 ## Parallel start and sequencing notes
 - `W8-S01` and `W8-S02` can progress in parallel once `W7-S05` exists.
-- `W8-S03` and `W8-S04` share the same base dependency and can run in parallel.
+- `W8-S08` should land before `W8-S03` and `W8-S04` so later route/policy and operator visibility flows consume compiled-context outputs.
+- `W8-S03` and `W8-S04` can run in parallel once `W8-S08` is available.
+- `W8-S09` starts after `W8-S08` and `W8-S05` to reuse compiled-context artifacts and quality comparison semantics.
 - `W8-S07` closes the wave after operator and incident maturity slices (`W8-S04`, `W8-S06`) are complete.
 
 ---
@@ -84,7 +88,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 - **State:** blocked
 - **Outcome:** Add later-stage route/policy governance required for delivery and security maturity stories.
 - **Primary modules:** `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**`
-- **Hard dependencies:** W6-S03, W7-S05
+- **Hard dependencies:** W6-S03, W7-S05, W8-S08
 - **Primary user-story surfaces:** delivery engineer, security / compliance
 
 ### Local tasks
@@ -115,7 +119,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 - **State:** blocked
 - **Outcome:** Expand operator event and policy-inspection surfaces for later SRE maturity stories.
 - **Primary modules:** `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**`
-- **Hard dependencies:** W6-S03, W7-S05
+- **Hard dependencies:** W6-S03, W7-S05, W8-S08
 - **Primary user-story surfaces:** operator / SRE
 
 ### Local tasks
@@ -231,3 +235,68 @@ Close later-maturity user stories for strategic operator visibility, governance 
 ### Out of scope
 - cross-org release automation
 - external dependency management systems
+
+---
+
+## W8-S08 — Runtime context compiler and adapter-context injection
+- **Epic:** EPIC-3 Routed execution
+- **State:** blocked
+- **Outcome:** Add deterministic step-time context compilation for prompt plus context assets and inject compiled context into adapter requests with durable evidence linkage.
+- **Primary modules:** `packages/orchestrator-core`, `packages/provider-routing`, `packages/adapter-sdk`, `docs/contracts/**`, `examples/prompts/**`
+- **Hard dependencies:** W6-S03, W7-S05
+- **Primary user-story surfaces:** delivery engineer, reviewer / QA, security / compliance
+
+### Local tasks
+1. Switch runtime prompt source to `project-profile.default_prompt_bundles`.
+2. Resolve and expand `default_context_bundles` as part of route/wrapper preparation.
+3. Integrate a deterministic context compiler in routed execution for step-time assembly.
+4. Inject compiled context into adapter request payloads (`request.context`) for execution.
+5. Persist compiled-context artifacts and link them from step-result and evidence outputs.
+
+### Acceptance criteria
+1. Routed dry-run for `implement`, `review`, and `qa` emits a compiled-context artifact for each step.
+2. Adapter requests include populated context payloads derived from compiled context.
+3. Runtime and reference-integrity checks no longer require legacy `wrapper.prompt_bundle_ref` and `route.wrapper_profile_ref`.
+4. Step-result and evidence outputs include stable references to compiled-context artifacts.
+
+### Done evidence
+- routed dry-run fixtures for `implement`, `review`, and `qa` with compiled-context outputs
+- adapter request fixtures showing populated `request.context`
+- updated reference-integrity and runtime checks aligned to compiled-context requirements
+- step-result/evidence fixtures linking compiled-context artifact ids
+
+### Out of scope
+- provider-specific prompt-template syntax extensions
+- external context registry runtime ownership
+
+---
+
+## W8-S09 — Context asset lifecycle and quality-gated update flow
+- **Epic:** EPIC-4 Quality platform
+- **State:** blocked
+- **Outcome:** Add AOR-owned lifecycle operations for context assets with versioning, gated updates, and promotion decisions backed by eval evidence.
+- **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/contracts/**`, `examples/eval/**`
+- **Hard dependencies:** W8-S08, W7-S02, W8-S05
+- **Primary user-story surfaces:** reviewer / QA, AI platform owner, security / compliance, operator / SRE
+
+### Local tasks
+1. Add context quality scenarios comparing `with-context` versus `without-context` runs.
+2. Add context update and outdated semantics with security gates for high/critical findings.
+3. Add promotion and freeze policies specific to context assets and provenance.
+4. Expose operator read surfaces for context status, version history, and decision trail.
+
+### Acceptance criteria
+1. Context updates are versioned, auditable, and linked to immutable provenance data.
+2. Policy can block risky context updates before promotion.
+3. Eval comparison evidence is required before context promotion decisions are accepted.
+4. CLI and API surfaces expose context version, provenance, and decision history.
+
+### Done evidence
+- eval fixtures comparing `with-context` and `without-context` scenarios
+- update/outdated decision fixtures with security-gate outcomes
+- promotion/freeze policy fixtures for context assets
+- API/CLI examples exposing context status and history views
+
+### Out of scope
+- mandatory publishing to external context marketplaces
+- autonomous context promotion without operator approval

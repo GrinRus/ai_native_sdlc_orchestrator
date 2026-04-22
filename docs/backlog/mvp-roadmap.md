@@ -18,7 +18,7 @@ The authoritative planning model for implementation lives in:
 | W5 | Expose operator-grade APIs, live views, and standardized live E2E orchestration for the full control plane. | 6 | EPIC-6, EPIC-7 | `docs/backlog/wave-5-implementation-slices.md` |
 | W6 | Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, delivery/release prep, and incident/audit flows. | 6 | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-6-implementation-slices.md` |
 | W7 | Close MVP+ governance and quality stories for certification, finance evidence, and learning-loop integration. | 5 | EPIC-4, EPIC-7 | `docs/backlog/wave-7-implementation-slices.md` |
-| W8 | Close later-maturity stories for strategic operator visibility, governance hardening, and multi-repo delivery maturity. | 7 | EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-8-implementation-slices.md` |
+| W8 | Close later-maturity stories for strategic operator visibility, governance hardening, context lifecycle maturity, and multi-repo delivery maturity. | 9 | EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-8-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -41,6 +41,8 @@ The authoritative planning model for implementation lives in:
 | W8-S05 | RQA-06, AIP-11 |
 | W8-S06 | INC-06, AIP-12 |
 | W8-S07 | RMO-06, PBO-08, DTX-08, FIN-08 |
+| W8-S08 | integration closure (compiled-context runtime foundation) |
+| W8-S09 | integration closure (context lifecycle governance evidence) |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -143,6 +145,8 @@ The authoritative planning model for implementation lives in:
 **Exit criteria:**
 - strategic sponsor/manager visibility stories are addressed through stable operator surfaces
 - later discovery, architecture, and security governance stories are represented in executable flows
+- routed execution compiles prompt/context assets into durable compiled-context artifacts and injects adapter-ready context payloads
+- context updates are versioned, policy-gated, and promotion-auditable with explicit provenance
 - multi-repo and delivery rerun maturity stories are closed with bounded artifacts and policies
 - incident and AI platform later-stage recertification loops are replayable and auditable
 
