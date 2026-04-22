@@ -78,7 +78,7 @@ This is the master index for the implementation slices across all defined waves.
 | W6-S03 | Run-control command pack with policy and audit guardrails | EPIC-6 | done | `apps/cli`, `apps/api`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**` | W6-S01, W5-S03 |
 | W6-S04 | UI attach/detach lifecycle command pack | EPIC-6 | done | `apps/cli`, `apps/web`, `apps/api`, `docs/ops/**` | W6-S03, W5-S04 |
 | W6-S05 | Delivery/release prepare command pack | EPIC-5 | done | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W6-S03, W4-S05 |
-| W6-S06 | Incident and audit command pack | EPIC-7 | ready | `apps/cli`, `apps/api`, `packages/observability`, `docs/contracts/**`, `docs/ops/**` | W6-S03, W5-S06 |
+| W6-S06 | Incident and audit command pack | EPIC-7 | done | `apps/cli`, `apps/api`, `packages/observability`, `docs/contracts/**`, `docs/ops/**` | W6-S03, W5-S06 |
 
 ## W7 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
@@ -86,7 +86,7 @@ This is the master index for the implementation slices across all defined waves.
 | W7-S01 | Governance quality guardrails and evidence parity | EPIC-4 | ready | `packages/orchestrator-core`, `packages/harness`, `docs/contracts/**`, `examples/eval/**` | W6-S03, W3-S04 |
 | W7-S02 | AI platform promotion/freeze maturity pack | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**` | W7-S01, W3-S05 |
 | W7-S03 | Incident recertification and controlled re-enable flow | EPIC-7 | blocked | `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `docs/ops/**` | W7-S02, W6-S06 |
-| W7-S04 | Finance evidence and audit durability expansion | EPIC-7 | blocked | `packages/observability`, `apps/api`, `docs/contracts/**`, `docs/ops/**` | W6-S06 |
+| W7-S04 | Finance evidence and audit durability expansion | EPIC-7 | ready | `packages/observability`, `apps/api`, `docs/contracts/**`, `docs/ops/**` | W6-S06 |
 | W7-S05 | MVP+ governance and learning-loop integration closure | EPIC-7 | blocked | `docs/backlog/**`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W7-S02, W7-S03, W7-S04 |
 
 ## W8 slices

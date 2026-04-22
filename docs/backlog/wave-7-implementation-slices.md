@@ -112,7 +112,7 @@ Close remaining MVP+ governance and quality stories across certification control
 
 ## W7-S04 — Finance evidence and audit durability expansion
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Expand finance/audit durability so operator-visible evidence supports cross-run governance reviews.
 - **Primary modules:** `packages/observability`, `apps/api`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W6-S06

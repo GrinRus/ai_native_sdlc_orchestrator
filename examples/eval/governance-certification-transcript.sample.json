@@ -1,0 +1,25 @@
+{
+  "approved_flow": {
+    "command": "aor harness certify",
+    "promotion_decision_status": "pass",
+    "decision_ref": "runtime://artifacts/promotion-decision-wrapper.eval.default-v1.json",
+    "governance_checks": [
+      "deterministic-validation:pass",
+      "evaluative-evidence:pass",
+      "harness-replay:pass",
+      "evidence-completeness:pass",
+      "finance-signals:pass",
+      "policy-quality-gate:pass"
+    ]
+  },
+  "blocked_flow": {
+    "command": "aor harness certify",
+    "promotion_decision_status": "fail",
+    "decision_ref": "runtime://artifacts/promotion-decision-wrapper.eval.default-v1.json",
+    "governance_checks": [
+      "deterministic-validation:fail",
+      "policy-quality-gate:fail"
+    ],
+    "blocked_reason": "Policy quality gate blocked by failing governance checks."
+  }
+}

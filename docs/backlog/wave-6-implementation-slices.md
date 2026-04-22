@@ -174,7 +174,7 @@ Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, 
 
 ## W6-S06 — Incident and audit command pack
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Implement `aor incident open`, `aor incident show`, and `aor audit runs` as first-class operational commands.
 - **Primary modules:** `apps/cli`, `apps/api`, `packages/observability`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W6-S03, W5-S06

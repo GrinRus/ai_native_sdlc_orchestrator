@@ -3,12 +3,62 @@ subject_ref: wrapper://wrapper.eval.default@v1
 from_channel: candidate
 to_channel: stable
 evidence_refs:
+  - runtime://reports/validation-report.json
+  - runtime://reports/project-analysis-report.json
   - runtime://reports/evaluation-report-suite.cert.core-v4.json
   - runtime://reports/harness-capture-aor-core.json
   - runtime://reports/harness-replay-aor-core.json
 evidence_summary:
+  asset_ref: wrapper://wrapper.eval.default@v1
+  subject_ref: wrapper://wrapper.eval.default@v1
   suite_ref: suite.cert.core@v4
+  deterministic_validation_report_ref: runtime://reports/validation-report.json
+  deterministic_validation_status: pass
   evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4.json
   harness_capture_ref: runtime://reports/harness-capture-aor-core.json
   harness_replay_ref: runtime://reports/harness-replay-aor-core.json
+  replay_evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4-replay.json
+  evaluation_status: pass
+  harness_replay_status: pass
+  governance_checks:
+    - check_id: deterministic-validation
+      status: pass
+      summary: Deterministic validation evidence is present and passing.
+    - check_id: evaluative-evidence
+      status: pass
+      summary: Evaluation evidence passed suite thresholds.
+    - check_id: harness-replay
+      status: pass
+      summary: Harness replay is compatible with baseline evidence.
+    - check_id: evidence-completeness
+      status: pass
+      summary: Required governance evidence files were materialized.
+    - check_id: finance-signals
+      status: pass
+      summary: Cost and latency guardrail signals are present.
+    - check_id: policy-quality-gate
+      status: pass
+      summary: Policy quality gate passed.
+  finance_signals:
+    max_cost_usd: 25
+    timeout_sec: 180
+    max_cost_source: route.constraints.max_cost_usd (route.implement.default)
+    timeout_source: route.constraints.timeout_sec (route.implement.default)
+    capture_latency_sec: 0.41
+    replay_latency_sec: 0.39
+    total_latency_sec: 0.8
+  evidence_bar:
+    required:
+      - validation-report
+      - evaluation-report
+      - harness-capture
+      - harness-replay
+      - finance-signals
+    satisfied:
+      - validation-report
+      - evaluation-report
+      - harness-capture
+      - harness-replay
+      - finance-signals
+      - replay-evaluation-report
 status: pass

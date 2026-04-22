@@ -4,7 +4,9 @@ import path from "node:path";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { captureHarnessReplayArtifact, replayHarnessCapture } from "./harness-capture-replay.mjs";
+import { analyzeProjectRuntime } from "./project-analysis.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { validateProjectRuntime } from "./project-validate.mjs";
 
 const PROMOTION_CHANNEL_VALUES = new Set(["draft", "candidate", "stable", "frozen", "demoted"]);
 
@@ -28,23 +30,199 @@ function assertPromotionChannel(options) {
 }
 
 /**
- * @param {{ evaluationStatus: string | null, replayStatus: string | null }} options
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function asNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function asString(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+/**
+ * @param {unknown} startedAt
+ * @param {unknown} finishedAt
+ * @returns {number | null}
+ */
+function resolveDurationSeconds(startedAt, finishedAt) {
+  if (typeof startedAt !== "string" || typeof finishedAt !== "string") {
+    return null;
+  }
+
+  const startMs = Date.parse(startedAt);
+  const finishMs = Date.parse(finishedAt);
+  if (!Number.isFinite(startMs) || !Number.isFinite(finishMs) || finishMs < startMs) {
+    return null;
+  }
+
+  return Math.round(((finishMs - startMs) / 1000) * 1000) / 1000;
+}
+
+/**
+ * @param {{
+ *  captureResult: Record<string, unknown>,
+ *  replayResult: Record<string, unknown>,
+ * }} options
+ */
+function resolveGovernanceFinanceSignals(options) {
+  const capture = asRecord(options.captureResult.capture);
+  const captureTrace = asRecord(capture.trace);
+  const selectedAssets = asRecord(captureTrace.selected_assets);
+  const policyResolution = asRecord(selectedAssets.policy_resolution);
+  const resolvedBounds = asRecord(policyResolution.resolved_bounds);
+  const budget = asRecord(resolvedBounds.budget);
+  const captureStepResult = asRecord(options.captureResult.stepResult);
+  const captureExecution = asRecord(captureStepResult.routed_execution);
+  const replayStepResult = asRecord(options.replayResult.stepResult);
+  const replayExecution = asRecord(replayStepResult.routed_execution);
+
+  const captureLatencySec = resolveDurationSeconds(captureExecution.started_at, captureExecution.finished_at);
+  const replayLatencySec = resolveDurationSeconds(replayExecution.started_at, replayExecution.finished_at);
+  const totalLatencySec =
+    captureLatencySec !== null && replayLatencySec !== null
+      ? Math.round((captureLatencySec + replayLatencySec) * 1000) / 1000
+      : null;
+
+  return {
+    max_cost_usd: asNumber(budget.max_cost_usd),
+    timeout_sec: asNumber(budget.timeout_sec),
+    max_cost_source: asString(budget.max_cost_source),
+    timeout_source: asString(budget.timeout_source),
+    capture_latency_sec: captureLatencySec,
+    replay_latency_sec: replayLatencySec,
+    total_latency_sec: totalLatencySec,
+  };
+}
+
+/**
+ * @param {{
+ *  validationStatus: string | null,
+ *  evaluationStatus: string | null,
+ *  replayStatus: string | null,
+ *  evidenceComplete: boolean,
+ *  financeSignalsComplete: boolean,
+ *  qualityGateRequired: boolean,
+ *  missingEvidenceKinds: string[],
+ * }} options
+ * @returns {Array<{ check_id: string, status: "pass" | "hold" | "fail", summary: string }>}
+ */
+function buildGovernanceChecks(options) {
+  const checks = [];
+  const deterministicStatus =
+    options.validationStatus === "fail" ? "fail" : options.validationStatus === "warn" ? "hold" : "pass";
+
+  checks.push({
+    check_id: "deterministic-validation",
+    status: deterministicStatus,
+    summary:
+      deterministicStatus === "pass"
+        ? "Deterministic validation evidence is present and passing."
+        : deterministicStatus === "hold"
+          ? "Deterministic validation evidence is present but warning-level; governance stays on hold."
+          : "Deterministic validation evidence failed and blocks governance promotion.",
+  });
+
+  checks.push({
+    check_id: "evaluative-evidence",
+    status: options.evaluationStatus === "pass" ? "pass" : "fail",
+    summary:
+      options.evaluationStatus === "pass"
+        ? "Evaluation evidence passed suite thresholds."
+        : "Evaluation evidence failed suite thresholds or was missing.",
+  });
+
+  checks.push({
+    check_id: "harness-replay",
+    status: options.replayStatus === "pass" ? "pass" : options.replayStatus === "fail" ? "fail" : "hold",
+    summary:
+      options.replayStatus === "pass"
+        ? "Harness replay is compatible with baseline evidence."
+        : options.replayStatus === "fail"
+          ? "Harness replay introduced a regression against baseline evidence."
+          : "Harness replay is not yet comparable with baseline evidence.",
+  });
+
+  checks.push({
+    check_id: "evidence-completeness",
+    status: options.evidenceComplete ? "pass" : "hold",
+    summary: options.evidenceComplete
+      ? "Required governance evidence files were materialized."
+      : `Required governance evidence is incomplete: ${options.missingEvidenceKinds.join(", ")}.`,
+  });
+
+  checks.push({
+    check_id: "finance-signals",
+    status: options.financeSignalsComplete ? "pass" : "hold",
+    summary: options.financeSignalsComplete
+      ? "Cost and latency guardrail signals are present."
+      : "Cost and latency guardrail signals are incomplete for governance review.",
+  });
+
+  const hasFail = checks.some((entry) => entry.status === "fail");
+  const hasHold = checks.some((entry) => entry.status === "hold");
+  checks.push({
+    check_id: "policy-quality-gate",
+    status: options.qualityGateRequired ? (hasFail ? "fail" : hasHold ? "hold" : "pass") : "pass",
+    summary: options.qualityGateRequired
+      ? hasFail
+        ? "Policy quality gate blocked by failing governance checks."
+        : hasHold
+          ? "Policy quality gate blocked until governance hold checks are resolved."
+          : "Policy quality gate passed."
+      : "Policy quality gate is not required for this step class.",
+  });
+
+  return checks;
+}
+
+/**
+ * @param {{
+ *  validationStatus?: string | null,
+ *  evaluationStatus: string | null,
+ *  replayStatus: string | null,
+ *  evidenceComplete?: boolean,
+ *  financeSignalsComplete?: boolean,
+ *  qualityGateRequired?: boolean,
+ * }} options
  * @returns {"pass" | "hold" | "fail"}
  */
 export function resolveCertificationDecisionStatus(options) {
-  if (options.evaluationStatus !== "pass") {
+  const deterministicStatus =
+    options.validationStatus === "fail" ? "fail" : options.validationStatus === "warn" ? "hold" : "pass";
+  const evaluativeStatus = options.evaluationStatus === "pass" ? "pass" : "fail";
+  const replayEvidenceStatus = options.replayStatus === "pass" ? "pass" : options.replayStatus === "fail" ? "fail" : "hold";
+  const evidenceStatus = options.evidenceComplete === false ? "hold" : "pass";
+  const financeStatus = options.financeSignalsComplete === false ? "hold" : "pass";
+  const qualityGateRequired = options.qualityGateRequired !== false;
+
+  const statuses = [deterministicStatus, evaluativeStatus, replayEvidenceStatus, evidenceStatus, financeStatus];
+  if (statuses.includes("fail")) {
     return "fail";
   }
 
-  if (options.replayStatus === "pass") {
+  if (!qualityGateRequired) {
     return "pass";
   }
 
-  if (options.replayStatus === "fail") {
-    return "fail";
+  if (statuses.includes("hold")) {
+    return "hold";
   }
 
-  return "hold";
+  return "pass";
 }
 
 /**
@@ -69,6 +247,20 @@ export function certifyAssetPromotion(options) {
   assertPromotionChannel({ channel: fromChannel, flagName: "--from-channel" });
   assertPromotionChannel({ channel: toChannel, flagName: "--to-channel" });
 
+  const analysisResult = analyzeProjectRuntime({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+  });
+
+  const validationResult = validateProjectRuntime({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+  });
+
   const captureResult = captureHarnessReplayArtifact({
     cwd: options.cwd,
     projectRef: options.projectRef,
@@ -91,7 +283,53 @@ export function certifyAssetPromotion(options) {
     typeof captureResult.evaluationReport.status === "string" ? captureResult.evaluationReport.status : null;
   const replayStatus =
     typeof replayResult.replayReport.status === "string" ? replayResult.replayReport.status : null;
-  const decisionStatus = resolveCertificationDecisionStatus({ evaluationStatus, replayStatus });
+  const validationStatus = typeof validationResult.report.status === "string" ? validationResult.report.status : null;
+  const qualityGateRequired = Boolean(
+    asRecord(
+      asRecord(
+        asRecord(asRecord(asRecord(captureResult.capture).trace).selected_assets).policy_resolution,
+      ).policy,
+    ).profile?.quality_gate?.required,
+  );
+
+  const evidenceChecks = [
+    { kind: "validation-report", ref: validationResult.validationReportPath },
+    { kind: "evaluation-report", ref: captureResult.evaluationReportPath },
+    { kind: "harness-capture", ref: captureResult.capturePath },
+    { kind: "harness-replay", ref: replayResult.replayReportPath },
+  ];
+  const missingEvidenceKinds = evidenceChecks
+    .filter((entry) => typeof entry.ref !== "string" || !fs.existsSync(entry.ref))
+    .map((entry) => entry.kind);
+  const evidenceComplete = missingEvidenceKinds.length === 0;
+
+  const financeSignals = resolveGovernanceFinanceSignals({
+    captureResult: /** @type {Record<string, unknown>} */ (captureResult),
+    replayResult: /** @type {Record<string, unknown>} */ (replayResult),
+  });
+  const financeSignalsComplete =
+    financeSignals.max_cost_usd !== null &&
+    financeSignals.timeout_sec !== null &&
+    financeSignals.capture_latency_sec !== null &&
+    financeSignals.replay_latency_sec !== null;
+
+  const governanceChecks = buildGovernanceChecks({
+    validationStatus,
+    evaluationStatus,
+    replayStatus,
+    evidenceComplete,
+    financeSignalsComplete,
+    qualityGateRequired,
+    missingEvidenceKinds,
+  });
+  const decisionStatus = resolveCertificationDecisionStatus({
+    validationStatus,
+    evaluationStatus,
+    replayStatus,
+    evidenceComplete,
+    financeSignalsComplete,
+    qualityGateRequired,
+  });
 
   const decisionId = `${init.projectId}.promotion.${normalizeForId(options.assetRef)}.${Date.now()}`;
   const decision = {
@@ -100,6 +338,8 @@ export function certifyAssetPromotion(options) {
     from_channel: fromChannel,
     to_channel: toChannel,
     evidence_refs: [
+      validationResult.validationReportPath,
+      analysisResult.reportPath,
       captureResult.evaluationReportPath,
       captureResult.capturePath,
       replayResult.replayReportPath,
@@ -113,14 +353,20 @@ export function certifyAssetPromotion(options) {
       harness_capture_ref: captureResult.capturePath,
       harness_replay_ref: replayResult.replayReportPath,
       replay_evaluation_report_ref: replayResult.replayEvaluationReportPath,
+      deterministic_validation_report_ref: validationResult.validationReportPath,
+      deterministic_validation_status: validationStatus,
       harness_replay_status: replayStatus,
       evaluation_status: evaluationStatus,
+      governance_checks: governanceChecks,
+      finance_signals: financeSignals,
       evidence_bar: {
-        required: ["evaluation-report", "harness-capture", "harness-replay"],
+        required: ["validation-report", "evaluation-report", "harness-capture", "harness-replay", "finance-signals"],
         satisfied: [
+          validationResult.validationReportPath ? "validation-report" : null,
           "evaluation-report",
           "harness-capture",
           "harness-replay",
+          financeSignalsComplete ? "finance-signals" : null,
           replayResult.replayEvaluationReportPath ? "replay-evaluation-report" : null,
         ].filter((entry) => entry !== null),
       },
@@ -152,5 +398,8 @@ export function certifyAssetPromotion(options) {
     harnessCapturePath: captureResult.capturePath,
     harnessReplayPath: replayResult.replayReportPath,
     replayEvaluationReportPath: replayResult.replayEvaluationReportPath,
+    validationReportPath: validationResult.validationReportPath,
+    analysisReportPath: analysisResult.reportPath,
+    governanceChecks,
   };
 }
