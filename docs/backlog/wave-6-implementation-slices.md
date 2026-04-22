@@ -19,7 +19,7 @@ Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, 
 
 ## W6-S01 — Backlog and slice-cycle extensibility for W6+
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Extend backlog planning and validation tooling so wave files beyond W5 participate in the normal slice loop.
 - **Primary modules:** `docs/backlog/**`, `scripts/**`
 - **Hard dependencies:** W5-S06

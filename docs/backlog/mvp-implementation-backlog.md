@@ -73,7 +73,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W6 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W6-S01 | Backlog and slice-cycle extensibility for W6+ | EPIC-0 | ready | `docs/backlog/**`, `scripts/**` | W5-S06 |
+| W6-S01 | Backlog and slice-cycle extensibility for W6+ | EPIC-0 | done | `docs/backlog/**`, `scripts/**` | W5-S06 |
 | W6-S02 | Intake/discovery/spec/wave command pack | EPIC-6 | blocked | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**` | W6-S01 |
 | W6-S03 | Run-control command pack with policy and audit guardrails | EPIC-6 | blocked | `apps/cli`, `apps/api`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**` | W6-S01, W5-S03 |
 | W6-S04 | UI attach/detach lifecycle command pack | EPIC-6 | blocked | `apps/cli`, `apps/web`, `apps/api`, `docs/ops/**` | W6-S03, W5-S04 |
