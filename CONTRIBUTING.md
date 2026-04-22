@@ -26,6 +26,8 @@ Read these in order:
 
 If the change is implementation work, find the owning slice first. Do not start by writing broad code without a slice boundary.
 
+For live E2E dependency requirements, use `docs/ops/live-e2e-dependency-matrix.md` as the source of truth.
+
 ## Development workflow
 
 1. Fork the repository and create a topic branch.

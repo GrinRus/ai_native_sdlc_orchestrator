@@ -2,6 +2,8 @@
 
 This catalog defines the public repositories AOR uses for live end-to-end rehearsals.
 
+For canonical setup and verification dependency details per profile, use `docs/ops/live-e2e-dependency-matrix.md`.
+
 ## Safety policy
 - Default to **read-only bootstrap and patch output**.
 - Never push to upstream public repositories by default.
@@ -24,7 +26,7 @@ This catalog defines the public repositories AOR uses for live end-to-end rehear
   - stop at patch, local branch, or fork PR draft.
 - Prerequisites:
   - Node `>=22` and npm available;
-  - network access for clone and install.
+  - network access for clone, npm install, and Playwright browser download.
 - Failure-safe defaults:
   - keep `write_back_to_remote=false`;
   - keep delivery mode in `patch-only`.

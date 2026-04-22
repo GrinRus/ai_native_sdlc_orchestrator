@@ -21,7 +21,7 @@ preflight:
   - stop
   prerequisites:
   - node >=22 with npm available
-  - network access for shallow clone and npm install
+  - network access for shallow clone, npm install, and playwright browser download
   repo_shape_notes:
   - single-package TypeScript library with npm-based checks
   failure_safe_defaults:
@@ -63,6 +63,9 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+  - npm install
+  - npx playwright install
   commands:
   - npm test
   eval_suites:

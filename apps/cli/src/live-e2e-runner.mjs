@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 import { appendRunEvent } from "../../api/src/index.mjs";
 import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
@@ -57,6 +58,15 @@ function writeJson(filePath, document) {
 
 /**
  * @param {string} filePath
+ * @param {string} content
+ */
+function writeText(filePath, content) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content, "utf8");
+}
+
+/**
+ * @param {string} filePath
  * @returns {Record<string, unknown>}
  */
 function readJson(filePath) {
@@ -86,6 +96,200 @@ function resolveScorecardFile(init, runId, targetRepoId) {
 }
 
 /**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
+ * @returns {string}
+ */
+function resolveTargetWorkspaceRoot(init, runId) {
+  return path.join(init.runtimeLayout.projectRuntimeRoot, "workspaces", "live-e2e", normalizeId(runId), "target");
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
+ * @returns {string}
+ */
+function resolveTargetPreflightLogFile(init, runId) {
+  return path.join(init.runtimeLayout.reportsRoot, `live-e2e-target-preflight-${normalizeId(runId)}.log`);
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
+ * @param {"setup" | "verification"} phase
+ * @param {number} index
+ * @param {"stdout" | "stderr"} stream
+ * @returns {string}
+ */
+function resolveVerificationCommandLogFile(init, runId, phase, index, stream) {
+  return path.join(
+    init.runtimeLayout.reportsRoot,
+    `live-e2e-${phase}-command-${normalizeId(runId)}-${index + 1}.${stream}.log`,
+  );
+}
+
+/**
+ * @param {{
+ *   command: string,
+ *   args?: string[],
+ *   cwd?: string,
+ *   shell?: boolean,
+ * }} options
+ * @returns {{ exitCode: number, stdout: string, stderr: string, durationMs: number }}
+ */
+function runShellCommand(options) {
+  const startedAt = Date.now();
+  const result = spawnSync(options.command, options.args ?? [], {
+    cwd: options.cwd,
+    shell: options.shell ?? false,
+    encoding: "utf8",
+  });
+  const durationMs = Date.now() - startedAt;
+  const stdout = typeof result.stdout === "string" ? result.stdout : "";
+  const stderrParts = [];
+  if (typeof result.stderr === "string" && result.stderr.length > 0) {
+    stderrParts.push(result.stderr);
+  }
+  if (result.error) {
+    stderrParts.push(`${result.error.name}: ${result.error.message}`);
+  }
+
+  return {
+    exitCode: typeof result.status === "number" ? result.status : -1,
+    stdout,
+    stderr: stderrParts.join("\n"),
+    durationMs,
+  };
+}
+
+/**
+ * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   runId: string,
+ *   targetRepo: Record<string, unknown>,
+ * }} options
+ * @returns {{ targetWorkspaceRoot: string, targetPreflightLogFile: string, targetRefResolved: string }}
+ */
+function prepareTargetWorkspace(options) {
+  const targetRepoUrl =
+    typeof options.targetRepo.repo_url === "string" ? options.targetRepo.repo_url.trim() : "";
+  if (targetRepoUrl.length === 0) {
+    throw new Error("Live E2E profile target_repo.repo_url must be a non-empty string.");
+  }
+
+  const targetRef =
+    typeof options.targetRepo.ref === "string" && options.targetRepo.ref.trim().length > 0
+      ? options.targetRepo.ref.trim()
+      : null;
+  const checkoutStrategy =
+    typeof options.targetRepo.checkout_strategy === "string"
+      ? options.targetRepo.checkout_strategy.trim().toLowerCase()
+      : "";
+
+  const targetWorkspaceRoot = resolveTargetWorkspaceRoot(options.init, options.runId);
+  const targetPreflightLogFile = resolveTargetPreflightLogFile(options.init, options.runId);
+  fs.rmSync(targetWorkspaceRoot, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(targetWorkspaceRoot), { recursive: true });
+
+  const cloneArgs = ["clone"];
+  if (checkoutStrategy === "shallow") {
+    cloneArgs.push("--depth", "1");
+  }
+  if (targetRef) {
+    cloneArgs.push("--branch", targetRef);
+  }
+  cloneArgs.push(targetRepoUrl, targetWorkspaceRoot);
+
+  const cloneRun = runShellCommand({
+    command: "git",
+    args: cloneArgs,
+    cwd: options.init.projectRoot,
+  });
+  if (cloneRun.exitCode !== 0) {
+    const cloneLog = [
+      `run_id: ${options.runId}`,
+      `target_repo_url: ${targetRepoUrl}`,
+      `target_ref_requested: ${targetRef ?? "<default>"}`,
+      `checkout_strategy: ${checkoutStrategy || "<default>"}`,
+      `target_workspace_root: ${targetWorkspaceRoot}`,
+      `clone_command: git ${cloneArgs.join(" ")}`,
+      `clone_exit_code: ${cloneRun.exitCode}`,
+      `clone_duration_ms: ${cloneRun.durationMs}`,
+      "clone_stdout:",
+      cloneRun.stdout,
+      "clone_stderr:",
+      cloneRun.stderr,
+    ].join("\n");
+    writeText(targetPreflightLogFile, `${cloneLog}\n`);
+    throw new Error(
+      `Live E2E target preflight clone failed for '${targetRepoUrl}' with exit code ${cloneRun.exitCode}.`,
+    );
+  }
+
+  const resolveRefRun = runShellCommand({
+    command: "git",
+    args: ["rev-parse", "HEAD"],
+    cwd: targetWorkspaceRoot,
+  });
+  if (resolveRefRun.exitCode !== 0) {
+    const resolveLog = [
+      `run_id: ${options.runId}`,
+      `target_repo_url: ${targetRepoUrl}`,
+      `target_ref_requested: ${targetRef ?? "<default>"}`,
+      `checkout_strategy: ${checkoutStrategy || "<default>"}`,
+      `target_workspace_root: ${targetWorkspaceRoot}`,
+      `clone_command: git ${cloneArgs.join(" ")}`,
+      `clone_exit_code: ${cloneRun.exitCode}`,
+      `clone_duration_ms: ${cloneRun.durationMs}`,
+      "clone_stdout:",
+      cloneRun.stdout,
+      "clone_stderr:",
+      cloneRun.stderr,
+      "resolve_ref_command: git rev-parse HEAD",
+      `resolve_ref_exit_code: ${resolveRefRun.exitCode}`,
+      `resolve_ref_duration_ms: ${resolveRefRun.durationMs}`,
+      "resolve_ref_stdout:",
+      resolveRefRun.stdout,
+      "resolve_ref_stderr:",
+      resolveRefRun.stderr,
+    ].join("\n");
+    writeText(targetPreflightLogFile, `${resolveLog}\n`);
+    throw new Error("Live E2E target preflight failed to resolve cloned repository HEAD.");
+  }
+
+  const targetRefResolved = resolveRefRun.stdout.trim().split("\n").filter(Boolean).pop() ?? "unknown";
+  const preflightLog = [
+    `run_id: ${options.runId}`,
+    `target_repo_url: ${targetRepoUrl}`,
+    `target_ref_requested: ${targetRef ?? "<default>"}`,
+    `target_ref_resolved: ${targetRefResolved}`,
+    `checkout_strategy: ${checkoutStrategy || "<default>"}`,
+    `target_workspace_root: ${targetWorkspaceRoot}`,
+    `clone_command: git ${cloneArgs.join(" ")}`,
+    `clone_exit_code: ${cloneRun.exitCode}`,
+    `clone_duration_ms: ${cloneRun.durationMs}`,
+    "clone_stdout:",
+    cloneRun.stdout,
+    "clone_stderr:",
+    cloneRun.stderr,
+    "resolve_ref_command: git rev-parse HEAD",
+    `resolve_ref_exit_code: ${resolveRefRun.exitCode}`,
+    `resolve_ref_duration_ms: ${resolveRefRun.durationMs}`,
+    "resolve_ref_stdout:",
+    resolveRefRun.stdout,
+    "resolve_ref_stderr:",
+    resolveRefRun.stderr,
+  ].join("\n");
+  writeText(targetPreflightLogFile, `${preflightLog}\n`);
+
+  return {
+    targetWorkspaceRoot,
+    targetPreflightLogFile,
+    targetRefResolved,
+  };
+}
+
+/**
  * @param {string} cwd
  * @param {string} profileRef
  * @returns {{ profilePath: string, profile: Record<string, unknown> }}
@@ -101,7 +305,15 @@ function loadLiveE2EProfile(cwd, profileRef) {
     family: "live-e2e-profile",
   });
   if (!loaded.ok) {
-    throw new Error(`Live E2E profile '${profileRef}' failed contract validation: ${loaded.error.message}`);
+    const issues = Array.isArray(loaded.validation?.issues) ? loaded.validation.issues : [];
+    const firstIssueMessage =
+      issues.length > 0 && typeof issues[0]?.message === "string"
+        ? issues[0].message
+        : "profile does not satisfy live-e2e-profile contract";
+    const moreIssuesSummary = issues.length > 1 ? ` (+${issues.length - 1} more issue(s))` : "";
+    throw new Error(
+      `Live E2E profile '${profileRef}' failed contract validation: ${firstIssueMessage}${moreIssuesSummary}`,
+    );
   }
 
   return {
@@ -298,7 +510,42 @@ export function startStandardLiveE2ERun(options) {
   let errorMessage = null;
 
   try {
-    markStage(stageMap, "bootstrap", "pass", [init.stateFile], "runtime initialized");
+    const targetWorkspaceRoot = resolveTargetWorkspaceRoot(init, runId);
+    const targetPreflightLogFile = resolveTargetPreflightLogFile(init, runId);
+    artifacts.target_workspace_root = targetWorkspaceRoot;
+    artifacts.target_preflight_log_file = targetPreflightLogFile;
+    artifacts.target_clone_log_file = targetPreflightLogFile;
+
+    let targetRefResolved = "unknown";
+    try {
+      const targetWorkspace = prepareTargetWorkspace({
+        init,
+        runId,
+        targetRepo,
+      });
+      targetRefResolved = targetWorkspace.targetRefResolved;
+      artifacts.target_workspace_root = targetWorkspace.targetWorkspaceRoot;
+      artifacts.target_preflight_log_file = targetWorkspace.targetPreflightLogFile;
+      artifacts.target_clone_log_file = targetWorkspace.targetPreflightLogFile;
+      artifacts.target_ref_resolved = targetWorkspace.targetRefResolved;
+      markStage(
+        stageMap,
+        "bootstrap",
+        "pass",
+        [init.stateFile, targetWorkspace.targetPreflightLogFile],
+        "runtime initialized and target repository preflight completed",
+      );
+    } catch (error) {
+      const bootstrapError = error instanceof Error ? error.message : String(error);
+      markStage(
+        stageMap,
+        "bootstrap",
+        "fail",
+        [init.stateFile, targetPreflightLogFile],
+        `target preflight failed: ${bootstrapError}`,
+      );
+      throw error;
+    }
 
     const analyze = analyzeProjectRuntime({
       cwd,
@@ -331,14 +578,117 @@ export function startStandardLiveE2ERun(options) {
     });
     artifacts.verify_summary_file = verify.verifySummaryPath;
     artifacts.step_result_files = verify.stepResultFiles;
-    const executionStageStatus = verify.validationGateStatus === "fail" ? "fail" : "pass";
-    markStage(stageMap, "execution", executionStageStatus, [
-      verify.verifySummaryPath,
-      ...verify.stepResultFiles,
-    ]);
-    if (executionStageStatus === "fail") {
+    if (verify.validationGateStatus === "fail") {
+      markStage(stageMap, "execution", "fail", [verify.verifySummaryPath, ...verify.stepResultFiles]);
       throw new Error("Live E2E execution stage failed validation gate.");
     }
+
+    const setupCommands = Array.isArray(profile.verification?.setup_commands)
+      ? profile.verification.setup_commands.filter((entry) => typeof entry === "string" && entry.trim().length > 0)
+      : [];
+    const setupCommandReports = [];
+    const setupCommandEvidenceRefs = [];
+    artifacts.verification_setup_command_reports = setupCommandReports;
+    artifacts.verification_command_reports = [];
+    for (const [index, command] of setupCommands.entries()) {
+      const stdoutFile = resolveVerificationCommandLogFile(init, runId, "setup", index, "stdout");
+      const stderrFile = resolveVerificationCommandLogFile(init, runId, "setup", index, "stderr");
+      const commandRun = runShellCommand({
+        command,
+        cwd: targetWorkspaceRoot,
+        shell: true,
+      });
+      writeText(stdoutFile, commandRun.stdout);
+      writeText(stderrFile, commandRun.stderr);
+
+      const report = {
+        command,
+        exit_code: commandRun.exitCode,
+        stdout_file: stdoutFile,
+        stderr_file: stderrFile,
+        duration_ms: commandRun.durationMs,
+        cwd: targetWorkspaceRoot,
+        target_ref_resolved: targetRefResolved,
+      };
+      setupCommandReports.push(report);
+      setupCommandEvidenceRefs.push(stdoutFile, stderrFile);
+      if (commandRun.exitCode !== 0) {
+        artifacts.verification_setup_command_reports = setupCommandReports;
+        markStage(
+          stageMap,
+          "execution",
+          "fail",
+          [verify.verifySummaryPath, ...verify.stepResultFiles, ...setupCommandEvidenceRefs],
+          `verification setup command failed: '${command}' (exit_code=${commandRun.exitCode})`,
+        );
+        throw new Error(`Live E2E setup command failed: '${command}' (exit code ${commandRun.exitCode}).`);
+      }
+    }
+    const verificationCommands = Array.isArray(profile.verification?.commands)
+      ? profile.verification.commands.filter((entry) => typeof entry === "string" && entry.trim().length > 0)
+      : [];
+    const verificationCommandReports = [];
+    const verificationCommandEvidenceRefs = [];
+    for (const [index, command] of verificationCommands.entries()) {
+      const stdoutFile = resolveVerificationCommandLogFile(init, runId, "verification", index, "stdout");
+      const stderrFile = resolveVerificationCommandLogFile(init, runId, "verification", index, "stderr");
+      const commandRun = runShellCommand({
+        command,
+        cwd: targetWorkspaceRoot,
+        shell: true,
+      });
+      writeText(stdoutFile, commandRun.stdout);
+      writeText(stderrFile, commandRun.stderr);
+
+      const report = {
+        command,
+        exit_code: commandRun.exitCode,
+        stdout_file: stdoutFile,
+        stderr_file: stderrFile,
+        duration_ms: commandRun.durationMs,
+        cwd: targetWorkspaceRoot,
+        target_ref_resolved: targetRefResolved,
+      };
+      verificationCommandReports.push(report);
+      verificationCommandEvidenceRefs.push(stdoutFile, stderrFile);
+      if (commandRun.exitCode !== 0) {
+        artifacts.verification_command_reports = verificationCommandReports;
+        markStage(
+          stageMap,
+          "execution",
+          "fail",
+          [
+            verify.verifySummaryPath,
+            ...verify.stepResultFiles,
+            ...setupCommandEvidenceRefs,
+            ...verificationCommandEvidenceRefs,
+          ],
+          `verification command failed: '${command}' (exit_code=${commandRun.exitCode})`,
+        );
+        throw new Error(`Live E2E verification command failed: '${command}' (exit code ${commandRun.exitCode}).`);
+      }
+    }
+    artifacts.verification_command_reports = verificationCommandReports;
+    const setupSummary =
+      setupCommands.length > 0
+        ? `${setupCommands.length} setup command(s) passed`
+        : "no setup_commands configured";
+    const executionSummary =
+      verificationCommands.length > 0
+        ? `${setupSummary}; internal verify plus ${verificationCommands.length} profile verification command(s) passed`
+        : `${setupSummary}; internal verify passed and profile has no verification.commands`;
+    markStage(
+      stageMap,
+      "execution",
+      "pass",
+      [
+        verify.verifySummaryPath,
+        ...verify.stepResultFiles,
+        ...setupCommandEvidenceRefs,
+        ...verificationCommandEvidenceRefs,
+      ],
+      executionSummary,
+    );
 
     const evalSuites = Array.isArray(profile.verification?.eval_suites)
       ? profile.verification.eval_suites.filter((entry) => typeof entry === "string")
@@ -704,6 +1054,23 @@ export function abortStandardLiveE2ERun(options) {
   summary.learning_loop_handoff_file = learningLoop.handoffFile;
   summary.incident_report_file = learningLoop.incidentFile;
   writeJson(current.summaryFile, summary);
+  const updatedScorecards = scorecardFiles
+    .filter((filePath) => fs.existsSync(filePath))
+    .map((filePath) => {
+      const scorecard = readJson(filePath);
+      const updatedScorecard = {
+        ...scorecard,
+        status: "aborted",
+        stage_counts: summarizeStageCounts(
+          /** @type {Array<{ stage: string, status: string, evidence_refs: string[], summary: string | null }>} */ (
+            stageResults
+          ),
+        ),
+        summary_ref: typeof scorecard.summary_ref === "string" ? scorecard.summary_ref : current.summaryFile,
+      };
+      writeJson(filePath, updatedScorecard);
+      return updatedScorecard;
+    });
 
   appendRunEvent({
     cwd,
@@ -730,6 +1097,8 @@ export function abortStandardLiveE2ERun(options) {
   return {
     ...current,
     summary,
+    scorecards: updatedScorecards,
+    scorecardFiles,
     abortApplied: true,
     incidentReportFile: learningLoop.incidentFile,
     learningLoopHandoffFile: learningLoop.handoffFile,

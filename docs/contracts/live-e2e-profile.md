@@ -30,7 +30,13 @@ Profiles should encode no-write preflight behavior as machine-readable data unde
 - `abort_conditions` — explicit stop conditions that terminate a rehearsal early;
 - `reusable_assumptions` — assumptions that later bootstrap, quality, and delivery rehearsals can reuse.
 
-Profiles may also include a scenario identifier, a task brief, and explicit verification commands. Public-repo defaults should prefer patch or fork-first output and disable upstream write-back.
+Profiles may also include a scenario identifier and a task brief.
+
+Verification behavior is configured under `verification`:
+- `setup_commands` (optional) — shell commands executed in the cloned target workspace before verification commands.
+- `commands` — shell verification commands executed sequentially after setup commands.
+
+Public-repo defaults should prefer patch or fork-first output and disable upstream write-back.
 
 ## Example
 See `examples/live-e2e/*.yaml`.

@@ -39,9 +39,8 @@ Isolation mode defaults:
 - prefer `workspace-clone` when rehearsing fork-first delivery behavior on public targets.
 
 ## Prerequisites
-- Python and pip available.
-- `make` is available in the local shell.
-- Network access for clone and dependency install.
+- See `docs/ops/live-e2e-dependency-matrix.md` for canonical dependency and command requirements.
+- Local environment must allow Python dependency installation.
 
 ## Abort conditions
 - Clone or setup path fails.
@@ -51,12 +50,14 @@ Isolation mode defaults:
 
 ## Start command
 ```bash
-aor live-e2e start   --profile ./examples/live-e2e/regress-long.yaml
+aor live-e2e start \
+  --project-ref . \
+  --profile ./examples/live-e2e/regress-long.yaml
 ```
 
 ## Expected verification
 - repository bootstrap succeeds;
-- `make all` or equivalent setup path succeeds;
+- setup command `python -m pip install -e ".[dev]"` succeeds;
 - `make test` and `make codestyle` succeed;
 - review and QA packets are materialized;
 - release packet is not required.

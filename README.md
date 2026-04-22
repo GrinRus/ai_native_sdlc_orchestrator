@@ -51,6 +51,7 @@ Start here if you want to understand the project before implementing anything:
 5. `docs/backlog/backlog-operating-model.md`
 6. `docs/backlog/mvp-roadmap.md`
 7. `docs/ops/live-e2e-target-catalog.md`
+8. `docs/ops/live-e2e-dependency-matrix.md`
 
 ## Contributor quickstart
 
@@ -89,6 +90,8 @@ Useful helpers for the slice loop:
 - `pnpm slice:gate`
 
 For the repo-specific rules, read `CONTRIBUTING.md` and the nearest `AGENTS.md`.
+
+For live rehearsal dependency requirements, see `docs/ops/live-e2e-dependency-matrix.md`.
 
 ## How AOR works
 

@@ -68,6 +68,8 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+  - yarn install --immutable
   commands:
   - yarn g:lint
   - yarn g:typecheck

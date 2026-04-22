@@ -30,9 +30,8 @@ Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
 6. stop unless no-write gates pass
 
 ## Prerequisites
-- Node `>=22` and npm available.
-- Network access for clone and dependency install.
-- Local shell can run `npm test`.
+- See `docs/ops/live-e2e-dependency-matrix.md` for canonical dependency and command requirements.
+- Local environment must allow npm dependency and Playwright browser downloads.
 
 ## Abort conditions
 - Clone or dependency installation fails.
@@ -49,10 +48,14 @@ When local-branch delivery fails mid-run:
 
 ## Start command
 ```bash
-aor live-e2e start   --profile ./examples/live-e2e/release-short.yaml
+aor live-e2e start \
+  --project-ref . \
+  --profile ./examples/live-e2e/release-short.yaml
 ```
 
 ## Expected verification
+- setup command `npm install` succeeds;
+- setup command `npx playwright install` succeeds;
 - `npm test` succeeds;
 - release packet exists;
 - delivery manifest exists;

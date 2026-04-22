@@ -66,6 +66,8 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+  - "python -m pip install -e \".[dev]\""
   commands:
   - make test
   - make codestyle

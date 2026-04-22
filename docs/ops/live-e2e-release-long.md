@@ -35,9 +35,8 @@ Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
 6. stop unless no-write gates pass
 
 ## Prerequisites
-- Node + corepack + yarn available.
-- Network access for clone and workspace install.
-- Shell resources suitable for workspace lint/typecheck/test commands.
+- See `docs/ops/live-e2e-dependency-matrix.md` for canonical dependency and command requirements.
+- Local environment must allow workspace dependency install and full lint/typecheck/test execution.
 
 ## Abort conditions
 - Clone or workspace installation fails.
@@ -46,11 +45,14 @@ Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
 
 ## Start command
 ```bash
-aor live-e2e start   --profile ./examples/live-e2e/release-long.yaml
+aor live-e2e start \
+  --project-ref . \
+  --profile ./examples/live-e2e/release-long.yaml
 ```
 
 ## Expected verification
 - bootstrap and install succeed;
+- setup command `yarn install --immutable` succeeds;
 - `yarn g:lint`, `yarn g:typecheck`, and `yarn g:test-unit` succeed;
 - impacted-repo and changed-path metadata are recorded;
 - release packet and delivery manifest are materialized.

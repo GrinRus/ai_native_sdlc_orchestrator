@@ -39,9 +39,8 @@ Isolation mode defaults:
 - keep `ephemeral` only for bootstrap smoke with no delivery mutation intent.
 
 ## Prerequisites
-- Node `>=22` and npm available.
-- Network access for clone and dependency install.
-- Local shell can run `npm test`.
+- See `docs/ops/live-e2e-dependency-matrix.md` for canonical dependency and command requirements.
+- Local environment must allow npm dependency and Playwright browser downloads.
 
 ## Abort conditions
 - Clone or dependency installation fails.
@@ -50,7 +49,9 @@ Isolation mode defaults:
 
 ## Start command
 ```bash
-aor live-e2e start   --profile ./examples/live-e2e/regress-short.yaml
+aor live-e2e start \
+  --project-ref . \
+  --profile ./examples/live-e2e/regress-short.yaml
 ```
 
 ## Optional UI attach
@@ -59,7 +60,8 @@ aor ui attach --run RUN-201 --control-plane http://localhost:8080
 ```
 
 ## Expected verification
-- install succeeds;
+- setup command `npm install` succeeds;
+- setup command `npx playwright install` succeeds;
 - `npm test` succeeds;
 - handoff packet and step results are materialized;
 - routed dry-run step result is materialized with route/asset/policy/adapter metadata;

@@ -11,6 +11,7 @@ Use only the canonical profiles from `examples/live-e2e/`:
 - `release-long.yaml` for the `belgattitude/nextjs-monorepo-example` long release-shaped rehearsal.
 
 This mapping stays aligned with `docs/ops/live-e2e-target-catalog.md`.
+Canonical dependency requirements are tracked in `docs/ops/live-e2e-dependency-matrix.md`.
 
 ## Start
 ```bash
@@ -18,6 +19,10 @@ aor live-e2e start \
   --project-ref . \
   --profile ./examples/live-e2e/regress-short.yaml
 ```
+
+`--project-ref` is the AOR control-plane workspace used for runtime state under `.aor/`.
+The rehearsal `target_repo` is loaded from the selected live E2E profile and cloned by the runner automatically into:
+- `.aor/projects/<project_id>/workspaces/live-e2e/<run_id>/target`
 
 Optional bounded hold-open mode for abort rehearsals:
 ```bash
@@ -36,6 +41,18 @@ The run summary also carries learning-loop linkage fields:
 - `learning_loop_scorecard_file`
 - `learning_loop_handoff_file`
 - `incident_report_file` (for failed or aborted runs)
+
+## Setup and verification command artifacts
+For canonical `setup_commands` and verification command dependencies by profile, see `docs/ops/live-e2e-dependency-matrix.md`.
+
+When `verification.setup_commands` are present, the runner executes them first in the cloned target workspace.
+When `verification.commands` are present, the runner executes them sequentially after setup commands.
+
+The run summary/report emits:
+- `artifacts.verification_setup_command_reports[]` for setup commands;
+- `artifacts.verification_command_reports[]` for verification commands;
+- per-command `stdout` and `stderr` logs under `.aor/projects/<project_id>/reports/`;
+- `exit_code`, `duration_ms`, and `cwd` metadata for each command.
 
 ## Observe
 ```bash

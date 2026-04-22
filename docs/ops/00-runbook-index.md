@@ -2,6 +2,7 @@
 
 ## Live E2E rehearsal profiles
 - `live-e2e-target-catalog.md` — canonical target repositories, setup commands, and scenario briefs.
+- `live-e2e-dependency-matrix.md` — canonical dependencies for setup and verification across all live E2E profiles.
 - `live-e2e-regress-short.md` — fast smoke rehearsal on a small public repository.
 - `live-e2e-regress-long.md` — deeper regression rehearsal with stronger verification.
 - `live-e2e-release-short.md` — short release rehearsal that still materializes a release packet.
