@@ -32,6 +32,24 @@ Promotion decisions should always point to certification evidence and approver c
 Governance guardrail semantics should be explicit and reproducible:
 - `governance_checks[]` should include per-check `check_id`, `status` (`pass|hold|fail`), and a stable summary.
 - include `policy-quality-gate` so blocked decisions are traceable to policy, not just final status.
+- include `baseline-comparison` when moving into `stable`, `frozen`, or `demoted`.
+- include `freeze-channel-guardrail` when `to_channel=frozen`.
+
+Baseline comparison evidence should be explicit for maturity decisions:
+- `baseline_comparison.baseline_status`
+- `baseline_comparison.baseline_pass_rate`
+- `baseline_comparison.candidate_status`
+- `baseline_comparison.candidate_pass_rate`
+- `baseline_comparison.comparison_ready`
+- `baseline_comparison.regression_detected`
+- `baseline_comparison.baseline_evaluation_report_ref`
+- `baseline_comparison.replay_evaluation_report_ref` (optional if replay is blocked)
+
+Controlled rollout semantics should be explicit:
+- `rollout_decision.action` should be one of `promote`, `hold`, `reject`, `freeze`, or `demote`.
+- `rollout_decision.requested_transition` records `from_channel` and `to_channel`.
+- `rollout_decision.baseline_comparison_required` and `rollout_decision.baseline_comparison_complete` make promotion/freeze requirements auditable.
+- `rollout_decision.freeze_guardrail_required` and `rollout_decision.freeze_guardrail_satisfied` document freeze escalation behavior.
 
 Finance evidence parity should be carried in decision evidence:
 - `finance_signals.max_cost_usd`
@@ -41,6 +59,9 @@ Finance evidence parity should be carried in decision evidence:
 - optional source fields (`max_cost_source`, `timeout_source`) for audit provenance.
 
 `evidence_bar.required` should include deterministic validation, evaluative artifacts, and finance signals when policy quality gate is required.
+For maturity transitions:
+- include `baseline-comparison` for `stable`, `frozen`, and `demoted`;
+- include `freeze-guardrail` for `frozen`.
 
 For MVP validation, `from_channel` and `to_channel` use this closed set:
 - `draft`

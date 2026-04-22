@@ -21,6 +21,8 @@ aor harness certify \
 - `certification_evaluation_report_file`
 - `certification_harness_capture_file`
 - `certification_harness_replay_file`
+- `rollout_decision.action` (`promote|hold|reject|freeze|demote`)
+- `baseline_comparison.*` for stable/frozen/demoted transitions
 
 ## Certification transcripts (examples)
 Approved flow:
@@ -44,9 +46,21 @@ Policy-blocked flow:
 ```
 Reference sample: `examples/eval/governance-certification-transcript.sample.json`.
 
+Freeze escalation flow (regression-backed):
+```json
+{
+  "command": "harness certify --from-channel stable --to-channel frozen",
+  "promotion_decision_status": "fail",
+  "rollout_action": "freeze",
+  "freeze_guardrail_satisfied": true
+}
+```
+
 ## Stop conditions
 - certification status is `hold` or `fail`;
 - harness replay reports compatibility mismatches;
 - deterministic validation status is `warn` or `fail`;
 - finance signals are incomplete in promotion decision evidence summary;
+- baseline comparison evidence is missing for `stable|frozen|demoted` transitions;
+- freeze transition is requested without explicit regression evidence;
 - required evidence files were not generated.

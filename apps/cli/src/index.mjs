@@ -196,7 +196,9 @@ function formatCommandHelp(definition) {
         ? [
             "- --asset-ref is the asset being promoted (for example wrapper://..., route://..., prompt-bundle://...).",
             "- --subject-ref defines the eval/harness subject family used to produce evidence.",
-            "- Certification combines eval report + harness capture + harness replay into one promotion-decision.",
+            "- Certification combines validation report + eval report + harness capture + harness replay into one promotion-decision.",
+            "- Stable/frozen/demoted transitions require baseline-comparison evidence.",
+            "- Freeze transitions require explicit regression evidence before rollout action becomes 'freeze'.",
             "- Status semantics are pass, hold, or fail.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
           ]

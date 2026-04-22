@@ -110,12 +110,93 @@ function resolveGovernanceFinanceSignals(options) {
 
 /**
  * @param {{
+ *  evaluationStatus: string | null,
+ *  replayStatus: string | null,
+ *  captureResult: Record<string, unknown>,
+ *  replayResult: Record<string, unknown>,
+ * }} options
+ */
+function resolveBaselineComparison(options) {
+  const replayReport = asRecord(options.replayResult.replayReport);
+  const baselineSnapshot = asRecord(replayReport.baseline_snapshot);
+  const replaySnapshot = asRecord(replayReport.replay_snapshot);
+
+  const baselineStatus = asString(baselineSnapshot.status);
+  const baselinePassRate = asNumber(baselineSnapshot.aggregate_pass_rate);
+  const candidateStatus = asString(options.evaluationStatus);
+  const candidatePassRate = asNumber(replaySnapshot.aggregate_pass_rate);
+  const comparable = replaySnapshot.comparable === true;
+
+  const comparisonReady =
+    baselineStatus !== null && baselinePassRate !== null && candidateStatus !== null && candidatePassRate !== null;
+  const regressionDetected =
+    options.replayStatus === "fail" ||
+    (comparisonReady && baselinePassRate !== null && candidatePassRate !== null && candidatePassRate < baselinePassRate);
+
+  return {
+    baseline_status: baselineStatus,
+    baseline_pass_rate: baselinePassRate,
+    candidate_status: candidateStatus,
+    candidate_pass_rate: candidatePassRate,
+    comparable,
+    comparison_ready: comparisonReady,
+    regression_detected: regressionDetected,
+    baseline_evaluation_report_ref: asString(options.captureResult.evaluationReportPath),
+    replay_evaluation_report_ref: asString(replaySnapshot.evaluation_report_ref),
+  };
+}
+
+/**
+ * @param {{
+ *  fromChannel: string,
+ *  toChannel: string,
+ *  decisionStatus: "pass" | "hold" | "fail",
+ *  baselineComparisonRequired: boolean,
+ *  baselineComparisonComplete: boolean,
+ *  freezeGuardrailRequired: boolean,
+ *  freezeGuardrailSatisfied: boolean,
+ * }} options
+ */
+function resolveRolloutDecision(options) {
+  const action =
+    options.toChannel === "frozen"
+      ? options.freezeGuardrailSatisfied
+        ? "freeze"
+        : "hold"
+      : options.decisionStatus === "pass"
+        ? options.toChannel === "stable"
+          ? "promote"
+          : options.toChannel === "demoted"
+            ? "demote"
+            : "promote"
+        : options.decisionStatus === "hold"
+          ? "hold"
+          : "reject";
+
+  return {
+    action,
+    requested_transition: {
+      from_channel: options.fromChannel,
+      to_channel: options.toChannel,
+    },
+    baseline_comparison_required: options.baselineComparisonRequired,
+    baseline_comparison_complete: options.baselineComparisonComplete,
+    freeze_guardrail_required: options.freezeGuardrailRequired,
+    freeze_guardrail_satisfied: options.freezeGuardrailSatisfied,
+  };
+}
+
+/**
+ * @param {{
  *  validationStatus: string | null,
  *  evaluationStatus: string | null,
  *  replayStatus: string | null,
  *  evidenceComplete: boolean,
  *  financeSignalsComplete: boolean,
- *  qualityGateRequired: boolean,
+  *  qualityGateRequired: boolean,
+ *  baselineComparisonRequired: boolean,
+ *  baselineComparisonComplete: boolean,
+ *  freezeGuardrailStatus: "pass" | "hold",
  *  missingEvidenceKinds: string[],
  * }} options
  * @returns {Array<{ check_id: string, status: "pass" | "hold" | "fail", summary: string }>}
@@ -172,6 +253,25 @@ function buildGovernanceChecks(options) {
       : "Cost and latency guardrail signals are incomplete for governance review.",
   });
 
+  checks.push({
+    check_id: "baseline-comparison",
+    status: options.baselineComparisonRequired ? (options.baselineComparisonComplete ? "pass" : "hold") : "pass",
+    summary: options.baselineComparisonRequired
+      ? options.baselineComparisonComplete
+        ? "Baseline comparison evidence is present for channel transition."
+        : "Baseline comparison evidence is required but incomplete."
+      : "Baseline comparison evidence is optional for this channel transition.",
+  });
+
+  checks.push({
+    check_id: "freeze-channel-guardrail",
+    status: options.freezeGuardrailStatus,
+    summary:
+      options.freezeGuardrailStatus === "pass"
+        ? "Freeze guardrail is satisfied for this transition."
+        : "Freeze transition requires explicit regression evidence before channel freeze.",
+  });
+
   const hasFail = checks.some((entry) => entry.status === "fail");
   const hasHold = checks.some((entry) => entry.status === "hold");
   checks.push({
@@ -197,6 +297,9 @@ function buildGovernanceChecks(options) {
  *  evidenceComplete?: boolean,
  *  financeSignalsComplete?: boolean,
  *  qualityGateRequired?: boolean,
+ *  baselineComparisonRequired?: boolean,
+ *  baselineComparisonComplete?: boolean,
+ *  freezeGuardrailStatus?: "pass" | "hold",
  * }} options
  * @returns {"pass" | "hold" | "fail"}
  */
@@ -207,9 +310,24 @@ export function resolveCertificationDecisionStatus(options) {
   const replayEvidenceStatus = options.replayStatus === "pass" ? "pass" : options.replayStatus === "fail" ? "fail" : "hold";
   const evidenceStatus = options.evidenceComplete === false ? "hold" : "pass";
   const financeStatus = options.financeSignalsComplete === false ? "hold" : "pass";
+  const baselineStatus =
+    options.baselineComparisonRequired === true
+      ? options.baselineComparisonComplete === true
+        ? "pass"
+        : "hold"
+      : "pass";
+  const freezeGuardrailStatus = options.freezeGuardrailStatus ?? "pass";
   const qualityGateRequired = options.qualityGateRequired !== false;
 
-  const statuses = [deterministicStatus, evaluativeStatus, replayEvidenceStatus, evidenceStatus, financeStatus];
+  const statuses = [
+    deterministicStatus,
+    evaluativeStatus,
+    replayEvidenceStatus,
+    evidenceStatus,
+    financeStatus,
+    baselineStatus,
+    freezeGuardrailStatus,
+  ];
   if (statuses.includes("fail")) {
     return "fail";
   }
@@ -307,6 +425,21 @@ export function certifyAssetPromotion(options) {
     captureResult: /** @type {Record<string, unknown>} */ (captureResult),
     replayResult: /** @type {Record<string, unknown>} */ (replayResult),
   });
+  const baselineComparison = resolveBaselineComparison({
+    evaluationStatus,
+    replayStatus,
+    captureResult: /** @type {Record<string, unknown>} */ (captureResult),
+    replayResult: /** @type {Record<string, unknown>} */ (replayResult),
+  });
+  const baselineComparisonRequired = toChannel === "stable" || toChannel === "frozen" || toChannel === "demoted";
+  const baselineComparisonComplete = baselineComparison.comparison_ready === true;
+  const freezeGuardrailRequired = toChannel === "frozen";
+  const freezeGuardrailSatisfied =
+    !freezeGuardrailRequired ||
+    evaluationStatus !== "pass" ||
+    replayStatus === "fail" ||
+    baselineComparison.regression_detected === true;
+  const freezeGuardrailStatus = freezeGuardrailSatisfied ? "pass" : "hold";
   const financeSignalsComplete =
     financeSignals.max_cost_usd !== null &&
     financeSignals.timeout_sec !== null &&
@@ -320,6 +453,9 @@ export function certifyAssetPromotion(options) {
     evidenceComplete,
     financeSignalsComplete,
     qualityGateRequired,
+    baselineComparisonRequired,
+    baselineComparisonComplete,
+    freezeGuardrailStatus,
     missingEvidenceKinds,
   });
   const decisionStatus = resolveCertificationDecisionStatus({
@@ -329,6 +465,18 @@ export function certifyAssetPromotion(options) {
     evidenceComplete,
     financeSignalsComplete,
     qualityGateRequired,
+    baselineComparisonRequired,
+    baselineComparisonComplete,
+    freezeGuardrailStatus,
+  });
+  const rolloutDecision = resolveRolloutDecision({
+    fromChannel,
+    toChannel,
+    decisionStatus,
+    baselineComparisonRequired,
+    baselineComparisonComplete,
+    freezeGuardrailRequired,
+    freezeGuardrailSatisfied,
   });
 
   const decisionId = `${init.projectId}.promotion.${normalizeForId(options.assetRef)}.${Date.now()}`;
@@ -357,16 +505,28 @@ export function certifyAssetPromotion(options) {
       deterministic_validation_status: validationStatus,
       harness_replay_status: replayStatus,
       evaluation_status: evaluationStatus,
+      baseline_comparison: baselineComparison,
+      rollout_decision: rolloutDecision,
       governance_checks: governanceChecks,
       finance_signals: financeSignals,
       evidence_bar: {
-        required: ["validation-report", "evaluation-report", "harness-capture", "harness-replay", "finance-signals"],
+        required: [
+          "validation-report",
+          "evaluation-report",
+          "harness-capture",
+          "harness-replay",
+          "finance-signals",
+          ...(baselineComparisonRequired ? ["baseline-comparison"] : []),
+          ...(freezeGuardrailRequired ? ["freeze-guardrail"] : []),
+        ],
         satisfied: [
           validationResult.validationReportPath ? "validation-report" : null,
           "evaluation-report",
           "harness-capture",
           "harness-replay",
           financeSignalsComplete ? "finance-signals" : null,
+          baselineComparisonComplete ? "baseline-comparison" : null,
+          freezeGuardrailSatisfied ? "freeze-guardrail" : null,
           replayResult.replayEvaluationReportPath ? "replay-evaluation-report" : null,
         ].filter((entry) => entry !== null),
       },

@@ -83,8 +83,8 @@ This is the master index for the implementation slices across all defined waves.
 ## W7 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W7-S01 | Governance quality guardrails and evidence parity | EPIC-4 | ready | `packages/orchestrator-core`, `packages/harness`, `docs/contracts/**`, `examples/eval/**` | W6-S03, W3-S04 |
-| W7-S02 | AI platform promotion/freeze maturity pack | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**` | W7-S01, W3-S05 |
+| W7-S01 | Governance quality guardrails and evidence parity | EPIC-4 | done | `packages/orchestrator-core`, `packages/harness`, `docs/contracts/**`, `examples/eval/**` | W6-S03, W3-S04 |
+| W7-S02 | AI platform promotion/freeze maturity pack | EPIC-4 | ready | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**` | W7-S01, W3-S05 |
 | W7-S03 | Incident recertification and controlled re-enable flow | EPIC-7 | blocked | `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `docs/ops/**` | W7-S02, W6-S06 |
 | W7-S04 | Finance evidence and audit durability expansion | EPIC-7 | ready | `packages/observability`, `apps/api`, `docs/contracts/**`, `docs/ops/**` | W6-S06 |
 | W7-S05 | MVP+ governance and learning-loop integration closure | EPIC-7 | blocked | `docs/backlog/**`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W7-S02, W7-S03, W7-S04 |

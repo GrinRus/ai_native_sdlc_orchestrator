@@ -150,7 +150,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     command: "harness certify",
     category: "quality-workflows",
     status: "implemented",
-    summary: "Certify a changed asset set from eval and harness replay evidence.",
+    summary: "Certify a changed asset set from deterministic validation, eval, harness replay, and baseline comparison evidence.",
     inputs: [
       "--project-ref <path>",
       "--project-profile <path> (optional)",

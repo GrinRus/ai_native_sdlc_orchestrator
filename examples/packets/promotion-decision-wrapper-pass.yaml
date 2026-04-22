@@ -36,9 +36,34 @@ evidence_summary:
     - check_id: finance-signals
       status: pass
       summary: Cost and latency guardrail signals are present.
+    - check_id: baseline-comparison
+      status: pass
+      summary: Baseline comparison evidence is present for channel transition.
+    - check_id: freeze-channel-guardrail
+      status: pass
+      summary: Freeze guardrail is satisfied for this transition.
     - check_id: policy-quality-gate
       status: pass
       summary: Policy quality gate passed.
+  baseline_comparison:
+    baseline_status: pass
+    baseline_pass_rate: 1
+    candidate_status: pass
+    candidate_pass_rate: 1
+    comparable: true
+    comparison_ready: true
+    regression_detected: false
+    baseline_evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4.json
+    replay_evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4-replay.json
+  rollout_decision:
+    action: promote
+    requested_transition:
+      from_channel: candidate
+      to_channel: stable
+    baseline_comparison_required: true
+    baseline_comparison_complete: true
+    freeze_guardrail_required: false
+    freeze_guardrail_satisfied: true
   finance_signals:
     max_cost_usd: 25
     timeout_sec: 180
@@ -54,11 +79,13 @@ evidence_summary:
       - harness-capture
       - harness-replay
       - finance-signals
+      - baseline-comparison
     satisfied:
       - validation-report
       - evaluation-report
       - harness-capture
       - harness-replay
       - finance-signals
+      - baseline-comparison
       - replay-evaluation-report
 status: pass
