@@ -23,6 +23,9 @@ Implemented commands:
   - aor release prepare
   - aor packet show
   - aor evidence show
+  - aor incident open
+  - aor incident show
+  - aor audit runs
   - aor live-e2e start
   - aor live-e2e status
   - aor live-e2e report
@@ -33,8 +36,5 @@ Planned commands (not implemented yet):
   - aor harness replay
   - aor asset promote
   - aor asset freeze
-  - aor incident open
-  - aor incident show
-  - aor audit runs
 
 Use 'aor <group> <command> --help' for implemented command contracts.

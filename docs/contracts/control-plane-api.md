@@ -82,6 +82,31 @@ Delivery/release response baseline:
 - `delivery_manifest_file` and `release_packet_file` as durable evidence outputs;
 - `delivery_writeback_result` to distinguish `no-write-confirmed`, `patch-materialized`, `local-branch-committed`, and `fork-pr-planned`.
 
+## Incident/audit command endpoints (W6-S06 baseline)
+- `POST /api/projects/:projectId/incidents`
+- `GET /api/projects/:projectId/incidents`
+- `GET /api/projects/:projectId/audit/runs`
+
+Incident open payload baseline:
+- `run_id` (required run linkage for the incident lifecycle);
+- `summary` (required operator summary);
+- `severity` (optional level, defaults to `high`);
+- `status` (optional state, defaults to `open`);
+- `linked_asset_refs` (optional explicit evidence refs).
+
+Incident open response baseline:
+- durable `incident_file` path for one contract-valid `incident-report`;
+- `incident_run_ref` and `incident_linked_asset_refs` for explicit run/evidence traceability.
+
+Incident show baseline:
+- supports bounded lookup by `incident_id` or `run_id`;
+- missing lookup targets return explicit not-found errors for operator diagnostics.
+
+Audit runs baseline:
+- emits run-centric snapshots of packet, step-result, quality, incident, and promotion refs;
+- supports optional `run_id` filter and bounded `limit` window;
+- response includes `audit_evidence_refs` for downstream handoff and review workflows.
+
 ## UI lifecycle endpoints (W6-S04 baseline)
 - `POST /api/projects/:projectId/ui/attach`
 - `POST /api/projects/:projectId/ui/detach`

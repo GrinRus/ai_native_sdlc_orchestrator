@@ -28,6 +28,9 @@ This catalog separates bootstrap commands implemented in the current shell from 
 | `aor release prepare` | implemented | `--project-ref <path>`; `--project-profile <path>` (optional); `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--step-class <step_class>` (optional); `--mode <mode>` (optional); `--approved-handoff-ref <ref>` (optional); `--promotion-evidence-refs <ref[,ref...]>` (optional); `--route-overrides <step=route_id,...>` (optional); `--policy-overrides <step=policy_id,...>` (optional); `--ticket-id <id>` (optional); `--branch-name <name>` (optional); `--commit-message <text>` (optional); `--fork-owner <owner>` (optional); `--base-ref <ref>` (optional); `--pr-title <text>` (optional); `--pr-body <text>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `delivery_plan_id`, `delivery_plan_file`, `delivery_plan_status`, `delivery_mode`, `delivery_blocking`, `delivery_blocking_reasons`, `delivery_transcript_file`, `delivery_manifest_id`, `delivery_manifest_file`, `release_packet_id`, `release_packet_file`, `release_packet_status`, `delivery_writeback_result`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `delivery-plan`, `delivery-manifest`, `release-packet` |
 | `aor packet show` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--family <contract_family\|all>` (optional); `--limit <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `packet_artifacts`, `selected_family`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `artifact-packet`, `wave-ticket`, `handoff-packet`, `delivery-plan`, `delivery-manifest`, `release-packet` |
 | `aor evidence show` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `step_results`, `quality_artifacts`, `delivery_manifests`, `promotion_decisions`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `step-result`, `validation-report`, `evaluation-report`, `incident-report`, `promotion-decision`, `delivery-manifest`, `release-packet` |
+| `aor incident open` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>`; `--summary <text>`; `--severity <level>` (optional); `--status <state>` (optional); `--linked-asset-refs <ref[,ref...]>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `incident_id`, `incident_file`, `incident_status`, `incident_run_ref`, `incident_linked_asset_refs`, `audit_evidence_refs`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `incident-report`, `promotion-decision`, `delivery-manifest`, `release-packet`, `step-result` |
+| `aor incident show` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--incident-id <id>` (optional); `--run-id <id>` (optional); `--limit <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `incident_records`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `incident-report` |
+| `aor audit runs` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--limit <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `run_audit_records`, `audit_evidence_refs`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `incident-report`, `promotion-decision`, `delivery-manifest`, `release-packet`, `step-result` |
 | `aor live-e2e start` | implemented | `--project-ref <path>`; `--profile <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--hold-open <true\|false>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_profile_ref`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecard_files`, `live_e2e_abort_supported`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-e2e-profile`, `live-run-event`, `incident-report`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
 | `aor live-e2e status` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>`; `--abort <true\|false>` (optional); `--reason <text>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecards`, `live_e2e_abort_applied`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event`, `incident-report`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
 | `aor live-e2e report` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecards`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `incident-report`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
@@ -43,10 +46,6 @@ The following commands remain planned and are intentionally not implemented in t
 - `aor asset promote`
 - `aor asset freeze`
 
-- `aor incident open`
-- `aor incident show`
-- `aor audit runs`
-
 ## Operator semantics for W5-S03
 - `aor run status`, `aor packet show`, and `aor evidence show` are read-only operator commands.
 - `aor run status --follow` reuses the shared live-run stream contract and backpressure semantics from the control-plane event stream.
@@ -54,8 +53,8 @@ The following commands remain planned and are intentionally not implemented in t
   - `aor run start`, `aor run pause`, `aor run resume`, `aor run steer`, `aor run cancel`
 - Delivery/release command pack is implemented in W6-S05:
   - `aor deliver prepare`, `aor release prepare`
-- Remaining planned control hooks:
-  - incident/audit control: `aor incident open`, `aor incident show`, `aor audit runs`
+- Incident/audit command pack is implemented in W6-S06:
+  - `aor incident open`, `aor incident show`, `aor audit runs`
 
 ## Standard live E2E semantics for W5-S05
 - `aor live-e2e start` is the standard orchestration entrypoint for target-catalog rehearsal profiles.
@@ -82,3 +81,8 @@ The following commands remain planned and are intentionally not implemented in t
 ## Story traceability for W6-S05
 - `aor deliver prepare` supports delivery transaction / Git / PR flow by resolving write-back mode through policy and emitting durable delivery-manifest plus release-packet lineage.
 - `aor release prepare` supports repository and release owners by enforcing handoff/promotion preconditions before release artifact materialization.
+
+## Story traceability for W6-S06
+- `aor incident open` supports incident/improvement owners by creating durable run-linked incident records with explicit evidence lineage.
+- `aor incident show` supports operators and auditors by resolving incident lookup paths through incident-id or run-id filters.
+- `aor audit runs` supports finance/audit/hygiene workflows by exposing run-centric packet/step/quality evidence with incident and promotion links.

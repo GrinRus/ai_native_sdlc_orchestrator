@@ -254,6 +254,39 @@ test("listRuns includes run-control state snapshots even before packet/report ar
   });
 });
 
+test("read surface links incident reports back to run-centric audit views", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const runId = "run.incident.audit.v1";
+    const incidentFile = path.join(init.runtimeLayout.reportsRoot, "incident-report-run-incident-audit-v1.json");
+
+    writeContractFile({
+      family: "incident-report",
+      filePath: incidentFile,
+      document: {
+        incident_id: `${init.projectId}.incident.audit.v1`,
+        project_id: init.projectId,
+        severity: "high",
+        summary: "Run requires incident follow-up.",
+        linked_run_refs: [`run://${runId}`],
+        linked_asset_refs: ["evidence://reports/learning-loop-scorecard-run-incident-audit-v1.json"],
+        status: "open",
+      },
+    });
+
+    const qualityArtifacts = listQualityArtifacts({ projectRef: repoRoot, cwd: repoRoot });
+    const incidentArtifact = qualityArtifacts.find(
+      (artifact) => artifact.family === "incident-report" && artifact.document.incident_id === `${init.projectId}.incident.audit.v1`,
+    );
+    assert.ok(incidentArtifact);
+
+    const runs = listRuns({ projectRef: repoRoot, cwd: repoRoot });
+    const auditedRun = runs.find((run) => run.run_id === runId);
+    assert.ok(auditedRun);
+    assert.ok(auditedRun.quality_refs.includes(/** @type {any} */ (incidentArtifact).artifact_ref));
+  });
+});
+
 test("ui lifecycle API supports attach/detach idempotency and disconnected mode", () => {
   withTempRepo((repoRoot) => {
     const attached = attachUiLifecycle({

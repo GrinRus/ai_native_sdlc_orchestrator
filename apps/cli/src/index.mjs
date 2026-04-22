@@ -15,7 +15,7 @@ import {
   readUiLifecycleState,
   readProjectState,
 } from "../../api/src/index.mjs";
-import { getContractFamilyIndex } from "../../../packages/contracts/src/index.mjs";
+import { getContractFamilyIndex, validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import {
   approveHandoffArtifacts,
   prepareHandoffArtifacts,
@@ -142,6 +142,10 @@ function formatCommandHelp(definition) {
           ? "Status: implemented in operator shell (W5-S03)"
         : definition.command === "deliver prepare" || definition.command === "release prepare"
           ? "Status: implemented in delivery/release shell (W6-S05)"
+        : definition.command === "incident open" ||
+            definition.command === "incident show" ||
+            definition.command === "audit runs"
+          ? "Status: implemented in incident/audit shell (W6-S06)"
         : definition.command === "ui attach" || definition.command === "ui detach"
           ? "Status: implemented in UI lifecycle shell (W6-S04)"
           : definition.command === "live-e2e start" ||
@@ -290,8 +294,26 @@ function formatCommandHelp(definition) {
               ? [
                   "- This command is read-only and aggregates step, quality, and delivery evidence.",
                   "- --run-id scopes results to one run when contracts include run_id.",
-                  "- Future control hooks remain planned: incident open, incident show, audit runs.",
+                  "- Use incident open/show and audit runs for incident and run-centric audit actions.",
                 ]
+              : definition.command === "incident open"
+                ? [
+                    "- Incident open writes one contract-valid incident-report under runtime reports.",
+                    "- --run-id and --summary are required to preserve explicit operator intent and run lineage.",
+                    "- Command links run packet, step, quality, and explicit linked-asset refs into one incident record.",
+                  ]
+                : definition.command === "incident show"
+                  ? [
+                      "- Incident show is read-only and supports lookup by --incident-id or --run-id.",
+                      "- --limit bounds output size for operator review sessions.",
+                      "- Empty result sets are valid when no incident record matches the filter.",
+                    ]
+                  : definition.command === "audit runs"
+                    ? [
+                        "- Audit runs is read-only and emits run-centric snapshots for packet, step, and quality refs.",
+                        "- Use --run-id to scope one run or --limit for bounded list output.",
+                        "- Audit output highlights incident and promotion references for traceable follow-up.",
+                      ]
               : definition.command === "live-e2e start"
                 ? [
                     "- This command starts one standard profile run and emits durable run summary + scorecard artifacts.",
@@ -460,6 +482,40 @@ function resolveOptionalCsvFlag(flagName, value) {
   }
 
   return Array.from(new Set(parsed));
+}
+
+/**
+ * @param {string[]} values
+ * @returns {string[]}
+ */
+function uniqueStrings(values) {
+  return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function asStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
+    : [];
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeForId(value) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/**
+ * @param {string} runId
+ * @returns {string}
+ */
+function toRunRef(runId) {
+  return runId.startsWith("run://") ? runId : `run://${runId}`;
 }
 
 /**
@@ -740,6 +796,14 @@ function executeImplementedCommand(command, flags, cwd) {
   let releasePacketFile = null;
   let releasePacketStatus = null;
   let deliveryWritebackResult = null;
+  let incidentId = null;
+  let incidentFile = null;
+  let incidentStatus = null;
+  let incidentRunRef = null;
+  let incidentLinkedAssetRefs = null;
+  let incidentRecords = null;
+  let runAuditRecords = null;
+  let auditEvidenceRefs = null;
 
   if (command === "project init") {
     const initResult = initializeProjectRuntime({
@@ -1385,6 +1449,248 @@ function executeImplementedCommand(command, flags, cwd) {
     );
     readOnly = true;
     futureControlHooks = ["incident open", "incident show", "audit runs"];
+  } else if (command === "incident open") {
+    ensureRequiredFlags(command, flags);
+    const runId = /** @type {string} */ (resolveOptionalStringFlag("run-id", flags["run-id"]));
+    const summary = /** @type {string} */ (resolveOptionalStringFlag("summary", flags.summary));
+    const severity = resolveOptionalStringFlag("severity", flags.severity) ?? "high";
+    const statusValue = resolveOptionalStringFlag("status", flags.status) ?? "open";
+    const explicitLinkedAssetRefs = resolveOptionalCsvFlag("linked-asset-refs", flags["linked-asset-refs"]);
+
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    resolvedProjectRef = projectState.project_root;
+    resolvedRuntimeRoot = projectState.runtime_root;
+    runtimeLayout = projectState.runtime_layout;
+    runtimeStateFile = projectState.state_file;
+    projectProfileRef = projectState.project_profile_ref;
+
+    const runSummariesForIncident = listRuns({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const runSummary = runSummariesForIncident.find((entry) => entry.run_id === runId);
+    if (!runSummary) {
+      throw new CliUsageError(`Run '${runId}' is not present in runtime evidence. Use 'aor run status --run-id ${runId}'.`);
+    }
+
+    const qualityForRun = listQualityArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    }).filter((artifact) => runSummary.quality_refs.includes(artifact.artifact_ref));
+
+    const linkedEvalSuiteRefs = uniqueStrings(
+      qualityForRun
+        .filter((artifact) => artifact.family === "evaluation-report")
+        .map((artifact) => (typeof artifact.document.suite_ref === "string" ? artifact.document.suite_ref : "")),
+    );
+    const linkedHarnessCaptureRefs = uniqueStrings(
+      qualityForRun
+        .filter((artifact) => artifact.family === "promotion-decision")
+        .flatMap((artifact) => asStringArray(artifact.document.evidence_refs))
+        .filter((ref) => ref.includes("harness-capture")),
+    );
+
+    const linkedAssetRefs = uniqueStrings([
+      ...runSummary.packet_refs,
+      ...runSummary.step_result_refs,
+      ...runSummary.quality_refs,
+      ...explicitLinkedAssetRefs,
+    ]);
+    const incidentRun = toRunRef(runId);
+    const generatedIncidentId = `${projectState.project_id}.incident.${normalizeForId(runId)}.${Date.now()}`;
+    const incidentDocument = {
+      incident_id: generatedIncidentId,
+      project_id: projectState.project_id,
+      severity,
+      summary,
+      linked_run_refs: [incidentRun],
+      linked_asset_refs: linkedAssetRefs,
+      status: statusValue,
+      linked_eval_suite_refs: linkedEvalSuiteRefs,
+      linked_harness_capture_refs: linkedHarnessCaptureRefs,
+      linked_backlog_refs: ["docs/backlog/mvp-implementation-backlog.md", "docs/backlog/wave-6-implementation-slices.md"],
+      evidence_root: projectState.runtime_layout.reports_root,
+      created_at: new Date().toISOString(),
+    };
+    const incidentValidation = validateContractDocument({
+      family: "incident-report",
+      document: incidentDocument,
+      source: "runtime://incident-report-open",
+    });
+    if (!incidentValidation.ok) {
+      const issues = incidentValidation.issues.map((issue) => issue.message).join("; ");
+      throw new CliUsageError(`Generated incident-report failed contract validation: ${issues}`);
+    }
+
+    const generatedIncidentFile = path.join(
+      projectState.runtime_layout.reports_root,
+      `incident-report-${normalizeForId(generatedIncidentId)}.json`,
+    );
+    fs.writeFileSync(generatedIncidentFile, `${JSON.stringify(incidentDocument, null, 2)}\n`, "utf8");
+
+    incidentId = incidentDocument.incident_id;
+    incidentFile = generatedIncidentFile;
+    incidentStatus = incidentDocument.status;
+    incidentRunRef = incidentRun;
+    incidentLinkedAssetRefs = incidentDocument.linked_asset_refs;
+    auditEvidenceRefs = linkedAssetRefs;
+    readOnly = false;
+    futureControlHooks = [
+      `incident show --incident-id ${incidentDocument.incident_id}`,
+      `audit runs --run-id ${runId}`,
+      `evidence show --run-id ${runId}`,
+    ];
+  } else if (command === "incident show") {
+    ensureRequiredFlags(command, flags);
+    const incidentIdFilter = resolveOptionalStringFlag("incident-id", flags["incident-id"]);
+    const runIdFilter = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    const limit = resolveOptionalIntegerFlag("limit", flags.limit, { min: 1 });
+
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    resolvedProjectRef = projectState.project_root;
+    resolvedRuntimeRoot = projectState.runtime_root;
+    runtimeLayout = projectState.runtime_layout;
+    runtimeStateFile = projectState.state_file;
+    projectProfileRef = projectState.project_profile_ref;
+
+    const incidents = listQualityArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    }).filter((artifact) => artifact.family === "incident-report");
+
+    const runRefFilter = runIdFilter ? toRunRef(runIdFilter) : null;
+    const incidentMatches = incidents
+      .filter((artifact) =>
+        !incidentIdFilter || artifact.document.incident_id === incidentIdFilter,
+      )
+      .filter((artifact) => {
+        if (!runRefFilter) return true;
+        const refs = asStringArray(artifact.document.linked_run_refs);
+        return refs.includes(runRefFilter) || refs.includes(runIdFilter ?? "");
+      });
+
+    if (incidentIdFilter && incidentMatches.length === 0) {
+      throw new CliUsageError(`Incident '${incidentIdFilter}' was not found.`);
+    }
+    if (runIdFilter && incidentMatches.length === 0) {
+      throw new CliUsageError(`No incident records are linked to run '${runIdFilter}'.`);
+    }
+
+    const boundedMatches = typeof limit === "number" ? incidentMatches.slice(0, limit) : incidentMatches;
+    incidentRecords = boundedMatches.map((artifact) => ({
+      incident_id:
+        typeof artifact.document.incident_id === "string" ? artifact.document.incident_id : null,
+      incident_ref: artifact.artifact_ref,
+      incident_file: artifact.file,
+      status: typeof artifact.document.status === "string" ? artifact.document.status : null,
+      severity: typeof artifact.document.severity === "string" ? artifact.document.severity : null,
+      summary: typeof artifact.document.summary === "string" ? artifact.document.summary : null,
+      linked_run_refs: asStringArray(artifact.document.linked_run_refs),
+      linked_asset_refs: asStringArray(artifact.document.linked_asset_refs),
+      linked_backlog_refs: asStringArray(artifact.document.linked_backlog_refs),
+      created_at: typeof artifact.document.created_at === "string" ? artifact.document.created_at : null,
+    }));
+    auditEvidenceRefs = uniqueStrings(incidentRecords.flatMap((record) => record.linked_asset_refs));
+    readOnly = true;
+    futureControlHooks = runIdFilter
+      ? [`audit runs --run-id ${runIdFilter}`]
+      : ["audit runs", "incident open --run-id <id> --summary <text>"];
+  } else if (command === "audit runs") {
+    ensureRequiredFlags(command, flags);
+    const runIdFilter = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    const limit = resolveOptionalIntegerFlag("limit", flags.limit, { min: 1 });
+
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    resolvedProjectRef = projectState.project_root;
+    resolvedRuntimeRoot = projectState.runtime_root;
+    runtimeLayout = projectState.runtime_layout;
+    runtimeStateFile = projectState.state_file;
+    projectProfileRef = projectState.project_profile_ref;
+
+    const runsForAudit = listRuns({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const scopedRuns = runIdFilter
+      ? runsForAudit.filter((run) => run.run_id === runIdFilter)
+      : runsForAudit;
+
+    if (runIdFilter && scopedRuns.length === 0) {
+      throw new CliUsageError(`Run '${runIdFilter}' was not found for audit output.`);
+    }
+
+    const qualityArtifacts = listQualityArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const incidents = qualityArtifacts.filter((artifact) => artifact.family === "incident-report");
+    const promotions = qualityArtifacts.filter((artifact) => artifact.family === "promotion-decision");
+
+    const runAuditSource = scopedRuns.map((run) => {
+      const runRef = toRunRef(run.run_id);
+      const incidentMatches = incidents.filter((artifact) => {
+        const refs = asStringArray(artifact.document.linked_run_refs);
+        return refs.includes(runRef) || refs.includes(run.run_id);
+      });
+      const incidentRefs = uniqueStrings([
+        ...run.quality_refs.filter((ref) => ref.includes("incident-report")),
+        ...incidentMatches.map((artifact) => artifact.artifact_ref),
+      ]);
+      const promotionRefs = uniqueStrings([
+        ...run.quality_refs.filter((ref) => ref.includes("promotion-decision")),
+        ...promotions
+          .filter((artifact) => artifact.artifact_ref && run.quality_refs.includes(artifact.artifact_ref))
+          .map((artifact) => artifact.artifact_ref),
+      ]);
+      const scorecardRefs = uniqueStrings(
+        incidentMatches
+          .flatMap((artifact) => asStringArray(artifact.document.linked_asset_refs))
+          .filter((ref) => ref.includes("learning-loop-scorecard")),
+      );
+      const evidenceRefs = uniqueStrings([
+        ...run.packet_refs,
+        ...run.step_result_refs,
+        ...run.quality_refs,
+        ...incidentMatches.flatMap((artifact) => asStringArray(artifact.document.linked_asset_refs)),
+      ]);
+
+      return {
+        run_id: run.run_id,
+        run_ref: runRef,
+        packet_refs: run.packet_refs,
+        step_result_refs: run.step_result_refs,
+        quality_refs: run.quality_refs,
+        incident_refs: incidentRefs,
+        promotion_refs: promotionRefs,
+        scorecard_refs: scorecardRefs,
+        evidence_refs: evidenceRefs,
+        evidence_root: projectState.runtime_layout.reports_root,
+      };
+    });
+
+    runAuditRecords = typeof limit === "number" ? runAuditSource.slice(0, limit) : runAuditSource;
+    auditEvidenceRefs = uniqueStrings(runAuditRecords.flatMap((record) => record.evidence_refs));
+    readOnly = true;
+    futureControlHooks = runIdFilter
+      ? [`incident open --run-id ${runIdFilter} --summary <text>`, `incident show --run-id ${runIdFilter}`]
+      : ["incident open --run-id <id> --summary <text>", "incident show --run-id <id>"];
   } else if (command === "live-e2e start") {
     ensureRequiredFlags(command, flags);
     const holdOpen = resolveOptionalBooleanFlag("hold-open", flags["hold-open"]);
@@ -1645,6 +1951,14 @@ function executeImplementedCommand(command, flags, cwd) {
     release_packet_file: releasePacketFile,
     release_packet_status: releasePacketStatus,
     delivery_writeback_result: deliveryWritebackResult,
+    incident_id: incidentId,
+    incident_file: incidentFile,
+    incident_status: incidentStatus,
+    incident_run_ref: incidentRunRef,
+    incident_linked_asset_refs: incidentLinkedAssetRefs,
+    incident_records: incidentRecords,
+    run_audit_records: runAuditRecords,
+    audit_evidence_refs: auditEvidenceRefs,
     run_summaries: runSummaries,
     follow_mode: followMode,
     stream_protocol: streamProtocol,

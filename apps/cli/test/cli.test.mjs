@@ -136,6 +136,21 @@ test("delivery and release command help documents bounded policy semantics", () 
   assert.match(releaseHelp.stdout, /Release prepare enforces release preconditions before delivery\/release artifact materialization\./);
 });
 
+test("incident and audit command help documents run-linked operational semantics", () => {
+  const incidentHelp = invokeCli(["incident", "open", "--help"]);
+  const auditHelp = invokeCli(["audit", "runs", "--help"]);
+
+  assert.equal(incidentHelp.exitCode, 0);
+  assert.equal(incidentHelp.stderr, "");
+  assert.match(incidentHelp.stdout, /Status: implemented in incident\/audit shell \(W6-S06\)/);
+  assert.match(incidentHelp.stdout, /--run-id <id>/);
+  assert.match(incidentHelp.stdout, /writes one contract-valid incident-report/);
+
+  assert.equal(auditHelp.exitCode, 0);
+  assert.equal(auditHelp.stderr, "");
+  assert.match(auditHelp.stdout, /run-centric snapshots for packet, step, and quality refs/);
+});
+
 test("unknown command fails clearly", () => {
   const result = invokeCli(["project", "unknown"]);
 
@@ -650,6 +665,149 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
         delivery_mode: forkPayload.delivery_mode,
         delivery_writeback_result: forkPayload.delivery_writeback_result,
         release_packet_status: forkPayload.release_packet_status,
+      },
+    };
+    assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("W6 incident and audit command pack links run evidence to durable incident and audit outputs", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const verifyResult = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--routed-dry-run-step",
+      "implement",
+    ]);
+    assert.equal(verifyResult.exitCode, 0, verifyResult.stderr);
+    const verifyPayload = JSON.parse(verifyResult.stdout);
+    const routedStepResult = JSON.parse(fs.readFileSync(verifyPayload.routed_step_result_file, "utf8"));
+    const runId = routedStepResult.run_id;
+
+    const incidentOpenResult = invokeCli([
+      "incident",
+      "open",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+      "--summary",
+      "release regression requires follow-up",
+      "--severity",
+      "critical",
+      "--linked-asset-refs",
+      "evidence://external/manual-note",
+    ]);
+    assert.equal(incidentOpenResult.exitCode, 0, incidentOpenResult.stderr);
+    const incidentOpenPayload = JSON.parse(incidentOpenResult.stdout);
+    assert.equal(typeof incidentOpenPayload.incident_id, "string");
+    assert.equal(incidentOpenPayload.incident_status, "open");
+    assert.equal(incidentOpenPayload.incident_run_ref, `run://${runId}`);
+    assert.equal(fs.existsSync(incidentOpenPayload.incident_file), true);
+    assert.ok(incidentOpenPayload.incident_linked_asset_refs.includes("evidence://external/manual-note"));
+    const incidentDocument = JSON.parse(fs.readFileSync(incidentOpenPayload.incident_file, "utf8"));
+    const incidentFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "incident-report.fixture.json"), "utf8"),
+    );
+    const incidentSubset = {
+      severity: incidentDocument.severity,
+      status: incidentDocument.status,
+      linked_run_ref_present: Array.isArray(incidentDocument.linked_run_refs)
+        ? incidentDocument.linked_run_refs.includes(`run://${runId}`)
+        : false,
+      linked_manual_note_present: Array.isArray(incidentDocument.linked_asset_refs)
+        ? incidentDocument.linked_asset_refs.includes("evidence://external/manual-note")
+        : false,
+    };
+    assert.deepEqual(incidentSubset, incidentFixture);
+
+    const incidentShowResult = invokeCli([
+      "incident",
+      "show",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      incidentOpenPayload.incident_id,
+    ]);
+    assert.equal(incidentShowResult.exitCode, 0, incidentShowResult.stderr);
+    const incidentShowPayload = JSON.parse(incidentShowResult.stdout);
+    assert.equal(Array.isArray(incidentShowPayload.incident_records), true);
+    assert.equal(incidentShowPayload.incident_records.length, 1);
+    assert.equal(incidentShowPayload.incident_records[0].incident_id, incidentOpenPayload.incident_id);
+    assert.ok(incidentShowPayload.incident_records[0].linked_run_refs.includes(`run://${runId}`));
+
+    const auditResult = invokeCli([
+      "audit",
+      "runs",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+    ]);
+    assert.equal(auditResult.exitCode, 0, auditResult.stderr);
+    const auditPayload = JSON.parse(auditResult.stdout);
+    assert.equal(Array.isArray(auditPayload.run_audit_records), true);
+    assert.equal(auditPayload.run_audit_records.length, 1);
+    assert.equal(auditPayload.run_audit_records[0].run_id, runId);
+    assert.ok(Array.isArray(auditPayload.run_audit_records[0].incident_refs));
+    assert.ok(auditPayload.run_audit_records[0].incident_refs.length >= 1);
+    const auditFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "run-audit-record.fixture.json"), "utf8"),
+    );
+    const auditSubset = {
+      run_ref: auditPayload.run_audit_records[0].run_ref,
+      has_incident_refs: auditPayload.run_audit_records[0].incident_refs.length > 0,
+      has_evidence_refs: auditPayload.run_audit_records[0].evidence_refs.length > 0,
+    };
+    assert.deepEqual(auditSubset, auditFixture);
+
+    const missingIncidentResult = invokeCli([
+      "incident",
+      "show",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      "missing-incident-id",
+    ]);
+    assert.equal(missingIncidentResult.exitCode, 1);
+    assert.equal(missingIncidentResult.stdout, "");
+    assert.match(missingIncidentResult.stderr, /Incident 'missing-incident-id' was not found\./);
+
+    const missingAuditRunResult = invokeCli([
+      "audit",
+      "runs",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "missing-run-id",
+    ]);
+    assert.equal(missingAuditRunResult.exitCode, 1);
+    assert.equal(missingAuditRunResult.stdout, "");
+    assert.match(missingAuditRunResult.stderr, /Run 'missing-run-id' was not found for audit output\./);
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "incident-audit-transcript.json"), "utf8"),
+    );
+    const transcriptSubset = {
+      incident_open: {
+        command: incidentOpenPayload.command,
+        status: incidentOpenPayload.status,
+        incident_status: incidentOpenPayload.incident_status,
+      },
+      incident_show: {
+        command: incidentShowPayload.command,
+        status: incidentShowPayload.status,
+        record_count: incidentShowPayload.incident_records.length,
+      },
+      audit_runs: {
+        command: auditPayload.command,
+        status: auditPayload.status,
+        record_count: auditPayload.run_audit_records.length,
       },
     };
     assert.deepEqual(transcriptSubset, transcriptFixture);

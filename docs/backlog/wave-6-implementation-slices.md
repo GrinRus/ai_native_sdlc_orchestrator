@@ -112,7 +112,7 @@ Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, 
 
 ## W6-S04 — UI attach/detach lifecycle command pack
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Implement `aor ui attach` and `aor ui detach` so web console lifecycle is explicit, bounded, and operationally traceable.
 - **Primary modules:** `apps/cli`, `apps/web`, `apps/api`, `docs/ops/**`
 - **Hard dependencies:** W6-S03, W5-S04
@@ -143,7 +143,7 @@ Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, 
 
 ## W6-S05 — Delivery/release prepare command pack
 - **Epic:** EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Implement `aor deliver prepare` and `aor release prepare` as policy-bounded command entrypoints linked to manifests and release packets.
 - **Primary modules:** `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W6-S03, W4-S05

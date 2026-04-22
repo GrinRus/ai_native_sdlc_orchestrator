@@ -1,0 +1,5 @@
+{
+  "run_ref": "run://aor-core.routed-execution.v1",
+  "has_incident_refs": true,
+  "has_evidence_refs": true
+}

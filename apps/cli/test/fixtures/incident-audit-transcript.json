@@ -1,0 +1,17 @@
+{
+  "incident_open": {
+    "command": "incident open",
+    "status": "implemented",
+    "incident_status": "open"
+  },
+  "incident_show": {
+    "command": "incident show",
+    "status": "implemented",
+    "record_count": 1
+  },
+  "audit_runs": {
+    "command": "audit runs",
+    "status": "implemented",
+    "record_count": 1
+  }
+}
