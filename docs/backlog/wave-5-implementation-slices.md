@@ -50,7 +50,7 @@ Expose operator-grade APIs, live views, and standardized live E2E orchestration 
 
 ## W5-S02 — Live run event stream
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Stream run events through a stable event model so operators can follow progress without tailing raw files.
 - **Primary modules:** `apps/api`, `packages/observability`, `docs/contracts/**`
 - **Hard dependencies:** W5-S01, W2-S05
@@ -81,7 +81,7 @@ Expose operator-grade APIs, live views, and standardized live E2E orchestration 
 
 ## W5-S03 — CLI operator commands beyond bootstrap
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Expand the CLI from bootstrap-only flows into an operator tool for inspecting and controlling bounded runs.
 - **Primary modules:** `apps/cli`, `apps/api`, `docs/architecture/**`
 - **Hard dependencies:** W5-S01, W5-S02
@@ -112,7 +112,7 @@ Expose operator-grade APIs, live views, and standardized live E2E orchestration 
 
 ## W5-S04 — Detachable web UI baseline
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Prove the headless-first but UI-attachable model by adding a detachable web operator console.
 - **Primary modules:** `apps/web`, `apps/api`, `docs/ops/**`
 - **Hard dependencies:** W5-S01, W5-S02
@@ -143,7 +143,7 @@ Expose operator-grade APIs, live views, and standardized live E2E orchestration 
 
 ## W5-S05 — Standard live E2E orchestration runner
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Run the selected public-target scenarios through the actual control plane instead of bespoke one-off scripts.
 - **Primary modules:** `apps/cli`, `apps/api`, `docs/ops/**`, `examples/live-e2e/**`
 - **Hard dependencies:** W5-S03, W4-S06, W3-S06
@@ -174,7 +174,7 @@ Expose operator-grade APIs, live views, and standardized live E2E orchestration 
 
 ## W5-S06 — Scorecards, incident capture, and learning-loop handoff
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Close the loop from live E2E and delivery output back into roadmap, eval, and asset improvement work.
 - **Primary modules:** `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/backlog/**`
 - **Hard dependencies:** W5-S05, W3-S05
