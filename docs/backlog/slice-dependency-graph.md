@@ -44,6 +44,25 @@ flowchart TB
   W5S04[W5-S04 Detachable web UI baseline]
   W5S05[W5-S05 Standard live E2E orchestration runner]
   W5S06[W5-S06 Scorecards, incident capture, and learning-loop handoff]
+  W6S01[W6-S01 Backlog and slice-cycle extensibility for W6+]
+  W6S02[W6-S02 Intake/discovery/spec/wave command pack]
+  W6S03[W6-S03 Run-control command pack with policy and audit guardrails]
+  W6S04[W6-S04 UI attach/detach lifecycle command pack]
+  W6S05[W6-S05 Delivery/release prepare command pack]
+  W6S06[W6-S06 Incident and audit command pack]
+  W7S01[W7-S01 Governance quality guardrails and evidence parity]
+  W7S02[W7-S02 AI platform promotion/freeze maturity pack]
+  W7S03[W7-S03 Incident recertification and controlled re-enable flow]
+  W7S04[W7-S04 Finance evidence and audit durability expansion]
+  W7S05[W7-S05 MVP+ governance and learning-loop integration closure]
+  W8S01[W8-S01 Sponsor and planner strategic visibility expansion]
+  W8S02[W8-S02 Later discovery and architecture maturity pack]
+  W8S03[W8-S03 Later delivery and security route-governance maturity]
+  W8S04[W8-S04 Later operator event and policy visibility expansion]
+  W8S05[W8-S05 Later QA and AI platform baseline comparison maturity]
+  W8S06[W8-S06 Later incident and platform recertification maturity]
+  W8S07[W8-S07 Later multi-repo, bootstrap, and delivery rerun maturity]
+
   W0S01 --> W0S02
   W0S02 --> W0S03
   W0S02 --> W0S05
@@ -117,6 +136,42 @@ flowchart TB
   W3S06 --> W5S05
   W5S05 --> W5S06
   W3S05 --> W5S06
+  W5S06 --> W6S01
+  W6S01 --> W6S02
+  W6S01 --> W6S03
+  W5S03 --> W6S03
+  W6S03 --> W6S04
+  W5S04 --> W6S04
+  W6S03 --> W6S05
+  W4S05 --> W6S05
+  W6S03 --> W6S06
+  W5S06 --> W6S06
+  W6S03 --> W7S01
+  W3S04 --> W7S01
+  W7S01 --> W7S02
+  W3S05 --> W7S02
+  W7S02 --> W7S03
+  W6S06 --> W7S03
+  W6S06 --> W7S04
+  W7S02 --> W7S05
+  W7S03 --> W7S05
+  W7S04 --> W7S05
+  W7S05 --> W8S01
+  W6S02 --> W8S02
+  W7S05 --> W8S02
+  W6S03 --> W8S03
+  W7S05 --> W8S03
+  W6S03 --> W8S04
+  W7S05 --> W8S04
+  W7S01 --> W8S05
+  W7S02 --> W8S05
+  W7S03 --> W8S06
+  W7S04 --> W8S06
+  W7S05 --> W8S06
+  W6S05 --> W8S07
+  W6S02 --> W8S07
+  W8S04 --> W8S07
+  W8S06 --> W8S07
 ```
 
 ## W0 hard dependencies
@@ -181,6 +236,36 @@ flowchart TB
 | W5-S05 | W5-S03, W4-S06, W3-S06 |
 | W5-S06 | W5-S05, W3-S05 |
 
+## W6 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W6-S01 | W5-S06 |
+| W6-S02 | W6-S01 |
+| W6-S03 | W6-S01, W5-S03 |
+| W6-S04 | W6-S03, W5-S04 |
+| W6-S05 | W6-S03, W4-S05 |
+| W6-S06 | W6-S03, W5-S06 |
+
+## W7 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W7-S01 | W6-S03, W3-S04 |
+| W7-S02 | W7-S01, W3-S05 |
+| W7-S03 | W7-S02, W6-S06 |
+| W7-S04 | W6-S06 |
+| W7-S05 | W7-S02, W7-S03, W7-S04 |
+
+## W8 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W8-S01 | W7-S05 |
+| W8-S02 | W6-S02, W7-S05 |
+| W8-S03 | W6-S03, W7-S05 |
+| W8-S04 | W6-S03, W7-S05 |
+| W8-S05 | W7-S01, W7-S02 |
+| W8-S06 | W7-S03, W7-S04, W7-S05 |
+| W8-S07 | W6-S05, W6-S02, W8-S04, W8-S06 |
+
 ## Topological order
 1. W0-S01
 2. W0-S04
@@ -220,6 +305,24 @@ flowchart TB
 36. W5-S04
 37. W5-S05
 38. W5-S06
+39. W6-S01
+40. W6-S02
+41. W6-S03
+42. W6-S04
+43. W6-S05
+44. W6-S06
+45. W7-S01
+46. W7-S02
+47. W7-S04
+48. W7-S03
+49. W8-S05
+50. W7-S05
+51. W8-S01
+52. W8-S02
+53. W8-S03
+54. W8-S04
+55. W8-S06
+56. W8-S07
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

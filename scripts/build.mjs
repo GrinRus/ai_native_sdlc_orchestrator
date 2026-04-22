@@ -13,6 +13,50 @@ function exists(file) {
   return fs.existsSync(path.join(root, file));
 }
 
+function discoverWaveFiles() {
+  const backlogDir = path.join(root, "docs/backlog");
+  const entries = fs
+    .readdirSync(backlogDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .map((name) => {
+      const match = /^wave-(\d+)-implementation-slices\.md$/.exec(name);
+      if (!match) return null;
+      return {
+        waveIndex: Number(match[1]),
+        name,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.waveIndex !== b.waveIndex) return a.waveIndex - b.waveIndex;
+      return a.name.localeCompare(b.name);
+    });
+
+  if (entries.length === 0) {
+    console.error("Could not find any wave implementation documents under docs/backlog/.");
+    process.exit(1);
+  }
+
+  if (entries[0].waveIndex !== 0) {
+    console.error("Wave documents must start at wave-0-implementation-slices.md.");
+    process.exit(1);
+  }
+
+  for (let index = 1; index < entries.length; index += 1) {
+    const previous = entries[index - 1];
+    const current = entries[index];
+    if (current.waveIndex !== previous.waveIndex + 1) {
+      console.error(`Wave numbering gap detected between ${previous.name} and ${current.name}.`);
+      process.exit(1);
+    }
+  }
+
+  return entries.map((entry) => path.posix.join("docs/backlog", entry.name));
+}
+
+const waveFiles = discoverWaveFiles();
+
 const requiredFiles = [
   "README.md",
   "AGENTS.md",
@@ -28,8 +72,7 @@ const requiredFiles = [
   "scripts/slice-cycle.mjs",
   "scripts/slice-cycle-lib.mjs",
   "scripts/test/slice-cycle.test.mjs",
-  "docs/backlog/wave-0-implementation-slices.md",
-  "docs/backlog/wave-5-implementation-slices.md",
+  ...waveFiles,
 ];
 
 const missing = requiredFiles.filter((file) => !exists(file));
