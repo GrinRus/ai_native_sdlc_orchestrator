@@ -781,7 +781,8 @@ const COMMAND_DEFINITIONS = Object.freeze([
     command: "audit runs",
     category: "incidents-and-audit",
     status: "implemented",
-    summary: "Produce run-centric audit snapshots linking run refs to incident and promotion evidence.",
+    summary:
+      "Produce run-centric audit snapshots linking run refs to incident/promotion evidence plus durable finance cost/latency signals.",
     inputs: [
       "--project-ref <path>",
       "--runtime-root <path> (optional)",
@@ -793,6 +794,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "resolved_project_ref",
       "resolved_runtime_root",
       "run_audit_records",
+      "run_audit_records.finance_evidence",
       "audit_evidence_refs",
       "read_only",
       "future_control_hooks",

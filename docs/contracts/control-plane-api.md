@@ -104,6 +104,7 @@ Incident show baseline:
 
 Audit runs baseline:
 - emits run-centric snapshots of packet, step-result, quality, incident, and promotion refs;
+- emits `run_audit_records.finance_evidence` with route/wrapper/adapter IDs plus bounded cost/timeout/latency summaries;
 - supports optional `run_id` filter and bounded `limit` window;
 - response includes `audit_evidence_refs` for downstream handoff and review workflows.
 

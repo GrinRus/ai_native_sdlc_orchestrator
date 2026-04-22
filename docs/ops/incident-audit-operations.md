@@ -53,7 +53,8 @@ aor audit runs \
 ```
 
 Expected signals:
-- `run_audit_records` includes packet/step/quality refs.
+- `run_audit_records` includes packet/step/quality refs and `finance_evidence` summaries.
+- `finance_evidence` carries route/wrapper/adapter IDs plus cost, timeout, and latency rollups.
 - `incident_refs` and `promotion_refs` highlight escalation and promotion lineage.
 - `audit_evidence_refs` provides the aggregate evidence set for handoff.
 

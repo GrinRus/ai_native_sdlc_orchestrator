@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { appendRunEvent } from "../../api/src/index.mjs";
+import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import { invokeCli } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -35,6 +36,19 @@ function runGitChecked(options) {
     0,
     `git ${options.args.join(" ")} failed: ${(run.stderr ?? run.stdout ?? "").trim()}`,
   );
+}
+
+/**
+ * @param {{ family: import("../../../packages/contracts/src/index.d.ts").ContractFamily, filePath: string, document: Record<string, unknown> }} options
+ */
+function writeContractFixture(options) {
+  const validation = validateContractDocument({
+    family: options.family,
+    document: options.document,
+    source: `fixture://${options.family}`,
+  });
+  assert.equal(validation.ok, true, `${options.family} fixture must pass contract validation`);
+  fs.writeFileSync(options.filePath, `${JSON.stringify(options.document, null, 2)}\n`, "utf8");
 }
 
 test("global help transcript matches fixture", () => {
@@ -148,7 +162,7 @@ test("incident and audit command help documents run-linked operational semantics
 
   assert.equal(auditHelp.exitCode, 0);
   assert.equal(auditHelp.stderr, "");
-  assert.match(auditHelp.stdout, /run-centric snapshots for packet, step, and quality refs/);
+  assert.match(auditHelp.stdout, /run-centric snapshots for packet, step, quality, and finance evidence refs/);
 });
 
 test("unknown command fails clearly", () => {
@@ -688,6 +702,75 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     const verifyPayload = JSON.parse(verifyResult.stdout);
     const routedStepResult = JSON.parse(fs.readFileSync(verifyPayload.routed_step_result_file, "utf8"));
     const runId = routedStepResult.run_id;
+    const reportsRoot = path.dirname(verifyPayload.routed_step_result_file);
+    const runtimeProjectRoot = path.dirname(reportsRoot);
+    const artifactsRoot = path.join(runtimeProjectRoot, "artifacts");
+
+    writeContractFixture({
+      family: "step-result",
+      filePath: path.join(reportsRoot, `step-result-finance-audit-${runId.replace(/[^\w.-]+/g, "-")}.json`),
+      document: {
+        step_result_id: `${runId}.step.finance.audit`,
+        run_id: runId,
+        step_id: "runner.finance.audit",
+        step_class: "runner",
+        status: "passed",
+        summary: "Finance evidence fixture for audit runs",
+        evidence_refs: [verifyPayload.routed_step_result_file],
+        routed_execution: {
+          started_at: "2026-01-01T02:00:00.000Z",
+          finished_at: "2026-01-01T02:00:04.000Z",
+          route_resolution: {
+            resolved_route_id: "route.finance.audit.fixture",
+          },
+          asset_resolution: {
+            wrapper: {
+              wrapper_ref: "wrapper://wrapper.finance.audit@v1",
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.finance.audit",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {
+              budget: {
+                max_cost_usd: 9999,
+                timeout_sec: 9999,
+                max_cost_source: "policy.finance.audit.max_cost",
+                timeout_source: "policy.finance.audit.timeout",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    writeContractFixture({
+      family: "promotion-decision",
+      filePath: path.join(artifactsRoot, `promotion-decision-finance-audit-${runId.replace(/[^\w.-]+/g, "-")}.json`),
+      document: {
+        decision_id: `fixture.promotion.finance.${runId}`,
+        run_id: runId,
+        subject_ref: "wrapper://wrapper.finance.audit@v1",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [verifyPayload.routed_step_result_file],
+        evidence_summary: {
+          finance_signals: {
+            capture_latency_sec: 0.25,
+            replay_latency_sec: 0.35,
+            total_latency_sec: 0.6,
+          },
+          baseline_comparison: {
+            baseline_pass_rate: 0.88,
+            candidate_pass_rate: 0.86,
+          },
+        },
+        status: "pass",
+      },
+    });
 
     const incidentOpenResult = invokeCli([
       "incident",
@@ -756,6 +839,20 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     assert.equal(auditPayload.run_audit_records[0].run_id, runId);
     assert.ok(Array.isArray(auditPayload.run_audit_records[0].incident_refs));
     assert.ok(auditPayload.run_audit_records[0].incident_refs.length >= 1);
+    assert.ok(auditPayload.run_audit_records[0].finance_evidence);
+    assert.ok(
+      auditPayload.run_audit_records[0].finance_evidence.route_ids.includes("route.finance.audit.fixture"),
+    );
+    assert.ok(
+      auditPayload.run_audit_records[0].finance_evidence.wrapper_refs.includes("wrapper://wrapper.finance.audit@v1"),
+    );
+    assert.ok(auditPayload.run_audit_records[0].finance_evidence.adapter_ids.includes("adapter.finance.audit"));
+    assert.equal(auditPayload.run_audit_records[0].finance_evidence.max_cost_usd, 9999);
+    assert.equal(auditPayload.run_audit_records[0].finance_evidence.timeout_sec, 9999);
+    assert.equal(auditPayload.run_audit_records[0].finance_evidence.baseline_pass_rate, 0.88);
+    assert.equal(auditPayload.run_audit_records[0].finance_evidence.candidate_pass_rate, 0.86);
+    assert.ok(auditPayload.run_audit_records[0].finance_evidence.step_latency_sec.samples >= 1);
+    assert.ok(auditPayload.run_audit_records[0].finance_evidence.certification_latency_sec.samples >= 3);
     const auditFixture = JSON.parse(
       fs.readFileSync(path.join(fixturesDir, "run-audit-record.fixture.json"), "utf8"),
     );
@@ -763,6 +860,8 @@ test("W6 incident and audit command pack links run evidence to durable incident 
       run_ref: auditPayload.run_audit_records[0].run_ref,
       has_incident_refs: auditPayload.run_audit_records[0].incident_refs.length > 0,
       has_evidence_refs: auditPayload.run_audit_records[0].evidence_refs.length > 0,
+      has_finance_evidence: typeof auditPayload.run_audit_records[0].finance_evidence === "object",
+      has_finance_latency: auditPayload.run_audit_records[0].finance_evidence.step_latency_sec.samples > 0,
     };
     assert.deepEqual(auditSubset, auditFixture);
 

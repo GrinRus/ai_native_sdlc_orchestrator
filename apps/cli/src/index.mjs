@@ -312,9 +312,9 @@ function formatCommandHelp(definition) {
                     ]
                   : definition.command === "audit runs"
                     ? [
-                        "- Audit runs is read-only and emits run-centric snapshots for packet, step, and quality refs.",
+                        "- Audit runs is read-only and emits run-centric snapshots for packet, step, quality, and finance evidence refs.",
                         "- Use --run-id to scope one run or --limit for bounded list output.",
-                        "- Audit output highlights incident and promotion references for traceable follow-up.",
+                        "- Audit output highlights incident/promotion lineage plus cost/latency signals for traceable governance follow-up.",
                       ]
               : definition.command === "live-e2e start"
                 ? [
@@ -1679,6 +1679,7 @@ function executeImplementedCommand(command, flags, cwd) {
         packet_refs: run.packet_refs,
         step_result_refs: run.step_result_refs,
         quality_refs: run.quality_refs,
+        finance_evidence: run.finance_evidence,
         incident_refs: incidentRefs,
         promotion_refs: promotionRefs,
         scorecard_refs: scorecardRefs,

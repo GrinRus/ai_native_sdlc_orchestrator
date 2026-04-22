@@ -254,6 +254,238 @@ test("listRuns includes run-control state snapshots even before packet/report ar
   });
 });
 
+test("listRuns aggregates finance evidence across multiple run profiles", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const runAlpha = "run.finance.audit.alpha.v1";
+    const runBeta = "run.finance.audit.beta.v1";
+
+    writeContractFile({
+      family: "step-result",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "step-result-finance-alpha-a.json"),
+      document: {
+        step_result_id: `${runAlpha}.step.finance.a`,
+        run_id: runAlpha,
+        step_id: "runner.finance.a",
+        step_class: "runner",
+        status: "passed",
+        summary: "Alpha finance sample A",
+        evidence_refs: [init.stateFile],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:00.000Z",
+          finished_at: "2026-01-01T00:00:05.000Z",
+          route_resolution: {
+            resolved_route_id: "route.finance.alpha",
+          },
+          asset_resolution: {
+            wrapper: {
+              wrapper_ref: "wrapper://wrapper.finance.alpha@v1",
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.finance.alpha",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {
+              budget: {
+                max_cost_usd: 12,
+                timeout_sec: 40,
+                max_cost_source: "policy.finance.alpha.max_cost",
+                timeout_source: "policy.finance.alpha.timeout",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    writeContractFile({
+      family: "step-result",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "step-result-finance-alpha-b.json"),
+      document: {
+        step_result_id: `${runAlpha}.step.finance.b`,
+        run_id: runAlpha,
+        step_id: "runner.finance.b",
+        step_class: "runner",
+        status: "passed",
+        summary: "Alpha finance sample B",
+        evidence_refs: [init.stateFile],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:10.000Z",
+          finished_at: "2026-01-01T00:00:17.000Z",
+          route_resolution: {
+            resolved_route_id: "route.finance.alpha",
+          },
+          asset_resolution: {
+            wrapper: {
+              wrapper_ref: "wrapper://wrapper.finance.alpha@v1",
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.finance.alpha",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {
+              budget: {
+                max_cost_usd: 17,
+                timeout_sec: 55,
+                max_cost_source: "policy.finance.alpha.max_cost.override",
+                timeout_source: "policy.finance.alpha.timeout.override",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    writeContractFile({
+      family: "promotion-decision",
+      filePath: path.join(init.runtimeLayout.artifactsRoot, "promotion-decision-finance-alpha.json"),
+      document: {
+        decision_id: `${init.projectId}.promotion.finance.alpha`,
+        run_id: runAlpha,
+        subject_ref: "wrapper://wrapper.finance.alpha@v1",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [init.stateFile],
+        evidence_summary: {
+          finance_signals: {
+            capture_latency_sec: 0.5,
+            replay_latency_sec: 0.4,
+            total_latency_sec: 0.9,
+          },
+          baseline_comparison: {
+            baseline_pass_rate: 0.91,
+            candidate_pass_rate: 0.87,
+          },
+        },
+        status: "pass",
+      },
+    });
+
+    writeContractFile({
+      family: "step-result",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "step-result-finance-beta-a.json"),
+      document: {
+        step_result_id: `${runBeta}.step.finance.a`,
+        run_id: runBeta,
+        step_id: "runner.finance.a",
+        step_class: "runner",
+        status: "passed",
+        summary: "Beta finance sample A",
+        evidence_refs: [init.stateFile],
+        routed_execution: {
+          started_at: "2026-01-01T01:00:00.000Z",
+          finished_at: "2026-01-01T01:00:03.000Z",
+          route_resolution: {
+            resolved_route_id: "route.finance.beta",
+          },
+          asset_resolution: {
+            wrapper: {
+              wrapper_ref: "wrapper://wrapper.finance.beta@v1",
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.finance.beta",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {
+              budget: {
+                max_cost_usd: 4,
+                timeout_sec: 20,
+                max_cost_source: "policy.finance.beta.max_cost",
+                timeout_source: "policy.finance.beta.timeout",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    writeContractFile({
+      family: "promotion-decision",
+      filePath: path.join(init.runtimeLayout.artifactsRoot, "promotion-decision-finance-beta.json"),
+      document: {
+        decision_id: `${init.projectId}.promotion.finance.beta`,
+        run_id: runBeta,
+        subject_ref: "wrapper://wrapper.finance.beta@v1",
+        from_channel: "candidate",
+        to_channel: "frozen",
+        evidence_refs: [init.stateFile],
+        evidence_summary: {
+          finance_signals: {
+            capture_latency_sec: 0.2,
+            replay_latency_sec: 0.3,
+            total_latency_sec: 0.5,
+          },
+          baseline_comparison: {
+            baseline_pass_rate: 0.95,
+            candidate_pass_rate: 0.95,
+          },
+        },
+        status: "hold",
+      },
+    });
+
+    const runs = listRuns({ projectRef: repoRoot, cwd: repoRoot });
+    const alpha = runs.find((run) => run.run_id === runAlpha);
+    const beta = runs.find((run) => run.run_id === runBeta);
+
+    assert.ok(alpha);
+    assert.ok(beta);
+
+    assert.deepEqual(alpha.finance_evidence.route_ids, ["route.finance.alpha"]);
+    assert.deepEqual(alpha.finance_evidence.wrapper_refs, ["wrapper://wrapper.finance.alpha@v1"]);
+    assert.deepEqual(alpha.finance_evidence.adapter_ids, ["adapter.finance.alpha"]);
+    assert.equal(alpha.finance_evidence.max_cost_usd, 17);
+    assert.equal(alpha.finance_evidence.timeout_sec, 55);
+    assert.ok(alpha.finance_evidence.max_cost_sources.includes("policy.finance.alpha.max_cost"));
+    assert.ok(alpha.finance_evidence.max_cost_sources.includes("policy.finance.alpha.max_cost.override"));
+    assert.ok(alpha.finance_evidence.timeout_sources.includes("policy.finance.alpha.timeout"));
+    assert.ok(alpha.finance_evidence.timeout_sources.includes("policy.finance.alpha.timeout.override"));
+    assert.deepEqual(alpha.finance_evidence.step_latency_sec, {
+      samples: 2,
+      min: 5,
+      max: 7,
+      avg: 6,
+    });
+    assert.deepEqual(alpha.finance_evidence.certification_latency_sec, {
+      samples: 3,
+      min: 0.4,
+      max: 0.9,
+      avg: 0.6,
+    });
+    assert.equal(alpha.finance_evidence.baseline_pass_rate, 0.91);
+    assert.equal(alpha.finance_evidence.candidate_pass_rate, 0.87);
+
+    assert.deepEqual(beta.finance_evidence.route_ids, ["route.finance.beta"]);
+    assert.deepEqual(beta.finance_evidence.wrapper_refs, ["wrapper://wrapper.finance.beta@v1"]);
+    assert.deepEqual(beta.finance_evidence.adapter_ids, ["adapter.finance.beta"]);
+    assert.equal(beta.finance_evidence.max_cost_usd, 4);
+    assert.equal(beta.finance_evidence.timeout_sec, 20);
+    assert.deepEqual(beta.finance_evidence.step_latency_sec, {
+      samples: 1,
+      min: 3,
+      max: 3,
+      avg: 3,
+    });
+    assert.deepEqual(beta.finance_evidence.certification_latency_sec, {
+      samples: 3,
+      min: 0.2,
+      max: 0.5,
+      avg: 0.333,
+    });
+    assert.equal(beta.finance_evidence.baseline_pass_rate, 0.95);
+    assert.equal(beta.finance_evidence.candidate_pass_rate, 0.95);
+  });
+});
+
 test("read surface links incident reports back to run-centric audit views", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });

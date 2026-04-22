@@ -1,5 +1,7 @@
 {
   "run_ref": "run://aor-core.routed-execution.v1",
   "has_incident_refs": true,
-  "has_evidence_refs": true
+  "has_evidence_refs": true,
+  "has_finance_evidence": true,
+  "has_finance_latency": true
 }

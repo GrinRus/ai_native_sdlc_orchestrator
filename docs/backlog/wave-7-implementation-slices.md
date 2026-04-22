@@ -50,7 +50,7 @@ Close remaining MVP+ governance and quality stories across certification control
 
 ## W7-S02 — AI platform promotion/freeze maturity pack
 - **Epic:** EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Strengthen promotion and freeze decisions with baseline comparison and controlled rollout semantics.
 - **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**`
 - **Hard dependencies:** W7-S01, W3-S05
@@ -81,7 +81,7 @@ Close remaining MVP+ governance and quality stories across certification control
 
 ## W7-S03 — Incident recertification and controlled re-enable flow
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Add a controlled incident recertification path before re-enabling problematic routes and assets.
 - **Primary modules:** `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W7-S02, W6-S06
