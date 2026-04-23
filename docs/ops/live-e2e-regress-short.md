@@ -60,6 +60,8 @@ aor live-e2e start \
 aor ui attach --run RUN-201 --control-plane http://localhost:8080
 ```
 
+The `--control-plane` value is currently a lifecycle hint for connected-mode intent. Detached HTTP control-plane transport is planned under `W9-S07`.
+
 ## Expected verification
 - setup command `npm install` succeeds;
 - setup command `npx playwright install` succeeds;

@@ -1,7 +1,7 @@
 # Package and module map
 
 ## Apps
-- `apps/api` — control-plane API, queries, approvals, and live streams
+- `apps/api` — module-backed control-plane query/control shell and live-stream primitives (detached HTTP transport is deferred)
 - `apps/cli` — operator CLI and bootstrap surface
 - `apps/web` — detachable operator console
 

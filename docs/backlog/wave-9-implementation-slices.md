@@ -53,7 +53,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 
 ## W9-S02 — Current-state documentation drift repair
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Repair repo-entry docs so backlog counts, command counts, repo map, and current-versus-target wording match the actual repository state.
 - **Primary modules:** `README.md`, `docs/architecture/00-repo-layout.md`, `docs/architecture/03-technical-stack.md`, `docs/backlog/**`
 - **Hard dependencies:** none

@@ -1,7 +1,20 @@
 # Control plane API
 
 ## Purpose
-The API exposes command, query, and live-stream surfaces for AOR.
+Define one control-plane surface for command, query, and live-stream operations while keeping the runtime headless-first.
+
+## Current implementation binding (W5-W8 baseline)
+
+Current code is **module-backed and in-process**, not detached HTTP transport:
+- API surface is exported from `apps/api/src/index.mjs` as function operations.
+- CLI and web consume those operations directly in-process.
+- Contract and artifact semantics stay stable even before detached transport exists.
+
+Implemented operation families:
+- read: project state, packets, step results, manifests, promotion decisions, quality artifacts, runs, run event history, run policy history, strategic snapshot;
+- run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
+- UI lifecycle: attach/detach/read state with headless-safe semantics;
+- live events: append/read/open stream using the `live-run-event` contract family.
 
 ## Command families
 - project bootstrap commands
@@ -23,26 +36,16 @@ The API exposes command, query, and live-stream surfaces for AOR.
 - incidents and promotion decisions
 - live E2E reports
 
-## Read endpoints (W5-S01 baseline)
-- `GET /api/projects/:projectId/state` — project runtime state and layout references.
-- `GET /api/projects/:projectId/packets` — packet artifacts (`artifact-packet`, `wave-ticket`, `handoff-packet`, `delivery-plan`, `delivery-manifest`, `release-packet`).
-- `GET /api/projects/:projectId/step-results` — `step-result` artifacts from reports.
-- `GET /api/projects/:projectId/manifests` — delivery-manifest artifacts.
-- `GET /api/projects/:projectId/promotion-decisions` — promotion-decision artifacts.
-- `GET /api/projects/:projectId/quality-artifacts` — validation/evaluation reports, incident reports, and promotion decisions.
-- `GET /api/projects/:projectId/runs` — aggregated run-level view derived from packet, step-result, and quality artifact references.
-  - run summaries include `context_lifecycle` when run-linked promotion decisions reference context assets, with context version refs, immutable provenance refs, and decision-trail history.
-- `GET /api/projects/:projectId/runs/:runId/events/history` — bounded event history for one run, including replay-safe sequence metadata and policy context snapshots when available.
-- `GET /api/projects/:projectId/runs/:runId/policy-history` — route/policy/governance decision history for one run derived from durable step-result and delivery-plan evidence.
+## Read surface baseline (module operations)
 
-All read responses must reuse existing contract families and IDs rather than API-only parallel shapes.
+Read operations must reuse existing contract families and IDs rather than introducing API-only parallel shapes.
 
-## Run-control command endpoints (W6-S03 baseline)
-- `POST /api/projects/:projectId/runs/:runId/start`
-- `POST /api/projects/:projectId/runs/:runId/pause`
-- `POST /api/projects/:projectId/runs/:runId/resume`
-- `POST /api/projects/:projectId/runs/:runId/steer`
-- `POST /api/projects/:projectId/runs/:runId/cancel`
+Run-level read baseline:
+- run summaries include `context_lifecycle` when run-linked promotion decisions reference context assets, with context version refs, immutable provenance refs, and decision-trail history;
+- run event history remains bounded and replay-safe;
+- run policy history remains evidence-derived from `step-result` and `delivery-plan` outputs.
+
+## Run-control baseline (module operations)
 
 Command payload baseline:
 - `reason` (optional text summary for operator intent);
@@ -57,16 +60,14 @@ Deterministic transition baseline:
 - `cancel` allowed from `running|paused`, resulting in terminal `canceled`.
 
 Guardrail baseline:
-- high-risk controls (`steer`, `cancel`) must evaluate `approval_policy` + `risk_tiers` before apply;
-- blocked actions must still emit durable audit evidence and warning-style live-run event payloads.
+- high-risk controls (`steer`, `cancel`) evaluate `approval_policy` + `risk_tiers` before apply;
+- blocked actions still emit durable audit evidence and warning-style live-run events.
 
 Durable audit baseline:
 - every control action writes one durable `run-control-event-*.json` record under runtime reports;
-- control records must include `run_id`, `action`, transition snapshot, guardrail decision, and `evidence_root`.
+- control records include `run_id`, `action`, transition snapshot, guardrail decision, and `evidence_root`.
 
-## Delivery/release command endpoints (W6-S05 baseline)
-- `POST /api/projects/:projectId/delivery/prepare`
-- `POST /api/projects/:projectId/release/prepare`
+## Delivery/release baseline (module operations)
 
 Delivery/release payload baseline:
 - `run_id` (optional command-scoped run identity; deterministic fallback when omitted);
@@ -77,9 +78,9 @@ Delivery/release payload baseline:
 
 Delivery/release guardrail baseline:
 - resolve policy bounds before materializing delivery/release artifacts;
-- non-`no-write` flows must remain blocked when approved handoff or promotion evidence is missing;
-- route governance decisions must resolve to `allow|deny|escalate` with explicit reason codes before write-back paths;
-- `release prepare` must fail fast with explicit precondition blocking reasons and must not bypass delivery-plan guardrails.
+- non-`no-write` flows stay blocked when approved handoff or promotion evidence is missing;
+- route governance decisions resolve to `allow|deny|escalate` with explicit reason codes before write-back paths;
+- `release prepare` fails fast with explicit precondition blocking reasons and does not bypass delivery-plan guardrails.
 
 Delivery/release response baseline:
 - `delivery_plan_file` and `delivery_plan_status` for policy traceability;
@@ -89,10 +90,7 @@ Delivery/release response baseline:
 - `delivery_manifest_file` and `release_packet_file` as durable evidence outputs;
 - `delivery_writeback_result` to distinguish `no-write-confirmed`, `patch-materialized`, `local-branch-committed`, and `fork-pr-planned`.
 
-## Incident/audit command endpoints (W6-S06 baseline)
-- `POST /api/projects/:projectId/incidents`
-- `GET /api/projects/:projectId/incidents`
-- `GET /api/projects/:projectId/audit/runs`
+## Incident/audit baseline (module operations)
 
 Incident open payload baseline:
 - `run_id` (required run linkage for the incident lifecycle);
@@ -123,18 +121,15 @@ Audit runs baseline:
 - response includes `audit_evidence_refs` for downstream handoff and review workflows.
 
 Context lifecycle read baseline (W8-S09):
-- run-level read surfaces must expose context lifecycle details when context promotions are present;
-- context lifecycle view should include promoted context ref/version, immutable provenance refs, and decision trail lineage;
-- operator-facing CLI/API read paths should make outdated/blocked context promotion outcomes auditable without opening raw artifacts.
+- run-level read surfaces expose context lifecycle details when context promotions are present;
+- context lifecycle view includes promoted context ref/version, immutable provenance refs, and decision trail lineage;
+- operator-facing CLI/API read paths make outdated/blocked context promotion outcomes auditable without opening raw artifacts.
 
-## UI lifecycle endpoints (W6-S04 baseline)
-- `POST /api/projects/:projectId/ui/attach`
-- `POST /api/projects/:projectId/ui/detach`
-- `GET /api/projects/:projectId/ui/state`
+## UI lifecycle baseline (module operations)
 
 UI lifecycle payload baseline:
 - `run_id` (optional operator context);
-- `control_plane` (optional URL for connected mode).
+- `control_plane` (optional connected-mode reference for future detached transport).
 
 UI lifecycle response baseline:
 - `ui_attached` boolean;
@@ -142,21 +137,9 @@ UI lifecycle response baseline:
 - `idempotent` marker for repeated attach/detach retries;
 - `headless_safe=true` to assert CLI/API paths remain usable while UI is detached.
 
-## Authentication and permission assumptions
-- Baseline assumption for local/operator rehearsals: trusted local operator context behind workspace access controls.
-- Read endpoints are read-only and must not mutate runtime artifacts.
-- Production deployments should require authenticated identity with project-scoped read permissions before exposing packet or evidence references.
-- Endpoint responses should preserve `evidence://` or runtime-relative refs for audit traceability; do not return secrets or raw credential material.
+## Streaming baseline
 
-## Streaming
-The API should provide SSE-first live events so CLI and web can observe active work without owning workflow state.
-
-## Streaming endpoint (W5-S02 baseline)
-- `GET /api/projects/:projectId/runs/:runId/events`
-  - transport: SSE (or equivalent stream abstraction with the same event contract);
-  - event contract: `live-run-event`;
-  - query: `after_event_id` for replay from the last acknowledged event;
-  - query: `max_replay` for bounded catch-up window.
+The current live stream is module-backed and uses the same event contract intended for future SSE transport.
 
 Expected event types:
 - `run.started`
@@ -170,21 +153,36 @@ Reconnect and backpressure baseline:
 - bounded replay window (do not allow unbounded buffers);
 - preserve monotonic per-run event ordering via payload sequence.
 
-## API/UI alignment notes (W5-S04 baseline)
-- The detachable web console reads run and evidence state from the same query families used by CLI:
-  - run list: `GET /api/projects/:projectId/runs`;
-  - run detail packets and evidence: `GET /api/projects/:projectId/packets`, `GET /api/projects/:projectId/step-results`, `GET /api/projects/:projectId/quality-artifacts`.
-- Later-stage troubleshooting on one selected run uses explicit query paths instead of raw log scraping:
-  - run event history: `GET /api/projects/:projectId/runs/:runId/events/history`;
-  - run policy history: `GET /api/projects/:projectId/runs/:runId/policy-history`.
-- Live follow in web mode reuses the same stream endpoint and parameters:
-  - `GET /api/projects/:projectId/runs/:runId/events?after_event_id=...&max_replay=...`.
-- Detach behavior is UI-local only:
-  - detaching unsubscribes the web listener;
-  - active runs and runtime artifacts remain owned by orchestrator runtime, not by UI process.
+## Deferred detached HTTP transport (W9-S07)
+
+Detached endpoint paths and SSE wiring are **deferred** to `W9-S07`.
+The intended transport mapping (not current runtime behavior) is:
+- `GET /api/projects/:projectId/state`
+- `GET /api/projects/:projectId/packets`
+- `GET /api/projects/:projectId/step-results`
+- `GET /api/projects/:projectId/quality-artifacts`
+- `GET /api/projects/:projectId/runs`
+- `GET /api/projects/:projectId/runs/:runId/events/history`
+- `GET /api/projects/:projectId/runs/:runId/policy-history`
+- `GET /api/projects/:projectId/runs/:runId/events` (SSE + replay parameters).
+
+Until `W9-S07` lands, these endpoint paths are contract targets, not guaranteed runtime endpoints.
+
+## API/UI alignment notes (W5-S04 + W9-S03)
+
+- The detachable web console currently reads run/evidence state via in-process API module operations.
+- Live follow in web mode currently reuses the same in-process stream contract and backpressure semantics.
+- Detach behavior is UI-local only: detaching unsubscribes the web listener while runtime artifacts stay owned by orchestrator runtime.
+- Switching connected mode to detached HTTP/SSE transport is explicitly deferred to `W9-S07`.
+
+## Authentication and permission assumptions
+- Baseline assumption for local/operator rehearsals: trusted local operator context behind workspace access controls.
+- Read operations are read-only and must not mutate runtime artifacts.
+- Production deployments should require authenticated identity with project-scoped read permissions before exposing packet or evidence references.
+- Responses should preserve `evidence://` or runtime-relative refs for audit traceability and must not return secrets.
 
 ## Key design rules
-- keep the API usable without the web UI;
+- keep the control-plane surface usable without the web UI;
 - keep ids and references visible in responses;
 - expose explicit approval and dry-run paths for risky actions;
-- keep command and query shapes aligned with the contract docs and CLI catalog.
+- keep operation and query shapes aligned with contract docs and CLI catalog.
