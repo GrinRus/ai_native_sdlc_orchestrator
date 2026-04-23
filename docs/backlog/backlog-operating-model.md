@@ -163,5 +163,6 @@ The repo now carries detailed wave documents for all currently defined waves:
 - `wave-6-implementation-slices.md`
 - `wave-7-implementation-slices.md`
 - `wave-8-implementation-slices.md`
+- `wave-9-implementation-slices.md`
 
 The implementation order is still constrained by hard dependencies. A later-wave slice can be described in detail and still remain blocked until earlier-wave slices close.

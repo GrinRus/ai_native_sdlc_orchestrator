@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-8-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-9-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -19,6 +19,7 @@ The authoritative planning model for implementation lives in:
 | W6 | Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, delivery/release prep, and incident/audit flows. | 6 | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-6-implementation-slices.md` |
 | W7 | Close MVP+ governance and quality stories for certification, finance evidence, and learning-loop integration. | 5 | EPIC-4, EPIC-7 | `docs/backlog/wave-7-implementation-slices.md` |
 | W8 | Close later-maturity stories for strategic operator visibility, governance hardening, context lifecycle maturity, and multi-repo delivery maturity. | 9 | EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-8-implementation-slices.md` |
+| W9 | Stabilize post-audit findings across routed evidence durability, source-of-truth docs, public quality surfaces, detached transport, and live execution foundations. | 8 | EPIC-0, EPIC-3, EPIC-4, EPIC-6 | `docs/backlog/wave-9-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -43,6 +44,14 @@ The authoritative planning model for implementation lives in:
 | W8-S07 | RMO-06, PBO-08, DTX-08, FIN-08 |
 | W8-S08 | integration closure (compiled-context runtime foundation) |
 | W8-S09 | integration closure (context lifecycle governance evidence) |
+| W9-S01 | post-audit stabilization bugfix (no direct story closure) |
+| W9-S02 | post-audit documentation drift repair (no direct story closure) |
+| W9-S03 | post-audit API/runtime alignment fix (no direct story closure) |
+| W9-S04 | post-audit contract coverage enablement (no direct story closure) |
+| W9-S05 | post-audit quality surface completion (no direct story closure) |
+| W9-S06 | post-audit promotion surface completion (no direct story closure) |
+| W9-S07 | post-audit transport baseline feature (no direct story closure) |
+| W9-S08 | post-audit live execution baseline feature (no direct story closure) |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -151,6 +160,19 @@ The authoritative planning model for implementation lives in:
 - incident and AI platform later-stage recertification loops are replayable and auditable
 
 **Detailed slices:** `docs/backlog/wave-8-implementation-slices.md`
+
+## W9 — post-audit stabilization and execution expansion
+**Goal:** Fix audit-discovered bugs and source-of-truth drift first, then reopen bounded platform expansion for detached transport and live routed execution.
+
+**Exit criteria:**
+- routed execution evidence is durable per run and no longer overwrites prior same-step artifacts
+- repo-entry docs and control-plane docs distinguish current implementation from target architecture accurately
+- control-plane API contract coverage is machine-checkable through the shared loader path
+- public CLI quality surfaces include harness replay plus asset promote/freeze workflows
+- connected web mode can consume a detached HTTP/SSE control-plane transport while headless operation remains supported
+- a first supported non-mock adapter can execute live routed work under explicit guardrails
+
+**Detailed slices:** `docs/backlog/wave-9-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

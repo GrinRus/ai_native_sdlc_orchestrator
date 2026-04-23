@@ -64,6 +64,14 @@ flowchart TB
   W8S07[W8-S07 Later multi-repo, bootstrap, and delivery rerun maturity]
   W8S08[W8-S08 Runtime context compiler and adapter-context injection]
   W8S09[W8-S09 Context asset lifecycle and quality-gated update flow]
+  W9S01[W9-S01 Run-scoped routed evidence durability bugfix]
+  W9S02[W9-S02 Current-state documentation drift repair]
+  W9S03[W9-S03 Control-plane API contract/runtime alignment]
+  W9S04[W9-S04 Machine-checkable control-plane API contract coverage]
+  W9S05[W9-S05 Public harness replay command surface]
+  W9S06[W9-S06 Asset promote/freeze command surface completion]
+  W9S07[W9-S07 Detached HTTP control-plane transport baseline]
+  W9S08[W9-S08 First real provider adapter and live execution foundation]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -181,6 +189,18 @@ flowchart TB
   W8S08 --> W8S09
   W7S02 --> W8S09
   W8S05 --> W8S09
+  W8S08 --> W9S01
+  W8S04 --> W9S03
+  W9S03 --> W9S04
+  W3S04 --> W9S05
+  W8S05 --> W9S05
+  W7S02 --> W9S06
+  W8S09 --> W9S06
+  W9S03 --> W9S07
+  W9S04 --> W9S07
+  W9S01 --> W9S08
+  W8S03 --> W9S08
+  W8S08 --> W9S08
 ```
 
 ## W0 hard dependencies
@@ -277,6 +297,18 @@ flowchart TB
 | W8-S08 | W6-S03, W7-S05 |
 | W8-S09 | W8-S08, W7-S02, W8-S05 |
 
+## W9 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W9-S01 | W8-S08 |
+| W9-S02 | none |
+| W9-S03 | W8-S04 |
+| W9-S04 | W9-S03 |
+| W9-S05 | W3-S04, W8-S05 |
+| W9-S06 | W7-S02, W8-S09 |
+| W9-S07 | W9-S03, W9-S04 |
+| W9-S08 | W9-S01, W8-S03, W8-S08 |
+
 ## Topological order
 1. W0-S01
 2. W0-S04
@@ -336,6 +368,14 @@ flowchart TB
 56. W8-S06
 57. W8-S09
 58. W8-S07
+59. W9-S01
+60. W9-S02
+61. W9-S03
+62. W9-S05
+63. W9-S06
+64. W9-S04
+65. W9-S07
+66. W9-S08
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.
