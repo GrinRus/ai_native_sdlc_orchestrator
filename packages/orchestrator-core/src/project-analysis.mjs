@@ -402,8 +402,10 @@ function resolveArchitectureTraceability(options) {
  *  routesRoot?: string,
  *  wrappersRoot?: string,
  *  promptsRoot?: string,
+ *  contextBundlesRoot?: string,
  *  policiesRoot?: string,
  *  adaptersRoot?: string,
+ *  evaluationWorkspaceRoot?: string,
  * }} options
  */
 export function analyzeProjectRuntime(options = {}) {
@@ -477,6 +479,11 @@ export function analyzeProjectRuntime(options = {}) {
       ? options.promptsRoot
       : path.resolve(init.projectRoot, options.promptsRoot)
     : path.join(init.projectRoot, "examples/prompts");
+  const contextBundlesRoot = options.contextBundlesRoot
+    ? path.isAbsolute(options.contextBundlesRoot)
+      ? options.contextBundlesRoot
+      : path.resolve(init.projectRoot, options.contextBundlesRoot)
+    : path.join(path.dirname(init.projectProfilePath), "context/bundles");
   const policiesRoot = options.policiesRoot
     ? path.isAbsolute(options.policiesRoot)
       ? options.policiesRoot
@@ -497,6 +504,7 @@ export function analyzeProjectRuntime(options = {}) {
     routesRoot,
     wrappersRoot,
     promptsRoot,
+    contextBundlesRoot,
     routeOverrides: options.routeOverrides,
   });
   const policyResolutionMatrix = resolveStepPolicyMatrix({
@@ -511,8 +519,13 @@ export function analyzeProjectRuntime(options = {}) {
     routeResolutionMatrix,
     adapterOverrides: options.adapterOverrides,
   });
+  const evaluationWorkspaceRoot = options.evaluationWorkspaceRoot
+    ? path.isAbsolute(options.evaluationWorkspaceRoot)
+      ? options.evaluationWorkspaceRoot
+      : path.resolve(init.projectRoot, options.evaluationWorkspaceRoot)
+    : init.projectRoot;
   const evaluationRegistry = loadEvaluationRegistry({
-    workspaceRoot: init.projectRoot,
+    workspaceRoot: evaluationWorkspaceRoot,
   });
 
   if (!evaluationRegistry.ok) {

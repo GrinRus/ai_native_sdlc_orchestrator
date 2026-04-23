@@ -51,7 +51,7 @@ Close the reopened target-catalog proof gap by making standard live E2E target-b
 
 ## W11-S02 — Target workspace materialization for live E2E
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Make `live-e2e start` clone the profile target repository into a run-scoped isolated workspace and generate a run-scoped project profile from the declared template reference.
 - **Primary modules:** `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**`
 - **Hard dependencies:** W11-S01

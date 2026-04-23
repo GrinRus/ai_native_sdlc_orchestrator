@@ -32,6 +32,7 @@ pnpm check
 ## Notes
 
 - Profiles declare `verification.setup_commands` and `verification.commands`; W11 tracks making the standard `live-e2e` runner execute them from a cloned target workspace as the canonical path.
+- Standard run summaries should expose `target_checkout_root` and `generated_project_profile_file` so target-workspace provenance is machine-checkable.
 - Public-repo rehearsals keep `write_back_to_remote=false` by default.
 - If an external CDN/network dependency is unavailable (for example Playwright browser download), mark the run as external `inconclusive` for smoke tracking.
 

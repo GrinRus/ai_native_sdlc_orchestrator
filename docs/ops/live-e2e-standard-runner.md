@@ -33,6 +33,12 @@ Expected output includes:
 - `live_e2e_run_summary_file`
 - `live_e2e_scorecard_files`
 
+The run summary now also includes target-workspace materialization fields:
+- `target_checkout_root`
+- `generated_project_profile_file`
+
+These fields point to the run-scoped cloned target checkout and the run-scoped generated project profile under runtime state roots.
+
 The run summary also carries learning-loop linkage fields:
 - `learning_loop_scorecard_file`
 - `learning_loop_handoff_file`
@@ -71,6 +77,8 @@ Expected abort behavior:
 
 ## Operator checks
 - Run summary and scorecard files exist under `.aor/projects/<project_id>/reports/`.
+- `target_checkout_root` exists and is a cloned checkout, not the control-plane repository root.
+- `generated_project_profile_file` exists under `.aor/projects/<project_id>/state/` and is used for analyze/validate/verify.
 - `aor run status --run-id <RUN_ID> --follow true` can observe the same run stream.
 - CLI-only operation remains valid with web UI detached.
 - Use `live-e2e-learning-loop.md` to hand off incidents and scorecards into backlog and quality follow-up.

@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 import { appendRunEvent } from "../../api/src/index.mjs";
-import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import { materializeLearningLoopArtifacts } from "../../../packages/observability/src/index.mjs";
 import { certifyAssetPromotion } from "../../../packages/orchestrator-core/src/certification-decision.mjs";
 import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
@@ -61,6 +62,32 @@ function writeJson(filePath, document) {
  */
 function readJson(filePath) {
   return /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(filePath, "utf8")));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? /** @type {Record<string, unknown>} */ (value)
+    : {};
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function asNonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : "";
+}
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 /**
@@ -170,6 +197,247 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {{ cwd: string, args: string[], operation: string }} options
+ */
+function runGitChecked(options) {
+  const run = spawnSync("git", options.args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+  });
+  if (run.status === 0) {
+    return;
+  }
+  const stderr = (run.stderr ?? run.stdout ?? "").trim();
+  throw new Error(
+    `Live E2E ${options.operation} failed: git ${options.args.join(" ")} (exit ${run.status ?? -1}). ${stderr}`,
+  );
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isRemoteGitUrl(value) {
+  return /^([a-z][a-z0-9+.-]*:\/\/|git@)/iu.test(value);
+}
+
+/**
+ * @param {string[]} candidates
+ * @returns {string}
+ */
+function resolveExistingPath(candidates) {
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  throw new Error("Could not resolve an existing path from the provided candidates.");
+}
+
+/**
+ * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   runId: string,
+ *   profile: Record<string, unknown>,
+ * }} options
+ * @returns {{ targetCheckoutRoot: string, targetRepoId: string, targetRepoRef: string, targetRepoUrl: string }}
+ */
+function materializeTargetCheckout(options) {
+  const targetRepo = asRecord(options.profile.target_repo);
+  const targetRepoUrl = asNonEmptyString(targetRepo.repo_url);
+  if (!targetRepoUrl) {
+    throw new Error("Live E2E profile must declare target_repo.repo_url.");
+  }
+  const targetRepoRef = asNonEmptyString(targetRepo.ref) || "main";
+  const targetRepoId = asNonEmptyString(targetRepo.repo_id) || "target";
+  const checkoutStrategy = asNonEmptyString(targetRepo.checkout_strategy) || "full";
+  const targetCheckoutRoot = path.join(
+    options.init.runtimeLayout.projectRuntimeRoot,
+    "target-checkouts",
+    `${normalizeId(targetRepoId)}-${normalizeId(options.runId)}`,
+  );
+
+  fs.rmSync(targetCheckoutRoot, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(targetCheckoutRoot), { recursive: true });
+
+  /** @type {string[]} */
+  const cloneArgs = ["clone"];
+  if (checkoutStrategy === "shallow" && isRemoteGitUrl(targetRepoUrl)) {
+    cloneArgs.push("--depth", "1");
+  }
+  cloneArgs.push("--branch", targetRepoRef, "--single-branch", targetRepoUrl, targetCheckoutRoot);
+  runGitChecked({
+    cwd: options.init.projectRoot,
+    args: cloneArgs,
+    operation: "target checkout clone",
+  });
+
+  runGitChecked({
+    cwd: targetCheckoutRoot,
+    args: ["checkout", targetRepoRef],
+    operation: "target checkout ref resolution",
+  });
+
+  return {
+    targetCheckoutRoot,
+    targetRepoId,
+    targetRepoRef,
+    targetRepoUrl,
+  };
+}
+
+/**
+ * @param {{ repoRecord: Record<string, unknown>, verification: Record<string, unknown> }} options
+ */
+function hydrateRepoVerificationCommands(options) {
+  const existingBuild = asStringArray(options.repoRecord.build_commands);
+  const existingLint = asStringArray(options.repoRecord.lint_commands);
+  const existingTests = asStringArray(options.repoRecord.test_commands);
+
+  const setupCommands = asStringArray(options.verification.setup_commands);
+  const verificationCommands = asStringArray(options.verification.commands);
+  const fallbackCommands = uniqueStrings([...existingLint, ...existingTests, ...existingBuild]);
+
+  const hydratedSetupCommands = setupCommands.length > 0 ? setupCommands : existingLint;
+  const hydratedVerificationCommands = verificationCommands.length > 0 ? verificationCommands : fallbackCommands;
+
+  const buildEnabled = options.verification.build === true;
+  const lintEnabled = options.verification.lint === true;
+  const testsEnabled = options.verification.tests !== false;
+
+  // Keep command execution deterministic for verifyProjectRuntime: lint -> test -> build.
+  // Setup commands run first (lint slot), verification commands run second (test slot).
+  options.repoRecord.lint_commands = lintEnabled ? hydratedSetupCommands : [];
+  options.repoRecord.test_commands = testsEnabled ? hydratedVerificationCommands : [];
+  options.repoRecord.build_commands = buildEnabled ? hydratedVerificationCommands : [];
+}
+
+/**
+ * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   runId: string,
+ *   profilePath: string,
+ *   profile: Record<string, unknown>,
+ *   targetCheckout: { targetCheckoutRoot: string, targetRepoId: string, targetRepoRef: string, targetRepoUrl: string },
+ * }} options
+ * @returns {{
+ *   generatedProjectProfileFile: string,
+ *   templateProjectProfilePath: string,
+ *   resolvedRegistryRoots: {
+ *     routesRoot?: string,
+ *     wrappersRoot?: string,
+ *     promptsRoot?: string,
+ *     contextBundlesRoot?: string,
+ *     policiesRoot?: string,
+ *     adaptersRoot?: string,
+ *   },
+ * }}
+ */
+function materializeRunScopedProjectProfile(options) {
+  const templateRef = asNonEmptyString(options.profile.project_profile_template_ref);
+  if (!templateRef) {
+    throw new Error("Live E2E profile must declare project_profile_template_ref.");
+  }
+
+  const templateProjectProfilePath = resolveExistingPath([
+    path.isAbsolute(templateRef) ? templateRef : "",
+    path.resolve(path.dirname(options.profilePath), templateRef),
+    path.resolve(options.init.projectRoot, templateRef),
+    path.resolve(process.cwd(), templateRef),
+  ]);
+
+  const loadedTemplate = loadContractFile({
+    filePath: templateProjectProfilePath,
+    family: "project-profile",
+  });
+  if (!loadedTemplate.ok) {
+    throw new Error(
+      `Project profile template '${templateProjectProfilePath}' failed validation: ${loadedTemplate.error.message}`,
+    );
+  }
+
+  const generatedProjectProfile = asRecord(deepClone(loadedTemplate.document));
+  generatedProjectProfile.project_id = `${asNonEmptyString(generatedProjectProfile.project_id) || "live-e2e-target"}.run.${normalizeId(options.runId)}`;
+  generatedProjectProfile.display_name =
+    `${asNonEmptyString(generatedProjectProfile.display_name) || "Live E2E Target"} (${options.targetCheckout.targetRepoId})`;
+
+  const registryRoots = asRecord(generatedProjectProfile.registry_roots);
+  for (const [key, rootValue] of Object.entries(registryRoots)) {
+    const rootPath = asNonEmptyString(rootValue);
+    if (!rootPath) continue;
+    registryRoots[key] = path.isAbsolute(rootPath) ? rootPath : path.resolve(options.init.projectRoot, rootPath);
+  }
+  generatedProjectProfile.registry_roots = registryRoots;
+
+  const repos = Array.isArray(generatedProjectProfile.repos)
+    ? /** @type {Array<Record<string, unknown>>} */ (deepClone(generatedProjectProfile.repos))
+    : [];
+  const matchingRepoIndex = repos.findIndex((repo) => asNonEmptyString(repo.repo_id) === options.targetCheckout.targetRepoId);
+  const selectedRepoIndex = matchingRepoIndex >= 0 ? matchingRepoIndex : 0;
+  const selectedRepo = asRecord(repos[selectedRepoIndex] ?? {});
+
+  selectedRepo.repo_id = options.targetCheckout.targetRepoId;
+  selectedRepo.name = asNonEmptyString(selectedRepo.name) || options.targetCheckout.targetRepoId;
+  selectedRepo.default_branch = options.targetCheckout.targetRepoRef;
+  selectedRepo.role = asNonEmptyString(selectedRepo.role) || "application";
+
+  const source = asRecord(selectedRepo.source);
+  source.kind = "git";
+  source.remote_url = options.targetCheckout.targetRepoUrl;
+  source.default_ref = options.targetCheckout.targetRepoRef;
+  selectedRepo.source = source;
+
+  const verification = asRecord(options.profile.verification);
+  hydrateRepoVerificationCommands({
+    repoRecord: selectedRepo,
+    verification,
+  });
+
+  if (repos.length === 0) {
+    repos.push(selectedRepo);
+  } else {
+    repos[selectedRepoIndex] = selectedRepo;
+  }
+  generatedProjectProfile.repos = repos;
+
+  const generatedProjectProfileFile = path.join(
+    options.init.runtimeLayout.stateRoot,
+    "live-e2e-generated",
+    `project-profile-${normalizeId(options.runId)}.json`,
+  );
+  fs.mkdirSync(path.dirname(generatedProjectProfileFile), { recursive: true });
+
+  const generatedValidation = validateContractDocument({
+    family: "project-profile",
+    document: generatedProjectProfile,
+    source: `runtime://live-e2e-generated-profile/${normalizeId(options.runId)}`,
+  });
+  if (!generatedValidation.ok) {
+    const firstIssue = generatedValidation.issues[0]?.message ?? "unknown issue";
+    throw new Error(`Generated project profile failed validation: ${firstIssue}`);
+  }
+
+  writeJson(generatedProjectProfileFile, generatedProjectProfile);
+
+  const controlPlaneExamplesRoot = path.resolve(options.init.projectRoot, "examples");
+  const resolvedRegistryRoots = {
+    routesRoot: asNonEmptyString(registryRoots.routes) || path.join(controlPlaneExamplesRoot, "routes"),
+    wrappersRoot: asNonEmptyString(registryRoots.wrappers) || path.join(controlPlaneExamplesRoot, "wrappers"),
+    promptsRoot: asNonEmptyString(registryRoots.prompts) || path.join(controlPlaneExamplesRoot, "prompts"),
+    contextBundlesRoot:
+      asNonEmptyString(registryRoots.context_bundles) || path.join(controlPlaneExamplesRoot, "context/bundles"),
+    policiesRoot: asNonEmptyString(registryRoots.policies) || path.join(controlPlaneExamplesRoot, "policies"),
+    adaptersRoot: asNonEmptyString(registryRoots.adapters) || path.join(controlPlaneExamplesRoot, "adapters"),
+  };
+
+  return {
+    generatedProjectProfileFile,
+    templateProjectProfilePath,
+    resolvedRegistryRoots,
+  };
 }
 
 /**
@@ -309,14 +577,63 @@ export function startStandardLiveE2ERun(options) {
   let status = "running";
   let finishedAt = null;
   let errorMessage = null;
+  /** @type {{
+   *  targetCheckoutRoot: string,
+   *  generatedProjectProfileFile: string,
+   *  templateProjectProfilePath: string,
+   *  resolvedRegistryRoots: {
+   *    routesRoot?: string,
+   *    wrappersRoot?: string,
+   *    promptsRoot?: string,
+   *    contextBundlesRoot?: string,
+   *    policiesRoot?: string,
+   *    adaptersRoot?: string,
+   *  },
+   * } | null} */
+  let targetWorkspace = null;
 
   try {
-    markStage(stageMap, "bootstrap", "pass", [init.stateFile], "runtime initialized");
+    const targetCheckout = materializeTargetCheckout({
+      init,
+      runId,
+      profile,
+    });
+    const generatedProfile = materializeRunScopedProjectProfile({
+      init,
+      runId,
+      profilePath,
+      profile,
+      targetCheckout,
+    });
+    targetWorkspace = {
+      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      generatedProjectProfileFile: generatedProfile.generatedProjectProfileFile,
+      templateProjectProfilePath: generatedProfile.templateProjectProfilePath,
+      resolvedRegistryRoots: generatedProfile.resolvedRegistryRoots,
+    };
+
+    artifacts.target_checkout_root = targetWorkspace.targetCheckoutRoot;
+    artifacts.generated_project_profile_file = targetWorkspace.generatedProjectProfileFile;
+    artifacts.project_profile_template_file = targetWorkspace.templateProjectProfilePath;
+    markStage(
+      stageMap,
+      "bootstrap",
+      "pass",
+      [init.stateFile, targetWorkspace.generatedProjectProfileFile],
+      "runtime initialized and target checkout prepared",
+    );
+
+    const executionProjectOptions = {
+      cwd,
+      projectRef: targetWorkspace.targetCheckoutRoot,
+      projectProfile: targetWorkspace.generatedProjectProfileFile,
+      runtimeRoot: init.runtimeRoot,
+    };
 
     const analyze = analyzeProjectRuntime({
-      cwd,
-      projectRef: init.projectRoot,
-      runtimeRoot: init.runtimeRoot,
+      ...executionProjectOptions,
+      ...targetWorkspace.resolvedRegistryRoots,
+      evaluationWorkspaceRoot: init.projectRoot,
     });
     artifacts.analysis_report_file = analyze.reportPath;
     artifacts.route_resolution_file = analyze.routeResolutionPath;
@@ -325,9 +642,7 @@ export function startStandardLiveE2ERun(options) {
     markStage(stageMap, "planning", "pass", [analyze.policyResolutionPath], "policy and route resolution aligned");
 
     const validate = validateProjectRuntime({
-      cwd,
-      projectRef: init.projectRoot,
-      runtimeRoot: init.runtimeRoot,
+      ...executionProjectOptions,
     });
     artifacts.validation_report_file = validate.validationReportPath;
     const validateStageStatus = validate.report.status === "fail" ? "fail" : "pass";
@@ -337,9 +652,7 @@ export function startStandardLiveE2ERun(options) {
     }
 
     const verify = verifyProjectRuntime({
-      cwd,
-      projectRef: init.projectRoot,
-      runtimeRoot: init.runtimeRoot,
+      ...executionProjectOptions,
       requireValidationPass: true,
     });
     artifacts.verify_summary_file = verify.verifySummaryPath;
@@ -545,6 +858,8 @@ export function startStandardLiveE2ERun(options) {
     finished_at: finishedAt,
     status,
     hold_open: Boolean(options.holdOpen),
+    target_checkout_root: targetWorkspace?.targetCheckoutRoot ?? null,
+    generated_project_profile_file: targetWorkspace?.generatedProjectProfileFile ?? null,
     stage_results: stageResults,
     artifacts,
     scorecard_files: [scorecardFile],

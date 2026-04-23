@@ -7,7 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { appendRunEvent } from "../../api/src/index.mjs";
-import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import { invokeCli } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -72,6 +72,87 @@ function configureCodexExternalRuntime(options) {
   ].join("\n");
   const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
   fs.writeFileSync(adapterPath, updated, "utf8");
+}
+
+/**
+ * @param {{
+ *   hostProjectRoot: string,
+ *   branch?: string,
+ * }} options
+ */
+function createLocalTargetRepository(options) {
+  const branch = options.branch ?? "main";
+  const targetRepoRoot = path.join(options.hostProjectRoot, "target-repo");
+  fs.mkdirSync(targetRepoRoot, { recursive: true });
+  fs.writeFileSync(
+    path.join(targetRepoRoot, "README.md"),
+    "# Local target repository for live-e2e tests\n",
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(targetRepoRoot, "package.json"),
+    `${JSON.stringify(
+      {
+        name: "local-live-e2e-target",
+        private: true,
+        version: "0.0.0",
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  runGitChecked({ cwd: targetRepoRoot, args: ["init", "-b", branch] });
+  runGitChecked({ cwd: targetRepoRoot, args: ["config", "user.email", "target@example.com"] });
+  runGitChecked({ cwd: targetRepoRoot, args: ["config", "user.name", "Target Test"] });
+  runGitChecked({ cwd: targetRepoRoot, args: ["add", "-A"] });
+  runGitChecked({ cwd: targetRepoRoot, args: ["commit", "-m", "target init"] });
+
+  return {
+    targetRepoRoot,
+    targetRef: branch,
+  };
+}
+
+/**
+ * @param {{
+ *   templateProfilePath: string,
+ *   outputProfilePath: string,
+ *   targetRepoRoot: string,
+ *   targetRef: string,
+ *   setupCommands?: string[],
+ *   verifyCommands?: string[],
+ * }} options
+ */
+function writeLocalLiveE2EProfile(options) {
+  const loadedProfile = loadContractFile({
+    filePath: options.templateProfilePath,
+    family: "live-e2e-profile",
+  });
+  assert.equal(loadedProfile.ok, true, loadedProfile.ok ? "" : loadedProfile.error.message);
+
+  const profile = /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(loadedProfile.document)));
+  const targetRepo = /** @type {Record<string, unknown>} */ (profile.target_repo ?? {});
+  targetRepo.repo_url = options.targetRepoRoot;
+  targetRepo.ref = options.targetRef;
+  targetRepo.checkout_strategy = "full";
+  profile.target_repo = targetRepo;
+
+  const verification = /** @type {Record<string, unknown>} */ (profile.verification ?? {});
+  verification.setup_commands =
+    options.setupCommands ?? ['node -e "process.stdout.write(\'setup ok\\n\')"'];
+  verification.commands =
+    options.verifyCommands ?? ['node -e "process.stdout.write(\'verify ok\\n\')"'];
+  profile.verification = verification;
+  profile.project_profile_template_ref = "examples/project.github.aor.yaml";
+
+  const validation = validateContractDocument({
+    family: "live-e2e-profile",
+    document: profile,
+    source: "fixture://live-e2e-profile",
+  });
+  assert.equal(validation.ok, true, "generated live-e2e profile fixture must be contract-valid");
+  fs.writeFileSync(options.outputProfilePath, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
 }
 
 test("global help transcript matches fixture", () => {
@@ -1514,8 +1595,18 @@ test("operator commands inspect runs, packets, and evidence through shared contr
 
 test("live-e2e standard runner supports start observe report and bounded abort surfaces", () => {
   withTempProject((projectRoot) => {
-    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init", "-b", "main"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "ci@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "CI Test"] });
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    const targetRepo = createLocalTargetRepository({ hostProjectRoot: projectRoot });
+    const localProfilePath = path.join(projectRoot, "examples/live-e2e/regress-short.local.json");
+    writeLocalLiveE2EProfile({
+      templateProfilePath: path.join(projectRoot, "examples/live-e2e/regress-short.yaml"),
+      outputProfilePath: localProfilePath,
+      targetRepoRoot: targetRepo.targetRepoRoot,
+      targetRef: targetRepo.targetRef,
+    });
 
     const startResult = invokeCli([
       "live-e2e",
@@ -1523,7 +1614,7 @@ test("live-e2e standard runner supports start observe report and bounded abort s
       "--project-ref",
       projectRoot,
       "--profile",
-      path.join(workspaceRoot, "examples/live-e2e/regress-short.yaml"),
+      localProfilePath,
       "--hold-open",
       "true",
     ]);
@@ -1534,6 +1625,17 @@ test("live-e2e standard runner supports start observe report and bounded abort s
     assert.ok(Array.isArray(startPayload.live_e2e_scorecard_files));
     assert.ok(startPayload.live_e2e_scorecard_files.length >= 1);
     assert.equal(fs.existsSync(startPayload.live_e2e_scorecard_files[0]), true);
+    const startedSummary = JSON.parse(fs.readFileSync(startPayload.live_e2e_run_summary_file, "utf8"));
+    assert.equal(typeof startedSummary.target_checkout_root, "string");
+    assert.equal(fs.existsSync(startedSummary.target_checkout_root), true);
+    assert.equal(typeof startedSummary.generated_project_profile_file, "string");
+    assert.equal(fs.existsSync(startedSummary.generated_project_profile_file), true);
+    assert.equal(fs.existsSync(startedSummary.artifacts.target_checkout_root), true);
+    assert.equal(fs.existsSync(startedSummary.artifacts.generated_project_profile_file), true);
+    const verifySummary = JSON.parse(fs.readFileSync(startedSummary.artifacts.verify_summary_file, "utf8"));
+    assert.equal(verifySummary.execution_isolation.source_root, startedSummary.target_checkout_root);
+    const generatedProjectProfile = JSON.parse(fs.readFileSync(startedSummary.generated_project_profile_file, "utf8"));
+    assert.equal(path.isAbsolute(generatedProjectProfile.registry_roots.routes), true);
 
     const statusResult = invokeCli([
       "live-e2e",
@@ -1601,6 +1703,39 @@ test("live-e2e standard runner supports start observe report and bounded abort s
   });
 });
 
+test("live-e2e start reports failure when target ref is invalid", () => {
+  withTempProject((projectRoot) => {
+    runGitChecked({ cwd: projectRoot, args: ["init", "-b", "main"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "ci@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "CI Test"] });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    const targetRepo = createLocalTargetRepository({ hostProjectRoot: projectRoot, branch: "main" });
+    const localProfilePath = path.join(projectRoot, "examples/live-e2e/regress-short.invalid-ref.json");
+    writeLocalLiveE2EProfile({
+      templateProfilePath: path.join(projectRoot, "examples/live-e2e/regress-short.yaml"),
+      outputProfilePath: localProfilePath,
+      targetRepoRoot: targetRepo.targetRepoRoot,
+      targetRef: "missing-ref",
+    });
+
+    const startResult = invokeCli([
+      "live-e2e",
+      "start",
+      "--project-ref",
+      projectRoot,
+      "--profile",
+      localProfilePath,
+    ]);
+    assert.equal(startResult.exitCode, 0, startResult.stderr);
+    const startPayload = JSON.parse(startResult.stdout);
+    assert.equal(startPayload.live_e2e_run_status, "fail");
+    assert.equal(fs.existsSync(startPayload.live_e2e_run_summary_file), true);
+    const summary = JSON.parse(fs.readFileSync(startPayload.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "fail");
+    assert.match(String(summary.error), /target checkout clone failed|Remote branch missing-ref not found/u);
+  });
+});
+
 test("live-e2e W7 governance profile links quality, incident, and finance evidence for closure smoke", () => {
   withTempProject((projectRoot) => {
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
@@ -1609,6 +1744,16 @@ test("live-e2e W7 governance profile links quality, incident, and finance eviden
     runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "CI Test"] });
     runGitChecked({ cwd: projectRoot, args: ["add", "examples"] });
     runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "fixture init"] });
+    const targetRepo = createLocalTargetRepository({ hostProjectRoot: projectRoot });
+    const localProfilePath = path.join(projectRoot, "examples/live-e2e/w7-governance-integration.local.json");
+    writeLocalLiveE2EProfile({
+      templateProfilePath: path.join(projectRoot, "examples/live-e2e/w7-governance-integration.yaml"),
+      outputProfilePath: localProfilePath,
+      targetRepoRoot: targetRepo.targetRepoRoot,
+      targetRef: targetRepo.targetRef,
+      setupCommands: ['node -e "process.stdout.write(\'setup ok\\n\')"'],
+      verifyCommands: ['node -e "process.stdout.write(\'verify ok\\n\')"'],
+    });
 
     const startResult = invokeCli([
       "live-e2e",
@@ -1616,7 +1761,7 @@ test("live-e2e W7 governance profile links quality, incident, and finance eviden
       "--project-ref",
       projectRoot,
       "--profile",
-      path.join(workspaceRoot, "examples/live-e2e/w7-governance-integration.yaml"),
+      localProfilePath,
     ]);
     assert.equal(startResult.exitCode, 0, startResult.stderr);
     const startPayload = JSON.parse(startResult.stdout);
