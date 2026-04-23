@@ -35,6 +35,29 @@ function withTempRepo(callback) {
   }
 }
 
+/**
+ * @param {{
+ *   command: string,
+ *   args: string[],
+ *   timeoutMs?: number,
+ * }} options
+ */
+function buildExternalRunnerProfile(options) {
+  return {
+    execution: {
+      runtime_mode: "external-process",
+      handler: "codex-cli-external-runner",
+      evidence_namespace: "evidence://adapter-live/codex-cli",
+      external_runtime: {
+        command: options.command,
+        args: options.args,
+        request_via_stdin: true,
+        timeout_ms: options.timeoutMs ?? 30000,
+      },
+    },
+  };
+}
+
 test("buildAdapterRegistry loads adapter capability profiles through shared contracts path", () => {
   withTempRepo((repoRoot) => {
     const registry = buildAdapterRegistry({
@@ -180,27 +203,112 @@ test("mock adapter executes deterministic dry-run outputs for rehearsal coverage
   assert.ok(first.evidence_refs[0].startsWith("evidence://mock-adapter/"));
 });
 
-test("live adapter baseline executes supported codex-cli requests", () => {
-  const adapter = createLiveAdapter({ adapterId: "codex-cli" });
+test("live adapter executes external runner path for supported codex-cli requests", () => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-evidence-"));
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+            "const request=input.request||{};",
+            "process.stdout.write(JSON.stringify({",
+            "status:'success',",
+            "summary:'external runner ok',",
+            "output:{runner:'node-inline',step_class:request.step_class||null},",
+            "evidence_refs:['evidence://external-runner/mock-success'],",
+            "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline'}]",
+            "}));",
+          ].join(""),
+        ],
+      }),
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: evidenceRoot,
+    });
+
+    const response = adapter.execute({
+      request_id: "req-live-1",
+      run_id: "run-live-1",
+      step_id: "step-live-1",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+      },
+    });
+
+    assert.equal(response.adapter_id, "codex-cli");
+    assert.equal(response.status, "success");
+    assert.equal(response.output.mode, "execute");
+    assert.equal(response.output.provider_adapter, "codex-cli");
+    assert.equal(response.output.external_runner.runtime_mode, "external-process");
+    assert.equal(response.output.external_runner.command, process.execPath);
+    assert.ok(response.evidence_refs.some((ref) => ref.startsWith("evidence://adapter-live/codex-cli/")));
+    assert.ok(response.evidence_refs.includes("evidence://external-runner/mock-success"));
+    assert.ok(
+      response.evidence_refs.some((ref) => ref.includes("adapter-live-raw-codex-cli")),
+      "expected raw external runner evidence ref to be persisted",
+    );
+  } finally {
+    fs.rmSync(evidenceRoot, { recursive: true, force: true });
+  }
+});
+
+test("live adapter reports blocked when external runner command is missing", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: "__aor_missing_runner_command__",
+      args: [],
+    }),
+  });
+
   const response = adapter.execute({
-    request_id: "req-live-1",
-    run_id: "run-live-1",
-    step_id: "step-live-1",
+    request_id: "req-live-missing",
+    run_id: "run-live-missing",
+    step_id: "step-live-missing",
     step_class: "implement",
     route: { resolved_route_id: "route.implement.default" },
     asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
     policy_bundle: { policy_id: "policy.step.runner.default" },
     dry_run: false,
-    context: {
-      compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
-    },
   });
 
-  assert.equal(response.adapter_id, "codex-cli");
-  assert.equal(response.status, "success");
-  assert.equal(response.output.mode, "execute");
-  assert.equal(response.output.provider_adapter, "codex-cli");
-  assert.ok(response.evidence_refs[0].startsWith("evidence://adapter-live/codex-cli/"));
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "missing-prerequisite");
+  assert.match(response.summary, /not available on PATH/i);
+});
+
+test("live adapter reports failed when external runner exits non-zero", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "process.stderr.write('boom');process.exit(17);"],
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-live-failed",
+    run_id: "run-live-failed",
+    step_id: "step-live-failed",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "failed");
+  assert.equal(response.output.failure_kind, "external-runner-failed");
+  assert.match(response.summary, /exited with code 17/i);
 });
 
 test("live adapter baseline rejects unsupported adapter ids", () => {

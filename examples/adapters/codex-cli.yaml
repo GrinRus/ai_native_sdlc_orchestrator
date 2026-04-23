@@ -18,9 +18,16 @@ constraints:
   supports_no_write_rehearsal: true
 execution:
   live_baseline: true
-  runtime_mode: in-process-deterministic
-  handler: codex-cli-live-baseline
+  runtime_mode: external-process
+  handler: codex-cli-external-runner
   evidence_namespace: evidence://adapter-live/codex-cli
+  external_runtime:
+    command: codex
+    args:
+      - exec
+      - --json
+    request_via_stdin: true
+    timeout_ms: 30000
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true

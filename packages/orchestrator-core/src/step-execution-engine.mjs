@@ -627,9 +627,28 @@ export function executeRoutedStep(options) {
           });
         } else {
           try {
-            const liveAdapter = createLiveAdapter({ adapterId: selectedAdapterId });
+            const liveAdapter = createLiveAdapter({
+              adapterId: selectedAdapterId,
+              adapterProfile: asRecord(asRecord(/** @type {any} */ (adapterResolution).adapter).profile),
+              runtimeEvidenceRoot: init.runtimeLayout.reportsRoot,
+              projectRoot: init.projectRoot,
+            });
             adapterResponse = liveAdapter.execute(/** @type {any} */ (adapterRequest));
-            summary = `Routed live execution for step '${requestedStepClass}' completed with adapter '${selectedAdapterId}'.`;
+            if (adapterResponse.status === "success") {
+              summary = `Routed live execution for step '${requestedStepClass}' completed with adapter '${selectedAdapterId}'.`;
+            } else {
+              status = "failed";
+              summary = asString(adapterResponse.summary) ?? summary;
+              const adapterOutput = asRecord(adapterResponse.output);
+              const failureKind = asString(adapterOutput.failure_kind);
+              if (failureKind === "missing-prerequisite") {
+                blockedNextStep =
+                  "Install/configure external runner prerequisites for the selected adapter or use '--routed-dry-run-step'.";
+              } else {
+                blockedNextStep =
+                  "Inspect adapter response evidence/tool traces, fix external runner execution, then retry live execution.";
+              }
+            }
           } catch (error) {
             status = "failed";
             summary = error instanceof Error ? error.message : String(error);

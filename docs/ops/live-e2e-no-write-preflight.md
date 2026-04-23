@@ -81,6 +81,29 @@ Evidence fixtures captured for this procedure:
 - `examples/live-e2e/fixtures/routed-rehearsal/aor/step-result-routed-*.json`
 - `examples/live-e2e/fixtures/routed-rehearsal/aor/runtime-tree.txt`
 
+## External live adapter rehearsal (W10-S01 baseline)
+Use this bounded rehearsal when validating the external live adapter path:
+
+```bash
+aor project verify \
+  --project-ref <AOR_WORKSPACE> \
+  --project-profile <AOR_WORKSPACE>/examples/project.aor.yaml \
+  --runtime-root <AOR_WORKSPACE>/.aor/w10-s01-live-adapter \
+  --routed-live-step implement \
+  --approved-handoff-ref evidence://handoff/live-approved \
+  --promotion-evidence-refs evidence://promotion/live-pass
+```
+
+Expected W10-S01 signals:
+- `routed_execution.mode=execute`;
+- adapter response status is explicit (`success`, `blocked`, or `failed`);
+- successful path records external runner metadata and raw execution evidence reference under `adapter_response.output.external_runner`;
+- missing command/runtime prerequisites produce `failure_kind=missing-prerequisite` without synthetic success;
+- delivery guardrails continue to block execution when required approval/promotion evidence is missing.
+
+Evidence fixtures captured for this procedure:
+- `examples/live-e2e/fixtures/w10-s01/external-live-adapter-transcript.json`
+
 ## Quality rehearsal procedure (W3-S06 baseline)
 Use this baseline on selected public targets after no-write preflight gates pass:
 

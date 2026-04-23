@@ -42,7 +42,7 @@ Shared lifecycle hooks are explicit and adapter-agnostic:
 
 Execution baselines:
 - deterministic dry-run adapter path (`mock-runner`) for rehearsal-safe execution;
-- first live provider baseline (`codex-cli`) for routed live execution foundation in `W9-S08`.
+- external live adapter path (`codex-cli`) that invokes a real external runner command in `W10-S01` and persists raw execution evidence plus normalized adapter output.
 
 ## Routed execution engine baseline (W2-S05 + W9-S08)
 The routed execution baseline follows one deterministic sequence:
@@ -54,7 +54,7 @@ The routed execution baseline follows one deterministic sequence:
 6. negotiate adapter capabilities;
 7. execute:
   - dry-run path: deterministic mock adapter;
-  - live path: supported live adapter only when delivery guardrails are ready, otherwise explicit blocked adapter response.
+  - live path: supported live adapter only when delivery guardrails are ready; external runner command execution emits `success`, `blocked`, or `failed` adapter responses with explicit prerequisite/policy diagnostics.
 
 The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with:
 - selected route/asset/policy/adapter metadata;

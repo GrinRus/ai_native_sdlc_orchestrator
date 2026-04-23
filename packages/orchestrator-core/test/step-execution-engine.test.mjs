@@ -26,6 +26,30 @@ function withTempRepo(callback) {
   }
 }
 
+/**
+ * @param {string} repoRoot
+ * @param {{ command: string, args: string[] }} runtime
+ */
+function configureCodexExternalRuntime(repoRoot, runtime) {
+  const adapterPath = path.join(repoRoot, "examples/adapters/codex-cli.yaml");
+  const source = fs.readFileSync(adapterPath, "utf8");
+  const executionBlock = [
+    "execution:",
+    "  live_baseline: true",
+    "  runtime_mode: external-process",
+    "  handler: codex-cli-external-runner",
+    "  evidence_namespace: evidence://adapter-live/codex-cli",
+    "  external_runtime:",
+    `    command: ${JSON.stringify(runtime.command)}`,
+    "    args:",
+    ...runtime.args.map((argument) => `      - ${JSON.stringify(argument)}`),
+    "    request_via_stdin: true",
+    "    timeout_ms: 30000",
+  ].join("\n");
+  const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
+  fs.writeFileSync(adapterPath, updated, "utf8");
+}
+
 test("executeRoutedStep resolves route/assets/policy/adapter and persists compiled context for runner dry-runs", () => {
   withTempRepo((repoRoot) => {
     for (const stepClass of ["implement", "review", "qa"]) {
@@ -200,6 +224,25 @@ test("executeRoutedStep still writes failed step-result when routed resolution f
 
 test("executeRoutedStep supports live execution for supported adapter when delivery guardrails are ready", () => {
   withTempRepo((repoRoot) => {
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+          "const request=input.request||{};",
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'external runner ok',",
+          "output:{runner:'node-inline',step_class:request.step_class||null},",
+          "evidence_refs:['evidence://external-runner/step-success'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline'}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
     const result = executeRoutedStep({
       projectRef: repoRoot,
       cwd: repoRoot,
@@ -219,6 +262,12 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
     assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "codex-cli");
     assert.equal(result.stepResult.routed_execution.adapter_response.status, "success");
     assert.equal(result.stepResult.routed_execution.adapter_response.output.mode, "execute");
+    assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.command, process.execPath);
+    assert.ok(
+      result.stepResult.routed_execution.adapter_response.evidence_refs.includes(
+        "evidence://external-runner/step-success",
+      ),
+    );
     assert.equal(typeof result.stepResult.routed_execution.context_compilation.compiled_context_ref, "string");
     assert.match(
       result.stepResult.routed_execution.context_compilation.compiled_context_ref,
@@ -228,6 +277,35 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
       result.stepResult.evidence_refs.includes(
         result.stepResult.routed_execution.context_compilation.compiled_context_ref,
       ),
+    );
+  });
+});
+
+test("executeRoutedStep reports missing external runner prerequisites as blocked live adapter response", () => {
+  withTempRepo((repoRoot) => {
+    configureCodexExternalRuntime(repoRoot, {
+      command: "__aor_missing_runner_command__",
+      args: [],
+    });
+
+    const result = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      approvedHandoffRef: "evidence://handoff/approved-3",
+      promotionEvidenceRefs: ["evidence://promotion/pass-3"],
+    });
+
+    assert.equal(result.stepResult.status, "failed");
+    assert.equal(result.stepResult.routed_execution.adapter_response.status, "blocked");
+    assert.equal(
+      result.stepResult.routed_execution.adapter_response.output.failure_kind,
+      "missing-prerequisite",
+    );
+    assert.match(
+      String(result.stepResult.routed_execution.blocked_next_step),
+      /Install\/configure external runner prerequisites/i,
     );
   });
 });

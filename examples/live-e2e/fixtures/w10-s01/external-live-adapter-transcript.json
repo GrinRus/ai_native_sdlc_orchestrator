@@ -1,0 +1,21 @@
+{
+  "fixture_id": "w10-s01.external-live-adapter.baseline.v1",
+  "slice_id": "W10-S01",
+  "summary": "Routed live execution invoked external runner path for codex-cli and persisted raw execution evidence.",
+  "signals": {
+    "step_status": "passed",
+    "routed_mode": "execute",
+    "adapter_status": "success",
+    "adapter_id": "codex-cli",
+    "external_runner_command": "node",
+    "raw_evidence_ref": "evidence://projects/aor-core/reports/adapter-live-raw-codex-cli-example.json"
+  },
+  "failure_signals": {
+    "missing_prerequisite_failure_kind": "missing-prerequisite",
+    "policy_blocked_status": "blocked"
+  },
+  "notes": [
+    "Fixture is execution-shape evidence for W10-S01 contract/runbook alignment.",
+    "Runtime-specific command arguments and timestamps are intentionally omitted."
+  ]
+}

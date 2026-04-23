@@ -51,6 +51,29 @@ function writeContractFixture(options) {
   fs.writeFileSync(options.filePath, `${JSON.stringify(options.document, null, 2)}\n`, "utf8");
 }
 
+/**
+ * @param {{ projectRoot: string, command: string, args: string[] }} options
+ */
+function configureCodexExternalRuntime(options) {
+  const adapterPath = path.join(options.projectRoot, "examples/adapters/codex-cli.yaml");
+  const source = fs.readFileSync(adapterPath, "utf8");
+  const executionBlock = [
+    "execution:",
+    "  live_baseline: true",
+    "  runtime_mode: external-process",
+    "  handler: codex-cli-external-runner",
+    "  evidence_namespace: evidence://adapter-live/codex-cli",
+    "  external_runtime:",
+    `    command: ${JSON.stringify(options.command)}`,
+    "    args:",
+    ...options.args.map((argument) => `      - ${JSON.stringify(argument)}`),
+    "    request_via_stdin: true",
+    "    timeout_ms: 30000",
+  ].join("\n");
+  const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
+  fs.writeFileSync(adapterPath, updated, "utf8");
+}
+
 test("global help transcript matches fixture", () => {
   const expected = fs.readFileSync(path.join(fixturesDir, "help-transcript.txt"), "utf8");
   const result = invokeCli(["--help"]);
@@ -1770,6 +1793,25 @@ test("project verify supports routed live execution baseline when delivery evide
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    configureCodexExternalRuntime({
+      projectRoot,
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+          "const request=input.request||{};",
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'external runner ok',",
+          "output:{runner:'node-inline',step_class:request.step_class||null},",
+          "evidence_refs:['evidence://external-runner/project-verify-live-success'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline'}]",
+          "}));",
+        ].join(""),
+      ],
+    });
 
     const result = invokeCli([
       "project",
@@ -1801,6 +1843,15 @@ test("project verify supports routed live execution baseline when delivery evide
     assert.equal(routedStepResult.routed_execution.adapter_response.adapter_id, "codex-cli");
     assert.equal(routedStepResult.routed_execution.adapter_response.status, "success");
     assert.equal(routedStepResult.routed_execution.adapter_response.output.mode, "execute");
+    assert.equal(
+      routedStepResult.routed_execution.adapter_response.output.external_runner.command,
+      process.execPath,
+    );
+    assert.ok(
+      routedStepResult.routed_execution.adapter_response.evidence_refs.includes(
+        "evidence://external-runner/project-verify-live-success",
+      ),
+    );
 
     const fixture = JSON.parse(
       fs.readFileSync(path.join(fixturesDir, "project-verify-routed-live-smoke.json"), "utf8"),
@@ -1864,6 +1915,48 @@ test("project verify routed live execution blocks with explicit guardrails when 
       ),
     };
     assert.deepEqual(subset, fixture);
+  });
+});
+
+test("project verify routed live execution reports missing external runner prerequisites", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    configureCodexExternalRuntime({
+      projectRoot,
+      command: "__aor_missing_runner_command__",
+      args: [],
+    });
+
+    const result = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--routed-live-step",
+      "implement",
+      "--approved-handoff-ref",
+      "evidence://handoff/live-approved",
+      "--promotion-evidence-refs",
+      "evidence://promotion/live-pass",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(fs.existsSync(parsed.routed_step_result_file), true);
+
+    const routedStepResult = JSON.parse(fs.readFileSync(parsed.routed_step_result_file, "utf8"));
+    assert.equal(routedStepResult.status, "failed");
+    assert.equal(routedStepResult.routed_execution.mode, "execute");
+    assert.equal(routedStepResult.routed_execution.adapter_response.status, "blocked");
+    assert.equal(
+      routedStepResult.routed_execution.adapter_response.output.failure_kind,
+      "missing-prerequisite",
+    );
+    assert.match(
+      String(routedStepResult.routed_execution.blocked_next_step),
+      /Install\/configure external runner prerequisites/i,
+    );
   });
 });
 
