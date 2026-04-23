@@ -38,24 +38,21 @@ pnpm check
 - Public-repo rehearsals keep `write_back_to_remote=false` by default.
 - If an external CDN/network dependency is unavailable (for example Playwright browser download), mark the run as external `inconclusive` for smoke tracking.
 
-## W10-S05 observed baseline runs pending W11 closure (2026-04-23)
+## W11-S05 refreshed short-profile proof bundle (2026-04-23)
 
-Observed with current external short-profile runs:
-- `live-e2e.regress.short.run-423122617518` (scenario `ky-regression-smoke`) status `pass`.
-- `live-e2e.release.short.run-423122830183` (scenario `ky-release-short`) status `pass`.
+Refreshed target-backed runs:
+- `live-e2e.regress.short.run-w11-s05` (scenario `ky-regression-smoke`) status `pass`.
+- `live-e2e.release.short.run-w11-s05` (scenario `ky-release-short`) status `pass`.
 
 Observed prerequisite confirmations:
-- `npm install` and `npx playwright install` completed successfully for both short profiles.
-- `npm test` completed successfully for both short profiles.
-- detached external adapter invocation path remained available throughout execution stages.
+- both runs used real cloned target checkouts (`target_checkout_root`) instead of the AOR workspace.
+- profile-driven `verification.setup_commands` and `verification.commands` ran through the standard preflight path.
+- routed live execution emitted raw adapter evidence and compiled-context linkage on both runs.
 
 Observed failure signatures and safety defaults:
-- no blocking failure signature was observed in these two runs; catalog defaults remain unchanged.
-- release-shaped rehearsal produced `patch-only` delivery artifacts and did not require upstream write-back.
+- missing-prerequisite and policy-blocked signatures remain explicit in standard runbook expectations; no silent mock-only fallback was observed.
+- release-shaped rehearsal anchored `delivery-manifest.repo_deliveries[0].repo_root` and `release-packet.source_provenance.delivery_execution_root` to the exercised target checkout.
 - no-write safety defaults (`write_back_to_remote=false`) remained effective while still materializing delivery/release evidence.
 
-Evidence fixture bundle:
-- `examples/live-e2e/fixtures/w10-s05/w10-s05-evidence-bundle.json`
-
-Closure note:
-- `W10-S05` remains blocked because the current bundle does not yet prove target-backed checkout, execution-root, and delivery-path anchoring end to end.
+Canonical fixture bundle:
+- `examples/live-e2e/fixtures/w11-s05/w11-s05-evidence-bundle.json`

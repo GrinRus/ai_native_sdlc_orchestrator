@@ -118,20 +118,19 @@ Evidence fixtures for W4-S06:
 Related runbook:
 - `docs/ops/github-fork-first-delivery.md`
 
-## W10-S05 observed baseline evidence pending W11 closure (2026-04-23)
+## W11-S05 refreshed target-backed evidence (2026-04-23)
 Observed release-shaped run:
-- `live-e2e.release.short.run-423122830183` with status `pass`.
+- `live-e2e.release.short.run-w11-s05` with status `pass`.
 
 Evidence note:
-- this run demonstrates the current short-profile external execution and delivery baseline, but it does not yet close target-backed proof for `W10-S05`.
+- this run anchors delivery/release lineage to the exercised target checkout (`repo_root` and `source_provenance.delivery_execution_root`) without control-plane file mutation hacks.
 
-Fresh fixtures:
-- `examples/live-e2e/fixtures/w10-s05/release-short.run-summary.json`
-- `examples/live-e2e/fixtures/w10-s05/release-short.scorecard.json`
-- `examples/live-e2e/fixtures/w10-s05/release-short.delivery-transcript.json`
-- `examples/live-e2e/fixtures/w10-s05/release-short.delivery-manifest.json`
-- `examples/live-e2e/fixtures/w10-s05/release-short.release-packet.json`
-- `examples/live-e2e/fixtures/w10-s05/release-short.incident-report.json`
-- `examples/live-e2e/fixtures/w10-s05/release-short.learning-loop-scorecard.json`
-- `examples/live-e2e/fixtures/w10-s05/release-short.delivery-learning-loop-scorecard.json`
-- `examples/live-e2e/fixtures/w10-s05/release-short.learning-loop-handoff.json`
+Canonical fixtures:
+- `examples/live-e2e/fixtures/w11-s05/release-short.run-summary.json`
+- `examples/live-e2e/fixtures/w11-s05/release-short.scorecard.json`
+- `examples/live-e2e/fixtures/w11-s05/release-short.delivery-transcript.json`
+- `examples/live-e2e/fixtures/w11-s05/release-short.delivery-manifest.json`
+- `examples/live-e2e/fixtures/w11-s05/release-short.release-packet.json`
+- `examples/live-e2e/fixtures/w11-s05/release-short.learning-loop-scorecard.json`
+- `examples/live-e2e/fixtures/w11-s05/release-short.delivery-learning-loop-scorecard.json`
+- `examples/live-e2e/fixtures/w11-s05/release-short.learning-loop-handoff.json`

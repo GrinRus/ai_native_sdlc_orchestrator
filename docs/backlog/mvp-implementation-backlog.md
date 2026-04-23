@@ -130,7 +130,7 @@ This is the master index for the implementation slices across all defined waves.
 | W11-S02 | Target workspace materialization for live E2E | EPIC-7 | done | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S01 |
 | W11-S03 | Profile-driven preflight and routed live execution | EPIC-3 | done | `apps/cli`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S02 |
 | W11-S04 | Target-anchored delivery and release evidence | EPIC-5 | done | `apps/cli`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S03 |
-| W11-S05 | Fresh external proof bundle for catalog targets | EPIC-7 | blocked | `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`, `docs/backlog/**` | W11-S04 |
+| W11-S05 | Fresh external proof bundle for catalog targets | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`, `docs/backlog/**` | W11-S04 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

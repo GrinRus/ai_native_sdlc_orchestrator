@@ -1,0 +1,111 @@
+{
+  "profile_id": "live-e2e.regress.short",
+  "version": 1,
+  "flow_kind": "regress",
+  "duration_class": "short",
+  "project_profile_template_ref": "examples/project.github.aor.yaml",
+  "scenario_id": "ky-regression-smoke",
+  "target_repo": {
+    "repo_id": "target",
+    "repo_url": "https://github.com/sindresorhus/ky.git",
+    "ref": "main",
+    "checkout_strategy": "shallow",
+    "write_target": "patch-or-fork"
+  },
+  "preflight": {
+    "mode": "no-write",
+    "sequence": [
+      "clone",
+      "inspect",
+      "analyze",
+      "validate",
+      "verify",
+      "stop"
+    ],
+    "prerequisites": [
+      "node >=22 with npm available",
+      "network access for shallow clone and npm install"
+    ],
+    "repo_shape_notes": [
+      "single-package TypeScript library with npm-based checks"
+    ],
+    "failure_safe_defaults": [
+      "keep output_policy.write_back_to_remote set to false",
+      "keep preferred delivery mode in patch-or-fork-safe options only"
+    ],
+    "abort_conditions": [
+      "repository clone fails or ref cannot be resolved",
+      "npm test fails during preflight verification",
+      "any command requests upstream write-back"
+    ],
+    "reusable_assumptions": {
+      "bootstrap": "clone and profile loading can run without write-back credentials",
+      "quality": "bounded regression verification uses npm test as preflight gate",
+      "delivery": "patch or fork-local artifacts remain sufficient for rehearsal completion"
+    }
+  },
+  "runtime": {
+    "mode": "ephemeral",
+    "runtime_root": ".aor",
+    "persist_workspace": false
+  },
+  "objective": {
+    "title": "Live E2E regression smoke on sindresorhus/ky",
+    "task_brief": [
+      "bootstrap the repository and confirm the local verification path",
+      "apply one narrow regression-test-backed change",
+      "produce patch output or a fork-local branch only"
+    ],
+    "success_definition": [
+      "source checkout succeeds",
+      "handoff packet is materialized",
+      "execution completes with evidence",
+      "npm test passes"
+    ]
+  },
+  "stages": [
+    "bootstrap",
+    "discovery",
+    "spec",
+    "planning",
+    "handoff",
+    "execution",
+    "review",
+    "qa"
+  ],
+  "verification": {
+    "build": true,
+    "lint": true,
+    "tests": "project-default",
+    "setup_commands": [
+      "node -e \"process.stdout.write(\\\"setup ok\\n\\\")\""
+    ],
+    "commands": [
+      "node -e \"process.stdout.write(\\\"verify ok\\n\\\")\""
+    ],
+    "eval_suites": [
+      "suite.regress.short@v1"
+    ],
+    "harness": {
+      "enabled": false
+    }
+  },
+  "budgets": {
+    "wall_clock_limit_min": 25,
+    "max_changed_files": 8,
+    "max_cost_usd": 12
+  },
+  "approvals": {
+    "handoff": "required",
+    "release": "skipped"
+  },
+  "output_policy": {
+    "materialize_release_packet": false,
+    "write_back_to_remote": false,
+    "preferred_delivery_mode": "patch"
+  },
+  "ui": {
+    "attachable": true,
+    "default_scope": "run"
+  }
+}

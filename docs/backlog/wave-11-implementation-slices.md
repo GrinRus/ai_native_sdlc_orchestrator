@@ -144,7 +144,7 @@ Close the reopened target-catalog proof gap by making standard live E2E target-b
 
 ## W11-S05 — Fresh external proof bundle for catalog targets
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Refresh the catalog proof bundle so it demonstrates target-backed execution and delivery for the short regression and short release profiles.
 - **Primary modules:** `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`, `docs/backlog/**`
 - **Hard dependencies:** W11-S04

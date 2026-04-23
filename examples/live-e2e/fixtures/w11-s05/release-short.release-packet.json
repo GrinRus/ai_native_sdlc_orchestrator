@@ -1,0 +1,56 @@
+{
+  "packet_id": "aor-core.release-packet.patch-only.1776954869373",
+  "project_id": "aor-core",
+  "ticket_id": "aor-core.wave.live-e2e.release.short.run-w11-s05",
+  "run_refs": [
+    "live-e2e.release.short.run-w11-s05"
+  ],
+  "change_summary": "Delivery mode 'patch-only' produced 0 changed file(s), +0/-0.",
+  "verification_refs": [
+    "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json",
+    "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/promotion-decision-wrapper-wrapper.eval.default-v1-1776954869244.json",
+    "evidence://.aor/projects/aor-core/reports/delivery-transcript-patch-only-live-e2e.release.short.run-w11-s05-1776954869248.json",
+    "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-w11-s05-1776954869372.json"
+  ],
+  "delivery_manifest_ref": "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-w11-s05-1776954869372.json",
+  "source_provenance": {
+    "delivery_execution_root": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/target-checkouts/target-live-e2e.release.short.run-w11-s05",
+    "delivery_execution_root_ref": "evidence://.aor/projects/aor-core/target-checkouts/target-live-e2e.release.short.run-w11-s05",
+    "delivery_transcript_ref": "evidence://.aor/projects/aor-core/reports/delivery-transcript-patch-only-live-e2e.release.short.run-w11-s05-1776954869248.json"
+  },
+  "evidence_lineage": {
+    "handoff_refs": [
+      "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json"
+    ],
+    "promotion_refs": [
+      "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/promotion-decision-wrapper-wrapper.eval.default-v1-1776954869244.json"
+    ],
+    "execution_refs": [
+      "evidence://.aor/projects/aor-core/artifacts/delivery-plan-implement-1776954869245.json",
+      "evidence://.aor/projects/aor-core/reports/delivery-transcript-patch-only-live-e2e.release.short.run-w11-s05-1776954869248.json"
+    ],
+    "coordination_refs": [],
+    "rerun_refs": [],
+    "delivery_output_refs": [
+      "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-w11-s05-1776954869372.json",
+      "evidence://.aor/projects/aor-core/artifacts/delivery-patch-live-e2e.release.short.run-w11-s05-1776954869299.patch"
+    ]
+  },
+  "coordination": {
+    "required": false,
+    "status": "not-required",
+    "repo_ids": [],
+    "evidence_refs": []
+  },
+  "rerun_recovery": {
+    "requested": false,
+    "status": "not-requested",
+    "rerun_of_run_ref": null,
+    "failed_step_ref": null,
+    "packet_boundary": "delivery-manifest",
+    "strategy": null,
+    "blocking_reasons": []
+  },
+  "status": "ready-for-close",
+  "created_at": "2026-04-23T14:34:29.341Z"
+}

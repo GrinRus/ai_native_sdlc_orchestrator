@@ -1,0 +1,41 @@
+{
+  "fixture_id": "w11-s05.target-catalog.target-backed-proof.v1",
+  "slice_id": "W11-S05",
+  "generated_at": "2026-04-23T14:34:29.390Z",
+  "targets": [
+    {
+      "profile_id": "live-e2e.regress.short",
+      "scenario_id": "ky-regression-smoke",
+      "run_id": "live-e2e.regress.short.run-w11-s05",
+      "status": "pass",
+      "summary_file": "regress-short.run-summary.json",
+      "scorecard_file": "regress-short.scorecard.json",
+      "live_run_events_file": "regress-short.live-run-events.jsonl",
+      "learning_loop_handoff_file": "regress-short.learning-loop-handoff.json",
+      "learning_loop_scorecard_file": "regress-short.learning-loop-scorecard.json"
+    },
+    {
+      "profile_id": "live-e2e.release.short",
+      "scenario_id": "ky-release-short",
+      "run_id": "live-e2e.release.short.run-w11-s05",
+      "status": "pass",
+      "summary_file": "release-short.run-summary.json",
+      "scorecard_file": "release-short.scorecard.json",
+      "live_run_events_file": "release-short.live-run-events.jsonl",
+      "delivery_transcript_file": "release-short.delivery-transcript.json",
+      "delivery_manifest_file": "release-short.delivery-manifest.json",
+      "release_packet_file": "release-short.release-packet.json",
+      "delivery_patch_file": null,
+      "incident_report_file": null,
+      "learning_loop_handoff_file": "release-short.learning-loop-handoff.json",
+      "learning_loop_scorecard_file": "release-short.learning-loop-scorecard.json",
+      "delivery_learning_loop_scorecard_file": "release-short.delivery-learning-loop-scorecard.json"
+    }
+  ],
+  "acceptance_alignment": {
+    "target_checkout_backed": true,
+    "routed_live_adapter_evidence": true,
+    "target_root_delivery_lineage": true,
+    "ready_for_w10_s05_closure": true
+  }
+}

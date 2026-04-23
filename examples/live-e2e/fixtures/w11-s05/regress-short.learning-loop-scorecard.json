@@ -1,0 +1,41 @@
+{
+  "scorecard_id": "live-e2e.regress.short.run-w11-s05.learning-loop.scorecard.v1",
+  "project_id": "aor-core",
+  "run_id": "live-e2e.regress.short.run-w11-s05",
+  "source_kind": "live-e2e",
+  "status": "pass",
+  "summary": "Live E2E run 'live-e2e.regress.short.run-w11-s05' completed with status 'pass'.",
+  "evidence_refs": [
+    "evidence://.aor/projects/aor-core/reports/live-e2e-run-summary-live-e2e.regress.short.run-w11-s05.json",
+    "evidence://.aor/projects/aor-core/reports/live-e2e-scorecard-target-live-e2e.regress.short.run-w11-s05.json",
+    "evidence://.aor/projects/aor-core/state/project-init-state.json",
+    "evidence://.aor/projects/aor-core/state/live-e2e-generated/project-profile-live-e2e.regress.short.run-w11-s05.json",
+    "evidence://.aor/projects/github-sandbox.run.live-e2e.regress.short.run-w11-s05/reports/project-analysis-report.json",
+    "evidence://.aor/projects/github-sandbox.run.live-e2e.regress.short.run-w11-s05/reports/validation-report.json",
+    "evidence://.aor/projects/github-sandbox.run.live-e2e.regress.short.run-w11-s05/reports/policy-resolution-report.json",
+    "evidence://.aor/projects/github-sandbox.run.live-e2e.regress.short.run-w11-s05/reports/verify-summary.json",
+    "evidence://.aor/projects/github-sandbox.run.live-e2e.regress.short.run-w11-s05/reports/step-result-1.json",
+    "evidence://.aor/projects/github-sandbox.run.live-e2e.regress.short.run-w11-s05/reports/step-result-2.json",
+    "evidence://.aor/projects/github-sandbox.run.live-e2e.regress.short.run-w11-s05/reports/step-result-routed-live-e2e.regress.short.run-w11-s05.routed.implement.implement.attempt.1.json",
+    "evidence://compiled-context://compiled-context.github-sandbox.run.live-e2e.regress.short.run-w11-s05.live-e2e.regress.short.run-w11-s05.routed.implement.implement.attempt.1.runner-default",
+    "evidence://.aor/projects/github-sandbox.run.live-e2e.regress.short.run-w11-s05/reports/compiled-context-live-e2e.regress.short.run-w11-s05.routed.implement.implement.attempt.1.json",
+    "evidence:///Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/github-sandbox.run.live-e2e.regress.short.run-w11-s05/reports/adapter-live-raw-codex-cli-live-e2e-regress-short-run-w11-s05-routed-implement-live-e2e-regress-short-run-w11-s05-step-implement-request-1776954865563-1776954866656.json",
+    "evidence://.aor/projects/aor-core/reports/evaluation-report-suite.regress.short-v1-1776954866686.json",
+    "evidence://.aor/projects/aor-core/target-checkouts/target-live-e2e.regress.short.run-w11-s05",
+    "evidence://examples/project.github.aor.yaml",
+    "evidence://.aor/projects/github-sandbox.run.live-e2e.regress.short.run-w11-s05/reports/route-resolution-report.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://.aor/projects/aor-core/reports/live-e2e-scorecard-target-live-e2e.regress.short.run-w11-s05.json"
+  ],
+  "linked_eval_suite_refs": [
+    "suite.regress.short@v1"
+  ],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/wave-5-implementation-slices.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "generated_at": "2026-04-23T14:34:26.688Z"
+}
