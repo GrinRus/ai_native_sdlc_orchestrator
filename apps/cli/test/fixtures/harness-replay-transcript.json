@@ -1,0 +1,6 @@
+{
+  "command": "harness replay",
+  "status": "implemented",
+  "harness_replay_status": "pass",
+  "harness_replay_compatible": true
+}

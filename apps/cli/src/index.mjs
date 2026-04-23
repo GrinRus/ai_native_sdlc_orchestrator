@@ -34,6 +34,7 @@ import {
   normalizeDeliveryMode,
 } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
 import { runEvaluationSuite } from "../../../packages/orchestrator-core/src/eval-runner.mjs";
+import { replayHarnessCapture } from "../../../packages/orchestrator-core/src/harness-capture-replay.mjs";
 import { applyIncidentRecertification } from "../../../packages/observability/src/index.mjs";
 import { resolveStepPolicyForStep } from "../../../packages/orchestrator-core/src/policy-resolution.mjs";
 import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
@@ -131,6 +132,8 @@ function formatCommandHelp(definition) {
   const statusLine =
     definition.command === "eval run"
       ? "Status: implemented in quality shell (W3-S03)"
+      : definition.command === "harness replay"
+        ? "Status: implemented in quality shell (W9-S05)"
       : definition.command === "harness certify"
         ? "Status: implemented in quality shell (W3-S05)"
       : definition.command === "intake create" ||
@@ -211,6 +214,14 @@ function formatCommandHelp(definition) {
             "- Freeze transitions require explicit regression evidence before rollout action becomes 'freeze'.",
             "- Context asset promotions require with-context vs without-context comparison and immutable provenance evidence.",
             "- Status semantics are pass, hold, or fail.",
+            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+          ]
+      : definition.command === "harness replay"
+        ? [
+            "- --capture-file points to an existing harness-capture-*.json artifact.",
+            "- Replay performs compatibility checks against current route/wrapper/prompt/policy/adapter resolution.",
+            "- Compatible captures replay eval scoring; incompatible captures persist status='incompatible' with explicit blocked_next_step guidance.",
+            "- Replay writes one durable harness-replay-*.json report under runtime reports root.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
           ]
       : definition.command === "handoff prepare"
@@ -778,6 +789,13 @@ function executeImplementedCommand(command, flags, cwd) {
   let evaluationBlocking = null;
   let evaluationSuiteRef = null;
   let evaluationSubjectRef = null;
+  let harnessReplayId = null;
+  let harnessReplayFile = null;
+  let harnessReplayStatus = null;
+  let harnessReplayCompatible = null;
+  let harnessReplayBlockedNextStep = null;
+  let harnessReplayEvidenceRefs = null;
+  let harnessReplayEvaluationReportFile = null;
   let promotionDecisionId = null;
   let promotionDecisionFile = null;
   let promotionDecisionStatus = null;
@@ -1085,6 +1103,29 @@ function executeImplementedCommand(command, flags, cwd) {
     evaluationBlocking = evalResult.blocking;
     evaluationSuiteRef = evalResult.suiteRef;
     evaluationSubjectRef = evalResult.subjectRef;
+  } else if (command === "harness replay") {
+    ensureRequiredFlags(command, flags);
+
+    const replayResult = replayHarnessCapture({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      capturePath: /** @type {string} */ (resolveOptionalStringFlag("capture-file", flags["capture-file"])),
+    });
+
+    resolvedProjectRef = replayResult.projectRoot;
+    resolvedRuntimeRoot = replayResult.runtimeRoot;
+    runtimeLayout = replayResult.runtimeLayout;
+    runtimeStateFile = replayResult.stateFile;
+    projectProfileRef = replayResult.projectProfileRef;
+    harnessReplayId = replayResult.replayReport.replay_id;
+    harnessReplayFile = replayResult.replayReportPath;
+    harnessReplayStatus = replayResult.replayReport.status;
+    harnessReplayCompatible = replayResult.replayReport.compatibility.compatible === true;
+    harnessReplayBlockedNextStep = replayResult.replayReport.blocked_next_step;
+    harnessReplayEvidenceRefs = replayResult.replayReport.evidence_refs;
+    harnessReplayEvaluationReportFile = replayResult.replayEvaluationReportPath;
   } else if (command === "harness certify") {
     ensureRequiredFlags(command, flags);
 
@@ -2333,6 +2374,13 @@ function executeImplementedCommand(command, flags, cwd) {
     evaluation_blocking: evaluationBlocking,
     evaluation_suite_ref: evaluationSuiteRef,
     evaluation_subject_ref: evaluationSubjectRef,
+    harness_replay_id: harnessReplayId,
+    harness_replay_file: harnessReplayFile,
+    harness_replay_status: harnessReplayStatus,
+    harness_replay_compatible: harnessReplayCompatible,
+    harness_replay_blocked_next_step: harnessReplayBlockedNextStep,
+    harness_replay_evidence_refs: harnessReplayEvidenceRefs,
+    harness_replay_evaluation_report_file: harnessReplayEvaluationReportFile,
     promotion_decision_id: promotionDecisionId,
     promotion_decision_file: promotionDecisionFile,
     promotion_decision_status: promotionDecisionStatus,

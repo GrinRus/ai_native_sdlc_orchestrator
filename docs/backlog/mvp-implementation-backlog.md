@@ -107,8 +107,8 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W9-S01 | Run-scoped routed evidence durability bugfix | EPIC-3 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/architecture/**` | W8-S08 |
 | W9-S02 | Current-state documentation drift repair | EPIC-0 | done | `README.md`, `docs/architecture/00-repo-layout.md`, `docs/architecture/03-technical-stack.md`, `docs/backlog/**` | none |
-| W9-S03 | Control-plane API contract/runtime alignment | EPIC-6 | ready | `docs/contracts/control-plane-api.md`, `apps/api`, `apps/web`, `docs/architecture/**` | W8-S04 |
-| W9-S04 | Machine-checkable control-plane API contract coverage | EPIC-6 | blocked | `docs/contracts/control-plane-api.md`, `packages/contracts`, `examples/**`, `apps/api` | W9-S03 |
+| W9-S03 | Control-plane API contract/runtime alignment | EPIC-6 | done | `docs/contracts/control-plane-api.md`, `apps/api`, `apps/web`, `docs/architecture/**` | W8-S04 |
+| W9-S04 | Machine-checkable control-plane API contract coverage | EPIC-6 | ready | `docs/contracts/control-plane-api.md`, `packages/contracts`, `examples/**`, `apps/api` | W9-S03 |
 | W9-S05 | Public harness replay command surface | EPIC-4 | ready | `apps/cli`, `packages/orchestrator-core`, `docs/architecture/**`, `docs/ops/**` | W3-S04, W8-S05 |
 | W9-S06 | Asset promote/freeze command surface completion | EPIC-4 | ready | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`, `examples/eval/**` | W7-S02, W8-S09 |
 | W9-S07 | Detached HTTP control-plane transport baseline | EPIC-6 | blocked | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**` | W9-S03, W9-S04 |

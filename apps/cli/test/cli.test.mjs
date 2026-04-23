@@ -86,6 +86,16 @@ test("eval run help documents quality-shell status and offline semantics", () =>
   assert.match(result.stdout, /Eval run is offline and independent from delivery automation\./);
 });
 
+test("harness replay help documents replay semantics and incompatibility guidance", () => {
+  const result = invokeCli(["harness", "replay", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in quality shell \(W9-S05\)/);
+  assert.match(result.stdout, /--capture-file points to an existing harness-capture-\*\.json artifact\./);
+  assert.match(result.stdout, /status='incompatible'/);
+});
+
 test("harness certify help documents certification semantics", () => {
   const result = invokeCli(["harness", "certify", "--help"]);
 
@@ -199,11 +209,11 @@ test("invalid project-ref fails clearly", () => {
 });
 
 test("planned commands report not implemented status", () => {
-  const result = invokeCli(["harness", "replay"]);
+  const result = invokeCli(["asset", "promote"]);
 
   assert.equal(result.exitCode, 1);
   assert.equal(result.stdout, "");
-  assert.match(result.stderr, /Command 'aor harness replay' is planned and not implemented yet\./);
+  assert.match(result.stderr, /Command 'aor asset promote' is planned and not implemented yet\./);
 });
 
 test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () => {
@@ -1775,6 +1785,123 @@ test("eval run executes offline suite and persists evaluation report", () => {
       evaluation_subject_ref: parsed.evaluation_subject_ref,
     };
     assert.deepEqual(smokeSubset, smokeFixture);
+  });
+});
+
+test("harness replay replays a capture and writes durable replay evidence", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const fixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "harness-replay-transcript.json"), "utf8"),
+    );
+
+    const certifyResult = invokeCli([
+      "harness",
+      "certify",
+      "--project-ref",
+      projectRoot,
+      "--asset-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--subject-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--suite-ref",
+      "suite.cert.core@v4",
+      "--step-class",
+      "implement",
+    ]);
+    assert.equal(certifyResult.exitCode, 0, certifyResult.stderr);
+    const certifyPayload = JSON.parse(certifyResult.stdout);
+
+    const replayResult = invokeCli([
+      "harness",
+      "replay",
+      "--project-ref",
+      projectRoot,
+      "--capture-file",
+      certifyPayload.certification_harness_capture_file,
+    ]);
+
+    assert.equal(replayResult.exitCode, 0, replayResult.stderr);
+    const replayPayload = JSON.parse(replayResult.stdout);
+    assert.equal(typeof replayPayload.harness_replay_id, "string");
+    assert.equal(replayPayload.harness_replay_status, "pass");
+    assert.equal(replayPayload.harness_replay_compatible, true);
+    assert.equal(fs.existsSync(replayPayload.harness_replay_file), true);
+    assert.equal(fs.existsSync(replayPayload.harness_replay_evaluation_report_file), true);
+    assert.ok(Array.isArray(replayPayload.harness_replay_evidence_refs));
+    assert.equal(replayPayload.harness_replay_evidence_refs.length > 0, true);
+
+    const transcriptSubset = {
+      command: replayPayload.command,
+      status: replayPayload.status,
+      harness_replay_status: replayPayload.harness_replay_status,
+      harness_replay_compatible: replayPayload.harness_replay_compatible,
+    };
+    assert.deepEqual(transcriptSubset, fixture);
+  });
+});
+
+test("harness replay reports incompatible captures with explicit blocked-next-step guidance", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const reportFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "harness-replay-report.fixture.json"), "utf8"),
+    );
+
+    const certifyResult = invokeCli([
+      "harness",
+      "certify",
+      "--project-ref",
+      projectRoot,
+      "--asset-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--subject-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--suite-ref",
+      "suite.cert.core@v4",
+      "--step-class",
+      "implement",
+    ]);
+    assert.equal(certifyResult.exitCode, 0, certifyResult.stderr);
+    const certifyPayload = JSON.parse(certifyResult.stdout);
+
+    const capture = JSON.parse(fs.readFileSync(certifyPayload.certification_harness_capture_file, "utf8"));
+    capture.compatibility.route_id = "route://mismatched-route@v0";
+    fs.writeFileSync(
+      certifyPayload.certification_harness_capture_file,
+      `${JSON.stringify(capture, null, 2)}\n`,
+      "utf8",
+    );
+
+    const replayResult = invokeCli([
+      "harness",
+      "replay",
+      "--project-ref",
+      projectRoot,
+      "--capture-file",
+      certifyPayload.certification_harness_capture_file,
+    ]);
+
+    assert.equal(replayResult.exitCode, 0, replayResult.stderr);
+    const replayPayload = JSON.parse(replayResult.stdout);
+    assert.equal(replayPayload.harness_replay_status, "incompatible");
+    assert.equal(replayPayload.harness_replay_compatible, false);
+    assert.equal(fs.existsSync(replayPayload.harness_replay_file), true);
+    assert.equal(replayPayload.harness_replay_evaluation_report_file, null);
+
+    const replayReport = JSON.parse(fs.readFileSync(replayPayload.harness_replay_file, "utf8"));
+    const reportSubset = {
+      status: replayReport.status,
+      compatibility: {
+        compatible: replayReport.compatibility.compatible,
+      },
+      blocked_next_step: replayReport.blocked_next_step,
+    };
+    assert.deepEqual(reportSubset, reportFixture);
   });
 });
 

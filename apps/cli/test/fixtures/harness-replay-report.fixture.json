@@ -1,0 +1,7 @@
+{
+  "status": "incompatible",
+  "compatibility": {
+    "compatible": false
+  },
+  "blocked_next_step": "Refresh harness capture from current route/wrapper/policy/adapter versions and replay again."
+}

@@ -29,6 +29,11 @@ Use `replayHarnessCapture(...)` to:
 3. reject replay explicitly with `status: incompatible` when drift is detected;
 4. rerun eval scoring only when compatibility passes.
 
+CLI surface (`W9-S05`):
+- `aor harness replay --project-ref <path> --capture-file <path>`
+- writes one durable `harness-replay-*.json` artifact under runtime reports;
+- reports explicit incompatibility guidance in `harness_replay_blocked_next_step` when replay is blocked.
+
 ## Minimum evidence bar for promotion decisions
 A promotion decision can move an asset from `candidate` to `stable` only when all required evidence exists:
 - one evaluation report for the certification suite (`evaluation-report-*.json`);

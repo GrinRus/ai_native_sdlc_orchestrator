@@ -66,7 +66,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 4. Add or extend consistency checks where repo-entry drift can be validated automatically.
 
 ### Acceptance criteria
-1. `README.md` reflects the actual backlog queue state and the current `31 implemented / 3 planned` command surface.
+1. `README.md` reflects the actual backlog queue state and the current implemented/planned command-surface counts from `apps/cli/src/command-catalog.mjs`.
 2. Architecture overview docs no longer describe implemented apps/packages as merely planned.
 3. Technical-stack language clearly distinguishes target design from current runtime/scaffold reality.
 4. Updated docs stay consistent with the backlog, command catalog, and root checks.
@@ -84,7 +84,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 
 ## W9-S03 — Control-plane API contract/runtime alignment
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Align control-plane API docs with the current in-process module surface and make future detached HTTP transport explicit rather than implied.
 - **Primary modules:** `docs/contracts/control-plane-api.md`, `apps/api`, `apps/web`, `docs/architecture/**`
 - **Hard dependencies:** W8-S04
@@ -115,7 +115,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 
 ## W9-S04 — Machine-checkable control-plane API contract coverage
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Replace the narrative-only control-plane API limitation with loader-covered operation/response contract shapes.
 - **Primary modules:** `docs/contracts/control-plane-api.md`, `packages/contracts`, `examples/**`, `apps/api`
 - **Hard dependencies:** W9-S03

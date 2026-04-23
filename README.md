@@ -123,19 +123,18 @@ At a high level, AOR is intended to work like this:
 
 ## Command surface status
 
-The CLI command surface currently includes **31 implemented** commands and **3 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
+The CLI command surface currently includes **32 implemented** commands and **2 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
 
 Implemented command groups:
 - project lifecycle: `project init`, `project analyze`, `project validate`, `project verify`;
 - intake/discovery/spec/wave: `intake create`, `discovery run`, `spec build`, `wave create`;
 - run control and monitoring: `run start`, `run pause`, `run resume`, `run steer`, `run cancel`, `run status`;
-- quality and handoff: `eval run`, `harness certify`, `handoff prepare`, `handoff approve`;
+- quality and handoff: `eval run`, `harness replay`, `harness certify`, `handoff prepare`, `handoff approve`;
 - delivery/release and operator reads: `deliver prepare`, `release prepare`, `packet show`, `evidence show`;
 - incidents and audit: `incident open`, `incident recertify`, `incident show`, `audit runs`;
 - UI and live rehearsal: `ui attach`, `ui detach`, `live-e2e start`, `live-e2e status`, `live-e2e report`.
 
 Planned commands:
-- `harness replay`
 - `asset promote`
 - `asset freeze`
 
