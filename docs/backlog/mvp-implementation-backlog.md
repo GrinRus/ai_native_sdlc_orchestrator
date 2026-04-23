@@ -126,7 +126,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W11 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W11-S01 | Source-of-truth reality repair | EPIC-0 | ready | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**` | none |
+| W11-S01 | Source-of-truth reality repair | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**` | none |
 | W11-S02 | Target workspace materialization for live E2E | EPIC-7 | blocked | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S01 |
 | W11-S03 | Profile-driven preflight and routed live execution | EPIC-3 | blocked | `apps/cli`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S02 |
 | W11-S04 | Target-anchored delivery and release evidence | EPIC-5 | blocked | `apps/cli`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S03 |

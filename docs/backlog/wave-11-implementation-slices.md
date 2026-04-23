@@ -20,7 +20,7 @@ Close the reopened target-catalog proof gap by making standard live E2E target-b
 
 ## W11-S01 — Source-of-truth reality repair
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Align current-state backlog, README, and related planning surfaces with the verified repository behavior so the repo no longer overclaims target-backed proof or live multi-runner support.
 - **Primary modules:** `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**`
 - **Hard dependencies:** none
