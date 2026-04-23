@@ -64,6 +64,8 @@ deferred_transport:
     - GET /api/projects/:projectId/runs/:runId/events/history
     - GET /api/projects/:projectId/runs/:runId/policy-history
     - GET /api/projects/:projectId/runs/:runId/events
+    - POST /api/projects/:projectId/run-control/actions
+    - POST /api/projects/:projectId/ui-lifecycle/actions
   out_of_scope:
-    - mutation-command endpoint parity for full CLI surface
+    - mutation-command endpoint parity for full CLI surface beyond run-control and ui-lifecycle baseline
     - production authn/authz policy envelope

@@ -1,4 +1,7 @@
 import {
+  applyRunControlAction,
+  attachUiLifecycle,
+  detachUiLifecycle,
   listDeliveryManifests,
   listPacketArtifacts,
   listPromotionDecisions,
@@ -90,6 +93,42 @@ async function readControlPlaneJson(options) {
     throw new Error(`Control-plane request failed (${response.status}) for '${url}': ${message || response.statusText}`);
   }
   return response.json();
+}
+
+/**
+ * @param {{
+ *   controlPlane: string,
+ *   pathname: string,
+ *   body: Record<string, unknown>,
+ * }} options
+ */
+async function writeControlPlaneJson(options) {
+  const url = buildControlPlaneUrl(options);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json; charset=utf-8",
+    },
+    body: JSON.stringify(options.body),
+  });
+
+  const raw = await response.text();
+  let payload = {};
+  if (raw.trim().length > 0) {
+    try {
+      payload = /** @type {Record<string, unknown>} */ (JSON.parse(raw));
+    } catch {
+      throw new Error(`Control-plane mutation returned invalid JSON (${response.status}) for '${url}'.`);
+    }
+  }
+
+  if (!response.ok) {
+    const errorPayload = asRecord(asRecord(payload).error);
+    const message = asString(errorPayload.message) ?? (raw.trim().length > 0 ? raw.trim() : response.statusText);
+    throw new Error(`Control-plane mutation failed (${response.status}) for '${url}': ${message}`);
+  }
+  return payload;
 }
 
 /**
@@ -242,6 +281,163 @@ function resolveControlPlaneUrl(options) {
 }
 
 /**
+ * @param {ReturnType<typeof applyRunControlAction>} result
+ * @returns {Record<string, unknown>}
+ */
+function toRunControlMutationPayload(result) {
+  return {
+    action: result.action,
+    run_id: result.runId,
+    blocked: result.blocked,
+    blocked_reason: result.blockedReason ?? null,
+    applied: result.applied,
+    transition: result.transition,
+    guardrails: result.guardrails,
+    state: result.state,
+    state_file: result.stateFile,
+    audit_id: result.auditRecord.audit_id,
+    audit_file: result.auditFile,
+    primary_event_id: result.primaryEvent.event_id,
+    evidence_event_id: result.evidenceEvent.event_id,
+    stream_log_file: result.streamLogFile,
+    next_actions: result.nextActions,
+  };
+}
+
+/**
+ * @param {ReturnType<typeof attachUiLifecycle> | ReturnType<typeof detachUiLifecycle>} result
+ * @returns {Record<string, unknown>}
+ */
+function toUiLifecycleMutationPayload(result) {
+  return {
+    action: result.action,
+    idempotent: result.idempotent,
+    connection_state: asString(result.state.connection_state) ?? "detached",
+    headless_safe: result.state.headless_safe === true,
+    state: result.state,
+    state_file: result.stateFile,
+  };
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef: string,
+ *   runtimeRoot?: string,
+ *   controlPlane?: string,
+ *   runId?: string,
+ *   action: "start" | "pause" | "resume" | "steer" | "cancel",
+ *   targetStep?: string,
+ *   reason?: string,
+ *   approvalRef?: string,
+ * }} options
+ */
+export async function applyOperatorRunControl(options) {
+  const requestedControlPlane = asString(options.controlPlane);
+  const uiLifecycle = readUiLifecycleState(options);
+  const connectedControlPlane = resolveControlPlaneUrl({
+    requestedControlPlane,
+    uiLifecycleState: uiLifecycle.state,
+  });
+
+  if (connectedControlPlane) {
+    const projectState = readProjectState(options);
+    const payload = await writeControlPlaneJson({
+      controlPlane: connectedControlPlane,
+      pathname: `/api/projects/${encodeURIComponent(projectState.project_id)}/run-control/actions`,
+      body: {
+        action: options.action,
+        run_id: options.runId ?? null,
+        target_step: options.targetStep ?? null,
+        reason: options.reason ?? null,
+        approval_ref: options.approvalRef ?? null,
+      },
+    });
+    return {
+      binding_mode: "detached-http-mutation",
+      control_plane: connectedControlPlane,
+      run_control: asRecord(payload).run_control ?? {},
+    };
+  }
+
+  const result = applyRunControlAction({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    runtimeRoot: options.runtimeRoot,
+    runId: options.runId,
+    action: options.action,
+    targetStep: options.targetStep,
+    reason: options.reason,
+    approvalRef: options.approvalRef,
+  });
+
+  return {
+    binding_mode: "module-in-process",
+    control_plane: null,
+    run_control: toRunControlMutationPayload(result),
+  };
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef: string,
+ *   runtimeRoot?: string,
+ *   controlPlane?: string,
+ *   runId?: string,
+ *   action: "attach" | "detach",
+ * }} options
+ */
+export async function applyOperatorUiLifecycle(options) {
+  const requestedControlPlane = asString(options.controlPlane);
+  const uiLifecycle = readUiLifecycleState(options);
+  const connectedControlPlane = resolveControlPlaneUrl({
+    requestedControlPlane,
+    uiLifecycleState: uiLifecycle.state,
+  });
+
+  if (connectedControlPlane) {
+    const projectState = readProjectState(options);
+    const payload = await writeControlPlaneJson({
+      controlPlane: connectedControlPlane,
+      pathname: `/api/projects/${encodeURIComponent(projectState.project_id)}/ui-lifecycle/actions`,
+      body: {
+        action: options.action,
+        run_id: options.runId ?? null,
+        control_plane: options.action === "attach" ? connectedControlPlane : null,
+      },
+    });
+    return {
+      binding_mode: "detached-http-mutation",
+      control_plane: connectedControlPlane,
+      ui_lifecycle: asRecord(payload).ui_lifecycle ?? {},
+    };
+  }
+
+  const result =
+    options.action === "attach"
+      ? attachUiLifecycle({
+          cwd: options.cwd,
+          projectRef: options.projectRef,
+          runtimeRoot: options.runtimeRoot,
+          runId: options.runId,
+          controlPlane: requestedControlPlane ?? undefined,
+        })
+      : detachUiLifecycle({
+          cwd: options.cwd,
+          projectRef: options.projectRef,
+          runtimeRoot: options.runtimeRoot,
+          runId: options.runId,
+        });
+
+  return {
+    binding_mode: "module-in-process",
+    control_plane: null,
+    ui_lifecycle: toUiLifecycleMutationPayload(result),
+  };
+}
+
+/**
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
@@ -319,6 +515,12 @@ export async function buildOperatorConsoleSnapshot(options) {
           "GET /api/projects/:projectId/runs/:runId/events/history",
           "GET /api/projects/:projectId/runs/:runId/policy-history",
         ],
+        mutation_model: [
+          "MODULE run-control.apply (start|pause|resume|steer|cancel)",
+          "MODULE ui-lifecycle.attach",
+          "MODULE ui-lifecycle.detach",
+        ],
+        mutation_error_shapes: ["run_control.blocked", "invalid_payload"],
         live_stream: "GET /api/projects/:projectId/runs/:runId/events",
         event_contract_family: "live-run-event",
       },
@@ -427,6 +629,11 @@ export async function buildOperatorConsoleSnapshot(options) {
         "GET /api/projects/:projectId/runs/:runId/events/history",
         "GET /api/projects/:projectId/runs/:runId/policy-history",
       ],
+      mutation_model: [
+        "POST /api/projects/:projectId/run-control/actions",
+        "POST /api/projects/:projectId/ui-lifecycle/actions",
+      ],
+      mutation_error_shapes: ["invalid_json", "invalid_payload", "invalid_run_control_action", "run_control.blocked"],
       live_stream: "GET /api/projects/:projectId/runs/:runId/events",
       event_contract_family: "live-run-event",
     },

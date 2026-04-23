@@ -26,7 +26,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Platform assets | `adapter-capability-profile.md` | `adapter-capability-profile` | `examples/adapters/*.yaml` | implemented | Required fields + top-level type checks, including deterministic `mock-runner` baseline profile. |
 | Operations | `live-run-event.md` | `live-run-event` | none | implemented | Contract is loader-covered with closed-set `event_type` validation; no YAML example in this repo yet. |
 | Operations | `live-e2e-profile.md` | `live-e2e-profile` | `examples/live-e2e/*.yaml` | implemented | Required fields + top-level type checks, including `preflight` no-write shape. |
-| Operations | `control-plane-api.md` | `control-plane-api` | `examples/control-plane-api/*.yaml` | implemented | Loader validates the hybrid module + detached HTTP/SSE baseline for read/follow operation families. |
+| Operations | `control-plane-api.md` | `control-plane-api` | `examples/control-plane-api/*.yaml` | implemented | Loader validates the hybrid module + detached HTTP/SSE baseline for read/follow plus bounded run-control/ui-lifecycle mutation families. |
 
 ## Reference integrity and compatibility checks (W3-S01)
 

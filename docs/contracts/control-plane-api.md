@@ -143,7 +143,7 @@ Context lifecycle read baseline (W8-S09):
 
 UI lifecycle payload baseline:
 - `run_id` (optional operator context);
-- `control_plane` (optional connected-mode reference for future detached transport).
+- `control_plane` (optional connected-mode reference for detached transport routing).
 
 UI lifecycle response baseline:
 - `ui_attached` boolean;
@@ -167,9 +167,9 @@ Reconnect and backpressure baseline:
 - bounded replay window (do not allow unbounded buffers);
 - preserve monotonic per-run event ordering via payload sequence.
 
-## Detached HTTP transport baseline (W9-S07)
+## Detached HTTP transport baseline (W10-S03)
 
-Connected-mode transport mapping is implemented for read/follow baseline:
+Connected-mode transport mapping is implemented for read, follow, and bounded mutation baseline:
 - `GET /api/projects/:projectId/state`
 - `GET /api/projects/:projectId/strategic-snapshot`
 - `GET /api/projects/:projectId/packets`
@@ -181,14 +181,30 @@ Connected-mode transport mapping is implemented for read/follow baseline:
 - `GET /api/projects/:projectId/runs/:runId/events/history`
 - `GET /api/projects/:projectId/runs/:runId/policy-history`
 - `GET /api/projects/:projectId/runs/:runId/events` (SSE + replay parameters).
+- `POST /api/projects/:projectId/run-control/actions`
+- `POST /api/projects/:projectId/ui-lifecycle/actions`
+
+Detached mutation payload baseline:
+- run-control payload fields: `action`, `run_id`, `target_step`, `reason`, `approval_ref`;
+- run-control response reuses module parity fields: `state_file`, `audit_file`, guardrail decision, transition, live event ids;
+- blocked run-control transitions return `409` with `{ error: { code, message }, run_control }` while still persisting audit and lifecycle artifacts;
+- ui lifecycle payload fields: `action`, `run_id`, `control_plane`;
+- ui lifecycle response reuses module parity fields: `state_file`, `connection_state`, `headless_safe`, `idempotent`.
+
+Detached mutation error-shape baseline:
+- `invalid_json` for malformed request body;
+- `invalid_payload` for non-object JSON payload;
+- `invalid_run_control_action` and `invalid_ui_lifecycle_action` for unsupported actions;
+- `run_control.blocked` family codes for policy or transition blocking branches.
 
 Deferred beyond this baseline:
-- mutation-command HTTP endpoint parity for full CLI surface;
+- mutation-command HTTP endpoint parity for the full CLI surface outside the supported run-control and UI lifecycle actions;
 - production authn/authz and deployment hardening.
 
-## API/UI alignment notes (W5-S04 + W9-S03)
+## API/UI alignment notes (W5-S04 + W9-S03 + W10-S03)
 
 - The detachable web console reads run/evidence state through detached HTTP/SSE when `control_plane` is configured and connected.
+- Connected-mode web mutation actions for run-control and UI lifecycle route through detached HTTP mutation endpoints.
 - Headless/disconnected web operation remains module-backed and in-process.
 - Detach behavior is UI-local only: detaching unsubscribes the web listener while runtime artifacts stay owned by orchestrator runtime.
 - Connected-mode fallback and headless-safe semantics remain explicit through `ui-lifecycle` state.

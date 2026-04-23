@@ -11,7 +11,10 @@ aor ui attach \
   --control-plane http://localhost:8080
 ```
 
-Note: when a reachable `--control-plane` URL is provided, connected mode reads/follow use the detached HTTP/SSE transport baseline. Without it, attach remains disconnected/read-model mode while headless workflows stay available.
+Note: when a reachable `--control-plane` URL is provided, connected mode uses detached transport for:
+- read/follow (`GET` + SSE);
+- bounded mutation actions (`POST /api/projects/:projectId/run-control/actions` and `POST /api/projects/:projectId/ui-lifecycle/actions`).
+Without a control-plane URL, attach remains disconnected/read-model mode while headless workflows stay available.
 
 Disconnected/read-model attach (no control-plane URL):
 ```bash
@@ -58,3 +61,27 @@ Expected smoke outcome:
 - JSON summary reports `mode=detachable-web-console` and `detached=true`;
 - rendered HTML exists under `.aor/web/`;
 - run/evidence read surfaces stay available with UI detached.
+
+## Detached mutation smoke (optional)
+Run-control mutation over detached transport:
+```bash
+curl -sS \
+  -X POST \
+  -H "content-type: application/json" \
+  -d '{"action":"start","run_id":"RUN-201"}' \
+  http://127.0.0.1:8080/api/projects/<PROJECT_ID>/run-control/actions
+```
+
+UI lifecycle detach over detached transport:
+```bash
+curl -sS \
+  -X POST \
+  -H "content-type: application/json" \
+  -d '{"action":"detach","run_id":"RUN-201"}' \
+  http://127.0.0.1:8080/api/projects/<PROJECT_ID>/ui-lifecycle/actions
+```
+
+Mutation error-shape checks:
+- malformed JSON returns `error.code: "invalid_json"`;
+- unsupported action returns `error.code: "invalid_run_control_action"` or `error.code: "invalid_ui_lifecycle_action"`;
+- policy/transition block returns HTTP `409` with `error.code` in the `run_control.blocked` family and a durable `run_control.audit_file`.

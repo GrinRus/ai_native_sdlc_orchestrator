@@ -1,0 +1,102 @@
+{
+  "fixture_id": "w10-s03.detached-mutation.connected-mode.v1",
+  "slice_id": "W10-S03",
+  "binding_mode": "detached-http-sse-and-mutation",
+  "project_id": "sample.project",
+  "control_plane": "http://127.0.0.1:8080",
+  "run_id": "run.http.transport.mutation.v1",
+  "steps": [
+    {
+      "request": {
+        "method": "POST",
+        "path": "/api/projects/sample.project/run-control/actions",
+        "payload": {
+          "action": "start",
+          "run_id": "run.http.transport.mutation.v1",
+          "reason": "http transport mutation smoke"
+        }
+      },
+      "response": {
+        "status": 200,
+        "run_control": {
+          "action": "start",
+          "run_id": "run.http.transport.mutation.v1",
+          "blocked": false,
+          "state": {
+            "status": "running"
+          }
+        }
+      },
+      "evidence": {
+        "state_file": ".aor/state/run-control-state-run-http-transport-mutation-v1.json",
+        "audit_file": ".aor/reports/run-control-event-run-http-transport-mutation-v1-0001.json"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/api/projects/sample.project/run-control/actions",
+        "payload": {
+          "action": "cancel",
+          "run_id": "run.http.transport.mutation.v1"
+        }
+      },
+      "response": {
+        "status": 409,
+        "error": {
+          "code": "approval.required"
+        },
+        "run_control": {
+          "action": "cancel",
+          "blocked": true
+        }
+      },
+      "evidence": {
+        "audit_file": ".aor/reports/run-control-event-run-http-transport-mutation-v1-0002.json"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/api/projects/sample.project/ui-lifecycle/actions",
+        "payload": {
+          "action": "attach",
+          "run_id": "run.http.transport.mutation.v1",
+          "control_plane": "http://127.0.0.1:8080"
+        }
+      },
+      "response": {
+        "status": 200,
+        "ui_lifecycle": {
+          "action": "attach",
+          "connection_state": "connected",
+          "headless_safe": true
+        }
+      },
+      "evidence": {
+        "state_file": ".aor/state/ui-lifecycle-state.json"
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/api/projects/sample.project/ui-lifecycle/actions",
+        "payload": {
+          "action": "detach",
+          "run_id": "run.http.transport.mutation.v1"
+        }
+      },
+      "response": {
+        "status": 200,
+        "ui_lifecycle": {
+          "action": "detach",
+          "connection_state": "detached",
+          "headless_safe": true
+        }
+      },
+      "evidence": {
+        "state_file": ".aor/state/ui-lifecycle-state.json"
+      }
+    }
+  ]
+}

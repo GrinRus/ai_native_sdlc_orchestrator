@@ -100,6 +100,21 @@ async function readNextLiveRunEvent(response, options = {}) {
   throw new Error("timed out waiting for live-run-event payload");
 }
 
+/**
+ * @param {string} url
+ * @param {Record<string, unknown>} payload
+ */
+async function postJson(url, payload) {
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json; charset=utf-8",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 test("detached control-plane transport serves read baseline endpoints", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.read.v1";
@@ -237,6 +252,94 @@ test("detached control-plane transport streams follow events through SSE", async
       assert.equal(streamed.event_type, "warning.raised");
       assert.equal(streamed.summary, "Transport follow smoke warning.");
       controller.abort();
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("detached control-plane transport supports bounded run-control and ui-lifecycle mutations", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.transport.mutation.v1";
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const startResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
+        {
+          action: "start",
+          run_id: runId,
+          reason: "http transport mutation smoke",
+        },
+      );
+      assert.equal(startResponse.status, 200);
+      const startPayload = await startResponse.json();
+      assert.equal(startPayload.run_control.action, "start");
+      assert.equal(startPayload.run_control.run_id, runId);
+      assert.equal(startPayload.run_control.blocked, false);
+      assert.equal(startPayload.run_control.state.status, "running");
+      assert.equal(fs.existsSync(startPayload.run_control.audit_file), true);
+      assert.equal(fs.existsSync(startPayload.run_control.state_file), true);
+
+      const blockedResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
+        {
+          action: "cancel",
+          run_id: runId,
+          reason: "cancel without approval should stay blocked",
+        },
+      );
+      assert.equal(blockedResponse.status, 409);
+      const blockedPayload = await blockedResponse.json();
+      assert.equal(blockedPayload.error.code, "approval.required");
+      assert.equal(blockedPayload.run_control.action, "cancel");
+      assert.equal(blockedPayload.run_control.blocked, true);
+      assert.equal(fs.existsSync(blockedPayload.run_control.audit_file), true);
+      assert.equal(fs.existsSync(blockedPayload.run_control.state_file), true);
+
+      const uiAttachResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/ui-lifecycle/actions`,
+        {
+          action: "attach",
+          run_id: runId,
+          control_plane: transport.baseUrl,
+        },
+      );
+      assert.equal(uiAttachResponse.status, 200);
+      const uiAttachPayload = await uiAttachResponse.json();
+      assert.equal(uiAttachPayload.ui_lifecycle.action, "attach");
+      assert.equal(uiAttachPayload.ui_lifecycle.connection_state, "connected");
+      assert.equal(uiAttachPayload.ui_lifecycle.headless_safe, true);
+      assert.equal(fs.existsSync(uiAttachPayload.ui_lifecycle.state_file), true);
+
+      const uiDetachResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/ui-lifecycle/actions`,
+        {
+          action: "detach",
+          run_id: runId,
+        },
+      );
+      assert.equal(uiDetachResponse.status, 200);
+      const uiDetachPayload = await uiDetachResponse.json();
+      assert.equal(uiDetachPayload.ui_lifecycle.action, "detach");
+      assert.equal(uiDetachPayload.ui_lifecycle.connection_state, "detached");
+      assert.equal(uiDetachPayload.ui_lifecycle.headless_safe, true);
+
+      const invalidActionResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
+        {
+          action: "explode",
+          run_id: runId,
+        },
+      );
+      assert.equal(invalidActionResponse.status, 400);
+      const invalidActionPayload = await invalidActionResponse.json();
+      assert.equal(invalidActionPayload.error.code, "invalid_run_control_action");
     } finally {
       await transport.close();
     }

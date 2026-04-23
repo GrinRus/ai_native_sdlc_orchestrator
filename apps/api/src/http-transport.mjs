@@ -1,6 +1,7 @@
 import http from "node:http";
 
 import { openRunEventStream } from "./live-event-stream.mjs";
+import { applyRunControlAction } from "./run-control.mjs";
 import {
   listDeliveryManifests,
   listPacketArtifacts,
@@ -13,11 +14,14 @@ import {
   readRunPolicyHistory,
   readStrategicSnapshot,
 } from "./read-surface.mjs";
+import { attachUiLifecycle, detachUiLifecycle } from "./ui-lifecycle.mjs";
 
 const JSON_HEADERS = Object.freeze({
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
 });
+const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
+const UI_LIFECYCLE_ACTIONS = new Set(["attach", "detach"]);
 
 /**
  * @param {unknown} value
@@ -69,6 +73,79 @@ function sendError(response, statusCode, code, message) {
  */
 function asRecord(value) {
   return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {http.IncomingMessage} request
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function readJsonRequestBody(request) {
+  /** @type {Array<Buffer>} */
+  const chunks = [];
+  for await (const chunk of request) {
+    if (typeof chunk === "string") {
+      chunks.push(Buffer.from(chunk));
+    } else {
+      chunks.push(chunk);
+    }
+  }
+
+  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  if (raw.length === 0) {
+    return {};
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("invalid_json");
+  }
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("invalid_payload");
+  }
+
+  return /** @type {Record<string, unknown>} */ (parsed);
+}
+
+/**
+ * @param {ReturnType<typeof applyRunControlAction>} result
+ * @returns {Record<string, unknown>}
+ */
+function toRunControlResponse(result) {
+  return {
+    action: result.action,
+    run_id: result.runId,
+    blocked: result.blocked,
+    blocked_reason: result.blockedReason ?? null,
+    applied: result.applied,
+    transition: result.transition,
+    guardrails: result.guardrails,
+    state: result.state,
+    state_file: result.stateFile,
+    audit_id: result.auditRecord.audit_id,
+    audit_file: result.auditFile,
+    primary_event_id: result.primaryEvent.event_id,
+    evidence_event_id: result.evidenceEvent.event_id,
+    stream_log_file: result.streamLogFile,
+    next_actions: result.nextActions,
+  };
+}
+
+/**
+ * @param {ReturnType<typeof attachUiLifecycle> | ReturnType<typeof detachUiLifecycle>} result
+ * @returns {Record<string, unknown>}
+ */
+function toUiLifecycleResponse(result) {
+  return {
+    action: result.action,
+    idempotent: result.idempotent,
+    connection_state: asString(result.state.connection_state) ?? "detached",
+    headless_safe: result.state.headless_safe === true,
+    state: result.state,
+    state_file: result.stateFile,
+  };
 }
 
 /**
@@ -159,214 +236,390 @@ export function createControlPlaneHttpServer(options) {
   const state = readProjectState(runtimeOptions);
   const projectId = state.project_id;
 
-  const server = http.createServer((request, response) => {
-    if (request.method !== "GET") {
-      response.setHeader("allow", "GET");
-      sendError(response, 405, "method_not_allowed", "Only GET is supported for detached control-plane baseline.");
-      return;
-    }
+  const server = http.createServer(async (request, response) => {
+    try {
+      const baseOrigin = `http://${request.headers.host ?? `${host}:${port}`}`;
+      const requestUrl = new URL(request.url ?? "/", baseOrigin);
+      const method = request.method ?? "GET";
 
-    const baseOrigin = `http://${request.headers.host ?? `${host}:${port}`}`;
-    const requestUrl = new URL(request.url ?? "/", baseOrigin);
+      /**
+       * @param {RegExp} pattern
+       * @returns {RegExpExecArray | null}
+       */
+      function matchPath(pattern) {
+        return pattern.exec(requestUrl.pathname);
+      }
 
-    /**
-     * @param {RegExp} pattern
-     * @returns {RegExpExecArray | null}
-     */
-    function matchPath(pattern) {
-      return pattern.exec(requestUrl.pathname);
-    }
+      /**
+       * @param {string} value
+       * @returns {boolean}
+       */
+      function projectMatches(value) {
+        return decodeURIComponent(value) === projectId;
+      }
 
-    /**
-     * @param {string} value
-     * @returns {boolean}
-     */
-    function projectMatches(value) {
-      return decodeURIComponent(value) === projectId;
-    }
-
-    const stateMatch = matchPath(/^\/api\/projects\/([^/]+)\/state$/u);
-    if (stateMatch) {
-      if (!projectMatches(stateMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+      if (method !== "GET" && method !== "POST") {
+        response.setHeader("allow", "GET, POST");
+        sendError(response, 405, "method_not_allowed", "Detached control-plane supports only GET and POST.");
         return;
       }
-      sendJson(response, 200, readProjectState(runtimeOptions));
-      return;
-    }
 
-    const packetsMatch = matchPath(/^\/api\/projects\/([^/]+)\/packets$/u);
-    if (packetsMatch) {
-      if (!projectMatches(packetsMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+      const stateMatch = matchPath(/^\/api\/projects\/([^/]+)\/state$/u);
+      if (stateMatch) {
+        if (!projectMatches(stateMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "State route supports only GET.");
+          return;
+        }
+        sendJson(response, 200, readProjectState(runtimeOptions));
         return;
       }
-      sendJson(response, 200, listPacketArtifacts(runtimeOptions));
-      return;
-    }
 
-    const stepResultsMatch = matchPath(/^\/api\/projects\/([^/]+)\/step-results$/u);
-    if (stepResultsMatch) {
-      if (!projectMatches(stepResultsMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+      const packetsMatch = matchPath(/^\/api\/projects\/([^/]+)\/packets$/u);
+      if (packetsMatch) {
+        if (!projectMatches(packetsMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "Packet route supports only GET.");
+          return;
+        }
+        sendJson(response, 200, listPacketArtifacts(runtimeOptions));
         return;
       }
-      sendJson(response, 200, listStepResults(runtimeOptions));
-      return;
-    }
 
-    const qualityArtifactsMatch = matchPath(/^\/api\/projects\/([^/]+)\/quality-artifacts$/u);
-    if (qualityArtifactsMatch) {
-      if (!projectMatches(qualityArtifactsMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+      const stepResultsMatch = matchPath(/^\/api\/projects\/([^/]+)\/step-results$/u);
+      if (stepResultsMatch) {
+        if (!projectMatches(stepResultsMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "Step-result route supports only GET.");
+          return;
+        }
+        sendJson(response, 200, listStepResults(runtimeOptions));
         return;
       }
-      sendJson(response, 200, listQualityArtifacts(runtimeOptions));
-      return;
-    }
 
-    const deliveryManifestsMatch = matchPath(/^\/api\/projects\/([^/]+)\/delivery-manifests$/u);
-    if (deliveryManifestsMatch) {
-      if (!projectMatches(deliveryManifestsMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+      const qualityArtifactsMatch = matchPath(/^\/api\/projects\/([^/]+)\/quality-artifacts$/u);
+      if (qualityArtifactsMatch) {
+        if (!projectMatches(qualityArtifactsMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "Quality route supports only GET.");
+          return;
+        }
+        sendJson(response, 200, listQualityArtifacts(runtimeOptions));
         return;
       }
-      sendJson(response, 200, listDeliveryManifests(runtimeOptions));
-      return;
-    }
 
-    const promotionDecisionsMatch = matchPath(/^\/api\/projects\/([^/]+)\/promotion-decisions$/u);
-    if (promotionDecisionsMatch) {
-      if (!projectMatches(promotionDecisionsMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+      const deliveryManifestsMatch = matchPath(/^\/api\/projects\/([^/]+)\/delivery-manifests$/u);
+      if (deliveryManifestsMatch) {
+        if (!projectMatches(deliveryManifestsMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "Delivery-manifest route supports only GET.");
+          return;
+        }
+        sendJson(response, 200, listDeliveryManifests(runtimeOptions));
         return;
       }
-      sendJson(response, 200, listPromotionDecisions(runtimeOptions));
-      return;
-    }
 
-    const strategicSnapshotMatch = matchPath(/^\/api\/projects\/([^/]+)\/strategic-snapshot$/u);
-    if (strategicSnapshotMatch) {
-      if (!projectMatches(strategicSnapshotMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+      const promotionDecisionsMatch = matchPath(/^\/api\/projects\/([^/]+)\/promotion-decisions$/u);
+      if (promotionDecisionsMatch) {
+        if (!projectMatches(promotionDecisionsMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "Promotion-decision route supports only GET.");
+          return;
+        }
+        sendJson(response, 200, listPromotionDecisions(runtimeOptions));
         return;
       }
-      sendJson(response, 200, readStrategicSnapshot(runtimeOptions));
-      return;
-    }
 
-    const runsMatch = matchPath(/^\/api\/projects\/([^/]+)\/runs$/u);
-    if (runsMatch) {
-      if (!projectMatches(runsMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+      const strategicSnapshotMatch = matchPath(/^\/api\/projects\/([^/]+)\/strategic-snapshot$/u);
+      if (strategicSnapshotMatch) {
+        if (!projectMatches(strategicSnapshotMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "Strategic-snapshot route supports only GET.");
+          return;
+        }
+        sendJson(response, 200, readStrategicSnapshot(runtimeOptions));
         return;
       }
-      sendJson(response, 200, listRuns(runtimeOptions));
-      return;
-    }
 
-    const eventHistoryMatch = matchPath(/^\/api\/projects\/([^/]+)\/runs\/([^/]+)\/events\/history$/u);
-    if (eventHistoryMatch) {
-      if (!projectMatches(eventHistoryMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+      const runsMatch = matchPath(/^\/api\/projects\/([^/]+)\/runs$/u);
+      if (runsMatch) {
+        if (!projectMatches(runsMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "Run route supports only GET.");
+          return;
+        }
+        sendJson(response, 200, listRuns(runtimeOptions));
         return;
       }
-      const runId = decodeURIComponent(eventHistoryMatch[2]);
-      const limit = readQueryInteger(requestUrl.searchParams, "limit");
-      sendJson(
-        response,
-        200,
-        readRunEventHistory({
+
+      const eventHistoryMatch = matchPath(/^\/api\/projects\/([^/]+)\/runs\/([^/]+)\/events\/history$/u);
+      if (eventHistoryMatch) {
+        if (!projectMatches(eventHistoryMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "Event-history route supports only GET.");
+          return;
+        }
+        const runId = decodeURIComponent(eventHistoryMatch[2]);
+        const limit = readQueryInteger(requestUrl.searchParams, "limit");
+        sendJson(
+          response,
+          200,
+          readRunEventHistory({
+            ...runtimeOptions,
+            runId,
+            limit,
+          }),
+        );
+        return;
+      }
+
+      const policyHistoryMatch = matchPath(/^\/api\/projects\/([^/]+)\/runs\/([^/]+)\/policy-history$/u);
+      if (policyHistoryMatch) {
+        if (!projectMatches(policyHistoryMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "Policy-history route supports only GET.");
+          return;
+        }
+        const runId = decodeURIComponent(policyHistoryMatch[2]);
+        const limit = readQueryInteger(requestUrl.searchParams, "limit");
+        sendJson(
+          response,
+          200,
+          readRunPolicyHistory({
+            ...runtimeOptions,
+            runId,
+            limit,
+          }),
+        );
+        return;
+      }
+
+      const streamMatch = matchPath(/^\/api\/projects\/([^/]+)\/runs\/([^/]+)\/events$/u);
+      if (streamMatch) {
+        if (!projectMatches(streamMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "GET") {
+          response.setHeader("allow", "GET");
+          sendError(response, 405, "method_not_allowed", "Run-event stream route supports only GET.");
+          return;
+        }
+        const runId = decodeURIComponent(streamMatch[2]);
+        const afterEventId =
+          asString(requestUrl.searchParams.get("after_event_id")) ?? asString(requestUrl.searchParams.get("afterEventId"));
+        const maxReplay = readQueryInteger(requestUrl.searchParams, "max_replay")
+          ?? readQueryInteger(requestUrl.searchParams, "maxReplay");
+
+        const stream = openRunEventStream({
           ...runtimeOptions,
           runId,
-          limit,
-        }),
-      );
-      return;
-    }
+          afterEventId,
+          maxReplay,
+        });
 
-    const policyHistoryMatch = matchPath(/^\/api\/projects\/([^/]+)\/runs\/([^/]+)\/policy-history$/u);
-    if (policyHistoryMatch) {
-      if (!projectMatches(policyHistoryMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+        response.writeHead(200, {
+          "content-type": "text/event-stream; charset=utf-8",
+          "cache-control": "no-cache, no-transform",
+          connection: "keep-alive",
+        });
+
+        writeSseEvent(response, {
+          event: "stream.meta",
+          data: {
+            protocol: stream.protocol,
+            backpressure: stream.backpressure,
+            log_file: stream.log_file,
+            run_id: runId,
+          },
+        });
+
+        for (const replayEvent of stream.replay_events) {
+          const payload = toHistoryEvent(replayEvent);
+          writeSseEvent(response, {
+            event: "live-run-event",
+            id: payload.event_id,
+            data: payload,
+          });
+        }
+
+        const unsubscribe = stream.subscribe((event) => {
+          const payload = toHistoryEvent(event);
+          writeSseEvent(response, {
+            event: "live-run-event",
+            id: payload.event_id,
+            data: payload,
+          });
+        });
+
+        const onClose = () => {
+          unsubscribe();
+          request.off("close", onClose);
+        };
+        request.on("close", onClose);
         return;
       }
-      const runId = decodeURIComponent(policyHistoryMatch[2]);
-      const limit = readQueryInteger(requestUrl.searchParams, "limit");
-      sendJson(
-        response,
-        200,
-        readRunPolicyHistory({
+
+      const runControlActionMatch = matchPath(/^\/api\/projects\/([^/]+)\/run-control\/actions$/u);
+      if (runControlActionMatch) {
+        if (!projectMatches(runControlActionMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "POST") {
+          response.setHeader("allow", "POST");
+          sendError(response, 405, "method_not_allowed", "Run-control mutation route supports only POST.");
+          return;
+        }
+
+        let payload;
+        try {
+          payload = await readJsonRequestBody(request);
+        } catch (error) {
+          if (error instanceof Error && error.message === "invalid_json") {
+            sendError(response, 400, "invalid_json", "Request body must be valid JSON.");
+            return;
+          }
+          if (error instanceof Error && error.message === "invalid_payload") {
+            sendError(response, 400, "invalid_payload", "Request body must be a JSON object.");
+            return;
+          }
+          throw error;
+        }
+
+        const action = asString(payload.action);
+        if (!action || !RUN_CONTROL_ACTIONS.has(action)) {
+          sendError(
+            response,
+            400,
+            "invalid_run_control_action",
+            `Unsupported run-control action '${action ?? "missing"}'.`,
+          );
+          return;
+        }
+
+        const result = applyRunControlAction({
           ...runtimeOptions,
-          runId,
-          limit,
-        }),
-      );
-      return;
-    }
+          action: /** @type {"start" | "pause" | "resume" | "steer" | "cancel"} */ (action),
+          runId: asString(payload.run_id) ?? undefined,
+          targetStep: asString(payload.target_step) ?? undefined,
+          reason: asString(payload.reason) ?? undefined,
+          approvalRef: asString(payload.approval_ref) ?? undefined,
+        });
+        const runControlPayload = toRunControlResponse(result);
 
-    const streamMatch = matchPath(/^\/api\/projects\/([^/]+)\/runs\/([^/]+)\/events$/u);
-    if (streamMatch) {
-      if (!projectMatches(streamMatch[1])) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+        if (result.blocked) {
+          sendJson(response, 409, {
+            error: {
+              code: result.blockedReason?.code ?? "run_control.blocked",
+              message: result.blockedReason?.message ?? "Run-control action blocked by policy or lifecycle transition.",
+            },
+            run_control: runControlPayload,
+          });
+          return;
+        }
+
+        sendJson(response, 200, {
+          run_control: runControlPayload,
+        });
         return;
       }
-      const runId = decodeURIComponent(streamMatch[2]);
-      const afterEventId =
-        asString(requestUrl.searchParams.get("after_event_id")) ?? asString(requestUrl.searchParams.get("afterEventId"));
-      const maxReplay = readQueryInteger(requestUrl.searchParams, "max_replay")
-        ?? readQueryInteger(requestUrl.searchParams, "maxReplay");
 
-      const stream = openRunEventStream({
-        ...runtimeOptions,
-        runId,
-        afterEventId,
-        maxReplay,
-      });
+      const uiLifecycleActionMatch = matchPath(/^\/api\/projects\/([^/]+)\/ui-lifecycle\/actions$/u);
+      if (uiLifecycleActionMatch) {
+        if (!projectMatches(uiLifecycleActionMatch[1])) {
+          sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
+          return;
+        }
+        if (method !== "POST") {
+          response.setHeader("allow", "POST");
+          sendError(response, 405, "method_not_allowed", "UI lifecycle mutation route supports only POST.");
+          return;
+        }
 
-      response.writeHead(200, {
-        "content-type": "text/event-stream; charset=utf-8",
-        "cache-control": "no-cache, no-transform",
-        connection: "keep-alive",
-      });
+        let payload;
+        try {
+          payload = await readJsonRequestBody(request);
+        } catch (error) {
+          if (error instanceof Error && error.message === "invalid_json") {
+            sendError(response, 400, "invalid_json", "Request body must be valid JSON.");
+            return;
+          }
+          if (error instanceof Error && error.message === "invalid_payload") {
+            sendError(response, 400, "invalid_payload", "Request body must be a JSON object.");
+            return;
+          }
+          throw error;
+        }
 
-      writeSseEvent(response, {
-        event: "stream.meta",
-        data: {
-          protocol: stream.protocol,
-          backpressure: stream.backpressure,
-          log_file: stream.log_file,
-          run_id: runId,
-        },
-      });
+        const action = asString(payload.action);
+        if (!action || !UI_LIFECYCLE_ACTIONS.has(action)) {
+          sendError(response, 400, "invalid_ui_lifecycle_action", `Unsupported ui-lifecycle action '${action ?? "missing"}'.`);
+          return;
+        }
 
-      for (const replayEvent of stream.replay_events) {
-        const payload = toHistoryEvent(replayEvent);
-        writeSseEvent(response, {
-          event: "live-run-event",
-          id: payload.event_id,
-          data: payload,
+        const result =
+          action === "attach"
+            ? attachUiLifecycle({
+                ...runtimeOptions,
+                runId: asString(payload.run_id) ?? undefined,
+                controlPlane: asString(payload.control_plane) ?? undefined,
+              })
+            : detachUiLifecycle({
+                ...runtimeOptions,
+                runId: asString(payload.run_id) ?? undefined,
+              });
+
+        sendJson(response, 200, {
+          ui_lifecycle: toUiLifecycleResponse(result),
         });
+        return;
       }
 
-      const unsubscribe = stream.subscribe((event) => {
-        const payload = toHistoryEvent(event);
-        writeSseEvent(response, {
-          event: "live-run-event",
-          id: payload.event_id,
-          data: payload,
-        });
-      });
-
-      const onClose = () => {
-        unsubscribe();
-        request.off("close", onClose);
-      };
-      request.on("close", onClose);
-      return;
+      sendError(response, 404, "route_not_found", `Unsupported control-plane path '${requestUrl.pathname}'.`);
+    } catch (error) {
+      sendError(response, 500, "transport_internal_error", error instanceof Error ? error.message : String(error));
     }
-
-    sendError(response, 404, "route_not_found", `Unsupported control-plane path '${requestUrl.pathname}'.`);
   });
 
   return new Promise((resolve, reject) => {

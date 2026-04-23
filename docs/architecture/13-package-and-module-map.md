@@ -1,7 +1,7 @@
 # Package and module map
 
 ## Apps
-- `apps/api` — module-backed control-plane query/control shell plus detached HTTP/SSE transport baseline for connected read/follow surfaces
+- `apps/api` — module-backed control-plane query/control shell plus detached HTTP/SSE transport baseline for connected read/follow and bounded run-control/ui-lifecycle mutations
 - `apps/cli` — operator CLI and bootstrap surface
 - `apps/web` — detachable operator console
 

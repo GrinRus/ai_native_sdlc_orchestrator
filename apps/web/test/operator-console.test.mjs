@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 import { appendRunEvent, createControlPlaneHttpServer } from "../../api/src/index.mjs";
 import { invokeCli } from "../../cli/src/index.mjs";
 import {
+  applyOperatorRunControl,
+  applyOperatorUiLifecycle,
   attachOperatorConsoleSession,
   buildOperatorConsoleSnapshot,
   renderOperatorConsoleHtml,
@@ -373,6 +375,67 @@ test("web connected mode consumes detached HTTP/SSE transport while preserving d
       const detached = session.detach();
       assert.equal(detached.detached, true);
       assert.ok(detached.captured_event_count >= 1);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("web connected mode routes run-control and ui-lifecycle mutations through detached transport", async () => {
+  await withTempProject(async (projectRoot) => {
+    seedOperatorArtifacts(projectRoot);
+    const runId = "run.web.transport.mutation.v1";
+    const transport = await createControlPlaneHttpServer({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const attachResult = invokeCli([
+        "ui",
+        "attach",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+        "--control-plane",
+        transport.baseUrl,
+      ]);
+      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
+
+      const remoteStart = await applyOperatorRunControl({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+        action: "start",
+      });
+      assert.equal(remoteStart.binding_mode, "detached-http-mutation");
+      assert.equal(remoteStart.run_control.action, "start");
+      assert.equal(remoteStart.run_control.run_id, runId);
+      assert.equal(remoteStart.run_control.blocked, false);
+
+      const remoteDetach = await applyOperatorUiLifecycle({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+        action: "detach",
+      });
+      assert.equal(remoteDetach.binding_mode, "detached-http-mutation");
+      assert.equal(remoteDetach.ui_lifecycle.action, "detach");
+      assert.equal(remoteDetach.ui_lifecycle.connection_state, "detached");
+
+      const localPause = await applyOperatorRunControl({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+        action: "pause",
+      });
+      assert.equal(localPause.binding_mode, "module-in-process");
+      assert.equal(localPause.run_control.action, "pause");
+      assert.equal(localPause.run_control.blocked, false);
+      assert.equal(localPause.run_control.state.status, "paused");
     } finally {
       await transport.close();
     }
