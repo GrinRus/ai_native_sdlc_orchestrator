@@ -1,0 +1,6 @@
+{
+  "status": "hold",
+  "to_channel": "frozen",
+  "rollout_action": "hold",
+  "freeze_guardrail_status": "hold"
+}

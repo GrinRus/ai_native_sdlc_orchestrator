@@ -1,0 +1,6 @@
+{
+  "command": "asset promote",
+  "status": "implemented",
+  "promotion_decision_status": "pass",
+  "promotion_rollout_action": "promote"
+}

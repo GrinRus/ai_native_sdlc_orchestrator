@@ -146,7 +146,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 
 ## W9-S05 — Public harness replay command surface
 - **Epic:** EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Expose existing harness replay core capability through `aor harness replay` with durable outputs, help text, docs, and tests.
 - **Primary modules:** `apps/cli`, `packages/orchestrator-core`, `docs/architecture/**`, `docs/ops/**`
 - **Hard dependencies:** W3-S04, W8-S05

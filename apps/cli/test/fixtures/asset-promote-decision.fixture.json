@@ -1,0 +1,6 @@
+{
+  "status": "pass",
+  "from_channel": "candidate",
+  "to_channel": "stable",
+  "rollout_action": "promote"
+}

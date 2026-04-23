@@ -8,6 +8,8 @@ Implemented commands:
   - aor eval run
   - aor harness replay
   - aor harness certify
+  - aor asset promote
+  - aor asset freeze
   - aor handoff prepare
   - aor handoff approve
   - aor intake create
@@ -35,7 +37,5 @@ Implemented commands:
   - aor ui detach
 
 Planned commands (not implemented yet):
-  - aor asset promote
-  - aor asset freeze
 
 Use 'aor <group> <command> --help' for implemented command contracts.

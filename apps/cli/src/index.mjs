@@ -134,6 +134,8 @@ function formatCommandHelp(definition) {
       ? "Status: implemented in quality shell (W3-S03)"
       : definition.command === "harness replay"
         ? "Status: implemented in quality shell (W9-S05)"
+      : definition.command === "asset promote" || definition.command === "asset freeze"
+        ? "Status: implemented in quality shell (W9-S06)"
       : definition.command === "harness certify"
         ? "Status: implemented in quality shell (W3-S05)"
       : definition.command === "intake create" ||
@@ -222,6 +224,22 @@ function formatCommandHelp(definition) {
             "- Replay performs compatibility checks against current route/wrapper/prompt/policy/adapter resolution.",
             "- Compatible captures replay eval scoring; incompatible captures persist status='incompatible' with explicit blocked_next_step guidance.",
             "- Replay writes one durable harness-replay-*.json report under runtime reports root.",
+            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+          ]
+      : definition.command === "asset promote"
+        ? [
+            "- --asset-ref and --subject-ref are required promotion targets for certification evidence.",
+            "- Promote defaults to candidate -> stable, but channels can be overridden for bounded transitions.",
+            "- Command reuses certification evidence flow (validation, eval, harness capture/replay) and writes one promotion-decision artifact.",
+            "- Status semantics are pass, hold, or fail; inspect promotion_rollout_action and promotion_governance_checks for audit details.",
+            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+          ]
+      : definition.command === "asset freeze"
+        ? [
+            "- Freeze defaults to stable -> frozen and enforces explicit freeze-channel guardrails.",
+            "- Freeze uses the same certification evidence bar (validation, eval, harness capture/replay).",
+            "- Without regression evidence, freeze remains hold with explicit guardrail rationale.",
+            "- With regression evidence, rollout_decision.action can become freeze even when final decision status is fail.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
           ]
       : definition.command === "handoff prepare"
@@ -799,6 +817,10 @@ function executeImplementedCommand(command, flags, cwd) {
   let promotionDecisionId = null;
   let promotionDecisionFile = null;
   let promotionDecisionStatus = null;
+  let promotionFromChannel = null;
+  let promotionToChannel = null;
+  let promotionRolloutAction = null;
+  let promotionGovernanceChecks = null;
   let certificationEvaluationReportFile = null;
   let certificationHarnessCaptureFile = null;
   let certificationHarnessReplayFile = null;
@@ -1126,6 +1148,72 @@ function executeImplementedCommand(command, flags, cwd) {
     harnessReplayBlockedNextStep = replayResult.replayReport.blocked_next_step;
     harnessReplayEvidenceRefs = replayResult.replayReport.evidence_refs;
     harnessReplayEvaluationReportFile = replayResult.replayEvaluationReportPath;
+  } else if (command === "asset promote") {
+    ensureRequiredFlags(command, flags);
+
+    const promoteResult = certifyAssetPromotion({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      assetRef: /** @type {string} */ (resolveOptionalStringFlag("asset-ref", flags["asset-ref"])),
+      subjectRef: /** @type {string} */ (resolveOptionalStringFlag("subject-ref", flags["subject-ref"])),
+      suiteRef: resolveOptionalStringFlag("suite-ref", flags["suite-ref"]),
+      stepClass: resolveOptionalStringFlag("step-class", flags["step-class"]),
+      fromChannel: resolveOptionalStringFlag("from-channel", flags["from-channel"]) ?? "candidate",
+      toChannel: resolveOptionalStringFlag("to-channel", flags["to-channel"]) ?? "stable",
+    });
+
+    resolvedProjectRef = promoteResult.projectRoot;
+    resolvedRuntimeRoot = promoteResult.runtimeRoot;
+    runtimeLayout = promoteResult.runtimeLayout;
+    runtimeStateFile = promoteResult.stateFile;
+    projectProfileRef = promoteResult.projectProfileRef;
+    promotionDecisionId = promoteResult.decision.decision_id;
+    promotionDecisionFile = promoteResult.decisionPath;
+    promotionDecisionStatus = promoteResult.decision.status;
+    promotionFromChannel = promoteResult.decision.from_channel ?? null;
+    promotionToChannel = promoteResult.decision.to_channel ?? null;
+    promotionRolloutAction =
+      promoteResult.decision.evidence_summary?.rollout_decision?.action ?? null;
+    promotionGovernanceChecks =
+      promoteResult.decision.evidence_summary?.governance_checks ?? null;
+    certificationEvaluationReportFile = promoteResult.evaluationReportPath;
+    certificationHarnessCaptureFile = promoteResult.harnessCapturePath;
+    certificationHarnessReplayFile = promoteResult.harnessReplayPath;
+  } else if (command === "asset freeze") {
+    ensureRequiredFlags(command, flags);
+
+    const freezeResult = certifyAssetPromotion({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      assetRef: /** @type {string} */ (resolveOptionalStringFlag("asset-ref", flags["asset-ref"])),
+      subjectRef: /** @type {string} */ (resolveOptionalStringFlag("subject-ref", flags["subject-ref"])),
+      suiteRef: resolveOptionalStringFlag("suite-ref", flags["suite-ref"]),
+      stepClass: resolveOptionalStringFlag("step-class", flags["step-class"]),
+      fromChannel: resolveOptionalStringFlag("from-channel", flags["from-channel"]) ?? "stable",
+      toChannel: "frozen",
+    });
+
+    resolvedProjectRef = freezeResult.projectRoot;
+    resolvedRuntimeRoot = freezeResult.runtimeRoot;
+    runtimeLayout = freezeResult.runtimeLayout;
+    runtimeStateFile = freezeResult.stateFile;
+    projectProfileRef = freezeResult.projectProfileRef;
+    promotionDecisionId = freezeResult.decision.decision_id;
+    promotionDecisionFile = freezeResult.decisionPath;
+    promotionDecisionStatus = freezeResult.decision.status;
+    promotionFromChannel = freezeResult.decision.from_channel ?? null;
+    promotionToChannel = freezeResult.decision.to_channel ?? null;
+    promotionRolloutAction =
+      freezeResult.decision.evidence_summary?.rollout_decision?.action ?? null;
+    promotionGovernanceChecks =
+      freezeResult.decision.evidence_summary?.governance_checks ?? null;
+    certificationEvaluationReportFile = freezeResult.evaluationReportPath;
+    certificationHarnessCaptureFile = freezeResult.harnessCapturePath;
+    certificationHarnessReplayFile = freezeResult.harnessReplayPath;
   } else if (command === "harness certify") {
     ensureRequiredFlags(command, flags);
 
@@ -2384,6 +2472,10 @@ function executeImplementedCommand(command, flags, cwd) {
     promotion_decision_id: promotionDecisionId,
     promotion_decision_file: promotionDecisionFile,
     promotion_decision_status: promotionDecisionStatus,
+    promotion_from_channel: promotionFromChannel,
+    promotion_to_channel: promotionToChannel,
+    promotion_rollout_action: promotionRolloutAction,
+    promotion_governance_checks: promotionGovernanceChecks,
     certification_evaluation_report_file: certificationEvaluationReportFile,
     certification_harness_capture_file: certificationHarnessCaptureFile,
     certification_harness_replay_file: certificationHarnessReplayFile,

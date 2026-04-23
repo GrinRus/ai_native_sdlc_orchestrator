@@ -13,15 +13,35 @@ aor harness certify \
   --step-class implement
 ```
 
+Public promote/freeze surfaces:
+```bash
+aor asset promote \
+  --project-ref <PROJECT_ROOT> \
+  --asset-ref wrapper://wrapper.eval.default@v1 \
+  --subject-ref wrapper://wrapper.eval.default@v1 \
+  --suite-ref suite.cert.core@v4
+```
+
+```bash
+aor asset freeze \
+  --project-ref <PROJECT_ROOT> \
+  --asset-ref wrapper://wrapper.eval.default@v1 \
+  --subject-ref wrapper://wrapper.eval.default@v1 \
+  --suite-ref suite.cert.core@v4
+```
+
 ## Expected output fields
 - `promotion_decision_id`
 - `promotion_decision_file`
 - `promotion_decision_status` (`pass|hold|fail`)
+- `promotion_from_channel`
+- `promotion_to_channel`
+- `promotion_rollout_action` (`promote|hold|reject|freeze|demote`)
+- `promotion_governance_checks`
 - `validation_report_file` (inside promotion-decision evidence refs)
 - `certification_evaluation_report_file`
 - `certification_harness_capture_file`
 - `certification_harness_replay_file`
-- `rollout_decision.action` (`promote|hold|reject|freeze|demote`)
 - `baseline_comparison.*` for stable/frozen/demoted transitions
 
 ## Certification transcripts (examples)

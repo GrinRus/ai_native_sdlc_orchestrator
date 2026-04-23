@@ -96,6 +96,26 @@ test("harness replay help documents replay semantics and incompatibility guidanc
   assert.match(result.stdout, /status='incompatible'/);
 });
 
+test("asset promote help documents promotion semantics", () => {
+  const result = invokeCli(["asset", "promote", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in quality shell \(W9-S06\)/);
+  assert.match(result.stdout, /Promote defaults to candidate -> stable/);
+  assert.match(result.stdout, /promotion_rollout_action/);
+});
+
+test("asset freeze help documents freeze guardrail semantics", () => {
+  const result = invokeCli(["asset", "freeze", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in quality shell \(W9-S06\)/);
+  assert.match(result.stdout, /Freeze defaults to stable -> frozen/);
+  assert.match(result.stdout, /freeze remains hold/);
+});
+
 test("harness certify help documents certification semantics", () => {
   const result = invokeCli(["harness", "certify", "--help"]);
 
@@ -208,12 +228,12 @@ test("invalid project-ref fails clearly", () => {
   assert.match(result.stderr, /Invalid project reference '\.\/does-not-exist': path does not exist\./);
 });
 
-test("planned commands report not implemented status", () => {
-  const result = invokeCli(["asset", "promote"]);
+test("planned command section is empty when the current shell has no planned commands", () => {
+  const result = invokeCli(["--help"]);
 
-  assert.equal(result.exitCode, 1);
-  assert.equal(result.stdout, "");
-  assert.match(result.stderr, /Command 'aor asset promote' is planned and not implemented yet\./);
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Planned commands \(not implemented yet\):\n\nUse 'aor <group> <command> --help'/);
 });
 
 test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () => {
@@ -1902,6 +1922,185 @@ test("harness replay reports incompatible captures with explicit blocked-next-st
       blocked_next_step: replayReport.blocked_next_step,
     };
     assert.deepEqual(reportSubset, reportFixture);
+  });
+});
+
+test("asset promote writes durable promotion decision with promote rollout semantics", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "asset-promote-transcript.json"), "utf8"),
+    );
+    const decisionFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "asset-promote-decision.fixture.json"), "utf8"),
+    );
+
+    const result = invokeCli([
+      "asset",
+      "promote",
+      "--project-ref",
+      projectRoot,
+      "--asset-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--subject-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--suite-ref",
+      "suite.cert.core@v4",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.promotion_decision_status, "pass");
+    assert.equal(payload.promotion_from_channel, "candidate");
+    assert.equal(payload.promotion_to_channel, "stable");
+    assert.equal(payload.promotion_rollout_action, "promote");
+    assert.equal(fs.existsSync(payload.promotion_decision_file), true);
+
+    const transcriptSubset = {
+      command: payload.command,
+      status: payload.status,
+      promotion_decision_status: payload.promotion_decision_status,
+      promotion_rollout_action: payload.promotion_rollout_action,
+    };
+    assert.deepEqual(transcriptSubset, transcriptFixture);
+
+    const decision = JSON.parse(fs.readFileSync(payload.promotion_decision_file, "utf8"));
+    const decisionSubset = {
+      status: decision.status,
+      from_channel: decision.from_channel,
+      to_channel: decision.to_channel,
+      rollout_action: decision.evidence_summary.rollout_decision.action,
+    };
+    assert.deepEqual(decisionSubset, decisionFixture);
+  });
+});
+
+test("asset freeze defaults to hold when freeze guardrail evidence is missing", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "asset-freeze-transcript.json"), "utf8"),
+    );
+    const decisionFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "asset-freeze-decision.fixture.json"), "utf8"),
+    );
+
+    const result = invokeCli([
+      "asset",
+      "freeze",
+      "--project-ref",
+      projectRoot,
+      "--asset-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--subject-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--suite-ref",
+      "suite.cert.core@v4",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.promotion_decision_status, "hold");
+    assert.equal(payload.promotion_from_channel, "stable");
+    assert.equal(payload.promotion_to_channel, "frozen");
+    assert.equal(payload.promotion_rollout_action, "hold");
+    assert.equal(fs.existsSync(payload.promotion_decision_file), true);
+
+    const transcriptSubset = {
+      command: payload.command,
+      status: payload.status,
+      promotion_decision_status: payload.promotion_decision_status,
+      promotion_rollout_action: payload.promotion_rollout_action,
+    };
+    assert.deepEqual(transcriptSubset, transcriptFixture);
+
+    const decision = JSON.parse(fs.readFileSync(payload.promotion_decision_file, "utf8"));
+    const freezeGuardrailCheck = decision.evidence_summary.governance_checks.find(
+      (entry) => entry.check_id === "freeze-channel-guardrail",
+    );
+    const decisionSubset = {
+      status: decision.status,
+      to_channel: decision.to_channel,
+      rollout_action: decision.evidence_summary.rollout_decision.action,
+      freeze_guardrail_status: freezeGuardrailCheck?.status ?? null,
+    };
+    assert.deepEqual(decisionSubset, decisionFixture);
+  });
+});
+
+test("asset promote reports fail status when evaluative evidence regresses", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const datasetPath = path.join(projectRoot, "examples/eval/dataset-wrapper-certification.yaml");
+    const dataset = fs.readFileSync(datasetPath, "utf8");
+    fs.writeFileSync(
+      datasetPath,
+      dataset.replace(
+        "expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json",
+        'expected_ref: ""',
+      ),
+      "utf8",
+    );
+
+    const result = invokeCli([
+      "asset",
+      "promote",
+      "--project-ref",
+      projectRoot,
+      "--asset-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--subject-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--suite-ref",
+      "suite.cert.core@v4",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.promotion_decision_status, "fail");
+    assert.equal(payload.promotion_rollout_action, "reject");
+  });
+});
+
+test("asset freeze keeps freeze rollout action when regression evidence exists", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const datasetPath = path.join(projectRoot, "examples/eval/dataset-wrapper-certification.yaml");
+    const dataset = fs.readFileSync(datasetPath, "utf8");
+    fs.writeFileSync(
+      datasetPath,
+      dataset.replace(
+        "expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json",
+        'expected_ref: ""',
+      ),
+      "utf8",
+    );
+
+    const result = invokeCli([
+      "asset",
+      "freeze",
+      "--project-ref",
+      projectRoot,
+      "--asset-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--subject-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--suite-ref",
+      "suite.cert.core@v4",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.promotion_decision_status, "fail");
+    assert.equal(payload.promotion_rollout_action, "freeze");
   });
 });
 

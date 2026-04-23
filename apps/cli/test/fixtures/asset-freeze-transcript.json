@@ -1,0 +1,6 @@
+{
+  "command": "asset freeze",
+  "status": "implemented",
+  "promotion_decision_status": "hold",
+  "promotion_rollout_action": "hold"
+}
