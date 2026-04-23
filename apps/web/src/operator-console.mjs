@@ -76,17 +76,41 @@ function buildControlPlaneUrl(options) {
 
 /**
  * @param {{
+ *   authToken?: string,
+ *   accept: string,
+ *   contentType?: string,
+ * }} options
+ */
+function buildControlPlaneHeaders(options) {
+  /** @type {Record<string, string>} */
+  const headers = {
+    accept: options.accept,
+  };
+  if (options.contentType) {
+    headers["content-type"] = options.contentType;
+  }
+  const authToken = asString(options.authToken);
+  if (authToken) {
+    headers.authorization = `Bearer ${authToken}`;
+  }
+  return headers;
+}
+
+/**
+ * @param {{
  *   controlPlane: string,
- *   pathname: string,
- *   query?: Record<string, string | number | undefined>,
+  *   pathname: string,
+  *   query?: Record<string, string | number | undefined>,
+ *   authToken?: string,
  * }} options
  */
 async function readControlPlaneJson(options) {
   const url = buildControlPlaneUrl(options);
   const response = await fetch(url, {
-    headers: {
+    headers: buildControlPlaneHeaders({
       accept: "application/json",
-    },
+      authToken: options.authToken,
+    }),
   });
   if (!response.ok) {
     const message = (await response.text()).trim();
@@ -98,18 +122,20 @@ async function readControlPlaneJson(options) {
 /**
  * @param {{
  *   controlPlane: string,
- *   pathname: string,
- *   body: Record<string, unknown>,
+  *   pathname: string,
+  *   body: Record<string, unknown>,
+ *   authToken?: string,
  * }} options
  */
 async function writeControlPlaneJson(options) {
   const url = buildControlPlaneUrl(options);
   const response = await fetch(url, {
     method: "POST",
-    headers: {
+    headers: buildControlPlaneHeaders({
       accept: "application/json",
-      "content-type": "application/json; charset=utf-8",
-    },
+      contentType: "application/json; charset=utf-8",
+      authToken: options.authToken,
+    }),
     body: JSON.stringify(options.body),
   });
 
@@ -134,8 +160,9 @@ async function writeControlPlaneJson(options) {
 /**
  * @param {{
  *   controlPlane: string,
- *   pathname: string,
- *   query?: Record<string, string | number | undefined>,
+  *   pathname: string,
+  *   query?: Record<string, string | number | undefined>,
+ *   authToken?: string,
  *   onEvent: (event: Record<string, unknown>) => void,
  * }} options
  */
@@ -149,9 +176,10 @@ function openControlPlaneSseStream(options) {
       query: options.query,
     });
     const response = await fetch(url, {
-      headers: {
+      headers: buildControlPlaneHeaders({
         accept: "text/event-stream",
-      },
+        authToken: options.authToken,
+      }),
       signal: controller.signal,
     });
 
@@ -325,6 +353,7 @@ function toUiLifecycleMutationPayload(result) {
  *   projectRef: string,
  *   runtimeRoot?: string,
  *   controlPlane?: string,
+ *   controlPlaneAuthToken?: string,
  *   runId?: string,
  *   action: "start" | "pause" | "resume" | "steer" | "cancel",
  *   targetStep?: string,
@@ -334,6 +363,7 @@ function toUiLifecycleMutationPayload(result) {
  */
 export async function applyOperatorRunControl(options) {
   const requestedControlPlane = asString(options.controlPlane);
+  const controlPlaneAuthToken = asString(options.controlPlaneAuthToken) ?? undefined;
   const uiLifecycle = readUiLifecycleState(options);
   const connectedControlPlane = resolveControlPlaneUrl({
     requestedControlPlane,
@@ -352,6 +382,7 @@ export async function applyOperatorRunControl(options) {
         reason: options.reason ?? null,
         approval_ref: options.approvalRef ?? null,
       },
+      authToken: controlPlaneAuthToken,
     });
     return {
       binding_mode: "detached-http-mutation",
@@ -384,12 +415,14 @@ export async function applyOperatorRunControl(options) {
  *   projectRef: string,
  *   runtimeRoot?: string,
  *   controlPlane?: string,
+ *   controlPlaneAuthToken?: string,
  *   runId?: string,
  *   action: "attach" | "detach",
  * }} options
  */
 export async function applyOperatorUiLifecycle(options) {
   const requestedControlPlane = asString(options.controlPlane);
+  const controlPlaneAuthToken = asString(options.controlPlaneAuthToken) ?? undefined;
   const uiLifecycle = readUiLifecycleState(options);
   const connectedControlPlane = resolveControlPlaneUrl({
     requestedControlPlane,
@@ -406,6 +439,7 @@ export async function applyOperatorUiLifecycle(options) {
         run_id: options.runId ?? null,
         control_plane: options.action === "attach" ? connectedControlPlane : null,
       },
+      authToken: controlPlaneAuthToken,
     });
     return {
       binding_mode: "detached-http-mutation",
@@ -444,11 +478,13 @@ export async function applyOperatorUiLifecycle(options) {
  *   runtimeRoot?: string,
  *   runId?: string,
  *   controlPlane?: string,
+ *   controlPlaneAuthToken?: string,
  * }} options
  */
 export async function buildOperatorConsoleSnapshot(options) {
   const uiLifecycle = readUiLifecycleState(options);
   const requestedControlPlane = asString(options.controlPlane);
+  const controlPlaneAuthToken = asString(options.controlPlaneAuthToken) ?? undefined;
   const connectedControlPlane = resolveControlPlaneUrl({
     requestedControlPlane,
     uiLifecycleState: uiLifecycle.state,
@@ -535,34 +571,42 @@ export async function buildOperatorConsoleSnapshot(options) {
       readControlPlaneJson({
         controlPlane: connectedControlPlane,
         pathname: `/api/projects/${encodeURIComponent(projectId)}/state`,
+        authToken: controlPlaneAuthToken,
       }),
       readControlPlaneJson({
         controlPlane: connectedControlPlane,
         pathname: `/api/projects/${encodeURIComponent(projectId)}/runs`,
+        authToken: controlPlaneAuthToken,
       }),
       readControlPlaneJson({
         controlPlane: connectedControlPlane,
         pathname: `/api/projects/${encodeURIComponent(projectId)}/packets`,
+        authToken: controlPlaneAuthToken,
       }),
       readControlPlaneJson({
         controlPlane: connectedControlPlane,
         pathname: `/api/projects/${encodeURIComponent(projectId)}/step-results`,
+        authToken: controlPlaneAuthToken,
       }),
       readControlPlaneJson({
         controlPlane: connectedControlPlane,
         pathname: `/api/projects/${encodeURIComponent(projectId)}/quality-artifacts`,
+        authToken: controlPlaneAuthToken,
       }),
       readControlPlaneJson({
         controlPlane: connectedControlPlane,
         pathname: `/api/projects/${encodeURIComponent(projectId)}/delivery-manifests`,
+        authToken: controlPlaneAuthToken,
       }),
       readControlPlaneJson({
         controlPlane: connectedControlPlane,
         pathname: `/api/projects/${encodeURIComponent(projectId)}/promotion-decisions`,
+        authToken: controlPlaneAuthToken,
       }),
       readControlPlaneJson({
         controlPlane: connectedControlPlane,
         pathname: `/api/projects/${encodeURIComponent(projectId)}/strategic-snapshot`,
+        authToken: controlPlaneAuthToken,
       }).catch(() => strategicSnapshot),
     ]);
 
@@ -584,11 +628,13 @@ export async function buildOperatorConsoleSnapshot(options) {
           controlPlane: connectedControlPlane,
           pathname: `/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(selectedRunId)}/events/history`,
           query: { limit: 50 },
+          authToken: controlPlaneAuthToken,
         }),
         readControlPlaneJson({
           controlPlane: connectedControlPlane,
           pathname: `/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(selectedRunId)}/policy-history`,
           query: { limit: 100 },
+          authToken: controlPlaneAuthToken,
         }),
       ])
     : [null, null];
@@ -634,6 +680,7 @@ export async function buildOperatorConsoleSnapshot(options) {
         "POST /api/projects/:projectId/ui-lifecycle/actions",
       ],
       mutation_error_shapes: ["invalid_json", "invalid_payload", "invalid_run_control_action", "run_control.blocked"],
+      auth_mode: "optional-bearer-token",
       live_stream: "GET /api/projects/:projectId/runs/:runId/events",
       event_contract_family: "live-run-event",
     },
@@ -781,6 +828,7 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
  *   afterEventId?: string,
  *   maxReplay?: number,
  *   controlPlane?: string,
+ *   controlPlaneAuthToken?: string,
  * }} options
  */
 export async function attachOperatorConsoleSession(options) {
@@ -816,6 +864,7 @@ export async function attachOperatorConsoleSession(options) {
         controlPlane,
         pathname: `/api/projects/${encodeURIComponent(snapshot.project.project_id)}/runs/${encodeURIComponent(runId)}/events/history`,
         query: { limit: replayLimit },
+        authToken: asString(options.controlPlaneAuthToken) ?? undefined,
       });
       const replayEvents = asArray(replay.events);
       for (const event of replayEvents) {
@@ -830,6 +879,7 @@ export async function attachOperatorConsoleSession(options) {
           after_event_id: afterEventId ?? undefined,
           max_replay: replayLimit,
         },
+        authToken: asString(options.controlPlaneAuthToken) ?? undefined,
         onEvent(event) {
           liveEvents.push(event);
           for (const listener of listeners) {

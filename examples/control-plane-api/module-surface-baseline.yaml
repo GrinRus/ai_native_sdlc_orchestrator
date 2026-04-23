@@ -69,3 +69,18 @@ deferred_transport:
   out_of_scope:
     - mutation-command endpoint parity for full CLI surface beyond run-control and ui-lifecycle baseline
     - production authn/authz policy envelope
+
+authn_authz:
+  mode: optional-bearer-token
+  defaults:
+    enabled: false
+  when_enabled:
+    required_header: "Authorization: Bearer <token>"
+    permission_scopes:
+      - read
+      - mutate
+    error_codes:
+      - auth.missing_credentials
+      - auth.invalid_token
+      - auth.forbidden_project
+      - auth.insufficient_permission

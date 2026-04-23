@@ -1,0 +1,101 @@
+{
+  "fixture_id": "w10-s04.detached-transport-auth.v1",
+  "slice_id": "W10-S04",
+  "transport_auth": {
+    "enabled": true,
+    "tokens": [
+      {
+        "token_id": "reader",
+        "permissions": ["read"],
+        "project_refs": ["sample.project"]
+      },
+      {
+        "token_id": "operator",
+        "permissions": ["read", "mutate"],
+        "project_refs": ["sample.project"]
+      },
+      {
+        "token_id": "foreign",
+        "permissions": ["read"],
+        "project_refs": ["project.unrelated"]
+      }
+    ]
+  },
+  "checks": [
+    {
+      "request": {
+        "method": "GET",
+        "path": "/api/projects/sample.project/state"
+      },
+      "response": {
+        "status": 401,
+        "error": {
+          "code": "auth.missing_credentials",
+          "auth": {
+            "required_permission": "read",
+            "project_id": "sample.project"
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "path": "/api/projects/sample.project/state",
+        "authorization": "Bearer foreign-token"
+      },
+      "response": {
+        "status": 403,
+        "error": {
+          "code": "auth.forbidden_project",
+          "auth": {
+            "required_permission": "read",
+            "project_id": "sample.project",
+            "token_id": "foreign"
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/api/projects/sample.project/run-control/actions",
+        "authorization": "Bearer reader-token",
+        "payload": {
+          "action": "start",
+          "run_id": "run.http.transport.auth.v1"
+        }
+      },
+      "response": {
+        "status": 403,
+        "error": {
+          "code": "auth.insufficient_permission",
+          "auth": {
+            "required_permission": "mutate",
+            "project_id": "sample.project",
+            "token_id": "reader"
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "/api/projects/sample.project/run-control/actions",
+        "authorization": "Bearer operator-token",
+        "payload": {
+          "action": "start",
+          "run_id": "run.http.transport.auth.v1"
+        }
+      },
+      "response": {
+        "status": 200,
+        "run_control": {
+          "action": "start",
+          "run_id": "run.http.transport.auth.v1",
+          "blocked": false
+        }
+      }
+    }
+  ]
+}

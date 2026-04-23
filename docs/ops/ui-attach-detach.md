@@ -85,3 +85,16 @@ Mutation error-shape checks:
 - malformed JSON returns `error.code: "invalid_json"`;
 - unsupported action returns `error.code: "invalid_run_control_action"` or `error.code: "invalid_ui_lifecycle_action"`;
 - policy/transition block returns HTTP `409` with `error.code` in the `run_control.blocked` family and a durable `run_control.audit_file`.
+
+## Auth-enabled detached mode
+If detached transport auth is enabled, pass bearer token on every read/follow/mutation request:
+```bash
+curl -sS \
+  -H "Authorization: Bearer <TOKEN>" \
+  http://127.0.0.1:8080/api/projects/<PROJECT_ID>/state
+```
+
+Auth failure checks:
+- missing or invalid token returns HTTP `401` with `error.code` in `auth.missing_credentials | auth.invalid_token`;
+- project mismatch or missing permission returns HTTP `403` with `error.code` in `auth.forbidden_project | auth.insufficient_permission`;
+- auth error payload includes `error.auth.required_permission` and `error.auth.project_id` for troubleshooting.

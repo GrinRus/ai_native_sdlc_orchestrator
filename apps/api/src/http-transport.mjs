@@ -216,12 +216,187 @@ function readQueryInteger(params, key) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function extractBearerToken(value) {
+  const headerValue = Array.isArray(value) ? asString(value[0]) : asString(value);
+  if (!headerValue) {
+    return null;
+  }
+  const match = /^Bearer\s+(.+)$/iu.exec(headerValue);
+  return match ? asString(match[1]) : null;
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} projectId
+ */
+function normalizeAuthPolicy(value, projectId) {
+  const auth = asRecord(value);
+  const enabled = auth.enabled === true;
+  /** @type {Map<string, { tokenId: string, permissions: Set<string>, projectRefs: Set<string> }>} */
+  const principals = new Map();
+
+  const tokenEntries = Array.isArray(auth.tokens) ? auth.tokens : [];
+  for (const entry of tokenEntries) {
+    const tokenRecord = asRecord(entry);
+    const token = asString(tokenRecord.token);
+    if (!token) {
+      continue;
+    }
+    const tokenId = asString(tokenRecord.token_id) ?? `token.${principals.size + 1}`;
+
+    const permissions = new Set();
+    const permissionEntries = Array.isArray(tokenRecord.permissions) ? tokenRecord.permissions : [];
+    for (const permission of permissionEntries) {
+      const normalized = asString(permission);
+      if (normalized === "read" || normalized === "mutate") {
+        permissions.add(normalized);
+      }
+    }
+    if (permissions.size === 0) {
+      permissions.add("read");
+      permissions.add("mutate");
+    }
+
+    const projectRefs = new Set();
+    const projectRefEntries = Array.isArray(tokenRecord.project_refs) ? tokenRecord.project_refs : [];
+    for (const projectRefEntry of projectRefEntries) {
+      const projectRef = asString(projectRefEntry);
+      if (projectRef) {
+        projectRefs.add(projectRef);
+      }
+    }
+    if (projectRefs.size === 0) {
+      projectRefs.add(projectId);
+    }
+
+    principals.set(token, {
+      tokenId,
+      permissions,
+      projectRefs,
+    });
+  }
+
+  return {
+    enabled,
+    principals,
+  };
+}
+
+/**
+ * @param {{
+ *   request: http.IncomingMessage,
+ *   policy: ReturnType<typeof normalizeAuthPolicy>,
+ *   projectId: string,
+ *   requiredPermission: "read" | "mutate",
+ * }} options
+ */
+function authorizeRequest(options) {
+  if (!options.policy.enabled) {
+    return {
+      allowed: true,
+    };
+  }
+
+  const token = extractBearerToken(options.request.headers.authorization);
+  if (!token) {
+    return {
+      allowed: false,
+      statusCode: 401,
+      code: "auth.missing_credentials",
+      message: "Authorization bearer token is required when detached transport auth is enabled.",
+      requiredPermission: options.requiredPermission,
+      projectId: options.projectId,
+      tokenId: null,
+    };
+  }
+
+  const principal = options.policy.principals.get(token);
+  if (!principal) {
+    return {
+      allowed: false,
+      statusCode: 401,
+      code: "auth.invalid_token",
+      message: "Authorization bearer token is not recognized by detached transport auth policy.",
+      requiredPermission: options.requiredPermission,
+      projectId: options.projectId,
+      tokenId: null,
+    };
+  }
+
+  if (!principal.projectRefs.has(options.projectId) && !principal.projectRefs.has("*")) {
+    return {
+      allowed: false,
+      statusCode: 403,
+      code: "auth.forbidden_project",
+      message: `Token '${principal.tokenId}' is not authorized for project '${options.projectId}'.`,
+      requiredPermission: options.requiredPermission,
+      projectId: options.projectId,
+      tokenId: principal.tokenId,
+    };
+  }
+
+  if (!principal.permissions.has(options.requiredPermission)) {
+    return {
+      allowed: false,
+      statusCode: 403,
+      code: "auth.insufficient_permission",
+      message: `Token '${principal.tokenId}' does not allow '${options.requiredPermission}' operations.`,
+      requiredPermission: options.requiredPermission,
+      projectId: options.projectId,
+      tokenId: principal.tokenId,
+    };
+  }
+
+  return {
+    allowed: true,
+    tokenId: principal.tokenId,
+  };
+}
+
+/**
+ * @param {http.ServerResponse} response
+ * @param {{
+ *   statusCode: number,
+ *   code: string,
+ *   message: string,
+ *   requiredPermission: "read" | "mutate",
+ *   projectId: string,
+ *   tokenId: string | null,
+ * }} decision
+ */
+function sendAuthError(response, decision) {
+  sendJson(response, decision.statusCode, {
+    error: {
+      code: decision.code,
+      message: decision.message,
+      auth: {
+        required_permission: decision.requiredPermission,
+        project_id: decision.projectId,
+        token_id: decision.tokenId,
+      },
+    },
+  });
+}
+
+/**
  * @param {{
  *   cwd?: string,
- *   projectRef: string,
- *   runtimeRoot?: string,
- *   host?: string,
- *   port?: number,
+  *   projectRef: string,
+  *   runtimeRoot?: string,
+  *   host?: string,
+  *   port?: number,
+ *   auth?: {
+ *     enabled?: boolean,
+ *     tokens?: Array<{
+ *       token: string,
+ *       token_id?: string,
+ *       permissions?: Array<"read" | "mutate">,
+ *       project_refs?: string[],
+ *     }>,
+ *   },
  * }} options
  */
 export function createControlPlaneHttpServer(options) {
@@ -235,6 +410,7 @@ export function createControlPlaneHttpServer(options) {
   };
   const state = readProjectState(runtimeOptions);
   const projectId = state.project_id;
+  const authPolicy = normalizeAuthPolicy(options.auth, projectId);
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -258,6 +434,24 @@ export function createControlPlaneHttpServer(options) {
         return decodeURIComponent(value) === projectId;
       }
 
+      /**
+       * @param {"read" | "mutate"} requiredPermission
+       * @returns {boolean}
+       */
+      function ensureAuthorized(requiredPermission) {
+        const decision = authorizeRequest({
+          request,
+          policy: authPolicy,
+          projectId,
+          requiredPermission,
+        });
+        if (decision.allowed) {
+          return true;
+        }
+        sendAuthError(response, decision);
+        return false;
+      }
+
       if (method !== "GET" && method !== "POST") {
         response.setHeader("allow", "GET, POST");
         sendError(response, 405, "method_not_allowed", "Detached control-plane supports only GET and POST.");
@@ -275,6 +469,9 @@ export function createControlPlaneHttpServer(options) {
           sendError(response, 405, "method_not_allowed", "State route supports only GET.");
           return;
         }
+        if (!ensureAuthorized("read")) {
+          return;
+        }
         sendJson(response, 200, readProjectState(runtimeOptions));
         return;
       }
@@ -288,6 +485,9 @@ export function createControlPlaneHttpServer(options) {
         if (method !== "GET") {
           response.setHeader("allow", "GET");
           sendError(response, 405, "method_not_allowed", "Packet route supports only GET.");
+          return;
+        }
+        if (!ensureAuthorized("read")) {
           return;
         }
         sendJson(response, 200, listPacketArtifacts(runtimeOptions));
@@ -305,6 +505,9 @@ export function createControlPlaneHttpServer(options) {
           sendError(response, 405, "method_not_allowed", "Step-result route supports only GET.");
           return;
         }
+        if (!ensureAuthorized("read")) {
+          return;
+        }
         sendJson(response, 200, listStepResults(runtimeOptions));
         return;
       }
@@ -318,6 +521,9 @@ export function createControlPlaneHttpServer(options) {
         if (method !== "GET") {
           response.setHeader("allow", "GET");
           sendError(response, 405, "method_not_allowed", "Quality route supports only GET.");
+          return;
+        }
+        if (!ensureAuthorized("read")) {
           return;
         }
         sendJson(response, 200, listQualityArtifacts(runtimeOptions));
@@ -335,6 +541,9 @@ export function createControlPlaneHttpServer(options) {
           sendError(response, 405, "method_not_allowed", "Delivery-manifest route supports only GET.");
           return;
         }
+        if (!ensureAuthorized("read")) {
+          return;
+        }
         sendJson(response, 200, listDeliveryManifests(runtimeOptions));
         return;
       }
@@ -348,6 +557,9 @@ export function createControlPlaneHttpServer(options) {
         if (method !== "GET") {
           response.setHeader("allow", "GET");
           sendError(response, 405, "method_not_allowed", "Promotion-decision route supports only GET.");
+          return;
+        }
+        if (!ensureAuthorized("read")) {
           return;
         }
         sendJson(response, 200, listPromotionDecisions(runtimeOptions));
@@ -365,6 +577,9 @@ export function createControlPlaneHttpServer(options) {
           sendError(response, 405, "method_not_allowed", "Strategic-snapshot route supports only GET.");
           return;
         }
+        if (!ensureAuthorized("read")) {
+          return;
+        }
         sendJson(response, 200, readStrategicSnapshot(runtimeOptions));
         return;
       }
@@ -380,6 +595,9 @@ export function createControlPlaneHttpServer(options) {
           sendError(response, 405, "method_not_allowed", "Run route supports only GET.");
           return;
         }
+        if (!ensureAuthorized("read")) {
+          return;
+        }
         sendJson(response, 200, listRuns(runtimeOptions));
         return;
       }
@@ -393,6 +611,9 @@ export function createControlPlaneHttpServer(options) {
         if (method !== "GET") {
           response.setHeader("allow", "GET");
           sendError(response, 405, "method_not_allowed", "Event-history route supports only GET.");
+          return;
+        }
+        if (!ensureAuthorized("read")) {
           return;
         }
         const runId = decodeURIComponent(eventHistoryMatch[2]);
@@ -420,6 +641,9 @@ export function createControlPlaneHttpServer(options) {
           sendError(response, 405, "method_not_allowed", "Policy-history route supports only GET.");
           return;
         }
+        if (!ensureAuthorized("read")) {
+          return;
+        }
         const runId = decodeURIComponent(policyHistoryMatch[2]);
         const limit = readQueryInteger(requestUrl.searchParams, "limit");
         sendJson(
@@ -443,6 +667,9 @@ export function createControlPlaneHttpServer(options) {
         if (method !== "GET") {
           response.setHeader("allow", "GET");
           sendError(response, 405, "method_not_allowed", "Run-event stream route supports only GET.");
+          return;
+        }
+        if (!ensureAuthorized("read")) {
           return;
         }
         const runId = decodeURIComponent(streamMatch[2]);
@@ -511,6 +738,9 @@ export function createControlPlaneHttpServer(options) {
           sendError(response, 405, "method_not_allowed", "Run-control mutation route supports only POST.");
           return;
         }
+        if (!ensureAuthorized("mutate")) {
+          return;
+        }
 
         let payload;
         try {
@@ -574,6 +804,9 @@ export function createControlPlaneHttpServer(options) {
         if (method !== "POST") {
           response.setHeader("allow", "POST");
           sendError(response, 405, "method_not_allowed", "UI lifecycle mutation route supports only POST.");
+          return;
+        }
+        if (!ensureAuthorized("mutate")) {
           return;
         }
 

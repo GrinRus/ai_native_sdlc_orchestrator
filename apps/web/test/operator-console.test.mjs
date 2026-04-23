@@ -441,3 +441,87 @@ test("web connected mode routes run-control and ui-lifecycle mutations through d
     }
   });
 });
+
+test("web connected mode supports auth-enabled detached transport with bearer token", async () => {
+  await withTempProject(async (projectRoot) => {
+    const runId = seedOperatorArtifacts(projectRoot);
+    const transport = await createControlPlaneHttpServer({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      host: "127.0.0.1",
+      port: 0,
+      auth: {
+        enabled: true,
+        tokens: [
+          {
+            token: "reader-token",
+            token_id: "reader",
+            permissions: ["read"],
+          },
+          {
+            token: "operator-token",
+            token_id: "operator",
+            permissions: ["read", "mutate"],
+          },
+        ],
+      },
+    });
+
+    try {
+      const attachResult = invokeCli([
+        "ui",
+        "attach",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+        "--control-plane",
+        transport.baseUrl,
+      ]);
+      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
+
+      await assert.rejects(
+        () =>
+          buildOperatorConsoleSnapshot({
+            cwd: projectRoot,
+            projectRef: projectRoot,
+            runId,
+          }),
+        /Control-plane request failed \(401\)/,
+      );
+
+      const snapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+        controlPlaneAuthToken: "reader-token",
+      });
+      assert.equal(snapshot.api_ui_contract_alignment.binding_mode, "detached-http-sse");
+      assert.equal(snapshot.api_ui_contract_alignment.auth_mode, "optional-bearer-token");
+
+      await assert.rejects(
+        () =>
+          applyOperatorRunControl({
+            cwd: projectRoot,
+            projectRef: projectRoot,
+            runId,
+            action: "start",
+            controlPlaneAuthToken: "reader-token",
+          }),
+        /Control-plane mutation failed \(403\)/,
+      );
+
+      const controlResult = await applyOperatorRunControl({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+        action: "start",
+        controlPlaneAuthToken: "operator-token",
+      });
+      assert.equal(controlResult.binding_mode, "detached-http-mutation");
+      assert.equal(controlResult.run_control.action, "start");
+    } finally {
+      await transport.close();
+    }
+  });
+});

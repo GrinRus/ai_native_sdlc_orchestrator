@@ -197,6 +197,14 @@ Detached mutation error-shape baseline:
 - `invalid_run_control_action` and `invalid_ui_lifecycle_action` for unsupported actions;
 - `run_control.blocked` family codes for policy or transition blocking branches.
 
+Detached authn/authz baseline (W10-S04):
+- auth mode is optional and disabled by default for local trusted operator rehearsals;
+- when auth is enabled, requests require `Authorization: Bearer <token>`;
+- tokens are project-scoped and permission-scoped (`read` and `mutate`);
+- missing or invalid credentials return HTTP `401` with `error.code` in `auth.missing_credentials | auth.invalid_token`;
+- project mismatch or missing permission return HTTP `403` with `error.code` in `auth.forbidden_project | auth.insufficient_permission`;
+- auth error payload includes `error.auth.required_permission`, `error.auth.project_id`, and `error.auth.token_id` (when available).
+
 Deferred beyond this baseline:
 - mutation-command HTTP endpoint parity for the full CLI surface outside the supported run-control and UI lifecycle actions;
 - production authn/authz and deployment hardening.
@@ -211,6 +219,7 @@ Deferred beyond this baseline:
 
 ## Authentication and permission assumptions
 - Baseline assumption for local/operator rehearsals: trusted local operator context behind workspace access controls.
+- Detached transport can enable optional bearer-token auth with project-scoped `read` and `mutate` permissions.
 - Read operations are read-only and must not mutate runtime artifacts.
 - Production deployments should require authenticated identity with project-scoped read permissions before exposing packet or evidence references.
 - Responses should preserve `evidence://` or runtime-relative refs for audit traceability and must not return secrets.

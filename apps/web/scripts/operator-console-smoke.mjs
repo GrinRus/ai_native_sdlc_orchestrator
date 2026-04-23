@@ -84,6 +84,7 @@ async function main() {
   const follow = optionalBoolean("follow", flags.follow);
   const runtimeRoot = optionalString("runtime-root", flags["runtime-root"]);
   const controlPlane = optionalString("control-plane", flags["control-plane"]);
+  const controlPlaneAuthToken = optionalString("control-plane-auth-token", flags["control-plane-auth-token"]);
   const afterEventId = optionalString("after-event-id", flags["after-event-id"]);
   const outputHtmlFlag = optionalString("output-html", flags["output-html"]);
   const maxReplayRaw = optionalString("max-replay", flags["max-replay"]);
@@ -105,6 +106,7 @@ async function main() {
     afterEventId,
     maxReplay,
     controlPlane,
+    controlPlaneAuthToken,
   });
 
   const html = session.render();

@@ -115,6 +115,42 @@ async function postJson(url, payload) {
   });
 }
 
+/**
+ * @param {string} url
+ * @param {string | null} token
+ */
+async function getJson(url, token = null) {
+  /** @type {Record<string, string>} */
+  const headers = {
+    accept: "application/json",
+  };
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+  return fetch(url, { headers });
+}
+
+/**
+ * @param {string} url
+ * @param {Record<string, unknown>} payload
+ * @param {string | null} token
+ */
+async function postJsonWithToken(url, payload, token = null) {
+  /** @type {Record<string, string>} */
+  const headers = {
+    accept: "application/json",
+    "content-type": "application/json; charset=utf-8",
+  };
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+  return fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+}
+
 test("detached control-plane transport serves read baseline endpoints", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.read.v1";
@@ -340,6 +376,90 @@ test("detached control-plane transport supports bounded run-control and ui-lifec
       assert.equal(invalidActionResponse.status, 400);
       const invalidActionPayload = await invalidActionResponse.json();
       assert.equal(invalidActionPayload.error.code, "invalid_run_control_action");
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("detached control-plane authn/authz enforces bearer auth with project-scoped permissions", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.transport.auth.v1";
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+      auth: {
+        enabled: true,
+        tokens: [
+          {
+            token: "reader-token",
+            token_id: "reader",
+            permissions: ["read"],
+          },
+          {
+            token: "operator-token",
+            token_id: "operator",
+            permissions: ["read", "mutate"],
+          },
+          {
+            token: "foreign-token",
+            token_id: "foreign",
+            permissions: ["read"],
+            project_refs: ["project.unrelated"],
+          },
+        ],
+      },
+    });
+
+    try {
+      const stateUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/state`;
+      const runControlUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`;
+
+      const missingAuthResponse = await getJson(stateUrl);
+      assert.equal(missingAuthResponse.status, 401);
+      const missingAuthPayload = await missingAuthResponse.json();
+      assert.equal(missingAuthPayload.error.code, "auth.missing_credentials");
+      assert.equal(missingAuthPayload.error.auth.required_permission, "read");
+
+      const forbiddenProjectResponse = await getJson(stateUrl, "foreign-token");
+      assert.equal(forbiddenProjectResponse.status, 403);
+      const forbiddenProjectPayload = await forbiddenProjectResponse.json();
+      assert.equal(forbiddenProjectPayload.error.code, "auth.forbidden_project");
+      assert.equal(forbiddenProjectPayload.error.auth.project_id, transport.projectId);
+
+      const readAllowedResponse = await getJson(stateUrl, "reader-token");
+      assert.equal(readAllowedResponse.status, 200);
+      const readAllowedPayload = await readAllowedResponse.json();
+      assert.equal(readAllowedPayload.project_id, transport.projectId);
+
+      const mutateForbiddenResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "start",
+          run_id: runId,
+        },
+        "reader-token",
+      );
+      assert.equal(mutateForbiddenResponse.status, 403);
+      const mutateForbiddenPayload = await mutateForbiddenResponse.json();
+      assert.equal(mutateForbiddenPayload.error.code, "auth.insufficient_permission");
+      assert.equal(mutateForbiddenPayload.error.auth.required_permission, "mutate");
+
+      const mutateAllowedResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "start",
+          run_id: runId,
+        },
+        "operator-token",
+      );
+      assert.equal(mutateAllowedResponse.status, 200);
+      const mutateAllowedPayload = await mutateAllowedResponse.json();
+      assert.equal(mutateAllowedPayload.run_control.action, "start");
+      assert.equal(mutateAllowedPayload.run_control.blocked, false);
+      assert.equal(fs.existsSync(mutateAllowedPayload.run_control.audit_file), true);
     } finally {
       await transport.close();
     }
