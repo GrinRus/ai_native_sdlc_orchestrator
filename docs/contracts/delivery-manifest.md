@@ -27,6 +27,7 @@ Delivery-capable runs should include execution isolation metadata (mode, checkou
 `approval_context` should preserve handoff and promotion evidence references that justified write-back eligibility.
 `coordination` should capture multi-repo coordination requirement/status and evidence refs used to unblock write-back.
 `rerun_recovery` should keep retry scope bounded by one failed step and explicit packet boundary.
+When fork-first network write is executed, `repo_deliveries[].pr_draft` and `writeback_policy.network_mode` should preserve draft PR and network provenance for audit replay.
 
 ## Example
 See `examples/delivery-manifest.sample.yaml`.

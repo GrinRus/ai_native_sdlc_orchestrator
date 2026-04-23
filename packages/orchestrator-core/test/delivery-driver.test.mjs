@@ -97,6 +97,40 @@ function createReadyPlan(options) {
 }
 
 /**
+ * @param {string} workspace
+ * @returns {string}
+ */
+function createMockGhCli(workspace) {
+  const mockPath = path.join(workspace, "mock-gh.mjs");
+  const mockScript = [
+    "#!/usr/bin/env node",
+    "const args = process.argv.slice(2);",
+    "if (args.length === 1 && args[0] === '--version') {",
+    "  process.stdout.write('gh version 9.9.9-mock\\n');",
+    "  process.exit(0);",
+    "}",
+    "const endpoint = args.find((entry) => entry.startsWith('/repos/')) || '';",
+    "if (endpoint === '/repos/aor-bot/openai') {",
+    "  process.stdout.write(JSON.stringify({ full_name: 'aor-bot/openai', html_url: 'https://github.com/aor-bot/openai' }));",
+    "  process.exit(0);",
+    "}",
+    "if (endpoint === '/repos/openai/openai/forks') {",
+    "  process.stdout.write(JSON.stringify({ full_name: 'aor-bot/openai', html_url: 'https://github.com/aor-bot/openai' }));",
+    "  process.exit(0);",
+    "}",
+    "if (endpoint === '/repos/openai/openai/pulls') {",
+    "  process.stdout.write(JSON.stringify({ number: 4321, html_url: 'https://github.com/openai/openai/pull/4321' }));",
+    "  process.exit(0);",
+    "}",
+    "process.stderr.write(`mock-gh: unsupported args ${args.join(' ')}\\n`);",
+    "process.exit(1);",
+  ].join("\n");
+  fs.writeFileSync(mockPath, `${mockScript}\n`, "utf8");
+  fs.chmodSync(mockPath, 0o755);
+  return mockPath;
+}
+
+/**
  * @param {ReturnType<typeof runDeliveryDriver>} result
  */
 function assertDeliveryArtifacts(result) {
@@ -292,6 +326,104 @@ test("runDeliveryDriver builds fork-first PR metadata in stubbed network mode", 
     assert.equal(transcript.status, "success");
     assert.equal(transcript.mode, "fork-first-pr");
     assert.equal(transcript.git.commands.some((command) => command.includes("push")), false);
+    assertDeliveryArtifacts(result);
+  });
+});
+
+test("runDeliveryDriver executes networked fork-first flow when explicitly enabled and credentials are present", () => {
+  withTempRepo((repoRoot) => {
+    runGitChecked({
+      cwd: repoRoot,
+      args: ["remote", "add", "origin", "https://github.com/openai/openai.git"],
+    });
+    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
+    fs.appendFileSync(targetFile, "\n# w10-s02 fork-first networked delivery test\n", "utf8");
+
+    const forkRemotePath = path.join(repoRoot, ".tmp-fork-remote.git");
+    runGitChecked({
+      cwd: repoRoot,
+      args: ["init", "--bare", forkRemotePath],
+    });
+    const mockGhPath = createMockGhCli(repoRoot);
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.fork.networked.v1",
+      mode: "fork-first-pr",
+    });
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.fork.networked.v1",
+      mode: "fork-first-pr",
+      deliveryPlanPath: deliveryPlanFile,
+      forkOwner: "aor-bot",
+      branchName: "aor/w10-s02-fork-networked",
+      prTitle: "W10-S02 fork-first networked draft",
+      enableNetworkWrite: true,
+      githubToken: "test-token",
+      githubCliPath: mockGhPath,
+      forkRemoteUrl: forkRemotePath,
+    });
+
+    assert.equal(result.status, "success");
+    assert.equal(result.outputs.network_mode, "networked");
+    assert.equal(result.outputs.network_write.requested, true);
+    assert.equal(result.outputs.network_write.executed, true);
+    assert.equal(result.outputs.network_write.pull_request_number, 4321);
+    assert.equal(result.outputs.pr_draft.number, 4321);
+    assert.equal(result.outputs.pr_draft.html_url, "https://github.com/openai/openai/pull/4321");
+    assert.equal(typeof result.outputs.commit_sha, "string");
+    assert.equal(result.outputs.commit_sha.length, 40);
+    assert.equal(result.deliveryManifest.writeback_policy.network_mode, "networked");
+    assert.equal(result.deliveryManifest.repo_deliveries[0].writeback_result, "fork-pr-draft-created");
+
+    const pushedRef = spawnSync(
+      "git",
+      ["--git-dir", forkRemotePath, "show-ref", "refs/heads/aor/w10-s02-fork-networked"],
+      { encoding: "utf8" },
+    );
+    assert.equal(pushedRef.status, 0, pushedRef.stderr);
+    assertDeliveryArtifacts(result);
+  });
+});
+
+test("runDeliveryDriver blocks fork-first network execution when credentials are missing", () => {
+  withTempRepo((repoRoot) => {
+    runGitChecked({
+      cwd: repoRoot,
+      args: ["remote", "add", "origin", "https://github.com/openai/openai.git"],
+    });
+    const targetFile = path.join(repoRoot, "examples/project.aor.yaml");
+    fs.appendFileSync(targetFile, "\n# w10-s02 missing credentials\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.fork.missing-credentials.v1",
+      mode: "fork-first-pr",
+    });
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.fork.missing-credentials.v1",
+      mode: "fork-first-pr",
+      deliveryPlanPath: deliveryPlanFile,
+      forkOwner: "aor-bot",
+      branchName: "aor/w10-s02-missing-creds",
+      enableNetworkWrite: true,
+      githubToken: "",
+    });
+
+    assert.equal(result.status, "failed");
+    const transcript = JSON.parse(fs.readFileSync(result.transcriptFile, "utf8"));
+    assert.match(String(transcript.error), /GitHub credentials are missing/i);
+    assert.equal(transcript.mode, "fork-first-pr");
+    assert.ok(transcript.git.commands.every((command) => !command.includes("git push")));
+    assert.equal(result.releasePacket.status, "blocked");
     assertDeliveryArtifacts(result);
   });
 });

@@ -81,6 +81,61 @@ function runGitChecked(options) {
 }
 
 /**
+ * @param {{ command: string, args: string[], cwd: string, env?: Record<string, string | undefined> }} options
+ * @returns {{ stdout: string, stderr: string, status: number | null, error: Error | null }}
+ */
+function runCommand(options) {
+  const run = spawnSync(options.command, options.args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+    env: options.env,
+  });
+  return {
+    stdout: run.stdout ?? "",
+    stderr: run.stderr ?? "",
+    status: run.status,
+    error: run.error instanceof Error ? run.error : null,
+  };
+}
+
+/**
+ * @param {{ command: string, args: string[], cwd: string, env?: Record<string, string | undefined> }} options
+ * @returns {string}
+ */
+function runCommandChecked(options) {
+  const run = runCommand(options);
+  if (run.error) {
+    throw new Error(`${options.command} failed to launch: ${run.error.message}`);
+  }
+  if (run.status !== 0) {
+    throw new Error(
+      `${options.command} ${options.args.join(" ")} failed (exit ${String(run.status)}): ${run.stderr.trim() || run.stdout.trim()}`,
+    );
+  }
+  return run.stdout;
+}
+
+/**
+ * @param {{ command: string, args: string[], cwd: string, env?: Record<string, string | undefined> }} options
+ * @returns {Record<string, unknown>}
+ */
+function runCommandJsonChecked(options) {
+  const stdout = runCommandChecked(options).trim();
+  if (!stdout) {
+    throw new Error(`${options.command} ${options.args.join(" ")} returned empty JSON response.`);
+  }
+  try {
+    const parsed = JSON.parse(stdout);
+    return asRecord(parsed);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `${options.command} ${options.args.join(" ")} returned invalid JSON payload: ${message}`,
+    );
+  }
+}
+
+/**
  * @param {string} output
  * @returns {string[]}
  */
@@ -311,9 +366,13 @@ function resolveDeliveryMode(deliveryPlan, requestedMode) {
   *  branchName?: string,
   *  commitMessage?: string,
  *  forkOwner?: string,
+ *  forkRemoteUrl?: string,
  *  baseRef?: string,
  *  prTitle?: string,
  *  prBody?: string,
+ *  enableNetworkWrite?: boolean,
+ *  githubToken?: string,
+ *  githubCliPath?: string,
  *  ticketId?: string,
  *  executionRoot?: string,
  *  deliveryPlanPath?: string,
@@ -518,10 +577,18 @@ export function runDeliveryDriver(options = {}) {
       const forkOwner = asString(options.forkOwner) ?? "aor-bot";
       const baseRef = asString(options.baseRef) ?? gitHeadBefore.branch;
       const headBranch = asString(options.branchName) ?? `aor/${normalizeForId(runId)}`;
+      const commitMessage = asString(options.commitMessage) ?? `AOR delivery ${runId}`;
       const prTitle = asString(options.prTitle) ?? `AOR delivery ${runId}`;
       const prBody =
         asString(options.prBody) ??
         "Draft PR prepared by AOR fork-first delivery planning mode. No network write was executed in this run.";
+      const enableNetworkWrite = options.enableNetworkWrite === true;
+      const githubToken = Object.prototype.hasOwnProperty.call(options, "githubToken")
+        ? asString(options.githubToken)
+        : asString(process.env.GITHUB_TOKEN);
+      const githubCliPath = asString(options.githubCliPath) ?? "gh";
+      const forkRemoteUrl =
+        asString(options.forkRemoteUrl) ?? `https://github.com/${forkOwner}/${parsedRemote.repo}.git`;
 
       commands.push("git diff --name-only HEAD");
       changedPaths = parseLineList(
@@ -541,7 +608,7 @@ export function runDeliveryDriver(options = {}) {
 
       const apiIntent = {
         mode: "fork-first-pr",
-        network_mode: "stubbed",
+        network_mode: enableNetworkWrite ? "requested" : "stubbed",
         remote: {
           host: parsedRemote.host,
           upstream_repo: `${parsedRemote.owner}/${parsedRemote.repo}`,
@@ -589,13 +656,175 @@ export function runDeliveryDriver(options = {}) {
       );
       fs.writeFileSync(apiIntentFile, `${JSON.stringify(apiIntent, null, 2)}\n`, "utf8");
 
-      outputs = {
+      /** @type {Record<string, unknown>} */
+      const planningOutputs = {
         fork_target: apiIntent.remote,
         branch_ref: apiIntent.branch,
         pr_draft: apiIntent.pr_draft,
         api_intent_file: apiIntentFile,
         network_mode: "stubbed",
+        network_write: {
+          requested: enableNetworkWrite,
+          executed: false,
+        },
       };
+
+      if (!enableNetworkWrite) {
+        outputs = planningOutputs;
+      } else {
+        if (!githubToken) {
+          throw new Error(
+            "fork-first-pr network write requested but GitHub credentials are missing. Set GITHUB_TOKEN or pass githubToken option.",
+          );
+        }
+
+        const githubEnv = {
+          ...process.env,
+          GITHUB_TOKEN: githubToken,
+        };
+
+        commands.push(`${githubCliPath} --version`);
+        runCommandChecked({
+          command: githubCliPath,
+          args: ["--version"],
+          cwd: executionRoot,
+          env: githubEnv,
+        });
+
+        let forkState = "verified";
+        /** @type {Record<string, unknown>} */
+        let forkMetadata;
+        commands.push(`${githubCliPath} api /repos/${forkOwner}/${parsedRemote.repo}`);
+        try {
+          forkMetadata = runCommandJsonChecked({
+            command: githubCliPath,
+            args: ["api", `/repos/${forkOwner}/${parsedRemote.repo}`],
+            cwd: executionRoot,
+            env: githubEnv,
+          });
+        } catch {
+          const createForkArgs = ["api", "-X", "POST", `/repos/${parsedRemote.owner}/${parsedRemote.repo}/forks`];
+          if (forkOwner !== parsedRemote.owner) {
+            createForkArgs.push("-f", `organization=${forkOwner}`);
+          }
+          commands.push(`${githubCliPath} ${createForkArgs.join(" ")}`);
+          forkMetadata = runCommandJsonChecked({
+            command: githubCliPath,
+            args: createForkArgs,
+            cwd: executionRoot,
+            env: githubEnv,
+          });
+          forkState = "created";
+        }
+
+        commands.push(`git checkout -B ${headBranch}`);
+        runGitChecked({
+          cwd: executionRoot,
+          args: ["checkout", "-B", headBranch],
+        });
+
+        commands.push("git add -A");
+        runGitChecked({
+          cwd: executionRoot,
+          args: ["add", "-A"],
+        });
+
+        commands.push("git diff --cached --quiet");
+        const stagedDiff = runGit({
+          cwd: executionRoot,
+          args: ["diff", "--cached", "--quiet"],
+        });
+        if (stagedDiff.status === 0) {
+          throw new Error("Fork-first network delivery has no staged changes to commit.");
+        }
+        if (stagedDiff.status !== 1) {
+          throw new Error(
+            `git diff --cached --quiet failed with exit ${String(stagedDiff.status)}: ${stagedDiff.stderr.trim()}`,
+          );
+        }
+
+        commands.push(`git commit -m ${JSON.stringify(commitMessage)} --no-verify`);
+        runGitChecked({
+          cwd: executionRoot,
+          args: ["commit", "-m", commitMessage, "--no-verify"],
+        });
+
+        commands.push("git rev-parse HEAD");
+        const commitSha = runGitChecked({
+          cwd: executionRoot,
+          args: ["rev-parse", "HEAD"],
+        }).trim();
+
+        commands.push(`git push ${forkRemoteUrl} HEAD:refs/heads/${headBranch} --force-with-lease`);
+        runGitChecked({
+          cwd: executionRoot,
+          args: ["push", forkRemoteUrl, `HEAD:refs/heads/${headBranch}`, "--force-with-lease"],
+        });
+
+        commands.push("git show --name-only --pretty=format: HEAD");
+        changedPaths = parseLineList(
+          runGitChecked({
+            cwd: executionRoot,
+            args: ["show", "--name-only", "--pretty=format:", "HEAD"],
+          }),
+        );
+
+        commands.push("git show --numstat --format= HEAD");
+        diffStats = parseNumstat(
+          runGitChecked({
+            cwd: executionRoot,
+            args: ["show", "--numstat", "--format=", "HEAD"],
+          }),
+        );
+
+        const prCreateArgs = [
+          "api",
+          "-X",
+          "POST",
+          `/repos/${parsedRemote.owner}/${parsedRemote.repo}/pulls`,
+          "-f",
+          `title=${prTitle}`,
+          "-f",
+          `body=${prBody}`,
+          "-f",
+          `head=${forkOwner}:${headBranch}`,
+          "-f",
+          `base=${baseRef}`,
+          "-F",
+          "draft=true",
+        ];
+        commands.push(`${githubCliPath} ${prCreateArgs.join(" ")}`);
+        const prResponse = runCommandJsonChecked({
+          command: githubCliPath,
+          args: prCreateArgs,
+          cwd: executionRoot,
+          env: githubEnv,
+        });
+
+        const prNumber = typeof prResponse.number === "number" ? prResponse.number : null;
+        const prUrl = asString(prResponse.html_url);
+        outputs = {
+          ...planningOutputs,
+          network_mode: "networked",
+          commit_sha: commitSha,
+          pr_draft: {
+            ...asRecord(planningOutputs.pr_draft),
+            number: prNumber,
+            html_url: prUrl,
+          },
+          network_write: {
+            requested: true,
+            executed: true,
+            fork_state: forkState,
+            fork_repo_url: asString(forkMetadata.html_url),
+            fork_full_name: asString(forkMetadata.full_name),
+            pull_request_number: prNumber,
+            pull_request_url: prUrl,
+            push_remote: forkRemoteUrl,
+            github_cli: githubCliPath,
+          },
+        };
+      }
     }
   } catch (error) {
     status = "failed";
@@ -677,7 +906,9 @@ export function runDeliveryDriver(options = {}) {
         ? "patch-materialized"
         : mode === "local-branch"
           ? "local-branch-committed"
-          : "fork-pr-planned"
+          : asString(outputs.network_mode) === "networked"
+            ? "fork-pr-draft-created"
+            : "fork-pr-planned"
       : "failed";
 
   const repoDelivery = {

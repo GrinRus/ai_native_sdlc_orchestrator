@@ -1,12 +1,13 @@
 # Runbook: GitHub fork-first delivery baseline
 
 ## Purpose
-Define safe default behavior for public-repository networked delivery planning before any real push or PR creation.
+Define safe default behavior for public-repository fork-first delivery, including planning-only fallback and bounded networked write execution.
 
 ## Policy boundary
 - Public repositories default to `fork-first-pr`.
 - Direct upstream branch write is not allowed by default.
-- This baseline materializes PR-ready metadata and API intent in `stubbed` mode only.
+- `fork-first-pr` stays in planning-only (`network_mode=stubbed`) unless operators explicitly request network write.
+- Networked write execution requires explicit `--network-write` plus valid GitHub credentials.
 
 ## Credential expectations
 - Use credentials that can read upstream repository metadata.
@@ -16,7 +17,7 @@ Define safe default behavior for public-repository networked delivery planning b
   - open draft pull requests against upstream base branch.
 
 ## Permission checklist
-Before switching from stubbed planning to real network write:
+Before switching from planning-only to real network write:
 1. Confirm token has `repo` scope for private targets, or equivalent minimum scope for public targets.
 2. Confirm fork owner can push branch refs to the fork repository.
 3. Confirm upstream repository allows PRs from fork branches.
@@ -27,6 +28,7 @@ Before switching from stubbed planning to real network write:
 2. Promotion evidence is present for the impacted assets.
 3. Delivery plan status is `ready`.
 4. Security/compliance reviewer signs off when policy requires it.
+5. Operator explicitly enables `--network-write` for the command invocation.
 
 ## Human checkpoints before production write-back
 1. Confirm latest `delivery-manifest-*.json` captures:
@@ -44,7 +46,7 @@ Before switching from stubbed planning to real network write:
    - `evidence_lineage.rerun_refs`,
    - `evidence_lineage.execution_refs`.
 3. If any checkpoint is missing, stop and rerun rehearsal in no-write mode.
-4. Only after all checkpoints pass may operators request policy change for real network write-back.
+4. Only after all checkpoints pass may operators run bounded network write-back.
 
 ## Recovery checkpoints
 On delivery failure:
@@ -60,7 +62,9 @@ On delivery failure:
 - Branch ref metadata (`base_ref`, `head_ref`, `head_branch`)
 - Draft PR metadata (`title`, `body`, `is_draft`, base/head refs)
 - API intent evidence (`fork_request`, `push_request`, `pr_request`)
+- For networked execution (`W10-S02`): commit SHA, fork verification/creation status, and created PR identifier/URL.
 
 Fixture sample:
 - `examples/live-e2e/fixtures/w4-s04/fork-first-intent.sample.json`
 - `examples/live-e2e/fixtures/w4-s06/public-target-delivery-rehearsal.sample.md`
+- `examples/live-e2e/fixtures/w10-s02/fork-first-networked-transcript.json`

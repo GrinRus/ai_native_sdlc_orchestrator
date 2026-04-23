@@ -102,7 +102,7 @@ Delivery/release response baseline:
 - `delivery_coordination` for multi-repo coordination requirement and evidence status;
 - `delivery_rerun_recovery` for explicit rerun run-ref, failed-step, and packet-boundary scope;
 - `delivery_manifest_file` and `release_packet_file` as durable evidence outputs;
-- `delivery_writeback_result` to distinguish `no-write-confirmed`, `patch-materialized`, `local-branch-committed`, and `fork-pr-planned`.
+- `delivery_writeback_result` to distinguish `no-write-confirmed`, `patch-materialized`, `local-branch-committed`, `fork-pr-planned`, and `fork-pr-draft-created`.
 
 ## Incident/audit baseline (module operations)
 

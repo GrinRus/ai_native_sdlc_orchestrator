@@ -1,0 +1,22 @@
+{
+  "fixture_id": "w10-s02.fork-first.networked.baseline.v1",
+  "slice_id": "W10-S02",
+  "summary": "Fork-first delivery executed bounded network path with fork verification, branch push, and draft PR creation.",
+  "signals": {
+    "delivery_mode": "fork-first-pr",
+    "network_mode": "networked",
+    "writeback_result": "fork-pr-draft-created",
+    "fork_state": "verified",
+    "commit_sha": "0123456789abcdef0123456789abcdef01234567",
+    "pull_request_number": 1234,
+    "pull_request_url": "https://github.com/example/upstream/pull/1234"
+  },
+  "blocked_signals": {
+    "missing_credentials_error": "fork-first-pr network write requested but GitHub credentials are missing.",
+    "planning_fallback_mode": "stubbed"
+  },
+  "notes": [
+    "Fixture is representative done evidence for W10-S02 networked fork-first baseline.",
+    "Identifiers are sample values for contract/runbook traceability."
+  ]
+}
