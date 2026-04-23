@@ -888,6 +888,7 @@ export function runDeliveryDriver(options = {}) {
       ? deliveryPlanPath
       : toEvidenceRef(init.projectRoot, deliveryPlanPath);
   const transcriptRef = toEvidenceRef(init.projectRoot, transcriptFile);
+  const executionRootRef = toEvidenceRef(init.projectRoot, executionRoot);
 
   /** @type {string[]} */
   const deliveryOutputRefs = [];
@@ -913,6 +914,12 @@ export function runDeliveryDriver(options = {}) {
 
   const repoDelivery = {
     repo_id: "main",
+    repo_root: executionRoot,
+    repo_root_ref: executionRootRef,
+    checkout_provenance: {
+      head_before: gitHeadBefore,
+      head_after: gitHeadAfter,
+    },
     base_ref: gitHeadBefore.branch,
     head_ref: gitHeadAfter.branch,
     branch_name: typeof outputs.branch_name === "string" ? outputs.branch_name : null,
@@ -965,6 +972,8 @@ export function runDeliveryDriver(options = {}) {
     source_refs: {
       delivery_plan_ref: planRef,
       delivery_transcript_ref: transcriptRef,
+      delivery_execution_root: executionRoot,
+      delivery_execution_root_ref: executionRootRef,
       delivery_output_refs: uniqueStrings(deliveryOutputRefs),
     },
     status: status === "success" ? "submitted" : "failed",
@@ -997,6 +1006,11 @@ export function runDeliveryDriver(options = {}) {
     change_summary: `Delivery mode '${mode}' produced ${diffStats.totals.files} changed file(s), +${diffStats.totals.added}/-${diffStats.totals.deleted}.`,
     verification_refs: uniqueStrings([...deliveryManifest.verification_refs, deliveryManifestRef]),
     delivery_manifest_ref: deliveryManifestRef,
+    source_provenance: {
+      delivery_execution_root: executionRoot,
+      delivery_execution_root_ref: executionRootRef,
+      delivery_transcript_ref: transcriptRef,
+    },
     evidence_lineage: {
       handoff_refs: evidenceGroups.handoffRefs,
       promotion_refs: evidenceGroups.promotionRefs,

@@ -113,7 +113,7 @@ Close the reopened target-catalog proof gap by making standard live E2E target-b
 
 ## W11-S04 — Target-anchored delivery and release evidence
 - **Epic:** EPIC-5 Delivery and release
-- **State:** blocked
+- **State:** done
 - **Outcome:** Make delivery and release proof anchor itself to the target checkout rather than to artificial changes in the AOR repository.
 - **Primary modules:** `apps/cli`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**`
 - **Hard dependencies:** W11-S03

@@ -84,6 +84,8 @@ Guardrail expectation:
 - `npm test` succeeds;
 - release packet exists;
 - delivery manifest exists;
+- delivery manifest `repo_deliveries[0].repo_root` matches `target_checkout_root`;
+- delivery manifest `repo_deliveries[0].changed_paths` stays target-relative (no absolute paths, no `..`);
 - write-back target is patch, local branch, or fork.
 
 ## Post-run artifact inspection
@@ -95,7 +97,8 @@ ls -1 .aor/projects/<project_id>/artifacts/release-packet-*.json | tail -n 1
 Confirm delivery lineage and approval context:
 ```bash
 jq '.delivery_mode, .approval_context, .repo_deliveries[0].changed_paths' <delivery-manifest-file>
-jq '.delivery_manifest_ref, .evidence_lineage' <release-packet-file>
+jq '.repo_deliveries[0].repo_root, .source_refs.delivery_execution_root, .repo_deliveries[0].changed_paths' <delivery-manifest-file>
+jq '.delivery_manifest_ref, .source_provenance, .evidence_lineage' <release-packet-file>
 ```
 
 ## W4-S06 rehearsal findings

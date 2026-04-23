@@ -147,6 +147,9 @@ function assertDeliveryArtifacts(result) {
   assert.equal(manifestLoaded.document.delivery_mode, result.mode);
   assert.equal(typeof manifestLoaded.document.evidence_root, "string");
   assert.equal(typeof manifestLoaded.document.approval_context, "object");
+  assert.equal(typeof manifestLoaded.document.repo_deliveries[0].repo_root, "string");
+  assert.equal(typeof manifestLoaded.document.source_refs.delivery_execution_root, "string");
+  assert.equal(typeof manifestLoaded.document.source_refs.delivery_execution_root_ref, "string");
 
   const releaseLoaded = loadContractFile({
     filePath: result.releasePacketFile,
@@ -155,6 +158,8 @@ function assertDeliveryArtifacts(result) {
   assert.equal(releaseLoaded.ok, true);
   assert.equal(typeof releaseLoaded.document.delivery_manifest_ref, "string");
   assert.equal(typeof releaseLoaded.document.evidence_lineage, "object");
+  assert.equal(typeof releaseLoaded.document.source_provenance.delivery_execution_root, "string");
+  assert.equal(typeof releaseLoaded.document.source_provenance.delivery_execution_root_ref, "string");
 
   const learningScorecard = JSON.parse(fs.readFileSync(result.learningLoopScorecardFile, "utf8"));
   assert.equal(learningScorecard.run_id, result.runId);

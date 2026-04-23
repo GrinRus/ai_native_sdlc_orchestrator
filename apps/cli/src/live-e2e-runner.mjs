@@ -841,27 +841,44 @@ export function startStandardLiveE2ERun(options) {
         promotionEvidenceRefs: [promotionDecision.decisionPath],
       });
 
-      // Ensure release rehearsals always produce a concrete patch/changeset artifact.
-      const rehearsalChangeFile = path.join(init.projectRoot, "examples", "project.aor.yaml");
-      if (fs.existsSync(rehearsalChangeFile)) {
-        fs.appendFileSync(
-          rehearsalChangeFile,
-          `\n# live-e2e standard runner rehearsal marker ${runId}\n`,
-          "utf8",
-        );
-        artifacts.rehearsal_change_file = rehearsalChangeFile;
-      }
-
+      artifacts.delivery_execution_root = targetWorkspace.targetCheckoutRoot;
       const delivery = runDeliveryDriver({
         projectRef: init.projectRoot,
         cwd,
+        runtimeRoot: init.runtimeRoot,
         runId,
         mode: preferredDeliveryMode,
+        executionRoot: targetWorkspace.targetCheckoutRoot,
         deliveryPlanPath: deliveryPlan.deliveryPlanFile,
       });
       artifacts.delivery_transcript_file = delivery.transcriptFile;
       artifacts.delivery_manifest_file = delivery.deliveryManifestFile;
       artifacts.release_packet_file = delivery.releasePacketFile;
+      const manifestRepoDelivery = asRecord(
+        Array.isArray(delivery.deliveryManifest.repo_deliveries) ? delivery.deliveryManifest.repo_deliveries[0] : null,
+      );
+      const manifestRepoRoot = asNonEmptyString(manifestRepoDelivery.repo_root);
+      const manifestChangedPaths = asStringArray(manifestRepoDelivery.changed_paths);
+      if (manifestRepoRoot) artifacts.delivery_repo_root = manifestRepoRoot;
+      artifacts.delivery_changed_paths = manifestChangedPaths;
+
+      const invalidTargetPath = manifestChangedPaths.find(
+        (entry) =>
+          path.isAbsolute(entry) ||
+          entry.startsWith("..") ||
+          entry === "examples/project.aor.yaml" ||
+          entry.startsWith("docs/backlog/"),
+      );
+      if (manifestRepoRoot !== targetWorkspace.targetCheckoutRoot) {
+        throw new Error(
+          `Live E2E delivery manifest repo_root '${manifestRepoRoot || "<missing>"}' does not match target checkout root.`,
+        );
+      }
+      if (invalidTargetPath) {
+        throw new Error(
+          `Live E2E delivery manifest changed_paths must stay target-anchored; found invalid path '${invalidTargetPath}'.`,
+        );
+      }
       const deliveryStageStatus = delivery.status === "success" ? "pass" : "fail";
       markStage(stageMap, "delivery", deliveryStageStatus, [
         delivery.transcriptFile,

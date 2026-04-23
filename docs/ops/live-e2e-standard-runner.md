@@ -91,6 +91,8 @@ Expected abort behavior:
 - `routed_step_result_file` exists and references a routed step with `mode=execute`.
 - `compiled_context_ref` is populated and matches routed context-compilation output.
 - `adapter_raw_evidence_ref` is populated and referenced from routed adapter response.
+- For release-shaped runs, `delivery_manifest_file` and `release_packet_file` must reference `repo_deliveries[0].repo_root == target_checkout_root`.
+- For release-shaped runs, `repo_deliveries[0].changed_paths` must remain target-relative (no absolute paths, no `..`, no control-plane docs/backlog paths).
 - `aor run status --run-id <RUN_ID> --follow true` can observe the same run stream.
 - CLI-only operation remains valid with web UI detached.
 - Use `live-e2e-learning-loop.md` to hand off incidents and scorecards into backlog and quality follow-up.

@@ -1879,7 +1879,18 @@ test("live-e2e W7 governance profile links quality, incident, and finance eviden
     assert.equal(fs.existsSync(summary.incident_report_file), true);
     assert.equal(fs.existsSync(summary.learning_loop_handoff_file), true);
     assert.equal(fs.existsSync(summary.artifacts.promotion_decision_file), true);
+    assert.equal(fs.existsSync(summary.artifacts.delivery_manifest_file), true);
     assert.equal(fs.existsSync(summary.artifacts.release_packet_file), true);
+    const deliveryManifest = JSON.parse(fs.readFileSync(summary.artifacts.delivery_manifest_file, "utf8"));
+    const repoDelivery = deliveryManifest.repo_deliveries[0];
+    assert.equal(repoDelivery.repo_root, summary.target_checkout_root);
+    assert.ok(Array.isArray(repoDelivery.changed_paths));
+    assert.ok(repoDelivery.changed_paths.every((entry) => !path.isAbsolute(String(entry))));
+    assert.ok(repoDelivery.changed_paths.every((entry) => !String(entry).startsWith("..")));
+    assert.equal(repoDelivery.changed_paths.includes("examples/project.aor.yaml"), false);
+    assert.equal(repoDelivery.changed_paths.some((entry) => String(entry).startsWith("docs/backlog/")), false);
+    const releasePacket = JSON.parse(fs.readFileSync(summary.artifacts.release_packet_file, "utf8"));
+    assert.equal(releasePacket.source_provenance.delivery_execution_root, summary.target_checkout_root);
 
     const handoff = JSON.parse(fs.readFileSync(summary.learning_loop_handoff_file, "utf8"));
     assert.ok(Array.isArray(handoff.backlog_refs));
