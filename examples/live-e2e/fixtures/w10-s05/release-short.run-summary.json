@@ -1,7 +1,7 @@
 {
   "run_id": "live-e2e.release.short.run-423122830183",
   "project_id": "aor-core",
-  "profile_ref": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/examples/live-e2e/release-short.yaml",
+  "profile_ref": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/scripts/live-e2e/profiles/release-short.yaml",
   "profile_id": "live-e2e.release.short",
   "scenario_id": "ky-release-short",
   "flow_kind": "release",
@@ -129,10 +129,17 @@
     "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/live-e2e-scorecard-target-live-e2e.release.short.run-423122830183.json"
   ],
   "control_surfaces": {
-    "start": "aor live-e2e start --project-ref <path> --profile <path>",
-    "status": "aor live-e2e status --project-ref <path> --run-id <id>",
-    "abort": "aor live-e2e status --project-ref <path> --run-id <id> --abort true",
-    "report": "aor live-e2e report --project-ref <path> --run-id <id>"
+    "internal_harness": "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>]",
+    "public_cli_sequence": [
+      "aor project analyze",
+      "aor project validate",
+      "aor handoff prepare",
+      "aor handoff approve",
+      "aor project verify",
+      "aor eval run",
+      "aor harness certify",
+      "aor release prepare"
+    ]
   },
   "error": null,
   "learning_loop_scorecard_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/learning-loop-scorecard-live-e2e-live-e2e.release.short.run-423122830183.json",

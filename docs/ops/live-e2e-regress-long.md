@@ -49,11 +49,11 @@ Isolation mode defaults:
 - `make codestyle` fails during preflight verification.
 - Any requested delivery mode requires upstream write-back.
 
-## Start command
+## Harness command
 ```bash
-aor live-e2e start \
+node ./scripts/live-e2e/run-profile.mjs \
   --project-ref . \
-  --profile ./examples/live-e2e/regress-long.yaml
+  --profile ./scripts/live-e2e/profiles/regress-long.yaml
 ```
 
 ## Expected verification

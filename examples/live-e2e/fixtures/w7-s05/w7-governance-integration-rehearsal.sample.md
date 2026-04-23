@@ -1,7 +1,7 @@
 # W7-S05 governance integration rehearsal transcript (sample)
 
 ## Run
-- Profile: `examples/live-e2e/w7-governance-integration.yaml`
+- Profile: `scripts/live-e2e/profiles/w7-governance-integration.yaml`
 - Run id: `live-e2e.w7.governance.integration.run-202604221230`
 - Status: `pass`
 

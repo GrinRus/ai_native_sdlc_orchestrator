@@ -26,7 +26,6 @@ export type ContractFamily =
   | "adapter-capability-profile"
   | "skill-profile"
   | "live-run-event"
-  | "live-e2e-profile"
   | "control-plane-api";
 
 export type ContractFieldType = "string" | "number" | "boolean" | "array" | "object";

@@ -1,0 +1,33 @@
+{
+  "compiled_context_id": "compiled-context.github-sandbox.run.w12-s04.regress-short.github-sandbox.run.w12-s04.regress-short.routed-execution.v1.routed.implement.implement.attempt.1.runner-default",
+  "version": 1,
+  "step": "implement",
+  "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+  "context_bundle_refs": [
+    "context-bundle://context.bundle.runner.foundation@v1"
+  ],
+  "context_doc_refs": [
+    "context-doc://context.doc.repo-map.core@v1"
+  ],
+  "context_rule_refs": [
+    "context-rule://context.rule.public-repo-safety@v1"
+  ],
+  "context_skill_refs": [
+    "context-skill://context.skill.runner-verification.default@v1"
+  ],
+  "packet_refs": [
+    "packet://handoff",
+    "packet://spec"
+  ],
+  "hashes": {
+    "prompt_hash": "sha256:0699fea38e1058a93964e43236b663903e610e9ea7fa8b874174d1416f82fdd7",
+    "context_hash": "sha256:cc04ee060121a2a9cd29625cc7921f89baa495cbb3c849c0413262a2650b75bf"
+  },
+  "provenance": {
+    "compiler_revision_ref": "compiler://runtime-context-compiler@v1",
+    "project_profile_ref": ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/project.aor.yaml",
+    "route_profile_ref": "route.implement.default",
+    "wrapper_profile_ref": "wrapper.runner.default@v3",
+    "generated_at": "2026-04-23T18:24:12.867Z"
+  }
+}

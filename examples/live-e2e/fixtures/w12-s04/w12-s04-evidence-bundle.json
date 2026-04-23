@@ -1,0 +1,49 @@
+{
+  "fixture_id": "w12-s04.internal-harness.black-box-proof.v1",
+  "slice_id": "W12-S04",
+  "generated_at": "2026-04-23T18:28:07.894Z",
+  "proof_method": {
+    "internal_harness": "node ./scripts/live-e2e/run-profile.mjs",
+    "profile_root": "scripts/live-e2e/profiles",
+    "examples_root_override": ".aor/w12-s04-proof/examples",
+    "external_runner_mode": "deterministic-external-process-mock",
+    "note": "The proof keeps target checkout, public CLI subprocesses, and routed live execution black-box semantics, while replacing the adapter external runtime with a deterministic Node stub via --examples-root."
+  },
+  "targets": [
+    {
+      "profile_id": "live-e2e.regress.short",
+      "scenario_id": "ky-regression-smoke",
+      "run_id": "w12-s04.regress-short",
+      "status": "pass",
+      "summary_file": "regress-short.run-summary.json",
+      "scorecard_file": "regress-short.scorecard.json",
+      "routed_step_result_file": "regress-short.routed-step-result.json",
+      "compiled_context_file": "regress-short.compiled-context.json",
+      "learning_loop_handoff_file": "regress-short.learning-loop-handoff.json",
+      "learning_loop_scorecard_file": "regress-short.learning-loop-scorecard.json"
+    },
+    {
+      "profile_id": "live-e2e.release.short",
+      "scenario_id": "ky-release-short",
+      "run_id": "w12-s04.release-short",
+      "status": "pass",
+      "summary_file": "release-short.run-summary.json",
+      "scorecard_file": "release-short.scorecard.json",
+      "routed_step_result_file": "release-short.routed-step-result.json",
+      "compiled_context_file": "release-short.compiled-context.json",
+      "delivery_transcript_file": "release-short.delivery-transcript.json",
+      "delivery_manifest_file": "release-short.delivery-manifest.json",
+      "release_packet_file": "release-short.release-packet.json",
+      "learning_loop_handoff_file": "release-short.learning-loop-handoff.json",
+      "learning_loop_scorecard_file": "release-short.learning-loop-scorecard.json",
+      "delivery_learning_loop_scorecard_file": "release-short.delivery-learning-loop-scorecard.json"
+    }
+  ],
+  "acceptance_alignment": {
+    "target_checkout_backed": true,
+    "routed_live_adapter_evidence": true,
+    "public_live_e2e_commands_removed_from_control_surfaces": true,
+    "target_root_delivery_lineage": true,
+    "scorecard_and_learning_loop_from_black_box_evidence": true
+  }
+}

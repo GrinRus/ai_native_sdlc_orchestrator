@@ -24,11 +24,11 @@ This repository is currently a **docs-first and scaffold-first project package**
 What exists today:
 
 - product, research, architecture, contract, ops, and backlog documentation;
-- example project profiles, routes, wrappers, prompt bundles, policies, packets, eval assets, and live E2E profiles;
+- example project profiles, routes, wrappers, prompt bundles, policies, packets, eval assets, and proof fixtures;
 - contributor guidance through `AGENTS.md`, nested `AGENTS.md` files, and reusable root skills;
 - root repository-integrity commands and CI for roadmap, guidance, and community-file consistency;
-- a documented live E2E target catalog built around public GitHub repositories, with target-backed proof closure still tracked explicitly in the backlog;
-- implemented W5 operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and standard live E2E runner commands.
+- a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
+- implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an internal black-box rehearsal harness tracked through `W12`.
 - expanded implementation backlog through W11 slices with active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - reopened post-audit productionization queue for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and a dedicated W11 target-backed proof-closure wave.
 - first live routed execution baseline for supported `codex-cli` adapter paths with explicit delivery-guardrail blocking semantics.
@@ -93,7 +93,7 @@ Useful helpers for the slice loop:
 
 For the repo-specific rules, read `CONTRIBUTING.md` and the nearest `AGENTS.md`.
 
-For live rehearsal dependency requirements, see `docs/ops/live-e2e-dependency-matrix.md`.
+For internal rehearsal dependency requirements, see `docs/ops/live-e2e-dependency-matrix.md`.
 
 ## How AOR works
 
@@ -121,11 +121,11 @@ At a high level, AOR is intended to work like this:
    Keep the runtime headless-first, with optional live event streams and a detachable web console.
 
 8. **Feed learning back into the platform**  
-   Turn live E2E output, scorecards, and incidents into new evals, harness captures, and backlog work.
+   Turn installed-user rehearsal output, scorecards, and incidents into new evals, harness captures, and backlog work.
 
 ## Command surface status
 
-The CLI command surface currently includes **34 implemented** commands and **0 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
+The CLI command surface currently includes **31 implemented** commands and **0 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
 
 Implemented command groups:
 - project lifecycle: `project init`, `project analyze`, `project validate`, `project verify`;
@@ -134,7 +134,7 @@ Implemented command groups:
 - quality and handoff: `eval run`, `harness replay`, `harness certify`, `asset promote`, `asset freeze`, `handoff prepare`, `handoff approve`;
 - delivery/release and operator reads: `deliver prepare`, `release prepare`, `packet show`, `evidence show`;
 - incidents and audit: `incident open`, `incident recertify`, `incident show`, `audit runs`;
-- UI and live rehearsal: `ui attach`, `ui detach`, `live-e2e start`, `live-e2e status`, `live-e2e report`.
+- UI lifecycle: `ui attach`, `ui detach`.
 
 Planned commands:
 - none in the current shell baseline.
@@ -155,16 +155,17 @@ For exact command inputs/outputs and contract linkage, use `docs/architecture/14
 - `docs/backlog/**` — operating model, roadmap, epic map, wave plans, and dependency graph.
 
 ### Operations
-- `docs/ops/**` — live E2E runbooks and operator procedures.
+- `docs/ops/**` — installed-user rehearsal runbooks and operator procedures.
 
 ### Examples
-- `examples/**` — project profiles, routes, wrappers, prompt bundles, policies, adapters, packets, eval assets, and live E2E profiles.
+- `examples/**` — project profiles, routes, wrappers, prompt bundles, policies, adapters, packets, eval assets, and proof fixtures.
 
 ### Code scaffold
 - `apps/api/` — implemented control-plane read/event baseline with detached HTTP/SSE transport for connected-mode read/follow surfaces.
-- `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, and live E2E command baseline with planned extensions.
+- `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, delivery, incident, and UI-lifecycle command baseline with planned extensions.
 - `apps/web/` — implemented detachable operator console baseline with planned production-hardening extensions.
 - `packages/**` — implemented shared runtime modules (contracts, orchestrator core, routing, adapter SDK, harness, observability) with roadmap extensions.
+- `scripts/live-e2e/**` — internal black-box installed-user rehearsal harness and private scenario profiles.
 
 ### Contributor support
 - `.agents/skills/**` — reusable repo skills for agents.
@@ -176,7 +177,7 @@ For exact command inputs/outputs and contract linkage, use `docs/architecture/14
 
 ## Live E2E target projects
 
-The repo includes a documented target catalog and runbooks for public rehearsal repositories:
+The repo includes a documented internal target catalog and internal runbooks for public rehearsal repositories:
 
 - `sindresorhus/ky` — short TypeScript library regressions and short release rehearsals.
 - `httpie/cli` — deeper Python CLI regressions.
@@ -185,6 +186,7 @@ The repo includes a documented target catalog and runbooks for public rehearsal 
 See:
 
 - `docs/ops/live-e2e-target-catalog.md`
+- `docs/ops/live-e2e-standard-runner.md`
 - `docs/ops/live-e2e-regress-short.md`
 - `docs/ops/live-e2e-regress-long.md`
 - `docs/ops/live-e2e-release-short.md`
@@ -216,6 +218,7 @@ Detailed wave plans:
 - `docs/backlog/wave-9-implementation-slices.md`
 - `docs/backlog/wave-10-implementation-slices.md`
 - `docs/backlog/wave-11-implementation-slices.md`
+- `docs/backlog/wave-12-implementation-slices.md`
 
 ## Contributing
 

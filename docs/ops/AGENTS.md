@@ -3,7 +3,7 @@
 `docs/ops` holds operator-facing runbooks.
 
 ## Update this folder when
-- a live E2E scenario changes;
+- an internal installed-user rehearsal scenario changes;
 - a UI attach or detach flow changes;
 - an operator gate, approval, or recovery procedure changes.
 

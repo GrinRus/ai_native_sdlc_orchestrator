@@ -1,0 +1,56 @@
+{
+  "handoff_id": "w12-s04.regress-short.learning-loop.handoff.v1",
+  "project_id": "aor-core",
+  "run_id": "w12-s04.regress-short",
+  "run_status": "pass",
+  "source_kind": "live-e2e",
+  "scorecard_ref": "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/reports/learning-loop-scorecard-live-e2e-w12-s04.regress-short.json",
+  "incident_ref": null,
+  "backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "quality_refs": [
+    "suite.regress.short@v1"
+  ],
+  "evidence_refs": [
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/reports/live-e2e-run-summary-w12-s04.regress-short.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/reports/live-e2e-scorecard-target-w12-s04.regress-short.json",
+    "evidence://.aor/w12-s04-proof/runtime",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/reports",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/sessions/w12-s04.regress-short",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/sessions/w12-s04.regress-short/aor-home",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/sessions/w12-s04.regress-short/codex-home",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short",
+    "evidence://https://github.com/sindresorhus/ky.git",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/examples",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/context",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/project.aor.yaml",
+    "evidence://examples/project.github.aor.yaml",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/project-analysis-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/route-resolution-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/asset-resolution-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/policy-resolution-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/evaluation-registry-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/validation-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/artifacts/github-sandbox.run.w12-s04.regress-short.handoff.bootstrap.v1.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/artifacts/wave-ticket-w12-s04.regress-short.ticket.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/verify-summary.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/step-result-1.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/step-result-2.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/step-result-3.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/step-result-routed-github-sandbox.run.w12-s04.regress-short.routed-execution.v1.routed.implement.implement.attempt.1.json",
+    "evidence://compiled-context://compiled-context.github-sandbox.run.w12-s04.regress-short.github-sandbox.run.w12-s04.regress-short.routed-execution.v1.routed.implement.implement.attempt.1.runner-default",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/compiled-context-github-sandbox.run.w12-s04.regress-short.routed-execution.v1.routed.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/adapter-live-raw-codex-cli-github-sandbox-run-w12-s04-regress-short-routed-execution-v1-routed-implement-github-sandbox-run-w12-s04-regress-short-routed-execution-v1-step-implement-request-1776968652868-1776968652939.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/.aor/projects/github-sandbox.run.w12-s04.regress-short/reports/evaluation-report-suite.regress.short-v1-1776968653150.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/reports/learning-loop-scorecard-live-e2e-w12-s04.regress-short.json"
+  ],
+  "next_actions": [
+    "Review learning-loop artifacts and incident context.",
+    "Map follow-up work into docs/backlog/mvp-implementation-backlog.md and the owning wave slice.",
+    "Update eval suites or harness captures before re-enabling risky write-back paths."
+  ],
+  "generated_at": "2026-04-23T18:24:13.157Z"
+}

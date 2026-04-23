@@ -47,11 +47,11 @@ When local-branch delivery fails mid-run:
 4. Delete temporary delivery branch only after confirming no required commit/evidence is on it.
 5. If retrying in same workspace, rerun no-write preflight before a second local-branch attempt.
 
-## Start command
+## Harness command
 ```bash
-aor live-e2e start \
+node ./scripts/live-e2e/run-profile.mjs \
   --project-ref . \
-  --profile ./examples/live-e2e/release-short.yaml
+  --profile ./scripts/live-e2e/profiles/release-short.yaml
 ```
 
 ## Delivery/release prepare command pack (W6-S05)
@@ -118,19 +118,22 @@ Evidence fixtures for W4-S06:
 Related runbook:
 - `docs/ops/github-fork-first-delivery.md`
 
-## W11-S05 refreshed target-backed evidence (2026-04-23)
+## W12-S04 refreshed black-box proof (2026-04-23)
 Observed release-shaped run:
-- `live-e2e.release.short.run-w11-s05` with status `pass`.
+- `w12-s04.release-short` with status `pass`.
 
 Evidence note:
 - this run anchors delivery/release lineage to the exercised target checkout (`repo_root` and `source_provenance.delivery_execution_root`) without control-plane file mutation hacks.
+- proof was generated through `node ./scripts/live-e2e/run-profile.mjs` and keeps the CLI subprocess flow black-box while using a deterministic external runner mock via `--examples-root`.
 
 Canonical fixtures:
-- `examples/live-e2e/fixtures/w11-s05/release-short.run-summary.json`
-- `examples/live-e2e/fixtures/w11-s05/release-short.scorecard.json`
-- `examples/live-e2e/fixtures/w11-s05/release-short.delivery-transcript.json`
-- `examples/live-e2e/fixtures/w11-s05/release-short.delivery-manifest.json`
-- `examples/live-e2e/fixtures/w11-s05/release-short.release-packet.json`
-- `examples/live-e2e/fixtures/w11-s05/release-short.learning-loop-scorecard.json`
-- `examples/live-e2e/fixtures/w11-s05/release-short.delivery-learning-loop-scorecard.json`
-- `examples/live-e2e/fixtures/w11-s05/release-short.learning-loop-handoff.json`
+- `examples/live-e2e/fixtures/w12-s04/release-short.run-summary.json`
+- `examples/live-e2e/fixtures/w12-s04/release-short.scorecard.json`
+- `examples/live-e2e/fixtures/w12-s04/release-short.routed-step-result.json`
+- `examples/live-e2e/fixtures/w12-s04/release-short.compiled-context.json`
+- `examples/live-e2e/fixtures/w12-s04/release-short.delivery-transcript.json`
+- `examples/live-e2e/fixtures/w12-s04/release-short.delivery-manifest.json`
+- `examples/live-e2e/fixtures/w12-s04/release-short.release-packet.json`
+- `examples/live-e2e/fixtures/w12-s04/release-short.learning-loop-scorecard.json`
+- `examples/live-e2e/fixtures/w12-s04/release-short.delivery-learning-loop-scorecard.json`
+- `examples/live-e2e/fixtures/w12-s04/release-short.learning-loop-handoff.json`

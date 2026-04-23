@@ -1,0 +1,117 @@
+{
+  "manifest_id": "github-sandbox.run.w12-s04.release-short.delivery-manifest.patch-only.1776968803279",
+  "project_id": "github-sandbox.run.w12-s04.release-short",
+  "ticket_id": "github-sandbox.run.w12-s04.release-short.wave.w12-s04.release-short",
+  "run_refs": [
+    "w12-s04.release-short"
+  ],
+  "step_ref": "release.prepare",
+  "delivery_mode": "patch-only",
+  "writeback_policy": {
+    "mode": "patch-only",
+    "mode_source": {
+      "resolved_mode": "patch-only",
+      "canonical_mode": "patch-only",
+      "resolution_kind": "step-override",
+      "resolution_field": "--mode"
+    },
+    "writeback_allowed": true,
+    "blocking_reasons": [],
+    "network_mode": "local"
+  },
+  "repo_deliveries": [
+    {
+      "repo_id": "main",
+      "repo_root": ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short",
+      "repo_root_ref": "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short",
+      "checkout_provenance": {
+        "head_before": {
+          "branch": "main",
+          "commit": "e0fcf780de2bd69af2528e4b7b87ccae6bb727b1"
+        },
+        "head_after": {
+          "branch": "main",
+          "commit": "e0fcf780de2bd69af2528e4b7b87ccae6bb727b1"
+        }
+      },
+      "base_ref": "main",
+      "head_ref": "main",
+      "branch_name": null,
+      "changed_paths": [],
+      "diff_totals": {
+        "files": 0,
+        "added": 0,
+        "deleted": 0
+      },
+      "commit_refs": [],
+      "writeback_result": "patch-materialized",
+      "coordination": {
+        "required": false,
+        "status": "not-required",
+        "repo_ids": [
+          "target"
+        ]
+      }
+    }
+  ],
+  "verification_refs": [
+    ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/artifacts/github-sandbox.run.w12-s04.release-short.handoff.bootstrap.v1.json",
+    ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/step-result-routed-github-sandbox.run.w12-s04.release-short.routed-execution.v1.routed.implement.implement.attempt.1.json",
+    ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/evaluation-report-suite.release.short-v1-1776968802984.json",
+    "evidence://.aor/projects/github-sandbox.run.w12-s04.release-short/reports/delivery-transcript-patch-only-w12-s04.release-short-1776968803156.json"
+  ],
+  "approval_context": {
+    "approved_handoff": {
+      "required": true,
+      "status": "present",
+      "ref": ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/artifacts/github-sandbox.run.w12-s04.release-short.handoff.bootstrap.v1.json"
+    },
+    "promotion_evidence": {
+      "required": true,
+      "status": "present",
+      "refs": [
+        ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/step-result-routed-github-sandbox.run.w12-s04.release-short.routed-execution.v1.routed.implement.implement.attempt.1.json",
+        ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/evaluation-report-suite.release.short-v1-1776968802984.json"
+      ]
+    },
+    "coordination_evidence": {
+      "required": false,
+      "status": "not-required",
+      "refs": []
+    },
+    "evidence_refs": [
+      ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/artifacts/github-sandbox.run.w12-s04.release-short.handoff.bootstrap.v1.json",
+      ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/step-result-routed-github-sandbox.run.w12-s04.release-short.routed-execution.v1.routed.implement.implement.attempt.1.json",
+      ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/evaluation-report-suite.release.short-v1-1776968802984.json"
+    ]
+  },
+  "coordination": {
+    "required": false,
+    "status": "not-required",
+    "repo_ids": [
+      "target"
+    ],
+    "evidence_refs": []
+  },
+  "rerun_recovery": {
+    "requested": false,
+    "status": "not-requested",
+    "rerun_of_run_ref": null,
+    "failed_step_ref": null,
+    "packet_boundary": "delivery-manifest",
+    "strategy": null,
+    "blocking_reasons": []
+  },
+  "evidence_root": ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports",
+  "source_refs": {
+    "delivery_plan_ref": "evidence://.aor/projects/github-sandbox.run.w12-s04.release-short/artifacts/delivery-plan-implement-1776968803151.json",
+    "delivery_transcript_ref": "evidence://.aor/projects/github-sandbox.run.w12-s04.release-short/reports/delivery-transcript-patch-only-w12-s04.release-short-1776968803156.json",
+    "delivery_execution_root": ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short",
+    "delivery_execution_root_ref": "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short",
+    "delivery_output_refs": [
+      "evidence://.aor/projects/github-sandbox.run.w12-s04.release-short/artifacts/delivery-patch-w12-s04.release-short-1776968803210.patch"
+    ]
+  },
+  "status": "submitted",
+  "created_at": "2026-04-23T18:26:43.250Z"
+}

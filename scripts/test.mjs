@@ -290,6 +290,18 @@ if (sliceCycleTestRun.status !== 0) {
 
 console.log("slice cycle tests ok: selection, state sync, and plan extraction");
 
+const liveE2EHarnessTestsPath = path.join(root, "scripts/test/live-e2e-harness.test.mjs");
+const liveE2EHarnessTestRun = spawnSync(process.execPath, ["--test", liveE2EHarnessTestsPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (liveE2EHarnessTestRun.status !== 0) {
+  process.exit(liveE2EHarnessTestRun.status ?? 1);
+}
+
+console.log("internal live-e2e harness tests ok: black-box installed-user rehearsal flow");
+
 const cliTestsPath = path.join(root, "apps/cli/test/cli.test.mjs");
 const cliTestRun = spawnSync(process.execPath, ["--test", cliTestsPath], {
   cwd: root,

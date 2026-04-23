@@ -326,50 +326,6 @@ test("control-plane API contract rejects invalid binding mode", () => {
   assert.ok(enumIssue, "expected enum_value_invalid for binding_mode");
 });
 
-test("live-e2e profile requires preflight block", () => {
-  const source = path.join(workspaceRoot, "examples/live-e2e/regress-short.yaml");
-  const loaded = loadContractFile({ filePath: source, family: "live-e2e-profile" });
-  assert.equal(loaded.ok, true, "fixture should load before mutation");
-
-  const candidate = structuredClone(loaded.document);
-  delete candidate.preflight;
-
-  const validation = validateContractDocument({
-    family: "live-e2e-profile",
-    document: candidate,
-    source: "test://live-e2e-missing-preflight",
-  });
-
-  assert.equal(validation.ok, false);
-  assert.ok(
-    validation.issues.some((problem) => problem.code === "required_field_missing" && problem.field === "preflight"),
-    "expected required field error for preflight",
-  );
-});
-
-test("live-e2e profile preflight block must be an object", () => {
-  const source = path.join(workspaceRoot, "examples/live-e2e/regress-short.yaml");
-  const loaded = loadContractFile({ filePath: source, family: "live-e2e-profile" });
-  assert.equal(loaded.ok, true, "fixture should load before mutation");
-
-  const candidate = structuredClone(loaded.document);
-  candidate.preflight = "no-write";
-
-  const validation = validateContractDocument({
-    family: "live-e2e-profile",
-    document: candidate,
-    source: "test://live-e2e-preflight-type",
-  });
-
-  assert.equal(validation.ok, false);
-  const mismatchIssue = validation.issues.find(
-    (problem) => problem.code === "field_type_mismatch" && problem.field === "preflight",
-  );
-  assert.ok(mismatchIssue, "expected field_type_mismatch for preflight");
-  assert.equal(mismatchIssue.expected, "object");
-  assert.equal(mismatchIssue.actual, "string");
-});
-
 test("contract index mapping covers every docs/contracts/00-index entry", () => {
   const contractsIndexPath = path.join(workspaceRoot, "docs/contracts/00-index.md");
   const contractsIndexContent = fs.readFileSync(contractsIndexPath, "utf8");

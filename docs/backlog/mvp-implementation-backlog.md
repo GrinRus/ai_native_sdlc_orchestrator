@@ -132,5 +132,13 @@ This is the master index for the implementation slices across all defined waves.
 | W11-S04 | Target-anchored delivery and release evidence | EPIC-5 | done | `apps/cli`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S03 |
 | W11-S05 | Fresh external proof bundle for catalog targets | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`, `docs/backlog/**` | W11-S04 |
 
+## W12 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W12-S01 | Public surface realignment | EPIC-0 | done | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/ops/**`, `docs/backlog/**` | none |
+| W12-S02 | Internal black-box installed-user harness | EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W12-S01 |
+| W12-S03 | Breaking CLI and contract removal | EPIC-6 | done | `apps/cli`, `docs/contracts/**`, `packages/contracts`, `examples/**` | W12-S02 |
+| W12-S04 | Proof refresh after surface cleanup | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/fixtures/**`, `packages/observability`, `scripts/live-e2e/**` | W12-S03 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.
