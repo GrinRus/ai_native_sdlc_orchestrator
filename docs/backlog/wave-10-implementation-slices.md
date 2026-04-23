@@ -18,7 +18,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 
 ## W10-S01 — External live adapter execution baseline
 - **Epic:** EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Replace the current in-process deterministic `codex-cli` live path with a real external runner invocation path that preserves compiled-context, evidence, and guardrail semantics.
 - **Primary modules:** `packages/adapter-sdk`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `examples/adapters/**`, `docs/ops/**`
 - **Hard dependencies:** W9-S08
@@ -49,7 +49,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 
 ## W10-S02 — Networked fork-first delivery execution
 - **Epic:** EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Turn fork-first delivery from stubbed PR-intent planning into bounded networked fork, branch, and PR draft execution with safe fallbacks.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W4-S04, W6-S05
@@ -80,7 +80,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 
 ## W10-S03 — Detached transport mutation command baseline
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Extend detached control-plane transport beyond GET-only reads so connected operator clients can invoke bounded run-control and UI lifecycle mutations over HTTP.
 - **Primary modules:** `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**`
 - **Hard dependencies:** W9-S07, W6-S03, W6-S04
@@ -111,7 +111,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 
 ## W10-S04 — Detached transport authn/authz hardening baseline
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add explicit operator identity and project-scoped permission enforcement to detached read and mutation transport before widening connected deployments.
 - **Primary modules:** `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**`
 - **Hard dependencies:** W10-S03
@@ -142,7 +142,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 
 ## W10-S05 — Externally verified live E2E target-catalog proof
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Refresh live target-catalog evidence using external runner execution and real bounded delivery transactions instead of in-process or stubbed-only proofs.
 - **Primary modules:** `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability`, `docs/backlog/**`
 - **Hard dependencies:** W10-S01, W10-S02
