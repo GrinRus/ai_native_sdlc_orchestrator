@@ -73,7 +73,7 @@ function ensureParentDir(outputFile) {
   fs.mkdirSync(path.dirname(outputFile), { recursive: true });
 }
 
-function main() {
+async function main() {
   const flags = parseFlags(process.argv.slice(2));
   const projectRef = optionalString("project-ref", flags["project-ref"]);
   if (!projectRef) {
@@ -83,6 +83,7 @@ function main() {
   const runId = optionalString("run-id", flags["run-id"]);
   const follow = optionalBoolean("follow", flags.follow);
   const runtimeRoot = optionalString("runtime-root", flags["runtime-root"]);
+  const controlPlane = optionalString("control-plane", flags["control-plane"]);
   const afterEventId = optionalString("after-event-id", flags["after-event-id"]);
   const outputHtmlFlag = optionalString("output-html", flags["output-html"]);
   const maxReplayRaw = optionalString("max-replay", flags["max-replay"]);
@@ -95,7 +96,7 @@ function main() {
     throw new Error("Flag '--run-id' is required when '--follow' is enabled.");
   }
 
-  const session = attachOperatorConsoleSession({
+  const session = await attachOperatorConsoleSession({
     cwd: process.cwd(),
     projectRef,
     runtimeRoot,
@@ -103,6 +104,7 @@ function main() {
     follow,
     afterEventId,
     maxReplay,
+    controlPlane,
   });
 
   const html = session.render();
@@ -133,7 +135,7 @@ function main() {
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;

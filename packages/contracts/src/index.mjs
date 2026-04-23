@@ -794,8 +794,8 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       deferred_transport: "object",
     },
     enumChecks: [
-      { field: "binding_mode", allowedValues: ["module-in-process"] },
-      { field: "deferred_transport_status", allowedValues: ["planned"] },
+      { field: "binding_mode", allowedValues: ["hybrid-module-and-detached-http-sse"] },
+      { field: "deferred_transport_status", allowedValues: ["implemented"] },
     ],
   },
 ]);

@@ -1,0 +1,244 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+import { applyRunControlAction, appendRunEvent, createControlPlaneHttpServer } from "../src/index.mjs";
+
+const currentFilePath = fileURLToPath(import.meta.url);
+const currentDir = path.dirname(currentFilePath);
+const workspaceRoot = path.resolve(currentDir, "../../..");
+
+/**
+ * @param {{ cwd: string, args: string[] }} options
+ */
+function runGitChecked(options) {
+  const run = spawnSync("git", options.args, { cwd: options.cwd, encoding: "utf8" });
+  assert.equal(
+    run.status,
+    0,
+    `git ${options.args.join(" ")} failed: ${(run.stderr ?? run.stdout ?? "").trim()}`,
+  );
+}
+
+/**
+ * @param {(repoRoot: string) => Promise<void> | void} callback
+ */
+async function withTempRepo(callback) {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w9-s07-api-http-"));
+  fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
+  runGitChecked({ cwd: repoRoot, args: ["init"] });
+  runGitChecked({ cwd: repoRoot, args: ["config", "user.email", "aor@example.com"] });
+  runGitChecked({ cwd: repoRoot, args: ["config", "user.name", "AOR Test"] });
+  runGitChecked({ cwd: repoRoot, args: ["add", "-A"] });
+  runGitChecked({ cwd: repoRoot, args: ["commit", "-m", "initial"] });
+
+  try {
+    await callback(repoRoot);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+}
+
+/**
+ * @param {Response} response
+ * @param {{ timeoutMs?: number }} [options]
+ */
+async function readNextLiveRunEvent(response, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 3000;
+  if (!response.body) {
+    throw new Error("SSE response body is missing.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const timeoutAt = Date.now() + timeoutMs;
+
+  while (Date.now() < timeoutAt) {
+    const remaining = timeoutAt - Date.now();
+    const readResult = await Promise.race([
+      reader.read(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timed out waiting for SSE event")), remaining)),
+    ]);
+
+    if (readResult.done) {
+      break;
+    }
+
+    buffer += decoder.decode(readResult.value, { stream: true });
+
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary >= 0) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      boundary = buffer.indexOf("\n\n");
+
+      const normalized = block.replace(/\r/g, "");
+      const lines = normalized.split("\n");
+      let event = "message";
+      let data = "";
+      for (const line of lines) {
+        if (line.startsWith("event:")) {
+          event = line.slice(6).trim();
+        } else if (line.startsWith("data:")) {
+          data = data.length > 0 ? `${data}\n${line.slice(5).trimStart()}` : line.slice(5).trimStart();
+        }
+      }
+
+      if (event !== "live-run-event" || data.length === 0) {
+        continue;
+      }
+
+      return JSON.parse(data);
+    }
+  }
+
+  throw new Error("timed out waiting for live-run-event payload");
+}
+
+test("detached control-plane transport serves read baseline endpoints", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.transport.read.v1";
+    applyRunControlAction({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      action: "start",
+    });
+    appendRunEvent({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      eventType: "step.updated",
+      payload: {
+        step_id: "runner.implement",
+        status: "pass",
+      },
+    });
+
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const stateResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
+      assert.equal(stateResponse.status, 200);
+      const state = await stateResponse.json();
+      assert.equal(state.project_root, repoRoot);
+
+      const runsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/runs`);
+      assert.equal(runsResponse.status, 200);
+      const runs = await runsResponse.json();
+      assert.ok(runs.some((run) => run.run_id === runId));
+
+      const historyResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events/history?limit=25`,
+      );
+      assert.equal(historyResponse.status, 200);
+      const history = await historyResponse.json();
+      assert.equal(history.run_id, runId);
+      assert.ok(history.total_events >= 2);
+
+      const policyResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/policy-history?limit=25`,
+      );
+      assert.equal(policyResponse.status, 200);
+      const policyHistory = await policyResponse.json();
+      assert.equal(policyHistory.run_id, runId);
+      assert.equal(Array.isArray(policyHistory.entries), true);
+
+      const deliveryResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/delivery-manifests`,
+      );
+      assert.equal(deliveryResponse.status, 200);
+      const deliveryManifests = await deliveryResponse.json();
+      assert.equal(Array.isArray(deliveryManifests), true);
+
+      const promotionResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/promotion-decisions`,
+      );
+      assert.equal(promotionResponse.status, 200);
+      const promotionDecisions = await promotionResponse.json();
+      assert.equal(Array.isArray(promotionDecisions), true);
+
+      const strategicResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/strategic-snapshot`,
+      );
+      assert.equal(strategicResponse.status, 200);
+      const strategicSnapshot = await strategicResponse.json();
+      assert.equal(typeof strategicSnapshot.wave_snapshot.total_slices, "number");
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("detached control-plane transport streams follow events through SSE", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.transport.follow.v1";
+    appendRunEvent({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      eventType: "run.started",
+      payload: {
+        status: "running",
+      },
+    });
+
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const historyResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events/history?limit=10`,
+      );
+      assert.equal(historyResponse.status, 200);
+      const history = await historyResponse.json();
+      const lastEventId = history.events.at(-1)?.event_id;
+      assert.equal(typeof lastEventId, "string");
+
+      const controller = new AbortController();
+      const streamResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events?after_event_id=${encodeURIComponent(lastEventId)}`,
+        {
+          headers: {
+            accept: "text/event-stream",
+          },
+          signal: controller.signal,
+        },
+      );
+      assert.equal(streamResponse.status, 200);
+
+      const nextEventPromise = readNextLiveRunEvent(streamResponse, { timeoutMs: 3000 });
+      appendRunEvent({
+        projectRef: repoRoot,
+        cwd: repoRoot,
+        runId,
+        eventType: "warning.raised",
+        payload: {
+          code: "scope.target_step_required",
+          summary: "Transport follow smoke warning.",
+        },
+      });
+
+      const streamed = await nextEventPromise;
+      assert.equal(streamed.event_type, "warning.raised");
+      assert.equal(streamed.summary, "Transport follow smoke warning.");
+      controller.abort();
+    } finally {
+      await transport.close();
+    }
+  });
+});

@@ -159,7 +159,7 @@ For exact command inputs/outputs and contract linkage, use `docs/architecture/14
 - `examples/**` — project profiles, routes, wrappers, prompt bundles, policies, adapters, packets, eval assets, and live E2E profiles.
 
 ### Code scaffold
-- `apps/api/` — implemented control-plane read/event baseline with roadmap extensions for broader command/control surfaces.
+- `apps/api/` — implemented control-plane read/event baseline with detached HTTP/SSE transport for connected-mode read/follow surfaces.
 - `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, and live E2E command baseline with planned extensions.
 - `apps/web/` — implemented detachable operator console baseline with planned production-hardening extensions.
 - `packages/**` — implemented shared runtime modules (contracts, orchestrator core, routing, adapter SDK, harness, observability) with roadmap extensions.

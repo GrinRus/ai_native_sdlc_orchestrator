@@ -3,12 +3,12 @@
 ## Purpose
 Define one control-plane surface for command, query, and live-stream operations while keeping the runtime headless-first.
 
-## Current implementation binding (W5-W8 baseline)
+## Current implementation binding (W9 baseline)
 
-Current code is **module-backed and in-process**, not detached HTTP transport:
-- API surface is exported from `apps/api/src/index.mjs` as function operations.
-- CLI and web consume those operations directly in-process.
-- Contract and artifact semantics stay stable even before detached transport exists.
+Current code is **hybrid module + detached transport**:
+- API surface is exported from `apps/api/src/index.mjs` as function operations for headless/in-process workflows.
+- Detached HTTP/SSE transport baseline is implemented in `apps/api/src/http-transport.mjs` for connected web mode.
+- Contract and artifact semantics stay aligned across both bindings.
 
 Implemented operation families:
 - read: project state, packets, step results, manifests, promotion decisions, quality artifacts, runs, run event history, run policy history, strategic snapshot;
@@ -27,8 +27,8 @@ Required top-level fields in the loader baseline:
 - `deferred_transport`.
 
 Current enum constraints:
-- `binding_mode=module-in-process` for the current runtime reality;
-- `deferred_transport_status=planned` until detached transport is implemented in `W9-S07`.
+- `binding_mode=hybrid-module-and-detached-http-sse`;
+- `deferred_transport_status=implemented`.
 
 ## Command families
 - project bootstrap commands
@@ -167,27 +167,31 @@ Reconnect and backpressure baseline:
 - bounded replay window (do not allow unbounded buffers);
 - preserve monotonic per-run event ordering via payload sequence.
 
-## Deferred detached HTTP transport (W9-S07)
+## Detached HTTP transport baseline (W9-S07)
 
-Detached endpoint paths and SSE wiring are **deferred** to `W9-S07`.
-The intended transport mapping (not current runtime behavior) is:
+Connected-mode transport mapping is implemented for read/follow baseline:
 - `GET /api/projects/:projectId/state`
+- `GET /api/projects/:projectId/strategic-snapshot`
 - `GET /api/projects/:projectId/packets`
 - `GET /api/projects/:projectId/step-results`
 - `GET /api/projects/:projectId/quality-artifacts`
+- `GET /api/projects/:projectId/delivery-manifests`
+- `GET /api/projects/:projectId/promotion-decisions`
 - `GET /api/projects/:projectId/runs`
 - `GET /api/projects/:projectId/runs/:runId/events/history`
 - `GET /api/projects/:projectId/runs/:runId/policy-history`
 - `GET /api/projects/:projectId/runs/:runId/events` (SSE + replay parameters).
 
-Until `W9-S07` lands, these endpoint paths are contract targets, not guaranteed runtime endpoints.
+Deferred beyond this baseline:
+- mutation-command HTTP endpoint parity for full CLI surface;
+- production authn/authz and deployment hardening.
 
 ## API/UI alignment notes (W5-S04 + W9-S03)
 
-- The detachable web console currently reads run/evidence state via in-process API module operations.
-- Live follow in web mode currently reuses the same in-process stream contract and backpressure semantics.
+- The detachable web console reads run/evidence state through detached HTTP/SSE when `control_plane` is configured and connected.
+- Headless/disconnected web operation remains module-backed and in-process.
 - Detach behavior is UI-local only: detaching unsubscribes the web listener while runtime artifacts stay owned by orchestrator runtime.
-- Switching connected mode to detached HTTP/SSE transport is explicitly deferred to `W9-S07`.
+- Connected-mode fallback and headless-safe semantics remain explicit through `ui-lifecycle` state.
 
 ## Authentication and permission assumptions
 - Baseline assumption for local/operator rehearsals: trusted local operator context behind workspace access controls.

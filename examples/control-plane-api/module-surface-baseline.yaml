@@ -1,7 +1,7 @@
-api_id: control-plane.api.module-surface
+api_id: control-plane.api.hybrid-surface
 version: 1
-binding_mode: module-in-process
-deferred_transport_status: planned
+binding_mode: hybrid-module-and-detached-http-sse
+deferred_transport_status: implemented
 
 read_operations:
   - operation_id: read.project-state
@@ -51,12 +51,19 @@ live_event_operations:
 
 deferred_transport:
   owning_slice: W9-S07
-  planned_mappings:
+  status: implemented
+  implemented_mappings:
     - GET /api/projects/:projectId/state
+    - GET /api/projects/:projectId/strategic-snapshot
     - GET /api/projects/:projectId/packets
     - GET /api/projects/:projectId/step-results
     - GET /api/projects/:projectId/quality-artifacts
+    - GET /api/projects/:projectId/delivery-manifests
+    - GET /api/projects/:projectId/promotion-decisions
     - GET /api/projects/:projectId/runs
     - GET /api/projects/:projectId/runs/:runId/events/history
     - GET /api/projects/:projectId/runs/:runId/policy-history
     - GET /api/projects/:projectId/runs/:runId/events
+  out_of_scope:
+    - mutation-command endpoint parity for full CLI surface
+    - production authn/authz policy envelope

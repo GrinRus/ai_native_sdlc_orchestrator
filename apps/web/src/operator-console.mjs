@@ -14,6 +14,167 @@ import {
 } from "../../api/src/index.mjs";
 
 /**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function asString(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function asNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Array<unknown>}
+ */
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeControlPlaneBaseUrl(value) {
+  const url = new URL(value);
+  if (url.pathname !== "/") {
+    url.pathname = url.pathname.replace(/\/+$/u, "");
+  }
+  return url.toString().replace(/\/+$/u, "");
+}
+
+/**
+ * @param {{
+ *   controlPlane: string,
+ *   pathname: string,
+ *   query?: Record<string, string | number | undefined>,
+ * }} options
+ * @returns {URL}
+ */
+function buildControlPlaneUrl(options) {
+  const normalizedBase = normalizeControlPlaneBaseUrl(options.controlPlane);
+  const baseWithSlash = normalizedBase.endsWith("/") ? normalizedBase : `${normalizedBase}/`;
+  const url = new URL(options.pathname.replace(/^\/+/u, ""), baseWithSlash);
+  if (options.query) {
+    for (const [key, value] of Object.entries(options.query)) {
+      if (value === undefined) continue;
+      url.searchParams.set(key, String(value));
+    }
+  }
+  return url;
+}
+
+/**
+ * @param {{
+ *   controlPlane: string,
+ *   pathname: string,
+ *   query?: Record<string, string | number | undefined>,
+ * }} options
+ */
+async function readControlPlaneJson(options) {
+  const url = buildControlPlaneUrl(options);
+  const response = await fetch(url, {
+    headers: {
+      accept: "application/json",
+    },
+  });
+  if (!response.ok) {
+    const message = (await response.text()).trim();
+    throw new Error(`Control-plane request failed (${response.status}) for '${url}': ${message || response.statusText}`);
+  }
+  return response.json();
+}
+
+/**
+ * @param {{
+ *   controlPlane: string,
+ *   pathname: string,
+ *   query?: Record<string, string | number | undefined>,
+ *   onEvent: (event: Record<string, unknown>) => void,
+ * }} options
+ */
+function openControlPlaneSseStream(options) {
+  const controller = new AbortController();
+
+  const done = (async () => {
+    const url = buildControlPlaneUrl({
+      controlPlane: options.controlPlane,
+      pathname: options.pathname,
+      query: options.query,
+    });
+    const response = await fetch(url, {
+      headers: {
+        accept: "text/event-stream",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const message = (await response.text()).trim();
+      throw new Error(`Control-plane SSE failed (${response.status}) for '${url}': ${message || response.statusText}`);
+    }
+    if (!response.body) {
+      throw new Error("Control-plane SSE stream has no response body.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) {
+        return;
+      }
+      buffer += decoder.decode(chunk.value, { stream: true });
+
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary >= 0) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        boundary = buffer.indexOf("\n\n");
+
+        const normalizedBlock = block.replace(/\r/g, "");
+        const lines = normalizedBlock.split("\n");
+        let eventName = "message";
+        let data = "";
+        for (const line of lines) {
+          if (line.startsWith("event:")) {
+            eventName = line.slice(6).trim();
+          } else if (line.startsWith("data:")) {
+            const payloadLine = line.slice(5).trimStart();
+            data = data.length > 0 ? `${data}\n${payloadLine}` : payloadLine;
+          }
+        }
+        if (eventName !== "live-run-event" || data.length === 0) {
+          continue;
+        }
+        options.onEvent(/** @type {Record<string, unknown>} */ (JSON.parse(data)));
+      }
+    }
+  })();
+
+  return {
+    close() {
+      controller.abort();
+    },
+    done: done.catch((error) => {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+      throw error;
+    }),
+  };
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -63,37 +224,172 @@ function selectRunId(runs, requestedRunId) {
 
 /**
  * @param {{
+ *   requestedControlPlane: string | null,
+ *   uiLifecycleState: Record<string, unknown>,
+ * }} options
+ * @returns {string | null}
+ */
+function resolveControlPlaneUrl(options) {
+  if (options.requestedControlPlane) {
+    return options.requestedControlPlane;
+  }
+  const controlPlane = asString(options.uiLifecycleState.control_plane);
+  const connectionState = asString(options.uiLifecycleState.connection_state);
+  if (!controlPlane || connectionState !== "connected") {
+    return null;
+  }
+  return controlPlane;
+}
+
+/**
+ * @param {{
  *   cwd?: string,
  *   projectRef: string,
  *   runtimeRoot?: string,
  *   runId?: string,
+ *   controlPlane?: string,
  * }} options
  */
-export function buildOperatorConsoleSnapshot(options) {
-  const state = readProjectState(options);
+export async function buildOperatorConsoleSnapshot(options) {
   const uiLifecycle = readUiLifecycleState(options);
-  const runs = listRuns(options).sort((left, right) => left.run_id.localeCompare(right.run_id));
-  const packets = listPacketArtifacts(options);
-  const stepResults = listStepResults(options);
-  const qualityArtifacts = listQualityArtifacts(options);
-  const deliveryManifests = listDeliveryManifests(options);
-  const promotionDecisions = listPromotionDecisions(options);
+  const requestedControlPlane = asString(options.controlPlane);
+  const connectedControlPlane = resolveControlPlaneUrl({
+    requestedControlPlane,
+    uiLifecycleState: uiLifecycle.state,
+  });
   const strategicSnapshot = readStrategicSnapshot(options);
-  const selectedRunId = selectRunId(runs, options.runId);
-  const selectedRunEventHistory = selectedRunId
-    ? readRunEventHistory({
-        ...options,
-        runId: selectedRunId,
-        limit: 50,
-      })
-    : null;
-  const selectedRunPolicyHistory = selectedRunId
-    ? readRunPolicyHistory({
-        ...options,
-        runId: selectedRunId,
-        limit: 100,
-      })
-    : null;
+
+  if (!connectedControlPlane) {
+    const state = readProjectState(options);
+    const runs = listRuns(options).sort((left, right) => left.run_id.localeCompare(right.run_id));
+    const packets = listPacketArtifacts(options);
+    const stepResults = listStepResults(options);
+    const qualityArtifacts = listQualityArtifacts(options);
+    const deliveryManifests = listDeliveryManifests(options);
+    const promotionDecisions = listPromotionDecisions(options);
+    const selectedRunId = selectRunId(runs, options.runId);
+    const selectedRunEventHistory = selectedRunId
+      ? readRunEventHistory({
+          ...options,
+          runId: selectedRunId,
+          limit: 50,
+        })
+      : null;
+    const selectedRunPolicyHistory = selectedRunId
+      ? readRunPolicyHistory({
+          ...options,
+          runId: selectedRunId,
+          limit: 100,
+        })
+      : null;
+
+    return {
+      project: state,
+      ui_lifecycle: uiLifecycle.state,
+      ui_lifecycle_state_file: uiLifecycle.stateFile,
+      runs,
+      selected_run_id: selectedRunId,
+      packet_artifacts: packets,
+      step_results: stepResults,
+      quality_artifacts: qualityArtifacts,
+      delivery_manifests: deliveryManifests,
+      promotion_decisions: promotionDecisions,
+      strategic_snapshot: strategicSnapshot,
+      run_detail: {
+        packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
+        step_results: filterArtifactsByRunId(stepResults, selectedRunId),
+        quality_artifacts: filterArtifactsByRunId(qualityArtifacts, selectedRunId),
+        delivery_manifests: filterArtifactsByRunId(deliveryManifests, selectedRunId),
+        promotion_decisions: filterArtifactsByRunId(promotionDecisions, selectedRunId),
+        event_history: selectedRunEventHistory,
+        policy_history: selectedRunPolicyHistory,
+      },
+      api_ui_contract_alignment: {
+        binding_mode: "module-in-process",
+        control_plane: null,
+        read_model: [
+          "GET /api/projects/:projectId/state",
+          "GET /api/projects/:projectId/runs",
+          "GET /api/projects/:projectId/packets",
+          "GET /api/projects/:projectId/step-results",
+          "GET /api/projects/:projectId/quality-artifacts",
+          "GET /api/projects/:projectId/delivery-manifests",
+          "GET /api/projects/:projectId/promotion-decisions",
+          "GET /api/projects/:projectId/strategic-snapshot",
+          "GET /api/projects/:projectId/runs/:runId/events/history",
+          "GET /api/projects/:projectId/runs/:runId/policy-history",
+        ],
+        live_stream: "GET /api/projects/:projectId/runs/:runId/events",
+        event_contract_family: "live-run-event",
+      },
+    };
+  }
+
+  const projectState = readProjectState(options);
+  const projectId = projectState.project_id;
+
+  const [state, runsRaw, packetsRaw, stepResultsRaw, qualityRaw, deliveryRaw, promotionRaw, strategicRaw] =
+    await Promise.all([
+      readControlPlaneJson({
+        controlPlane: connectedControlPlane,
+        pathname: `/api/projects/${encodeURIComponent(projectId)}/state`,
+      }),
+      readControlPlaneJson({
+        controlPlane: connectedControlPlane,
+        pathname: `/api/projects/${encodeURIComponent(projectId)}/runs`,
+      }),
+      readControlPlaneJson({
+        controlPlane: connectedControlPlane,
+        pathname: `/api/projects/${encodeURIComponent(projectId)}/packets`,
+      }),
+      readControlPlaneJson({
+        controlPlane: connectedControlPlane,
+        pathname: `/api/projects/${encodeURIComponent(projectId)}/step-results`,
+      }),
+      readControlPlaneJson({
+        controlPlane: connectedControlPlane,
+        pathname: `/api/projects/${encodeURIComponent(projectId)}/quality-artifacts`,
+      }),
+      readControlPlaneJson({
+        controlPlane: connectedControlPlane,
+        pathname: `/api/projects/${encodeURIComponent(projectId)}/delivery-manifests`,
+      }),
+      readControlPlaneJson({
+        controlPlane: connectedControlPlane,
+        pathname: `/api/projects/${encodeURIComponent(projectId)}/promotion-decisions`,
+      }),
+      readControlPlaneJson({
+        controlPlane: connectedControlPlane,
+        pathname: `/api/projects/${encodeURIComponent(projectId)}/strategic-snapshot`,
+      }).catch(() => strategicSnapshot),
+    ]);
+
+  const runs = asArray(runsRaw).sort((left, right) => {
+    const leftId = asString(asRecord(left).run_id) ?? "";
+    const rightId = asString(asRecord(right).run_id) ?? "";
+    return leftId.localeCompare(rightId);
+  });
+  const packets = /** @type {Array<{ family: string, document: Record<string, unknown> }>} */ (asArray(packetsRaw));
+  const stepResults = /** @type {Array<{ document: Record<string, unknown> }>} */ (asArray(stepResultsRaw));
+  const qualityArtifacts = /** @type {Array<{ document: Record<string, unknown> }>} */ (asArray(qualityRaw));
+  const deliveryManifests = /** @type {Array<{ document: Record<string, unknown> }>} */ (asArray(deliveryRaw));
+  const promotionDecisions = /** @type {Array<{ document: Record<string, unknown> }>} */ (asArray(promotionRaw));
+
+  const selectedRunId = selectRunId(/** @type {Array<{ run_id: string }>} */ (runs), options.runId);
+  const [selectedRunEventHistory, selectedRunPolicyHistory] = selectedRunId
+    ? await Promise.all([
+        readControlPlaneJson({
+          controlPlane: connectedControlPlane,
+          pathname: `/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(selectedRunId)}/events/history`,
+          query: { limit: 50 },
+        }),
+        readControlPlaneJson({
+          controlPlane: connectedControlPlane,
+          pathname: `/api/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(selectedRunId)}/policy-history`,
+          query: { limit: 100 },
+        }),
+      ])
+    : [null, null];
 
   return {
     project: state,
@@ -106,7 +402,7 @@ export function buildOperatorConsoleSnapshot(options) {
     quality_artifacts: qualityArtifacts,
     delivery_manifests: deliveryManifests,
     promotion_decisions: promotionDecisions,
-    strategic_snapshot: strategicSnapshot,
+    strategic_snapshot: strategicRaw,
     run_detail: {
       packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
       step_results: filterArtifactsByRunId(stepResults, selectedRunId),
@@ -117,11 +413,17 @@ export function buildOperatorConsoleSnapshot(options) {
       policy_history: selectedRunPolicyHistory,
     },
     api_ui_contract_alignment: {
+      binding_mode: "detached-http-sse",
+      control_plane: connectedControlPlane,
       read_model: [
+        "GET /api/projects/:projectId/state",
         "GET /api/projects/:projectId/runs",
         "GET /api/projects/:projectId/packets",
         "GET /api/projects/:projectId/step-results",
         "GET /api/projects/:projectId/quality-artifacts",
+        "GET /api/projects/:projectId/delivery-manifests",
+        "GET /api/projects/:projectId/promotion-decisions",
+        "GET /api/projects/:projectId/strategic-snapshot",
         "GET /api/projects/:projectId/runs/:runId/events/history",
         "GET /api/projects/:projectId/runs/:runId/policy-history",
       ],
@@ -132,7 +434,15 @@ export function buildOperatorConsoleSnapshot(options) {
 }
 
 /**
- * @param {ReturnType<typeof buildOperatorConsoleSnapshot>} snapshot
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {Awaited<ReturnType<typeof buildOperatorConsoleSnapshot>>} snapshot
  * @param {{
  *   title?: string,
  *   streamProtocol?: string | null,
@@ -263,10 +573,11 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
  *   follow?: boolean,
  *   afterEventId?: string,
  *   maxReplay?: number,
+ *   controlPlane?: string,
  * }} options
  */
-export function attachOperatorConsoleSession(options) {
-  const snapshot = buildOperatorConsoleSnapshot(options);
+export async function attachOperatorConsoleSession(options) {
+  const snapshot = await buildOperatorConsoleSnapshot(options);
   const follow = Boolean(options.follow);
   const runId = options.runId ?? snapshot.selected_run_id;
 
@@ -282,28 +593,71 @@ export function attachOperatorConsoleSession(options) {
   let streamProtocol = null;
   let streamBackpressure = null;
   let streamLogFile = null;
+  /** @type {Promise<void> | null} */
+  let streamDone = null;
 
   if (follow && runId) {
-    const stream = openRunEventStream({
-      cwd: options.cwd,
-      projectRef: options.projectRef,
-      runtimeRoot: options.runtimeRoot,
-      runId,
-      afterEventId: options.afterEventId,
-      maxReplay: options.maxReplay,
-    });
-    streamProtocol = stream.protocol;
-    streamBackpressure = stream.backpressure;
-    streamLogFile = stream.log_file;
-    for (const event of stream.replay_events) {
-      liveEvents.push(event);
-    }
-    unsubscribeStream = stream.subscribe((event) => {
-      liveEvents.push(event);
-      for (const listener of listeners) {
-        listener(event);
+    if (snapshot.api_ui_contract_alignment.binding_mode === "detached-http-sse") {
+      const controlPlane = asString(snapshot.api_ui_contract_alignment.control_plane);
+      if (!controlPlane) {
+        throw new Error("Connected mode is selected but no control-plane base URL is available.");
       }
-    });
+
+      const maxReplay = asNumber(options.maxReplay);
+      const replayLimit = maxReplay !== null ? Math.floor(maxReplay) : 50;
+      const replay = await readControlPlaneJson({
+        controlPlane,
+        pathname: `/api/projects/${encodeURIComponent(snapshot.project.project_id)}/runs/${encodeURIComponent(runId)}/events/history`,
+        query: { limit: replayLimit },
+      });
+      const replayEvents = asArray(replay.events);
+      for (const event of replayEvents) {
+        liveEvents.push(/** @type {Record<string, unknown>} */ (event));
+      }
+      const afterEventId = asString(options.afterEventId) ?? asString(replayEvents.at(-1)?.event_id);
+
+      const stream = openControlPlaneSseStream({
+        controlPlane,
+        pathname: `/api/projects/${encodeURIComponent(snapshot.project.project_id)}/runs/${encodeURIComponent(runId)}/events`,
+        query: {
+          after_event_id: afterEventId ?? undefined,
+          max_replay: replayLimit,
+        },
+        onEvent(event) {
+          liveEvents.push(event);
+          for (const listener of listeners) {
+            listener(event);
+          }
+        },
+      });
+      streamProtocol = "sse";
+      streamBackpressure = { policy: "bounded-replay-window" };
+      streamDone = stream.done.catch(() => {});
+      unsubscribeStream = () => {
+        stream.close();
+      };
+    } else {
+      const stream = openRunEventStream({
+        cwd: options.cwd,
+        projectRef: options.projectRef,
+        runtimeRoot: options.runtimeRoot,
+        runId,
+        afterEventId: options.afterEventId,
+        maxReplay: options.maxReplay,
+      });
+      streamProtocol = stream.protocol;
+      streamBackpressure = stream.backpressure;
+      streamLogFile = stream.log_file;
+      for (const event of stream.replay_events) {
+        liveEvents.push(event);
+      }
+      unsubscribeStream = stream.subscribe((event) => {
+        liveEvents.push(event);
+        for (const listener of listeners) {
+          listener(event);
+        }
+      });
+    }
   }
 
   return {
@@ -319,6 +673,11 @@ export function attachOperatorConsoleSession(options) {
       return () => {
         listeners.delete(listener);
       };
+    },
+    async awaitStreamIdle() {
+      if (streamDone) {
+        await streamDone;
+      }
     },
     render() {
       return renderOperatorConsoleHtml(snapshot, {

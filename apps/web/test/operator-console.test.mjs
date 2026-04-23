@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { appendRunEvent } from "../../api/src/index.mjs";
+import { appendRunEvent, createControlPlaneHttpServer } from "../../api/src/index.mjs";
 import { invokeCli } from "../../cli/src/index.mjs";
 import {
   attachOperatorConsoleSession,
@@ -86,7 +86,7 @@ function seedOperatorArtifacts(projectRoot) {
 test("web console snapshot builds run list and run detail from shared API contracts", async () => {
   await withTempProject(async (projectRoot) => {
     const runId = seedOperatorArtifacts(projectRoot);
-    const snapshot = buildOperatorConsoleSnapshot({
+    const snapshot = await buildOperatorConsoleSnapshot({
       cwd: projectRoot,
       projectRef: projectRoot,
       runId,
@@ -153,7 +153,7 @@ test("web console follow mode reuses shared stream and detach is non-disruptive"
       payload: { step_id: "runner.implement", status: "pass" },
     });
 
-    const session = attachOperatorConsoleSession({
+    const session = await attachOperatorConsoleSession({
       cwd: projectRoot,
       projectRef: projectRoot,
       runId,
@@ -203,7 +203,7 @@ test("web console follow mode reuses shared stream and detach is non-disruptive"
     await new Promise((resolve) => setTimeout(resolve, 200));
     assert.equal(session.replay_events.length, capturedBeforeDetach);
 
-    const snapshotAfterDetach = buildOperatorConsoleSnapshot({
+    const snapshotAfterDetach = await buildOperatorConsoleSnapshot({
       cwd: projectRoot,
       projectRef: projectRoot,
       runId,
@@ -215,38 +215,48 @@ test("web console follow mode reuses shared stream and detach is non-disruptive"
 test("web snapshot reflects ui attach/detach lifecycle while headless reads remain available", async () => {
   await withTempProject(async (projectRoot) => {
     const runId = seedOperatorArtifacts(projectRoot);
-
-    const attachResult = invokeCli([
-      "ui",
-      "attach",
-      "--project-ref",
-      projectRoot,
-      "--run-id",
-      runId,
-      "--control-plane",
-      "http://localhost:8080",
-    ]);
-    assert.equal(attachResult.exitCode, 0, attachResult.stderr);
-
-    const attachedSnapshot = buildOperatorConsoleSnapshot({
+    const transport = await createControlPlaneHttpServer({
       cwd: projectRoot,
       projectRef: projectRoot,
-      runId,
+      host: "127.0.0.1",
+      port: 0,
     });
-    assert.equal(attachedSnapshot.ui_lifecycle.ui_attached, true);
-    assert.equal(attachedSnapshot.ui_lifecycle.connection_state, "connected");
 
-    const detachResult = invokeCli(["ui", "detach", "--project-ref", projectRoot, "--run-id", runId]);
-    assert.equal(detachResult.exitCode, 0, detachResult.stderr);
+    try {
+      const attachResult = invokeCli([
+        "ui",
+        "attach",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+        "--control-plane",
+        transport.baseUrl,
+      ]);
+      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
 
-    const detachedSnapshot = buildOperatorConsoleSnapshot({
-      cwd: projectRoot,
-      projectRef: projectRoot,
-      runId,
-    });
-    assert.equal(detachedSnapshot.ui_lifecycle.ui_attached, false);
-    assert.equal(detachedSnapshot.ui_lifecycle.connection_state, "detached");
-    assert.ok(detachedSnapshot.runs.some((run) => run.run_id === runId));
+      const attachedSnapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+      });
+      assert.equal(attachedSnapshot.ui_lifecycle.ui_attached, true);
+      assert.equal(attachedSnapshot.ui_lifecycle.connection_state, "connected");
+
+      const detachResult = invokeCli(["ui", "detach", "--project-ref", projectRoot, "--run-id", runId]);
+      assert.equal(detachResult.exitCode, 0, detachResult.stderr);
+
+      const detachedSnapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+      });
+      assert.equal(detachedSnapshot.ui_lifecycle.ui_attached, false);
+      assert.equal(detachedSnapshot.ui_lifecycle.connection_state, "detached");
+      assert.ok(detachedSnapshot.runs.some((run) => run.run_id === runId));
+    } finally {
+      await transport.close();
+    }
   });
 });
 
@@ -295,5 +305,76 @@ test("operator console smoke script renders html and emits transcript summary", 
         : false,
     };
     assert.deepEqual(subset, fixture);
+  });
+});
+
+test("web connected mode consumes detached HTTP/SSE transport while preserving detachable session behavior", async () => {
+  await withTempProject(async (projectRoot) => {
+    const runId = seedOperatorArtifacts(projectRoot);
+
+    const transport = await createControlPlaneHttpServer({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const attachResult = invokeCli([
+        "ui",
+        "attach",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+        "--control-plane",
+        transport.baseUrl,
+      ]);
+      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
+
+      const snapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+      });
+      assert.equal(snapshot.ui_lifecycle.connection_state, "connected");
+      assert.equal(snapshot.api_ui_contract_alignment.binding_mode, "detached-http-sse");
+      assert.equal(snapshot.api_ui_contract_alignment.control_plane, transport.baseUrl);
+
+      const session = await attachOperatorConsoleSession({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+        follow: true,
+      });
+      assert.equal(session.stream_protocol, "sse");
+      assert.equal(session.stream_backpressure.policy, "bounded-replay-window");
+
+      const streamedEvent = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("timed out waiting for connected-mode follow event")), 3000);
+        const unsubscribe = session.onEvent((event) => {
+          clearTimeout(timeout);
+          unsubscribe();
+          resolve(event);
+        });
+      });
+
+      appendRunEvent({
+        projectRef: projectRoot,
+        cwd: projectRoot,
+        runId,
+        eventType: "warning.raised",
+        payload: { code: "connected.mode.transport.follow" },
+      });
+
+      const received = /** @type {Record<string, unknown>} */ (await streamedEvent);
+      assert.equal(received.event_type, "warning.raised");
+
+      const detached = session.detach();
+      assert.equal(detached.detached, true);
+      assert.ok(detached.captured_event_count >= 1);
+    } finally {
+      await transport.close();
+    }
   });
 });

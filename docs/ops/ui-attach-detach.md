@@ -11,7 +11,7 @@ aor ui attach \
   --control-plane http://localhost:8080
 ```
 
-Note: in the current module-backed baseline, `--control-plane` records connected-mode intent for UI lifecycle state. Detached HTTP transport wiring is deferred to `W9-S07`.
+Note: when a reachable `--control-plane` URL is provided, connected mode reads/follow use the detached HTTP/SSE transport baseline. Without it, attach remains disconnected/read-model mode while headless workflows stay available.
 
 Disconnected/read-model attach (no control-plane URL):
 ```bash
