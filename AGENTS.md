@@ -79,3 +79,4 @@ Use the root skills when they help:
 - `backlog-workflow`
 - `story-traceability`
 - `live-e2e-preflight`
+- `live-e2e-runner`
