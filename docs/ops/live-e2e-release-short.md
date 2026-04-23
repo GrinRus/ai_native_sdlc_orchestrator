@@ -115,9 +115,12 @@ Evidence fixtures for W4-S06:
 Related runbook:
 - `docs/ops/github-fork-first-delivery.md`
 
-## W10-S05 refreshed evidence (2026-04-23)
+## W10-S05 observed baseline evidence pending W11 closure (2026-04-23)
 Observed release-shaped run:
 - `live-e2e.release.short.run-423122830183` with status `pass`.
+
+Evidence note:
+- this run demonstrates the current short-profile external execution and delivery baseline, but it does not yet close target-backed proof for `W10-S05`.
 
 Fresh fixtures:
 - `examples/live-e2e/fixtures/w10-s05/release-short.run-summary.json`

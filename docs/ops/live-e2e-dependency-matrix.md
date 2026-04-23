@@ -31,13 +31,13 @@ pnpm check
 
 ## Notes
 
-- `live-e2e` runner executes `verification.setup_commands` first, then `verification.commands`, both in the cloned target workspace.
+- Profiles declare `verification.setup_commands` and `verification.commands`; W11 tracks making the standard `live-e2e` runner execute them from a cloned target workspace as the canonical path.
 - Public-repo rehearsals keep `write_back_to_remote=false` by default.
 - If an external CDN/network dependency is unavailable (for example Playwright browser download), mark the run as external `inconclusive` for smoke tracking.
 
-## W10-S05 observed runs (2026-04-23)
+## W10-S05 observed baseline runs pending W11 closure (2026-04-23)
 
-Observed with fresh external target-catalog runs:
+Observed with current external short-profile runs:
 - `live-e2e.regress.short.run-423122617518` (scenario `ky-regression-smoke`) status `pass`.
 - `live-e2e.release.short.run-423122830183` (scenario `ky-release-short`) status `pass`.
 
@@ -53,3 +53,6 @@ Observed failure signatures and safety defaults:
 
 Evidence fixture bundle:
 - `examples/live-e2e/fixtures/w10-s05/w10-s05-evidence-bundle.json`
+
+Closure note:
+- `W10-S05` remains blocked because the current bundle does not yet prove target-backed checkout, execution-root, and delivery-path anchoring end to end.

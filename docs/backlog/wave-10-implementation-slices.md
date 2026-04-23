@@ -12,7 +12,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 ## Parallel start and sequencing notes
 - `W10-S01`, `W10-S02`, and `W10-S03` can start in parallel because they close separate production-facing gaps on top of completed baselines.
 - `W10-S04` starts after `W10-S03` so auth and permission work hardens an already-defined mutation surface rather than a hypothetical one.
-- `W10-S05` starts after `W10-S01` and `W10-S02` so target-catalog proof uses real external execution and real bounded delivery rather than in-process or stubbed substitutes.
+- `W10-S05` remains blocked until `W11-S05` lands because the current catalog proof bundle still resolves delivery evidence to the AOR workspace rather than a cloned target checkout.
 
 ---
 
@@ -142,28 +142,28 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 
 ## W10-S05 — Externally verified live E2E target-catalog proof
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** done
-- **Outcome:** Refresh live target-catalog evidence using external runner execution and real bounded delivery transactions instead of in-process or stubbed-only proofs.
+- **State:** blocked
+- **Outcome:** Keep the original wave-level target-catalog proof open until fresh target-backed evidence replaces the current AOR-workspace-backed proof bundle.
 - **Primary modules:** `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability`, `docs/backlog/**`
-- **Hard dependencies:** W10-S01, W10-S02
+- **Hard dependencies:** W10-S01, W10-S02, W11-S05
 - **Primary user-story surfaces:** operator / SRE, delivery engineer, finance / audit / hygiene
 
 ### Local tasks
-1. Run at least one regression target and one release-shaped target through the external live adapter and real bounded delivery path.
-2. Capture fresh transcripts, scorecards, manifests, and incident or learning-loop evidence under `examples/live-e2e/fixtures/**`.
-3. Update runbooks and dependency matrix entries with observed prerequisites, failure signatures, and safety defaults.
-4. Link resulting evidence back to backlog closure criteria for production-facing readiness.
+1. Keep `W10-S05` explicitly blocked until W11 delivers target checkout materialization, profile-driven execution, target-anchored delivery evidence, and refreshed proof fixtures.
+2. Reject evidence bundles whose delivery manifests or changed paths resolve to the AOR workspace rather than the cloned target checkout.
+3. Link the eventual W11 short-profile proof bundle back to the original W10 closure criteria and target-catalog entries.
+4. Refresh the wave-level closure notes only after replacement evidence is reviewable end to end.
 
 ### Acceptance criteria
-1. At least one regression target and one release-shaped target produce fresh external evidence from actual runner invocation.
-2. Delivery evidence for the exercised path is no longer limited to stubbed fork-first metadata.
-3. Runbooks and dependency matrix reflect observed external prerequisites, failure signatures, and safety defaults.
-4. The evidence bundle is sufficient to review production-facing readiness without relying solely on narrative claims or fixture-only baselines.
+1. `W10-S05` does not return to `ready` or `done` until `W11-S05` lands and the resulting bundle is target-backed.
+2. The replacement proof bundle includes at least one regression target and one release-shaped target executed from a target checkout.
+3. Delivery evidence for the closure path anchors repo root and changed paths to the exercised target repository.
+4. Wave-level closure can be reviewed without relying on AOR-workspace artifacts or narrative-only claims.
 
 ### Done evidence
-- fresh live-e2e transcripts and fixtures for selected targets
-- updated scorecard, manifest, incident, and learning-loop artifacts linked to the same run ids
-- updated runbooks and dependency matrix entries referencing the refreshed evidence bundle
+- W11 proof-bundle references for `regress-short` and `release-short`
+- updated runbooks and dependency matrix entries linked to the replacement target-backed evidence
+- backlog state change showing `W10-S05` moved from `blocked` to `done` only after W11 closure evidence landed
 
 ### Out of scope
 - broad target-catalog expansion

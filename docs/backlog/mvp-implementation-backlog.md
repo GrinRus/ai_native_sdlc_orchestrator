@@ -121,7 +121,16 @@ This is the master index for the implementation slices across all defined waves.
 | W10-S02 | Networked fork-first delivery execution | EPIC-5 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**` | W4-S04, W6-S05 |
 | W10-S03 | Detached transport mutation command baseline | EPIC-6 | done | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W9-S07, W6-S03, W6-S04 |
 | W10-S04 | Detached transport authn/authz hardening baseline | EPIC-6 | done | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W10-S03 |
-| W10-S05 | Externally verified live E2E target-catalog proof | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability`, `docs/backlog/**` | W10-S01, W10-S02 |
+| W10-S05 | Externally verified live E2E target-catalog proof | EPIC-7 | blocked | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability`, `docs/backlog/**` | W10-S01, W10-S02, W11-S05 |
+
+## W11 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W11-S01 | Source-of-truth reality repair | EPIC-0 | ready | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**` | none |
+| W11-S02 | Target workspace materialization for live E2E | EPIC-7 | blocked | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S01 |
+| W11-S03 | Profile-driven preflight and routed live execution | EPIC-3 | blocked | `apps/cli`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S02 |
+| W11-S04 | Target-anchored delivery and release evidence | EPIC-5 | blocked | `apps/cli`, `packages/orchestrator-core`, `packages/observability`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**` | W11-S03 |
+| W11-S05 | Fresh external proof bundle for catalog targets | EPIC-7 | blocked | `docs/ops/**`, `examples/live-e2e/**`, `packages/observability`, `docs/backlog/**` | W11-S04 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

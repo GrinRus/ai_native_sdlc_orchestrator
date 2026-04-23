@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-10-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-11-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -21,6 +21,7 @@ The authoritative planning model for implementation lives in:
 | W8 | Close later-maturity stories for strategic operator visibility, governance hardening, context lifecycle maturity, and multi-repo delivery maturity. | 9 | EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-8-implementation-slices.md` |
 | W9 | Stabilize post-audit findings across routed evidence durability, source-of-truth docs, public quality surfaces, detached transport, and live execution foundations. | 8 | EPIC-0, EPIC-3, EPIC-4, EPIC-6 | `docs/backlog/wave-9-implementation-slices.md` |
 | W10 | Reopen production-facing gaps left after the baseline audit across external runner execution, networked fork-first delivery, detached mutation transport, and live target-catalog proof. | 5 | EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-10-implementation-slices.md` |
+| W11 | Close the remaining target-backed live E2E proof gap through source-of-truth repair, target-checkout execution, target-anchored delivery evidence, and refreshed external proof. | 5 | EPIC-0, EPIC-3, EPIC-5, EPIC-7 | `docs/backlog/wave-11-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -58,6 +59,11 @@ The authoritative planning model for implementation lives in:
 | W10-S03 | productionization gap closure: detached mutation transport (no direct story closure) |
 | W10-S04 | productionization gap closure: detached transport auth hardening (no direct story closure) |
 | W10-S05 | productionization gap closure: external live target-catalog proof (no direct story closure) |
+| W11-S01 | productionization gap closure: source-of-truth reality repair (no direct story closure) |
+| W11-S02 | productionization gap closure: target-backed workspace materialization (no direct story closure) |
+| W11-S03 | productionization gap closure: profile-driven live preflight and routed execution (no direct story closure) |
+| W11-S04 | productionization gap closure: target-anchored delivery evidence (no direct story closure) |
+| W11-S05 | productionization gap closure: refreshed target-catalog proof bundle (no direct story closure) |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -189,7 +195,21 @@ The authoritative planning model for implementation lives in:
 - detached transport supports bounded authenticated mutation commands for connected operator clients
 - at least one regression target and one release-shaped target from the catalog have fresh live evidence produced through the external runner and real bounded delivery paths
 
+**Current status note:** `W10-S05` is blocked after the audit because the current fixture bundle still anchors delivery evidence to the AOR workspace rather than a cloned target checkout. W11 carries the closure work required to satisfy this proof honestly.
+
 **Detailed slices:** `docs/backlog/wave-10-implementation-slices.md`
+
+## W11 — target-backed live E2E proof closure
+**Goal:** Make standard live E2E truly target-backed, profile-driven, and honest enough to serve as production-facing proof.
+
+**Exit criteria:**
+- standard `live-e2e` executes against a cloned target checkout rather than the AOR workspace
+- preflight executes machine-readable setup and verification commands from the live E2E profile
+- routed live execution invokes the supported external adapter path from the target checkout root
+- delivery manifests and release packets anchor repo root and changed paths to the target checkout
+- fresh `regress-short` and `release-short` evidence bundles prove the target-backed flow without narrative-only assumptions
+
+**Detailed slices:** `docs/backlog/wave-11-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

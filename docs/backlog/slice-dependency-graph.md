@@ -77,6 +77,11 @@ flowchart TB
   W10S03[W10-S03 Detached transport mutation command baseline]
   W10S04[W10-S04 Detached transport authn/authz hardening baseline]
   W10S05[W10-S05 Externally verified live E2E target-catalog proof]
+  W11S01[W11-S01 Source-of-truth reality repair]
+  W11S02[W11-S02 Target workspace materialization for live E2E]
+  W11S03[W11-S03 Profile-driven preflight and routed live execution]
+  W11S04[W11-S04 Target-anchored delivery and release evidence]
+  W11S05[W11-S05 Fresh external proof bundle for catalog targets]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -213,8 +218,13 @@ flowchart TB
   W6S03 --> W10S03
   W6S04 --> W10S03
   W10S03 --> W10S04
+  W11S01 --> W11S02
+  W11S02 --> W11S03
+  W11S03 --> W11S04
+  W11S04 --> W11S05
   W10S01 --> W10S05
   W10S02 --> W10S05
+  W11S05 --> W10S05
 ```
 
 ## W0 hard dependencies
@@ -330,7 +340,16 @@ flowchart TB
 | W10-S02 | W4-S04, W6-S05 |
 | W10-S03 | W9-S07, W6-S03, W6-S04 |
 | W10-S04 | W10-S03 |
-| W10-S05 | W10-S01, W10-S02 |
+| W10-S05 | W10-S01, W10-S02, W11-S05 |
+
+## W11 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W11-S01 | none |
+| W11-S02 | W11-S01 |
+| W11-S03 | W11-S02 |
+| W11-S04 | W11-S03 |
+| W11-S05 | W11-S04 |
 
 ## Topological order
 1. W0-S01
@@ -403,7 +422,12 @@ flowchart TB
 68. W10-S02
 69. W10-S03
 70. W10-S04
-71. W10-S05
+71. W11-S01
+72. W11-S02
+73. W11-S03
+74. W11-S04
+75. W11-S05
+76. W10-S05
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

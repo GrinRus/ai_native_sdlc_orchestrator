@@ -101,5 +101,6 @@ All targets must reuse the same baseline sequence before execution-style stages:
 
 See `docs/ops/live-e2e-no-write-preflight.md` for the reusable procedure used by bootstrap, quality, and delivery rehearsals.
 
-## Latest refreshed evidence bundle
-- `examples/live-e2e/fixtures/w10-s05/w10-s05-evidence-bundle.json` captures fresh regression and release-shaped external runs plus linked delivery, incident, and learning-loop artifacts.
+## Latest observed evidence bundle
+- `examples/live-e2e/fixtures/w10-s05/w10-s05-evidence-bundle.json` captures the current short-profile external-run baseline plus linked delivery, incident, and learning-loop artifacts.
+- The bundle remains useful for audit traceability, but `W10-S05` stays blocked until W11 replaces it with target-backed proof that anchors delivery evidence to the exercised target checkout.

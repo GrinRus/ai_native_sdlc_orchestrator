@@ -7,6 +7,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W0:** `W0-S01` Workspace and package build baseline; `W0-S02` Contracts package and schema loader baseline; `W0-S03` Example and reference integrity checks; `W0-S04` Agent guidance and backlog workflow baseline; `W0-S06` Repository CI and acceptance gates
 - **W6:** `W6-S01` Backlog and slice-cycle extensibility for W6+
 - **W9:** `W9-S02` Current-state documentation drift repair
+- **W11:** `W11-S01` Source-of-truth reality repair
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -29,6 +30,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W8:** `W8-S03` Later delivery and security route-governance maturity; `W8-S08` Runtime context compiler and adapter-context injection
 - **W9:** `W9-S01` Run-scoped routed evidence durability bugfix; `W9-S08` First real provider adapter and live execution foundation
 - **W10:** `W10-S01` External live adapter execution baseline
+- **W11:** `W11-S03` Profile-driven preflight and routed live execution
 
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -48,6 +50,7 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W6:** `W6-S05` Delivery/release prepare command pack
 - **W8:** `W8-S07` Later multi-repo, bootstrap, and delivery rerun maturity
 - **W10:** `W10-S02` Networked fork-first delivery execution
+- **W11:** `W11-S04` Target-anchored delivery and release evidence
 
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
@@ -74,3 +77,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W7:** `W7-S03` Incident recertification and controlled re-enable flow; `W7-S04` Finance evidence and audit durability expansion; `W7-S05` MVP+ governance and learning-loop integration closure
 - **W8:** `W8-S06` Later incident and platform recertification maturity
 - **W10:** `W10-S05` Externally verified live E2E target-catalog proof
+- **W11:** `W11-S02` Target workspace materialization for live E2E; `W11-S05` Fresh external proof bundle for catalog targets

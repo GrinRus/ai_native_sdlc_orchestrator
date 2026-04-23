@@ -71,9 +71,12 @@ When `--control-plane` is reachable, connected mode uses detached HTTP/SSE read/
 - evidence and live events are available;
 - no upstream write-back occurs.
 
-## W10-S05 refreshed evidence (2026-04-23)
+## W10-S05 observed baseline evidence pending W11 closure (2026-04-23)
 Observed run:
 - `live-e2e.regress.short.run-423122617518` with status `pass`.
+
+Evidence note:
+- this run demonstrates the current short-profile external execution baseline, but it does not by itself close target-backed proof for `W10-S05`.
 
 Fresh fixtures:
 - `examples/live-e2e/fixtures/w10-s05/regress-short.run-summary.json`
