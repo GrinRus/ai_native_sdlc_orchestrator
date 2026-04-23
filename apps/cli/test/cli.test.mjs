@@ -1141,6 +1141,10 @@ test("W6 incident and audit command pack links run evidence to durable incident 
       },
     });
     const rollbackPromotionRef = `evidence://${path.relative(projectRoot, rollbackPromotionFile).replace(/\\/g, "/")}`;
+    const tiedArtifactTimestamp = new Date("2026-01-01T02:00:10.000Z");
+    for (const fixturePath of [promotionDecisionFile, blockedPromotionFile, rollbackPromotionFile]) {
+      fs.utimesSync(fixturePath, tiedArtifactTimestamp, tiedArtifactTimestamp);
+    }
 
     const incidentOpenResult = invokeCli([
       "incident",

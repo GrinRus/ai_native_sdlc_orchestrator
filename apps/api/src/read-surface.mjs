@@ -53,7 +53,11 @@ function listJsonFiles(dirPath) {
     .sort((left, right) => {
       const leftStat = fs.statSync(left);
       const rightStat = fs.statSync(right);
-      return rightStat.mtimeMs - leftStat.mtimeMs;
+      const mtimeDelta = rightStat.mtimeMs - leftStat.mtimeMs;
+      if (mtimeDelta !== 0) {
+        return mtimeDelta;
+      }
+      return path.basename(right).localeCompare(path.basename(left));
     });
 }
 
@@ -351,6 +355,158 @@ function toTimelineMs(value) {
 }
 
 /**
+ * @param {string} filePath
+ * @returns {number}
+ */
+function readFileTimelineMs(filePath) {
+  try {
+    const stats = fs.statSync(filePath);
+    return Number.isFinite(stats.mtimeMs) ? stats.mtimeMs : Number.NEGATIVE_INFINITY;
+  } catch {
+    return Number.NEGATIVE_INFINITY;
+  }
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @returns {Record<string, unknown>}
+ */
+function resolvePromotionRolloutDecision(document) {
+  const topLevel = asRecord(document.rollout_decision);
+  if (Object.keys(topLevel).length > 0) {
+    return topLevel;
+  }
+  return asRecord(asRecord(document.evidence_summary).rollout_decision);
+}
+
+/**
+ * @param {string | null} status
+ * @returns {number}
+ */
+function promotionStatusPriority(status) {
+  if (status === "pass") return 3;
+  if (status === "hold") return 2;
+  if (status === "fail") return 1;
+  return 0;
+}
+
+/**
+ * @param {string | null} toChannel
+ * @returns {number}
+ */
+function promotionTransitionPriority(toChannel) {
+  if (toChannel === "stable") return 4;
+  if (toChannel === "frozen") return 3;
+  if (toChannel === "candidate") return 2;
+  if (toChannel === "draft") return 1;
+  if (toChannel === "demoted") return 0;
+  return -1;
+}
+
+/**
+ * @param {string | null} action
+ * @returns {number}
+ */
+function promotionActionPriority(action) {
+  if (action === "promote") return 4;
+  if (action === null) return 3;
+  if (action === "freeze") return 2;
+  if (action === "hold") return 1;
+  if (action === "reject") return 0;
+  if (action === "demote") return -1;
+  return -2;
+}
+
+/**
+ * @param {{
+ *   status: string | null,
+ *   to_channel: string | null,
+ *   rollout_action: string | null,
+ * }} candidate
+ * @returns {boolean}
+ */
+function isPrimaryPromotionCandidate(candidate) {
+  return (
+    candidate.status === "pass" &&
+    candidate.to_channel !== "demoted" &&
+    candidate.rollout_action !== "demote" &&
+    candidate.rollout_action !== "reject"
+  );
+}
+
+/**
+ * @param {Array<{
+ *   artifact_ref: string,
+ *   file: string,
+ *   status: string | null,
+ *   to_channel: string | null,
+ *   rollout_action: string | null,
+ *   baseline_pass_rate: number | null,
+ *   candidate_pass_rate: number | null,
+ *   created_at: string | null,
+ * }>} candidates
+ * @returns {{
+ *   artifact_ref: string,
+ *   file: string,
+ *   status: string | null,
+ *   to_channel: string | null,
+ *   rollout_action: string | null,
+ *   baseline_pass_rate: number | null,
+ *   candidate_pass_rate: number | null,
+ *   created_at: string | null,
+ * } | null}
+ */
+function selectCanonicalPromotionCandidate(candidates) {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return candidates
+    .slice()
+    .sort((left, right) => {
+      const leftHasComparison = left.baseline_pass_rate !== null || left.candidate_pass_rate !== null;
+      const rightHasComparison = right.baseline_pass_rate !== null || right.candidate_pass_rate !== null;
+      if (leftHasComparison !== rightHasComparison) {
+        return rightHasComparison ? 1 : -1;
+      }
+
+      const leftPrimary = isPrimaryPromotionCandidate(left);
+      const rightPrimary = isPrimaryPromotionCandidate(right);
+      if (leftPrimary !== rightPrimary) {
+        return rightPrimary ? 1 : -1;
+      }
+
+      const statusDelta = promotionStatusPriority(right.status) - promotionStatusPriority(left.status);
+      if (statusDelta !== 0) {
+        return statusDelta;
+      }
+
+      const transitionDelta =
+        promotionTransitionPriority(right.to_channel) - promotionTransitionPriority(left.to_channel);
+      if (transitionDelta !== 0) {
+        return transitionDelta;
+      }
+
+      const actionDelta = promotionActionPriority(right.rollout_action) - promotionActionPriority(left.rollout_action);
+      if (actionDelta !== 0) {
+        return actionDelta;
+      }
+
+      const createdAtDelta = toTimelineMs(right.created_at) - toTimelineMs(left.created_at);
+      if (Number.isFinite(createdAtDelta) && createdAtDelta !== 0) {
+        return createdAtDelta;
+      }
+
+      const fileTimelineDelta = readFileTimelineMs(right.file) - readFileTimelineMs(left.file);
+      if (fileTimelineDelta !== 0) {
+        return fileTimelineDelta;
+      }
+
+      return left.artifact_ref.localeCompare(right.artifact_ref);
+    })[0];
+}
+
+/**
  * @param {string} markdown
  * @returns {Array<{ slice_id: string, wave_id: string, state: "ready" | "blocked" | "active" | "done" }>}
  */
@@ -509,9 +665,17 @@ export function listRuns(options = {}) {
    *     max_cost_sources: string[],
    *     timeout_sources: string[],
    *     step_latency_samples_sec: number[],
-   *     certification_latency_samples_sec: number[],
-   *     baseline_pass_rate: number | null,
-   *     candidate_pass_rate: number | null,
+ *     certification_latency_samples_sec: number[],
+   *     promotion_candidates: Array<{
+   *       artifact_ref: string,
+   *       file: string,
+   *       status: string | null,
+   *       to_channel: string | null,
+   *       rollout_action: string | null,
+   *       baseline_pass_rate: number | null,
+   *       candidate_pass_rate: number | null,
+   *       created_at: string | null,
+   *     }>,
    *   },
    *   policy_context: {
    *     route_ids: string[],
@@ -564,8 +728,7 @@ export function listRuns(options = {}) {
           timeout_sources: [],
           step_latency_samples_sec: [],
           certification_latency_samples_sec: [],
-          baseline_pass_rate: null,
-          candidate_pass_rate: null,
+          promotion_candidates: [],
         },
         policy_context: {
           route_ids: [],
@@ -706,13 +869,18 @@ export function listRuns(options = {}) {
       if (totalLatency !== null) run.finance_evidence.certification_latency_samples_sec.push(totalLatency);
 
       const baselinePassRate = asNumber(baselineComparison.baseline_pass_rate);
-      if (baselinePassRate !== null) {
-        run.finance_evidence.baseline_pass_rate = baselinePassRate;
-      }
       const candidatePassRate = asNumber(baselineComparison.candidate_pass_rate);
-      if (candidatePassRate !== null) {
-        run.finance_evidence.candidate_pass_rate = candidatePassRate;
-      }
+      const rolloutDecision = resolvePromotionRolloutDecision(artifact.document);
+      run.finance_evidence.promotion_candidates.push({
+        artifact_ref: artifact.artifact_ref,
+        file: artifact.file,
+        status: asString(artifact.document.status),
+        to_channel: asString(artifact.document.to_channel),
+        rollout_action: asString(rolloutDecision.action),
+        baseline_pass_rate: baselinePassRate,
+        candidate_pass_rate: candidatePassRate,
+        created_at: asString(artifact.document.created_at),
+      });
 
       const parsedContextRef = parseContextAssetRef(artifact.document.subject_ref);
       if (!parsedContextRef) {
@@ -765,6 +933,7 @@ export function listRuns(options = {}) {
   }
 
   return [...runMap.values()].map((entry) => {
+    const selectedPromotionCandidate = selectCanonicalPromotionCandidate(entry.finance_evidence.promotion_candidates);
     const seenTrailKeys = new Set();
     const decisionTrail = entry.context_lifecycle.decision_trail
       .slice()
@@ -800,8 +969,8 @@ export function listRuns(options = {}) {
         timeout_sources: Array.from(new Set(entry.finance_evidence.timeout_sources)),
         step_latency_sec: summarizeSamples(entry.finance_evidence.step_latency_samples_sec),
         certification_latency_sec: summarizeSamples(entry.finance_evidence.certification_latency_samples_sec),
-        baseline_pass_rate: entry.finance_evidence.baseline_pass_rate,
-        candidate_pass_rate: entry.finance_evidence.candidate_pass_rate,
+        baseline_pass_rate: selectedPromotionCandidate?.baseline_pass_rate ?? null,
+        candidate_pass_rate: selectedPromotionCandidate?.candidate_pass_rate ?? null,
       },
       policy_context: {
         route_ids: Array.from(new Set(entry.policy_context.route_ids)),
