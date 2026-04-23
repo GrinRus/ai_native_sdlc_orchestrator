@@ -12,7 +12,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 ## Parallel start and sequencing notes
 - `W10-S01`, `W10-S02`, and `W10-S03` can start in parallel because they close separate production-facing gaps on top of completed baselines.
 - `W10-S04` starts after `W10-S03` so auth and permission work hardens an already-defined mutation surface rather than a hypothetical one.
-- `W10-S05` remains blocked until `W11-S05` lands because the current catalog proof bundle still resolves delivery evidence to the AOR workspace rather than a cloned target checkout.
+- `W10-S05` closed after `W11-S05` landed with replacement target-backed evidence in `examples/live-e2e/fixtures/w11-s05/w11-s05-evidence-bundle.json`.
 
 ---
 
@@ -142,17 +142,17 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 
 ## W10-S05 — Externally verified live E2E target-catalog proof
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
-- **Outcome:** Keep the original wave-level target-catalog proof open until fresh target-backed evidence replaces the current AOR-workspace-backed proof bundle.
+- **State:** done
+- **Outcome:** Close the original wave-level target-catalog proof by linking it to the refreshed W11 target-backed short-profile evidence bundle.
 - **Primary modules:** `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability`, `docs/backlog/**`
 - **Hard dependencies:** W10-S01, W10-S02, W11-S05
 - **Primary user-story surfaces:** operator / SRE, delivery engineer, finance / audit / hygiene
 
 ### Local tasks
-1. Keep `W10-S05` explicitly blocked until W11 delivers target checkout materialization, profile-driven execution, target-anchored delivery evidence, and refreshed proof fixtures.
+1. Keep `W10-S05` blocked until W11 delivers target checkout materialization, profile-driven execution, target-anchored delivery evidence, and refreshed proof fixtures.
 2. Reject evidence bundles whose delivery manifests or changed paths resolve to the AOR workspace rather than the cloned target checkout.
-3. Link the eventual W11 short-profile proof bundle back to the original W10 closure criteria and target-catalog entries.
-4. Refresh the wave-level closure notes only after replacement evidence is reviewable end to end.
+3. Link the W11 short-profile proof bundle back to the original W10 closure criteria and target-catalog entries.
+4. Mark the wave-level closure only after replacement evidence is reviewable end to end.
 
 ### Acceptance criteria
 1. `W10-S05` does not return to `ready` or `done` until `W11-S05` lands and the resulting bundle is target-backed.
@@ -161,7 +161,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 4. Wave-level closure can be reviewed without relying on AOR-workspace artifacts or narrative-only claims.
 
 ### Done evidence
-- W11 proof-bundle references for `regress-short` and `release-short`
+- W11 proof-bundle references for `regress-short` and `release-short`: `examples/live-e2e/fixtures/w11-s05/w11-s05-evidence-bundle.json`
 - updated runbooks and dependency matrix entries linked to the replacement target-backed evidence
 - backlog state change showing `W10-S05` moved from `blocked` to `done` only after W11 closure evidence landed
 

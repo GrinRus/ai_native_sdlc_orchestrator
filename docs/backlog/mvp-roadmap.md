@@ -195,7 +195,7 @@ The authoritative planning model for implementation lives in:
 - detached transport supports bounded authenticated mutation commands for connected operator clients
 - at least one regression target and one release-shaped target from the catalog have fresh live evidence produced through the external runner and real bounded delivery paths
 
-**Current status note:** `W10-S05` is blocked after the audit because the current fixture bundle still anchors delivery evidence to the AOR workspace rather than a cloned target checkout. W11 carries the closure work required to satisfy this proof honestly.
+**Current status note:** `W10-S05` is now closed using the replacement `W11-S05` target-backed proof bundle at `examples/live-e2e/fixtures/w11-s05/w11-s05-evidence-bundle.json`. The closure evidence anchors execution and delivery lineage to cloned target checkouts rather than the AOR workspace.
 
 **Detailed slices:** `docs/backlog/wave-10-implementation-slices.md`
 

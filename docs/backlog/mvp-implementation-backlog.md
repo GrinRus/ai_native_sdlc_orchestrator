@@ -121,7 +121,7 @@ This is the master index for the implementation slices across all defined waves.
 | W10-S02 | Networked fork-first delivery execution | EPIC-5 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**` | W4-S04, W6-S05 |
 | W10-S03 | Detached transport mutation command baseline | EPIC-6 | done | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W9-S07, W6-S03, W6-S04 |
 | W10-S04 | Detached transport authn/authz hardening baseline | EPIC-6 | done | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W10-S03 |
-| W10-S05 | Externally verified live E2E target-catalog proof | EPIC-7 | blocked | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability`, `docs/backlog/**` | W10-S01, W10-S02, W11-S05 |
+| W10-S05 | Externally verified live E2E target-catalog proof | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability`, `docs/backlog/**` | W10-S01, W10-S02, W11-S05 |
 
 ## W11 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
