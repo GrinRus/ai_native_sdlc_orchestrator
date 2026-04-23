@@ -94,11 +94,11 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W8-S01 | Sponsor and planner strategic visibility expansion | EPIC-6 | done | `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W7-S05 |
 | W8-S02 | Later discovery and architecture maturity pack | EPIC-1 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**` | W6-S02, W7-S05 |
-| W8-S03 | Later delivery and security route-governance maturity | EPIC-3 | ready | `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**` | W6-S03, W7-S05, W8-S08 |
-| W8-S04 | Later operator event and policy visibility expansion | EPIC-6 | ready | `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W6-S03, W7-S05, W8-S08 |
+| W8-S03 | Later delivery and security route-governance maturity | EPIC-3 | done | `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**` | W6-S03, W7-S05 |
+| W8-S04 | Later operator event and policy visibility expansion | EPIC-6 | done | `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W6-S03, W7-S05 |
 | W8-S05 | Later QA and AI platform baseline comparison maturity | EPIC-4 | done | `packages/harness`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/eval/**` | W7-S01, W7-S02 |
-| W8-S06 | Later incident and platform recertification maturity | EPIC-7 | ready | `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W7-S03, W7-S04, W7-S05 |
-| W8-S07 | Later multi-repo, bootstrap, and delivery rerun maturity | EPIC-5 | blocked | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**` | W6-S05, W6-S02, W8-S04, W8-S06 |
+| W8-S06 | Later incident and platform recertification maturity | EPIC-7 | done | `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W7-S03, W7-S04, W7-S05 |
+| W8-S07 | Later multi-repo, bootstrap, and delivery rerun maturity | EPIC-5 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**` | W6-S05, W6-S02, W8-S04, W8-S06 |
 | W8-S08 | Runtime context compiler and adapter-context injection | EPIC-3 | blocked | `packages/orchestrator-core`, `packages/provider-routing`, `packages/adapter-sdk`, `docs/contracts/**`, `examples/prompts/**` | W6-S03, W7-S05 |
 | W8-S09 | Context asset lifecycle and quality-gated update flow | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/contracts/**`, `examples/eval/**` | W8-S08, W7-S02, W8-S05 |
 

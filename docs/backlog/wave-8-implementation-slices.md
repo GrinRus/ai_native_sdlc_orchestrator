@@ -85,7 +85,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S03 — Later delivery and security route-governance maturity
 - **Epic:** EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Add later-stage route/policy governance required for delivery and security maturity stories.
 - **Primary modules:** `packages/provider-routing`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/policies/**`
 - **Hard dependencies:** W6-S03, W7-S05, W8-S08
@@ -116,7 +116,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S04 — Later operator event and policy visibility expansion
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Expand operator event and policy-inspection surfaces for later SRE maturity stories.
 - **Primary modules:** `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**`
 - **Hard dependencies:** W6-S03, W7-S05, W8-S08
@@ -178,7 +178,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S06 — Later incident and platform recertification maturity
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Close later incident and AI platform recertification stories with integrated evidence and decision controls.
 - **Primary modules:** `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W7-S03, W7-S04, W7-S05
@@ -209,7 +209,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S07 — Later multi-repo, bootstrap, and delivery rerun maturity
 - **Epic:** EPIC-5 Delivery and release
-- **State:** blocked
+- **State:** done
 - **Outcome:** Close later repository/multirepo/bootstrap/delivery rerun stories with bounded orchestration semantics.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W6-S05, W6-S02, W8-S04, W8-S06
