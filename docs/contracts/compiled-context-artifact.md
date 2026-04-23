@@ -19,7 +19,7 @@ Runtime artifact that captures the selected prompt bundle, resolved context bund
 ## Notes
 This contract family is introduced in `W6-S02` so downstream runtime, harness, and promotion contracts can refer to one stable compiled-context shape before the compiler exists.
 
-`W6-S02` includes only static sample artifacts. Runtime generation and persistence start in `W6-S03`.
+`W6-S02` includes only static sample artifacts. Runtime generation, persistence, and adapter-context injection start in `W8-S08`.
 
 ## Example
 See `examples/context/compiled/*.yaml`.

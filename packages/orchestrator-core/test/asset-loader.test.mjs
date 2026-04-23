@@ -29,7 +29,7 @@ function withTempRepo(callback) {
   }
 }
 
-test("resolveAssetBundleMatrix materializes route/wrapper/prompt bundles for all step classes", () => {
+test("resolveAssetBundleMatrix materializes route/wrapper/prompt/context bundles for all step classes", () => {
   withTempRepo((repoRoot) => {
     const matrix = resolveAssetBundleMatrix({
       projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
@@ -44,10 +44,16 @@ test("resolveAssetBundleMatrix materializes route/wrapper/prompt bundles for all
     assert.equal(implementBundle.route.resolved_route_id, "route.implement.default");
     assert.equal(implementBundle.wrapper.wrapper_ref, "wrapper.runner.default@v3");
     assert.equal(implementBundle.prompt_bundle.prompt_bundle_ref, "prompt-bundle://runner-default@v3");
+    assert.deepEqual(implementBundle.context_bundles.bundle_refs, [
+      "context-bundle://context.bundle.runner.foundation@v1",
+    ]);
+    assert.deepEqual(implementBundle.context_bundles.expanded_refs.context_doc_refs, [
+      "context-doc://context.doc.repo-map.core@v1",
+    ]);
   });
 });
 
-test("resolveAssetBundleForStep applies wrapper and prompt overrides deterministically", () => {
+test("resolveAssetBundleForStep applies wrapper/prompt/context overrides deterministically", () => {
   withTempRepo((repoRoot) => {
     const resolved = resolveAssetBundleForStep({
       projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
@@ -61,10 +67,14 @@ test("resolveAssetBundleForStep applies wrapper and prompt overrides determinist
       promptBundleOverrides: {
         planning: "prompt-bundle://planner-default@v1",
       },
+      contextBundleOverrides: {
+        planning: ["context-bundle://context.bundle.planner.foundation@v1"],
+      },
     });
 
     assert.equal(resolved.wrapper.resolution_source.kind, "step-override");
     assert.equal(resolved.prompt_bundle.resolution_source.kind, "step-override");
+    assert.equal(resolved.context_bundles.resolution_source.kind, "step-override");
   });
 });
 
@@ -91,6 +101,33 @@ test("resolveAssetBundleForStep fails cleanly when project default prompt bundle
           stepClass: "planning",
         }),
       /prompt bundle 'prompt-bundle:\/\/does-not-exist@v1' is not present/i,
+    );
+  });
+});
+
+test("resolveAssetBundleForStep fails cleanly when project default context bundle source is missing", () => {
+  withTempRepo((repoRoot) => {
+    const projectProfilePath = path.join(repoRoot, "examples/project.aor.yaml");
+    const projectProfileContent = fs.readFileSync(projectProfilePath, "utf8");
+    fs.writeFileSync(
+      projectProfilePath,
+      projectProfileContent.replace(
+        "    - context-bundle://context.bundle.planner.foundation@v1",
+        "    - context-bundle://context.bundle.planner.missing@v1",
+      ),
+      "utf8",
+    );
+
+    assert.throws(
+      () =>
+        resolveAssetBundleForStep({
+          projectProfilePath: path.join(repoRoot, "examples/project.aor.yaml"),
+          routesRoot: path.join(repoRoot, "examples/routes"),
+          wrappersRoot: path.join(repoRoot, "examples/wrappers"),
+          promptsRoot: path.join(repoRoot, "examples/prompts"),
+          stepClass: "planning",
+        }),
+      /context bundle 'context-bundle:\/\/context\.bundle\.planner\.missing@v1' is not present/i,
     );
   });
 });

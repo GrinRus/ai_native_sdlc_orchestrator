@@ -123,11 +123,16 @@ test("adapter request and response envelopes enforce stable required fields", ()
     policy_bundle: { policy_id: "policy.step.runner.default" },
     input_packet_refs: ["packet://handoff"],
     dry_run: true,
+    context: {
+      compiled_context_ref: "compiled-context://compiled-context.aor-core.implement.runner-default",
+      packet_refs: ["packet://handoff"],
+    },
   });
 
   assert.equal(request.request_id, "req-1");
   assert.equal(request.dry_run, true);
   assert.deepEqual(request.input_packet_refs, ["packet://handoff"]);
+  assert.equal(request.context.compiled_context_ref, "compiled-context://compiled-context.aor-core.implement.runner-default");
 
   const response = createAdapterResponseEnvelope({
     request_id: "req-1",

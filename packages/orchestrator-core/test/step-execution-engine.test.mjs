@@ -26,32 +26,62 @@ function withTempRepo(callback) {
   }
 }
 
-test("executeRoutedStep resolves route/assets/policy/adapter and writes durable dry-run step-result", () => {
+test("executeRoutedStep resolves route/assets/policy/adapter and persists compiled context for runner dry-runs", () => {
   withTempRepo((repoRoot) => {
-    const result = executeRoutedStep({
-      projectRef: repoRoot,
-      cwd: repoRoot,
-      stepClass: "implement",
-      dryRun: true,
-    });
+    for (const stepClass of ["implement", "review", "qa"]) {
+      const result = executeRoutedStep({
+        projectRef: repoRoot,
+        cwd: repoRoot,
+        stepClass,
+        dryRun: true,
+      });
 
-    assert.equal(fs.existsSync(result.stepResultPath), true);
-    assert.equal(result.stepResult.step_class, "runner");
-    assert.equal(result.stepResult.status, "passed");
-    assert.equal(result.stepResult.routed_execution.mode, "dry-run");
-    assert.equal(result.stepResult.routed_execution.route_resolution.resolved_route_id, "route.implement.default");
-    assert.equal(result.stepResult.routed_execution.asset_resolution.wrapper.wrapper_ref, "wrapper.runner.default@v3");
-    assert.equal(result.stepResult.routed_execution.policy_resolution.policy.policy_id, "policy.step.runner.default");
-    assert.equal(result.stepResult.routed_execution.policy_resolution.resolved_bounds.budget.max_cost_usd, 25);
-    assert.equal(result.stepResult.routed_execution.delivery_plan.delivery_mode, "fork-first-pr");
-    assert.equal(result.stepResult.routed_execution.delivery_plan.status, "blocked");
-    assert.equal(fs.existsSync(result.stepResult.routed_execution.delivery_plan.delivery_plan_file), true);
-    assert.equal(result.stepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
-    assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
-    assert.ok(Array.isArray(result.stepResult.evidence_refs));
-    assert.ok(result.stepResult.evidence_refs.length > 0);
-    assert.ok(Array.isArray(result.stepResult.routed_execution.architecture_traceability.contract_refs));
-    assert.ok(result.stepResult.routed_execution.architecture_traceability.contract_refs.includes("docs/contracts/step-result.md"));
+      assert.equal(fs.existsSync(result.stepResultPath), true);
+      assert.equal(result.stepResult.step_class, "runner");
+      assert.equal(result.stepResult.status, "passed");
+      assert.equal(result.stepResult.routed_execution.mode, "dry-run");
+      assert.equal(result.stepResult.routed_execution.route_resolution.step_class, stepClass);
+      assert.equal(result.stepResult.routed_execution.asset_resolution.wrapper.wrapper_ref, "wrapper.runner.default@v3");
+      assert.equal(result.stepResult.routed_execution.policy_resolution.policy.policy_id, "policy.step.runner.default");
+      assert.equal(
+        typeof result.stepResult.routed_execution.policy_resolution.resolved_bounds.budget.max_cost_usd,
+        "number",
+      );
+      assert.ok(result.stepResult.routed_execution.policy_resolution.resolved_bounds.budget.max_cost_usd > 0);
+      assert.equal(result.stepResult.routed_execution.delivery_plan.delivery_mode, "fork-first-pr");
+      assert.equal(result.stepResult.routed_execution.delivery_plan.status, "blocked");
+      assert.equal(fs.existsSync(result.stepResult.routed_execution.delivery_plan.delivery_plan_file), true);
+      assert.equal(result.stepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
+      assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
+      assert.ok(Array.isArray(result.stepResult.evidence_refs));
+      assert.ok(result.stepResult.evidence_refs.length > 0);
+      assert.ok(Array.isArray(result.stepResult.routed_execution.architecture_traceability.contract_refs));
+      assert.ok(
+        result.stepResult.routed_execution.architecture_traceability.contract_refs.includes("docs/contracts/step-result.md"),
+      );
+
+      const contextCompilation = result.stepResult.routed_execution.context_compilation;
+      assert.equal(typeof contextCompilation.compiled_context_ref, "string");
+      assert.match(contextCompilation.compiled_context_ref, /^compiled-context:\/\//u);
+      assert.equal(fs.existsSync(contextCompilation.compiled_context_file), true);
+      assert.equal(typeof contextCompilation.diagnostics.compiled_context_fingerprint, "string");
+      assert.equal(contextCompilation.compiled_context_artifact.step, stepClass);
+      assert.equal(contextCompilation.compiled_context_artifact.prompt_bundle_ref, "prompt-bundle://runner-default@v3");
+      assert.ok(
+        contextCompilation.compiled_context_artifact.context_bundle_refs.includes(
+          "context-bundle://context.bundle.runner.foundation@v1",
+        ),
+      );
+
+      assert.equal(typeof result.stepResult.routed_execution.adapter_request.context, "object");
+      assert.equal(
+        result.stepResult.routed_execution.adapter_request.context.compiled_context_ref,
+        contextCompilation.compiled_context_ref,
+      );
+      assert.ok(
+        result.stepResult.evidence_refs.includes(contextCompilation.compiled_context_ref),
+      );
+    }
   });
 });
 

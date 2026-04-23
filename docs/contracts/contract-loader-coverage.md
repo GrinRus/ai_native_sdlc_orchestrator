@@ -36,13 +36,13 @@ The reference-integrity validator checks only local example graph refs and inten
 |---|---|---|
 | `project-profile` | `default_route_profiles.*` | existing `route_id` (`provider-route-profile`) |
 | `project-profile` | `default_wrapper_profiles.*` | existing `wrapper_id@vN` (`wrapper-profile`) |
+| `project-profile` | `default_prompt_bundles.*` | existing `prompt-bundle://prompt_bundle_id@vN` (`prompt-bundle`) |
+| `project-profile` | `default_context_bundles.*[]` | existing `context-bundle://context_bundle_id@vN` (`context-bundle`) |
 | `project-profile` | `default_step_policies.*` | existing `policy_id` (`step-policy-profile`) |
 | `project-profile` | `eval_policy.default_release_suite_ref` | existing `suite_id@vN` (`evaluation-suite`) |
 | `project-profile` | `live_e2e_defaults.profiles.*` | existing `profile_id@vN` (`live-e2e-profile`) |
-| `provider-route-profile` | `wrapper_profile_ref` | existing `wrapper_id@vN` (`wrapper-profile`) |
 | `provider-route-profile` | `primary.adapter` | existing `adapter_id` (`adapter-capability-profile`) |
 | `provider-route-profile` | `fallback[].adapter` | existing `adapter_id` (`adapter-capability-profile`) |
-| `wrapper-profile` | `prompt_bundle_ref` | existing `prompt-bundle://prompt_bundle_id@vN` (`prompt-bundle`) |
 | `evaluation-suite` | `dataset_ref` | existing `dataset://dataset_id@version` (`dataset`) |
 | `step-policy-profile` | `quality_gate.suite_ref` (if present) | existing `suite_id@vN` (`evaluation-suite`) |
 | `prompt-bundle` | `certification_hints.default_suite_refs[]` (if present) | existing `suite_id@vN` (`evaluation-suite`) |

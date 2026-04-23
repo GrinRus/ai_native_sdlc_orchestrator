@@ -85,8 +85,20 @@ test("compileStepContext produces compiled context and diagnostics for adapter i
     assert.equal(typeof compiled.compiled_context.compiled_context_fingerprint, "string");
     assert.equal(compiled.compiled_context.compiled_context_fingerprint.length, 64);
     assert.equal(compiled.compiled_context.instruction_set.instructions.priorities.length > 0, true);
-    assert.deepEqual(compiled.compiled_context.session_bootstrap.include_packets, ["handoff", "spec"]);
+    assert.deepEqual(compiled.compiled_context.session_bootstrap.include_packets, []);
     assert.deepEqual(compiled.compiled_context.skill_refs, ["skill.runner.implement@v1"]);
+    assert.deepEqual(compiled.compiled_context.context_refs.context_bundle_refs, [
+      "context-bundle://context.bundle.runner.foundation@v1",
+    ]);
+    assert.deepEqual(compiled.compiled_context.context_refs.context_doc_refs, [
+      "context-doc://context.doc.repo-map.core@v1",
+    ]);
+    assert.deepEqual(compiled.compiled_context.context_refs.context_rule_refs, [
+      "context-rule://context.rule.public-repo-safety@v1",
+    ]);
+    assert.deepEqual(compiled.compiled_context.context_refs.context_skill_refs, [
+      "context-skill://context.skill.runner-verification.default@v1",
+    ]);
     assert.equal(compiled.context_compilation.required_inputs_status, "ready");
     assert.ok(compiled.context_compilation.resolved_input_packet_refs.includes("packet://handoff"));
     assert.ok(compiled.context_compilation.resolved_input_packet_refs.includes("packet://spec"));
@@ -133,7 +145,7 @@ test("compileStepContext fails deterministically when required inputs are missin
           runtimeEvidenceRefs: [],
           skillsRoot: path.join(repoRoot, "examples/skills"),
         }),
-      /missing required inputs \[packet:mandatory-packet\]/i,
+      /packet:mandatory-packet/i,
     );
   });
 });

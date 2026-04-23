@@ -38,7 +38,7 @@ Committed registry roots are source assets and static samples only. Runtime-gene
 
 `default_prompt_bundles` is keyed by workflow step and resolves one prompt bundle ref per step.
 `default_context_bundles` is keyed by workflow step and resolves one or more context bundle refs per step.
-These fields declare deterministic defaults only. Actual context selection, expansion, and prompt/context assembly begin in `W6-S03`.
+These fields declare deterministic defaults only. Actual context selection, expansion, and prompt/context assembly begin in `W8-S08`.
 
 `default_skill_profiles` maps route classes (`artifact`, `planner`, `runner`, `repair`, `eval`, `harness`) to ordered skill refs (`skill_id@vN`).
 `skill_overrides` maps route step slots (`discovery`, `research`, `spec`, `planning`, `implement`, `review`, `qa`, `repair`, `eval`, `harness`) to ordered skill refs and has higher precedence than defaults.

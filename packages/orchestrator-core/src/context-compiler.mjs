@@ -106,6 +106,23 @@ function uniqueStrings(values) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {"context_doc_refs" | "context_rule_refs" | "context_skill_refs"} field
+ * @returns {string[]}
+ */
+function collectExpandedContextRefs(value, field) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((entry) => typeof entry === "object" && entry !== null)
+    .flatMap((entry) => {
+      const record = asRecord(entry);
+      return asStringArray(record[field]);
+    });
+}
+
+/**
  * @param {{
  *   required: string[],
  *   optional: string[],
@@ -246,6 +263,7 @@ export function compileStepContext(options) {
   const assetResolution = asRecord(options.assetResolution);
   const wrapperResolution = asRecord(assetResolution.wrapper);
   const promptResolution = asRecord(assetResolution.prompt_bundle);
+  const contextBundleResolution = asRecord(assetResolution.context_bundles);
   const policyResolution = asRecord(options.policyResolution);
   const policy = asRecord(policyResolution.policy);
 
@@ -264,6 +282,34 @@ export function compileStepContext(options) {
 
   const wrapperProfile = loadProfileFromSource(wrapperProfileSource, "wrapper-profile");
   const promptBundle = loadProfileFromSource(promptProfileSource, "prompt-bundle");
+
+  const contextBundleRefs = uniqueStrings(asStringArray(contextBundleResolution.bundle_refs));
+  if (contextBundleRefs.length === 0) {
+    throw new Error(
+      `Context compilation failed for step '${options.stepClass}': asset resolution did not include any context bundle refs.`,
+    );
+  }
+  const expandedRefs = asRecord(contextBundleResolution.expanded_refs);
+  const contextDocRefs = uniqueStrings(
+    asStringArray(expandedRefs.context_doc_refs).concat(
+      collectExpandedContextRefs(contextBundleResolution.bundles, "context_doc_refs"),
+    ),
+  );
+  const contextRuleRefs = uniqueStrings(
+    asStringArray(expandedRefs.context_rule_refs).concat(
+      collectExpandedContextRefs(contextBundleResolution.bundles, "context_rule_refs"),
+    ),
+  );
+  const contextSkillRefs = uniqueStrings(
+    asStringArray(expandedRefs.context_skill_refs).concat(
+      collectExpandedContextRefs(contextBundleResolution.bundles, "context_skill_refs"),
+    ),
+  );
+  const contextBundleSources = Array.isArray(contextBundleResolution.bundles)
+    ? contextBundleResolution.bundles
+        .map((entry) => asRecord(entry).profile_source)
+        .filter((entry) => typeof entry === "string")
+    : [];
 
   const routeClass = typeof routeProfile.route_class === "string" ? routeProfile.route_class : null;
   if (!routeClass) {
@@ -397,6 +443,11 @@ export function compileStepContext(options) {
         source: promptProfileSource,
       },
       {
+        kind: "context-bundles",
+        reference: contextBundleRefs,
+        source: contextBundleSources,
+      },
+      {
         kind: "step-policy-profile",
         reference: policy.policy_id ?? null,
         source: policy.profile_source ?? null,
@@ -421,6 +472,12 @@ export function compileStepContext(options) {
     },
     required_inputs_resolved: requiredInputsResolved,
     guardrails,
+    context_refs: {
+      context_bundle_refs: contextBundleRefs,
+      context_doc_refs: contextDocRefs,
+      context_rule_refs: contextRuleRefs,
+      context_skill_refs: contextSkillRefs,
+    },
     skill_refs: skillResolution.skill_refs,
     provenance: {
       project_profile_path: options.projectProfilePath,
@@ -428,6 +485,7 @@ export function compileStepContext(options) {
       wrapper_profile_source: wrapperProfileSource,
       prompt_bundle_source: promptProfileSource,
       policy_profile_source: policy.profile_source ?? null,
+      context_bundle_sources: contextBundleSources,
       skill_profile_sources: skillResolution.provenance.skill_profile_sources,
       route_resolution_source: asRecord(routeResolution.resolution_source),
       wrapper_resolution_source: asRecord(wrapperResolution.resolution_source),

@@ -240,7 +240,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S08 — Runtime context compiler and adapter-context injection
 - **Epic:** EPIC-3 Routed execution
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add deterministic step-time context compilation for prompt plus context assets and inject compiled context into adapter requests with durable evidence linkage.
 - **Primary modules:** `packages/orchestrator-core`, `packages/provider-routing`, `packages/adapter-sdk`, `docs/contracts/**`, `examples/prompts/**`
 - **Hard dependencies:** W6-S03, W7-S05

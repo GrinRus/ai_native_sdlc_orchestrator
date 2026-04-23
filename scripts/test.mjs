@@ -353,6 +353,7 @@ const orchestratorCoreTests = [
   path.join(root, "packages/orchestrator-core/test/certification-decision.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/harness-capture-replay.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/asset-loader.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/context-compiler.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/policy-resolution.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/delivery-plan.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/delivery-driver.test.mjs"),

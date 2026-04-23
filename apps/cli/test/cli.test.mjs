@@ -1679,40 +1679,60 @@ test("project verify resolves runtime root and contract metadata", () => {
   });
 });
 
-test("project verify supports routed dry-run smoke execution and durable routed step-result output", () => {
+test("project verify supports routed dry-run smoke execution with compiled-context linkage", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
 
-    const result = invokeCli([
-      "project",
-      "verify",
-      "--project-ref",
-      projectRoot,
-      "--routed-dry-run-step",
-      "implement",
-    ]);
+    for (const stepClass of ["implement", "review", "qa"]) {
+      const result = invokeCli([
+        "project",
+        "verify",
+        "--project-ref",
+        projectRoot,
+        "--routed-dry-run-step",
+        stepClass,
+      ]);
 
-    assert.equal(result.exitCode, 0, result.stderr);
-    const parsed = JSON.parse(result.stdout);
-    assert.equal(typeof parsed.routed_step_result_id, "string");
-    assert.equal(fs.existsSync(parsed.routed_step_result_file), true);
-    assert.ok(parsed.step_result_files.includes(parsed.routed_step_result_file));
+      assert.equal(result.exitCode, 0, result.stderr);
+      const parsed = JSON.parse(result.stdout);
+      assert.equal(typeof parsed.routed_step_result_id, "string");
+      assert.equal(fs.existsSync(parsed.routed_step_result_file), true);
+      assert.ok(parsed.step_result_files.includes(parsed.routed_step_result_file));
 
-    const routedStepResult = JSON.parse(fs.readFileSync(parsed.routed_step_result_file, "utf8"));
-    assert.equal(routedStepResult.step_class, "runner");
-    assert.equal(routedStepResult.status, "passed");
-    assert.equal(routedStepResult.routed_execution.mode, "dry-run");
-    assert.equal(routedStepResult.routed_execution.no_write_enforced, true);
-    assert.equal(routedStepResult.routed_execution.route_resolution.step_class, "implement");
-    assert.equal(routedStepResult.routed_execution.delivery_plan.delivery_mode, "fork-first-pr");
-    assert.equal(routedStepResult.routed_execution.delivery_plan.status, "blocked");
-    assert.equal(
-      fs.existsSync(routedStepResult.routed_execution.delivery_plan.delivery_plan_file),
-      true,
-    );
-    assert.equal(routedStepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
-    assert.equal(routedStepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
+      const routedStepResult = JSON.parse(fs.readFileSync(parsed.routed_step_result_file, "utf8"));
+      assert.equal(routedStepResult.step_class, "runner");
+      assert.equal(routedStepResult.status, "passed");
+      assert.equal(routedStepResult.routed_execution.mode, "dry-run");
+      assert.equal(routedStepResult.routed_execution.no_write_enforced, true);
+      assert.equal(routedStepResult.routed_execution.route_resolution.step_class, stepClass);
+      assert.equal(routedStepResult.routed_execution.delivery_plan.delivery_mode, "fork-first-pr");
+      assert.equal(routedStepResult.routed_execution.delivery_plan.status, "blocked");
+      assert.equal(
+        fs.existsSync(routedStepResult.routed_execution.delivery_plan.delivery_plan_file),
+        true,
+      );
+      assert.equal(routedStepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
+      assert.equal(routedStepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
+      assert.equal(typeof routedStepResult.routed_execution.context_compilation.compiled_context_ref, "string");
+      assert.match(
+        routedStepResult.routed_execution.context_compilation.compiled_context_ref,
+        /^compiled-context:\/\//u,
+      );
+      assert.equal(
+        fs.existsSync(routedStepResult.routed_execution.context_compilation.compiled_context_file),
+        true,
+      );
+      assert.equal(
+        routedStepResult.routed_execution.adapter_request.context.compiled_context_ref,
+        routedStepResult.routed_execution.context_compilation.compiled_context_ref,
+      );
+      assert.ok(
+        routedStepResult.evidence_refs.includes(
+          routedStepResult.routed_execution.context_compilation.compiled_context_ref,
+        ),
+      );
+    }
   });
 });
 

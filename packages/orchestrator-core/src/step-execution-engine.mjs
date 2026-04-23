@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -10,6 +11,7 @@ import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
 import { resolveAssetBundleForStep } from "./asset-loader.mjs";
+import { compileStepContext } from "./context-compiler.mjs";
 import { materializeDeliveryPlan } from "./delivery-plan.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { analyzeProjectRuntime } from "./project-analysis.mjs";
@@ -47,6 +49,85 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeRefSuffix(value) {
+  return value.replace(/[^a-zA-Z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function uniqueStrings(value) {
+  return [...new Set(asStringArray(value))];
+}
+
+/**
+ * @param {string} projectId
+ * @param {string} stepClass
+ * @param {string} promptBundleRef
+ * @returns {string}
+ */
+function buildCompiledContextId(projectId, stepClass, promptBundleRef) {
+  const promptMatch = /^prompt-bundle:\/\/([^@]+)@v\d+$/u.exec(promptBundleRef);
+  const promptSuffix = normalizeRefSuffix(promptMatch?.[1] ?? promptBundleRef);
+  return `compiled-context.${projectId}.${stepClass}.${promptSuffix || "default"}`;
+}
+
+/**
+ * @param {{
+ *   runtimeLayout: { reportsRoot: string },
+ *   compiledContextArtifact: Record<string, unknown>,
+ *   stepClass: string,
+ * }} options
+ */
+function writeCompiledContextArtifact(options) {
+  const validation = validateContractDocument({
+    family: "compiled-context-artifact",
+    document: options.compiledContextArtifact,
+    source: "runtime://compiled-context-artifact",
+  });
+  if (!validation.ok) {
+    const messages = validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Compiled-context artifact failed contract validation: ${messages}`);
+  }
+
+  const artifactPath = path.join(options.runtimeLayout.reportsRoot, `compiled-context-${options.stepClass}.json`);
+  fs.writeFileSync(artifactPath, `${JSON.stringify(options.compiledContextArtifact, null, 2)}\n`, "utf8");
+  return artifactPath;
+}
+
+/**
+ * @param {Record<string, unknown>} assetResolution
+ * @returns {string[]}
+ */
+function resolveSyntheticPacketRefs(assetResolution) {
+  const promptBundle = asRecord(assetResolution.prompt_bundle);
+  const promptProfile = asRecord(promptBundle.profile);
+  const requiredInputs = asRecord(promptProfile.required_inputs);
+  const packets = asRecord(requiredInputs.packets);
+  return uniqueStrings(packets.required).map((packetName) => `packet://${packetName}`);
 }
 
 /**
@@ -90,8 +171,10 @@ function writeStepResult(options) {
  *   routesRoot?: string,
  *   wrappersRoot?: string,
  *   promptsRoot?: string,
+ *   contextBundlesRoot?: string,
  *   policiesRoot?: string,
  *   adaptersRoot?: string,
+ *   skillsRoot?: string,
  *   requireDiscoveryCompleteness?: boolean,
  * }} options
  */
@@ -113,6 +196,11 @@ export function executeRoutedStep(options) {
       ? options.promptsRoot
       : path.resolve(init.projectRoot, options.promptsRoot)
     : path.join(init.projectRoot, "examples/prompts");
+  const contextBundlesRoot = options.contextBundlesRoot
+    ? path.isAbsolute(options.contextBundlesRoot)
+      ? options.contextBundlesRoot
+      : path.resolve(init.projectRoot, options.contextBundlesRoot)
+    : path.join(init.projectRoot, "examples/context/bundles");
   const policiesRoot = options.policiesRoot
     ? path.isAbsolute(options.policiesRoot)
       ? options.policiesRoot
@@ -123,6 +211,11 @@ export function executeRoutedStep(options) {
       ? options.adaptersRoot
       : path.resolve(init.projectRoot, options.adaptersRoot)
     : path.join(init.projectRoot, "examples/adapters");
+  const skillsRoot = options.skillsRoot
+    ? path.isAbsolute(options.skillsRoot)
+      ? options.skillsRoot
+      : path.resolve(init.projectRoot, options.skillsRoot)
+    : path.join(init.projectRoot, "examples/skills");
 
   const requestedStepClass = options.stepClass;
   const resultStepClass = STEP_CLASS_TO_RESULT_CLASS[requestedStepClass] ?? "runner";
@@ -147,6 +240,14 @@ export function executeRoutedStep(options) {
   let adapterRequest = null;
   /** @type {Record<string, unknown> | null} */
   let adapterResponse = null;
+  /** @type {Record<string, unknown> | null} */
+  let compiledContextArtifact = null;
+  /** @type {Record<string, unknown> | null} */
+  let contextCompilation = null;
+  /** @type {string | null} */
+  let compiledContextRef = null;
+  /** @type {string | null} */
+  let compiledContextArtifactPath = null;
   /** @type {string[]} */
   let evidenceRefs = [init.projectProfilePath];
   /** @type {"passed" | "failed"} */
@@ -275,6 +376,7 @@ export function executeRoutedStep(options) {
         routesRoot,
         wrappersRoot,
         promptsRoot,
+        contextBundlesRoot,
         stepClass: requestedStepClass,
         routeOverrides: options.routeOverrides,
         wrapperOverrides: options.wrapperOverrides,
@@ -314,6 +416,55 @@ export function executeRoutedStep(options) {
         summary = `Routed step '${requestedStepClass}' blocked: live adapter execution is not implemented yet; use dry-run mode.`;
         blockedNextStep = "Retry with '--routed-dry-run-step' until live adapter execution is implemented.";
       } else {
+        const syntheticPacketRefs = resolveSyntheticPacketRefs(/** @type {Record<string, unknown>} */ (assetResolution));
+        const compiled = compileStepContext({
+          projectRoot: init.projectRoot,
+          projectProfilePath: init.projectProfilePath,
+          stepClass: requestedStepClass,
+          routeResolution: /** @type {Record<string, unknown>} */ (routeResolution),
+          assetResolution: /** @type {Record<string, unknown>} */ (assetResolution),
+          policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
+          inputPacketRefs: syntheticPacketRefs,
+          runtimeEvidenceRefs: evidenceRefs,
+          skillsRoot,
+        });
+        contextCompilation = compiled.context_compilation;
+
+        const promptBundleRef = String(
+          asRecord(asRecord(assetResolution).prompt_bundle).prompt_bundle_ref ?? "prompt-bundle://unknown@v1",
+        );
+        const contextBundles = asRecord(asRecord(assetResolution).context_bundles);
+        const expandedRefs = asRecord(contextBundles.expanded_refs);
+        const compiledContextId = buildCompiledContextId(init.projectId, requestedStepClass, promptBundleRef);
+        compiledContextArtifact = {
+          compiled_context_id: compiledContextId,
+          version: 1,
+          step: requestedStepClass,
+          prompt_bundle_ref: promptBundleRef,
+          context_bundle_refs: uniqueStrings(contextBundles.bundle_refs),
+          context_doc_refs: uniqueStrings(expandedRefs.context_doc_refs),
+          context_rule_refs: uniqueStrings(expandedRefs.context_rule_refs),
+          context_skill_refs: uniqueStrings(expandedRefs.context_skill_refs),
+          packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
+          hashes: {
+            prompt_hash: `sha256:${sha256Hex(promptBundleRef)}`,
+            context_hash: `sha256:${String(compiled.context_compilation.compiled_context_fingerprint ?? "")}`,
+          },
+          provenance: {
+            compiler_revision_ref: "compiler://runtime-context-compiler@v1",
+            project_profile_ref: init.projectProfilePath,
+            route_profile_ref: asRecord(routeResolution).resolved_route_id ?? null,
+            wrapper_profile_ref: asRecord(asRecord(assetResolution).wrapper).wrapper_ref ?? null,
+            generated_at: new Date().toISOString(),
+          },
+        };
+        compiledContextArtifactPath = writeCompiledContextArtifact({
+          runtimeLayout: init.runtimeLayout,
+          compiledContextArtifact,
+          stepClass: requestedStepClass,
+        });
+        compiledContextRef = `compiled-context://${compiledContextId}`;
+
         adapterRequest = createAdapterRequestEnvelope({
           request_id: `${stepResultId}.request`,
           run_id: runId,
@@ -322,8 +473,23 @@ export function executeRoutedStep(options) {
           route: routeResolution,
           asset_bundle: assetResolution,
           policy_bundle: policyResolution,
-          input_packet_refs: [],
+          input_packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
           dry_run: true,
+          context: {
+            compiled_context_ref: compiledContextRef,
+            compiled_context_id: compiledContextId,
+            compiled_context_fingerprint: compiled.context_compilation.compiled_context_fingerprint,
+            context_bundle_refs: compiledContextArtifact.context_bundle_refs,
+            context_doc_refs: compiledContextArtifact.context_doc_refs,
+            context_rule_refs: compiledContextArtifact.context_rule_refs,
+            context_skill_refs: compiledContextArtifact.context_skill_refs,
+            packet_refs: compiledContextArtifact.packet_refs,
+            instruction_set: compiled.compiled_context.instruction_set,
+            required_inputs_resolved: compiled.compiled_context.required_inputs_resolved,
+            guardrails: compiled.compiled_context.guardrails,
+            skill_refs: compiled.compiled_context.skill_refs,
+            provenance: compiled.compiled_context.provenance,
+          },
         });
 
         const mockAdapter = createMockAdapter();
@@ -332,6 +498,8 @@ export function executeRoutedStep(options) {
           ...new Set([
             init.projectProfilePath,
             ...(deliveryPlanResult ? [deliveryPlanResult.deliveryPlanFile] : []),
+            ...(compiledContextRef ? [compiledContextRef] : []),
+            ...(compiledContextArtifactPath ? [compiledContextArtifactPath] : []),
             ...asStringArray(adapterResponse.evidence_refs),
           ]),
         ];
@@ -375,6 +543,12 @@ export function executeRoutedStep(options) {
       adapter_resolution: adapterResolution,
       adapter_request: adapterRequest,
       adapter_response: adapterResponse,
+      context_compilation: {
+        compiled_context_ref: compiledContextRef,
+        compiled_context_file: compiledContextArtifactPath,
+        compiled_context_artifact: compiledContextArtifact,
+        diagnostics: contextCompilation,
+      },
       discovery_completeness_gate: discoveryCompletenessGate,
       architecture_traceability: {
         architecture_doc_refs: discoveryArchitectureTraceability?.architecture_doc_refs ?? [...STEP_ARCHITECTURE_DOC_REFS],
