@@ -67,6 +67,8 @@ function normalizeRefSuffix(value) {
   return value.replace(/[^a-zA-Z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
 }
 
+const STEP_RESULT_FILE_REGEX = /^step-result-.*\.json$/u;
+
 /**
  * @param {unknown} value
  * @returns {Record<string, unknown>}
@@ -85,21 +87,27 @@ function uniqueStrings(value) {
 
 /**
  * @param {string} projectId
+ * @param {string} runId
+ * @param {string} stepId
  * @param {string} stepClass
  * @param {string} promptBundleRef
+ * @param {number} attempt
  * @returns {string}
  */
-function buildCompiledContextId(projectId, stepClass, promptBundleRef) {
+function buildCompiledContextId(projectId, runId, stepId, stepClass, promptBundleRef, attempt) {
   const promptMatch = /^prompt-bundle:\/\/([^@]+)@v\d+$/u.exec(promptBundleRef);
   const promptSuffix = normalizeRefSuffix(promptMatch?.[1] ?? promptBundleRef);
-  return `compiled-context.${projectId}.${stepClass}.${promptSuffix || "default"}`;
+  const runSuffix = normalizeRefSuffix(runId) || "run";
+  const stepSuffix = normalizeRefSuffix(stepId) || "step";
+  const classSuffix = normalizeRefSuffix(stepClass) || "step";
+  return `compiled-context.${projectId}.${runSuffix}.${stepSuffix}.${classSuffix}.attempt.${attempt}.${promptSuffix || "default"}`;
 }
 
 /**
  * @param {{
  *   runtimeLayout: { reportsRoot: string },
  *   compiledContextArtifact: Record<string, unknown>,
- *   stepClass: string,
+ *   artifactFileName: string,
  * }} options
  */
 function writeCompiledContextArtifact(options) {
@@ -113,9 +121,66 @@ function writeCompiledContextArtifact(options) {
     throw new Error(`Compiled-context artifact failed contract validation: ${messages}`);
   }
 
-  const artifactPath = path.join(options.runtimeLayout.reportsRoot, `compiled-context-${options.stepClass}.json`);
+  const artifactPath = path.join(options.runtimeLayout.reportsRoot, options.artifactFileName);
   fs.writeFileSync(artifactPath, `${JSON.stringify(options.compiledContextArtifact, null, 2)}\n`, "utf8");
   return artifactPath;
+}
+
+/**
+ * @param {{
+ *   reportsRoot: string,
+ *   runId: string,
+ *   stepId: string,
+ *   stepClass: string,
+ * }} options
+ * @returns {number}
+ */
+function resolveStepExecutionAttempt(options) {
+  if (!fs.existsSync(options.reportsRoot)) {
+    return 1;
+  }
+
+  const reportFiles = fs.readdirSync(options.reportsRoot).filter((entry) => STEP_RESULT_FILE_REGEX.test(entry));
+  let highestAttempt = 0;
+
+  for (const reportFile of reportFiles) {
+    const reportPath = path.join(options.reportsRoot, reportFile);
+    /** @type {Record<string, unknown>} */
+    let stepResultDoc;
+    try {
+      const raw = fs.readFileSync(reportPath, "utf8");
+      const parsed = JSON.parse(raw);
+      stepResultDoc = asRecord(parsed);
+    } catch {
+      continue;
+    }
+
+    if (stepResultDoc.run_id !== options.runId || stepResultDoc.step_id !== options.stepId) {
+      continue;
+    }
+
+    const selectedStep = asRecord(asRecord(asRecord(stepResultDoc.routed_execution).architecture_traceability).selected_step);
+    if (typeof selectedStep.step_class === "string" && selectedStep.step_class !== options.stepClass) {
+      continue;
+    }
+
+    let detectedAttempt = 1;
+    if (typeof stepResultDoc.step_result_id === "string") {
+      const explicitAttempt = /\.attempt\.(\d+)$/u.exec(stepResultDoc.step_result_id);
+      if (explicitAttempt) {
+        const parsedAttempt = Number.parseInt(explicitAttempt[1], 10);
+        if (Number.isFinite(parsedAttempt) && parsedAttempt > 0) {
+          detectedAttempt = parsedAttempt;
+        }
+      }
+    }
+
+    if (detectedAttempt > highestAttempt) {
+      highestAttempt = detectedAttempt;
+    }
+  }
+
+  return highestAttempt + 1;
 }
 
 /**
@@ -222,7 +287,20 @@ export function executeRoutedStep(options) {
   const resultStepClass = STEP_CLASS_TO_RESULT_CLASS[requestedStepClass] ?? "runner";
   const runId = options.runId ?? `${init.projectId}.routed-execution.v1`;
   const stepId = options.stepId ?? `routed.${requestedStepClass}`;
-  const stepResultId = `${runId}.step.${requestedStepClass}`;
+  const executionAttempt = resolveStepExecutionAttempt({
+    reportsRoot: init.runtimeLayout.reportsRoot,
+    runId,
+    stepId,
+    stepClass: requestedStepClass,
+  });
+  const stepResultIdBase = `${runId}.step.${requestedStepClass}`;
+  const stepResultId = executionAttempt > 1 ? `${stepResultIdBase}.attempt.${executionAttempt}` : stepResultIdBase;
+  const runScopeSuffix = normalizeRefSuffix(runId) || "run";
+  const stepScopeSuffix = normalizeRefSuffix(stepId) || "step";
+  const classScopeSuffix = normalizeRefSuffix(requestedStepClass) || "step";
+  const scopedArtifactSuffix = `${runScopeSuffix}.${stepScopeSuffix}.${classScopeSuffix}.attempt.${executionAttempt}`;
+  const stepResultFileName = `step-result-routed-${scopedArtifactSuffix}.json`;
+  const compiledContextFileName = `compiled-context-${scopedArtifactSuffix}.json`;
   const dryRun = options.dryRun !== false;
 
   const startedAt = new Date().toISOString();
@@ -437,7 +515,14 @@ export function executeRoutedStep(options) {
         );
         const contextBundles = asRecord(asRecord(assetResolution).context_bundles);
         const expandedRefs = asRecord(contextBundles.expanded_refs);
-        const compiledContextId = buildCompiledContextId(init.projectId, requestedStepClass, promptBundleRef);
+        const compiledContextId = buildCompiledContextId(
+          init.projectId,
+          runId,
+          stepId,
+          requestedStepClass,
+          promptBundleRef,
+          executionAttempt,
+        );
         compiledContextArtifact = {
           compiled_context_id: compiledContextId,
           version: 1,
@@ -463,7 +548,7 @@ export function executeRoutedStep(options) {
         compiledContextArtifactPath = writeCompiledContextArtifact({
           runtimeLayout: init.runtimeLayout,
           compiledContextArtifact,
-          stepClass: requestedStepClass,
+          artifactFileName: compiledContextFileName,
         });
         compiledContextRef = `compiled-context://${compiledContextId}`;
 
@@ -595,7 +680,6 @@ export function executeRoutedStep(options) {
     },
   };
 
-  const stepResultFileName = `step-result-routed-${requestedStepClass}.json`;
   const stepResultPath = writeStepResult({
     runtimeLayout: init.runtimeLayout,
     stepResultFileName,

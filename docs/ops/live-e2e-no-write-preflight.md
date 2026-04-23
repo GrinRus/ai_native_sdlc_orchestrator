@@ -72,12 +72,13 @@ Expected routed rehearsal signals:
 - `handoff approve` returns `handoff_status=approved`;
 - validation handoff gate returns `pass`;
 - `project verify` materializes `routed_step_result_file`;
-- `step-result-routed-implement.json` contains route, asset, policy, and adapter resolution metadata with `mode=dry-run`.
+- routed `step-result` and `compiled-context` artifacts use run/step-scoped names (for example `step-result-routed-<run>.<step>.attempt.<n>.json`) and keep prior same-step artifacts intact;
+- the routed `step-result` contains route, asset, policy, and adapter resolution metadata with `mode=dry-run`.
 
 Evidence fixtures captured for this procedure:
 - `examples/live-e2e/fixtures/routed-rehearsal/aor/routed-rehearsal-transcript.md`
 - `examples/live-e2e/fixtures/routed-rehearsal/aor/project-verify-routed.json`
-- `examples/live-e2e/fixtures/routed-rehearsal/aor/step-result-routed-implement.json`
+- `examples/live-e2e/fixtures/routed-rehearsal/aor/step-result-routed-*.json`
 - `examples/live-e2e/fixtures/routed-rehearsal/aor/runtime-tree.txt`
 
 ## Quality rehearsal procedure (W3-S06 baseline)

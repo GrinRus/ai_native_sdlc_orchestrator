@@ -85,6 +85,53 @@ test("executeRoutedStep resolves route/assets/policy/adapter and persists compil
   });
 });
 
+test("executeRoutedStep keeps same-step routed artifacts distinct for repeated executions in one runtime root", () => {
+  withTempRepo((repoRoot) => {
+    const first = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+    });
+    const second = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+    });
+
+    assert.equal(first.stepResult.status, "passed");
+    assert.equal(second.stepResult.status, "passed");
+    assert.notEqual(first.stepResultPath, second.stepResultPath);
+    assert.notEqual(
+      first.stepResult.routed_execution.context_compilation.compiled_context_file,
+      second.stepResult.routed_execution.context_compilation.compiled_context_file,
+    );
+    assert.notEqual(
+      first.stepResult.routed_execution.context_compilation.compiled_context_ref,
+      second.stepResult.routed_execution.context_compilation.compiled_context_ref,
+    );
+    assert.equal(fs.existsSync(first.stepResultPath), true);
+    assert.equal(fs.existsSync(second.stepResultPath), true);
+    assert.equal(fs.existsSync(first.stepResult.routed_execution.context_compilation.compiled_context_file), true);
+    assert.equal(fs.existsSync(second.stepResult.routed_execution.context_compilation.compiled_context_file), true);
+
+    assert.equal(first.stepResult.step_result_id, `${first.runId}.step.implement`);
+    assert.equal(second.stepResult.step_result_id, `${second.runId}.step.implement.attempt.2`);
+    assert.ok(
+      second.stepResult.evidence_refs.includes(second.stepResult.routed_execution.context_compilation.compiled_context_ref),
+    );
+    assert.equal(
+      second.stepResult.routed_execution.adapter_request.context.compiled_context_ref,
+      second.stepResult.routed_execution.context_compilation.compiled_context_ref,
+    );
+
+    const reportFiles = fs.readdirSync(first.runtimeLayout.reportsRoot).filter((entry) => entry.endsWith(".json"));
+    assert.ok(reportFiles.filter((entry) => entry.startsWith("step-result-routed-")).length >= 2);
+    assert.ok(reportFiles.filter((entry) => entry.startsWith("compiled-context-")).length >= 2);
+  });
+});
+
 test("executeRoutedStep enforces discovery completeness gate for spec build and carries architecture traceability", () => {
   withTempRepo((repoRoot) => {
     const result = executeRoutedStep({

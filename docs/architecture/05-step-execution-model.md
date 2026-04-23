@@ -49,7 +49,7 @@ The first routed execution baseline runs one deterministic path:
 5. negotiate adapter capabilities;
 6. invoke deterministic mock adapter in dry-run mode.
 
-The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with selected route/assets/policy/adapter metadata, context-compilation diagnostics, and evidence refs.
+The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with selected route/assets/policy/adapter metadata, context-compilation diagnostics, and evidence refs. Routed `step-result` and `compiled-context` outputs use run/step/attempt-scoped identities so repeated same-step executions preserve prior evidence.
 
 ## Adapter SDK baseline (W2-S04)
 Adapter invocation uses one stable envelope pair:
