@@ -1828,6 +1828,53 @@ test("harness certify writes durable promotion decision with explicit evidence s
   });
 });
 
+test("harness certify exposes context lifecycle evidence for context asset promotion", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const result = invokeCli([
+      "harness",
+      "certify",
+      "--project-ref",
+      projectRoot,
+      "--asset-ref",
+      "context-bundle://context.bundle.runner.foundation@v1",
+      "--subject-ref",
+      "wrapper://wrapper.eval.default@v1",
+      "--suite-ref",
+      "suite.cert.core@v4",
+      "--step-class",
+      "implement",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.promotion_decision_status, "pass");
+    assert.equal(fs.existsSync(parsed.promotion_decision_file), true);
+
+    const decision = JSON.parse(fs.readFileSync(parsed.promotion_decision_file, "utf8"));
+    const lifecycle = decision.evidence_summary.context_lifecycle;
+    assert.equal(typeof lifecycle, "object");
+    assert.equal(lifecycle.context_asset_ref, "context-bundle://context.bundle.runner.foundation@v1");
+    assert.equal(lifecycle.quality_comparison.comparison_ready, true);
+    assert.equal(Array.isArray(lifecycle.immutable_provenance_refs), true);
+    assert.equal(lifecycle.immutable_provenance_refs.length > 0, true);
+
+    const evidenceResult = invokeCli(["evidence", "show", "--project-ref", projectRoot]);
+    assert.equal(evidenceResult.exitCode, 0, evidenceResult.stderr);
+    const evidencePayload = JSON.parse(evidenceResult.stdout);
+    const contextPromotion = evidencePayload.promotion_decisions.find(
+      (artifact) => artifact.document.subject_ref === "context-bundle://context.bundle.runner.foundation@v1",
+    );
+    assert.ok(contextPromotion);
+    assert.equal(
+      contextPromotion.document.evidence_summary.context_lifecycle.context_asset_version,
+      1,
+    );
+  });
+});
+
 test("project init discovers repo root from cwd and materializes runtime layout idempotently", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });

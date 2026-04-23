@@ -1,0 +1,23 @@
+context_bundle_id: context.bundle.runner.empty
+version: 1
+title: Runner workflow empty context
+metadata:
+  owner: ai-platform
+  lifecycle: draft
+  tags:
+    - runner
+    - empty
+applies_to:
+  steps:
+    - implement
+    - review
+    - qa
+context_doc_refs: []
+context_rule_refs: []
+context_skill_refs: []
+source_refs:
+  - docs/backlog/wave-8-implementation-slices.md
+selection_policy:
+  rules: disabled
+  docs: disabled
+  skills: disabled

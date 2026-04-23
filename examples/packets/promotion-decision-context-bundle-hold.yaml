@@ -1,0 +1,140 @@
+decision_id: aor-core.promotion.context.bundle.runner.foundation.v1
+created_at: 2026-04-23T08:00:00.000Z
+subject_ref: context-bundle://context.bundle.runner.foundation@v1
+from_channel: candidate
+to_channel: stable
+evidence_refs:
+  - runtime://reports/validation-report.json
+  - runtime://reports/evaluation-report-suite.cert.core-v4.json
+  - runtime://reports/harness-capture-context-with.json
+  - runtime://reports/harness-replay-context-with.json
+  - runtime://reports/harness-capture-context-without.json
+  - runtime://reports/harness-replay-context-without.json
+evidence_summary:
+  asset_ref: context-bundle://context.bundle.runner.foundation@v1
+  subject_ref: wrapper://wrapper.eval.default@v1
+  suite_ref: suite.cert.core@v4
+  deterministic_validation_report_ref: runtime://reports/validation-report.json
+  deterministic_validation_status: pass
+  evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4.json
+  harness_capture_ref: runtime://reports/harness-capture-context-with.json
+  harness_replay_ref: runtime://reports/harness-replay-context-with.json
+  replay_evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4-replay.json
+  evaluation_status: pass
+  harness_replay_status: pass
+  baseline_comparison:
+    comparison_ready: true
+    baseline_status: pass
+    candidate_status: pass
+    baseline_pass_rate: 1
+    candidate_pass_rate: 1
+    pass_rate_delta: 0
+  regression_triage:
+    regression_detected: false
+    triage_recommendation: promote
+  rollout_decision:
+    action: hold
+    requested_transition:
+      from_channel: candidate
+      to_channel: stable
+    baseline_comparison_required: true
+    baseline_comparison_complete: true
+    freeze_guardrail_required: false
+    freeze_guardrail_satisfied: true
+  context_lifecycle:
+    context_asset_ref: context-bundle://context.bundle.runner.foundation@v1
+    context_asset_family_ref: context-bundle://context.bundle.runner.foundation
+    context_asset_kind: context-bundle
+    context_asset_version: 1
+    update_status: outdated
+    outdated: true
+    latest_known_version: 2
+    superseded_by_version: 2
+    security_gate_status: pass
+    security_findings:
+      critical_count: 0
+      high_count: 0
+      critical_case_ids: []
+      high_case_ids: []
+    quality_comparison:
+      comparison_ready: true
+      pass_rate_delta: 0
+      recommendation: manual-review
+      with_context:
+        evaluation_status: pass
+        pass_rate: 1
+        evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4.json
+        harness_capture_ref: runtime://reports/harness-capture-context-with.json
+        harness_replay_ref: runtime://reports/harness-replay-context-with.json
+      without_context:
+        evaluation_status: pass
+        pass_rate: 1
+        evaluation_report_ref: runtime://reports/evaluation-report-suite.cert.core-v4-without-context.json
+        harness_capture_ref: runtime://reports/harness-capture-context-without.json
+        harness_replay_ref: runtime://reports/harness-replay-context-without.json
+    immutable_provenance_refs:
+      - compiled-context://compiled-context.aor-core.implement.runner-default
+      - sha256://8fd4de6f2f1c024a40f4a0f3a92e6b839f8a112bbec5c91dbec60567f66f7bc3
+    without_context_bundle_ref: context-bundle://context.bundle.runner.empty@v1
+    decision_trail:
+      - decision_id: aor-core.promotion.context.bundle.runner.foundation.v2
+        decision_ref: evidence://artifacts/promotion-decision-context-bundle-runner-v2.json
+        subject_ref: context-bundle://context.bundle.runner.foundation@v2
+        version: 2
+        from_channel: candidate
+        to_channel: stable
+        status: pass
+        created_at: 2026-04-22T08:00:00.000Z
+  governance_checks:
+    - check_id: deterministic-validation
+      status: pass
+      summary: Deterministic validation evidence is present and passing.
+    - check_id: evaluative-evidence
+      status: pass
+      summary: Evaluation evidence passed suite thresholds.
+    - check_id: context-provenance
+      status: pass
+      summary: Context promotion evidence includes immutable compiled-context provenance.
+    - check_id: context-update-freshness
+      status: hold
+      summary: Context update is outdated versus newer promoted context version history.
+    - check_id: context-security-gate
+      status: pass
+      summary: Context security gate passed; no high/critical findings were detected.
+    - check_id: context-quality-comparison
+      status: pass
+      summary: With-context and without-context comparison evidence is present.
+    - check_id: policy-quality-gate
+      status: hold
+      summary: Policy quality gate blocked until governance hold checks are resolved.
+  finance_signals:
+    max_cost_usd: 25
+    timeout_sec: 180
+    capture_latency_sec: 0.5
+    replay_latency_sec: 0.4
+    total_latency_sec: 0.9
+  evidence_bar:
+    required:
+      - validation-report
+      - evaluation-report
+      - harness-capture
+      - harness-replay
+      - finance-signals
+      - baseline-comparison
+      - regression-triage
+      - context-provenance
+      - context-update-freshness
+      - context-security-gate
+      - context-quality-comparison
+    satisfied:
+      - validation-report
+      - evaluation-report
+      - harness-capture
+      - harness-replay
+      - finance-signals
+      - baseline-comparison
+      - regression-triage
+      - context-provenance
+      - context-security-gate
+      - context-quality-comparison
+status: hold

@@ -100,7 +100,7 @@ This is the master index for the implementation slices across all defined waves.
 | W8-S06 | Later incident and platform recertification maturity | EPIC-7 | done | `packages/observability`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W7-S03, W7-S04, W7-S05 |
 | W8-S07 | Later multi-repo, bootstrap, and delivery rerun maturity | EPIC-5 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**` | W6-S05, W6-S02, W8-S04, W8-S06 |
 | W8-S08 | Runtime context compiler and adapter-context injection | EPIC-3 | done | `packages/orchestrator-core`, `packages/provider-routing`, `packages/adapter-sdk`, `docs/contracts/**`, `examples/prompts/**` | W6-S03, W7-S05 |
-| W8-S09 | Context asset lifecycle and quality-gated update flow | EPIC-4 | blocked | `packages/harness`, `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/contracts/**`, `examples/eval/**` | W8-S08, W7-S02, W8-S05 |
+| W8-S09 | Context asset lifecycle and quality-gated update flow | EPIC-4 | done | `packages/harness`, `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/contracts/**`, `examples/eval/**` | W8-S08, W7-S02, W8-S05 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

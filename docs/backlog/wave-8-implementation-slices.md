@@ -273,7 +273,7 @@ Close later-maturity user stories for strategic operator visibility, governance 
 
 ## W8-S09 — Context asset lifecycle and quality-gated update flow
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add AOR-owned lifecycle operations for context assets with versioning, gated updates, and promotion decisions backed by eval evidence.
 - **Primary modules:** `packages/harness`, `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/contracts/**`, `examples/eval/**`
 - **Hard dependencies:** W8-S08, W7-S02, W8-S05

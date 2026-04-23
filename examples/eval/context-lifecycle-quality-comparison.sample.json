@@ -1,0 +1,37 @@
+{
+  "scenario": "context-lifecycle-quality-comparison",
+  "generated_at": "2026-04-23T08:00:00.000Z",
+  "with_context": {
+    "suite_ref": "suite.cert.core@v4",
+    "evaluation_status": "pass",
+    "aggregate_pass_rate": 1,
+    "evaluation_report_ref": "runtime://reports/evaluation-report-suite.cert.core-v4.json",
+    "harness_capture_ref": "runtime://reports/harness-capture-context-with.json",
+    "harness_replay_ref": "runtime://reports/harness-replay-context-with.json"
+  },
+  "without_context": {
+    "suite_ref": "suite.cert.core@v4",
+    "evaluation_status": "pass",
+    "aggregate_pass_rate": 1,
+    "evaluation_report_ref": "runtime://reports/evaluation-report-suite.cert.core-v4-without-context.json",
+    "harness_capture_ref": "runtime://reports/harness-capture-context-without.json",
+    "harness_replay_ref": "runtime://reports/harness-replay-context-without.json"
+  },
+  "comparison": {
+    "comparison_ready": true,
+    "pass_rate_delta": 0,
+    "recommendation": "manual-review"
+  },
+  "policy_outcomes": [
+    {
+      "outcome": "promotion-hold",
+      "reason": "outdated-context-version",
+      "security_gate_status": "pass"
+    },
+    {
+      "outcome": "promotion-fail",
+      "reason": "critical-finding-block",
+      "security_gate_status": "fail"
+    }
+  ]
+}

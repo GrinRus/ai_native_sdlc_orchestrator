@@ -102,3 +102,8 @@ The following commands remain planned and are intentionally not implemented in t
 - `aor run status --run-id <id>` now exposes `run_event_history` and `run_policy_history` so operators can inspect later-stage policy decisions without raw log scraping.
 - The read surface remains headless-first: event and policy history reuse control-plane evidence (`live-run-event`, `step-result`, `delivery-plan`) already materialized by runtime flows.
 - Run-level summaries preserve `policy_context` for quick triage before deeper history inspection.
+
+## Story traceability for W8-S09
+- `aor harness certify` now records context-asset lifecycle evidence (`context_lifecycle`) including with/without context comparison, immutable provenance refs, and context update freshness outcomes.
+- `aor run status` and `aor evidence show` expose run-linked context lifecycle decision trails through existing read-only operator surfaces.
+- Context promotion decisions carry explicit context guardrail checks (`context-provenance`, `context-update-freshness`, `context-security-gate`, `context-quality-comparison`) so blocked promotions remain auditable.

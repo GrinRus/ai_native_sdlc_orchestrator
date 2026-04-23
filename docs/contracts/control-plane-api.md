@@ -31,6 +31,7 @@ The API exposes command, query, and live-stream surfaces for AOR.
 - `GET /api/projects/:projectId/promotion-decisions` — promotion-decision artifacts.
 - `GET /api/projects/:projectId/quality-artifacts` — validation/evaluation reports, incident reports, and promotion decisions.
 - `GET /api/projects/:projectId/runs` — aggregated run-level view derived from packet, step-result, and quality artifact references.
+  - run summaries include `context_lifecycle` when run-linked promotion decisions reference context assets, with context version refs, immutable provenance refs, and decision-trail history.
 - `GET /api/projects/:projectId/runs/:runId/events/history` — bounded event history for one run, including replay-safe sequence metadata and policy context snapshots when available.
 - `GET /api/projects/:projectId/runs/:runId/policy-history` — route/policy/governance decision history for one run derived from durable step-result and delivery-plan evidence.
 
@@ -120,6 +121,11 @@ Audit runs baseline:
 - emits `run_audit_records.finance_evidence` with route/wrapper/adapter IDs plus bounded cost/timeout/latency summaries;
 - supports optional `run_id` filter and bounded `limit` window;
 - response includes `audit_evidence_refs` for downstream handoff and review workflows.
+
+Context lifecycle read baseline (W8-S09):
+- run-level read surfaces must expose context lifecycle details when context promotions are present;
+- context lifecycle view should include promoted context ref/version, immutable provenance refs, and decision trail lineage;
+- operator-facing CLI/API read paths should make outdated/blocked context promotion outcomes auditable without opening raw artifacts.
 
 ## UI lifecycle endpoints (W6-S04 baseline)
 - `POST /api/projects/:projectId/ui/attach`

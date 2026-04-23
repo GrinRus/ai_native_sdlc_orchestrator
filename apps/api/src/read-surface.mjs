@@ -18,6 +18,7 @@ const EVALUATION_REPORT_REGEX = /^evaluation-report.*\.json$/;
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
 const RUN_CONTROL_STATE_REGEX = /^run-control-state-.*\.json$/;
 const MASTER_BACKLOG_FILE = path.join("docs", "backlog", "mvp-implementation-backlog.md");
+const CONTEXT_ASSET_REF_REGEX = /^(context-(?:bundle|doc|rule|skill)):\/\/([^@]+)@v(\d+)$/u;
 
 /**
  * @param {string} value
@@ -237,6 +238,33 @@ function asNumber(value) {
  */
 function asString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ kind: string, asset_id: string, version: number, normalized_ref: string } | null}
+ */
+function parseContextAssetRef(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const match = CONTEXT_ASSET_REF_REGEX.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+
+  const version = Number.parseInt(match[3], 10);
+  if (!Number.isFinite(version)) {
+    return null;
+  }
+
+  return {
+    kind: match[1],
+    asset_id: match[2],
+    version,
+    normalized_ref: `${match[1]}://${match[2]}@v${version}`,
+  };
 }
 
 /**
@@ -471,9 +499,9 @@ export function listRuns(options = {}) {
    *   run_id: string,
    *   packet_refs: string[],
    *   step_result_refs: string[],
- *   quality_refs: string[],
- *   finance_evidence: {
- *     route_ids: string[],
+   *   quality_refs: string[],
+   *   finance_evidence: {
+   *     route_ids: string[],
    *     wrapper_refs: string[],
    *     adapter_ids: string[],
    *     max_cost_usd: number | null,
@@ -482,19 +510,35 @@ export function listRuns(options = {}) {
    *     timeout_sources: string[],
    *     step_latency_samples_sec: number[],
    *     certification_latency_samples_sec: number[],
- *     baseline_pass_rate: number | null,
- *     candidate_pass_rate: number | null,
- *   },
- *   policy_context: {
- *     route_ids: string[],
- *     policy_ids: string[],
- *     writeback_modes: string[],
- *     governance_decisions: string[],
- *     governance_reason_codes: string[],
- *     approval_required: boolean,
- *   },
- * }} RunSummaryEntry
- */
+   *     baseline_pass_rate: number | null,
+   *     candidate_pass_rate: number | null,
+   *   },
+   *   policy_context: {
+   *     route_ids: string[],
+   *     policy_ids: string[],
+   *     writeback_modes: string[],
+   *     governance_decisions: string[],
+   *     governance_reason_codes: string[],
+   *     approval_required: boolean,
+   *   },
+   *   context_lifecycle: {
+   *     context_asset_refs: string[],
+   *     provenance_refs: string[],
+   *     decision_trail: Array<{
+   *       decision_ref: string,
+   *       decision_id: string | null,
+   *       context_asset_ref: string,
+   *       version: number | null,
+   *       from_channel: string | null,
+   *       to_channel: string | null,
+   *       status: string | null,
+   *       update_status: string | null,
+   *       security_gate_status: string | null,
+   *       created_at: string | null,
+   *     }>,
+   *   },
+   * }} RunSummaryEntry
+   */
 
   /** @type {Map<string, RunSummaryEntry>} */
   const runMap = new Map();
@@ -530,6 +574,11 @@ export function listRuns(options = {}) {
           governance_decisions: [],
           governance_reason_codes: [],
           approval_required: false,
+        },
+        context_lifecycle: {
+          context_asset_refs: [],
+          provenance_refs: [],
+          decision_trail: [],
         },
       });
     }
@@ -664,6 +713,50 @@ export function listRuns(options = {}) {
       if (candidatePassRate !== null) {
         run.finance_evidence.candidate_pass_rate = candidatePassRate;
       }
+
+      const parsedContextRef = parseContextAssetRef(artifact.document.subject_ref);
+      if (!parsedContextRef) {
+        continue;
+      }
+
+      const contextLifecycle = asRecord(evidenceSummary.context_lifecycle);
+      run.context_lifecycle.context_asset_refs.push(parsedContextRef.normalized_ref);
+      run.context_lifecycle.provenance_refs.push(...asStringArray(contextLifecycle.immutable_provenance_refs));
+
+      run.context_lifecycle.decision_trail.push({
+        decision_ref: artifact.artifact_ref,
+        decision_id: asString(artifact.document.decision_id),
+        context_asset_ref: parsedContextRef.normalized_ref,
+        version: parsedContextRef.version,
+        from_channel: asString(artifact.document.from_channel),
+        to_channel: asString(artifact.document.to_channel),
+        status: asString(artifact.document.status),
+        update_status: asString(contextLifecycle.update_status),
+        security_gate_status: asString(contextLifecycle.security_gate_status),
+        created_at: asString(artifact.document.created_at),
+      });
+
+      const lifecycleTrail = Array.isArray(contextLifecycle.decision_trail) ? contextLifecycle.decision_trail : [];
+      for (const trailEntryRaw of lifecycleTrail) {
+        const trailEntry = asRecord(trailEntryRaw);
+        const trailSubjectRef = parseContextAssetRef(trailEntry.subject_ref);
+        if (!trailSubjectRef) {
+          continue;
+        }
+        run.context_lifecycle.context_asset_refs.push(trailSubjectRef.normalized_ref);
+        run.context_lifecycle.decision_trail.push({
+          decision_ref: asString(trailEntry.decision_ref) ?? artifact.artifact_ref,
+          decision_id: asString(trailEntry.decision_id),
+          context_asset_ref: trailSubjectRef.normalized_ref,
+          version: asNumber(trailEntry.version),
+          from_channel: asString(trailEntry.from_channel),
+          to_channel: asString(trailEntry.to_channel),
+          status: asString(trailEntry.status),
+          update_status: null,
+          security_gate_status: null,
+          created_at: asString(trailEntry.created_at),
+        });
+      }
     }
   }
 
@@ -671,33 +764,60 @@ export function listRuns(options = {}) {
     ensureRun(normalizeRunRef(runId));
   }
 
-  return [...runMap.values()].map((entry) => ({
-    run_id: entry.run_id,
-    packet_refs: Array.from(new Set(entry.packet_refs)),
-    step_result_refs: Array.from(new Set(entry.step_result_refs)),
-    quality_refs: Array.from(new Set(entry.quality_refs)),
-    finance_evidence: {
-      route_ids: Array.from(new Set(entry.finance_evidence.route_ids)),
-      wrapper_refs: Array.from(new Set(entry.finance_evidence.wrapper_refs)),
-      adapter_ids: Array.from(new Set(entry.finance_evidence.adapter_ids)),
-      max_cost_usd: entry.finance_evidence.max_cost_usd,
-      timeout_sec: entry.finance_evidence.timeout_sec,
-      max_cost_sources: Array.from(new Set(entry.finance_evidence.max_cost_sources)),
-      timeout_sources: Array.from(new Set(entry.finance_evidence.timeout_sources)),
-      step_latency_sec: summarizeSamples(entry.finance_evidence.step_latency_samples_sec),
-      certification_latency_sec: summarizeSamples(entry.finance_evidence.certification_latency_samples_sec),
-      baseline_pass_rate: entry.finance_evidence.baseline_pass_rate,
-      candidate_pass_rate: entry.finance_evidence.candidate_pass_rate,
-    },
-    policy_context: {
-      route_ids: Array.from(new Set(entry.policy_context.route_ids)),
-      policy_ids: Array.from(new Set(entry.policy_context.policy_ids)),
-      writeback_modes: Array.from(new Set(entry.policy_context.writeback_modes)),
-      governance_decisions: Array.from(new Set(entry.policy_context.governance_decisions)),
-      governance_reason_codes: Array.from(new Set(entry.policy_context.governance_reason_codes)),
-      approval_required: entry.policy_context.approval_required,
-    },
-  }));
+  return [...runMap.values()].map((entry) => {
+    const seenTrailKeys = new Set();
+    const decisionTrail = entry.context_lifecycle.decision_trail
+      .slice()
+      .sort((left, right) => {
+        const leftTs = toTimelineMs(left.created_at);
+        const rightTs = toTimelineMs(right.created_at);
+        if (leftTs !== rightTs) {
+          return leftTs - rightTs;
+        }
+        return String(left.decision_ref).localeCompare(String(right.decision_ref));
+      })
+      .filter((trailEntry) => {
+        const key = `${trailEntry.decision_ref}|${trailEntry.context_asset_ref}|${trailEntry.version ?? "unknown"}`;
+        if (seenTrailKeys.has(key)) {
+          return false;
+        }
+        seenTrailKeys.add(key);
+        return true;
+      });
+
+    return {
+      run_id: entry.run_id,
+      packet_refs: Array.from(new Set(entry.packet_refs)),
+      step_result_refs: Array.from(new Set(entry.step_result_refs)),
+      quality_refs: Array.from(new Set(entry.quality_refs)),
+      finance_evidence: {
+        route_ids: Array.from(new Set(entry.finance_evidence.route_ids)),
+        wrapper_refs: Array.from(new Set(entry.finance_evidence.wrapper_refs)),
+        adapter_ids: Array.from(new Set(entry.finance_evidence.adapter_ids)),
+        max_cost_usd: entry.finance_evidence.max_cost_usd,
+        timeout_sec: entry.finance_evidence.timeout_sec,
+        max_cost_sources: Array.from(new Set(entry.finance_evidence.max_cost_sources)),
+        timeout_sources: Array.from(new Set(entry.finance_evidence.timeout_sources)),
+        step_latency_sec: summarizeSamples(entry.finance_evidence.step_latency_samples_sec),
+        certification_latency_sec: summarizeSamples(entry.finance_evidence.certification_latency_samples_sec),
+        baseline_pass_rate: entry.finance_evidence.baseline_pass_rate,
+        candidate_pass_rate: entry.finance_evidence.candidate_pass_rate,
+      },
+      policy_context: {
+        route_ids: Array.from(new Set(entry.policy_context.route_ids)),
+        policy_ids: Array.from(new Set(entry.policy_context.policy_ids)),
+        writeback_modes: Array.from(new Set(entry.policy_context.writeback_modes)),
+        governance_decisions: Array.from(new Set(entry.policy_context.governance_decisions)),
+        governance_reason_codes: Array.from(new Set(entry.policy_context.governance_reason_codes)),
+        approval_required: entry.policy_context.approval_required,
+      },
+      context_lifecycle: {
+        context_asset_refs: Array.from(new Set(entry.context_lifecycle.context_asset_refs)),
+        provenance_refs: Array.from(new Set(entry.context_lifecycle.provenance_refs)),
+        decision_trail: decisionTrail,
+      },
+    };
+  });
 }
 
 /**

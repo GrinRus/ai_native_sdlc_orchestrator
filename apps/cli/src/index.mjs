@@ -209,6 +209,7 @@ function formatCommandHelp(definition) {
             "- Certification combines validation report + eval report + harness capture + harness replay into one promotion-decision.",
             "- Stable/frozen/demoted transitions require baseline-comparison evidence.",
             "- Freeze transitions require explicit regression evidence before rollout action becomes 'freeze'.",
+            "- Context asset promotions require with-context vs without-context comparison and immutable provenance evidence.",
             "- Status semantics are pass, hold, or fail.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
           ]

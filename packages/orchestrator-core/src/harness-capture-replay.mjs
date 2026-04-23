@@ -41,6 +41,7 @@ function loadHarnessCapture(options) {
  *  suiteRef: string,
  *  subjectRef: string,
  *  subjectVersion?: string,
+ *  contextBundleOverrides?: Record<string, string[]>,
  * }} options
  */
 export function captureHarnessReplayArtifact(options) {
@@ -50,6 +51,7 @@ export function captureHarnessReplayArtifact(options) {
     projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
     stepClass: options.stepClass,
+    contextBundleOverrides: options.contextBundleOverrides,
     dryRun: true,
   });
 
@@ -97,6 +99,7 @@ export function captureHarnessReplayArtifact(options) {
  *  projectProfile?: string,
  *  runtimeRoot?: string,
  *  capturePath: string,
+ *  contextBundleOverrides?: Record<string, string[]>,
  * }} options
  */
 export function replayHarnessCapture(options) {
@@ -113,6 +116,7 @@ export function replayHarnessCapture(options) {
     projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
     stepClass,
+    contextBundleOverrides: options.contextBundleOverrides,
     dryRun: true,
   });
 

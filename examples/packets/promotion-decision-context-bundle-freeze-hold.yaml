@@ -1,0 +1,78 @@
+decision_id: aor-core.promotion.context.bundle.runner.foundation.freeze.v2
+created_at: 2026-04-23T09:00:00.000Z
+subject_ref: context-bundle://context.bundle.runner.foundation@v2
+from_channel: stable
+to_channel: frozen
+evidence_refs:
+  - runtime://reports/validation-report.json
+  - runtime://reports/evaluation-report-suite.cert.core-v4.json
+  - runtime://reports/harness-capture-context-with.json
+  - runtime://reports/harness-replay-context-with.json
+evidence_summary:
+  asset_ref: context-bundle://context.bundle.runner.foundation@v2
+  subject_ref: wrapper://wrapper.eval.default@v1
+  suite_ref: suite.cert.core@v4
+  deterministic_validation_status: pass
+  evaluation_status: pass
+  harness_replay_status: pass
+  baseline_comparison:
+    comparison_ready: true
+    regression_detected: false
+    flaky_detected: false
+  rollout_decision:
+    action: hold
+    requested_transition:
+      from_channel: stable
+      to_channel: frozen
+    baseline_comparison_required: true
+    baseline_comparison_complete: true
+    freeze_guardrail_required: true
+    freeze_guardrail_satisfied: false
+  context_lifecycle:
+    context_asset_ref: context-bundle://context.bundle.runner.foundation@v2
+    context_asset_kind: context-bundle
+    context_asset_version: 2
+    update_status: replay
+    outdated: false
+    security_gate_status: pass
+    security_findings:
+      critical_count: 0
+      high_count: 0
+      critical_case_ids: []
+      high_case_ids: []
+    quality_comparison:
+      comparison_ready: true
+      pass_rate_delta: 0
+      recommendation: manual-review
+    immutable_provenance_refs:
+      - compiled-context://compiled-context.aor-core.implement.runner-default
+      - sha256://8fd4de6f2f1c024a40f4a0f3a92e6b839f8a112bbec5c91dbec60567f66f7bc3
+    decision_trail:
+      - decision_id: aor-core.promotion.context.bundle.runner.foundation.v1
+        decision_ref: evidence://artifacts/promotion-decision-context-bundle-runner-v1.json
+        subject_ref: context-bundle://context.bundle.runner.foundation@v1
+        version: 1
+        from_channel: candidate
+        to_channel: stable
+        status: hold
+        created_at: 2026-04-23T08:00:00.000Z
+  governance_checks:
+    - check_id: freeze-channel-guardrail
+      status: hold
+      summary: Freeze transition requires explicit regression evidence before channel freeze.
+    - check_id: context-provenance
+      status: pass
+      summary: Context promotion evidence includes immutable compiled-context provenance.
+    - check_id: context-update-freshness
+      status: pass
+      summary: Context update targets the latest known version lineage.
+    - check_id: context-security-gate
+      status: pass
+      summary: Context security gate passed; no high/critical findings were detected.
+    - check_id: context-quality-comparison
+      status: pass
+      summary: With-context and without-context comparison evidence is present.
+    - check_id: policy-quality-gate
+      status: hold
+      summary: Policy quality gate blocked until governance hold checks are resolved.
+status: hold

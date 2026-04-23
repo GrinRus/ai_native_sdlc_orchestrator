@@ -11,6 +11,7 @@ import {
   resolveCertificationDecisionStatus,
   resolveRegressionTriage,
 } from "../src/certification-decision.mjs";
+import { initializeProjectRuntime } from "../src/project-init.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -288,6 +289,124 @@ test("certifyAssetPromotion combines eval and harness evidence into durable prom
       "baseline-comparison",
       "regression-triage",
     ]);
+  });
+});
+
+test("certifyAssetPromotion records context lifecycle comparison and provenance for context assets", () => {
+  withTempRepo((repoRoot) => {
+    const result = certifyAssetPromotion({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      assetRef: "context-bundle://context.bundle.runner.foundation@v1",
+      subjectRef: "wrapper://wrapper.eval.default@v1",
+      suiteRef: "suite.cert.core@v4",
+      stepClass: "implement",
+      fromChannel: "candidate",
+      toChannel: "stable",
+    });
+
+    assert.equal(result.decision.status, "pass");
+    const lifecycle = result.decision.evidence_summary.context_lifecycle;
+    assert.equal(lifecycle.context_asset_ref, "context-bundle://context.bundle.runner.foundation@v1");
+    assert.equal(lifecycle.update_status, "initial");
+    assert.equal(lifecycle.outdated, false);
+    assert.equal(Array.isArray(lifecycle.immutable_provenance_refs), true);
+    assert.equal(lifecycle.immutable_provenance_refs.length > 0, true);
+    assert.equal(lifecycle.quality_comparison.comparison_ready, true);
+    assert.equal(lifecycle.quality_comparison.with_context.evaluation_status, "pass");
+    assert.equal(lifecycle.quality_comparison.without_context.evaluation_status, "pass");
+    const contextComparisonCheck = result.decision.evidence_summary.governance_checks.find(
+      (entry) => entry.check_id === "context-quality-comparison",
+    );
+    assert.equal(contextComparisonCheck?.status, "pass");
+  });
+});
+
+test("certifyAssetPromotion holds context promotion when target context version is outdated", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const seededDecisionPath = path.join(
+      init.runtimeLayout.artifactsRoot,
+      "promotion-decision-context-bundle-runner-foundation-v2-seed.json",
+    );
+    fs.writeFileSync(
+      seededDecisionPath,
+      `${JSON.stringify(
+        {
+          decision_id: "aor-core.promotion.context.bundle.runner.foundation.v2.seed",
+          created_at: "2026-04-22T00:00:00.000Z",
+          subject_ref: "context-bundle://context.bundle.runner.foundation@v2",
+          from_channel: "candidate",
+          to_channel: "stable",
+          evidence_refs: ["runtime://reports/evaluation-report-seed.json"],
+          evidence_summary: {
+            reason: "seed context lifecycle history",
+          },
+          status: "pass",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const result = certifyAssetPromotion({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      assetRef: "context-bundle://context.bundle.runner.foundation@v1",
+      subjectRef: "wrapper://wrapper.eval.default@v1",
+      suiteRef: "suite.cert.core@v4",
+      stepClass: "implement",
+      fromChannel: "candidate",
+      toChannel: "stable",
+    });
+
+    assert.equal(result.decision.status, "hold");
+    const lifecycle = result.decision.evidence_summary.context_lifecycle;
+    assert.equal(lifecycle.outdated, true);
+    assert.equal(lifecycle.update_status, "outdated");
+    assert.equal(lifecycle.superseded_by_version, 2);
+    const freshnessCheck = result.decision.evidence_summary.governance_checks.find(
+      (entry) => entry.check_id === "context-update-freshness",
+    );
+    assert.equal(freshnessCheck?.status, "hold");
+  });
+});
+
+test("certifyAssetPromotion blocks context promotion on critical findings via context security gate", () => {
+  withTempRepo((repoRoot) => {
+    const datasetPath = path.join(repoRoot, "examples/eval/dataset-wrapper-certification.yaml");
+    const dataset = fs.readFileSync(datasetPath, "utf8");
+    fs.writeFileSync(
+      datasetPath,
+      dataset
+        .replace("      - evidence-discipline", "      - evidence-discipline\n      - critical")
+        .replace(
+          "expected_ref: evidence://datasets/wrapper-certification/CASE-WRAP-0023/expected.json",
+          'expected_ref: ""',
+        ),
+      "utf8",
+    );
+
+    const result = certifyAssetPromotion({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      assetRef: "context-bundle://context.bundle.runner.foundation@v1",
+      subjectRef: "wrapper://wrapper.eval.default@v1",
+      suiteRef: "suite.cert.core@v4",
+      stepClass: "implement",
+      fromChannel: "candidate",
+      toChannel: "stable",
+    });
+
+    assert.equal(result.decision.status, "fail");
+    const lifecycle = result.decision.evidence_summary.context_lifecycle;
+    assert.equal(lifecycle.security_gate_status, "fail");
+    assert.equal(lifecycle.security_findings.critical_count > 0, true);
+    const securityGateCheck = result.decision.evidence_summary.governance_checks.find(
+      (entry) => entry.check_id === "context-security-gate",
+    );
+    assert.equal(securityGateCheck?.status, "fail");
   });
 });
 

@@ -166,6 +166,7 @@ function writeStepResult(options) {
  *   routeOverrides?: Record<string, string>,
  *   wrapperOverrides?: Record<string, string>,
  *   promptBundleOverrides?: Record<string, string>,
+ *   contextBundleOverrides?: Record<string, string[]>,
  *   policyOverrides?: Record<string, string>,
  *   adapterOverrides?: Record<string, string>,
  *   routesRoot?: string,
@@ -381,6 +382,7 @@ export function executeRoutedStep(options) {
         routeOverrides: options.routeOverrides,
         wrapperOverrides: options.wrapperOverrides,
         promptBundleOverrides: options.promptBundleOverrides,
+        contextBundleOverrides: options.contextBundleOverrides,
       });
 
       policyResolution = resolveStepPolicyForStep({

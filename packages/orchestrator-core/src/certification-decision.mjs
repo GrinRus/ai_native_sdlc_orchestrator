@@ -11,6 +11,8 @@ import { validateProjectRuntime } from "./project-validate.mjs";
 const PROMOTION_CHANNEL_VALUES = new Set(["draft", "candidate", "stable", "frozen", "demoted"]);
 const FLAKY_PASS_RATE_DELTA_THRESHOLD = 0.02;
 const MAJOR_DRIFT_DELTA_THRESHOLD = 0.1;
+const CONTEXT_ASSET_REF_PATTERN = /^(context-(?:bundle|doc|rule|skill)):\/\/([^@]+)@v(\d+)$/u;
+const DEFAULT_WITHOUT_CONTEXT_BUNDLE_REF = "context-bundle://context.bundle.runner.empty@v1";
 
 /**
  * @param {string} value
@@ -41,6 +43,16 @@ function asRecord(value) {
 
 /**
  * @param {unknown} value
+ * @returns {string[]}
+ */
+function asStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
+    : [];
+}
+
+/**
+ * @param {unknown} value
  * @returns {number | null}
  */
 function asNumber(value) {
@@ -53,6 +65,283 @@ function asNumber(value) {
  */
 function asString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {"pass" | "hold" | "fail"}
+ */
+function asCheckStatus(value) {
+  return value === "pass" || value === "hold" || value === "fail" ? value : "hold";
+}
+
+/**
+ * @param {unknown} subjectRef
+ * @returns {{ kind: string, asset_id: string, version: number, normalized_ref: string, family_ref: string } | null}
+ */
+function parseContextAssetReference(subjectRef) {
+  if (typeof subjectRef !== "string") {
+    return null;
+  }
+
+  const match = CONTEXT_ASSET_REF_PATTERN.exec(subjectRef.trim());
+  if (!match) {
+    return null;
+  }
+
+  const kind = match[1];
+  const assetId = match[2];
+  const version = Number.parseInt(match[3], 10);
+  if (!Number.isFinite(version)) {
+    return null;
+  }
+
+  return {
+    kind,
+    asset_id: assetId,
+    version,
+    normalized_ref: `${kind}://${assetId}@v${version}`,
+    family_ref: `${kind}://${assetId}`,
+  };
+}
+
+/**
+ * @param {unknown} filePath
+ * @returns {Record<string, unknown> | null}
+ */
+function readJsonObject(filePath) {
+  if (typeof filePath !== "string" || !fs.existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {{
+ *   artifactsRoot: string,
+ *   contextAsset: { kind: string, asset_id: string },
+ * }} options
+ */
+function loadContextDecisionHistory(options) {
+  if (!fs.existsSync(options.artifactsRoot)) {
+    return [];
+  }
+
+  const files = fs
+    .readdirSync(options.artifactsRoot)
+    .filter((entry) => /^promotion-decision-.*\.json$/u.test(entry))
+    .map((entry) => path.join(options.artifactsRoot, entry));
+
+  const history = [];
+  for (const filePath of files) {
+    const parsed = readJsonObject(filePath);
+    if (!parsed) {
+      continue;
+    }
+
+    const subjectRef = asString(parsed.subject_ref);
+    const parsedContextRef = parseContextAssetReference(subjectRef);
+    if (!parsedContextRef) {
+      continue;
+    }
+
+    if (parsedContextRef.kind !== options.contextAsset.kind || parsedContextRef.asset_id !== options.contextAsset.asset_id) {
+      continue;
+    }
+
+    const fileStat = fs.statSync(filePath);
+    const createdAt = asString(parsed.created_at) ?? new Date(fileStat.mtimeMs).toISOString();
+    history.push({
+      decision_id: asString(parsed.decision_id),
+      decision_ref: filePath,
+      subject_ref: parsedContextRef.normalized_ref,
+      version: parsedContextRef.version,
+      from_channel: asString(parsed.from_channel),
+      to_channel: asString(parsed.to_channel),
+      status: asString(parsed.status),
+      created_at: createdAt,
+      timeline_ms: Date.parse(createdAt),
+    });
+  }
+
+  return history
+    .sort((left, right) => {
+      if (left.version !== right.version) {
+        return left.version - right.version;
+      }
+      return left.timeline_ms - right.timeline_ms;
+    })
+    .map(({ timeline_ms: _timeline, ...entry }) => entry);
+}
+
+/**
+ * @param {{ version: number, history: Array<{ version: number }> }} options
+ */
+function resolveContextUpdateStatus(options) {
+  if (options.history.length === 0) {
+    return {
+      update_status: "initial",
+      outdated: false,
+      latest_known_version: null,
+      superseded_by_version: null,
+    };
+  }
+
+  const latestKnownVersion = options.history.reduce(
+    (max, entry) => (entry.version > max ? entry.version : max),
+    options.history[0].version,
+  );
+
+  if (options.version > latestKnownVersion) {
+    return {
+      update_status: "upgrade",
+      outdated: false,
+      latest_known_version: latestKnownVersion,
+      superseded_by_version: null,
+    };
+  }
+
+  if (options.version === latestKnownVersion) {
+    return {
+      update_status: "replay",
+      outdated: false,
+      latest_known_version: latestKnownVersion,
+      superseded_by_version: null,
+    };
+  }
+
+  return {
+    update_status: "outdated",
+    outdated: true,
+    latest_known_version: latestKnownVersion,
+    superseded_by_version: latestKnownVersion,
+  };
+}
+
+/**
+ * @param {{ stepResult: Record<string, unknown> }} options
+ */
+function extractCompiledContextProvenance(options) {
+  const routedExecution = asRecord(options.stepResult.routed_execution);
+  const contextCompilation = asRecord(routedExecution.context_compilation);
+  const diagnostics = asRecord(contextCompilation.diagnostics);
+  const fingerprint = asString(diagnostics.compiled_context_fingerprint);
+
+  return [
+    asString(contextCompilation.compiled_context_ref),
+    asString(contextCompilation.compiled_context_file),
+    ...(fingerprint ? [`sha256://${fingerprint}`] : []),
+    ...asStringArray(asRecord(contextCompilation.compiled_context_artifact).context_bundle_refs),
+  ].filter((entry) => typeof entry === "string");
+}
+
+/**
+ * @param {{
+ *   evaluationReport: Record<string, unknown>,
+ * }} options
+ */
+function resolveEvaluationFindings(options) {
+  const graderResults = asRecord(options.evaluationReport.grader_results);
+  /** @type {Map<string, "high" | "critical">} */
+  const findingsByCase = new Map();
+
+  for (const graderResult of Object.values(graderResults)) {
+    const resultRecord = asRecord(graderResult);
+    const results = Array.isArray(resultRecord.case_results) ? resultRecord.case_results : [];
+    for (const rawCase of results) {
+      const caseRecord = asRecord(rawCase);
+      if (asString(caseRecord.status) !== "fail") {
+        continue;
+      }
+      const caseId = asString(caseRecord.case_id) ?? `unknown-${findingsByCase.size + 1}`;
+      const severity = caseRecord.critical === true ? "critical" : "high";
+      const previous = findingsByCase.get(caseId);
+      if (!previous || previous === "high") {
+        findingsByCase.set(caseId, severity);
+      }
+    }
+  }
+
+  const criticalCaseIds = [];
+  const highCaseIds = [];
+  for (const [caseId, severity] of findingsByCase.entries()) {
+    if (severity === "critical") {
+      criticalCaseIds.push(caseId);
+    } else {
+      highCaseIds.push(caseId);
+    }
+  }
+
+  return {
+    critical_count: criticalCaseIds.length,
+    high_count: highCaseIds.length,
+    critical_case_ids: criticalCaseIds,
+    high_case_ids: highCaseIds,
+  };
+}
+
+/**
+ * @param {{
+ *   withContextEvaluation: Record<string, unknown>,
+ *   withoutContextEvaluation: Record<string, unknown>,
+ *   withContextEvidence: { evaluation_report_ref: string | null, harness_capture_ref: string | null, harness_replay_ref: string | null },
+ *   withoutContextEvidence: { evaluation_report_ref: string | null, harness_capture_ref: string | null, harness_replay_ref: string | null },
+ * }} options
+ */
+function resolveContextQualityComparison(options) {
+  const withContextSummary = asRecord(options.withContextEvaluation.summary_metrics);
+  const withoutContextSummary = asRecord(options.withoutContextEvaluation.summary_metrics);
+  const withContextStatus = asString(options.withContextEvaluation.status);
+  const withoutContextStatus = asString(options.withoutContextEvaluation.status);
+  const withContextPassRate = asNumber(withContextSummary.aggregate_pass_rate);
+  const withoutContextPassRate = asNumber(withoutContextSummary.aggregate_pass_rate);
+
+  const comparisonReady =
+    withContextStatus !== null &&
+    withoutContextStatus !== null &&
+    withContextPassRate !== null &&
+    withoutContextPassRate !== null;
+  const passRateDelta =
+    comparisonReady && withContextPassRate !== null && withoutContextPassRate !== null
+      ? Math.round((withContextPassRate - withoutContextPassRate) * 1000) / 1000
+      : null;
+
+  return {
+    comparison_ready: comparisonReady,
+    with_context: {
+      evaluation_status: withContextStatus,
+      pass_rate: withContextPassRate,
+      ...options.withContextEvidence,
+    },
+    without_context: {
+      evaluation_status: withoutContextStatus,
+      pass_rate: withoutContextPassRate,
+      ...options.withoutContextEvidence,
+    },
+    pass_rate_delta: passRateDelta,
+    recommendation:
+      comparisonReady && passRateDelta !== null
+        ? passRateDelta < 0
+          ? "block-context-update"
+          : passRateDelta === 0
+            ? "manual-review"
+            : "promote-context-update"
+        : "collect-context-comparison-evidence",
+    evidence_refs: [
+      options.withContextEvidence.evaluation_report_ref,
+      options.withContextEvidence.harness_capture_ref,
+      options.withContextEvidence.harness_replay_ref,
+      options.withoutContextEvidence.evaluation_report_ref,
+      options.withoutContextEvidence.harness_capture_ref,
+      options.withoutContextEvidence.harness_replay_ref,
+    ].filter((entry) => typeof entry === "string"),
+  };
 }
 
 /**
@@ -267,6 +556,13 @@ function resolveRolloutDecision(options) {
  *  flakyDetected: boolean,
  *  freezeGuardrailStatus: "pass" | "hold",
  *  missingEvidenceKinds: string[],
+ *  contextAsset: boolean,
+ *  contextProvenanceComplete: boolean,
+ *  contextOutdated: boolean,
+ *  contextSecurityGateStatus: "pass" | "hold" | "fail",
+ *  contextSecuritySummary: string,
+ *  contextQualityComparisonRequired: boolean,
+ *  contextQualityComparisonComplete: boolean,
  * }} options
  * @returns {Array<{ check_id: string, status: "pass" | "hold" | "fail", summary: string }>}
  */
@@ -361,6 +657,44 @@ function buildGovernanceChecks(options) {
         : "Freeze transition requires explicit regression evidence before channel freeze.",
   });
 
+  if (options.contextAsset) {
+    checks.push({
+      check_id: "context-provenance",
+      status: options.contextProvenanceComplete ? "pass" : "hold",
+      summary: options.contextProvenanceComplete
+        ? "Context promotion evidence includes immutable compiled-context provenance."
+        : "Context promotion evidence is missing immutable compiled-context provenance.",
+    });
+
+    checks.push({
+      check_id: "context-update-freshness",
+      status: options.contextOutdated ? "hold" : "pass",
+      summary: options.contextOutdated
+        ? "Context update is outdated versus newer promoted context version history."
+        : "Context update targets the latest known version lineage.",
+    });
+
+    checks.push({
+      check_id: "context-security-gate",
+      status: options.contextSecurityGateStatus,
+      summary: options.contextSecuritySummary,
+    });
+
+    checks.push({
+      check_id: "context-quality-comparison",
+      status: options.contextQualityComparisonRequired
+        ? options.contextQualityComparisonComplete
+          ? "pass"
+          : "hold"
+        : "pass",
+      summary: options.contextQualityComparisonRequired
+        ? options.contextQualityComparisonComplete
+          ? "With-context and without-context comparison evidence is present."
+          : "With-context and without-context comparison evidence is required before context promotion."
+        : "With-context and without-context comparison evidence is optional for this transition.",
+    });
+  }
+
   const hasFail = checks.some((entry) => entry.status === "fail");
   const hasHold = checks.some((entry) => entry.status === "hold");
   checks.push({
@@ -453,6 +787,7 @@ export function resolveCertificationDecisionStatus(options) {
  *  fromChannel?: string,
  *  toChannel?: string,
  *  runRef?: string,
+ *  withoutContextBundleRef?: string,
  * }} options
  */
 export function certifyAssetPromotion(options) {
@@ -477,13 +812,18 @@ export function certifyAssetPromotion(options) {
     runtimeRoot: options.runtimeRoot,
   });
 
+  const stepClass = options.stepClass ?? "implement";
+  const suiteRef = options.suiteRef ?? "suite.release.core@v1";
+  const contextAsset = parseContextAssetReference(options.assetRef);
+  const contextAssetEnabled = contextAsset !== null;
+
   const captureResult = captureHarnessReplayArtifact({
     cwd: options.cwd,
     projectRef: options.projectRef,
     projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
-    stepClass: options.stepClass ?? "implement",
-    suiteRef: options.suiteRef ?? "suite.release.core@v1",
+    stepClass,
+    suiteRef,
     subjectRef: options.subjectRef,
   });
 
@@ -494,6 +834,40 @@ export function certifyAssetPromotion(options) {
     runtimeRoot: options.runtimeRoot,
     capturePath: captureResult.capturePath,
   });
+
+  /** @type {ReturnType<typeof captureHarnessReplayArtifact> | null} */
+  let withoutContextCaptureResult = null;
+  /** @type {ReturnType<typeof replayHarnessCapture> | null} */
+  let withoutContextReplayResult = null;
+  let withoutContextBundleRef = null;
+
+  if (contextAssetEnabled) {
+    withoutContextBundleRef = options.withoutContextBundleRef ?? DEFAULT_WITHOUT_CONTEXT_BUNDLE_REF;
+    const contextBundleOverrides = {
+      [stepClass]: [withoutContextBundleRef],
+    };
+    const withoutContextSubjectRef = `${options.subjectRef}::without-context`;
+
+    withoutContextCaptureResult = captureHarnessReplayArtifact({
+      cwd: options.cwd,
+      projectRef: options.projectRef,
+      projectProfile: options.projectProfile,
+      runtimeRoot: options.runtimeRoot,
+      stepClass,
+      suiteRef,
+      subjectRef: withoutContextSubjectRef,
+      contextBundleOverrides,
+    });
+
+    withoutContextReplayResult = replayHarnessCapture({
+      cwd: options.cwd,
+      projectRef: options.projectRef,
+      projectProfile: options.projectProfile,
+      runtimeRoot: options.runtimeRoot,
+      capturePath: withoutContextCaptureResult.capturePath,
+      contextBundleOverrides,
+    });
+  }
 
   const evaluationStatus =
     typeof captureResult.evaluationReport.status === "string" ? captureResult.evaluationReport.status : null;
@@ -513,6 +887,13 @@ export function certifyAssetPromotion(options) {
     { kind: "evaluation-report", ref: captureResult.evaluationReportPath },
     { kind: "harness-capture", ref: captureResult.capturePath },
     { kind: "harness-replay", ref: replayResult.replayReportPath },
+    ...(contextAssetEnabled
+      ? [
+          { kind: "without-context-evaluation-report", ref: withoutContextCaptureResult?.evaluationReportPath ?? null },
+          { kind: "without-context-harness-capture", ref: withoutContextCaptureResult?.capturePath ?? null },
+          { kind: "without-context-harness-replay", ref: withoutContextReplayResult?.replayReportPath ?? null },
+        ]
+      : []),
   ];
   const missingEvidenceKinds = evidenceChecks
     .filter((entry) => typeof entry.ref !== "string" || !fs.existsSync(entry.ref))
@@ -529,8 +910,93 @@ export function certifyAssetPromotion(options) {
     captureResult: /** @type {Record<string, unknown>} */ (captureResult),
     replayResult: /** @type {Record<string, unknown>} */ (replayResult),
   });
-  const baselineComparisonRequired = toChannel === "stable" || toChannel === "frozen" || toChannel === "demoted";
+  const baselineComparisonRequired =
+    contextAssetEnabled || toChannel === "stable" || toChannel === "frozen" || toChannel === "demoted";
   const baselineComparisonComplete = baselineComparison.comparison_ready === true;
+
+  const contextDecisionHistory = contextAsset
+    ? loadContextDecisionHistory({
+        artifactsRoot: init.runtimeLayout.artifactsRoot,
+        contextAsset,
+      })
+    : [];
+  const contextUpdateStatus = contextAsset
+    ? resolveContextUpdateStatus({
+        version: contextAsset.version,
+        history: contextDecisionHistory,
+      })
+    : {
+        update_status: null,
+        outdated: false,
+        latest_known_version: null,
+        superseded_by_version: null,
+      };
+  const contextProvenanceRefs = contextAssetEnabled
+    ? [
+        ...extractCompiledContextProvenance({ stepResult: asRecord(captureResult.stepResult) }),
+        ...extractCompiledContextProvenance({ stepResult: asRecord(replayResult.stepResult) }),
+        ...(withoutContextCaptureResult
+          ? extractCompiledContextProvenance({ stepResult: asRecord(withoutContextCaptureResult.stepResult) })
+          : []),
+        ...(withoutContextReplayResult
+          ? extractCompiledContextProvenance({ stepResult: asRecord(withoutContextReplayResult.stepResult) })
+          : []),
+      ]
+    : [];
+  const uniqueContextProvenanceRefs = [...new Set(contextProvenanceRefs)];
+  const contextProvenanceComplete = !contextAssetEnabled || uniqueContextProvenanceRefs.length > 0;
+
+  const withContextFindings = resolveEvaluationFindings({
+    evaluationReport: asRecord(captureResult.evaluationReport),
+  });
+  const withoutContextFindings =
+    contextAssetEnabled && withoutContextCaptureResult
+      ? resolveEvaluationFindings({
+          evaluationReport: asRecord(withoutContextCaptureResult.evaluationReport),
+        })
+      : {
+          critical_count: 0,
+          high_count: 0,
+          critical_case_ids: [],
+          high_case_ids: [],
+        };
+  const contextCriticalFindings = withContextFindings.critical_count + withoutContextFindings.critical_count;
+  const contextHighFindings = withContextFindings.high_count + withoutContextFindings.high_count;
+  const contextSecurityGateStatus = contextAssetEnabled
+    ? contextCriticalFindings > 0
+      ? "fail"
+      : contextHighFindings > 0
+        ? "hold"
+        : "pass"
+    : "pass";
+  const contextSecuritySummary =
+    contextSecurityGateStatus === "fail"
+      ? `Context security gate blocked by critical findings (critical=${contextCriticalFindings}, high=${contextHighFindings}).`
+      : contextSecurityGateStatus === "hold"
+        ? `Context security gate is on hold due to high findings (high=${contextHighFindings}).`
+        : "Context security gate passed; no high/critical findings were detected.";
+
+  const contextQualityComparisonRequired = contextAssetEnabled;
+  const contextQualityComparison =
+    contextAssetEnabled && withoutContextCaptureResult && withoutContextReplayResult
+      ? resolveContextQualityComparison({
+          withContextEvaluation: asRecord(captureResult.evaluationReport),
+          withoutContextEvaluation: asRecord(withoutContextCaptureResult.evaluationReport),
+          withContextEvidence: {
+            evaluation_report_ref: asString(captureResult.evaluationReportPath),
+            harness_capture_ref: asString(captureResult.capturePath),
+            harness_replay_ref: asString(replayResult.replayReportPath),
+          },
+          withoutContextEvidence: {
+            evaluation_report_ref: asString(withoutContextCaptureResult.evaluationReportPath),
+            harness_capture_ref: asString(withoutContextCaptureResult.capturePath),
+            harness_replay_ref: asString(withoutContextReplayResult.replayReportPath),
+          },
+        })
+      : null;
+  const contextQualityComparisonComplete =
+    !contextQualityComparisonRequired || contextQualityComparison?.comparison_ready === true;
+
   const regressionTriage = resolveRegressionTriage({
     baselineComparison: baselineComparison,
     toChannel,
@@ -561,8 +1027,15 @@ export function certifyAssetPromotion(options) {
     flakyDetected: baselineComparison.flaky_detected === true,
     freezeGuardrailStatus,
     missingEvidenceKinds,
+    contextAsset: contextAssetEnabled,
+    contextProvenanceComplete,
+    contextOutdated: contextUpdateStatus.outdated === true,
+    contextSecurityGateStatus: asCheckStatus(contextSecurityGateStatus),
+    contextSecuritySummary,
+    contextQualityComparisonRequired,
+    contextQualityComparisonComplete,
   });
-  const decisionStatus = resolveCertificationDecisionStatus({
+  let decisionStatus = resolveCertificationDecisionStatus({
     validationStatus,
     evaluationStatus,
     replayStatus,
@@ -574,6 +1047,19 @@ export function certifyAssetPromotion(options) {
     flakyDetected: baselineComparison.flaky_detected === true,
     freezeGuardrailStatus,
   });
+  if (contextAssetEnabled) {
+    if (contextSecurityGateStatus === "fail") {
+      decisionStatus = "fail";
+    } else if (
+      decisionStatus !== "fail" &&
+      (contextUpdateStatus.outdated === true ||
+        !contextProvenanceComplete ||
+        !contextQualityComparisonComplete ||
+        contextSecurityGateStatus === "hold")
+    ) {
+      decisionStatus = "hold";
+    }
+  }
   const rolloutDecision = resolveRolloutDecision({
     fromChannel,
     toChannel,
@@ -585,21 +1071,27 @@ export function certifyAssetPromotion(options) {
   });
 
   const decisionId = `${init.projectId}.promotion.${normalizeForId(options.assetRef)}.${Date.now()}`;
+  const decisionEvidenceRefs = [
+    validationResult.validationReportPath,
+    analysisResult.reportPath,
+    captureResult.evaluationReportPath,
+    captureResult.capturePath,
+    replayResult.replayReportPath,
+    replayResult.replayEvaluationReportPath,
+    ...(contextQualityComparison ? contextQualityComparison.evidence_refs : []),
+  ]
+    .filter((entry) => typeof entry === "string")
+    .filter((entry, index, values) => values.indexOf(entry) === index);
+
   const decision = {
     decision_id: decisionId,
+    created_at: new Date().toISOString(),
     subject_ref: options.assetRef,
     run_id: options.runRef ?? null,
     linked_run_refs: options.runRef ? [`run://${options.runRef}`] : [],
     from_channel: fromChannel,
     to_channel: toChannel,
-    evidence_refs: [
-      validationResult.validationReportPath,
-      analysisResult.reportPath,
-      captureResult.evaluationReportPath,
-      captureResult.capturePath,
-      replayResult.replayReportPath,
-      replayResult.replayEvaluationReportPath,
-    ].filter((entry) => typeof entry === "string"),
+    evidence_refs: decisionEvidenceRefs,
     evidence_summary: {
       asset_ref: options.assetRef,
       subject_ref: options.subjectRef,
@@ -617,6 +1109,43 @@ export function certifyAssetPromotion(options) {
       rollout_decision: rolloutDecision,
       governance_checks: governanceChecks,
       finance_signals: financeSignals,
+      ...(contextAsset
+        ? {
+            context_lifecycle: {
+              context_asset_ref: contextAsset.normalized_ref,
+              context_asset_family_ref: contextAsset.family_ref,
+              context_asset_kind: contextAsset.kind,
+              context_asset_version: contextAsset.version,
+              update_status: contextUpdateStatus.update_status,
+              outdated: contextUpdateStatus.outdated,
+              latest_known_version: contextUpdateStatus.latest_known_version,
+              superseded_by_version: contextUpdateStatus.superseded_by_version,
+              security_gate_status: contextSecurityGateStatus,
+              security_findings: {
+                critical_count: contextCriticalFindings,
+                high_count: contextHighFindings,
+                critical_case_ids: [
+                  ...withContextFindings.critical_case_ids,
+                  ...withoutContextFindings.critical_case_ids,
+                ],
+                high_case_ids: [...withContextFindings.high_case_ids, ...withoutContextFindings.high_case_ids],
+              },
+              quality_comparison: contextQualityComparison,
+              immutable_provenance_refs: uniqueContextProvenanceRefs,
+              without_context_bundle_ref: withoutContextBundleRef,
+              decision_trail: contextDecisionHistory.map((entry) => ({
+                decision_id: entry.decision_id,
+                decision_ref: entry.decision_ref,
+                subject_ref: entry.subject_ref,
+                version: entry.version,
+                from_channel: entry.from_channel,
+                to_channel: entry.to_channel,
+                status: entry.status,
+                created_at: entry.created_at,
+              })),
+            },
+          }
+        : {}),
       evidence_bar: {
         required: [
           "validation-report",
@@ -626,6 +1155,9 @@ export function certifyAssetPromotion(options) {
           "finance-signals",
           ...(baselineComparisonRequired ? ["baseline-comparison", "regression-triage"] : []),
           ...(freezeGuardrailRequired ? ["freeze-guardrail"] : []),
+          ...(contextAssetEnabled
+            ? ["context-provenance", "context-update-freshness", "context-security-gate", "context-quality-comparison"]
+            : []),
         ],
         satisfied: [
           validationResult.validationReportPath ? "validation-report" : null,
@@ -639,6 +1171,10 @@ export function certifyAssetPromotion(options) {
             : null,
           freezeGuardrailSatisfied ? "freeze-guardrail" : null,
           replayResult.replayEvaluationReportPath ? "replay-evaluation-report" : null,
+          contextProvenanceComplete ? "context-provenance" : null,
+          contextUpdateStatus.outdated ? null : "context-update-freshness",
+          contextSecurityGateStatus === "pass" ? "context-security-gate" : null,
+          contextQualityComparisonComplete ? "context-quality-comparison" : null,
         ].filter((entry) => entry !== null),
       },
     },

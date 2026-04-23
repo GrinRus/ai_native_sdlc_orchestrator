@@ -489,6 +489,92 @@ test("listRuns aggregates finance evidence across multiple run profiles", () => 
   });
 });
 
+test("listRuns exposes context lifecycle status, provenance, and decision trail", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const runId = "run.context.lifecycle.v1";
+
+    writeContractFile({
+      family: "promotion-decision",
+      filePath: path.join(init.runtimeLayout.artifactsRoot, "promotion-decision-context-runner-v1.json"),
+      document: {
+        decision_id: `${init.projectId}.promotion.context.runner.v1`,
+        created_at: "2026-04-21T00:00:00.000Z",
+        run_id: runId,
+        linked_run_refs: [`run://${runId}`],
+        subject_ref: "context-bundle://context.bundle.runner.foundation@v1",
+        from_channel: "draft",
+        to_channel: "candidate",
+        evidence_refs: [init.stateFile],
+        evidence_summary: {
+          context_lifecycle: {
+            context_asset_ref: "context-bundle://context.bundle.runner.foundation@v1",
+            update_status: "initial",
+            outdated: false,
+            immutable_provenance_refs: ["compiled-context://compiled-context.aor-core.implement.runner-default"],
+            decision_trail: [],
+          },
+        },
+        status: "pass",
+      },
+    });
+
+    writeContractFile({
+      family: "promotion-decision",
+      filePath: path.join(init.runtimeLayout.artifactsRoot, "promotion-decision-context-runner-v2.json"),
+      document: {
+        decision_id: `${init.projectId}.promotion.context.runner.v2`,
+        created_at: "2026-04-22T00:00:00.000Z",
+        run_id: runId,
+        linked_run_refs: [`run://${runId}`],
+        subject_ref: "context-bundle://context.bundle.runner.foundation@v2",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [init.stateFile],
+        evidence_summary: {
+          context_lifecycle: {
+            context_asset_ref: "context-bundle://context.bundle.runner.foundation@v2",
+            update_status: "upgrade",
+            outdated: false,
+            immutable_provenance_refs: [
+              "compiled-context://compiled-context.aor-core.implement.runner-default",
+              "sha256://abc123",
+            ],
+            decision_trail: [
+              {
+                decision_id: `${init.projectId}.promotion.context.runner.v1`,
+                decision_ref: "evidence://artifacts/promotion-decision-context-runner-v1.json",
+                subject_ref: "context-bundle://context.bundle.runner.foundation@v1",
+                version: 1,
+                from_channel: "draft",
+                to_channel: "candidate",
+                status: "pass",
+                created_at: "2026-04-21T00:00:00.000Z",
+              },
+            ],
+          },
+        },
+        status: "pass",
+      },
+    });
+
+    const runs = listRuns({ projectRef: repoRoot, cwd: repoRoot });
+    const contextRun = runs.find((run) => run.run_id === runId);
+    assert.ok(contextRun);
+    assert.ok(
+      contextRun.context_lifecycle.context_asset_refs.includes("context-bundle://context.bundle.runner.foundation@v2"),
+    );
+    assert.ok(
+      contextRun.context_lifecycle.provenance_refs.includes(
+        "compiled-context://compiled-context.aor-core.implement.runner-default",
+      ),
+    );
+    assert.equal(contextRun.context_lifecycle.decision_trail.length >= 2, true);
+    assert.equal(contextRun.context_lifecycle.decision_trail.some((entry) => entry.version === 1), true);
+    assert.equal(contextRun.context_lifecycle.decision_trail.some((entry) => entry.version === 2), true);
+  });
+});
+
 test("selected-run history surfaces expose policy and event troubleshooting context", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });

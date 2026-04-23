@@ -77,11 +77,23 @@ Finance evidence parity should be carried in decision evidence:
 - `finance_signals.replay_latency_sec`
 - optional source fields (`max_cost_source`, `timeout_source`) for audit provenance.
 
+Context-asset lifecycle evidence should be explicit when `subject_ref` is a context asset (`context-bundle://`, `context-doc://`, `context-rule://`, `context-skill://`):
+- `context_lifecycle.context_asset_ref`
+- `context_lifecycle.context_asset_version`
+- `context_lifecycle.update_status` (`initial|upgrade|replay|outdated`)
+- `context_lifecycle.outdated` with optional `latest_known_version` / `superseded_by_version`
+- `context_lifecycle.immutable_provenance_refs` (compiled-context refs/files/hashes)
+- `context_lifecycle.security_gate_status` (`pass|hold|fail`) plus `security_findings` counts/case ids
+- `context_lifecycle.quality_comparison` with explicit `with_context` and `without_context` evidence refs/status/pass-rate
+- `context_lifecycle.decision_trail[]` with version/channel/status lineage for operator audits
+
 `evidence_bar.required` should include deterministic validation, evaluative artifacts, and finance signals when policy quality gate is required.
 For maturity transitions:
 - include `baseline-comparison` for `stable`, `frozen`, and `demoted`;
 - include `regression-triage` for `stable`, `frozen`, and `demoted`;
 - include `freeze-guardrail` for `frozen`.
+For context-asset transitions:
+- include `context-provenance`, `context-update-freshness`, `context-security-gate`, and `context-quality-comparison`.
 
 For MVP validation, `from_channel` and `to_channel` use this closed set:
 - `draft`
