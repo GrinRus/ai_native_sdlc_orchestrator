@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 
 const root = process.cwd();
 
@@ -232,6 +233,32 @@ for (const file of waveFiles) {
 }
 
 console.log(`backlog consistency ok: ${waveSliceIds.length} slices across ${waveFiles.length} waves`);
+
+const readme = read("README.md");
+const readmeCommandSurfaceMatch = readme.match(
+  /CLI command surface currently includes \*\*(\d+) implemented\*\* commands and \*\*(\d+) planned\*\* commands/u,
+);
+if (!readmeCommandSurfaceMatch) {
+  console.error("README command surface section must include implemented/planned command counts in the expected format.");
+  process.exit(1);
+}
+
+const commandCatalogModule = await import(pathToFileURL(path.join(root, "apps/cli/src/command-catalog.mjs")).href);
+const implementedCommandsCount = commandCatalogModule.getImplementedCommands().length;
+const plannedCommandsCount = commandCatalogModule.getPlannedCommands().length;
+const documentedImplementedCount = Number.parseInt(readmeCommandSurfaceMatch[1], 10);
+const documentedPlannedCount = Number.parseInt(readmeCommandSurfaceMatch[2], 10);
+
+if (documentedImplementedCount !== implementedCommandsCount || documentedPlannedCount !== plannedCommandsCount) {
+  console.error(
+    `README command surface counts are stale: documented ${documentedImplementedCount}/${documentedPlannedCount}, actual ${implementedCommandsCount}/${plannedCommandsCount}.`,
+  );
+  process.exit(1);
+}
+
+console.log(
+  `README command surface counts ok: ${implementedCommandsCount} implemented and ${plannedCommandsCount} planned commands.`,
+);
 
 const contractsTestDir = path.join(root, "packages/contracts/test");
 const contractsTestFiles = fs

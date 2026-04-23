@@ -29,7 +29,7 @@ What exists today:
 - root repository-integrity commands and CI for roadmap, guidance, and community-file consistency;
 - a documented live E2E target catalog built around public GitHub repositories.
 - implemented W5 operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and standard live E2E runner commands.
-- completed implementation backlog baseline (`38/38` slices marked `done`) with a green root gate baseline.
+- expanded implementation backlog through W9 slices with active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
 
 What does **not** exist yet:
 
@@ -123,52 +123,23 @@ At a high level, AOR is intended to work like this:
 
 ## Command surface status
 
-The CLI command surface currently includes **14 implemented** commands and **19 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
+The CLI command surface currently includes **31 implemented** commands and **3 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
 
-Implemented commands:
+Implemented command groups:
+- project lifecycle: `project init`, `project analyze`, `project validate`, `project verify`;
+- intake/discovery/spec/wave: `intake create`, `discovery run`, `spec build`, `wave create`;
+- run control and monitoring: `run start`, `run pause`, `run resume`, `run steer`, `run cancel`, `run status`;
+- quality and handoff: `eval run`, `harness certify`, `handoff prepare`, `handoff approve`;
+- delivery/release and operator reads: `deliver prepare`, `release prepare`, `packet show`, `evidence show`;
+- incidents and audit: `incident open`, `incident recertify`, `incident show`, `audit runs`;
+- UI and live rehearsal: `ui attach`, `ui detach`, `live-e2e start`, `live-e2e status`, `live-e2e report`.
 
-```bash
-aor project init [--project-ref <path>] [--project-profile <path>] [--runtime-root <path>]
-aor project analyze --project-ref <path> [--project-profile <path>] [--runtime-root <path>]
-aor project validate --project-ref <path> [--project-profile <path>] [--runtime-root <path>]
-aor project verify --project-ref <path> [--project-profile <path>] [--runtime-root <path>] [--require-validation-pass]
-aor eval run --project-ref <path> --subject-ref <subject_type://target> [--suite-ref <suite_id@vN>] [--subject-version <version>] [--project-profile <path>] [--runtime-root <path>]
-aor harness certify --project-ref <path> --asset-ref <asset://target> --subject-ref <subject_type://target> [--suite-ref <suite_id@vN>] [--step-class <step_class>] [--from-channel <channel>] [--to-channel <channel>] [--project-profile <path>] [--runtime-root <path>]
-aor handoff prepare --project-ref <path> [--project-profile <path>] [--runtime-root <path>] [--ticket-id <id>] [--approved-artifact <path>]
-aor handoff approve --project-ref <path> [--runtime-root <path>] [--handoff-packet <path>] --approval-ref <ref>
-aor run status --project-ref <path> [--runtime-root <path>] [--run-id <id>] [--follow <true|false>]
-aor packet show --project-ref <path> [--runtime-root <path>] [--family <contract_family|all>] [--limit <number>]
-aor evidence show --project-ref <path> [--runtime-root <path>] [--run-id <id>]
-aor live-e2e start --project-ref <path> --profile <path> [--runtime-root <path>] [--run-id <id>] [--hold-open <true|false>]
-aor live-e2e status --project-ref <path> --run-id <id> [--runtime-root <path>] [--abort <true|false>] [--reason <text>]
-aor live-e2e report --project-ref <path> --run-id <id> [--runtime-root <path>]
-```
+Planned commands:
+- `harness replay`
+- `asset promote`
+- `asset freeze`
 
-Planned command contracts:
-
-```bash
-aor intake create
-aor discovery run
-aor spec build
-aor wave create
-aor run start
-aor run pause
-aor run resume
-aor run steer
-aor run cancel
-aor harness replay
-aor asset promote
-aor asset freeze
-aor deliver prepare
-aor release prepare
-aor incident open
-aor incident show
-aor audit runs
-aor ui attach
-aor ui detach
-```
-
-Planned commands remain explicit roadmap items and are not fully implemented runtime flows yet.
+For exact command inputs/outputs and contract linkage, use `docs/architecture/14-cli-command-catalog.md`.
 
 ## Repository map
 
@@ -239,6 +210,10 @@ Detailed wave plans:
 - `docs/backlog/wave-3-implementation-slices.md`
 - `docs/backlog/wave-4-implementation-slices.md`
 - `docs/backlog/wave-5-implementation-slices.md`
+- `docs/backlog/wave-6-implementation-slices.md`
+- `docs/backlog/wave-7-implementation-slices.md`
+- `docs/backlog/wave-8-implementation-slices.md`
+- `docs/backlog/wave-9-implementation-slices.md`
 
 ## Contributing
 

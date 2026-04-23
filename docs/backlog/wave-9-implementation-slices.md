@@ -22,7 +22,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 
 ## W9-S01 — Run-scoped routed evidence durability bugfix
 - **Epic:** EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Prevent repeated routed executions in one runtime root from overwriting prior `step-result` and `compiled-context` evidence.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/architecture/**`
 - **Hard dependencies:** W8-S08
@@ -66,7 +66,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 4. Add or extend consistency checks where repo-entry drift can be validated automatically.
 
 ### Acceptance criteria
-1. `README.md` reports the actual `58/58` backlog state and `31 implemented / 3 planned` command surface.
+1. `README.md` reflects the actual backlog queue state and the current `31 implemented / 3 planned` command surface.
 2. Architecture overview docs no longer describe implemented apps/packages as merely planned.
 3. Technical-stack language clearly distinguishes target design from current runtime/scaffold reality.
 4. Updated docs stay consistent with the backlog, command catalog, and root checks.
@@ -239,7 +239,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 
 ## W9-S08 — First real provider adapter and live execution foundation
 - **Epic:** EPIC-3 Routed execution
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Add a first supported non-mock provider adapter baseline and unblock live routed execution for approved configurations.
 - **Primary modules:** `packages/adapter-sdk`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `examples/adapters/**`
 - **Hard dependencies:** W9-S01, W8-S03, W8-S08

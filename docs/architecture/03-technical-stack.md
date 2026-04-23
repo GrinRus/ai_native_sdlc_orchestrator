@@ -1,29 +1,31 @@
 # Technical stack
 
-## Primary implementation language
-**TypeScript** is the default language for AOR.
+## Current implementation baseline
 
-Why:
-- one language across API, CLI, workers, and web;
-- shared contracts and validators;
-- faster MVP delivery;
-- good fit for modern orchestration libraries and web tooling.
+The repository currently runs on a Node.js ESM JavaScript baseline:
+- Node.js runtime with `.mjs` modules across `apps/**` and `packages/**`;
+- pnpm workspace monorepo with repository-integrity gates and package/app tests;
+- headless-first control-plane behavior exposed through CLI plus module-backed API and detachable web surface;
+- `.aor/` runtime root for materialized reports, packets, manifests, and related evidence.
 
-Python may be used for optional offline utilities or experimental evaluators, but the core runtime should not depend on Python in MVP.
+## Target architecture stack (roadmap intent)
 
-## Runtime stack
-- **Node.js** for core runtime
-- **NestJS** for the control-plane API
-- **Temporal** for durable workflows, pause/resume, approvals, retries, and long-running jobs
-- **Next.js + React** for the detachable web console
-- **pnpm workspaces** for the AOR monorepo itself
+The long-term design target remains:
+- TypeScript-first runtime layers;
+- NestJS-backed detached control-plane transport;
+- Next.js + React detachable operator console;
+- Temporal-style durable orchestration for long-running workflow controls.
 
-## Storage and infrastructure
-- **PostgreSQL** for project, run, approval, promotion, and query state
-- **S3-compatible object storage** for evidence, logs, diffs, reports, and snapshots
-- **Redis** as optional cache or short-lived pub/sub layer, never as source of truth
-- **OpenTelemetry** for traces, metrics, and logs
-- **SSE-first live events** for the UI and operator surfaces
+These target components are design intent, not a claim that every runtime dependency is already active in the current repository.
+
+## Storage and infrastructure (target-oriented)
+
+Planned production-oriented infrastructure surfaces include:
+- PostgreSQL for run/query state;
+- S3-compatible evidence storage;
+- Redis as optional cache/pub-sub helper (not source of truth);
+- OpenTelemetry telemetry pipeline;
+- SSE-first operator event delivery.
 
 ## Execution environment
 - clean workspaces or worktrees;

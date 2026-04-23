@@ -16,8 +16,8 @@ This document explains how to navigate the AOR repository and where each kind of
 - `docs/backlog/**` — roadmap waves, epics, slices, local-task planning model, and dependency graph.
 - `docs/ops/**` — live E2E runbooks and operator procedures.
 - `examples/**` — example profiles, packets, routes, wrappers, prompt bundles, policies, adapters, and suites.
-- `apps/**` — planned API, CLI, and web surfaces.
-- `packages/**` — planned shared runtime modules.
+- `apps/**` — implemented API, CLI, and web surfaces with ongoing roadmap extensions.
+- `packages/**` — implemented shared runtime modules with ongoing roadmap extensions.
 - `.agents/skills/**` — reusable agent workflows for work inside this repo.
 - `.github/**` — CI workflow plus GitHub issue and PR templates.
 - `scripts/**` — repository-integrity checks used by local commands and CI.
