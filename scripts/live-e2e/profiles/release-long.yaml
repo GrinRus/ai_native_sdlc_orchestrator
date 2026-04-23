@@ -1,0 +1,92 @@
+profile_id: live-e2e.release.long
+version: 1
+flow_kind: release
+duration_class: long
+project_profile_template_ref: examples/project.github.aor.yaml
+scenario_id: nextjs-monorepo-release-long
+target_repo:
+  repo_id: target
+  repo_url: https://github.com/belgattitude/nextjs-monorepo-example.git
+  ref: main
+  checkout_strategy: shallow
+  write_target: patch-or-fork
+preflight:
+  mode: no-write
+  sequence:
+    - clone
+    - inspect
+    - analyze
+    - validate
+    - verify
+    - stop
+  prerequisites:
+    - node, corepack, and yarn available
+    - network access for shallow clone and workspace install
+  repo_shape_notes:
+    - public Next.js monorepo with workspace-wide checks
+  failure_safe_defaults:
+    - keep output_policy.write_back_to_remote set to false
+    - keep delivery mode in fork-first-pr for long public-target rehearsals
+  abort_conditions:
+    - repository clone fails or ref cannot be resolved
+    - workspace lint, typecheck, or unit tests fail during preflight verification
+    - release mode requires upstream writes
+  reusable_assumptions:
+    bootstrap: workspace bootstrap remains no-write
+    quality: review and qa stages assume verify gate passes before release steps
+    delivery: release packet and manifest can be generated without upstream push
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+objective:
+  title: Live E2E long release rehearsal on belgattitude/nextjs-monorepo-example
+  task_brief:
+    - run a bounded shared-package or app change in a public monorepo
+    - materialize delivery and release artifacts without upstream write-back
+    - keep execution scoped to fork or local outputs only
+  success_definition:
+    - execution, review, and qa complete with evidence
+    - workspace verification commands pass
+    - delivery manifest is materialized
+    - release packet is materialized
+stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - release
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  setup_commands:
+    - corepack enable
+    - yarn install
+  commands:
+    - yarn g:lint
+    - yarn g:typecheck
+    - yarn g:test-unit
+  eval_suites:
+    - suite.release.long@v1
+  harness:
+    enabled: false
+budgets:
+  wall_clock_limit_min: 60
+  max_changed_files: 16
+  max_cost_usd: 30
+approvals:
+  handoff: required
+  release: required
+output_policy:
+  materialize_release_packet: true
+  write_back_to_remote: false
+  preferred_delivery_mode: fork-first-pr
+ui:
+  attachable: true
+  default_scope: run

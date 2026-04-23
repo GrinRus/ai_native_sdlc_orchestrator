@@ -38,7 +38,6 @@ Current enum constraints:
 - eval and harness commands
 - delivery and release commands
 - incident and promotion commands
-- live E2E commands
 
 ## Query families
 - projects
@@ -48,7 +47,6 @@ Current enum constraints:
 - validation and evaluation reports
 - delivery manifests and release packets
 - incidents and promotion decisions
-- live E2E reports
 
 ## Read surface baseline (module operations)
 

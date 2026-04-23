@@ -30,9 +30,6 @@ Implemented commands:
   - aor incident recertify
   - aor incident show
   - aor audit runs
-  - aor live-e2e start
-  - aor live-e2e status
-  - aor live-e2e report
   - aor ui attach
   - aor ui detach
 

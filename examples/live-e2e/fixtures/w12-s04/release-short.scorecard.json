@@ -1,0 +1,24 @@
+{
+  "scorecard_id": "w12-s04.release-short.scorecard.target",
+  "run_id": "w12-s04.release-short",
+  "profile_ref": "scripts/live-e2e/profiles/release-short.yaml",
+  "profile_id": "live-e2e.release.short",
+  "scenario_id": "ky-release-short",
+  "flow_kind": "release",
+  "duration_class": "short",
+  "target_repo": {
+    "repo_id": "target",
+    "repo_url": "https://github.com/sindresorhus/ky.git",
+    "ref": "main"
+  },
+  "stage_counts": {
+    "pass": 10,
+    "fail": 0,
+    "pending": 0,
+    "skipped": 0
+  },
+  "status": "pass",
+  "summary_ref": ".aor/w12-s04-proof/runtime/projects/aor-core/reports/live-e2e-run-summary-w12-s04.release-short.json",
+  "command_count": 8,
+  "generated_at": "2026-04-23T18:26:43.287Z"
+}

@@ -1,6 +1,6 @@
 {
   "run_id": "live-e2e.regress.short.run-202604211530",
-  "profile_ref": "examples/live-e2e/regress-short.yaml",
+  "profile_ref": "scripts/live-e2e/profiles/regress-short.yaml",
   "profile_id": "live-e2e.regress.short",
   "scenario_id": "ky-regression-smoke",
   "flow_kind": "regress",

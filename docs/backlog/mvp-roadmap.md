@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-11-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-12-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -22,6 +22,7 @@ The authoritative planning model for implementation lives in:
 | W9 | Stabilize post-audit findings across routed evidence durability, source-of-truth docs, public quality surfaces, detached transport, and live execution foundations. | 8 | EPIC-0, EPIC-3, EPIC-4, EPIC-6 | `docs/backlog/wave-9-implementation-slices.md` |
 | W10 | Reopen production-facing gaps left after the baseline audit across external runner execution, networked fork-first delivery, detached mutation transport, and live target-catalog proof. | 5 | EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-10-implementation-slices.md` |
 | W11 | Close the remaining target-backed live E2E proof gap through source-of-truth repair, target-checkout execution, target-anchored delivery evidence, and refreshed external proof. | 5 | EPIC-0, EPIC-3, EPIC-5, EPIC-7 | `docs/backlog/wave-11-implementation-slices.md` |
+| W12 | Remove public live-E2E product surfaces, move rehearsal to an internal black-box harness, and refresh proof through installed-user style execution. | 4 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-12-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -64,6 +65,10 @@ The authoritative planning model for implementation lives in:
 | W11-S03 | productionization gap closure: profile-driven live preflight and routed execution (no direct story closure) |
 | W11-S04 | productionization gap closure: target-anchored delivery evidence (no direct story closure) |
 | W11-S05 | productionization gap closure: refreshed target-catalog proof bundle (no direct story closure) |
+| W12-S01 | public surface realignment and breaking removal planning (no direct story closure) |
+| W12-S02 | internal black-box installed-user harness (no direct story closure) |
+| W12-S03 | breaking CLI and contract removal (no direct story closure) |
+| W12-S04 | proof refresh after surface cleanup (no direct story closure) |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -195,7 +200,7 @@ The authoritative planning model for implementation lives in:
 - detached transport supports bounded authenticated mutation commands for connected operator clients
 - at least one regression target and one release-shaped target from the catalog have fresh live evidence produced through the external runner and real bounded delivery paths
 
-**Current status note:** `W10-S05` is now closed using the replacement `W11-S05` target-backed proof bundle at `examples/live-e2e/fixtures/w11-s05/w11-s05-evidence-bundle.json`. The closure evidence anchors execution and delivery lineage to cloned target checkouts rather than the AOR workspace.
+**Current status note:** `W10-S05` is now closed using the replacement target-backed proof bundles, with the latest black-box closure evidence at `examples/live-e2e/fixtures/w12-s04/w12-s04-evidence-bundle.json`. The closure evidence anchors execution and delivery lineage to cloned target checkouts rather than the AOR workspace.
 
 **Detailed slices:** `docs/backlog/wave-10-implementation-slices.md`
 
@@ -210,6 +215,23 @@ The authoritative planning model for implementation lives in:
 - fresh `regress-short` and `release-short` evidence bundles prove the target-backed flow without narrative-only assumptions
 
 **Detailed slices:** `docs/backlog/wave-11-implementation-slices.md`
+
+## W12 — public-surface removal and internal harness conversion
+**Goal:** Remove public `live-e2e` CLI and contract surfaces, move rehearsal to repo-maintainer-only tooling, and prove the same target scenarios through an internal installed-user black-box harness.
+
+**Exit criteria:**
+- public CLI/help/catalog/contracts no longer expose `live-e2e` command or profile surfaces
+- public project-profile examples no longer advertise `live_e2e_defaults`
+- internal rehearsal runs execute installed-user style through external `aor` subprocesses rather than direct runtime imports
+- refreshed proof bundles and runbooks use the internal black-box harness and no longer depend on removed `aor live-e2e *` commands
+
+**Closure evidence:**
+- internal harness: `scripts/live-e2e/run-profile.mjs`
+- black-box coverage: `scripts/test/live-e2e-harness.test.mjs`
+- refreshed operator runbooks: `docs/ops/live-e2e-standard-runner.md`, `docs/ops/live-e2e-learning-loop.md`, `docs/ops/live-e2e-no-write-preflight.md`
+- refreshed proof fixtures: `examples/live-e2e/fixtures/w10-s05/*.json`, `examples/live-e2e/fixtures/w11-s05/*.json`, `examples/live-e2e/fixtures/w12-s04/*.json`, `examples/live-e2e/fixtures/w7-s05/w7-governance-integration-rehearsal.sample.md`
+
+**Detailed slices:** `docs/backlog/wave-12-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

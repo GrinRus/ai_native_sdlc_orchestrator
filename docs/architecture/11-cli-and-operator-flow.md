@@ -12,8 +12,7 @@ The CLI is the primary operator surface for AOR. It must remain usable when the 
 6. inspect evidence and quality outputs
 7. launch eval or harness workflows
 8. prepare delivery or release output
-9. run live E2E rehearsals
-10. open incidents and review promotion decisions
+9. open incidents and review promotion decisions
 
 ## UX rules
 - commands should reflect the packet-first model;
@@ -22,3 +21,5 @@ The CLI is the primary operator surface for AOR. It must remain usable when the 
 - the CLI must surface run ids, packet ids, and evidence locations clearly.
 
 `aor project verify --routed-dry-run-step <step_class>` is the baseline smoke path for routed no-write execution and durable step-result emission.
+
+Installed-user proof for AOR itself runs through the internal `scripts/live-e2e/*` harness and is not part of the public CLI command surface.

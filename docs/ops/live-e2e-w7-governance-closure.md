@@ -4,15 +4,15 @@
 Run one repeatable rehearsal that links W7 quality governance evidence, incident context, and finance-oriented promotion evidence under a single run id.
 
 ## Profile
-Use `examples/live-e2e/w7-governance-integration.yaml`.
+Use `scripts/live-e2e/profiles/w7-governance-integration.yaml`.
 
 This profile keeps no-write safety defaults, forces learning-loop incident materialization, and emits release-shaped artifacts for closure audit review.
 
-## Start
+## Harness command
 ```bash
-aor live-e2e start \
+node ./scripts/live-e2e/run-profile.mjs \
   --project-ref . \
-  --profile ./examples/live-e2e/w7-governance-integration.yaml
+  --profile ./scripts/live-e2e/profiles/w7-governance-integration.yaml
 ```
 
 ## Verify integrated closure evidence

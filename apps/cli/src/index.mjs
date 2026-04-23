@@ -49,11 +49,6 @@ import {
   getImplementedCommands,
   getPlannedCommands,
 } from "./command-catalog.mjs";
-import {
-  abortStandardLiveE2ERun,
-  readStandardLiveE2ERun,
-  startStandardLiveE2ERun,
-} from "./live-e2e-runner.mjs";
 
 class CliUsageError extends Error {
   /**
@@ -163,10 +158,6 @@ function formatCommandHelp(definition) {
           ? "Status: implemented in incident/audit shell (W6-S06)"
         : definition.command === "ui attach" || definition.command === "ui detach"
           ? "Status: implemented in UI lifecycle shell (W6-S04)"
-          : definition.command === "live-e2e start" ||
-              definition.command === "live-e2e status" ||
-              definition.command === "live-e2e report"
-            ? "Status: implemented in live E2E shell (W5-S05)"
           : "Status: implemented in bootstrap shell (W1-S01)";
   const notes =
     definition.command === "project init"
@@ -376,24 +367,6 @@ function formatCommandHelp(definition) {
                         "- Use --run-id to scope one run or --limit for bounded list output.",
                         "- Audit output highlights incident/promotion lineage plus cost/latency signals for traceable governance follow-up.",
                       ]
-              : definition.command === "live-e2e start"
-                ? [
-                    "- This command starts one standard profile run and emits durable run summary + scorecard artifacts.",
-                    "- --hold-open=true leaves the run in running state for explicit abort and status rehearsal.",
-                    "- Start/observe/abort surfaces stay bounded to the same control-plane model.",
-                  ]
-                : definition.command === "live-e2e status"
-                  ? [
-                      "- By default this command is read-only status/report for one run summary.",
-                      "- --abort=true issues a bounded abort request for a non-terminal run.",
-                      "- Abort uses the same live-run-event contract and does not require web UI attachment.",
-                    ]
-                : definition.command === "live-e2e report"
-                  ? [
-                      "- This command is read-only and returns run summary plus per-target scorecards.",
-                      "- Report output is durable and sourced from runtime report artifacts.",
-                      "- Use status --abort for intervention; report itself is observation-only.",
-                    ]
                   : definition.command === "ui attach"
                     ? [
                         "- Attach records explicit UI lifecycle state in runtime state artifacts.",
@@ -845,14 +818,6 @@ function executeImplementedCommand(command, flags, cwd) {
   let promotionDecisions = null;
   let readOnly = null;
   let futureControlHooks = null;
-  let liveE2EProfileRef = null;
-  let liveE2ERunId = null;
-  let liveE2ERunStatus = null;
-  let liveE2ERunSummaryFile = null;
-  let liveE2EScorecardFiles = null;
-  let liveE2EScorecards = null;
-  let liveE2EAbortApplied = null;
-  let liveE2EAbortSupported = null;
   let runControlAction = null;
   let runControlRunId = null;
   let runControlState = null;
@@ -2254,114 +2219,6 @@ function executeImplementedCommand(command, flags, cwd) {
           "incident show --run-id <id>",
           "incident recertify --incident-id <id> --decision recertify",
         ];
-  } else if (command === "live-e2e start") {
-    ensureRequiredFlags(command, flags);
-    const holdOpen = resolveOptionalBooleanFlag("hold-open", flags["hold-open"]);
-    const profileRef = /** @type {string} */ (
-      resolveOptionalStringFlag("profile", flags.profile)
-    );
-
-    const started = startStandardLiveE2ERun({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-      profileRef,
-      runId: resolveOptionalStringFlag("run-id", flags["run-id"]),
-      holdOpen,
-    });
-
-    const projectState = readProjectState({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    });
-    resolvedProjectRef = projectState.project_root;
-    resolvedRuntimeRoot = projectState.runtime_root;
-    runtimeLayout = projectState.runtime_layout;
-    runtimeStateFile = projectState.state_file;
-    projectProfileRef = projectState.project_profile_ref;
-
-    liveE2EProfileRef = profileRef;
-    liveE2ERunId = started.runId;
-    liveE2ERunStatus = started.summary.status;
-    liveE2ERunSummaryFile = started.summaryFile;
-    liveE2EScorecardFiles = started.scorecardFiles;
-    liveE2EScorecards = started.scorecards;
-    liveE2EAbortSupported = true;
-    readOnly = false;
-    futureControlHooks = ["live-e2e status --abort true", "live-e2e report", "ui attach", "ui detach"];
-  } else if (command === "live-e2e status") {
-    ensureRequiredFlags(command, flags);
-    const abortRequested = resolveOptionalBooleanFlag("abort", flags.abort);
-    const runId = /** @type {string} */ (resolveOptionalStringFlag("run-id", flags["run-id"]));
-    const reason = resolveOptionalStringFlag("reason", flags.reason);
-
-    const statusResult = abortRequested
-      ? abortStandardLiveE2ERun({
-          cwd,
-          projectRef: /** @type {string} */ (flags["project-ref"]),
-          runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-          runId,
-          reason,
-        })
-      : readStandardLiveE2ERun({
-          cwd,
-          projectRef: /** @type {string} */ (flags["project-ref"]),
-          runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-          runId,
-        });
-
-    const projectState = readProjectState({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    });
-    resolvedProjectRef = projectState.project_root;
-    resolvedRuntimeRoot = projectState.runtime_root;
-    runtimeLayout = projectState.runtime_layout;
-    runtimeStateFile = projectState.state_file;
-    projectProfileRef = projectState.project_profile_ref;
-
-    liveE2ERunId = runId;
-    liveE2ERunStatus = statusResult.summary.status;
-    liveE2ERunSummaryFile = statusResult.summaryFile;
-    liveE2EScorecardFiles = statusResult.scorecardFiles;
-    liveE2EScorecards = statusResult.scorecards;
-    liveE2EAbortApplied = "abortApplied" in statusResult ? statusResult.abortApplied : false;
-    liveE2EAbortSupported = true;
-    readOnly = !abortRequested;
-    futureControlHooks = abortRequested
-      ? ["live-e2e report", "ui attach", "ui detach"]
-      : ["live-e2e status --abort true", "live-e2e report", "ui attach", "ui detach"];
-  } else if (command === "live-e2e report") {
-    ensureRequiredFlags(command, flags);
-    const runId = /** @type {string} */ (resolveOptionalStringFlag("run-id", flags["run-id"]));
-    const reportResult = readStandardLiveE2ERun({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-      runId,
-    });
-
-    const projectState = readProjectState({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    });
-    resolvedProjectRef = projectState.project_root;
-    resolvedRuntimeRoot = projectState.runtime_root;
-    runtimeLayout = projectState.runtime_layout;
-    runtimeStateFile = projectState.state_file;
-    projectProfileRef = projectState.project_profile_ref;
-
-    liveE2ERunId = runId;
-    liveE2ERunStatus = reportResult.summary.status;
-    liveE2ERunSummaryFile = reportResult.summaryFile;
-    liveE2EScorecardFiles = reportResult.scorecardFiles;
-    liveE2EScorecards = reportResult.scorecards;
-    liveE2EAbortSupported = true;
-    readOnly = true;
-    futureControlHooks = ["live-e2e status --abort true", "ui attach", "ui detach"];
   } else if (command === "ui attach") {
     ensureRequiredFlags(command, flags);
     const uiAttachResult = attachUiLifecycle({
@@ -2569,14 +2426,6 @@ function executeImplementedCommand(command, flags, cwd) {
     promotion_decisions: promotionDecisions,
     read_only: readOnly,
     future_control_hooks: futureControlHooks,
-    live_e2e_profile_ref: liveE2EProfileRef,
-    live_e2e_run_id: liveE2ERunId,
-    live_e2e_run_status: liveE2ERunStatus,
-    live_e2e_run_summary_file: liveE2ERunSummaryFile,
-    live_e2e_scorecard_files: liveE2EScorecardFiles,
-    live_e2e_scorecards: liveE2EScorecards,
-    live_e2e_abort_applied: liveE2EAbortApplied,
-    live_e2e_abort_supported: liveE2EAbortSupported,
     contract_families: resolvedFamilies,
     command_catalog_alignment: "docs/architecture/14-cli-command-catalog.md",
   };

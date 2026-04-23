@@ -1,6 +1,6 @@
 # AGENTS.md
 
-CLI is the primary operator surface for bootstrap, runs, delivery, evaluation, harness, and live E2E.
+CLI is the primary operator surface for bootstrap, runs, delivery, evaluation, harness, incidents, and UI lifecycle.
 
 ## Owns
 - `aor project *`
@@ -8,7 +8,6 @@ CLI is the primary operator surface for bootstrap, runs, delivery, evaluation, h
 - `aor deliver *`
 - `aor eval *`
 - `aor harness *`
-- `aor live-e2e *`
 - `aor ui *`
 
 ## Rules

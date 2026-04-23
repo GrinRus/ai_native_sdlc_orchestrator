@@ -27,7 +27,7 @@ AOR covers the full SDLC control flow for software delivery:
 - one bounded project at a time;
 - monolith or bounded multirepo topology;
 - multiple runner backends through adapters;
-- live E2E profiles on selected public repositories;
+- internal installed-user rehearsal coverage on selected public repositories;
 - explicit approvals and delivery artifacts.
 
 ## Out of scope for MVP

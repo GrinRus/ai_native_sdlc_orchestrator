@@ -1,7 +1,7 @@
 # Project profile
 
 ## Purpose
-Persistent configuration for one target project, including repos, allowed providers/adapters, committed runtime asset roots, default routes, wrappers, prompt bundles, context bundles, policies, budgets, security rules, runtime defaults, and live-E2E defaults.
+Persistent configuration for one target project, including repos, allowed providers/adapters, committed runtime asset roots, default routes, wrappers, prompt bundles, context bundles, policies, budgets, security rules, and runtime defaults.
 
 ## Required fields
 - `project_id`

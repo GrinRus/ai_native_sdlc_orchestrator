@@ -100,7 +100,7 @@ Expected W10-S01 signals:
 - successful path records external runner metadata and raw execution evidence reference under `adapter_response.output.external_runner`;
 - missing command/runtime prerequisites produce `failure_kind=missing-prerequisite` without synthetic success;
 - delivery guardrails continue to block execution when required approval/promotion evidence is missing.
-- the standard `aor live-e2e start` runner reuses the same branch signatures and exposes routed evidence via `routed_step_result_file`, `compiled_context_ref`, and `adapter_raw_evidence_ref`.
+- the internal `node ./scripts/live-e2e/run-profile.mjs` harness reuses the same branch signatures and exposes routed evidence via `routed_step_result_file`, `compiled_context_ref`, and `adapter_raw_evidence_ref`.
 
 Evidence fixtures captured for this procedure:
 - `examples/live-e2e/fixtures/w10-s01/external-live-adapter-transcript.json`
@@ -179,6 +179,6 @@ Abort the rehearsal when any of these conditions occur:
 
 ## Related artifacts
 - Target catalog: `docs/ops/live-e2e-target-catalog.md`
-- Profiles: `examples/live-e2e/*.yaml`
+- Profiles: `scripts/live-e2e/profiles/*.yaml`
 - Quality rehearsal runbook: `docs/ops/live-e2e-quality-rehearsal.md`
 - Runbooks: `docs/ops/live-e2e-regress-short.md`, `docs/ops/live-e2e-regress-long.md`, `docs/ops/live-e2e-release-short.md`, `docs/ops/live-e2e-release-long.md`

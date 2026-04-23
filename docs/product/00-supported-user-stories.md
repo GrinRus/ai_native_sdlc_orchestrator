@@ -76,7 +76,7 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Watch live run state in CLI or web.
 - Tail logs, view live events, and inspect policy plus compile decisions.
 - Approve risky actions and replay failures through harness.
-- Run standard live E2E profiles on real repositories.
+- Review installed-user rehearsal evidence produced by the internal black-box harness on real repositories.
 
 ### Security / compliance
 - Enforce provider and adapter allowlists.
