@@ -239,7 +239,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 
 ## W9-S08 — First real provider adapter and live execution foundation
 - **Epic:** EPIC-3 Routed execution
-- **State:** ready
+- **State:** done
 - **Outcome:** Add a first supported non-mock provider adapter baseline and unblock live routed execution for approved configurations.
 - **Primary modules:** `packages/adapter-sdk`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `examples/adapters/**`
 - **Hard dependencies:** W9-S01, W8-S03, W8-S08
