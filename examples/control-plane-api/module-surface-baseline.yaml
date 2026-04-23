@@ -1,0 +1,62 @@
+api_id: control-plane.api.module-surface
+version: 1
+binding_mode: module-in-process
+deferred_transport_status: planned
+
+read_operations:
+  - operation_id: read.project-state
+    operation_family: read
+    output_contract_families:
+      - project-profile
+      - artifact-packet
+      - step-result
+      - promotion-decision
+  - operation_id: read.run-history
+    operation_family: read
+    output_contract_families:
+      - live-run-event
+      - step-result
+      - delivery-plan
+
+run_control_operations:
+  - operation_id: run.start
+    action: start
+    audit_contract_family: live-run-event
+  - operation_id: run.pause
+    action: pause
+    audit_contract_family: live-run-event
+  - operation_id: run.resume
+    action: resume
+    audit_contract_family: live-run-event
+  - operation_id: run.steer
+    action: steer
+    audit_contract_family: live-run-event
+  - operation_id: run.cancel
+    action: cancel
+    audit_contract_family: live-run-event
+
+ui_lifecycle_operations:
+  - operation_id: ui.attach
+    headless_safe: true
+  - operation_id: ui.detach
+    headless_safe: true
+  - operation_id: ui.state
+    headless_safe: true
+
+live_event_operations:
+  - operation_id: run.events.follow
+    event_contract_family: live-run-event
+    replay_supported: true
+    backpressure: bounded-replay-window
+
+deferred_transport:
+  owning_slice: W9-S07
+  planned_mappings:
+    - GET /api/projects/:projectId/state
+    - GET /api/projects/:projectId/packets
+    - GET /api/projects/:projectId/step-results
+    - GET /api/projects/:projectId/quality-artifacts
+    - GET /api/projects/:projectId/runs
+    - GET /api/projects/:projectId/runs/:runId/events/history
+    - GET /api/projects/:projectId/runs/:runId/policy-history
+    - GET /api/projects/:projectId/runs/:runId/events

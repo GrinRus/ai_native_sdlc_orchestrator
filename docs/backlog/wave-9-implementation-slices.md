@@ -177,7 +177,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 
 ## W9-S06 — Asset promote/freeze command surface completion
 - **Epic:** EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Implement public `aor asset promote` and `aor asset freeze` command surfaces backed by existing promotion/freeze evidence and governance rules.
 - **Primary modules:** `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`, `examples/eval/**`
 - **Hard dependencies:** W7-S02, W8-S09

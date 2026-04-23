@@ -299,20 +299,31 @@ test("context assets require metadata and source reference fields in the support
   );
 });
 
-test("returns explicit limitation for unsupported narrative-only contract families", () => {
+test("control-plane API baseline example loads through the shared contract path", () => {
+  const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
+  assert.equal(loaded.ok, true, "expected control-plane-api baseline example to load");
+});
+
+test("control-plane API contract rejects invalid binding mode", () => {
+  const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.binding_mode = "detached-http";
+
   const validation = validateContractDocument({
     family: "control-plane-api",
-    document: {},
-    source: "docs/contracts/control-plane-api.md",
+    document: candidate,
+    source: "test://control-plane-api-invalid-binding-mode",
   });
 
   assert.equal(validation.ok, false);
-  const limitationIssue = validation.issues.find((problem) => problem.code === "contract_family_limitation");
-  assert.ok(limitationIssue, "expected contract_family_limitation issue");
-  assert.ok(
-    limitationIssue.message.includes("TODO"),
-    "expected limitation issue to include explicit TODO guidance",
+  const enumIssue = validation.issues.find(
+    (problem) => problem.code === "enum_value_invalid" && problem.field === "binding_mode",
   );
+  assert.ok(enumIssue, "expected enum_value_invalid for binding_mode");
 });
 
 test("live-e2e profile requires preflight block", () => {
@@ -377,5 +388,6 @@ test("contract index mapping covers every docs/contracts/00-index entry", () => 
 
   const controlPlaneEntry = familyIndex.find((entry) => entry.family === "control-plane-api");
   assert.ok(controlPlaneEntry, "expected control-plane-api in family index");
-  assert.equal(controlPlaneEntry.status, "limitation");
+  assert.equal(controlPlaneEntry.status, "implemented");
+  assert.equal(controlPlaneEntry.exampleGlob, "examples/control-plane-api/*.yaml");
 });

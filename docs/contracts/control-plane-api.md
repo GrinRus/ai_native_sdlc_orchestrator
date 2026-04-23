@@ -16,6 +16,20 @@ Implemented operation families:
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
 - live events: append/read/open stream using the `live-run-event` contract family.
 
+## Machine-checkable baseline (W9-S04)
+
+The `control-plane-api` family is loader-covered with a machine-checkable baseline example:
+- `examples/control-plane-api/module-surface-baseline.yaml`
+
+Required top-level fields in the loader baseline:
+- `api_id`, `version`, `binding_mode`, `deferred_transport_status`;
+- `read_operations`, `run_control_operations`, `ui_lifecycle_operations`, `live_event_operations`;
+- `deferred_transport`.
+
+Current enum constraints:
+- `binding_mode=module-in-process` for the current runtime reality;
+- `deferred_transport_status=planned` until detached transport is implemented in `W9-S07`.
+
 ## Command families
 - project bootstrap commands
 - intake and planning commands
