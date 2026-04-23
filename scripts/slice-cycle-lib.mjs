@@ -115,7 +115,7 @@ function sortByOrder(ids, orderIndex) {
 }
 
 export function parseMasterBacklog(content) {
-  const rows = [...content.matchAll(/^\|\s*(W\d-S\d+)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(ready|blocked|active|done)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*$/gm)];
+  const rows = [...content.matchAll(/^\|\s*(W\d+-S\d+)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(ready|blocked|active|done)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*$/gm)];
   const slices = new Map();
 
   for (const row of rows) {
@@ -153,7 +153,7 @@ export function parseTopologicalOrder(content) {
   const nextHeadingIndex = afterHeading.indexOf("\n## ");
   const sectionBody = nextHeadingIndex >= 0 ? afterHeading.slice(0, nextHeadingIndex) : afterHeading;
 
-  const order = [...sectionBody.matchAll(/^\d+\.\s+(W\d-S\d+)\s*$/gm)].map((match) => match[1]);
+  const order = [...sectionBody.matchAll(/^\d+\.\s+(W\d+-S\d+)\s*$/gm)].map((match) => match[1]);
   if (order.length === 0) {
     throw new Error("Topological order section does not list any slice ids.");
   }
@@ -162,7 +162,7 @@ export function parseTopologicalOrder(content) {
 }
 
 export function parseDependencyRows(content) {
-  const rows = [...content.matchAll(/^\|\s*(W\d-S\d+)\s*\|\s*([^|]+?)\s*\|\s*$/gm)];
+  const rows = [...content.matchAll(/^\|\s*(W\d+-S\d+)\s*\|\s*([^|]+?)\s*\|\s*$/gm)];
   const dependencies = new Map();
 
   for (const row of rows) {
@@ -180,7 +180,7 @@ export function parseDependencyRows(content) {
 }
 
 export function parseWaveSlices(content, waveFile) {
-  const headingRegex = /^##\s+(W\d-S\d+)\s+—\s+(.+)$/gm;
+  const headingRegex = /^##\s+(W\d+-S\d+)\s+—\s+(.+)$/gm;
   const matches = [...content.matchAll(headingRegex)];
   const slices = new Map();
 

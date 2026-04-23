@@ -72,6 +72,11 @@ flowchart TB
   W9S06[W9-S06 Asset promote/freeze command surface completion]
   W9S07[W9-S07 Detached HTTP control-plane transport baseline]
   W9S08[W9-S08 First real provider adapter and live execution foundation]
+  W10S01[W10-S01 External live adapter execution baseline]
+  W10S02[W10-S02 Networked fork-first delivery execution]
+  W10S03[W10-S03 Detached transport mutation command baseline]
+  W10S04[W10-S04 Detached transport authn/authz hardening baseline]
+  W10S05[W10-S05 Externally verified live E2E target-catalog proof]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -201,6 +206,15 @@ flowchart TB
   W9S01 --> W9S08
   W8S03 --> W9S08
   W8S08 --> W9S08
+  W9S08 --> W10S01
+  W4S04 --> W10S02
+  W6S05 --> W10S02
+  W9S07 --> W10S03
+  W6S03 --> W10S03
+  W6S04 --> W10S03
+  W10S03 --> W10S04
+  W10S01 --> W10S05
+  W10S02 --> W10S05
 ```
 
 ## W0 hard dependencies
@@ -309,6 +323,15 @@ flowchart TB
 | W9-S07 | W9-S03, W9-S04 |
 | W9-S08 | W9-S01, W8-S03, W8-S08 |
 
+## W10 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W10-S01 | W9-S08 |
+| W10-S02 | W4-S04, W6-S05 |
+| W10-S03 | W9-S07, W6-S03, W6-S04 |
+| W10-S04 | W10-S03 |
+| W10-S05 | W10-S01, W10-S02 |
+
 ## Topological order
 1. W0-S01
 2. W0-S04
@@ -376,6 +399,11 @@ flowchart TB
 64. W9-S04
 65. W9-S07
 66. W9-S08
+67. W10-S01
+68. W10-S02
+69. W10-S03
+70. W10-S04
+71. W10-S05
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

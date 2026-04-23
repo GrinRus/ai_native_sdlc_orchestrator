@@ -28,6 +28,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W2:** `W2-S01` Route registry and step resolution kernel; `W2-S02` Wrapper, prompt-bundle, and asset loader runtime; `W2-S03` Step policy resolution, budgets, and guardrails; `W2-S04` Adapter SDK and mock adapter baseline; `W2-S05` Routed step execution engine and durable step results
 - **W8:** `W8-S03` Later delivery and security route-governance maturity; `W8-S08` Runtime context compiler and adapter-context injection
 - **W9:** `W9-S01` Run-scoped routed evidence durability bugfix; `W9-S08` First real provider adapter and live execution foundation
+- **W10:** `W10-S01` External live adapter execution baseline
 
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -46,6 +47,7 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W4:** `W4-S01` Isolated worktree and workspace execution foundation; `W4-S02` Delivery planning and write-back mode policy; `W4-S03` Patch and local branch delivery driver; `W4-S04` Fork-first GitHub PR delivery driver; `W4-S05` Delivery manifest and release packet materialization
 - **W6:** `W6-S05` Delivery/release prepare command pack
 - **W8:** `W8-S07` Later multi-repo, bootstrap, and delivery rerun maturity
+- **W10:** `W10-S02` Networked fork-first delivery execution
 
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
@@ -56,6 +58,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W6:** `W6-S02` Intake/discovery/spec/wave command pack; `W6-S03` Run-control command pack with policy and audit guardrails; `W6-S04` UI attach/detach lifecycle command pack
 - **W8:** `W8-S01` Sponsor and planner strategic visibility expansion; `W8-S04` Later operator event and policy visibility expansion
 - **W9:** `W9-S03` Control-plane API contract/runtime alignment; `W9-S04` Machine-checkable control-plane API contract coverage; `W9-S07` Detached HTTP control-plane transport baseline
+- **W10:** `W10-S03` Detached transport mutation command baseline; `W10-S04` Detached transport authn/authz hardening baseline
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -70,3 +73,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W6:** `W6-S06` Incident and audit command pack
 - **W7:** `W7-S03` Incident recertification and controlled re-enable flow; `W7-S04` Finance evidence and audit durability expansion; `W7-S05` MVP+ governance and learning-loop integration closure
 - **W8:** `W8-S06` Later incident and platform recertification maturity
+- **W10:** `W10-S05` Externally verified live E2E target-catalog proof

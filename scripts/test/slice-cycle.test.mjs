@@ -57,6 +57,12 @@ test("loadBacklogModel and summarizeStates stay coherent", () => {
   assert.equal(summary.total, summary.ready + summary.blocked + summary.active + summary.done);
 });
 
+test("loadBacklogModel supports multi-digit wave ids", () => {
+  const model = loadBacklogModel(process.cwd());
+  assert.equal(model.slices.has("W10-S01"), true);
+  assert.equal(model.slices.has("W10-S05"), true);
+});
+
 test("selectNextSlice prefers earliest ready slice in topological order", () => {
   const model = buildSyntheticModel(
     [

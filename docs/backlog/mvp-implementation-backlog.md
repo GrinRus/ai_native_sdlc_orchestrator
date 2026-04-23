@@ -114,5 +114,14 @@ This is the master index for the implementation slices across all defined waves.
 | W9-S07 | Detached HTTP control-plane transport baseline | EPIC-6 | done | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**` | W9-S03, W9-S04 |
 | W9-S08 | First real provider adapter and live execution foundation | EPIC-3 | done | `packages/adapter-sdk`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `examples/adapters/**` | W9-S01, W8-S03, W8-S08 |
 
+## W10 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W10-S01 | External live adapter execution baseline | EPIC-3 | ready | `packages/adapter-sdk`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `examples/adapters/**`, `docs/ops/**` | W9-S08 |
+| W10-S02 | Networked fork-first delivery execution | EPIC-5 | ready | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/ops/**` | W4-S04, W6-S05 |
+| W10-S03 | Detached transport mutation command baseline | EPIC-6 | ready | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W9-S07, W6-S03, W6-S04 |
+| W10-S04 | Detached transport authn/authz hardening baseline | EPIC-6 | blocked | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W10-S03 |
+| W10-S05 | Externally verified live E2E target-catalog proof | EPIC-7 | blocked | `docs/ops/**`, `examples/live-e2e/**`, `apps/cli`, `packages/observability`, `docs/backlog/**` | W10-S01, W10-S02 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-9-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-10-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -20,6 +20,7 @@ The authoritative planning model for implementation lives in:
 | W7 | Close MVP+ governance and quality stories for certification, finance evidence, and learning-loop integration. | 5 | EPIC-4, EPIC-7 | `docs/backlog/wave-7-implementation-slices.md` |
 | W8 | Close later-maturity stories for strategic operator visibility, governance hardening, context lifecycle maturity, and multi-repo delivery maturity. | 9 | EPIC-1, EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-8-implementation-slices.md` |
 | W9 | Stabilize post-audit findings across routed evidence durability, source-of-truth docs, public quality surfaces, detached transport, and live execution foundations. | 8 | EPIC-0, EPIC-3, EPIC-4, EPIC-6 | `docs/backlog/wave-9-implementation-slices.md` |
+| W10 | Reopen production-facing gaps left after the baseline audit across external runner execution, networked fork-first delivery, detached mutation transport, and live target-catalog proof. | 5 | EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-10-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -52,6 +53,11 @@ The authoritative planning model for implementation lives in:
 | W9-S06 | post-audit promotion surface completion (no direct story closure) |
 | W9-S07 | post-audit transport baseline feature (no direct story closure) |
 | W9-S08 | post-audit live execution baseline feature (no direct story closure) |
+| W10-S01 | productionization gap closure: external live adapter execution (no direct story closure) |
+| W10-S02 | productionization gap closure: networked fork-first delivery (no direct story closure) |
+| W10-S03 | productionization gap closure: detached mutation transport (no direct story closure) |
+| W10-S04 | productionization gap closure: detached transport auth hardening (no direct story closure) |
+| W10-S05 | productionization gap closure: external live target-catalog proof (no direct story closure) |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -173,6 +179,17 @@ The authoritative planning model for implementation lives in:
 - a first supported non-mock adapter can execute live routed work under explicit guardrails
 
 **Detailed slices:** `docs/backlog/wave-9-implementation-slices.md`
+
+## W10 — production-facing execution and delivery proof
+**Goal:** Convert the current baselines into externally exercised runtime paths so the backlog once again reflects the remaining work between implementation baseline and production-facing proof.
+
+**Exit criteria:**
+- the supported live adapter path invokes an external runner rather than returning an in-process deterministic success envelope
+- fork-first delivery can perform bounded GitHub fork/branch/PR draft writes when approvals and credentials are present, while preserving safe planning-only fallbacks
+- detached transport supports bounded authenticated mutation commands for connected operator clients
+- at least one regression target and one release-shaped target from the catalog have fresh live evidence produced through the external runner and real bounded delivery paths
+
+**Detailed slices:** `docs/backlog/wave-10-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

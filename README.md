@@ -29,7 +29,8 @@ What exists today:
 - root repository-integrity commands and CI for roadmap, guidance, and community-file consistency;
 - a documented live E2E target catalog built around public GitHub repositories.
 - implemented W5 operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and standard live E2E runner commands.
-- expanded implementation backlog through W9 slices with active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
+- expanded implementation backlog through W10 slices with active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
+- reopened post-audit productionization queue for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and fresh target-catalog proof.
 - first live routed execution baseline for supported `codex-cli` adapter paths with explicit delivery-guardrail blocking semantics.
 
 What does **not** exist yet:
@@ -213,6 +214,7 @@ Detailed wave plans:
 - `docs/backlog/wave-7-implementation-slices.md`
 - `docs/backlog/wave-8-implementation-slices.md`
 - `docs/backlog/wave-9-implementation-slices.md`
+- `docs/backlog/wave-10-implementation-slices.md`
 
 ## Contributing
 

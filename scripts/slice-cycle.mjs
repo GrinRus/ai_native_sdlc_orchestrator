@@ -211,7 +211,7 @@ function executeNext(args) {
 
 function executePlan(args) {
   const asJson = hasFlag(args, "--json");
-  const explicitSliceId = args.find((item) => /^W\d-S\d+$/.test(item));
+  const explicitSliceId = args.find((item) => /^W\d+-S\d+$/.test(item));
 
   const model = loadBacklogModel(process.cwd());
 

@@ -56,7 +56,7 @@ function discoverWaveFiles() {
 const waveFiles = discoverWaveFiles();
 
 function parseWaveSlices(content) {
-  const regex = /^## (W\d-S\d+) — .+$/gm;
+  const regex = /^## (W\d+-S\d+) — .+$/gm;
   const matches = [...content.matchAll(regex)];
   const sections = new Map();
 
@@ -119,9 +119,9 @@ for (const file of waveFiles) {
 const waveSliceIds = [...waveSectionMap.keys()].sort();
 
 const masterBacklog = read("docs/backlog/mvp-implementation-backlog.md");
-const masterSliceIds = [...masterBacklog.matchAll(/^\| (W\d-S\d+) \|/gm)].map((match) => match[1]);
+const masterSliceIds = [...masterBacklog.matchAll(/^\| (W\d+-S\d+) \|/gm)].map((match) => match[1]);
 const uniqueMasterSliceIds = [...new Set(masterSliceIds)].sort();
-const masterRows = [...masterBacklog.matchAll(/^\| (W\d-S\d+) \| ([^|]+) \| ([^|]+) \| (ready|blocked|active|done) \| ([^|]+) \| ([^|]+) \|$/gm)];
+const masterRows = [...masterBacklog.matchAll(/^\| (W\d+-S\d+) \| ([^|]+) \| ([^|]+) \| (ready|blocked|active|done) \| ([^|]+) \| ([^|]+) \|$/gm)];
 const masterSliceMap = new Map();
 for (const row of masterRows) {
   const sliceId = row[1];
@@ -142,11 +142,11 @@ for (const row of masterRows) {
 }
 
 const epicMap = read("docs/backlog/orchestrator-epics.md");
-const epicSliceIds = [...epicMap.matchAll(/`(W\d-S\d+)`/gm)].map((match) => match[1]);
+const epicSliceIds = [...epicMap.matchAll(/`(W\d+-S\d+)`/gm)].map((match) => match[1]);
 const uniqueEpicSliceIds = [...new Set(epicSliceIds)].sort();
 
 const depGraph = read("docs/backlog/slice-dependency-graph.md");
-const depSliceIds = [...depGraph.matchAll(/^\| (W\d-S\d+) \|/gm)].map((match) => match[1]);
+const depSliceIds = [...depGraph.matchAll(/^\| (W\d+-S\d+) \|/gm)].map((match) => match[1]);
 const uniqueDepSliceIds = [...new Set(depSliceIds)].sort();
 
 function sameSet(a, b) {
@@ -168,7 +168,7 @@ if (!sameSet(waveSliceIds, uniqueDepSliceIds)) {
   process.exit(1);
 }
 
-const depLines = depGraph.split("\n").filter((line) => /^\| W\d-S\d+ \|/.test(line));
+const depLines = depGraph.split("\n").filter((line) => /^\| W\d+-S\d+ \|/.test(line));
 const depSliceMap = new Map();
 for (const line of depLines) {
   const cells = line.split("|").map((cell) => cell.trim()).filter(Boolean);
