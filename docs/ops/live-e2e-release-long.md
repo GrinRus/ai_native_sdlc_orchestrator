@@ -44,11 +44,11 @@ Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
 - `yarn g:lint`, `yarn g:typecheck`, or `yarn g:test-unit` fails in preflight.
 - Delivery or release stage requests upstream write-back.
 
-## Start command
+## Harness command
 ```bash
-aor live-e2e start \
+node ./scripts/live-e2e/run-profile.mjs \
   --project-ref . \
-  --profile ./examples/live-e2e/release-long.yaml
+  --profile ./scripts/live-e2e/profiles/release-long.yaml
 ```
 
 ## Expected verification

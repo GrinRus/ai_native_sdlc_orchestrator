@@ -35,9 +35,6 @@ This catalog separates bootstrap commands implemented in the current shell from 
 | `aor incident recertify` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--incident-id <id>`; `--decision <recertify\|hold\|re-enable>` (optional); `--promotion-ref <evidence://...>` (optional); `--run-id <id>` (optional); `--reason <text>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `incident_id`, `incident_file`, `incident_status`, `incident_run_ref`, `incident_linked_asset_refs`, `incident_recertification_decision`, `incident_recertification_from_status`, `incident_recertification_to_status`, `incident_recertification_promotion_ref`, `incident_recertification_gate`, `incident_recertification_platform_action`, `incident_recertification_platform_linkage`, `incident_recertification_rollback_required`, `incident_recertification_finance_evidence_refs`, `incident_recertification_quality_evidence_refs`, `incident_recertification_finance_evidence_root`, `incident_recertification_quality_evidence_root`, `audit_evidence_refs`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `incident-report`, `promotion-decision`, `step-result` |
 | `aor incident show` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--incident-id <id>` (optional); `--run-id <id>` (optional); `--limit <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `incident_records`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `incident-report` |
 | `aor audit runs` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--limit <number>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `run_audit_records`, `run_audit_records.finance_evidence`, `audit_evidence_refs`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `incident-report`, `promotion-decision`, `delivery-manifest`, `release-packet`, `step-result` |
-| `aor live-e2e start` | implemented | `--project-ref <path>`; `--profile <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--hold-open <true\|false>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_profile_ref`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecard_files`, `live_e2e_abort_supported`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-e2e-profile`, `live-run-event`, `incident-report`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
-| `aor live-e2e status` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>`; `--abort <true\|false>` (optional); `--reason <text>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecards`, `live_e2e_abort_applied`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event`, `incident-report`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
-| `aor live-e2e report` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` | `resolved_project_ref`, `resolved_runtime_root`, `live_e2e_run_id`, `live_e2e_run_status`, `live_e2e_run_summary_file`, `live_e2e_scorecards`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `incident-report`, `step-result`, `evaluation-report`, `delivery-manifest`, `release-packet` |
 | `aor ui attach` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional); `--control-plane <url>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `ui_lifecycle_action`, `ui_lifecycle_state`, `ui_lifecycle_state_file`, `ui_lifecycle_idempotent`, `ui_lifecycle_connection_state`, `ui_lifecycle_headless_safe`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event` |
 | `aor ui detach` | implemented | `--project-ref <path>`; `--runtime-root <path>` (optional); `--run-id <id>` (optional) | `resolved_project_ref`, `resolved_runtime_root`, `ui_lifecycle_action`, `ui_lifecycle_state`, `ui_lifecycle_state_file`, `ui_lifecycle_idempotent`, `ui_lifecycle_connection_state`, `ui_lifecycle_headless_safe`, `read_only`, `future_control_hooks`, `contract_families`, `command_catalog_alignment` | `live-run-event` |
 
@@ -45,6 +42,8 @@ This catalog separates bootstrap commands implemented in the current shell from 
 
 ## Planned command contracts
 No planned commands remain in the current shell baseline.
+
+Installed-user rehearsal is maintained as internal repo tooling under `scripts/live-e2e/` and is intentionally excluded from the public CLI catalog.
 
 ## Operator semantics for W5-S03
 - `aor run status`, `aor packet show`, and `aor evidence show` are read-only operator commands.
@@ -55,12 +54,6 @@ No planned commands remain in the current shell baseline.
   - `aor deliver prepare`, `aor release prepare`
 - Incident/audit command pack is implemented in W6-S06:
   - `aor incident open`, `aor incident show`, `aor audit runs`
-
-## Standard live E2E semantics for W5-S05
-- `aor live-e2e start` is the standard orchestration entrypoint for target-catalog rehearsal profiles.
-- `aor live-e2e status` is observe-first and supports bounded abort (`--abort=true`) for non-terminal runs.
-- `aor live-e2e report` is read-only and returns durable run summary plus per-target scorecards.
-- Learning-loop artifacts (`learning-loop-scorecard-*`, `learning-loop-handoff-*`, optional `incident-report-*`) are materialized under runtime reports for backlog and quality handoff.
 
 ## Story traceability for W6-S02
 - `aor intake create` supports sponsor/owner intake start from approved repository context and produces durable bootstrap intake artifacts.

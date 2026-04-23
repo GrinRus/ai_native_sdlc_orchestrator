@@ -1,10 +1,10 @@
 # Runbook: live E2E standard runner
 
 ## Purpose
-Provide one standard start/observe/abort flow for the catalog-backed live E2E profiles.
+Provide one standard internal black-box harness for the catalog-backed installed-user rehearsal profiles.
 
 ## Profile mapping
-Use only the canonical profiles from `examples/live-e2e/`:
+Use only the canonical internal profiles from `scripts/live-e2e/profiles/`:
 - `regress-short.yaml` for the `sindresorhus/ky` fast regression scenario.
 - `regress-long.yaml` for the `httpie/cli` deeper regression scenario.
 - `release-short.yaml` for the `sindresorhus/ky` short release-shaped rehearsal.
@@ -15,21 +15,13 @@ This mapping stays aligned with `docs/ops/live-e2e-target-catalog.md`.
 
 ## Start
 ```bash
-aor live-e2e start \
+node ./scripts/live-e2e/run-profile.mjs \
   --project-ref . \
-  --profile ./examples/live-e2e/regress-short.yaml
-```
-
-Optional bounded hold-open mode for abort rehearsals:
-```bash
-aor live-e2e start \
-  --project-ref . \
-  --profile ./examples/live-e2e/regress-short.yaml \
-  --hold-open true
+  --profile ./scripts/live-e2e/profiles/regress-short.yaml
 ```
 
 Expected output includes:
-- `live_e2e_run_id`
+- `run_id`
 - `live_e2e_run_summary_file`
 - `live_e2e_scorecard_files`
 
@@ -46,38 +38,15 @@ These fields point to the run-scoped cloned target checkout and the run-scoped g
 The run summary also carries learning-loop linkage fields:
 - `learning_loop_scorecard_file`
 - `learning_loop_handoff_file`
-- `incident_report_file` (for failed or aborted runs)
+- `incident_report_file` (for failed runs or forced-incident profiles)
 
 For profiles that set `learning_loop.force_incident=true`, `incident_report_file` is emitted even on `status=pass` so closure evidence stays linked.
 
-## Observe
-```bash
-aor live-e2e status \
-  --project-ref . \
-  --run-id <RUN_ID>
-```
-
-Detailed report:
-```bash
-aor live-e2e report \
-  --project-ref . \
-  --run-id <RUN_ID>
-```
-
-## Abort
-Abort only when run status is non-terminal:
-```bash
-aor live-e2e status \
-  --project-ref . \
-  --run-id <RUN_ID> \
-  --abort true \
-  --reason "operator stop due to budget or external gate"
-```
-
-Expected abort behavior:
-- updates the durable run summary status to `aborted`;
-- emits terminal stream event for the same run id;
-- keeps already materialized evidence and scorecards intact.
+## Inspect
+The harness is a one-shot command. Inspect the emitted `live_e2e_run_summary_file` directly:
+- read `status`, `stage_results`, and `command_results`;
+- inspect `artifacts.routed_step_result_file`, `artifacts.verify_summary_file`, and delivery/release artifacts when present;
+- use `learning_loop_scorecard_file` and `learning_loop_handoff_file` as the stable follow-up refs.
 
 ## Routed execution branch signatures
 - **Success branch:** `routed_step_result_file` exists, routed `step-result` has `routed_execution.mode=execute`, `adapter_response.status=success`, and raw adapter evidence reference is present.
@@ -93,7 +62,6 @@ Expected abort behavior:
 - `adapter_raw_evidence_ref` is populated and referenced from routed adapter response.
 - For release-shaped runs, `delivery_manifest_file` and `release_packet_file` must reference `repo_deliveries[0].repo_root == target_checkout_root`.
 - For release-shaped runs, `repo_deliveries[0].changed_paths` must remain target-relative (no absolute paths, no `..`, no control-plane docs/backlog paths).
-- `aor run status --run-id <RUN_ID> --follow true` can observe the same run stream.
-- CLI-only operation remains valid with web UI detached.
+- Harness execution stays CLI-only and remains valid with web UI detached.
 - Use `live-e2e-learning-loop.md` to hand off incidents and scorecards into backlog and quality follow-up.
 - Use `live-e2e-w7-governance-closure.md` for wave-level governance closure rehearsal and smoke checks.

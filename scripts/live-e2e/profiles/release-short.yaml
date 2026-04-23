@@ -13,24 +13,24 @@ target_repo:
 preflight:
   mode: no-write
   sequence:
-  - clone
-  - inspect
-  - analyze
-  - validate
-  - verify
-  - stop
+    - clone
+    - inspect
+    - analyze
+    - validate
+    - verify
+    - stop
   prerequisites:
-  - node >=22 with npm available
-  - network access for shallow clone and npm install
+    - node >=22 with npm available
+    - network access for shallow clone and npm install
   repo_shape_notes:
-  - single-package TypeScript library with fast test verification
+    - single-package TypeScript library with fast test verification
   failure_safe_defaults:
-  - keep output_policy.write_back_to_remote set to false
-  - keep delivery mode in patch-only for short public-target rehearsals
+    - keep output_policy.write_back_to_remote set to false
+    - keep delivery mode in patch-only for short public-target rehearsals
   abort_conditions:
-  - repository clone fails or ref cannot be resolved
-  - npm test fails during preflight verification
-  - release mode requires upstream writes
+    - repository clone fails or ref cannot be resolved
+    - npm test fails during preflight verification
+    - release mode requires upstream writes
   reusable_assumptions:
     bootstrap: no-write bootstrap flow is identical to regress-short profile
     quality: review and qa stages assume verify gate passes before release steps
@@ -42,36 +42,36 @@ runtime:
 objective:
   title: Live E2E short release rehearsal on sindresorhus/ky
   task_brief:
-  - run a narrow change with review and QA
-  - materialize a delivery manifest and release packet
-  - keep upstream write-back disabled unless a fork is explicitly configured
+    - run a narrow change with review and QA
+    - materialize a delivery manifest and release packet
+    - keep upstream write-back disabled unless a fork is explicitly configured
   success_definition:
-  - execution, review, and qa complete with evidence
-  - npm test passes
-  - delivery manifest is materialized
-  - release packet is materialized
+    - execution, review, and qa complete with evidence
+    - npm test passes
+    - delivery manifest is materialized
+    - release packet is materialized
 stages:
-- bootstrap
-- discovery
-- spec
-- planning
-- handoff
-- execution
-- review
-- qa
-- delivery
-- release
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - release
 verification:
   build: true
   lint: true
   tests: project-default
   setup_commands:
-  - npm install
-  - npx playwright install
+    - npm install
+    - npx playwright install
   commands:
-  - npm test
+    - npm test
   eval_suites:
-  - suite.release.short@v1
+    - suite.release.short@v1
   harness:
     enabled: false
 budgets:

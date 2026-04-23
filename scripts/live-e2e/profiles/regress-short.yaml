@@ -13,24 +13,24 @@ target_repo:
 preflight:
   mode: no-write
   sequence:
-  - clone
-  - inspect
-  - analyze
-  - validate
-  - verify
-  - stop
+    - clone
+    - inspect
+    - analyze
+    - validate
+    - verify
+    - stop
   prerequisites:
-  - node >=22 with npm available
-  - network access for shallow clone and npm install
+    - node >=22 with npm available
+    - network access for shallow clone and npm install
   repo_shape_notes:
-  - single-package TypeScript library with npm-based checks
+    - single-package TypeScript library with npm-based checks
   failure_safe_defaults:
-  - keep output_policy.write_back_to_remote set to false
-  - keep preferred delivery mode in patch-or-fork-safe options only
+    - keep output_policy.write_back_to_remote set to false
+    - keep preferred delivery mode in patch-or-fork-safe options only
   abort_conditions:
-  - repository clone fails or ref cannot be resolved
-  - npm test fails during preflight verification
-  - any command requests upstream write-back
+    - repository clone fails or ref cannot be resolved
+    - npm test fails during preflight verification
+    - any command requests upstream write-back
   reusable_assumptions:
     bootstrap: clone and profile loading can run without write-back credentials
     quality: bounded regression verification uses npm test as preflight gate
@@ -42,34 +42,34 @@ runtime:
 objective:
   title: Live E2E regression smoke on sindresorhus/ky
   task_brief:
-  - bootstrap the repository and confirm the local verification path
-  - apply one narrow regression-test-backed change
-  - produce patch output or a fork-local branch only
+    - bootstrap the repository and confirm the local verification path
+    - apply one narrow regression-test-backed change
+    - produce patch output or a fork-local branch only
   success_definition:
-  - source checkout succeeds
-  - handoff packet is materialized
-  - execution completes with evidence
-  - npm test passes
+    - source checkout succeeds
+    - handoff packet is materialized
+    - execution completes with evidence
+    - npm test passes
 stages:
-- bootstrap
-- discovery
-- spec
-- planning
-- handoff
-- execution
-- review
-- qa
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
 verification:
   build: true
   lint: true
   tests: project-default
   setup_commands:
-  - npm install
-  - npx playwright install
+    - npm install
+    - npx playwright install
   commands:
-  - npm test
+    - npm test
   eval_suites:
-  - suite.regress.short@v1
+    - suite.regress.short@v1
   harness:
     enabled: false
 budgets:

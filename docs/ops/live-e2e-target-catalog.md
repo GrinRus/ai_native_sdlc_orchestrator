@@ -102,5 +102,6 @@ All targets must reuse the same baseline sequence before execution-style stages:
 See `docs/ops/live-e2e-no-write-preflight.md` for the reusable procedure used by bootstrap, quality, and delivery rehearsals.
 
 ## Latest observed evidence bundle
-- `examples/live-e2e/fixtures/w11-s05/w11-s05-evidence-bundle.json` is the current canonical short-profile proof bundle.
+- `examples/live-e2e/fixtures/w12-s04/w12-s04-evidence-bundle.json` is the current canonical short-profile proof bundle.
 - The bundle links target-backed checkout evidence, routed live adapter raw evidence, and target-root delivery/release lineage for `regress-short` and `release-short`.
+- The proof keeps installed-user black-box CLI execution and uses a deterministic `--examples-root` override only for the adapter external runtime so the bundle stays reproducible.

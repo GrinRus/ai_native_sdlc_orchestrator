@@ -1,0 +1,60 @@
+{
+  "handoff_id": "w12-s04.release-short.learning-loop.handoff.v1",
+  "project_id": "aor-core",
+  "run_id": "w12-s04.release-short",
+  "run_status": "pass",
+  "source_kind": "live-e2e",
+  "scorecard_ref": "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/reports/learning-loop-scorecard-live-e2e-w12-s04.release-short.json",
+  "incident_ref": null,
+  "backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "quality_refs": [
+    "suite.release.short@v1"
+  ],
+  "evidence_refs": [
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/reports/live-e2e-run-summary-w12-s04.release-short.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/reports/live-e2e-scorecard-target-w12-s04.release-short.json",
+    "evidence://.aor/w12-s04-proof/runtime",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/reports",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/sessions/w12-s04.release-short",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/sessions/w12-s04.release-short/aor-home",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/sessions/w12-s04.release-short/codex-home",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short",
+    "evidence://https://github.com/sindresorhus/ky.git",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/examples",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/context",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/project.aor.yaml",
+    "evidence://examples/project.github.aor.yaml",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/project-analysis-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/route-resolution-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/asset-resolution-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/policy-resolution-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/evaluation-registry-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/validation-report.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/artifacts/github-sandbox.run.w12-s04.release-short.handoff.bootstrap.v1.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/artifacts/wave-ticket-w12-s04.release-short.ticket.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/verify-summary.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/step-result-1.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/step-result-2.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/step-result-3.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/step-result-routed-github-sandbox.run.w12-s04.release-short.routed-execution.v1.routed.implement.implement.attempt.1.json",
+    "evidence://compiled-context://compiled-context.github-sandbox.run.w12-s04.release-short.github-sandbox.run.w12-s04.release-short.routed-execution.v1.routed.implement.implement.attempt.1.runner-default",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/compiled-context-github-sandbox.run.w12-s04.release-short.routed-execution.v1.routed.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/github-sandbox.run.w12-s04.release-short/reports/adapter-live-raw-codex-cli-github-sandbox-run-w12-s04-release-short-routed-execution-v1-routed-implement-github-sandbox-run-w12-s04-release-short-routed-execution-v1-step-implement-request-1776968802722-1776968802789.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/evaluation-report-suite.release.short-v1-1776968802984.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/artifacts/delivery-plan-implement-1776968803151.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/artifacts/delivery-manifest-patch-only-w12-s04.release-short-1776968803279.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/artifacts/release-packet-patch-only-w12-s04.release-short-1776968803280.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.release-short/.aor/projects/github-sandbox.run.w12-s04.release-short/reports/delivery-transcript-patch-only-w12-s04.release-short-1776968803156.json",
+    "evidence://.aor/w12-s04-proof/runtime/projects/aor-core/reports/learning-loop-scorecard-live-e2e-w12-s04.release-short.json"
+  ],
+  "next_actions": [
+    "Review learning-loop artifacts and incident context.",
+    "Map follow-up work into docs/backlog/mvp-implementation-backlog.md and the owning wave slice.",
+    "Update eval suites or harness captures before re-enabling risky write-back paths."
+  ],
+  "generated_at": "2026-04-23T18:26:43.287Z"
+}

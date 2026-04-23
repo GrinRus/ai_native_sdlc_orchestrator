@@ -8,6 +8,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W6:** `W6-S01` Backlog and slice-cycle extensibility for W6+
 - **W9:** `W9-S02` Current-state documentation drift repair
 - **W11:** `W11-S01` Source-of-truth reality repair
+- **W12:** `W12-S01` Public surface realignment
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -62,6 +63,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W8:** `W8-S01` Sponsor and planner strategic visibility expansion; `W8-S04` Later operator event and policy visibility expansion
 - **W9:** `W9-S03` Control-plane API contract/runtime alignment; `W9-S04` Machine-checkable control-plane API contract coverage; `W9-S07` Detached HTTP control-plane transport baseline
 - **W10:** `W10-S03` Detached transport mutation command baseline; `W10-S04` Detached transport authn/authz hardening baseline
+- **W12:** `W12-S03` Breaking CLI and contract removal
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -78,3 +80,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W8:** `W8-S06` Later incident and platform recertification maturity
 - **W10:** `W10-S05` Externally verified live E2E target-catalog proof
 - **W11:** `W11-S02` Target workspace materialization for live E2E; `W11-S05` Fresh external proof bundle for catalog targets
+- **W12:** `W12-S02` Internal black-box installed-user harness; `W12-S04` Proof refresh after surface cleanup

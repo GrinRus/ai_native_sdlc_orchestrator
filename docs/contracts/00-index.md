@@ -34,7 +34,6 @@
 
 ## Operations
 - `live-run-event.md`
-- `live-e2e-profile.md`
 - `control-plane-api.md`
 
 ## Loader coverage

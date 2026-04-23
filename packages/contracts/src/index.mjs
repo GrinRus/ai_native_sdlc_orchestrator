@@ -724,48 +724,6 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
     enumChecks: [{ field: "event_type", allowedValues: LIVE_RUN_EVENT_TYPE_VALUES }],
   },
   {
-    family: "live-e2e-profile",
-    familyGroup: "operations",
-    sourceContract: "docs/contracts/live-e2e-profile.md",
-    exampleGlob: "examples/live-e2e/*.yaml",
-    status: "implemented",
-    requiredFields: [
-      "profile_id",
-      "version",
-      "flow_kind",
-      "duration_class",
-      "project_profile_template_ref",
-      "target_repo",
-      "preflight",
-      "runtime",
-      "objective",
-      "stages",
-      "verification",
-      "budgets",
-      "approvals",
-      "output_policy",
-      "ui",
-    ],
-    fieldTypes: {
-      profile_id: "string",
-      version: "number",
-      flow_kind: "string",
-      duration_class: "string",
-      project_profile_template_ref: "string",
-      target_repo: "object",
-      preflight: "object",
-      runtime: "object",
-      objective: "object",
-      stages: "array",
-      verification: "object",
-      budgets: "object",
-      approvals: "object",
-      output_policy: "object",
-      ui: "object",
-    },
-    enumChecks: [],
-  },
-  {
     family: "control-plane-api",
     familyGroup: "operations",
     sourceContract: "docs/contracts/control-plane-api.md",
@@ -813,7 +771,6 @@ const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/eval\/dataset-[^/]+\.ya?ml$/, family: "dataset" },
   { regex: /^examples\/eval\/report-[^/]+\.sample\.ya?ml$/, family: "evaluation-report" },
   { regex: /^examples\/eval\/suite-[^/]+\.ya?ml$/, family: "evaluation-suite" },
-  { regex: /^examples\/live-e2e\/[^/]+\.ya?ml$/, family: "live-e2e-profile" },
   { regex: /^examples\/packets\/wave-ticket-[^/]+\.ya?ml$/, family: "wave-ticket" },
   { regex: /^examples\/packets\/handoff-[^/]+\.ya?ml$/, family: "handoff-packet" },
   { regex: /^examples\/packets\/promotion-decision-[^/]+\.ya?ml$/, family: "promotion-decision" },
@@ -1385,39 +1342,6 @@ export function validateExampleReferences(options = {}) {
         }
       }
 
-      const liveE2eProfiles = document.live_e2e_defaults?.profiles;
-      if (isPlainObject(liveE2eProfiles)) {
-        for (const [key, rawValue] of Object.entries(liveE2eProfiles)) {
-          checkedReferences += 1;
-          const field = `live_e2e_defaults.profiles.${key}`;
-          const reference = asReferenceString(rawValue, { issues, source, field });
-          if (!reference || isExternalReference(reference)) continue;
-          if (!isVersionedRef(reference)) {
-            issues.push(
-              referenceIssue({
-                code: "reference_format_invalid",
-                source,
-                field,
-                reference,
-                expected: "profile_id@vN",
-                actual: reference,
-                message: `Field '${field}' must use profile_id@vN format.`,
-              }),
-            );
-            continue;
-          }
-          validateReferenceTarget({
-            issues,
-            source,
-            field,
-            reference,
-            expected: "existing profile_id@vN",
-            expectedFamily: "live-e2e-profile",
-            expectedSet: registry.liveE2eProfileRefs,
-            registry,
-          });
-        }
-      }
     }
 
     if (result.family === "provider-route-profile") {
@@ -1629,80 +1553,6 @@ export function validateExampleReferences(options = {}) {
       }
     }
 
-    if (result.family === "live-e2e-profile") {
-      checkedReferences += 1;
-      const projectProfileField = "project_profile_template_ref";
-      const projectProfileRef = asReferenceString(document.project_profile_template_ref, {
-        issues,
-        source,
-        field: projectProfileField,
-      });
-      if (projectProfileRef && !isExternalReference(projectProfileRef)) {
-        const resolvedProjectProfilePath = path.resolve(loaded.workspaceRoot, projectProfileRef);
-        if (!fs.existsSync(resolvedProjectProfilePath)) {
-          issues.push(
-            referenceIssue({
-              code: "reference_target_missing",
-              source,
-              field: projectProfileField,
-              reference: projectProfileRef,
-              expected: "existing project-profile file",
-              actual: "missing file",
-              message: `Referenced project profile file '${projectProfileRef}' does not exist.`,
-            }),
-          );
-        } else {
-          const loadedProjectProfile = loadContractFile({ filePath: resolvedProjectProfilePath });
-          if (loadedProjectProfile.family !== "project-profile") {
-            issues.push(
-              referenceIssue({
-                code: "reference_target_type_mismatch",
-                source,
-                field: projectProfileField,
-                reference: projectProfileRef,
-                expected: "project-profile",
-                actual: loadedProjectProfile.family ?? "unknown",
-                message: `Reference '${projectProfileRef}' does not point to a project-profile example.`,
-              }),
-            );
-          }
-        }
-      }
-
-      const evalSuites = document.verification?.eval_suites;
-      if (Array.isArray(evalSuites)) {
-        evalSuites.forEach((rawValue, index) => {
-          checkedReferences += 1;
-          const field = `verification.eval_suites[${index}]`;
-          const reference = asReferenceString(rawValue, { issues, source, field });
-          if (!reference || isExternalReference(reference)) return;
-          if (!isVersionedRef(reference)) {
-            issues.push(
-              referenceIssue({
-                code: "reference_format_invalid",
-                source,
-                field,
-                reference,
-                expected: "suite_id@vN",
-                actual: reference,
-                message: `${field} must use suite_id@vN format.`,
-              }),
-            );
-            return;
-          }
-          validateReferenceTarget({
-            issues,
-            source,
-            field,
-            reference,
-            expected: "existing suite_id@vN",
-            expectedFamily: "evaluation-suite",
-            expectedSet: registry.suiteRefs,
-            registry,
-          });
-        });
-      }
-    }
   }
 
   return {
@@ -1992,7 +1842,6 @@ function extractRouteAdapterRefs(routeProfile) {
  *   policyIds: Set<string>,
  *   suiteRefs: Set<string>,
  *   datasetRefs: Set<string>,
- *   liveE2eProfileRefs: Set<string>,
  *   contextBundleRefs: Set<string>,
  *   promptBundleRefs: Set<string>,
  *   adapterIds: Set<string>,
@@ -2012,7 +1861,6 @@ function buildReferenceRegistry(results, workspaceRoot) {
   const policyIds = new Set();
   const suiteRefs = new Set();
   const datasetRefs = new Set();
-  const liveE2eProfileRefs = new Set();
   const contextBundleRefs = new Set();
   const promptBundleRefs = new Set();
   const adapterIds = new Set();
@@ -2104,16 +1952,6 @@ function buildReferenceRegistry(results, workspaceRoot) {
         }
         break;
       }
-      case "live-e2e-profile": {
-        const profileId = document.profile_id;
-        const version = document.version;
-        if (typeof profileId === "string" && typeof version === "number") {
-          const profileRef = `${profileId}@v${version}`;
-          liveE2eProfileRefs.add(profileRef);
-          registerKnownReference(knownReferenceFamilies, profileRef, "live-e2e-profile");
-        }
-        break;
-      }
       case "context-bundle": {
         const bundleId = document.context_bundle_id;
         const version = document.version;
@@ -2182,7 +2020,6 @@ function buildReferenceRegistry(results, workspaceRoot) {
     policyIds,
     suiteRefs,
     datasetRefs,
-    liveE2eProfileRefs,
     contextBundleRefs,
     promptBundleRefs,
     adapterIds,

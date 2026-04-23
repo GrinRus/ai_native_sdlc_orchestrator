@@ -25,7 +25,6 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Platform assets | `step-policy-profile.md` | `step-policy-profile` | `examples/policies/*.yaml` | implemented | Includes closed-set enum check for `step_class`. |
 | Platform assets | `adapter-capability-profile.md` | `adapter-capability-profile` | `examples/adapters/*.yaml` | implemented | Required fields + top-level type checks, including deterministic `mock-runner` baseline profile. |
 | Operations | `live-run-event.md` | `live-run-event` | none | implemented | Contract is loader-covered with closed-set `event_type` validation; no YAML example in this repo yet. |
-| Operations | `live-e2e-profile.md` | `live-e2e-profile` | `examples/live-e2e/*.yaml` | implemented | Required fields + top-level type checks, including `preflight` no-write shape. |
 | Operations | `control-plane-api.md` | `control-plane-api` | `examples/control-plane-api/*.yaml` | implemented | Loader validates the hybrid module + detached HTTP/SSE baseline for read/follow plus bounded run-control/ui-lifecycle mutation families. |
 
 ## Reference integrity and compatibility checks (W3-S01)
@@ -40,15 +39,11 @@ The reference-integrity validator checks only local example graph refs and inten
 | `project-profile` | `default_context_bundles.*[]` | existing `context-bundle://context_bundle_id@vN` (`context-bundle`) |
 | `project-profile` | `default_step_policies.*` | existing `policy_id` (`step-policy-profile`) |
 | `project-profile` | `eval_policy.default_release_suite_ref` | existing `suite_id@vN` (`evaluation-suite`) |
-| `project-profile` | `live_e2e_defaults.profiles.*` | existing `profile_id@vN` (`live-e2e-profile`) |
 | `provider-route-profile` | `primary.adapter` | existing `adapter_id` (`adapter-capability-profile`) |
 | `provider-route-profile` | `fallback[].adapter` | existing `adapter_id` (`adapter-capability-profile`) |
 | `evaluation-suite` | `dataset_ref` | existing `dataset://dataset_id@version` (`dataset`) |
 | `step-policy-profile` | `quality_gate.suite_ref` (if present) | existing `suite_id@vN` (`evaluation-suite`) |
 | `prompt-bundle` | `certification_hints.default_suite_refs[]` (if present) | existing `suite_id@vN` (`evaluation-suite`) |
-| `live-e2e-profile` | `project_profile_template_ref` | existing example file resolved as `project-profile` |
-| `live-e2e-profile` | `verification.eval_suites[]` (if present) | existing `suite_id@vN` (`evaluation-suite`) |
-
 ### Compatibility checks
 
 The validator also enforces deterministic asset-graph compatibility after reference resolution:

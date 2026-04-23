@@ -23,7 +23,7 @@ Confirm that AOR can:
 2. Confirm install and verification commands.
 3. Apply one narrow regression-test-backed change.
 4. Produce patch output or a local/fork branch.
-5. Run routed dry-run smoke (`project verify --routed-dry-run-step implement`) before any delivery-stage action.
+5. Run the internal harness through preflight verify plus routed live execution before any delivery-stage action.
 
 ## No-write preflight
 Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
@@ -48,39 +48,34 @@ Isolation mode defaults:
 - `npm test` fails during preflight verification.
 - Any requested delivery mode requires upstream write-back.
 
-## Start command
+## Harness command
 ```bash
-aor live-e2e start \
+node ./scripts/live-e2e/run-profile.mjs \
   --project-ref . \
-  --profile ./examples/live-e2e/regress-short.yaml
+  --profile ./scripts/live-e2e/profiles/regress-short.yaml
 ```
-
-## Optional UI attach
-```bash
-aor ui attach --run RUN-201 --control-plane http://localhost:8080
-```
-
-When `--control-plane` is reachable, connected mode uses detached HTTP/SSE read/follow plus bounded mutation endpoints for run-control and UI lifecycle.
 
 ## Expected verification
 - setup command `npm install` succeeds;
 - setup command `npx playwright install` succeeds;
 - `npm test` succeeds;
 - handoff packet and step results are materialized;
-- routed dry-run step result is materialized with route/asset/policy/adapter metadata;
+- routed live step result is materialized with route/asset/policy/adapter metadata;
 - evidence and live events are available;
 - no upstream write-back occurs.
 
-## W11-S05 refreshed target-backed evidence (2026-04-23)
+## W12-S04 refreshed black-box proof (2026-04-23)
 Observed run:
-- `live-e2e.regress.short.run-w11-s05` with status `pass`.
+- `w12-s04.regress-short` with status `pass`.
 
 Evidence note:
 - this run is target-backed (`target_checkout_root`), keeps routed live adapter evidence, and links compiled context plus learning-loop artifacts in one bundle.
+- proof was generated through `node ./scripts/live-e2e/run-profile.mjs` and keeps the CLI subprocess flow black-box while using a deterministic external runner mock via `--examples-root`.
 
 Canonical fixtures:
-- `examples/live-e2e/fixtures/w11-s05/regress-short.run-summary.json`
-- `examples/live-e2e/fixtures/w11-s05/regress-short.scorecard.json`
-- `examples/live-e2e/fixtures/w11-s05/regress-short.live-run-events.jsonl`
-- `examples/live-e2e/fixtures/w11-s05/regress-short.learning-loop-scorecard.json`
-- `examples/live-e2e/fixtures/w11-s05/regress-short.learning-loop-handoff.json`
+- `examples/live-e2e/fixtures/w12-s04/regress-short.run-summary.json`
+- `examples/live-e2e/fixtures/w12-s04/regress-short.scorecard.json`
+- `examples/live-e2e/fixtures/w12-s04/regress-short.routed-step-result.json`
+- `examples/live-e2e/fixtures/w12-s04/regress-short.compiled-context.json`
+- `examples/live-e2e/fixtures/w12-s04/regress-short.learning-loop-scorecard.json`
+- `examples/live-e2e/fixtures/w12-s04/regress-short.learning-loop-handoff.json`

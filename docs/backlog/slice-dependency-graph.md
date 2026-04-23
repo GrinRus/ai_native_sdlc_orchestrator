@@ -82,6 +82,10 @@ flowchart TB
   W11S03[W11-S03 Profile-driven preflight and routed live execution]
   W11S04[W11-S04 Target-anchored delivery and release evidence]
   W11S05[W11-S05 Fresh external proof bundle for catalog targets]
+  W12S01[W12-S01 Public surface realignment]
+  W12S02[W12-S02 Internal black-box installed-user harness]
+  W12S03[W12-S03 Breaking CLI and contract removal]
+  W12S04[W12-S04 Proof refresh after surface cleanup]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -225,6 +229,9 @@ flowchart TB
   W10S01 --> W10S05
   W10S02 --> W10S05
   W11S05 --> W10S05
+  W12S01 --> W12S02
+  W12S02 --> W12S03
+  W12S03 --> W12S04
 ```
 
 ## W0 hard dependencies
@@ -351,6 +358,14 @@ flowchart TB
 | W11-S04 | W11-S03 |
 | W11-S05 | W11-S04 |
 
+## W12 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W12-S01 | none |
+| W12-S02 | W12-S01 |
+| W12-S03 | W12-S02 |
+| W12-S04 | W12-S03 |
+
 ## Topological order
 1. W0-S01
 2. W0-S04
@@ -428,6 +443,10 @@ flowchart TB
 74. W11-S04
 75. W11-S05
 76. W10-S05
+77. W12-S01
+78. W12-S02
+79. W12-S03
+80. W12-S04
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

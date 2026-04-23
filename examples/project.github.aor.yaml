@@ -137,12 +137,6 @@ writeback_policy:
 tooling_policy:
   network_mode: deny-by-default
   mcp_allowlist: []
-live_e2e_defaults:
-  profiles:
-    regress_short: live-e2e.regress.short@v1
-    regress_long: live-e2e.regress.long@v1
-    release_short: live-e2e.release.short@v1
-    release_long: live-e2e.release.long@v1
 risk_tiers:
   low:
     require_human_approval: false

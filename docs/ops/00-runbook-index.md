@@ -1,13 +1,13 @@
 # Runbook index
 
-## Live E2E rehearsal profiles
+## Installed-user rehearsal profiles
 - `live-e2e-target-catalog.md` — canonical target repositories, setup commands, and scenario briefs.
 - `live-e2e-dependency-matrix.md` — canonical dependencies for setup and verification across all live E2E profiles.
 - `live-e2e-regress-short.md` — fast smoke rehearsal on a small public repository.
 - `live-e2e-regress-long.md` — deeper regression rehearsal with stronger verification.
 - `live-e2e-release-short.md` — short release rehearsal that still materializes a release packet.
 - `live-e2e-release-long.md` — long monorepo release rehearsal with stronger gates.
-- `live-e2e-standard-runner.md` — standard start/status/report/abort surfaces for catalog profiles.
+- `live-e2e-standard-runner.md` — internal black-box harness entrypoint and artifact map for catalog profiles.
 - `live-e2e-learning-loop.md` — repeatable scorecard/incident capture and backlog-quality handoff flow.
 - `live-e2e-w7-governance-closure.md` — integrated W7 governance closure rehearsal and wave-level smoke checks.
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
