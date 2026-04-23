@@ -1,0 +1,85 @@
+{
+  "transcript_id": "aor-core.delivery-transcript.patch-only.1776947396715",
+  "project_id": "aor-core",
+  "run_id": "live-e2e.release.short.run-423122830183",
+  "step_id": "delivery.apply",
+  "mode": "patch-only",
+  "status": "success",
+  "started_at": "2026-04-23T12:29:56.715Z",
+  "finished_at": "2026-04-23T12:29:56.840Z",
+  "execution_root": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator",
+  "delivery_plan_ref": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/delivery-plan-implement-1776947396710.json",
+  "ownership": {
+    "source_run_id": "live-e2e.release.short.run-423122830183",
+    "source_step_class": "implement"
+  },
+  "coordination": {
+    "required": false,
+    "status": "not-required",
+    "repo_ids": [],
+    "evidence_refs": []
+  },
+  "recovery_scope": {
+    "requested": false,
+    "status": "not-requested",
+    "rerun_of_run_ref": null,
+    "failed_step_ref": null,
+    "packet_boundary": "delivery-manifest",
+    "strategy": null,
+    "blocking_reasons": []
+  },
+  "git": {
+    "head_before": {
+      "branch": "main",
+      "commit": "c74dc58064c4b9e1563407963a7044acd5965e98"
+    },
+    "head_after": {
+      "branch": "main",
+      "commit": "c74dc58064c4b9e1563407963a7044acd5965e98"
+    },
+    "commands": [
+      "git diff --binary HEAD",
+      "git diff --name-only HEAD",
+      "git diff --numstat HEAD"
+    ]
+  },
+  "changed_paths": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/wave-10-implementation-slices.md",
+    "examples/project.aor.yaml"
+  ],
+  "diff_stats": {
+    "files": [
+      {
+        "path": "docs/backlog/mvp-implementation-backlog.md",
+        "added": 5,
+        "deleted": 5
+      },
+      {
+        "path": "docs/backlog/wave-10-implementation-slices.md",
+        "added": 5,
+        "deleted": 5
+      },
+      {
+        "path": "examples/project.aor.yaml",
+        "added": 2,
+        "deleted": 0
+      }
+    ],
+    "totals": {
+      "files": 3,
+      "added": 12,
+      "deleted": 10
+    }
+  },
+  "outputs": {
+    "patch_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/delivery-patch-live-e2e.release.short.run-423122830183-1776947396790.patch",
+    "delivery_manifest_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json",
+    "release_packet_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/release-packet-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json",
+    "learning_loop_scorecard_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/learning-loop-scorecard-delivery-live-e2e.release.short.run-423122830183.json",
+    "learning_loop_handoff_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/learning-loop-handoff-live-e2e.release.short.run-423122830183.json",
+    "incident_report_file": null
+  },
+  "error": null,
+  "recovery_steps": null
+}

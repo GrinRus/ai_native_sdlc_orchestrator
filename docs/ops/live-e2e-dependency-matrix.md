@@ -34,3 +34,22 @@ pnpm check
 - `live-e2e` runner executes `verification.setup_commands` first, then `verification.commands`, both in the cloned target workspace.
 - Public-repo rehearsals keep `write_back_to_remote=false` by default.
 - If an external CDN/network dependency is unavailable (for example Playwright browser download), mark the run as external `inconclusive` for smoke tracking.
+
+## W10-S05 observed runs (2026-04-23)
+
+Observed with fresh external target-catalog runs:
+- `live-e2e.regress.short.run-423122617518` (scenario `ky-regression-smoke`) status `pass`.
+- `live-e2e.release.short.run-423122830183` (scenario `ky-release-short`) status `pass`.
+
+Observed prerequisite confirmations:
+- `npm install` and `npx playwright install` completed successfully for both short profiles.
+- `npm test` completed successfully for both short profiles.
+- detached external adapter invocation path remained available throughout execution stages.
+
+Observed failure signatures and safety defaults:
+- no blocking failure signature was observed in these two runs; catalog defaults remain unchanged.
+- release-shaped rehearsal produced `patch-only` delivery artifacts and did not require upstream write-back.
+- no-write safety defaults (`write_back_to_remote=false`) remained effective while still materializing delivery/release evidence.
+
+Evidence fixture bundle:
+- `examples/live-e2e/fixtures/w10-s05/w10-s05-evidence-bundle.json`

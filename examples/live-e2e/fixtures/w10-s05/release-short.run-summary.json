@@ -1,0 +1,141 @@
+{
+  "run_id": "live-e2e.release.short.run-423122830183",
+  "project_id": "aor-core",
+  "profile_ref": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/examples/live-e2e/release-short.yaml",
+  "profile_id": "live-e2e.release.short",
+  "scenario_id": "ky-release-short",
+  "flow_kind": "release",
+  "duration_class": "short",
+  "target_repo": {
+    "repo_id": "target",
+    "repo_url": "https://github.com/sindresorhus/ky.git",
+    "ref": "main",
+    "checkout_strategy": "shallow",
+    "write_target": "patch-or-fork"
+  },
+  "started_at": "2026-04-23T12:28:30.184Z",
+  "finished_at": "2026-04-23T12:29:56.887Z",
+  "status": "pass",
+  "hold_open": false,
+  "stage_results": [
+    {
+      "stage": "bootstrap",
+      "status": "pass",
+      "evidence_refs": [
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/state/project-init-state.json"
+      ],
+      "summary": "runtime initialized"
+    },
+    {
+      "stage": "discovery",
+      "status": "pass",
+      "evidence_refs": [
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/project-analysis-report.json"
+      ],
+      "summary": "project analysis report emitted"
+    },
+    {
+      "stage": "spec",
+      "status": "pass",
+      "evidence_refs": [
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/validation-report.json"
+      ],
+      "summary": null
+    },
+    {
+      "stage": "planning",
+      "status": "pass",
+      "evidence_refs": [
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/policy-resolution-report.json"
+      ],
+      "summary": "policy and route resolution aligned"
+    },
+    {
+      "stage": "handoff",
+      "status": "pass",
+      "evidence_refs": [
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json"
+      ],
+      "summary": null
+    },
+    {
+      "stage": "execution",
+      "status": "pass",
+      "evidence_refs": [
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/verify-summary.json",
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/step-result-1.json",
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/step-result-2.json",
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/step-result-3.json"
+      ],
+      "summary": null
+    },
+    {
+      "stage": "review",
+      "status": "pass",
+      "evidence_refs": [
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/evaluation-report-suite.release.short-v1-1776947396234.json"
+      ],
+      "summary": null
+    },
+    {
+      "stage": "qa",
+      "status": "pass",
+      "evidence_refs": [
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/evaluation-report-suite.release.short-v1-1776947396234.json"
+      ],
+      "summary": null
+    },
+    {
+      "stage": "delivery",
+      "status": "pass",
+      "evidence_refs": [
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/delivery-transcript-patch-only-live-e2e.release.short.run-423122830183-1776947396715.json",
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json"
+      ],
+      "summary": null
+    },
+    {
+      "stage": "release",
+      "status": "pass",
+      "evidence_refs": [
+        "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/release-packet-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json"
+      ],
+      "summary": null
+    }
+  ],
+  "artifacts": {
+    "analysis_report_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/project-analysis-report.json",
+    "route_resolution_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/route-resolution-report.json",
+    "policy_resolution_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/policy-resolution-report.json",
+    "validation_report_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/validation-report.json",
+    "verify_summary_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/verify-summary.json",
+    "step_result_files": [
+      "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/step-result-1.json",
+      "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/step-result-2.json",
+      "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/step-result-3.json"
+    ],
+    "evaluation_report_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/evaluation-report-suite.release.short-v1-1776947396234.json",
+    "promotion_decision_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/promotion-decision-wrapper-wrapper.eval.default-v1-1776947396710.json",
+    "promotion_evaluation_report_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/evaluation-report-suite.cert.core-v4-1776947396631.json",
+    "promotion_harness_capture_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/harness-capture-aor-core.harness.capture.1776947396631.json",
+    "promotion_harness_replay_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/harness-replay-aor-core.harness.replay.1776947396708.json",
+    "promotion_replay_evaluation_report_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/evaluation-report-suite.cert.core-v4-1776947396708.json",
+    "rehearsal_change_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/examples/project.aor.yaml",
+    "delivery_transcript_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/delivery-transcript-patch-only-live-e2e.release.short.run-423122830183-1776947396715.json",
+    "delivery_manifest_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json",
+    "release_packet_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/artifacts/release-packet-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json"
+  },
+  "scorecard_files": [
+    "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/live-e2e-scorecard-target-live-e2e.release.short.run-423122830183.json"
+  ],
+  "control_surfaces": {
+    "start": "aor live-e2e start --project-ref <path> --profile <path>",
+    "status": "aor live-e2e status --project-ref <path> --run-id <id>",
+    "abort": "aor live-e2e status --project-ref <path> --run-id <id> --abort true",
+    "report": "aor live-e2e report --project-ref <path> --run-id <id>"
+  },
+  "error": null,
+  "learning_loop_scorecard_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/learning-loop-scorecard-live-e2e-live-e2e.release.short.run-423122830183.json",
+  "learning_loop_handoff_file": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/learning-loop-handoff-live-e2e.release.short.run-423122830183.json",
+  "incident_report_file": null
+}

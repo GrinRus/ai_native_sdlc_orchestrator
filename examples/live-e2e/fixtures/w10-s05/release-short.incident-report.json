@@ -1,0 +1,26 @@
+{
+  "incident_id": "aor-core.incident.live-e2e.release.short.run-423122830183.1776947434334",
+  "project_id": "aor-core",
+  "severity": "high",
+  "summary": "W10-S05 release rehearsal evidence linkage",
+  "linked_run_refs": [
+    "run://live-e2e.release.short.run-423122830183"
+  ],
+  "linked_asset_refs": [
+    "evidence://.aor/projects/aor-core/artifacts/delivery-plan-implement-1776947396710.json",
+    "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json",
+    "evidence://.aor/projects/aor-core/artifacts/release-packet-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json",
+    "evidence://.aor/projects/aor-core/artifacts/promotion-decision-wrapper-wrapper.eval.default-v1-1776947396710.json"
+  ],
+  "status": "open",
+  "linked_eval_suite_refs": [],
+  "linked_harness_capture_refs": [
+    "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports/harness-capture-aor-core.harness.capture.1776947396631.json"
+  ],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/wave-6-implementation-slices.md"
+  ],
+  "evidence_root": "/Users/griogrii_riabov/grigorii_projects/ai_native_sdlc_orchestrator/.aor/projects/aor-core/reports",
+  "created_at": "2026-04-23T12:30:34.334Z"
+}

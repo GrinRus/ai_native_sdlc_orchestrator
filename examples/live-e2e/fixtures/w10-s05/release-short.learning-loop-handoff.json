@@ -1,0 +1,48 @@
+{
+  "handoff_id": "live-e2e.release.short.run-423122830183.learning-loop.handoff.v1",
+  "project_id": "aor-core",
+  "run_id": "live-e2e.release.short.run-423122830183",
+  "run_status": "pass",
+  "source_kind": "live-e2e",
+  "scorecard_ref": "evidence://.aor/projects/aor-core/reports/learning-loop-scorecard-live-e2e-live-e2e.release.short.run-423122830183.json",
+  "incident_ref": null,
+  "backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/wave-5-implementation-slices.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "quality_refs": [
+    "suite.release.short@v1"
+  ],
+  "evidence_refs": [
+    "evidence://.aor/projects/aor-core/reports/live-e2e-run-summary-live-e2e.release.short.run-423122830183.json",
+    "evidence://.aor/projects/aor-core/reports/live-e2e-scorecard-target-live-e2e.release.short.run-423122830183.json",
+    "evidence://.aor/projects/aor-core/state/project-init-state.json",
+    "evidence://.aor/projects/aor-core/reports/project-analysis-report.json",
+    "evidence://.aor/projects/aor-core/reports/validation-report.json",
+    "evidence://.aor/projects/aor-core/reports/policy-resolution-report.json",
+    "evidence://.aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json",
+    "evidence://.aor/projects/aor-core/reports/verify-summary.json",
+    "evidence://.aor/projects/aor-core/reports/step-result-1.json",
+    "evidence://.aor/projects/aor-core/reports/step-result-2.json",
+    "evidence://.aor/projects/aor-core/reports/step-result-3.json",
+    "evidence://.aor/projects/aor-core/reports/evaluation-report-suite.release.short-v1-1776947396234.json",
+    "evidence://.aor/projects/aor-core/reports/delivery-transcript-patch-only-live-e2e.release.short.run-423122830183-1776947396715.json",
+    "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json",
+    "evidence://.aor/projects/aor-core/artifacts/release-packet-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json",
+    "evidence://.aor/projects/aor-core/reports/route-resolution-report.json",
+    "evidence://.aor/projects/aor-core/artifacts/promotion-decision-wrapper-wrapper.eval.default-v1-1776947396710.json",
+    "evidence://.aor/projects/aor-core/reports/evaluation-report-suite.cert.core-v4-1776947396631.json",
+    "evidence://.aor/projects/aor-core/reports/harness-capture-aor-core.harness.capture.1776947396631.json",
+    "evidence://.aor/projects/aor-core/reports/harness-replay-aor-core.harness.replay.1776947396708.json",
+    "evidence://.aor/projects/aor-core/reports/evaluation-report-suite.cert.core-v4-1776947396708.json",
+    "evidence://examples/project.aor.yaml",
+    "evidence://.aor/projects/aor-core/reports/learning-loop-scorecard-live-e2e-live-e2e.release.short.run-423122830183.json"
+  ],
+  "next_actions": [
+    "Review learning-loop artifacts and incident context.",
+    "Map follow-up work into docs/backlog/mvp-implementation-backlog.md and the owning wave slice.",
+    "Update eval suites or harness captures before re-enabling risky write-back paths."
+  ],
+  "generated_at": "2026-04-23T12:29:56.891Z"
+}

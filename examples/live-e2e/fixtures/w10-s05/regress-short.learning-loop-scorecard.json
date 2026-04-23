@@ -1,0 +1,35 @@
+{
+  "scorecard_id": "live-e2e.regress.short.run-423122617518.learning-loop.scorecard.v1",
+  "project_id": "aor-core",
+  "run_id": "live-e2e.regress.short.run-423122617518",
+  "source_kind": "live-e2e",
+  "status": "pass",
+  "summary": "Live E2E run 'live-e2e.regress.short.run-423122617518' completed with status 'pass'.",
+  "evidence_refs": [
+    "evidence://.aor/projects/aor-core/reports/live-e2e-run-summary-live-e2e.regress.short.run-423122617518.json",
+    "evidence://.aor/projects/aor-core/reports/live-e2e-scorecard-target-live-e2e.regress.short.run-423122617518.json",
+    "evidence://.aor/projects/aor-core/state/project-init-state.json",
+    "evidence://.aor/projects/aor-core/reports/project-analysis-report.json",
+    "evidence://.aor/projects/aor-core/reports/validation-report.json",
+    "evidence://.aor/projects/aor-core/reports/policy-resolution-report.json",
+    "evidence://.aor/projects/aor-core/reports/verify-summary.json",
+    "evidence://.aor/projects/aor-core/reports/step-result-1.json",
+    "evidence://.aor/projects/aor-core/reports/step-result-2.json",
+    "evidence://.aor/projects/aor-core/reports/step-result-3.json",
+    "evidence://.aor/projects/aor-core/reports/evaluation-report-suite.regress.short-v1-1776947305998.json",
+    "evidence://.aor/projects/aor-core/reports/route-resolution-report.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://.aor/projects/aor-core/reports/live-e2e-scorecard-target-live-e2e.regress.short.run-423122617518.json"
+  ],
+  "linked_eval_suite_refs": [
+    "suite.regress.short@v1"
+  ],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/wave-5-implementation-slices.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "generated_at": "2026-04-23T12:28:26.004Z"
+}

@@ -1,0 +1,25 @@
+{
+  "scorecard_id": "live-e2e.release.short.run-423122830183.learning-loop.scorecard.v1",
+  "project_id": "aor-core",
+  "run_id": "live-e2e.release.short.run-423122830183",
+  "source_kind": "delivery",
+  "status": "pass",
+  "summary": "Delivery mode 'patch-only' produced 3 changed file(s), +12/-10.",
+  "evidence_refs": [
+    "evidence://.aor/projects/aor-core/artifacts/delivery-plan-implement-1776947396710.json",
+    "evidence://.aor/projects/aor-core/reports/delivery-transcript-patch-only-live-e2e.release.short.run-423122830183-1776947396715.json",
+    "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json",
+    "evidence://.aor/projects/aor-core/artifacts/release-packet-patch-only-live-e2e.release.short.run-423122830183-1776947396886.json",
+    "evidence://.aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json",
+    "evidence://.aor/projects/aor-core/artifacts/promotion-decision-wrapper-wrapper.eval.default-v1-1776947396710.json",
+    "evidence://.aor/projects/aor-core/artifacts/delivery-patch-live-e2e.release.short.run-423122830183-1776947396790.patch"
+  ],
+  "linked_scorecard_refs": [],
+  "linked_eval_suite_refs": [],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/wave-5-implementation-slices.md"
+  ],
+  "generated_at": "2026-04-23T12:29:56.886Z"
+}

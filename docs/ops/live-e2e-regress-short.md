@@ -70,3 +70,14 @@ When `--control-plane` is reachable, connected mode uses detached HTTP/SSE read/
 - routed dry-run step result is materialized with route/asset/policy/adapter metadata;
 - evidence and live events are available;
 - no upstream write-back occurs.
+
+## W10-S05 refreshed evidence (2026-04-23)
+Observed run:
+- `live-e2e.regress.short.run-423122617518` with status `pass`.
+
+Fresh fixtures:
+- `examples/live-e2e/fixtures/w10-s05/regress-short.run-summary.json`
+- `examples/live-e2e/fixtures/w10-s05/regress-short.scorecard.json`
+- `examples/live-e2e/fixtures/w10-s05/regress-short.live-run-events.jsonl`
+- `examples/live-e2e/fixtures/w10-s05/regress-short.learning-loop-scorecard.json`
+- `examples/live-e2e/fixtures/w10-s05/regress-short.learning-loop-handoff.json`

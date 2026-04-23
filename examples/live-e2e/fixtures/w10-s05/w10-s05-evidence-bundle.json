@@ -1,0 +1,40 @@
+{
+  "fixture_id": "w10-s05.target-catalog.external-evidence.v1",
+  "slice_id": "W10-S05",
+  "generated_at": "2026-04-23T12:30:34Z",
+  "targets": [
+    {
+      "profile_id": "live-e2e.regress.short",
+      "scenario_id": "ky-regression-smoke",
+      "run_id": "live-e2e.regress.short.run-423122617518",
+      "status": "pass",
+      "summary_file": "regress-short.run-summary.json",
+      "scorecard_file": "regress-short.scorecard.json",
+      "live_run_events_file": "regress-short.live-run-events.jsonl",
+      "learning_loop_handoff_file": "regress-short.learning-loop-handoff.json",
+      "learning_loop_scorecard_file": "regress-short.learning-loop-scorecard.json"
+    },
+    {
+      "profile_id": "live-e2e.release.short",
+      "scenario_id": "ky-release-short",
+      "run_id": "live-e2e.release.short.run-423122830183",
+      "status": "pass",
+      "summary_file": "release-short.run-summary.json",
+      "scorecard_file": "release-short.scorecard.json",
+      "live_run_events_file": "release-short.live-run-events.jsonl",
+      "delivery_transcript_file": "release-short.delivery-transcript.json",
+      "delivery_manifest_file": "release-short.delivery-manifest.json",
+      "release_packet_file": "release-short.release-packet.json",
+      "delivery_patch_file": "release-short.delivery.patch",
+      "incident_report_file": "release-short.incident-report.json",
+      "learning_loop_handoff_file": "release-short.learning-loop-handoff.json",
+      "learning_loop_scorecard_file": "release-short.learning-loop-scorecard.json",
+      "delivery_learning_loop_scorecard_file": "release-short.delivery-learning-loop-scorecard.json"
+    }
+  ],
+  "acceptance_alignment": {
+    "external_runner_invocation": true,
+    "delivery_evidence_not_stubbed": true,
+    "runbook_dependency_updates_required": true
+  }
+}

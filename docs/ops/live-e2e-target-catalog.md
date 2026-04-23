@@ -100,3 +100,6 @@ All targets must reuse the same baseline sequence before execution-style stages:
 6. stop or continue only when no-write safety gates pass
 
 See `docs/ops/live-e2e-no-write-preflight.md` for the reusable procedure used by bootstrap, quality, and delivery rehearsals.
+
+## Latest refreshed evidence bundle
+- `examples/live-e2e/fixtures/w10-s05/w10-s05-evidence-bundle.json` captures fresh regression and release-shaped external runs plus linked delivery, incident, and learning-loop artifacts.

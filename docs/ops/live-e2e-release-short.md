@@ -114,3 +114,18 @@ Evidence fixtures for W4-S06:
 
 Related runbook:
 - `docs/ops/github-fork-first-delivery.md`
+
+## W10-S05 refreshed evidence (2026-04-23)
+Observed release-shaped run:
+- `live-e2e.release.short.run-423122830183` with status `pass`.
+
+Fresh fixtures:
+- `examples/live-e2e/fixtures/w10-s05/release-short.run-summary.json`
+- `examples/live-e2e/fixtures/w10-s05/release-short.scorecard.json`
+- `examples/live-e2e/fixtures/w10-s05/release-short.delivery-transcript.json`
+- `examples/live-e2e/fixtures/w10-s05/release-short.delivery-manifest.json`
+- `examples/live-e2e/fixtures/w10-s05/release-short.release-packet.json`
+- `examples/live-e2e/fixtures/w10-s05/release-short.incident-report.json`
+- `examples/live-e2e/fixtures/w10-s05/release-short.learning-loop-scorecard.json`
+- `examples/live-e2e/fixtures/w10-s05/release-short.delivery-learning-loop-scorecard.json`
+- `examples/live-e2e/fixtures/w10-s05/release-short.learning-loop-handoff.json`
