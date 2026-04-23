@@ -15,6 +15,7 @@ import {
 } from "../../../packages/orchestrator-core/src/handoff-packets.mjs";
 import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
+import { executeRoutedStep } from "../../../packages/orchestrator-core/src/step-execution-engine.mjs";
 import { validateProjectRuntime } from "../../../packages/orchestrator-core/src/project-validate.mjs";
 import { verifyProjectRuntime } from "../../../packages/orchestrator-core/src/project-verify.mjs";
 
@@ -333,6 +334,7 @@ function hydrateRepoVerificationCommands(options) {
  *     contextBundlesRoot?: string,
  *     policiesRoot?: string,
  *     adaptersRoot?: string,
+ *     skillsRoot?: string,
  *   },
  * }}
  */
@@ -431,6 +433,7 @@ function materializeRunScopedProjectProfile(options) {
       asNonEmptyString(registryRoots.context_bundles) || path.join(controlPlaneExamplesRoot, "context/bundles"),
     policiesRoot: asNonEmptyString(registryRoots.policies) || path.join(controlPlaneExamplesRoot, "policies"),
     adaptersRoot: asNonEmptyString(registryRoots.adapters) || path.join(controlPlaneExamplesRoot, "adapters"),
+    skillsRoot: path.join(controlPlaneExamplesRoot, "skills"),
   };
 
   return {
@@ -588,6 +591,7 @@ export function startStandardLiveE2ERun(options) {
    *    contextBundlesRoot?: string,
    *    policiesRoot?: string,
    *    adaptersRoot?: string,
+   *    skillsRoot?: string,
    *  },
    * } | null} */
   let targetWorkspace = null;
@@ -657,14 +661,95 @@ export function startStandardLiveE2ERun(options) {
     });
     artifacts.verify_summary_file = verify.verifySummaryPath;
     artifacts.step_result_files = verify.stepResultFiles;
-    const executionStageStatus = verify.validationGateStatus === "fail" ? "fail" : "pass";
-    markStage(stageMap, "execution", executionStageStatus, [
-      verify.verifySummaryPath,
-      ...verify.stepResultFiles,
-    ]);
-    if (executionStageStatus === "fail") {
+    if (verify.validationGateStatus === "fail") {
+      markStage(stageMap, "execution", "fail", [verify.verifySummaryPath, ...verify.stepResultFiles]);
       throw new Error("Live E2E execution stage failed validation gate.");
     }
+
+    const routedStep = executeRoutedStep({
+      ...executionProjectOptions,
+      ...targetWorkspace.resolvedRegistryRoots,
+      stepClass: "implement",
+      dryRun: false,
+      runId,
+      stepId: "routed.implement",
+      executionRoot: targetWorkspace.targetCheckoutRoot,
+      approvedHandoffRef: `evidence://live-e2e/${normalizeId(runId)}/approved-handoff`,
+      promotionEvidenceRefs: [verify.verifySummaryPath, ...verify.stepResultFiles],
+    });
+    artifacts.routed_step_result_file = routedStep.stepResultPath;
+    artifacts.routed_step_result_id = routedStep.stepResultId;
+
+    const routedExecution = asRecord(routedStep.stepResult.routed_execution);
+    const contextCompilation = asRecord(routedExecution.context_compilation);
+    const adapterResponse = asRecord(routedExecution.adapter_response);
+    const adapterOutput = asRecord(adapterResponse.output);
+    const externalRunner = asRecord(adapterOutput.external_runner);
+    const routedMode = asNonEmptyString(routedExecution.mode);
+    const routedStatus = asNonEmptyString(routedStep.stepResult.status);
+    const routedSummary = asNonEmptyString(routedStep.stepResult.summary);
+    const routedFailureKind = asNonEmptyString(adapterOutput.failure_kind);
+    const routedBlockedNextStep = asNonEmptyString(routedStep.stepResult.blocked_next_step);
+
+    const compiledContextRef = asNonEmptyString(contextCompilation.compiled_context_ref);
+    const compiledContextFile = asNonEmptyString(contextCompilation.compiled_context_file);
+    const adapterRawEvidenceRef = asNonEmptyString(externalRunner.raw_evidence_ref);
+    const adapterExecutionRoot = asNonEmptyString(externalRunner.execution_root);
+
+    if (compiledContextRef) artifacts.compiled_context_ref = compiledContextRef;
+    if (compiledContextFile) artifacts.compiled_context_file = compiledContextFile;
+    if (adapterRawEvidenceRef) artifacts.adapter_raw_evidence_ref = adapterRawEvidenceRef;
+    if (adapterExecutionRoot) artifacts.adapter_execution_root = adapterExecutionRoot;
+
+    const executionEvidenceRefs = uniqueStrings([
+      verify.verifySummaryPath,
+      ...verify.stepResultFiles,
+      routedStep.stepResultPath,
+      ...(compiledContextRef ? [compiledContextRef] : []),
+      ...(compiledContextFile ? [compiledContextFile] : []),
+      ...(adapterRawEvidenceRef ? [adapterRawEvidenceRef] : []),
+    ]);
+
+    if (routedMode !== "execute") {
+      markStage(
+        stageMap,
+        "execution",
+        "fail",
+        executionEvidenceRefs,
+        `Routed execution mode '${routedMode || "unknown"}' is not valid for short proof profiles.`,
+      );
+      throw new Error("Live E2E routed execution must run in execute mode.");
+    }
+
+    if (routedStatus !== "passed") {
+      const failureLabel = routedFailureKind || asNonEmptyString(adapterResponse.status) || "failed";
+      markStage(
+        stageMap,
+        "execution",
+        "fail",
+        executionEvidenceRefs,
+        routedSummary || `Routed execution failed with '${failureLabel}'.`,
+      );
+      if (routedFailureKind === "missing-prerequisite") {
+        throw new Error(
+          `Live E2E routed execution blocked with missing-prerequisite: ${routedBlockedNextStep || routedSummary || "install/configure the external runner and retry."}`,
+        );
+      }
+      if (asNonEmptyString(adapterResponse.status) === "blocked") {
+        throw new Error(
+          `Live E2E routed execution policy-blocked: ${routedBlockedNextStep || routedSummary || "resolve delivery guardrails or adapter support and retry."}`,
+        );
+      }
+      throw new Error(`Live E2E routed execution failed: ${routedSummary || "inspect routed step evidence."}`);
+    }
+
+    markStage(
+      stageMap,
+      "execution",
+      "pass",
+      executionEvidenceRefs,
+      "Preflight verification and routed live execution succeeded.",
+    );
 
     const evalSuites = Array.isArray(profile.verification?.eval_suites)
       ? profile.verification.eval_suites.filter((entry) => typeof entry === "string")
@@ -860,6 +945,11 @@ export function startStandardLiveE2ERun(options) {
     hold_open: Boolean(options.holdOpen),
     target_checkout_root: targetWorkspace?.targetCheckoutRoot ?? null,
     generated_project_profile_file: targetWorkspace?.generatedProjectProfileFile ?? null,
+    routed_step_result_file:
+      typeof artifacts.routed_step_result_file === "string" ? artifacts.routed_step_result_file : null,
+    compiled_context_ref: typeof artifacts.compiled_context_ref === "string" ? artifacts.compiled_context_ref : null,
+    adapter_raw_evidence_ref:
+      typeof artifacts.adapter_raw_evidence_ref === "string" ? artifacts.adapter_raw_evidence_ref : null,
     stage_results: stageResults,
     artifacts,
     scorecard_files: [scorecardFile],

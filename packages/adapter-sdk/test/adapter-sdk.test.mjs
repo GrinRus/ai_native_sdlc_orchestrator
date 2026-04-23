@@ -205,6 +205,8 @@ test("mock adapter executes deterministic dry-run outputs for rehearsal coverage
 
 test("live adapter executes external runner path for supported codex-cli requests", () => {
   const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-evidence-"));
+  const executionRoot = path.join(evidenceRoot, "execution-root");
+  fs.mkdirSync(executionRoot, { recursive: true });
   try {
     const adapter = createLiveAdapter({
       adapterId: "codex-cli",
@@ -219,7 +221,7 @@ test("live adapter executes external runner path for supported codex-cli request
             "process.stdout.write(JSON.stringify({",
             "status:'success',",
             "summary:'external runner ok',",
-            "output:{runner:'node-inline',step_class:request.step_class||null},",
+            "output:{runner:'node-inline',step_class:request.step_class||null,cwd:process.cwd()},",
             "evidence_refs:['evidence://external-runner/mock-success'],",
             "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline'}]",
             "}));",
@@ -228,6 +230,7 @@ test("live adapter executes external runner path for supported codex-cli request
       }),
       runtimeEvidenceRoot: evidenceRoot,
       projectRoot: evidenceRoot,
+      executionRoot,
     });
 
     const response = adapter.execute({
@@ -250,6 +253,11 @@ test("live adapter executes external runner path for supported codex-cli request
     assert.equal(response.output.provider_adapter, "codex-cli");
     assert.equal(response.output.external_runner.runtime_mode, "external-process");
     assert.equal(response.output.external_runner.command, process.execPath);
+    assert.equal(
+      fs.realpathSync(response.output.external_runner.execution_root),
+      fs.realpathSync(executionRoot),
+    );
+    assert.equal(fs.realpathSync(response.output.runner_output.cwd), fs.realpathSync(executionRoot));
     assert.ok(response.evidence_refs.some((ref) => ref.startsWith("evidence://adapter-live/codex-cli/")));
     assert.ok(response.evidence_refs.includes("evidence://external-runner/mock-success"));
     assert.ok(

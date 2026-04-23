@@ -224,6 +224,8 @@ test("executeRoutedStep still writes failed step-result when routed resolution f
 
 test("executeRoutedStep supports live execution for supported adapter when delivery guardrails are ready", () => {
   withTempRepo((repoRoot) => {
+    const executionRoot = path.join(repoRoot, "target-checkout-root");
+    fs.mkdirSync(executionRoot, { recursive: true });
     configureCodexExternalRuntime(repoRoot, {
       command: process.execPath,
       args: [
@@ -235,7 +237,7 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
           "process.stdout.write(JSON.stringify({",
           "status:'success',",
           "summary:'external runner ok',",
-          "output:{runner:'node-inline',step_class:request.step_class||null},",
+          "output:{runner:'node-inline',step_class:request.step_class||null,cwd:process.cwd()},",
           "evidence_refs:['evidence://external-runner/step-success'],",
           "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline'}]",
           "}));",
@@ -250,6 +252,7 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
       dryRun: false,
       approvedHandoffRef: "evidence://handoff/approved-1",
       promotionEvidenceRefs: ["evidence://promotion/pass-1"],
+      executionRoot,
     });
 
     assert.equal(result.stepResult.status, "passed");
@@ -263,6 +266,14 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
     assert.equal(result.stepResult.routed_execution.adapter_response.status, "success");
     assert.equal(result.stepResult.routed_execution.adapter_response.output.mode, "execute");
     assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.command, process.execPath);
+    assert.equal(
+      fs.realpathSync(result.stepResult.routed_execution.adapter_response.output.external_runner.execution_root),
+      fs.realpathSync(executionRoot),
+    );
+    assert.equal(
+      fs.realpathSync(result.stepResult.routed_execution.adapter_response.output.runner_output.cwd),
+      fs.realpathSync(executionRoot),
+    );
     assert.ok(
       result.stepResult.routed_execution.adapter_response.evidence_refs.includes(
         "evidence://external-runner/step-success",

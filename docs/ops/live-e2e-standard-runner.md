@@ -36,8 +36,12 @@ Expected output includes:
 The run summary now also includes target-workspace materialization fields:
 - `target_checkout_root`
 - `generated_project_profile_file`
+- `routed_step_result_file`
+- `compiled_context_ref`
+- `adapter_raw_evidence_ref`
 
 These fields point to the run-scoped cloned target checkout and the run-scoped generated project profile under runtime state roots.
+`routed_step_result_file` links the routed live execution packet, `compiled_context_ref` links compiled-context lineage, and `adapter_raw_evidence_ref` links raw external-adapter evidence.
 
 The run summary also carries learning-loop linkage fields:
 - `learning_loop_scorecard_file`
@@ -75,10 +79,18 @@ Expected abort behavior:
 - emits terminal stream event for the same run id;
 - keeps already materialized evidence and scorecards intact.
 
+## Routed execution branch signatures
+- **Success branch:** `routed_step_result_file` exists, routed `step-result` has `routed_execution.mode=execute`, `adapter_response.status=success`, and raw adapter evidence reference is present.
+- **Missing-prerequisite branch:** run status is `fail`; routed `step-result` has `adapter_response.status=blocked` and `adapter_response.output.failure_kind=missing-prerequisite`.
+- **Policy-blocked branch:** run status is `fail`; routed `step-result` has `adapter_response.status=blocked` with non-empty delivery guardrail `blocking_reasons` or unsupported-adapter block metadata.
+
 ## Operator checks
 - Run summary and scorecard files exist under `.aor/projects/<project_id>/reports/`.
 - `target_checkout_root` exists and is a cloned checkout, not the control-plane repository root.
 - `generated_project_profile_file` exists under `.aor/projects/<project_id>/state/` and is used for analyze/validate/verify.
+- `routed_step_result_file` exists and references a routed step with `mode=execute`.
+- `compiled_context_ref` is populated and matches routed context-compilation output.
+- `adapter_raw_evidence_ref` is populated and referenced from routed adapter response.
 - `aor run status --run-id <RUN_ID> --follow true` can observe the same run stream.
 - CLI-only operation remains valid with web UI detached.
 - Use `live-e2e-learning-loop.md` to hand off incidents and scorecards into backlog and quality follow-up.

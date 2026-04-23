@@ -433,7 +433,13 @@ export function createMockAdapter(options = {}) {
 }
 
 /**
- * @param {{ adapterId: string }} options
+ * @param {{
+ *   adapterId: string,
+ *   adapterProfile?: Record<string, unknown>,
+ *   runtimeEvidenceRoot?: string,
+ *   projectRoot?: string,
+ *   executionRoot?: string,
+ * }} options
  */
 export function createLiveAdapter(options) {
   const adapterId = requireString("adapterId", options.adapterId);
@@ -451,6 +457,12 @@ export function createLiveAdapter(options) {
   const envOverrides = asStringMap(externalRuntime.env);
   const runtimeEvidenceRoot = asOptionalString(options.runtimeEvidenceRoot);
   const projectRoot = asOptionalString(options.projectRoot);
+  const requestedExecutionRoot = asOptionalString(options.executionRoot);
+  const executionRoot = requestedExecutionRoot
+    ? path.isAbsolute(requestedExecutionRoot)
+      ? requestedExecutionRoot
+      : path.resolve(process.cwd(), requestedExecutionRoot)
+    : process.cwd();
 
   if (adapterId !== "codex-cli") {
     throw new Error(
@@ -552,7 +564,7 @@ export function createLiveAdapter(options) {
       };
 
       const invocation = spawnSync(runtimeCommand, runtimeArgs, {
-        cwd: process.cwd(),
+        cwd: executionRoot,
         env: {
           ...process.env,
           ...envOverrides,
@@ -585,6 +597,7 @@ export function createLiveAdapter(options) {
           args: runtimeArgs,
           timeout_ms: timeoutMs,
           request_via_stdin: requestViaStdin,
+          execution_root: executionRoot,
         },
         process: {
           exit_code: invocation.status,
@@ -604,7 +617,7 @@ export function createLiveAdapter(options) {
       if (runtimeEvidenceRoot) {
         const evidenceDir = path.isAbsolute(runtimeEvidenceRoot)
           ? runtimeEvidenceRoot
-          : path.resolve(process.cwd(), runtimeEvidenceRoot);
+          : path.resolve(executionRoot, runtimeEvidenceRoot);
         fs.mkdirSync(evidenceDir, { recursive: true });
         rawEvidenceFile = path.join(
           evidenceDir,
@@ -646,6 +659,7 @@ export function createLiveAdapter(options) {
           runtime_mode: runtimeMode,
           command: runtimeCommand,
           args: runtimeArgs,
+          execution_root: executionRoot,
           exit_code: invocation.status,
           signal: invocation.signal,
           timed_out: invocationTimedOut,

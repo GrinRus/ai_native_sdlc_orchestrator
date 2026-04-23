@@ -82,7 +82,7 @@ Close the reopened target-catalog proof gap by making standard live E2E target-b
 
 ## W11-S03 — Profile-driven preflight and routed live execution
 - **Epic:** EPIC-3 Routed execution
-- **State:** blocked
+- **State:** done
 - **Outcome:** Make the standard live E2E execution stage use profile-defined verification commands and the supported external adapter path from the target checkout root.
 - **Primary modules:** `apps/cli`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `examples/live-e2e/**`, `docs/ops/**`
 - **Hard dependencies:** W11-S02

@@ -251,6 +251,7 @@ function writeStepResult(options) {
  *   policiesRoot?: string,
  *   adaptersRoot?: string,
  *   skillsRoot?: string,
+ *   executionRoot?: string,
  *   requireDiscoveryCompleteness?: boolean,
  *   approvedHandoffRef?: string,
  *   promotionEvidenceRefs?: string[],
@@ -295,6 +296,11 @@ export function executeRoutedStep(options) {
       ? options.skillsRoot
       : path.resolve(init.projectRoot, options.skillsRoot)
     : path.join(init.projectRoot, "examples/skills");
+  const executionRoot = options.executionRoot
+    ? path.isAbsolute(options.executionRoot)
+      ? options.executionRoot
+      : path.resolve(init.projectRoot, options.executionRoot)
+    : init.projectRoot;
 
   const requestedStepClass = options.stepClass;
   const resultStepClass = STEP_CLASS_TO_RESULT_CLASS[requestedStepClass] ?? "runner";
@@ -632,6 +638,7 @@ export function executeRoutedStep(options) {
               adapterProfile: asRecord(asRecord(/** @type {any} */ (adapterResolution).adapter).profile),
               runtimeEvidenceRoot: init.runtimeLayout.reportsRoot,
               projectRoot: init.projectRoot,
+              executionRoot,
             });
             adapterResponse = liveAdapter.execute(/** @type {any} */ (adapterRequest));
             if (adapterResponse.status === "success") {

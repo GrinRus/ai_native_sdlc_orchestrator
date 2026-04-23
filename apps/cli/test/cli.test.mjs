@@ -75,6 +75,31 @@ function configureCodexExternalRuntime(options) {
 }
 
 /**
+ * @param {{ projectRoot: string }} options
+ */
+function configureCodexExternalRuntimeSuccess(options) {
+  configureCodexExternalRuntime({
+    projectRoot: options.projectRoot,
+    command: process.execPath,
+    args: [
+      "-e",
+      [
+        "const fs=require('node:fs');",
+        "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+        "const request=input.request||{};",
+        "process.stdout.write(JSON.stringify({",
+        "status:'success',",
+        "summary:'external runner ok',",
+        "output:{runner:'node-inline',step_class:request.step_class||null,execution_root:process.cwd()},",
+        "evidence_refs:['evidence://external-runner/live-e2e-success'],",
+        "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline'}]",
+        "}));",
+      ].join(""),
+    ],
+  });
+}
+
+/**
  * @param {{
  *   hostProjectRoot: string,
  *   branch?: string,
@@ -1599,6 +1624,7 @@ test("live-e2e standard runner supports start observe report and bounded abort s
     runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "ci@example.com"] });
     runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "CI Test"] });
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    configureCodexExternalRuntimeSuccess({ projectRoot });
     const targetRepo = createLocalTargetRepository({ hostProjectRoot: projectRoot });
     const localProfilePath = path.join(projectRoot, "examples/live-e2e/regress-short.local.json");
     writeLocalLiveE2EProfile({
@@ -1632,8 +1658,35 @@ test("live-e2e standard runner supports start observe report and bounded abort s
     assert.equal(fs.existsSync(startedSummary.generated_project_profile_file), true);
     assert.equal(fs.existsSync(startedSummary.artifacts.target_checkout_root), true);
     assert.equal(fs.existsSync(startedSummary.artifacts.generated_project_profile_file), true);
+    assert.equal(typeof startedSummary.routed_step_result_file, "string");
+    assert.equal(fs.existsSync(startedSummary.routed_step_result_file), true);
+    assert.equal(typeof startedSummary.compiled_context_ref, "string");
+    assert.equal(typeof startedSummary.adapter_raw_evidence_ref, "string");
+    assert.match(startedSummary.adapter_raw_evidence_ref, /^evidence:\/\//u);
     const verifySummary = JSON.parse(fs.readFileSync(startedSummary.artifacts.verify_summary_file, "utf8"));
     assert.equal(verifySummary.execution_isolation.source_root, startedSummary.target_checkout_root);
+    const verifyStepResults = verifySummary.step_result_refs.map((filePath) =>
+      JSON.parse(fs.readFileSync(filePath, "utf8")),
+    );
+    const verifyTranscripts = verifyStepResults
+      .flatMap((stepResult) => (Array.isArray(stepResult.evidence_refs) ? stepResult.evidence_refs : []))
+      .filter((entry) => typeof entry === "string" && entry.endsWith(".log"))
+      .map((filePath) => fs.readFileSync(filePath, "utf8"));
+    assert.ok(verifyTranscripts.some((entry) => entry.includes("setup ok")));
+    assert.ok(verifyTranscripts.some((entry) => entry.includes("verify ok")));
+
+    const routedStepResult = JSON.parse(fs.readFileSync(startedSummary.routed_step_result_file, "utf8"));
+    assert.equal(routedStepResult.status, "passed");
+    assert.equal(routedStepResult.routed_execution.mode, "execute");
+    assert.equal(routedStepResult.routed_execution.adapter_response.status, "success");
+    assert.equal(
+      routedStepResult.routed_execution.adapter_response.output.external_runner.execution_root,
+      startedSummary.target_checkout_root,
+    );
+    assert.equal(
+      routedStepResult.routed_execution.adapter_request.context.compiled_context_ref,
+      startedSummary.compiled_context_ref,
+    );
     const generatedProjectProfile = JSON.parse(fs.readFileSync(startedSummary.generated_project_profile_file, "utf8"));
     assert.equal(path.isAbsolute(generatedProjectProfile.registry_roots.routes), true);
 
@@ -1736,9 +1789,63 @@ test("live-e2e start reports failure when target ref is invalid", () => {
   });
 });
 
+test("live-e2e start reports missing-prerequisite when routed external runner is unavailable", () => {
+  withTempProject((projectRoot) => {
+    runGitChecked({ cwd: projectRoot, args: ["init", "-b", "main"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "ci@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "CI Test"] });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    configureCodexExternalRuntime({
+      projectRoot,
+      command: "__aor_missing_runner_command__",
+      args: [],
+    });
+    const targetRepo = createLocalTargetRepository({ hostProjectRoot: projectRoot });
+    const localProfilePath = path.join(projectRoot, "examples/live-e2e/regress-short.missing-runner.json");
+    writeLocalLiveE2EProfile({
+      templateProfilePath: path.join(projectRoot, "examples/live-e2e/regress-short.yaml"),
+      outputProfilePath: localProfilePath,
+      targetRepoRoot: targetRepo.targetRepoRoot,
+      targetRef: targetRepo.targetRef,
+    });
+
+    const startResult = invokeCli([
+      "live-e2e",
+      "start",
+      "--project-ref",
+      projectRoot,
+      "--profile",
+      localProfilePath,
+    ]);
+    assert.equal(startResult.exitCode, 0, startResult.stderr);
+    const startPayload = JSON.parse(startResult.stdout);
+    assert.equal(startPayload.live_e2e_run_status, "fail");
+    assert.equal(fs.existsSync(startPayload.live_e2e_run_summary_file), true);
+
+    const summary = JSON.parse(fs.readFileSync(startPayload.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "fail");
+    assert.match(String(summary.error), /missing-prerequisite/u);
+    assert.equal(fs.existsSync(summary.artifacts.routed_step_result_file), true);
+
+    const routedStepResult = JSON.parse(fs.readFileSync(summary.artifacts.routed_step_result_file, "utf8"));
+    assert.equal(routedStepResult.status, "failed");
+    assert.equal(routedStepResult.routed_execution.mode, "execute");
+    assert.equal(routedStepResult.routed_execution.adapter_response.status, "blocked");
+    assert.equal(
+      routedStepResult.routed_execution.adapter_response.output.failure_kind,
+      "missing-prerequisite",
+    );
+    assert.match(
+      String(routedStepResult.routed_execution.adapter_response.summary),
+      /not available on PATH/i,
+    );
+  });
+});
+
 test("live-e2e W7 governance profile links quality, incident, and finance evidence for closure smoke", () => {
   withTempProject((projectRoot) => {
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    configureCodexExternalRuntimeSuccess({ projectRoot });
     runGitChecked({ cwd: projectRoot, args: ["init", "-b", "main"] });
     runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "ci@example.com"] });
     runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "CI Test"] });
@@ -1991,6 +2098,10 @@ test("project verify supports routed live execution baseline when delivery evide
     assert.equal(
       routedStepResult.routed_execution.adapter_response.output.external_runner.command,
       process.execPath,
+    );
+    assert.equal(
+      routedStepResult.routed_execution.adapter_response.output.external_runner.execution_root,
+      projectRoot,
     );
     assert.ok(
       routedStepResult.routed_execution.adapter_response.evidence_refs.includes(
