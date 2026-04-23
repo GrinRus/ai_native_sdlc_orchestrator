@@ -4,6 +4,8 @@ import path from "node:path";
 
 import {
   createAdapterRequestEnvelope,
+  createAdapterResponseEnvelope,
+  createLiveAdapter,
   createMockAdapter,
   resolveAdapterForRoute,
 } from "../../adapter-sdk/src/index.mjs";
@@ -49,6 +51,14 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function asString(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
 /**
@@ -242,6 +252,9 @@ function writeStepResult(options) {
  *   adaptersRoot?: string,
  *   skillsRoot?: string,
  *   requireDiscoveryCompleteness?: boolean,
+ *   approvedHandoffRef?: string,
+ *   promotionEvidenceRefs?: string[],
+ *   coordinationEvidenceRefs?: string[],
  * }} options
  */
 export function executeRoutedStep(options) {
@@ -331,7 +344,9 @@ export function executeRoutedStep(options) {
   let evidenceRefs = [init.projectProfilePath];
   /** @type {"passed" | "failed"} */
   let status = "passed";
-  let summary = `Routed step '${requestedStepClass}' completed in dry-run mode.`;
+  let summary = dryRun
+    ? `Routed step '${requestedStepClass}' completed in dry-run mode.`
+    : `Routed live execution for step '${requestedStepClass}' completed.`;
   /** @type {string | null} */
   let blockedNextStep = null;
   /** @type {{
@@ -471,12 +486,21 @@ export function executeRoutedStep(options) {
         routeOverrides: options.routeOverrides,
         policyOverrides: options.policyOverrides,
       });
+      const approvedHandoffRef = asString(options.approvedHandoffRef);
       deliveryPlanResult = materializeDeliveryPlan({
         runtimeLayout: init.runtimeLayout,
         projectId: init.projectId,
         runId,
         stepClass: requestedStepClass,
         policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
+        handoffApproval: approvedHandoffRef
+          ? {
+              status: "pass",
+              ref: approvedHandoffRef,
+            }
+          : undefined,
+        promotionEvidenceRefs: asStringArray(options.promotionEvidenceRefs),
+        coordinationEvidenceRefs: asStringArray(options.coordinationEvidenceRefs),
       });
 
       adapterResolution = resolveAdapterForRoute({
@@ -484,120 +508,162 @@ export function executeRoutedStep(options) {
         adaptersRoot,
         adapterOverrides: options.adapterOverrides,
       });
+      const syntheticPacketRefs = resolveSyntheticPacketRefs(/** @type {Record<string, unknown>} */ (assetResolution));
+      const compiled = compileStepContext({
+        projectRoot: init.projectRoot,
+        projectProfilePath: init.projectProfilePath,
+        stepClass: requestedStepClass,
+        routeResolution: /** @type {Record<string, unknown>} */ (routeResolution),
+        assetResolution: /** @type {Record<string, unknown>} */ (assetResolution),
+        policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
+        inputPacketRefs: syntheticPacketRefs,
+        runtimeEvidenceRefs: evidenceRefs,
+        skillsRoot,
+      });
+      contextCompilation = compiled.context_compilation;
 
-      if (!dryRun) {
-        evidenceRefs = [
-          ...new Set([
-            init.projectProfilePath,
-            ...(deliveryPlanResult ? [deliveryPlanResult.deliveryPlanFile] : []),
-          ]),
-        ];
-        status = "failed";
-        summary = `Routed step '${requestedStepClass}' blocked: live adapter execution is not implemented yet; use dry-run mode.`;
-        blockedNextStep = "Retry with '--routed-dry-run-step' until live adapter execution is implemented.";
-      } else {
-        const syntheticPacketRefs = resolveSyntheticPacketRefs(/** @type {Record<string, unknown>} */ (assetResolution));
-        const compiled = compileStepContext({
-          projectRoot: init.projectRoot,
-          projectProfilePath: init.projectProfilePath,
-          stepClass: requestedStepClass,
-          routeResolution: /** @type {Record<string, unknown>} */ (routeResolution),
-          assetResolution: /** @type {Record<string, unknown>} */ (assetResolution),
-          policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
-          inputPacketRefs: syntheticPacketRefs,
-          runtimeEvidenceRefs: evidenceRefs,
-          skillsRoot,
-        });
-        contextCompilation = compiled.context_compilation;
+      const promptBundleRef = String(
+        asRecord(asRecord(assetResolution).prompt_bundle).prompt_bundle_ref ?? "prompt-bundle://unknown@v1",
+      );
+      const contextBundles = asRecord(asRecord(assetResolution).context_bundles);
+      const expandedRefs = asRecord(contextBundles.expanded_refs);
+      const compiledContextId = buildCompiledContextId(
+        init.projectId,
+        runId,
+        stepId,
+        requestedStepClass,
+        promptBundleRef,
+        executionAttempt,
+      );
+      compiledContextArtifact = {
+        compiled_context_id: compiledContextId,
+        version: 1,
+        step: requestedStepClass,
+        prompt_bundle_ref: promptBundleRef,
+        context_bundle_refs: uniqueStrings(contextBundles.bundle_refs),
+        context_doc_refs: uniqueStrings(expandedRefs.context_doc_refs),
+        context_rule_refs: uniqueStrings(expandedRefs.context_rule_refs),
+        context_skill_refs: uniqueStrings(expandedRefs.context_skill_refs),
+        packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
+        hashes: {
+          prompt_hash: `sha256:${sha256Hex(promptBundleRef)}`,
+          context_hash: `sha256:${String(compiled.context_compilation.compiled_context_fingerprint ?? "")}`,
+        },
+        provenance: {
+          compiler_revision_ref: "compiler://runtime-context-compiler@v1",
+          project_profile_ref: init.projectProfilePath,
+          route_profile_ref: asRecord(routeResolution).resolved_route_id ?? null,
+          wrapper_profile_ref: asRecord(asRecord(assetResolution).wrapper).wrapper_ref ?? null,
+          generated_at: new Date().toISOString(),
+        },
+      };
+      compiledContextArtifactPath = writeCompiledContextArtifact({
+        runtimeLayout: init.runtimeLayout,
+        compiledContextArtifact,
+        artifactFileName: compiledContextFileName,
+      });
+      compiledContextRef = `compiled-context://${compiledContextId}`;
 
-        const promptBundleRef = String(
-          asRecord(asRecord(assetResolution).prompt_bundle).prompt_bundle_ref ?? "prompt-bundle://unknown@v1",
-        );
-        const contextBundles = asRecord(asRecord(assetResolution).context_bundles);
-        const expandedRefs = asRecord(contextBundles.expanded_refs);
-        const compiledContextId = buildCompiledContextId(
-          init.projectId,
-          runId,
-          stepId,
-          requestedStepClass,
-          promptBundleRef,
-          executionAttempt,
-        );
-        compiledContextArtifact = {
+      adapterRequest = createAdapterRequestEnvelope({
+        request_id: `${stepResultId}.request`,
+        run_id: runId,
+        step_id: stepId,
+        step_class: requestedStepClass,
+        route: routeResolution,
+        asset_bundle: assetResolution,
+        policy_bundle: policyResolution,
+        input_packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
+        dry_run: dryRun,
+        context: {
+          compiled_context_ref: compiledContextRef,
           compiled_context_id: compiledContextId,
-          version: 1,
-          step: requestedStepClass,
-          prompt_bundle_ref: promptBundleRef,
-          context_bundle_refs: uniqueStrings(contextBundles.bundle_refs),
-          context_doc_refs: uniqueStrings(expandedRefs.context_doc_refs),
-          context_rule_refs: uniqueStrings(expandedRefs.context_rule_refs),
-          context_skill_refs: uniqueStrings(expandedRefs.context_skill_refs),
-          packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
-          hashes: {
-            prompt_hash: `sha256:${sha256Hex(promptBundleRef)}`,
-            context_hash: `sha256:${String(compiled.context_compilation.compiled_context_fingerprint ?? "")}`,
-          },
-          provenance: {
-            compiler_revision_ref: "compiler://runtime-context-compiler@v1",
-            project_profile_ref: init.projectProfilePath,
-            route_profile_ref: asRecord(routeResolution).resolved_route_id ?? null,
-            wrapper_profile_ref: asRecord(asRecord(assetResolution).wrapper).wrapper_ref ?? null,
-            generated_at: new Date().toISOString(),
-          },
-        };
-        compiledContextArtifactPath = writeCompiledContextArtifact({
-          runtimeLayout: init.runtimeLayout,
-          compiledContextArtifact,
-          artifactFileName: compiledContextFileName,
-        });
-        compiledContextRef = `compiled-context://${compiledContextId}`;
+          compiled_context_fingerprint: compiled.context_compilation.compiled_context_fingerprint,
+          context_bundle_refs: compiledContextArtifact.context_bundle_refs,
+          context_doc_refs: compiledContextArtifact.context_doc_refs,
+          context_rule_refs: compiledContextArtifact.context_rule_refs,
+          context_skill_refs: compiledContextArtifact.context_skill_refs,
+          packet_refs: compiledContextArtifact.packet_refs,
+          instruction_set: compiled.compiled_context.instruction_set,
+          required_inputs_resolved: compiled.compiled_context.required_inputs_resolved,
+          guardrails: compiled.compiled_context.guardrails,
+          skill_refs: compiled.compiled_context.skill_refs,
+          provenance: compiled.compiled_context.provenance,
+        },
+      });
 
-        adapterRequest = createAdapterRequestEnvelope({
-          request_id: `${stepResultId}.request`,
-          run_id: runId,
-          step_id: stepId,
-          step_class: requestedStepClass,
-          route: routeResolution,
-          asset_bundle: assetResolution,
-          policy_bundle: policyResolution,
-          input_packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
-          dry_run: true,
-          context: {
-            compiled_context_ref: compiledContextRef,
-            compiled_context_id: compiledContextId,
-            compiled_context_fingerprint: compiled.context_compilation.compiled_context_fingerprint,
-            context_bundle_refs: compiledContextArtifact.context_bundle_refs,
-            context_doc_refs: compiledContextArtifact.context_doc_refs,
-            context_rule_refs: compiledContextArtifact.context_rule_refs,
-            context_skill_refs: compiledContextArtifact.context_skill_refs,
-            packet_refs: compiledContextArtifact.packet_refs,
-            instruction_set: compiled.compiled_context.instruction_set,
-            required_inputs_resolved: compiled.compiled_context.required_inputs_resolved,
-            guardrails: compiled.compiled_context.guardrails,
-            skill_refs: compiled.compiled_context.skill_refs,
-            provenance: compiled.compiled_context.provenance,
-          },
-        });
+      const selectedAdapterId =
+        typeof (/** @type {any} */ (adapterResolution))?.adapter?.adapter_id === "string"
+          ? /** @type {any} */ (adapterResolution).adapter.adapter_id
+          : "none";
 
+      if (dryRun) {
         const mockAdapter = createMockAdapter();
         adapterResponse = mockAdapter.execute(/** @type {any} */ (adapterRequest));
-        evidenceRefs = [
-          ...new Set([
-            init.projectProfilePath,
-            ...(deliveryPlanResult ? [deliveryPlanResult.deliveryPlanFile] : []),
-            ...(compiledContextRef ? [compiledContextRef] : []),
-            ...(compiledContextArtifactPath ? [compiledContextArtifactPath] : []),
-            ...asStringArray(adapterResponse.evidence_refs),
-          ]),
-        ];
-        summary = `Routed dry-run for step '${requestedStepClass}' completed with selected adapter '${String(
-          /** @type {any} */ (adapterResolution).adapter?.adapter_id ?? "unknown",
-        )}' and mock execution.`;
+        summary = `Routed dry-run for step '${requestedStepClass}' completed with selected adapter '${selectedAdapterId}' and mock execution.`;
+      } else {
+        const plan = asRecord(deliveryPlanResult?.deliveryPlan);
+        const planReady = plan.status === "ready" && plan.writeback_allowed === true;
+        const blockingReasons = asStringArray(plan.blocking_reasons);
+
+        if (!planReady) {
+          status = "failed";
+          summary =
+            blockingReasons.length > 0
+              ? `Routed live execution blocked by delivery guardrails: ${blockingReasons.join(", ")}.`
+              : `Routed live execution blocked for step '${requestedStepClass}': delivery plan is not ready.`;
+          blockedNextStep =
+            "Provide approved handoff and promotion evidence (or use '--routed-dry-run-step') before live execution.";
+          adapterResponse = createAdapterResponseEnvelope({
+            request_id: adapterRequest.request_id,
+            adapter_id: selectedAdapterId,
+            status: "blocked",
+            summary,
+            output: {
+              mode: "execute",
+              blocked: true,
+              blocking_reasons: blockingReasons,
+              delivery_plan_status: asString(plan.status) ?? "unknown",
+            },
+          });
+        } else {
+          try {
+            const liveAdapter = createLiveAdapter({ adapterId: selectedAdapterId });
+            adapterResponse = liveAdapter.execute(/** @type {any} */ (adapterRequest));
+            summary = `Routed live execution for step '${requestedStepClass}' completed with adapter '${selectedAdapterId}'.`;
+          } catch (error) {
+            status = "failed";
+            summary = error instanceof Error ? error.message : String(error);
+            blockedNextStep = "Select a supported live adapter or use '--routed-dry-run-step'.";
+            adapterResponse = createAdapterResponseEnvelope({
+              request_id: adapterRequest.request_id,
+              adapter_id: selectedAdapterId,
+              status: "blocked",
+              summary,
+              output: {
+                mode: "execute",
+                blocked: true,
+                failure_kind: "adapter-not-supported",
+              },
+            });
+          }
+        }
       }
+
+      evidenceRefs = [
+        ...new Set([
+          init.projectProfilePath,
+          ...(deliveryPlanResult ? [deliveryPlanResult.deliveryPlanFile] : []),
+          ...(compiledContextRef ? [compiledContextRef] : []),
+          ...(compiledContextArtifactPath ? [compiledContextArtifactPath] : []),
+          ...asStringArray(adapterResponse?.evidence_refs),
+        ]),
+      ];
     } catch (error) {
       status = "failed";
       summary = error instanceof Error ? error.message : String(error);
-      blockedNextStep = "Fix routed resolution inputs (route/asset/policy/adapter) and retry dry-run.";
+      blockedNextStep = dryRun
+        ? "Fix routed resolution inputs (route/asset/policy/adapter) and retry dry-run."
+        : "Fix routed resolution inputs (route/asset/policy/adapter) and retry live execution.";
     }
   }
 

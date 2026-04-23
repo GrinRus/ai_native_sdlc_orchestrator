@@ -111,7 +111,7 @@ This is the master index for the implementation slices across all defined waves.
 | W9-S04 | Machine-checkable control-plane API contract coverage | EPIC-6 | done | `docs/contracts/control-plane-api.md`, `packages/contracts`, `examples/**`, `apps/api` | W9-S03 |
 | W9-S05 | Public harness replay command surface | EPIC-4 | done | `apps/cli`, `packages/orchestrator-core`, `docs/architecture/**`, `docs/ops/**` | W3-S04, W8-S05 |
 | W9-S06 | Asset promote/freeze command surface completion | EPIC-4 | done | `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`, `examples/eval/**` | W7-S02, W8-S09 |
-| W9-S07 | Detached HTTP control-plane transport baseline | EPIC-6 | ready | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**` | W9-S03, W9-S04 |
+| W9-S07 | Detached HTTP control-plane transport baseline | EPIC-6 | done | `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**` | W9-S03, W9-S04 |
 | W9-S08 | First real provider adapter and live execution foundation | EPIC-3 | ready | `packages/adapter-sdk`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `examples/adapters/**` | W9-S01, W8-S03, W8-S08 |
 
 ## Planning note

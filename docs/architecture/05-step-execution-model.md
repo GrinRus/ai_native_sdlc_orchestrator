@@ -32,42 +32,37 @@ For each step AOR resolves:
 8. optionally run eval or harness
 9. retry, repair, escalate, or close
 
-## Adapter SDK baseline (W2-S04)
+## Adapter SDK baseline (W2-S04 + W9-S08)
 Adapter invocation uses one stable envelope pair:
-- request envelope: `request_id`, `run_id`, `step_id`, `step_class`, resolved route/asset/policy bundles, non-empty input packet refs, compiled context, and dry-run flag;
+- request envelope: `request_id`, `run_id`, `step_id`, `step_class`, resolved route/asset/policy bundles, input packet refs, compiled context, and dry-run flag;
 - response envelope: `request_id`, `adapter_id`, `status`, summary, normalized output payload, evidence refs, and tool traces.
 
 Shared lifecycle hooks are explicit and adapter-agnostic:
 `before_step`, `invoke_adapter`, `after_step`, `on_retry`, `on_repair`, `on_escalation`.
 
-## Routed execution engine baseline (W2-S05)
-The first routed execution baseline runs one deterministic path:
+Execution baselines:
+- deterministic dry-run adapter path (`mock-runner`) for rehearsal-safe execution;
+- first live provider baseline (`codex-cli`) for routed live execution foundation in `W9-S08`.
+
+## Routed execution engine baseline (W2-S05 + W9-S08)
+The routed execution baseline follows one deterministic sequence:
 1. resolve route;
-2. resolve wrapper + prompt bundle;
-3. resolve policy bounds and guardrails;
-4. compile context (prompt instruction set, wrapper bootstrap, required input resolution, guardrails, skill refs, provenance);
-5. negotiate adapter capabilities;
-6. invoke deterministic mock adapter in dry-run mode.
+2. resolve wrapper + prompt bundle + context bundles;
+3. resolve policy bounds and governance;
+4. materialize delivery guardrails (`delivery-plan`) for writeback policy truth;
+5. compile context and persist one `compiled-context` artifact;
+6. negotiate adapter capabilities;
+7. execute:
+  - dry-run path: deterministic mock adapter;
+  - live path: supported live adapter only when delivery guardrails are ready, otherwise explicit blocked adapter response.
 
-The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with selected route/assets/policy/adapter metadata, context-compilation diagnostics, and evidence refs. Routed `step-result` and `compiled-context` outputs use run/step/attempt-scoped identities so repeated same-step executions preserve prior evidence.
+The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with:
+- selected route/asset/policy/adapter metadata;
+- compiled-context diagnostics and refs;
+- adapter request/response lineage;
+- deterministic blocked-next-step guidance.
 
-## Adapter SDK baseline (W2-S04)
-Adapter invocation uses one stable envelope pair:
-- request envelope: `request_id`, `run_id`, `step_id`, `step_class`, resolved route/asset/policy bundles, input packet refs, and dry-run flag;
-- response envelope: `request_id`, `adapter_id`, `status`, summary, normalized output payload, evidence refs, and tool traces.
-
-Shared lifecycle hooks are explicit and adapter-agnostic:
-`before_step`, `invoke_adapter`, `after_step`, `on_retry`, `on_repair`, `on_escalation`.
-
-## Routed execution engine baseline (W2-S05)
-The first routed execution baseline runs one deterministic path:
-1. resolve route;
-2. resolve wrapper + prompt bundle;
-3. resolve policy bounds and guardrails;
-4. negotiate adapter capabilities;
-5. invoke deterministic mock adapter in dry-run mode.
-
-The engine always writes a normalized `step-result` artifact, including failure and blocked outcomes, with selected route/assets/policy/adapter metadata and evidence refs.
+Routed `step-result` and `compiled-context` outputs use run/step/attempt-scoped identities so repeated same-step executions preserve prior evidence.
 
 ## Why one model matters
 A single step model keeps:

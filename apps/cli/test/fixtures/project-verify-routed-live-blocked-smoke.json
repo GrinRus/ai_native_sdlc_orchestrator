@@ -1,0 +1,7 @@
+{
+  "status": "failed",
+  "mode": "execute",
+  "adapter_status": "blocked",
+  "has_approved_handoff_required": true,
+  "has_promotion_evidence_required": true
+}

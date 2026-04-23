@@ -104,6 +104,9 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--runtime-root <path> (optional)",
       "--require-validation-pass (optional)",
       "--routed-dry-run-step <step_class> (optional)",
+      "--routed-live-step <step_class> (optional)",
+      "--approved-handoff-ref <ref> (optional, required for live non-no-write flow)",
+      "--promotion-evidence-refs <ref[,ref...]> (optional, required for live non-no-write flow)",
       "--help",
     ],
     outputs: [

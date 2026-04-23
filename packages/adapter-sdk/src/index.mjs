@@ -378,3 +378,72 @@ export function createMockAdapter(options = {}) {
     },
   };
 }
+
+/**
+ * @param {{ adapterId: string }} options
+ */
+export function createLiveAdapter(options) {
+  const adapterId = requireString("adapterId", options.adapterId);
+
+  if (adapterId !== "codex-cli") {
+    throw new Error(
+      `Live adapter '${adapterId}' is not supported in the current baseline. Supported adapters: codex-cli.`,
+    );
+  }
+
+  return {
+    adapter_id: adapterId,
+    lifecycle_hooks: STEP_LIFECYCLE_HOOKS,
+    /**
+     * @param {{
+     *   request_id: string,
+     *   run_id: string,
+     *   step_id: string,
+     *   step_class: string,
+     *   route: Record<string, unknown>,
+     *   asset_bundle: Record<string, unknown>,
+     *   policy_bundle: Record<string, unknown>,
+     *   input_packet_refs?: string[],
+     *   dry_run?: boolean,
+     *   context?: Record<string, unknown>,
+     * }} request
+     */
+    execute(request) {
+      const envelope = createAdapterRequestEnvelope(request);
+      const route = asRecord(envelope.route);
+      const routeId =
+        typeof route.resolved_route_id === "string" && route.resolved_route_id.trim().length > 0
+          ? route.resolved_route_id.trim()
+          : "route.unknown";
+      const context = asRecord(envelope.context);
+      const compiledContextRef =
+        typeof context.compiled_context_ref === "string" && context.compiled_context_ref.trim().length > 0
+          ? context.compiled_context_ref.trim()
+          : null;
+      const deterministicSeed = `${envelope.step_id}:${envelope.step_class}:${routeId}:execute`;
+      const normalizedEvidenceToken = deterministicSeed.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+      return createAdapterResponseEnvelope({
+        request_id: envelope.request_id,
+        adapter_id: adapterId,
+        status: "success",
+        summary: `Codex CLI live baseline executed ${envelope.step_class}`,
+        output: {
+          deterministic_seed: deterministicSeed,
+          mode: "execute",
+          route_id: routeId,
+          provider_adapter: adapterId,
+          compiled_context_ref: compiledContextRef,
+        },
+        evidence_refs: [`evidence://adapter-live/${adapterId}/${normalizedEvidenceToken}`],
+        tool_traces: [
+          {
+            phase: "invoke_adapter",
+            kind: "codex-cli-live-baseline",
+            detail: `deterministic_seed=${deterministicSeed}`,
+          },
+        ],
+      });
+    },
+  };
+}

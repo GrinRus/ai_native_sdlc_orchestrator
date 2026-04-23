@@ -197,6 +197,9 @@ function formatCommandHelp(definition) {
             "- --project-ref must point to an existing directory.",
             "- --require-validation-pass enforces validation gate before verify can proceed.",
             "- --routed-dry-run-step executes one routed dry-run step and writes a durable step-result artifact.",
+            "- --routed-live-step executes one routed live step when delivery guardrails and supported adapter baseline permit it.",
+            "- Use --approved-handoff-ref and --promotion-evidence-refs with --routed-live-step for non-no-write live routes.",
+            "- --routed-dry-run-step and --routed-live-step are mutually exclusive.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
           ]
       : definition.command === "eval run"
@@ -1056,14 +1059,27 @@ function executeImplementedCommand(command, flags, cwd) {
     verifyStepResultFiles = verifyResult.stepResultFiles;
 
     const routedDryRunStep = resolveOptionalStringFlag("routed-dry-run-step", flags["routed-dry-run-step"]);
-    if (routedDryRunStep) {
+    const routedLiveStep = resolveOptionalStringFlag("routed-live-step", flags["routed-live-step"]);
+    if (routedDryRunStep && routedLiveStep) {
+      throw new CliUsageError(
+        "Flags '--routed-dry-run-step' and '--routed-live-step' are mutually exclusive.",
+      );
+    }
+
+    const selectedRoutedStep = routedDryRunStep ?? routedLiveStep;
+    if (selectedRoutedStep) {
       const routedResult = executeRoutedStep({
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
         projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-        stepClass: routedDryRunStep,
-        dryRun: true,
+        stepClass: selectedRoutedStep,
+        dryRun: routedDryRunStep ? true : false,
+        approvedHandoffRef: resolveOptionalStringFlag("approved-handoff-ref", flags["approved-handoff-ref"]),
+        promotionEvidenceRefs: resolveOptionalCsvFlag(
+          "promotion-evidence-refs",
+          flags["promotion-evidence-refs"],
+        ),
       });
 
       routedStepResultId = routedResult.stepResultId;

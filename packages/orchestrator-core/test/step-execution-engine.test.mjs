@@ -197,3 +197,81 @@ test("executeRoutedStep still writes failed step-result when routed resolution f
     assert.equal(result.stepResult.routed_execution.no_write_enforced, true);
   });
 });
+
+test("executeRoutedStep supports live execution for supported adapter when delivery guardrails are ready", () => {
+  withTempRepo((repoRoot) => {
+    const result = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      approvedHandoffRef: "evidence://handoff/approved-1",
+      promotionEvidenceRefs: ["evidence://promotion/pass-1"],
+    });
+
+    assert.equal(result.stepResult.status, "passed");
+    assert.equal(result.stepResult.routed_execution.mode, "execute");
+    assert.equal(result.stepResult.routed_execution.no_write_enforced, false);
+    assert.equal(result.stepResult.routed_execution.delivery_plan.status, "ready");
+    assert.equal(result.stepResult.routed_execution.delivery_plan.writeback_allowed, true);
+    assert.equal(result.stepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
+    assert.equal(result.stepResult.routed_execution.adapter_request.dry_run, false);
+    assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "codex-cli");
+    assert.equal(result.stepResult.routed_execution.adapter_response.status, "success");
+    assert.equal(result.stepResult.routed_execution.adapter_response.output.mode, "execute");
+    assert.equal(typeof result.stepResult.routed_execution.context_compilation.compiled_context_ref, "string");
+    assert.match(
+      result.stepResult.routed_execution.context_compilation.compiled_context_ref,
+      /^compiled-context:\/\//u,
+    );
+    assert.ok(
+      result.stepResult.evidence_refs.includes(
+        result.stepResult.routed_execution.context_compilation.compiled_context_ref,
+      ),
+    );
+  });
+});
+
+test("executeRoutedStep blocks live execution deterministically for unapproved or unsupported adapter paths", () => {
+  withTempRepo((repoRoot) => {
+    const unapproved = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+    });
+
+    assert.equal(unapproved.stepResult.status, "failed");
+    assert.match(unapproved.stepResult.summary, /delivery guardrails/i);
+    assert.equal(unapproved.stepResult.routed_execution.adapter_response.status, "blocked");
+    assert.ok(
+      Array.isArray(unapproved.stepResult.routed_execution.adapter_response.output.blocking_reasons),
+    );
+    assert.ok(
+      unapproved.stepResult.routed_execution.adapter_response.output.blocking_reasons.includes(
+        "approved-handoff-required",
+      ),
+    );
+
+    const unsupported = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      approvedHandoffRef: "evidence://handoff/approved-2",
+      promotionEvidenceRefs: ["evidence://promotion/pass-2"],
+      adapterOverrides: {
+        implement: "open-code",
+      },
+    });
+
+    assert.equal(unsupported.stepResult.status, "failed");
+    assert.match(unsupported.stepResult.summary, /supported adapters: codex-cli/i);
+    assert.equal(unsupported.stepResult.routed_execution.adapter_response.status, "blocked");
+    assert.equal(unsupported.stepResult.routed_execution.adapter_response.output.failure_kind, "adapter-not-supported");
+    assert.match(
+      String(unsupported.stepResult.routed_execution.blocked_next_step),
+      /supported live adapter|routed-dry-run-step/i,
+    );
+  });
+});

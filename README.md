@@ -30,11 +30,12 @@ What exists today:
 - a documented live E2E target catalog built around public GitHub repositories.
 - implemented W5 operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and standard live E2E runner commands.
 - expanded implementation backlog through W9 slices with active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
+- first live routed execution baseline for supported `codex-cli` adapter paths with explicit delivery-guardrail blocking semantics.
 
 What does **not** exist yet:
 
 - a production-ready orchestrator runtime;
-- real provider adapters for Codex, Claude, or OpenCode;
+- broad multi-provider production-grade adapter coverage (beyond the first `codex-cli` live baseline);
 - delivery write-back automation to upstream repositories;
 - full planned command surface and production hardening for all operator/delivery controls.
 

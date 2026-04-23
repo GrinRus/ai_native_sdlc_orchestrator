@@ -1766,6 +1766,107 @@ test("project verify supports routed dry-run smoke execution with compiled-conte
   });
 });
 
+test("project verify supports routed live execution baseline when delivery evidence is provided", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const result = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--routed-live-step",
+      "implement",
+      "--approved-handoff-ref",
+      "evidence://handoff/live-approved",
+      "--promotion-evidence-refs",
+      "evidence://promotion/live-pass",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(typeof parsed.routed_step_result_id, "string");
+    assert.equal(fs.existsSync(parsed.routed_step_result_file), true);
+
+    const routedStepResult = JSON.parse(fs.readFileSync(parsed.routed_step_result_file, "utf8"));
+    assert.equal(routedStepResult.step_class, "runner");
+    assert.equal(routedStepResult.status, "passed");
+    assert.equal(routedStepResult.routed_execution.mode, "execute");
+    assert.equal(routedStepResult.routed_execution.no_write_enforced, false);
+    assert.equal(routedStepResult.routed_execution.delivery_plan.status, "ready");
+    assert.equal(routedStepResult.routed_execution.delivery_plan.writeback_allowed, true);
+    assert.equal(routedStepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
+    assert.equal(routedStepResult.routed_execution.adapter_request.dry_run, false);
+    assert.equal(routedStepResult.routed_execution.adapter_response.adapter_id, "codex-cli");
+    assert.equal(routedStepResult.routed_execution.adapter_response.status, "success");
+    assert.equal(routedStepResult.routed_execution.adapter_response.output.mode, "execute");
+
+    const fixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "project-verify-routed-live-smoke.json"), "utf8"),
+    );
+    const subset = {
+      status: routedStepResult.status,
+      mode: routedStepResult.routed_execution.mode,
+      no_write_enforced: routedStepResult.routed_execution.no_write_enforced,
+      delivery_plan_status: routedStepResult.routed_execution.delivery_plan.status,
+      delivery_plan_writeback_allowed: routedStepResult.routed_execution.delivery_plan.writeback_allowed,
+      adapter_id: routedStepResult.routed_execution.adapter_response.adapter_id,
+      adapter_status: routedStepResult.routed_execution.adapter_response.status,
+      adapter_output_mode: routedStepResult.routed_execution.adapter_response.output.mode,
+    };
+    assert.deepEqual(subset, fixture);
+  });
+});
+
+test("project verify routed live execution blocks with explicit guardrails when evidence is missing", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const result = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--routed-live-step",
+      "implement",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(fs.existsSync(parsed.routed_step_result_file), true);
+
+    const routedStepResult = JSON.parse(fs.readFileSync(parsed.routed_step_result_file, "utf8"));
+    assert.equal(routedStepResult.status, "failed");
+    assert.equal(routedStepResult.routed_execution.mode, "execute");
+    assert.match(routedStepResult.summary, /delivery guardrails/i);
+    assert.equal(routedStepResult.routed_execution.adapter_response.status, "blocked");
+    assert.ok(
+      routedStepResult.routed_execution.adapter_response.output.blocking_reasons.includes("approved-handoff-required"),
+    );
+    assert.ok(
+      routedStepResult.routed_execution.adapter_response.output.blocking_reasons.includes("promotion-evidence-required"),
+    );
+
+    const fixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "project-verify-routed-live-blocked-smoke.json"), "utf8"),
+    );
+    const subset = {
+      status: routedStepResult.status,
+      mode: routedStepResult.routed_execution.mode,
+      adapter_status: routedStepResult.routed_execution.adapter_response.status,
+      has_approved_handoff_required: routedStepResult.routed_execution.adapter_response.output.blocking_reasons.includes(
+        "approved-handoff-required",
+      ),
+      has_promotion_evidence_required: routedStepResult.routed_execution.adapter_response.output.blocking_reasons.includes(
+        "promotion-evidence-required",
+      ),
+    };
+    assert.deepEqual(subset, fixture);
+  });
+});
+
 test("eval run executes offline suite and persists evaluation report", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });

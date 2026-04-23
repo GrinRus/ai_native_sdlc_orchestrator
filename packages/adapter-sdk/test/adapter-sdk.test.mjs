@@ -9,6 +9,7 @@ import {
   buildAdapterRegistry,
   createAdapterRequestEnvelope,
   createAdapterResponseEnvelope,
+  createLiveAdapter,
   createMockAdapter,
   resolveAdapterForRoute,
   resolveAdapterMatrix,
@@ -177,4 +178,34 @@ test("mock adapter executes deterministic dry-run outputs for rehearsal coverage
   assert.equal(first.status, "success");
   assert.equal(first.output.mode, "dry-run");
   assert.ok(first.evidence_refs[0].startsWith("evidence://mock-adapter/"));
+});
+
+test("live adapter baseline executes supported codex-cli requests", () => {
+  const adapter = createLiveAdapter({ adapterId: "codex-cli" });
+  const response = adapter.execute({
+    request_id: "req-live-1",
+    run_id: "run-live-1",
+    step_id: "step-live-1",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+    context: {
+      compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+    },
+  });
+
+  assert.equal(response.adapter_id, "codex-cli");
+  assert.equal(response.status, "success");
+  assert.equal(response.output.mode, "execute");
+  assert.equal(response.output.provider_adapter, "codex-cli");
+  assert.ok(response.evidence_refs[0].startsWith("evidence://adapter-live/codex-cli/"));
+});
+
+test("live adapter baseline rejects unsupported adapter ids", () => {
+  assert.throws(
+    () => createLiveAdapter({ adapterId: "open-code" }),
+    /supported adapters: codex-cli/i,
+  );
 });

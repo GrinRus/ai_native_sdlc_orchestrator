@@ -208,7 +208,7 @@ Stabilize post-audit backlog findings by fixing routed-evidence durability and s
 
 ## W9-S07 — Detached HTTP control-plane transport baseline
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Add a real HTTP/SSE transport baseline for supported control-plane reads/follow paths and make connected web mode consume it instead of direct module imports.
 - **Primary modules:** `apps/api`, `apps/web`, `docs/contracts/**`, `docs/architecture/**`
 - **Hard dependencies:** W9-S03, W9-S04

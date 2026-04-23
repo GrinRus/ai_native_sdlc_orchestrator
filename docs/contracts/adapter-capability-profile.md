@@ -13,6 +13,7 @@ Capability matrix for a runner adapter such as repo write support, shell access,
 Routing should depend on declared capabilities rather than assumptions.
 Capability negotiation must happen before adapter invocation; missing required capabilities are deterministic pre-execution failures.
 `mock-runner` is the deterministic dry-run baseline profile for rehearsals and tests.
+Live adapter baselines can add optional execution metadata (for example handler/runtime hints) without changing required fields.
 
 ## Example
 See `examples/adapters/*.yaml`.

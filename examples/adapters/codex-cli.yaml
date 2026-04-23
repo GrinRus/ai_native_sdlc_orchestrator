@@ -16,6 +16,11 @@ constraints:
   requires_local_runtime: true
   default_network_mode: deny-by-default
   supports_no_write_rehearsal: true
+execution:
+  live_baseline: true
+  runtime_mode: in-process-deterministic
+  handler: codex-cli-live-baseline
+  evidence_namespace: evidence://adapter-live/codex-cli
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true
