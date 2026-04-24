@@ -36,8 +36,13 @@ Current enum constraints:
 - approval commands
 - run lifecycle commands
 - eval and harness commands
+- review and learning-loop commands
 - delivery and release commands
 - incident and promotion commands
+
+Project bootstrap baseline:
+- `project init` may materialize a clean target repo through public bootstrap flags only;
+- `project init` accepts optional repo verification overrides via repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs so curated live E2E targets can preserve required setup and verification commands without harness-side profile generation.
 
 ## Query families
 - projects
@@ -45,6 +50,7 @@ Current enum constraints:
 - runs
 - step results
 - validation and evaluation reports
+- review reports and learning-loop closure artifacts
 - delivery manifests and release packets
 - incidents and promotion decisions
 
@@ -61,11 +67,14 @@ Run-level read baseline:
 
 Command payload baseline:
 - `reason` (optional text summary for operator intent);
-- `target_step` (required for `steer` scope, blocked when missing);
+- `target_step` (optional for `start`, required for `steer`);
+- `require_validation_pass` (optional start-only boolean, defaults to true for public execution runs);
+- `approved_handoff_ref` (optional start-only evidence ref for bounded execution provenance);
+- `promotion_evidence_refs` (optional start-only evidence refs for delivery/release-safe execution start);
 - `approval_ref` (required by high-risk policy guardrails when applicable).
 
 Deterministic transition baseline:
-- `start` creates/opens `running` lifecycle;
+- `start` creates/opens `running` lifecycle and may finalize to `completed|failed` in the same invocation when one routed execution attempt finishes inline;
 - `pause` allowed only from `running`;
 - `resume` allowed only from `paused`;
 - `steer` allowed from `running|paused` with explicit target step;
@@ -78,6 +87,11 @@ Guardrail baseline:
 Durable audit baseline:
 - every control action writes one durable `run-control-event-*.json` record under runtime reports;
 - control records include `run_id`, `action`, transition snapshot, guardrail decision, and `evidence_root`.
+
+Full-journey execution baseline (W13):
+- `run start` is the canonical public execution entrypoint for full-journey live runs;
+- successful execution emits one run-linked `step-result` plus terminal `live-run-event` lineage;
+- `run status` resolves that execution lineage without requiring harness-private execution state.
 
 ## Delivery/release baseline (module operations)
 
@@ -112,7 +126,7 @@ Incident open payload baseline:
 - `linked_asset_refs` (optional explicit evidence refs).
 
 Incident open response baseline:
-- durable `incident_file` path for one contract-valid `incident-report`;
+- durable `incident_report_file` path for one contract-valid `incident-report`;
 - `incident_run_ref` and `incident_linked_asset_refs` for explicit run/evidence traceability.
 
 Incident show baseline:
@@ -131,6 +145,19 @@ Audit runs baseline:
 - emits `run_audit_records.finance_evidence` with route/wrapper/adapter IDs plus bounded cost/timeout/latency summaries;
 - supports optional `run_id` filter and bounded `limit` window;
 - response includes `audit_evidence_refs` for downstream handoff and review workflows.
+
+## Review and learning baseline (module operations)
+
+Review run baseline:
+- `review run` is report-only and must not block subsequent commands by exit code alone when verdict is `warn|fail`;
+- response includes `review_report_file`, `review_overall_status`, and `review_recommendation`;
+- `review-report` must cover `feature_traceability`, `discovery_quality`, `artifact_quality`, `code_quality`, `findings`, and `evidence_refs`;
+- artifact review must treat bootstrap-owned files and runner-produced request-input files as non-code when computing target code-scope findings.
+
+Learning handoff baseline:
+- `learning handoff` writes one public `learning-loop-scorecard` and one public `learning-loop-handoff`;
+- existing public `incident-report` linkage is preserved instead of replaced when incident open/recertify already ran;
+- closure artifacts are derived from public run, review, eval, audit, and incident evidence, not from harness-private observability shortcuts.
 
 Context lifecycle read baseline (W8-S09):
 - run-level read surfaces expose context lifecycle details when context promotions are present;
@@ -226,4 +253,5 @@ Deferred beyond this baseline:
 - keep the control-plane surface usable without the web UI;
 - keep ids and references visible in responses;
 - expose explicit approval and dry-run paths for risky actions;
+- expose verdict and closure artifacts through public module surfaces before relying on harness-side aggregation;
 - keep operation and query shapes aligned with contract docs and CLI catalog.

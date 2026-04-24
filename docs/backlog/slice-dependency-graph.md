@@ -366,6 +366,16 @@ flowchart TB
 | W12-S03 | W12-S02 |
 | W12-S04 | W12-S03 |
 
+## W13 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W13-S01 | none |
+| W13-S02 | W13-S01 |
+| W13-S03 | W13-S02 |
+| W13-S04 | W13-S03 |
+| W13-S05 | W13-S04 |
+| W13-S06 | W13-S05 |
+
 ## Topological order
 1. W0-S01
 2. W0-S04
@@ -447,6 +457,12 @@ flowchart TB
 78. W12-S02
 79. W12-S03
 80. W12-S04
+81. W13-S01
+82. W13-S02
+83. W13-S03
+84. W13-S04
+85. W13-S05
+86. W13-S06
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

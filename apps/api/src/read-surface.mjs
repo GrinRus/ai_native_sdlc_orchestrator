@@ -15,7 +15,10 @@ const PROMOTION_DECISION_REGEX = /^promotion-decision-.*\.json$/;
 const STEP_RESULT_REGEX = /^step-result-.*\.json$/;
 const VALIDATION_REPORT_REGEX = /^validation-report.*\.json$/;
 const EVALUATION_REPORT_REGEX = /^evaluation-report.*\.json$/;
+const REVIEW_REPORT_REGEX = /^review-report.*\.json$/;
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
+const LEARNING_LOOP_SCORECARD_REGEX = /^learning-loop-scorecard-.*\.json$/;
+const LEARNING_LOOP_HANDOFF_REGEX = /^learning-loop-handoff-.*\.json$/;
 const RUN_CONTROL_STATE_REGEX = /^run-control-state-.*\.json$/;
 const MASTER_BACKLOG_FILE = path.join("docs", "backlog", "mvp-implementation-backlog.md");
 const CONTEXT_ASSET_REF_REGEX = /^(context-(?:bundle|doc|rule|skill)):\/\/([^@]+)@v(\d+)$/u;
@@ -197,7 +200,20 @@ export function listQualityArtifacts(options = {}) {
   return [
     ...loadContractDocuments({ init, files: reportFiles, family: "validation-report", matcher: VALIDATION_REPORT_REGEX }),
     ...loadContractDocuments({ init, files: reportFiles, family: "evaluation-report", matcher: EVALUATION_REPORT_REGEX }),
+    ...loadContractDocuments({ init, files: reportFiles, family: "review-report", matcher: REVIEW_REPORT_REGEX }),
     ...loadContractDocuments({ init, files: reportFiles, family: "incident-report", matcher: INCIDENT_REPORT_REGEX }),
+    ...loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "learning-loop-scorecard",
+      matcher: LEARNING_LOOP_SCORECARD_REGEX,
+    }),
+    ...loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "learning-loop-handoff",
+      matcher: LEARNING_LOOP_HANDOFF_REGEX,
+    }),
     ...listPromotionDecisions(options),
   ];
 }

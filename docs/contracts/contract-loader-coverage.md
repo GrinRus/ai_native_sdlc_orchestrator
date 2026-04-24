@@ -16,6 +16,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Execution and quality | `step-result.md` | `step-result` | none | implemented | Includes closed-set enum check for `step_class`; routed replay metadata (including completeness gate and architecture traceability) is optional. |
 | Execution and quality | `validation-report.md` | `validation-report` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Execution and quality | `evaluation-report.md` | `evaluation-report` | `examples/eval/report-*.sample.yaml` | implemented | Required fields + top-level type checks, including scorer metadata and summary metrics. |
+| Execution and quality | `review-report.md` | `review-report` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Execution and quality | `dataset.md` | `dataset` | `examples/eval/dataset-*.yaml` | implemented | Required fields + top-level type checks. |
 | Execution and quality | `evaluation-suite.md` | `evaluation-suite` | `examples/eval/suite-*.yaml` | implemented | Required fields + top-level type checks. |
 | Execution and quality | `promotion-decision.md` | `promotion-decision` | `examples/packets/promotion-decision-*.yaml` | implemented | Includes closed-set enum checks for promotion channels and certification status (`pass|hold|fail`). |
@@ -25,6 +26,8 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Platform assets | `step-policy-profile.md` | `step-policy-profile` | `examples/policies/*.yaml` | implemented | Includes closed-set enum check for `step_class`. |
 | Platform assets | `adapter-capability-profile.md` | `adapter-capability-profile` | `examples/adapters/*.yaml` | implemented | Required fields + top-level type checks, including deterministic `mock-runner` baseline profile. |
 | Operations | `live-run-event.md` | `live-run-event` | none | implemented | Contract is loader-covered with closed-set `event_type` validation; no YAML example in this repo yet. |
+| Operations | `learning-loop-scorecard.md` | `learning-loop-scorecard` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
+| Operations | `learning-loop-handoff.md` | `learning-loop-handoff` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Operations | `control-plane-api.md` | `control-plane-api` | `examples/control-plane-api/*.yaml` | implemented | Loader validates the hybrid module + detached HTTP/SSE baseline for read/follow plus bounded run-control/ui-lifecycle mutation families. |
 
 ## Reference integrity and compatibility checks (W3-S01)

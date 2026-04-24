@@ -6,7 +6,9 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { appendRunEvent } from "../../api/src/index.mjs";
+import { parse as parseYaml } from "../../../packages/contracts/node_modules/yaml/dist/index.js";
+
+import { appendRunEvent, applyRunControlAction } from "../../api/src/index.mjs";
 import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import { invokeCli } from "../src/index.mjs";
 
@@ -139,6 +141,30 @@ function createLocalTargetRepository(options) {
   };
 }
 
+/**
+ * @param {() => void} callback
+ */
+function withBootstrapAssetsEnv(callback) {
+  const previousBootstrapAssetsRoot = process.env.AOR_BOOTSTRAP_ASSETS_ROOT;
+  const previousExamplesRoot = process.env.AOR_EXAMPLES_ROOT;
+  process.env.AOR_BOOTSTRAP_ASSETS_ROOT = path.join(workspaceRoot, "examples");
+  delete process.env.AOR_EXAMPLES_ROOT;
+  try {
+    callback();
+  } finally {
+    if (typeof previousBootstrapAssetsRoot === "string") {
+      process.env.AOR_BOOTSTRAP_ASSETS_ROOT = previousBootstrapAssetsRoot;
+    } else {
+      delete process.env.AOR_BOOTSTRAP_ASSETS_ROOT;
+    }
+    if (typeof previousExamplesRoot === "string") {
+      process.env.AOR_EXAMPLES_ROOT = previousExamplesRoot;
+    } else {
+      delete process.env.AOR_EXAMPLES_ROOT;
+    }
+  }
+}
+
 test("global help transcript matches fixture", () => {
   const expected = fs.readFileSync(path.join(fixturesDir, "help-transcript.txt"), "utf8");
   const result = invokeCli(["--help"]);
@@ -156,13 +182,31 @@ test("implemented command help documents inputs outputs and contracts", () => {
   assert.match(result.stdout, /Status: implemented in bootstrap shell \(W1-S01\)/);
   assert.match(
     result.stdout,
-    /Inputs: --project-ref <path> \(optional, defaults to cwd discovery\), --project-profile <path> \(optional\), --runtime-root <path> \(optional\), --help/,
+    /Inputs: --project-ref <path> \(optional, defaults to cwd discovery\), --project-profile <path> \(optional\), --runtime-root <path> \(optional\), --materialize-project-profile \(optional\), --bootstrap-template <template_id\|path> \(optional\), --materialize-bootstrap-assets \(optional\), --repo-build-command <cmd> \(optional, repeatable\), --repo-lint-command <cmd> \(optional, repeatable\), --repo-test-command <cmd> \(optional, repeatable\), --help/,
   );
   assert.match(
     result.stdout,
-    /Outputs: resolved_project_ref, resolved_runtime_root, project_profile_ref, runtime_layout, runtime_state_file, artifact_packet_id, artifact_packet_file, contract_families, command_catalog_alignment/,
+    /Outputs: resolved_project_ref, resolved_runtime_root, project_profile_ref, runtime_layout, runtime_state_file, artifact_packet_id, artifact_packet_file, artifact_packet_body_file, bootstrap_materialization_status, materialized_project_profile_file, materialized_bootstrap_assets_root, bootstrap_materialization_idempotent, contract_families, command_catalog_alignment/,
   );
   assert.match(result.stdout, /Contract families: project-profile/);
+});
+
+test("W13 review and learning command help documents verdict and closure semantics", () => {
+  const reviewHelp = invokeCli(["review", "run", "--help"]);
+  const learningHelp = invokeCli(["learning", "handoff", "--help"]);
+
+  assert.equal(reviewHelp.exitCode, 0);
+  assert.equal(reviewHelp.stderr, "");
+  assert.match(reviewHelp.stdout, /Status: implemented in review shell \(W13-S05\)/);
+  assert.match(reviewHelp.stdout, /report-only review verdict/);
+  assert.match(reviewHelp.stdout, /review_report_file/);
+
+  assert.equal(learningHelp.exitCode, 0);
+  assert.equal(learningHelp.stderr, "");
+  assert.match(learningHelp.stdout, /Status: implemented in learning-loop shell \(W13-S05\)/);
+  assert.match(learningHelp.stdout, /public learning-loop scorecard and handoff artifacts/);
+  assert.match(learningHelp.stdout, /learning_loop_scorecard_file/);
+  assert.match(learningHelp.stdout, /incident_report_file/);
 });
 
 test("eval run help documents quality-shell status and offline semantics", () => {
@@ -441,21 +485,65 @@ test("W6 intake/discovery/spec/wave commands require --project-ref", () => {
 
 test("W6 run-control command pack enforces guardrails, transitions, and durable audit evidence", () => {
   withTempProject((projectRoot) => {
-    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify({ name: "fixture", scripts: { lint: "eslint .", test: "node --test", build: "tsc -b" } }, null, 2),
+      "utf8",
+    );
+    fs.writeFileSync(path.join(projectRoot, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\\n", "utf8");
+    configureCodexExternalRuntimeSuccess({ projectRoot });
 
-    const runId = "run-control-smoke";
+    const executionRunId = "run-control-execution-smoke";
 
-    const startResult = invokeCli(["run", "start", "--project-ref", projectRoot, "--run-id", runId]);
+    const preflightResult = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--routed-dry-run-step",
+      "implement",
+    ]);
+    assert.equal(preflightResult.exitCode, 0, preflightResult.stderr);
+    const preflightPayload = JSON.parse(preflightResult.stdout);
+    const promotionEvidenceRefs = [
+      preflightPayload.verify_summary_file,
+      ...preflightPayload.step_result_files,
+    ].join(",");
+
+    const startResult = invokeCli([
+      "run",
+      "start",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      executionRunId,
+      "--approved-handoff-ref",
+      "evidence://handoff/run-control-approved",
+      "--promotion-evidence-refs",
+      promotionEvidenceRefs,
+    ]);
     assert.equal(startResult.exitCode, 0, startResult.stderr);
     const startPayload = JSON.parse(startResult.stdout);
     assert.equal(startPayload.run_control_action, "start");
     assert.equal(startPayload.run_control_blocked, false);
-    assert.equal(startPayload.run_control_state.status, "running");
+    assert.equal(startPayload.run_control_state.status, "completed");
     assert.equal(fs.existsSync(startPayload.run_control_state_file), true);
     assert.equal(fs.existsSync(startPayload.run_control_audit_file), true);
+    assert.equal(typeof startPayload.routed_step_result_id, "string");
+    assert.equal(fs.existsSync(startPayload.routed_step_result_file), true);
 
-    const pauseResult = invokeCli(["run", "pause", "--project-ref", projectRoot, "--run-id", runId]);
+    const transitionRunId = "run-control-transition-smoke";
+    applyRunControlAction({
+      projectRef: projectRoot,
+      runId: transitionRunId,
+      action: "start",
+    });
+
+    const pauseResult = invokeCli(["run", "pause", "--project-ref", projectRoot, "--run-id", transitionRunId]);
     assert.equal(pauseResult.exitCode, 0, pauseResult.stderr);
     const pausePayload = JSON.parse(pauseResult.stdout);
     assert.equal(pausePayload.run_control_action, "pause");
@@ -463,7 +551,14 @@ test("W6 run-control command pack enforces guardrails, transitions, and durable 
     assert.equal(pausePayload.run_control_state.status, "paused");
     assert.equal(fs.existsSync(pausePayload.run_control_audit_file), true);
 
-    const blockedScopeResult = invokeCli(["run", "steer", "--project-ref", projectRoot, "--run-id", runId]);
+    const blockedScopeResult = invokeCli([
+      "run",
+      "steer",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      transitionRunId,
+    ]);
     assert.equal(blockedScopeResult.exitCode, 0, blockedScopeResult.stderr);
     const blockedScopePayload = JSON.parse(blockedScopeResult.stdout);
     assert.equal(blockedScopePayload.run_control_action, "steer");
@@ -473,17 +568,24 @@ test("W6 run-control command pack enforces guardrails, transitions, and durable 
     assert.equal(blockedScopePayload.run_control_transition.to_status, "paused");
     assert.equal(fs.existsSync(blockedScopePayload.run_control_audit_file), true);
     const blockedScopeAudit = JSON.parse(fs.readFileSync(blockedScopePayload.run_control_audit_file, "utf8"));
-    assert.equal(blockedScopeAudit.run_id, runId);
+    assert.equal(blockedScopeAudit.run_id, transitionRunId);
     assert.equal(blockedScopeAudit.blocked, true);
     assert.equal(blockedScopeAudit.blocked_reason.code, "scope.target_step_required");
 
-    const resumeResult = invokeCli(["run", "resume", "--project-ref", projectRoot, "--run-id", runId]);
+    const resumeResult = invokeCli(["run", "resume", "--project-ref", projectRoot, "--run-id", transitionRunId]);
     assert.equal(resumeResult.exitCode, 0, resumeResult.stderr);
     const resumePayload = JSON.parse(resumeResult.stdout);
     assert.equal(resumePayload.run_control_blocked, false);
     assert.equal(resumePayload.run_control_state.status, "running");
 
-    const invalidTransitionResult = invokeCli(["run", "resume", "--project-ref", projectRoot, "--run-id", runId]);
+    const invalidTransitionResult = invokeCli([
+      "run",
+      "resume",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      transitionRunId,
+    ]);
     assert.equal(invalidTransitionResult.exitCode, 0, invalidTransitionResult.stderr);
     const invalidTransitionPayload = JSON.parse(invalidTransitionResult.stdout);
     assert.equal(invalidTransitionPayload.run_control_action, "resume");
@@ -497,7 +599,7 @@ test("W6 run-control command pack enforces guardrails, transitions, and durable 
       "--project-ref",
       projectRoot,
       "--run-id",
-      runId,
+      transitionRunId,
     ]);
     assert.equal(blockedApprovalResult.exitCode, 0, blockedApprovalResult.stderr);
     const blockedApprovalPayload = JSON.parse(blockedApprovalResult.stdout);
@@ -512,7 +614,7 @@ test("W6 run-control command pack enforces guardrails, transitions, and durable 
       "--project-ref",
       projectRoot,
       "--run-id",
-      runId,
+      transitionRunId,
       "--approval-ref",
       "approval://RC-1001",
     ]);
@@ -522,10 +624,17 @@ test("W6 run-control command pack enforces guardrails, transitions, and durable 
     assert.equal(cancelPayload.run_control_state.status, "canceled");
     assert.equal(fs.existsSync(cancelPayload.run_control_audit_file), true);
 
-    const statusResult = invokeCli(["run", "status", "--project-ref", projectRoot, "--run-id", runId]);
+    const statusResult = invokeCli([
+      "run",
+      "status",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      transitionRunId,
+    ]);
     assert.equal(statusResult.exitCode, 0, statusResult.stderr);
     const statusPayload = JSON.parse(statusResult.stdout);
-    assert.ok(statusPayload.run_summaries.some((summary) => summary.run_id === runId));
+    assert.ok(statusPayload.run_summaries.some((summary) => summary.run_id === transitionRunId));
 
     const transcriptFixture = JSON.parse(
       fs.readFileSync(path.join(fixturesDir, "run-control-transcript.json"), "utf8"),
@@ -2326,6 +2435,380 @@ test("project init discovers repo root from cwd and materializes runtime layout 
     assert.equal(artifactPacket.packet_id, "aor-core.artifact.bootstrap.v1");
     assert.equal(artifactPacket.project_id, "aor-core");
     assert.equal(artifactPacket.packet_type, "bootstrap");
+  });
+});
+
+test("project init materializes bundled bootstrap profile and assets idempotently for a clean target repo", () => {
+  withTempProject((projectRoot) => {
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    fs.writeFileSync(path.join(projectRoot, "README.md"), "# clean repo\n", "utf8");
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify({ name: "clean-target", scripts: { lint: "eslint .", test: "node --test", build: "tsc -b" } }, null, 2),
+      "utf8",
+    );
+
+    withBootstrapAssetsEnv(() => {
+      const firstRun = invokeCli([
+        "project",
+        "init",
+        "--project-ref",
+        projectRoot,
+        "--materialize-project-profile",
+        "--materialize-bootstrap-assets",
+        "--repo-build-command",
+        "npm test",
+        "--repo-lint-command",
+        "npm install",
+        "--repo-lint-command",
+        "npx playwright install",
+        "--repo-test-command",
+        "npm test",
+      ]);
+      const secondRun = invokeCli([
+        "project",
+        "init",
+        "--project-ref",
+        projectRoot,
+        "--materialize-project-profile",
+        "--materialize-bootstrap-assets",
+        "--repo-build-command",
+        "npm test",
+        "--repo-lint-command",
+        "npm install",
+        "--repo-lint-command",
+        "npx playwright install",
+        "--repo-test-command",
+        "npm test",
+      ]);
+
+      assert.equal(firstRun.exitCode, 0, firstRun.stderr);
+      assert.equal(secondRun.exitCode, 0, secondRun.stderr);
+
+      const firstPayload = JSON.parse(firstRun.stdout);
+      const secondPayload = JSON.parse(secondRun.stdout);
+
+      assert.equal(firstPayload.bootstrap_materialization_status, "materialized");
+      assert.equal(firstPayload.bootstrap_materialization_idempotent, false);
+      assert.equal(firstPayload.project_profile_ref, "project.aor.yaml");
+      assert.equal(fs.existsSync(firstPayload.materialized_project_profile_file), true);
+      assert.equal(fs.existsSync(firstPayload.materialized_bootstrap_assets_root), true);
+      assert.equal(fs.existsSync(path.join(projectRoot, "examples", "project.github.aor.yaml")), true);
+      const materializedProfile = parseYaml(fs.readFileSync(firstPayload.materialized_project_profile_file, "utf8"));
+      assert.deepEqual(materializedProfile.repos[0].build_commands, ["npm test"]);
+      assert.deepEqual(materializedProfile.repos[0].lint_commands, ["npm install", "npx playwright install"]);
+      assert.deepEqual(materializedProfile.repos[0].test_commands, ["npm test"]);
+
+      assert.equal(secondPayload.bootstrap_materialization_status, "reused-existing");
+      assert.equal(secondPayload.bootstrap_materialization_idempotent, true);
+      assert.equal(secondPayload.materialized_project_profile_file, firstPayload.materialized_project_profile_file);
+      assert.equal(secondPayload.materialized_bootstrap_assets_root, firstPayload.materialized_bootstrap_assets_root);
+    });
+  });
+});
+
+test("intake create preserves mission traceability and discovery run consumes explicit input packets", () => {
+  withTempProject((projectRoot) => {
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify({ name: "fixture", scripts: { lint: "eslint .", test: "node --test", build: "tsc -b" } }, null, 2),
+      "utf8",
+    );
+    fs.writeFileSync(path.join(projectRoot, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\\n", "utf8");
+
+    const requestFile = path.join(projectRoot, "feature-request.json");
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify(
+        {
+          allowed_paths: ["source/**", "test/**"],
+          forbidden_paths: ["docs/**", "examples/**", "context/**"],
+          expected_evidence: ["verify-summary", "review-report"],
+          change_budget: { max_changed_files: 6, max_added_lines: 220 },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const intakeResult = invokeCli([
+      "intake",
+      "create",
+      "--project-ref",
+      projectRoot,
+      "--mission-id",
+      "fixture-mission",
+      "--request-title",
+      "Fixture mission request",
+      "--request-brief",
+      "Prepare one bounded feature mission request.",
+      "--request-constraints",
+      "keep the change inside source and test",
+      "--request-constraints",
+      "avoid docs and control-plane content",
+      "--request-file",
+      requestFile,
+    ]);
+    assert.equal(intakeResult.exitCode, 0, intakeResult.stderr);
+    const intakePayload = JSON.parse(intakeResult.stdout);
+    assert.equal(fs.existsSync(intakePayload.artifact_packet_file), true);
+    assert.equal(fs.existsSync(intakePayload.artifact_packet_body_file), true);
+    const intakeBody = JSON.parse(fs.readFileSync(intakePayload.artifact_packet_body_file, "utf8"));
+    assert.equal(intakeBody.mission_traceability.mission_id, "fixture-mission");
+    assert.equal(intakeBody.feature_request.request_file, requestFile);
+    assert.deepEqual(intakeBody.feature_request.request_document.allowed_paths, ["source/**", "test/**"]);
+
+    const discoveryResult = invokeCli([
+      "discovery",
+      "run",
+      "--project-ref",
+      projectRoot,
+      "--input-packet",
+      intakePayload.artifact_packet_file,
+    ]);
+    assert.equal(discoveryResult.exitCode, 0, discoveryResult.stderr);
+    const discoveryPayload = JSON.parse(discoveryResult.stdout);
+    const analysisReport = JSON.parse(fs.readFileSync(discoveryPayload.analysis_report_file, "utf8"));
+    const intakePacketRef = `evidence://${path.relative(projectRoot, intakePayload.artifact_packet_file).replace(/\\/g, "/")}`;
+    assert.equal(analysisReport.feature_traceability.mission_id, "fixture-mission");
+    assert.equal(analysisReport.feature_traceability.input_packet_ref, intakePacketRef);
+    assert.deepEqual(analysisReport.feature_traceability.allowed_paths, ["source/**", "test/**"]);
+  });
+});
+
+test("W13 run start, review run, and learning handoff produce durable execution and closure artifacts", () => {
+  withTempProject((projectRoot) => {
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "test"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, "source", "mission.js"), "export const mission = 'baseline';\n", "utf8");
+    fs.writeFileSync(
+      path.join(projectRoot, "test", "mission.test.js"),
+      "import test from 'node:test';\nimport assert from 'node:assert/strict';\n\ntest('mission smoke', () => {\n  assert.equal(1, 1);\n});\n",
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify(
+        {
+          name: "fixture",
+          scripts: {
+            lint: "node -e \"process.exit(0)\"",
+            test: "node --test ./test/mission.test.js",
+            build: "node -e \"process.exit(0)\"",
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(path.join(projectRoot, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\\n", "utf8");
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "baseline"] });
+    fs.appendFileSync(path.join(projectRoot, "source", "mission.js"), "export const missionPatch = 'updated';\n", "utf8");
+
+    withBootstrapAssetsEnv(() => {
+      const initResult = invokeCli([
+        "project",
+        "init",
+        "--project-ref",
+        projectRoot,
+        "--materialize-project-profile",
+        "--materialize-bootstrap-assets",
+      ]);
+      assert.equal(initResult.exitCode, 0, initResult.stderr);
+      configureCodexExternalRuntimeSuccess({ projectRoot });
+
+      const requestFile = path.join(projectRoot, "feature-request.json");
+      fs.writeFileSync(
+        requestFile,
+        `${JSON.stringify(
+          {
+            allowed_paths: ["source/**", "test/**"],
+            forbidden_paths: ["docs/**", "examples/**", "context/**", ".agents/**", "scripts/live-e2e/**"],
+            expected_evidence: ["verify-summary", "routed-step-result", "review-report"],
+            change_budget: { max_changed_files: 6, max_added_lines: 220 },
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+
+      const intakeResult = invokeCli([
+        "intake",
+        "create",
+        "--project-ref",
+        projectRoot,
+        "--mission-id",
+        "fixture-review-mission",
+        "--request-title",
+        "Fixture review mission",
+        "--request-brief",
+        "Exercise the public full-journey review path.",
+        "--request-file",
+        requestFile,
+      ]);
+      assert.equal(intakeResult.exitCode, 0, intakeResult.stderr);
+      const intakePayload = JSON.parse(intakeResult.stdout);
+
+      const discoveryResult = invokeCli([
+        "discovery",
+        "run",
+        "--project-ref",
+        projectRoot,
+        "--input-packet",
+        intakePayload.artifact_packet_file,
+      ]);
+      assert.equal(discoveryResult.exitCode, 0, discoveryResult.stderr);
+
+      const specResult = invokeCli(["spec", "build", "--project-ref", projectRoot]);
+      assert.equal(specResult.exitCode, 0, specResult.stderr);
+
+      const waveResult = invokeCli(["wave", "create", "--project-ref", projectRoot]);
+      assert.equal(waveResult.exitCode, 0, waveResult.stderr);
+      const wavePayload = JSON.parse(waveResult.stdout);
+
+      const approveResult = invokeCli([
+        "handoff",
+        "approve",
+        "--project-ref",
+        projectRoot,
+        "--handoff-packet",
+        wavePayload.handoff_packet_file,
+        "--approval-ref",
+        "approval://W13-1001",
+      ]);
+      assert.equal(approveResult.exitCode, 0, approveResult.stderr);
+      const approvedPayload = JSON.parse(approveResult.stdout);
+
+      const validateResult = invokeCli([
+        "project",
+        "validate",
+        "--project-ref",
+        projectRoot,
+        "--require-approved-handoff",
+        "--handoff-packet",
+        approvedPayload.handoff_packet_file,
+      ]);
+      assert.equal(validateResult.exitCode, 0, validateResult.stderr);
+      assert.equal(JSON.parse(validateResult.stdout).handoff_gate_status, "pass");
+
+      const preflightVerify = invokeCli([
+        "project",
+        "verify",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--routed-dry-run-step",
+        "implement",
+      ]);
+      assert.equal(preflightVerify.exitCode, 0, preflightVerify.stderr);
+      const preflightPayload = JSON.parse(preflightVerify.stdout);
+
+      const runId = "w13-review-learning-smoke";
+      const runStart = invokeCli([
+        "run",
+        "start",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--target-step",
+        "implement",
+        "--approved-handoff-ref",
+        approvedPayload.handoff_packet_file,
+        "--promotion-evidence-refs",
+        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+      ]);
+      assert.equal(runStart.exitCode, 0, runStart.stderr);
+      const runStartPayload = JSON.parse(runStart.stdout);
+      assert.equal(runStartPayload.run_control_state.status, "completed");
+      assert.equal(fs.existsSync(runStartPayload.routed_step_result_file), true);
+
+      const reviewRun = invokeCli([
+        "review",
+        "run",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+      ]);
+      assert.equal(reviewRun.exitCode, 0, reviewRun.stderr);
+      const reviewPayload = JSON.parse(reviewRun.stdout);
+      assert.equal(reviewPayload.review_overall_status, "pass");
+      assert.equal(reviewPayload.review_recommendation, "proceed");
+      const reviewReport = JSON.parse(fs.readFileSync(reviewPayload.review_report_file, "utf8"));
+      assert.equal(reviewReport.feature_traceability.mission_id, "fixture-review-mission");
+      assert.equal(reviewReport.code_quality.status, "pass");
+      assert.equal(reviewReport.discovery_quality.status, "pass");
+      assert.equal(
+        validateContractDocument({
+          family: "review-report",
+          document: reviewReport,
+          source: "fixture://review-report",
+        }).ok,
+        true,
+      );
+
+      const auditRun = invokeCli([
+        "audit",
+        "runs",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+      ]);
+      assert.equal(auditRun.exitCode, 0, auditRun.stderr);
+      assert.equal(JSON.parse(auditRun.stdout).run_audit_records.length, 1);
+
+      const learningRun = invokeCli([
+        "learning",
+        "handoff",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+      ]);
+      assert.equal(learningRun.exitCode, 0, learningRun.stderr);
+      const learningPayload = JSON.parse(learningRun.stdout);
+      assert.equal(fs.existsSync(learningPayload.learning_loop_scorecard_file), true);
+      assert.equal(fs.existsSync(learningPayload.learning_loop_handoff_file), true);
+      assert.equal(Object.prototype.hasOwnProperty.call(learningPayload, "incident_report_file"), true);
+      const learningScorecard = JSON.parse(fs.readFileSync(learningPayload.learning_loop_scorecard_file, "utf8"));
+      const learningHandoff = JSON.parse(fs.readFileSync(learningPayload.learning_loop_handoff_file, "utf8"));
+      assert.equal(
+        validateContractDocument({
+          family: "learning-loop-scorecard",
+          document: learningScorecard,
+          source: "fixture://learning-loop-scorecard",
+        }).ok,
+        true,
+      );
+      assert.equal(
+        validateContractDocument({
+          family: "learning-loop-handoff",
+          document: learningHandoff,
+          source: "fixture://learning-loop-handoff",
+        }).ok,
+        true,
+      );
+    });
   });
 });
 

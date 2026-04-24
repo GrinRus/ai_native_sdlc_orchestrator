@@ -1,0 +1,29 @@
+{
+  "mission_id": "nextjs-shared-package-release",
+  "title": "Prepare one shared-package release-shaped change",
+  "brief": "Update one shared package and one consuming app with bounded release evidence and no upstream write-back.",
+  "allowed_paths": [
+    "apps/**",
+    "packages/**"
+  ],
+  "forbidden_paths": [
+    "docs/**",
+    ".github/**",
+    "scripts/**",
+    "examples/**",
+    "context/**"
+  ],
+  "expected_evidence": [
+    "delivery-manifest",
+    "release-packet",
+    "review-report"
+  ],
+  "acceptance_checks": [
+    "keep changes inside apps and packages only",
+    "preserve monorepo lint/typecheck plus shared-package unit smoke linkage"
+  ],
+  "change_budget": {
+    "max_changed_files": 14,
+    "max_added_lines": 420
+  }
+}

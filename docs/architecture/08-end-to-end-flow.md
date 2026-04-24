@@ -5,7 +5,7 @@
 2. `project analyze`
 3. `project validate`
 4. `project verify`
-5. intake request
+5. feature-intent intake request
 6. discovery packet
 7. research / ADR packet
 8. spec packet
@@ -16,7 +16,7 @@
 13. delivery manifest
 14. release packet
 15. incident or close
-16. dataset / suite backfill and recertification when needed
+16. learning handoff, dataset / suite backfill, and recertification when needed
 
 ## Why bootstrap is a first-class stage
 AOR cannot safely run against a repository until it knows:
@@ -30,6 +30,8 @@ AOR cannot safely run against a repository until it knows:
 ## Why delivery is not the end
 The full loop closes only when:
 - delivery artifacts exist,
+- review verdict artifacts exist,
 - sign-offs are recorded,
 - incidents can feed back into quality memory,
+- learning-loop handoff exists for follow-up,
 - platform assets can be recertified if needed.

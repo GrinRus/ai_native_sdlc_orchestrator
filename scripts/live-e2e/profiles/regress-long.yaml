@@ -20,7 +20,7 @@ preflight:
     - verify
     - stop
   prerequisites:
-    - python, pip, and make available
+    - python3 and make available
     - network access for shallow clone and dependency setup
   repo_shape_notes:
     - medium Python CLI with make-based checks
@@ -64,7 +64,7 @@ verification:
   lint: true
   tests: project-default
   setup_commands:
-    - python -m pip install -e .[test]
+    - make install
   commands:
     - make test
     - make codestyle

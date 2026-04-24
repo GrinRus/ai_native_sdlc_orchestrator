@@ -6,7 +6,8 @@ import { validateContractDocument } from "../../contracts/src/index.mjs";
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
 const DEFAULT_BACKLOG_REFS = Object.freeze([
   "docs/backlog/mvp-implementation-backlog.md",
-  "docs/backlog/wave-5-implementation-slices.md",
+  "docs/backlog/mvp-roadmap.md",
+  "docs/ops/live-e2e-standard-runner.md",
 ]);
 
 /**
@@ -157,6 +158,8 @@ function resolveReportsRoot(runtimeLayout) {
  *   incidentSummary?: string,
  *   incidentStatus?: string,
  *   forceIncident?: boolean,
+ *   existingIncidentFile?: string,
+ *   existingIncidentRef?: string,
  *   timestamp?: string,
  * }} options
  */
@@ -190,6 +193,15 @@ export function materializeLearningLoopArtifacts(options) {
     options.runtimeLayout.reportsRoot,
     `learning-loop-scorecard-${normalizeId(options.sourceKind)}-${normalizeId(options.runId)}.json`,
   );
+  const scorecardValidation = validateContractDocument({
+    family: "learning-loop-scorecard",
+    document: scorecard,
+    source: "runtime://learning-loop-scorecard",
+  });
+  if (!scorecardValidation.ok) {
+    const issues = scorecardValidation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Generated learning-loop-scorecard failed contract validation: ${issues}`);
+  }
   writeJson(scorecardFile, scorecard);
   const scorecardRef = toEvidenceRef(options.projectRoot, scorecardFile);
 
@@ -198,8 +210,16 @@ export function materializeLearningLoopArtifacts(options) {
     (options.forceIncident !== false && (runStatus === "fail" || runStatus === "aborted"));
 
   let incident = null;
-  let incidentFile = null;
-  let incidentRef = null;
+  let incidentFile =
+    typeof options.existingIncidentFile === "string" && options.existingIncidentFile.trim().length > 0
+      ? options.existingIncidentFile.trim()
+      : null;
+  let incidentRef =
+    typeof options.existingIncidentRef === "string" && options.existingIncidentRef.trim().length > 0
+      ? toEvidenceRef(options.projectRoot, options.existingIncidentRef.trim())
+      : incidentFile
+        ? toEvidenceRef(options.projectRoot, incidentFile)
+        : null;
 
   const incidentId =
     options.incidentId ??
@@ -265,6 +285,15 @@ export function materializeLearningLoopArtifacts(options) {
     ],
     generated_at: generatedAt,
   };
+  const handoffValidation = validateContractDocument({
+    family: "learning-loop-handoff",
+    document: handoff,
+    source: "runtime://learning-loop-handoff",
+  });
+  if (!handoffValidation.ok) {
+    const issues = handoffValidation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Generated learning-loop-handoff failed contract validation: ${issues}`);
+  }
   writeJson(handoffFile, handoff);
 
   return {

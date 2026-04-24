@@ -1,0 +1,24 @@
+{
+  "scorecard_id": "w13-s06.full-journey-release-nextjs.scorecard.belgattitude/nextjs-monorepo-example",
+  "run_id": "w13-s06.full-journey-release-nextjs",
+  "profile_ref": "./scripts/live-e2e/profiles/full-journey-release-nextjs.yaml",
+  "profile_id": "live-e2e.full-journey.release.nextjs",
+  "scenario_id": null,
+  "flow_kind": "release",
+  "duration_class": "long",
+  "target_repo": {
+    "repo_id": "belgattitude/nextjs-monorepo-example",
+    "repo_url": "https://github.com/belgattitude/nextjs-monorepo-example.git",
+    "ref": "main"
+  },
+  "stage_counts": {
+    "pass": 10,
+    "fail": 0,
+    "pending": 1,
+    "skipped": 0
+  },
+  "status": "pass",
+  "summary_ref": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/reports/live-e2e-run-summary-w13-s06.full-journey-release-nextjs.json",
+  "command_count": 18,
+  "generated_at": "2026-04-24T09:12:15.834Z"
+}

@@ -35,6 +35,7 @@ Repository contributor guidance such as `AGENTS.md` and `.agents/**` belongs to 
 - evaluation-only
 - harness-only
 - full end-to-end rehearsal
+- full end-to-end rehearsal from curated feature mission
 
 ## Detailed execution pattern
 1. load the project profile and target repository information;
@@ -50,7 +51,8 @@ Repository contributor guidance such as `AGENTS.md` and `.agents/**` belongs to 
 11. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
 12. only if the delivery plan is ready, materialize a delivery manifest;
 13. if the flow reaches release, materialize a release packet;
-14. if the flow fails materially, open or update an incident path.
+14. run review and learning closure surfaces before declaring the run complete;
+15. if the flow fails materially, open or update an incident path.
 
 ## Delivery model
 AOR should support these delivery modes:
@@ -80,3 +82,8 @@ When a run fails or a release causes trouble:
 3. backfill a dataset case;
 4. update or create suites;
 5. recertify the impacted platform asset before restoring it to stable use.
+
+For full-journey live E2E, the same loop must also leave behind:
+- a feature-linked review verdict;
+- a learning-loop scorecard;
+- a learning-loop handoff that points backlog follow-up back to the curated mission and target repo.

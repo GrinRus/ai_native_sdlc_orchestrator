@@ -1,0 +1,36 @@
+profile_id: live-e2e.full-journey.release.nextjs
+version: 1
+journey_mode: full-journey
+flow_kind: release
+duration_class: long
+target_catalog_id: nextjs-monorepo-example
+feature_mission_id: nextjs-shared-package-release
+bootstrap_template: github-default
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - release
+  - learning
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  eval_suites:
+    - suite.release.short@v1
+  harness:
+    enabled: false
+output_policy:
+  materialize_release_packet: true
+  write_back_to_remote: false
+  preferred_delivery_mode: fork-first-pr

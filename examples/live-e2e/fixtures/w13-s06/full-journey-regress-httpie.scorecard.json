@@ -1,0 +1,24 @@
+{
+  "scorecard_id": "w13-s06.full-journey-regress-httpie.scorecard.httpie/cli",
+  "run_id": "w13-s06.full-journey-regress-httpie",
+  "profile_ref": "./scripts/live-e2e/profiles/full-journey-regress-httpie.yaml",
+  "profile_id": "live-e2e.full-journey.regress.httpie",
+  "scenario_id": null,
+  "flow_kind": "regress",
+  "duration_class": "long",
+  "target_repo": {
+    "repo_id": "httpie/cli",
+    "repo_url": "https://github.com/httpie/cli.git",
+    "ref": "master"
+  },
+  "stage_counts": {
+    "pass": 9,
+    "fail": 0,
+    "pending": 1,
+    "skipped": 1
+  },
+  "status": "pass",
+  "summary_ref": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/reports/live-e2e-run-summary-w13-s06.full-journey-regress-httpie.json",
+  "command_count": 17,
+  "generated_at": "2026-04-24T09:09:34.932Z"
+}

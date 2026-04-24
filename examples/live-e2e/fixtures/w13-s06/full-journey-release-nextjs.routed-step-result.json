@@ -1,0 +1,1178 @@
+{
+  "step_result_id": "w13-s06.full-journey-release-nextjs.step.implement",
+  "run_id": "w13-s06.full-journey-release-nextjs",
+  "step_id": "run.start.implement",
+  "step_class": "runner",
+  "status": "passed",
+  "summary": "Routed live execution for step 'implement' completed with adapter 'codex-cli'.",
+  "evidence_refs": [
+    "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/project.aor.yaml",
+    "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/delivery-plan-implement-1777021932548.json",
+    "compiled-context://compiled-context.belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.runner-default",
+    "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/compiled-context-w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.json",
+    "evidence://adapter-live/codex-cli/w13-s06-full-journey-release-nextjs-run-start-implement-w13-s06-full-journey-release-nextjs-step-implement-request-1777021932563",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/adapter-live-raw-codex-cli-w13-s06-full-journey-release-nextjs-run-start-implement-w13-s06-full-journey-release-nextjs-step-implement-request-1777021932563-1777021932699.json",
+    "evidence://external-runner/w13-proof"
+  ],
+  "routed_execution": {
+    "mode": "execute",
+    "no_write_enforced": false,
+    "started_at": "2026-04-24T09:12:12.504Z",
+    "finished_at": "2026-04-24T09:12:12.701Z",
+    "route_resolution": {
+      "step_class": "implement",
+      "resolved_route_id": "route.implement.default",
+      "resolution_source": {
+        "kind": "project-default",
+        "field": "default_route_profiles.implement"
+      },
+      "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+      "route_profile": {
+        "route_id": "route.implement.default",
+        "step": "implement",
+        "route_class": "runner",
+        "risk_tier": "medium",
+        "primary": {
+          "adapter": "codex-cli",
+          "provider": "openai",
+          "model": "coding-primary"
+        },
+        "required_adapter_capabilities": [
+          "repo_write",
+          "shell_commands",
+          "live_logs"
+        ],
+        "constraints": {
+          "timeout_sec": 1800,
+          "max_cost_usd": 25,
+          "allow_scope_expansion": false
+        },
+        "promotion_channel": "stable"
+      }
+    },
+    "asset_resolution": {
+      "step_class": "implement",
+      "route": {
+        "step_class": "implement",
+        "resolved_route_id": "route.implement.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.implement"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+        "route_profile": {
+          "route_id": "route.implement.default",
+          "step": "implement",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1800,
+            "max_cost_usd": 25,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      "wrapper": {
+        "wrapper_ref": "wrapper.runner.default@v3",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_wrapper_profiles.runner"
+        },
+        "profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/wrappers/wrapper-runner-default.yaml",
+        "profile": {
+          "wrapper_id": "wrapper.runner.default",
+          "version": 3,
+          "step_class": "runner"
+        }
+      },
+      "prompt_bundle": {
+        "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_prompt_bundles.implement"
+        },
+        "profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/prompts/runner-default.yaml",
+        "profile": {
+          "prompt_bundle_id": "runner-default",
+          "version": 3,
+          "step_class": "runner",
+          "required_inputs": {
+            "packets": {
+              "required": [
+                "handoff",
+                "spec"
+              ],
+              "optional": [
+                "discovery",
+                "previous-step-result"
+              ]
+            },
+            "files": {
+              "recommended": []
+            }
+          }
+        }
+      },
+      "context_bundles": {
+        "bundle_refs": [
+          "context-bundle://context.bundle.runner.foundation@v1"
+        ],
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_context_bundles.implement"
+        },
+        "bundles": [
+          {
+            "context_bundle_ref": "context-bundle://context.bundle.runner.foundation@v1",
+            "profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/context/bundles/runner-foundation.yaml",
+            "profile": {
+              "context_bundle_id": "context.bundle.runner.foundation",
+              "version": 1,
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": [
+                "context-skill://context.skill.runner-verification.default@v1"
+              ]
+            },
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": [
+              "context-skill://context.skill.runner-verification.default@v1"
+            ]
+          }
+        ],
+        "expanded_refs": {
+          "context_doc_refs": [
+            "context-doc://context.doc.repo-map.core@v1"
+          ],
+          "context_rule_refs": [
+            "context-rule://context.rule.public-repo-safety@v1"
+          ],
+          "context_skill_refs": [
+            "context-skill://context.skill.runner-verification.default@v1"
+          ]
+        }
+      },
+      "provenance": {
+        "project_profile_path": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/project.aor.yaml",
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+        "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/wrappers/wrapper-runner-default.yaml",
+        "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/prompts/runner-default.yaml",
+        "context_bundle_sources": [
+          "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/context/bundles/runner-foundation.yaml"
+        ]
+      }
+    },
+    "policy_resolution": {
+      "step_class": "implement",
+      "route": {
+        "step_class": "implement",
+        "resolved_route_id": "route.implement.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.implement"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+        "route_profile": {
+          "route_id": "route.implement.default",
+          "step": "implement",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1800,
+            "max_cost_usd": 25,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      "policy": {
+        "policy_id": "policy.step.runner.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_step_policies.runner"
+        },
+        "profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/policies/step-runner-default.yaml",
+        "profile": {
+          "policy_id": "policy.step.runner.default",
+          "step_class": "runner",
+          "pre_validators": [
+            "contract-shape",
+            "repo-scope",
+            "approval-present",
+            "route-resolved"
+          ],
+          "post_validators": [
+            "output-schema",
+            "evidence-complete",
+            "validation-commands"
+          ],
+          "quality_gate": {
+            "required": true,
+            "suite_ref": "suite.release.core@v1"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout",
+              "rate-limit",
+              "runner-crash"
+            ]
+          },
+          "repair": {
+            "max_attempts": 2,
+            "on": [
+              "schema-mismatch",
+              "lint-failed",
+              "tests-failed",
+              "missing-evidence"
+            ]
+          },
+          "escalation": {
+            "after_total_failures": 4,
+            "on": [
+              "business-ambiguity",
+              "policy-conflict",
+              "security-boundary"
+            ],
+            "reasons": [
+              {
+                "code": "high-risk-security-review-required",
+                "message": "escalate when high-risk route requires security review"
+              },
+              {
+                "code": "high-risk-human-approval-required",
+                "message": "escalate when high-risk route requires human approval"
+              }
+            ]
+          },
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        }
+      },
+      "resolved_bounds": {
+        "budget": {
+          "max_cost_usd": 25,
+          "timeout_sec": 1800,
+          "max_cost_source": "route.constraints.max_cost_usd (route.implement.default)",
+          "timeout_source": "route.constraints.timeout_sec (route.implement.default)"
+        },
+        "retry": {
+          "max_attempts": 2,
+          "on": [
+            "provider-timeout",
+            "rate-limit",
+            "runner-crash"
+          ],
+          "source": "step-policy-profile.retry"
+        },
+        "command_constraints": {
+          "allowed_commands": [
+            "yarn g:lint",
+            "yarn g:typecheck",
+            "yarn workspace @your-org/ts-utils test-unit",
+            "yarn workspace @your-org/core-lib test-unit",
+            "yarn install --immutable"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "repos[*].{build_commands,test_commands,lint_commands}"
+          }
+        },
+        "writeback_mode": {
+          "mode": "pull-request",
+          "allow_direct_write": false,
+          "require_delivery_manifest": true,
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "writeback_policy.default_delivery_mode"
+          }
+        }
+      },
+      "guardrails": {
+        "approval_required": true,
+        "provider_allowlist_enforced": true,
+        "redact_secrets": true,
+        "blocking_rules": [
+          "approval-missing",
+          "repo-scope-violation",
+          "frozen-route"
+        ]
+      },
+      "governance_decision": {
+        "decision": "allow",
+        "route_risk_tier": "medium",
+        "high_risk_delivery": false,
+        "reasons": []
+      },
+      "provenance": {
+        "project_profile_path": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/project.aor.yaml",
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+        "policy_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/policies/step-runner-default.yaml"
+      }
+    },
+    "delivery_plan": {
+      "plan_id": "belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.delivery-plan.implement.1777021932548",
+      "delivery_mode": "fork-first-pr",
+      "status": "ready",
+      "writeback_allowed": true,
+      "delivery_plan_file": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/delivery-plan-implement-1777021932548.json"
+    },
+    "adapter_resolution": {
+      "step_class": "implement",
+      "route_id": "route.implement.default",
+      "adapter": {
+        "adapter_id": "codex-cli",
+        "resolution_source": {
+          "kind": "route-primary",
+          "field": "route.primary.adapter"
+        },
+        "profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/adapters/codex-cli.yaml",
+        "profile": {
+          "adapter_id": "codex-cli",
+          "version": 1,
+          "runner_family": "codex",
+          "capabilities": {
+            "repo_read": true,
+            "repo_write": true,
+            "shell_commands": true,
+            "structured_output": true,
+            "live_logs": true,
+            "mcp_tools": true,
+            "subagents": true
+          },
+          "constraints": {
+            "requires_local_runtime": true,
+            "default_network_mode": "deny-by-default",
+            "supports_no_write_rehearsal": true
+          },
+          "execution": {
+            "live_baseline": true,
+            "runtime_mode": "external-process",
+            "handler": "codex-cli-external-runner",
+            "evidence_namespace": "evidence://adapter-live/codex-cli",
+            "external_runtime": {
+              "command": "node",
+              "args": [
+                "-e",
+                "const fs=require('node:fs');const input=JSON.parse(fs.readFileSync(0,'utf8'));const request=input.request||{};process.stdout.write(JSON.stringify({status:'success',summary:'external runner ok',output:{runner:'node-inline',step_class:request.step_class||null,execution_root:process.cwd()},evidence_refs:['evidence://external-runner/w13-proof'],tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline'}]}));"
+              ],
+              "request_via_stdin": true,
+              "timeout_ms": 30000
+            }
+          }
+        }
+      },
+      "capability_check": {
+        "required": [
+          "repo_write",
+          "shell_commands",
+          "live_logs"
+        ],
+        "satisfied": [
+          "repo_write",
+          "shell_commands",
+          "live_logs"
+        ],
+        "missing": [],
+        "status": "pass"
+      },
+      "lifecycle_hooks": [
+        "before_step",
+        "invoke_adapter",
+        "after_step",
+        "on_retry",
+        "on_repair",
+        "on_escalation"
+      ],
+      "provenance": {
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+        "adapter_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/adapters/codex-cli.yaml"
+      }
+    },
+    "adapter_request": {
+      "request_id": "w13-s06.full-journey-release-nextjs.step.implement.request",
+      "run_id": "w13-s06.full-journey-release-nextjs",
+      "step_id": "run.start.implement",
+      "step_class": "implement",
+      "route": {
+        "step_class": "implement",
+        "resolved_route_id": "route.implement.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.implement"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+        "route_profile": {
+          "route_id": "route.implement.default",
+          "step": "implement",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1800,
+            "max_cost_usd": 25,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      "asset_bundle": {
+        "step_class": "implement",
+        "route": {
+          "step_class": "implement",
+          "resolved_route_id": "route.implement.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+          "route_profile": {
+            "route_id": "route.implement.default",
+            "step": "implement",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1800,
+              "max_cost_usd": 25,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.runner"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/wrappers/wrapper-runner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.runner.default",
+            "version": 3,
+            "step_class": "runner"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.implement"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/prompts/runner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "runner-default",
+            "version": 3,
+            "step_class": "runner",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "handoff",
+                  "spec"
+                ],
+                "optional": [
+                  "discovery",
+                  "previous-step-result"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.runner.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.implement"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.runner.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/context/bundles/runner-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.runner.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": [
+                  "context-skill://context.skill.runner-verification.default@v1"
+                ]
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": [
+                "context-skill://context.skill.runner-verification.default@v1"
+              ]
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": [
+              "context-skill://context.skill.runner-verification.default@v1"
+            ]
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/wrappers/wrapper-runner-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/prompts/runner-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/context/bundles/runner-foundation.yaml"
+          ]
+        }
+      },
+      "policy_bundle": {
+        "step_class": "implement",
+        "route": {
+          "step_class": "implement",
+          "resolved_route_id": "route.implement.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+          "route_profile": {
+            "route_id": "route.implement.default",
+            "step": "implement",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1800,
+              "max_cost_usd": 25,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.runner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.runner"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/policies/step-runner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.runner.default",
+            "step_class": "runner",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "approval-present",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout",
+                "rate-limit",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed",
+                "missing-evidence"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 4,
+              "on": [
+                "business-ambiguity",
+                "policy-conflict",
+                "security-boundary"
+              ],
+              "reasons": [
+                {
+                  "code": "high-risk-security-review-required",
+                  "message": "escalate when high-risk route requires security review"
+                },
+                {
+                  "code": "high-risk-human-approval-required",
+                  "message": "escalate when high-risk route requires human approval"
+                }
+              ]
+            },
+            "blocking_rules": [
+              "approval-missing",
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 25,
+            "timeout_sec": 1800,
+            "max_cost_source": "route.constraints.max_cost_usd (route.implement.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.implement.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout",
+              "rate-limit",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "yarn g:lint",
+              "yarn g:typecheck",
+              "yarn workspace @your-org/ts-utils test-unit",
+              "yarn workspace @your-org/core-lib test-unit",
+              "yarn install --immutable"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "medium",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/policies/step-runner-default.yaml"
+        }
+      },
+      "input_packet_refs": [
+        "packet://handoff",
+        "packet://spec"
+      ],
+      "dry_run": false,
+      "context": {
+        "compiled_context_ref": "compiled-context://compiled-context.belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.runner-default",
+        "compiled_context_id": "compiled-context.belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.runner-default",
+        "compiled_context_fingerprint": "a6d72c92809526a6571570db07cf899cd34c887e98919611d4c48f5f1d16404f",
+        "context_bundle_refs": [
+          "context-bundle://context.bundle.runner.foundation@v1"
+        ],
+        "context_doc_refs": [
+          "context-doc://context.doc.repo-map.core@v1"
+        ],
+        "context_rule_refs": [
+          "context-rule://context.rule.public-repo-safety@v1"
+        ],
+        "context_skill_refs": [
+          "context-skill://context.skill.runner-verification.default@v1"
+        ],
+        "packet_refs": [
+          "packet://handoff",
+          "packet://spec"
+        ],
+        "instruction_set": {
+          "objective": "execute approved implementation, review and QA steps within bounded scope",
+          "instructions": {
+            "role": "You are the execution runner for an approved AOR handoff packet.\nWork only inside approved repo scope and use project-declared commands.\n",
+            "priorities": [
+              "obey handoff scope and project rules",
+              "prefer deterministic verification over unsupported claims",
+              "stop and escalate instead of expanding scope silently"
+            ]
+          },
+          "output_contract_hints": {
+            "format": "structured-markdown",
+            "required_sections": [
+              "summary",
+              "changed-files",
+              "commands-run",
+              "verification",
+              "risks"
+            ],
+            "required_evidence": [
+              "diff",
+              "validation-report"
+            ]
+          },
+          "stop_conditions": [
+            "business-ambiguity",
+            "scope-expansion-needed",
+            "missing-prerequisite"
+          ],
+          "redaction_expectations": [
+            "never echo secrets from environment or config",
+            "reference sensitive values symbolically"
+          ],
+          "skills": [
+            {
+              "skill_ref": "skill.runner.implement@v1",
+              "summary": "implementation-focused runner workflow with explicit contract and verification order",
+              "workflow": [
+                {
+                  "id": "contract-first",
+                  "instruction": "confirm contract and interface changes before implementation details"
+                },
+                {
+                  "id": "apply-change",
+                  "instruction": "implement bounded changes and keep route, policy, and evidence alignment explicit"
+                },
+                {
+                  "id": "verify",
+                  "instruction": "run required checks and capture outputs for delivery/harness reuse"
+                }
+              ],
+              "expected_outputs": [
+                "diff",
+                "validation-report"
+              ]
+            }
+          ]
+        },
+        "required_inputs_resolved": {
+          "packets": {
+            "required": [
+              {
+                "packet": "handoff",
+                "required": true,
+                "found": true,
+                "resolved_ref": "packet://handoff",
+                "source": "input-packet-refs"
+              },
+              {
+                "packet": "spec",
+                "required": true,
+                "found": true,
+                "resolved_ref": "packet://spec",
+                "source": "input-packet-refs"
+              }
+            ],
+            "optional": [
+              {
+                "packet": "discovery",
+                "required": false,
+                "found": false,
+                "resolved_ref": null,
+                "source": null
+              },
+              {
+                "packet": "previous-step-result",
+                "required": false,
+                "found": false,
+                "resolved_ref": null,
+                "source": null
+              }
+            ],
+            "missing_required": []
+          },
+          "files": {
+            "required": [],
+            "recommended": [],
+            "missing_required": []
+          },
+          "status": "ready"
+        },
+        "guardrails": {
+          "policy_id": "policy.step.runner.default",
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ],
+          "quality_gate": {
+            "required": true,
+            "suite_ref": "suite.release.core@v1"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "yarn g:lint",
+              "yarn g:typecheck",
+              "yarn workspace @your-org/ts-utils test-unit",
+              "yarn workspace @your-org/core-lib test-unit",
+              "yarn install --immutable"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "skill_refs": [
+          "skill.runner.implement@v1"
+        ],
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/wrappers/wrapper-runner-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/prompts/runner-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/policies/step-runner-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/context/bundles/runner-foundation.yaml"
+          ],
+          "skill_profile_sources": [
+            "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/skills/skill-runner-implement.yaml"
+          ],
+          "route_resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "wrapper_resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.runner"
+          },
+          "prompt_bundle_resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.implement"
+          },
+          "policy_resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.runner"
+          },
+          "skill_resolution_source": {
+            "kind": "step-override",
+            "field": "skill_overrides.implement"
+          },
+          "input_packet_refs": [
+            "packet://handoff",
+            "packet://spec"
+          ],
+          "runtime_evidence_refs": []
+        }
+      }
+    },
+    "adapter_response": {
+      "request_id": "w13-s06.full-journey-release-nextjs.step.implement.request",
+      "adapter_id": "codex-cli",
+      "status": "success",
+      "summary": "External runner 'node' completed implement.",
+      "output": {
+        "mode": "execute",
+        "route_id": "route.implement.default",
+        "provider_adapter": "codex-cli",
+        "compiled_context_ref": "compiled-context://compiled-context.belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.runner-default",
+        "external_runner": {
+          "runtime_mode": "external-process",
+          "command": "node",
+          "args": [
+            "-e",
+            "const fs=require('node:fs');const input=JSON.parse(fs.readFileSync(0,'utf8'));const request=input.request||{};process.stdout.write(JSON.stringify({status:'success',summary:'external runner ok',output:{runner:'node-inline',step_class:request.step_class||null,execution_root:process.cwd()},evidence_refs:['evidence://external-runner/w13-proof'],tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline'}]}));"
+          ],
+          "execution_root": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs",
+          "exit_code": 0,
+          "signal": null,
+          "timed_out": false,
+          "raw_evidence_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/adapter-live-raw-codex-cli-w13-s06-full-journey-release-nextjs-run-start-implement-w13-s06-full-journey-release-nextjs-step-implement-request-1777021932563-1777021932699.json"
+        },
+        "runner_output": {
+          "runner": "node-inline",
+          "step_class": "implement",
+          "execution_root": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs"
+        }
+      },
+      "evidence_refs": [
+        "evidence://adapter-live/codex-cli/w13-s06-full-journey-release-nextjs-run-start-implement-w13-s06-full-journey-release-nextjs-step-implement-request-1777021932563",
+        "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/adapter-live-raw-codex-cli-w13-s06-full-journey-release-nextjs-run-start-implement-w13-s06-full-journey-release-nextjs-step-implement-request-1777021932563-1777021932699.json",
+        "evidence://external-runner/w13-proof"
+      ],
+      "tool_traces": [
+        {
+          "phase": "invoke_adapter",
+          "kind": "codex-cli-external-runner",
+          "detail": "command=node exit_code=0 signal=none"
+        },
+        {
+          "phase": "invoke_adapter",
+          "kind": "external-runner-mock",
+          "detail": "node-inline"
+        }
+      ]
+    },
+    "context_compilation": {
+      "compiled_context_ref": "compiled-context://compiled-context.belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.runner-default",
+      "compiled_context_file": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/compiled-context-w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.json",
+      "compiled_context_artifact": {
+        "compiled_context_id": "compiled-context.belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.runner-default",
+        "version": 1,
+        "step": "implement",
+        "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+        "context_bundle_refs": [
+          "context-bundle://context.bundle.runner.foundation@v1"
+        ],
+        "context_doc_refs": [
+          "context-doc://context.doc.repo-map.core@v1"
+        ],
+        "context_rule_refs": [
+          "context-rule://context.rule.public-repo-safety@v1"
+        ],
+        "context_skill_refs": [
+          "context-skill://context.skill.runner-verification.default@v1"
+        ],
+        "packet_refs": [
+          "packet://handoff",
+          "packet://spec"
+        ],
+        "hashes": {
+          "prompt_hash": "sha256:0699fea38e1058a93964e43236b663903e610e9ea7fa8b874174d1416f82fdd7",
+          "context_hash": "sha256:a6d72c92809526a6571570db07cf899cd34c887e98919611d4c48f5f1d16404f"
+        },
+        "provenance": {
+          "compiler_revision_ref": "compiler://runtime-context-compiler@v1",
+          "project_profile_ref": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/project.aor.yaml",
+          "route_profile_ref": "route.implement.default",
+          "wrapper_profile_ref": "wrapper.runner.default@v3",
+          "generated_at": "2026-04-24T09:12:12.562Z"
+        }
+      },
+      "diagnostics": {
+        "included_sources": [
+          {
+            "kind": "project-profile",
+            "reference": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/project.aor.yaml"
+          },
+          {
+            "kind": "route-profile",
+            "reference": "route.implement.default",
+            "source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/routes/implement-default.yaml"
+          },
+          {
+            "kind": "wrapper-profile",
+            "reference": "wrapper.runner.default@v3",
+            "source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/wrappers/wrapper-runner-default.yaml"
+          },
+          {
+            "kind": "prompt-bundle",
+            "reference": "prompt-bundle://runner-default@v3",
+            "source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/prompts/runner-default.yaml"
+          },
+          {
+            "kind": "context-bundles",
+            "reference": [
+              "context-bundle://context.bundle.runner.foundation@v1"
+            ],
+            "source": [
+              "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/context/bundles/runner-foundation.yaml"
+            ]
+          },
+          {
+            "kind": "step-policy-profile",
+            "reference": "policy.step.runner.default",
+            "source": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/policies/step-runner-default.yaml"
+          },
+          {
+            "kind": "skill-profiles",
+            "reference": [
+              "skill.runner.implement@v1"
+            ],
+            "source": [
+              "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/examples/skills/skill-runner-implement.yaml"
+            ]
+          }
+        ],
+        "dropped_sources": [
+          {
+            "kind": "runtime-evidence-ref",
+            "value": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/project.aor.yaml",
+            "reason": "volatile-local-path"
+          }
+        ],
+        "dropped_runtime_evidence_refs": [
+          {
+            "kind": "runtime-evidence-ref",
+            "value": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/project.aor.yaml",
+            "reason": "volatile-local-path"
+          }
+        ],
+        "missing_required_inputs": [],
+        "required_inputs_status": "ready",
+        "compiled_context_fingerprint": "a6d72c92809526a6571570db07cf899cd34c887e98919611d4c48f5f1d16404f",
+        "resolved_input_packet_refs": [
+          "packet://handoff",
+          "packet://spec"
+        ],
+        "skill_refs": [
+          "skill.runner.implement@v1"
+        ]
+      }
+    },
+    "feature_traceability": {
+      "status": "pass",
+      "input_packet_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.artifact.intake.nextjs-shared-package-release.v1.json",
+      "mission_id": "nextjs-shared-package-release",
+      "request_title": "Prepare one shared-package release-shaped change",
+      "request_brief": "Update one shared package and one consuming app with bounded release evidence and no upstream write-back.",
+      "allowed_paths": [
+        "apps/**",
+        "packages/**"
+      ],
+      "forbidden_paths": [
+        "docs/**",
+        ".github/**",
+        "scripts/**",
+        "examples/**",
+        "context/**"
+      ],
+      "expected_evidence": [
+        "delivery-manifest",
+        "release-packet",
+        "review-report"
+      ],
+      "change_budget": {
+        "max_changed_files": 14,
+        "max_added_lines": 420
+      },
+      "source_kind": "catalog-feature-mission"
+    },
+    "discovery_completeness_gate": null,
+    "architecture_traceability": {
+      "architecture_doc_refs": [
+        "docs/architecture/04-system-of-record-and-core-entities.md",
+        "docs/architecture/12-orchestrator-operating-model.md",
+        "docs/architecture/14-cli-command-catalog.md"
+      ],
+      "contract_refs": [
+        "docs/contracts/project-analysis-report.md",
+        "docs/contracts/step-result.md",
+        "docs/contracts/wave-ticket.md",
+        "docs/contracts/handoff-packet.md"
+      ],
+      "planning_artifact_families": [
+        "project-analysis-report",
+        "step-result",
+        "wave-ticket",
+        "handoff-packet"
+      ],
+      "step_linkage": [],
+      "evaluation_refs": {
+        "suite_refs": [],
+        "dataset_refs": []
+      },
+      "selected_step": {
+        "step_class": "implement",
+        "route_id": "route.implement.default",
+        "wrapper_ref": "wrapper.runner.default@v3",
+        "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+        "policy_id": "policy.step.runner.default",
+        "adapter_id": "codex-cli"
+      }
+    },
+    "blocked_next_step": null,
+    "evidence_root": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports"
+  }
+}

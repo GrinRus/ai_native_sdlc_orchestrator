@@ -114,6 +114,22 @@ function loadApprovedArtifactPacket(artifactPacketFile) {
 }
 
 /**
+ * @param {Record<string, unknown>} packet
+ * @returns {Record<string, unknown>}
+ */
+function loadArtifactPacketBody(packet) {
+  const bodyRef = typeof packet.body_ref === "string" && packet.body_ref.trim().length > 0 ? packet.body_ref : null;
+  if (!bodyRef || !fs.existsSync(bodyRef)) {
+    return {};
+  }
+  try {
+    return /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(bodyRef, "utf8")));
+  } catch {
+    return {};
+  }
+}
+
+/**
  * @param {{
  *   runtimeLayout: { artifactsRoot: string },
  *   projectId: string,
@@ -128,6 +144,15 @@ function resolveArtifactPacketPath(options) {
       ? options.explicitPath
       : path.resolve(options.cwd ?? process.cwd(), options.explicitPath);
     return absolutePath;
+  }
+
+  const intakeCandidates = fs
+    .readdirSync(options.runtimeLayout.artifactsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.includes(".artifact.intake.") && entry.name.endsWith(".json"))
+    .map((entry) => path.join(options.runtimeLayout.artifactsRoot, entry.name))
+    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
+  if (intakeCandidates.length > 0) {
+    return intakeCandidates[0];
   }
 
   return path.join(options.runtimeLayout.artifactsRoot, `${options.projectId}.artifact.bootstrap.v1.json`);
@@ -181,6 +206,9 @@ export function prepareHandoffArtifacts(options = {}) {
     explicitPath: options.approvedArtifactPath,
   });
   const artifactPacket = loadApprovedArtifactPacket(artifactPacketFile);
+  const artifactPacketBody = loadArtifactPacketBody(artifactPacket);
+  const missionTraceability = asRecord(artifactPacketBody.mission_traceability);
+  const featureRequest = asRecord(artifactPacketBody.feature_request);
 
   const repoScopes = deriveRepoScopes(profile);
   const allowedPaths = unique(repoScopes.flatMap((scope) => scope.paths));
@@ -196,7 +224,10 @@ export function prepareHandoffArtifacts(options = {}) {
   const waveTicket = {
     ticket_id: ticketId,
     project_id: init.projectId,
-    objective: "Establish a bounded handoff packet from approved bootstrap artifacts.",
+    objective:
+      typeof featureRequest.title === "string" && featureRequest.title.trim().length > 0
+        ? featureRequest.title
+        : "Establish a bounded handoff packet from approved bootstrap artifacts.",
     scope: {
       repo_scopes: repoScopes.map((scope) => scope.repo_id),
       allowed_paths: allowedPaths,
@@ -208,6 +239,12 @@ export function prepareHandoffArtifacts(options = {}) {
     source_refs: {
       artifact_packet_file: artifactPacketFile,
       project_profile_ref: init.projectProfileRef,
+    },
+    feature_traceability: {
+      mission_id: typeof missionTraceability.mission_id === "string" ? missionTraceability.mission_id : null,
+      source_kind: typeof missionTraceability.source_kind === "string" ? missionTraceability.source_kind : null,
+      request_title: typeof featureRequest.title === "string" ? featureRequest.title : null,
+      request_brief: typeof featureRequest.brief === "string" ? featureRequest.brief : null,
     },
   };
 
@@ -257,6 +294,12 @@ export function prepareHandoffArtifacts(options = {}) {
       required: true,
       state: "pending",
       approval_refs: [],
+    },
+    feature_traceability: {
+      mission_id: typeof missionTraceability.mission_id === "string" ? missionTraceability.mission_id : null,
+      source_kind: typeof missionTraceability.source_kind === "string" ? missionTraceability.source_kind : null,
+      request_title: typeof featureRequest.title === "string" ? featureRequest.title : null,
+      request_brief: typeof featureRequest.brief === "string" ? featureRequest.brief : null,
     },
     source_refs: {
       wave_ticket_file: waveTicketFile,

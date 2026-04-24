@@ -1,0 +1,29 @@
+{
+  "scorecard_id": "w13-s06.full-journey-regress-ky.learning-loop.scorecard.v1",
+  "project_id": "sindresorhus-ky-w13-s06.full-journey-regress-ky",
+  "run_id": "w13-s06.full-journey-regress-ky",
+  "source_kind": "cli-learning-handoff",
+  "status": "pass",
+  "summary": "Run 'w13-s06.full-journey-regress-ky' completed public learning-loop handoff.",
+  "evidence_refs": [
+    "evidence://.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/artifacts/delivery-plan-implement-1777021716581.json",
+    "evidence://.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/artifacts/delivery-plan-implement-1777021715243.json",
+    "evidence://.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/artifacts/delivery-manifest-patch-only-w13-s06.full-journey-regress-ky-1777021716733.json",
+    "evidence://.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/artifacts/release-packet-patch-only-w13-s06.full-journey-regress-ky-1777021716733.json",
+    "evidence://.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/reports/step-result-routed-w13-s06.full-journey-regress-ky.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/reports/review-report-w13-s06.full-journey-regress-ky.json",
+    "evidence://.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/reports/learning-loop-scorecard-delivery-w13-s06.full-journey-regress-ky.json",
+    "evidence://.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/reports/learning-loop-handoff-w13-s06.full-journey-regress-ky.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/reports/review-report-w13-s06.full-journey-regress-ky.json"
+  ],
+  "linked_eval_suite_refs": [],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "generated_at": "2026-04-24T09:08:37.317Z"
+}

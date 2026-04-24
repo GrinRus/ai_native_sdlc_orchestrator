@@ -28,6 +28,7 @@ What exists today:
 - contributor guidance through `AGENTS.md`, nested `AGENTS.md` files, and reusable root skills;
 - root repository-integrity commands and CI for roadmap, guidance, and community-file consistency;
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
+- a layered live E2E model: bounded rehearsal profiles plus a catalog-backed full-journey layer on curated repositories and curated feature missions tracked through `W13`;
 - implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an internal black-box rehearsal harness tracked through `W12`.
 - expanded implementation backlog through W11 slices with active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - reopened post-audit productionization queue for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and a dedicated W11 target-backed proof-closure wave.
@@ -121,11 +122,11 @@ At a high level, AOR is intended to work like this:
    Keep the runtime headless-first, with optional live event streams and a detachable web console.
 
 8. **Feed learning back into the platform**  
-   Turn installed-user rehearsal output, scorecards, and incidents into new evals, harness captures, and backlog work.
+   Turn installed-user rehearsal output, review verdicts, scorecards, and incidents into new evals, harness captures, and backlog work.
 
 ## Command surface status
 
-The CLI command surface currently includes **31 implemented** commands and **0 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
+The CLI command surface currently includes **33 implemented** commands and **0 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
 
 Implemented command groups:
 - project lifecycle: `project init`, `project analyze`, `project validate`, `project verify`;
@@ -134,6 +135,7 @@ Implemented command groups:
 - quality and handoff: `eval run`, `harness replay`, `harness certify`, `asset promote`, `asset freeze`, `handoff prepare`, `handoff approve`;
 - delivery/release and operator reads: `deliver prepare`, `release prepare`, `packet show`, `evidence show`;
 - incidents and audit: `incident open`, `incident recertify`, `incident show`, `audit runs`;
+- review and learning closure: `review run`, `learning handoff`;
 - UI lifecycle: `ui attach`, `ui detach`.
 
 Planned commands:
@@ -192,6 +194,8 @@ See:
 - `docs/ops/live-e2e-release-short.md`
 - `docs/ops/live-e2e-release-long.md`
 
+The W13 full-journey layer resolves these repositories and feature missions through an internal machine-readable catalog under `scripts/live-e2e/catalog/**`. Bounded `regress/release short/long` profiles remain, but they no longer claim to prove the entire installed-user journey.
+
 ## Roadmap
 
 The implementation roadmap is tracked as **wave → epic → slice → local task**.
@@ -219,6 +223,7 @@ Detailed wave plans:
 - `docs/backlog/wave-10-implementation-slices.md`
 - `docs/backlog/wave-11-implementation-slices.md`
 - `docs/backlog/wave-12-implementation-slices.md`
+- `docs/backlog/wave-13-implementation-slices.md`
 
 ## Contributing
 

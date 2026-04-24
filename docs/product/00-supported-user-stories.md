@@ -62,6 +62,7 @@ This document groups the AOR user-story surface into role clusters. The current 
 
 ### Reviewer / QA
 - Review structured review packets with risk notes and evidence.
+- Inspect machine-readable review verdicts for discovery quality, artifact quality, and generated code quality before deciding whether to proceed.
 - Compare deterministic validation with judge-based eval outcomes.
 - Run suite-based comparisons against baselines.
 - Manage flaky cases and escalation paths.
@@ -77,6 +78,7 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Tail logs, view live events, and inspect policy plus compile decisions.
 - Approve risky actions and replay failures through harness.
 - Review installed-user rehearsal evidence produced by the internal black-box harness on real repositories.
+- Run full-journey live acceptance only on curated repositories and curated feature missions.
 
 ### Security / compliance
 - Enforce provider and adapter allowlists.
@@ -122,3 +124,11 @@ MVP for AOR means the system can prove a full bounded flow on a real repository:
 4. validate and evaluate quality,
 5. prepare delivery output,
 6. learn from failures through incidents and datasets.
+
+The W13 live-acceptance bar raises that proof for curated rehearsal targets:
+1. bootstrap a clean target repo through public CLI,
+2. prepare a feature-specific intake request,
+3. generate discovery/spec/handoff during the run,
+4. execute through public run-control surfaces,
+5. emit review and learning-loop closure artifacts,
+6. judge the result on runtime, discovery, artifact, code, delivery, and learning quality.

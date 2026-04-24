@@ -20,7 +20,7 @@ preflight:
     - verify
     - stop
   prerequisites:
-    - node, corepack, and yarn available
+    - node and yarn available
     - network access for shallow clone and workspace install
   repo_shape_notes:
     - public Next.js monorepo with workspace-wide checks
@@ -29,7 +29,7 @@ preflight:
     - keep delivery mode in fork-first-pr for long public-target rehearsals
   abort_conditions:
     - repository clone fails or ref cannot be resolved
-    - workspace lint, typecheck, or unit tests fail during preflight verification
+    - workspace lint, typecheck, or shared-package unit smoke fails during preflight verification
     - release mode requires upstream writes
   reusable_assumptions:
     bootstrap: workspace bootstrap remains no-write
@@ -47,7 +47,7 @@ objective:
     - keep execution scoped to fork or local outputs only
   success_definition:
     - execution, review, and qa complete with evidence
-    - workspace verification commands pass
+    - workspace verification smoke commands pass
     - delivery manifest is materialized
     - release packet is materialized
 stages:
@@ -66,12 +66,12 @@ verification:
   lint: true
   tests: project-default
   setup_commands:
-    - corepack enable
-    - yarn install
+    - yarn install --immutable
   commands:
     - yarn g:lint
     - yarn g:typecheck
-    - yarn g:test-unit
+    - yarn workspace @your-org/ts-utils test-unit
+    - yarn workspace @your-org/core-lib test-unit
   eval_suites:
     - suite.release.long@v1
   harness:

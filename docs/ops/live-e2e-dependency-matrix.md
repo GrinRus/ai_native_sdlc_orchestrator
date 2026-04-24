@@ -26,8 +26,8 @@ pnpm check
 | `regress-short` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | `xo: command not found` (dependencies not installed) or `browserType.launch: Executable doesn't exist` (Playwright browsers not installed) |
 | `release-short` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | `xo: command not found` or Playwright browser executable missing |
 | `w7-governance-integration` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | promotion/learning-loop linkage missing or release rehearsal path fails before closure evidence materialization |
-| `regress-long` | `python`, `pip`, `make`, `git` | `python -m pip install -e ".[dev]"` | `make test`<br>`make codestyle` | Python dependencies from index/mirror | `No module named ...`, `make: *** ... Error` |
-| `release-long` | `node`, `corepack`, `yarn`, `git` | `yarn install --immutable` | `yarn g:lint`<br>`yarn g:typecheck`<br>`yarn g:test-unit` | Yarn workspace dependencies | `YN0000/YN...` install errors, workspace script failure |
+| `regress-long` | `python3`, `make`, `git` | `make install` | `make test`<br>`make codestyle` | Python dependencies from index/mirror | `No module named ...`, `make: *** ... Error` |
+| `release-long` | `node`, `yarn`, `git` | `yarn install --immutable` | `yarn g:lint`<br>`yarn g:typecheck`<br>`yarn workspace @your-org/ts-utils test-unit`<br>`yarn workspace @your-org/core-lib test-unit` | Yarn workspace dependencies | `YN0000/YN...` install errors, workspace script failure |
 
 ## Notes
 
@@ -57,3 +57,24 @@ Observed failure signatures and safety defaults:
 
 Canonical fixture bundle:
 - `examples/live-e2e/fixtures/w12-s04/w12-s04-evidence-bundle.json`
+
+## W13-S06 refreshed curated full-journey proof bundle (2026-04-24)
+
+Refreshed curated runs:
+- `w13-s06.full-journey-regress-ky` status `pass` on mission `ky-header-regression`
+- `w13-s06.full-journey-regress-httpie` status `pass` on mission `httpie-cli-output-regression`
+- `w13-s06.full-journey-release-nextjs` status `pass` on mission `nextjs-shared-package-release`
+
+Observed prerequisite confirmations:
+- full-journey `project init` preserved target-specific verification commands through public repo command overrides instead of harness-side profile generation;
+- `httpie/cli` bootstrap now uses `make install`, and its full-journey verification uses a bounded CLI pytest slice plus `make codestyle`;
+- `nextjs-monorepo-example` full-journey verification uses monorepo `g:lint`, `g:typecheck`, and shared-package unit smoke instead of the broader `g:test-unit` matrix.
+
+Observed artifact and closure guarantees:
+- each run materialized mission-generated feature request, intake packet, discovery analysis, spec step-result, and handoff packet;
+- review verdicts are backed by public `review-report`;
+- closure is backed by public `audit runs` and `learning handoff`;
+- release-shaped proof keeps `delivery-manifest` and `release-packet` anchored to the target checkout.
+
+Canonical fixture bundle:
+- `examples/live-e2e/fixtures/w13-s06/w13-s06-evidence-bundle.json`

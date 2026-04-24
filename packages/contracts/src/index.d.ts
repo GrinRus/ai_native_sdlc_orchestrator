@@ -11,6 +11,7 @@ export type ContractFamily =
   | "step-result"
   | "validation-report"
   | "evaluation-report"
+  | "review-report"
   | "dataset"
   | "evaluation-suite"
   | "promotion-decision"
@@ -26,6 +27,8 @@ export type ContractFamily =
   | "adapter-capability-profile"
   | "skill-profile"
   | "live-run-event"
+  | "learning-loop-scorecard"
+  | "learning-loop-handoff"
   | "control-plane-api";
 
 export type ContractFieldType = "string" | "number" | "boolean" | "array" | "object";

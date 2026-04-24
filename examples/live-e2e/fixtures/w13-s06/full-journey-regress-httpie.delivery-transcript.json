@@ -1,0 +1,67 @@
+{
+  "transcript_id": "httpie-cli-w13-s06.full-journey-regress-httpie.delivery-transcript.patch-only.1777021774203",
+  "project_id": "httpie-cli-w13-s06.full-journey-regress-httpie",
+  "run_id": "w13-s06.full-journey-regress-httpie",
+  "step_id": "deliver.prepare",
+  "mode": "patch-only",
+  "status": "success",
+  "started_at": "2026-04-24T09:09:34.203Z",
+  "finished_at": "2026-04-24T09:09:34.304Z",
+  "execution_root": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie",
+  "delivery_plan_ref": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/artifacts/delivery-plan-implement-1777021774198.json",
+  "ownership": {
+    "source_run_id": "w13-s06.full-journey-regress-httpie",
+    "source_step_class": "implement"
+  },
+  "coordination": {
+    "required": false,
+    "status": "not-required",
+    "repo_ids": [
+      "target"
+    ],
+    "evidence_refs": []
+  },
+  "recovery_scope": {
+    "requested": false,
+    "status": "not-requested",
+    "rerun_of_run_ref": null,
+    "failed_step_ref": null,
+    "packet_boundary": "delivery-manifest",
+    "strategy": null,
+    "blocking_reasons": []
+  },
+  "git": {
+    "head_before": {
+      "branch": "master",
+      "commit": "5b604c37c6c67e18e7c3e9aee6c88a8c22b98345"
+    },
+    "head_after": {
+      "branch": "master",
+      "commit": "5b604c37c6c67e18e7c3e9aee6c88a8c22b98345"
+    },
+    "commands": [
+      "git diff --binary HEAD",
+      "git diff --name-only HEAD",
+      "git diff --numstat HEAD"
+    ]
+  },
+  "changed_paths": [],
+  "diff_stats": {
+    "files": [],
+    "totals": {
+      "files": 0,
+      "added": 0,
+      "deleted": 0
+    }
+  },
+  "outputs": {
+    "patch_file": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/artifacts/delivery-patch-w13-s06.full-journey-regress-httpie-1777021774264.patch",
+    "delivery_manifest_file": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/artifacts/delivery-manifest-patch-only-w13-s06.full-journey-regress-httpie-1777021774342.json",
+    "release_packet_file": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/artifacts/release-packet-patch-only-w13-s06.full-journey-regress-httpie-1777021774342.json",
+    "learning_loop_scorecard_file": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/reports/learning-loop-scorecard-delivery-w13-s06.full-journey-regress-httpie.json",
+    "learning_loop_handoff_file": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/reports/learning-loop-handoff-w13-s06.full-journey-regress-httpie.json",
+    "incident_report_file": null
+  },
+  "error": null,
+  "recovery_steps": null
+}

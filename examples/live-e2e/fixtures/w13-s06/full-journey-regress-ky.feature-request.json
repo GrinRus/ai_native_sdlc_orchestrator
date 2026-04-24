@@ -1,0 +1,29 @@
+{
+  "mission_id": "ky-header-regression",
+  "title": "Preserve narrow header-normalization regression coverage",
+  "brief": "Add or adjust one bounded regression test around header handling and the smallest source fix needed to satisfy it.",
+  "allowed_paths": [
+    "source/**",
+    "test/**"
+  ],
+  "forbidden_paths": [
+    "docs/**",
+    ".github/**",
+    "scripts/**",
+    "examples/**",
+    "context/**"
+  ],
+  "expected_evidence": [
+    "verify-summary",
+    "routed-step-result",
+    "review-report"
+  ],
+  "acceptance_checks": [
+    "keep changes inside source and test folders only",
+    "preserve npm test as the primary regression gate"
+  ],
+  "change_budget": {
+    "max_changed_files": 6,
+    "max_added_lines": 220
+  }
+}

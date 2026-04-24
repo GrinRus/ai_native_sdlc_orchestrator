@@ -39,7 +39,7 @@ Isolation mode defaults:
 - prefer `workspace-clone` when rehearsing fork-first delivery behavior on public targets.
 
 ## Prerequisites
-- Python and pip available.
+- Python 3 available.
 - `make` is available in the local shell.
 - Network access for clone and dependency install.
 
@@ -58,7 +58,7 @@ node ./scripts/live-e2e/run-profile.mjs \
 
 ## Expected verification
 - repository bootstrap succeeds;
-- setup command `python -m pip install -e ".[dev]"` succeeds;
+- setup command `make install` succeeds;
 - `make test` and `make codestyle` succeed;
 - review and QA packets are materialized;
 - release packet is not required.

@@ -1,0 +1,61 @@
+catalog_id: ky
+repo:
+  repo_id: sindresorhus/ky
+  repo_url: https://github.com/sindresorhus/ky.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - npm install
+    - npx playwright install
+  commands:
+    - npm test
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch
+feature_missions:
+  - mission_id: ky-header-regression
+    title: Preserve narrow header-normalization regression coverage
+    brief: Add or adjust one bounded regression test around header handling and the smallest source fix needed to satisfy it.
+    allowed_paths:
+      - source/**
+      - test/**
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+    acceptance_checks:
+      - keep changes inside source and test folders only
+      - preserve npm test as the primary regression gate
+    change_budget:
+      max_changed_files: 6
+      max_added_lines: 220
+  - mission_id: ky-release-doc-typing
+    title: Prepare one release-shaped typed API adjustment
+    brief: Land one bounded API or typing fix with matching regression coverage and release-ready lineage.
+    allowed_paths:
+      - source/**
+      - test/**
+      - index.d.ts
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - delivery-manifest
+      - release-packet
+      - review-report
+    acceptance_checks:
+      - keep release evidence anchored to the target checkout
+      - avoid any upstream write-back
+    change_budget:
+      max_changed_files: 8
+      max_added_lines: 260

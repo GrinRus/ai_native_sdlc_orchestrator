@@ -1,0 +1,35 @@
+{
+  "handoff_id": "w13-s06.full-journey-release-nextjs.learning-loop.handoff.v1",
+  "project_id": "belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs",
+  "run_id": "w13-s06.full-journey-release-nextjs",
+  "run_status": "pass",
+  "source_kind": "cli-learning-handoff",
+  "scorecard_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/learning-loop-scorecard-cli-learning-handoff-w13-s06.full-journey-release-nextjs.json",
+  "incident_ref": null,
+  "backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "quality_refs": [],
+  "evidence_refs": [
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/delivery-plan-implement-1777021934915.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/delivery-plan-implement-1777021934423.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/delivery-plan-implement-1777021932548.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/delivery-manifest-fork-first-pr-w13-s06.full-journey-release-nextjs-1777021935102.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/delivery-manifest-fork-first-pr-w13-s06.full-journey-release-nextjs-1777021934614.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/release-packet-fork-first-pr-w13-s06.full-journey-release-nextjs-1777021935103.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/release-packet-fork-first-pr-w13-s06.full-journey-release-nextjs-1777021934614.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/step-result-routed-w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/review-report-w13-s06.full-journey-release-nextjs.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/learning-loop-scorecard-delivery-w13-s06.full-journey-release-nextjs.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/learning-loop-handoff-w13-s06.full-journey-release-nextjs.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/learning-loop-scorecard-cli-learning-handoff-w13-s06.full-journey-release-nextjs.json"
+  ],
+  "next_actions": [
+    "Review learning-loop artifacts and incident context.",
+    "Map follow-up work into docs/backlog/mvp-implementation-backlog.md and the owning wave slice.",
+    "Update eval suites or harness captures before re-enabling risky write-back paths."
+  ],
+  "generated_at": "2026-04-24T09:12:15.825Z"
+}
