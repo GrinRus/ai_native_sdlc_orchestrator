@@ -100,6 +100,18 @@ function createExamplesRoot(options) {
 }
 
 /**
+ * @param {{ catalogRoot: string }} options
+ */
+function seedLocalCatalogSupport(options) {
+  fs.cpSync(path.join(workspaceRoot, "scripts/live-e2e/catalog/providers"), path.join(options.catalogRoot, "providers"), {
+    recursive: true,
+  });
+  fs.cpSync(path.join(workspaceRoot, "scripts/live-e2e/catalog/scenarios"), path.join(options.catalogRoot, "scenarios"), {
+    recursive: true,
+  });
+}
+
+/**
  * @param {{ tempRoot: string }} options
  */
 function createFakeCodexBinary(options) {
@@ -138,8 +150,8 @@ function createFakeCodexBinary(options) {
  *   args: string[],
  * }} options
  */
-function configureCodexExternalRuntime(options) {
-  const adapterPath = path.join(options.examplesRoot, "adapters/codex-cli.yaml");
+function configureAdapterExternalRuntime(options) {
+  const adapterPath = path.join(options.examplesRoot, "adapters", options.adapterFileName);
   const source = fs.readFileSync(adapterPath, "utf8");
   const executionBlock = [
     "execution:",
@@ -154,7 +166,9 @@ function configureCodexExternalRuntime(options) {
     "    request_via_stdin: true",
     "    timeout_ms: 30000",
   ].join("\n");
-  const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
+  const updated = source.includes("execution:\n")
+    ? source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`)
+    : source.replace(/sandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
   fs.writeFileSync(adapterPath, updated, "utf8");
 }
 
@@ -162,8 +176,9 @@ function configureCodexExternalRuntime(options) {
  * @param {{ examplesRoot: string }} options
  */
 function configureCodexExternalRuntimeSuccess(options) {
-  configureCodexExternalRuntime({
+  configureAdapterExternalRuntime({
     examplesRoot: options.examplesRoot,
+    adapterFileName: "codex-cli.yaml",
     command: process.execPath,
     args: [
       "-e",
@@ -187,8 +202,9 @@ function configureCodexExternalRuntimeSuccess(options) {
  * @param {{ examplesRoot: string }} options
  */
 function configureCodexExternalRuntimeForbiddenWrite(options) {
-  configureCodexExternalRuntime({
+  configureAdapterExternalRuntime({
     examplesRoot: options.examplesRoot,
+    adapterFileName: "codex-cli.yaml",
     command: process.execPath,
     args: [
       "-e",
@@ -204,6 +220,32 @@ function configureCodexExternalRuntimeForbiddenWrite(options) {
         "output:{runner:'node-inline',step_class:request.step_class||null,execution_root:process.cwd()},",
         "evidence_refs:['evidence://external-runner/live-e2e-harness-forbidden-write'],",
         "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'forbidden-write'}]",
+        "}));",
+      ].join(""),
+    ],
+  });
+}
+
+/**
+ * @param {{ examplesRoot: string }} options
+ */
+function configureClaudeExternalRuntimeSuccess(options) {
+  configureAdapterExternalRuntime({
+    examplesRoot: options.examplesRoot,
+    adapterFileName: "claude-code.yaml",
+    command: process.execPath,
+    args: [
+      "-e",
+      [
+        "const fs=require('node:fs');",
+        "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+        "const request=input.request||{};",
+        "process.stdout.write(JSON.stringify({",
+        "status:'success',",
+        "summary:'claude external runner ok',",
+        "output:{runner:'node-inline-claude',step_class:request.step_class||null,execution_root:process.cwd()},",
+        "evidence_refs:['evidence://external-runner/live-e2e-harness-claude-success'],",
+        "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'claude-inline'}]",
         "}));",
       ].join(""),
     ],
@@ -275,15 +317,50 @@ function writeLocalCatalogTarget(options) {
         write_back_to_remote: false,
         preferred_delivery_mode: "patch",
       },
+      required_matrix_cells: [
+        {
+          cell_id: `${options.catalogId}.regress.small.openai`,
+          scenario_family: "regress",
+          feature_size: "small",
+          feature_mission_id: options.missionId,
+          provider_variant_id: "openai-primary",
+          coverage_tier: "required",
+        },
+        {
+          cell_id: `${options.catalogId}.regress.small.anthropic`,
+          scenario_family: "regress",
+          feature_size: "small",
+          feature_mission_id: options.missionId,
+          provider_variant_id: "anthropic-primary",
+          coverage_tier: "required",
+        },
+      ],
+      provider_comparison_pairs: [
+        {
+          pair_id: `${options.catalogId}.regress.small`,
+          scenario_family: "regress",
+          feature_size: "small",
+          feature_mission_id: options.missionId,
+          provider_variants: ["openai-primary", "anthropic-primary"],
+        },
+      ],
       feature_missions: [
         {
           mission_id: options.missionId,
           title: "Local full-journey mission",
           brief: "Use one bounded local mission for harness coverage.",
+          feature_size: "small",
           allowed_paths: ["src/**", "test/**", "package.json"],
           forbidden_paths: ["docs/**", ".github/**", "scripts/**", "examples/**", "context/**"],
           expected_evidence: ["review-report", "learning-loop-handoff"],
           acceptance_checks: ["keep changes inside src and test only"],
+          supported_scenarios: ["regress", "repair", "governance", "release"],
+          recommended_provider_variants: ["openai-primary", "anthropic-primary", "open-code-primary"],
+          size_budget: {
+            max_changed_files: 4,
+            max_added_lines: 120,
+          },
+          size_rationale: "Local harness mission should stay inside a narrow source and test seam.",
           change_budget: {
             max_changed_files: 4,
             max_added_lines: 120,
@@ -300,6 +377,8 @@ function writeLocalCatalogTarget(options) {
  *   outputProfilePath: string,
  *   catalogId: string,
  *   missionId: string,
+ *   scenarioFamily?: string,
+ *   providerVariantId?: string,
  *   internalTestHooks?: Record<string, unknown>,
  *   outputPolicy?: Record<string, unknown>,
  * }} options
@@ -315,6 +394,8 @@ function writeLocalFullJourneyProfile(options) {
       duration_class: "short",
       target_catalog_id: options.catalogId,
       feature_mission_id: options.missionId,
+      scenario_family: options.scenarioFamily ?? "regress",
+      provider_variant_id: options.providerVariantId ?? "openai-primary",
       bootstrap_template: "github-default",
       runtime: {
         mode: "ephemeral",
@@ -455,8 +536,9 @@ test("internal harness surfaces missing external runner prerequisites", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
     const examplesRoot = createExamplesRoot({ tempRoot });
-    configureCodexExternalRuntime({
+    configureAdapterExternalRuntime({
       examplesRoot,
+      adapterFileName: "codex-cli.yaml",
       command: "__aor_missing_runner_command__",
       args: [],
     });
@@ -532,6 +614,7 @@ test("internal harness runs a catalog-backed full-journey profile without harnes
     const examplesRoot = createExamplesRoot({ tempRoot });
     configureCodexExternalRuntimeSuccess({ examplesRoot });
     const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
     writeLocalCatalogTarget({
       catalogRoot,
       catalogId: "local-target",
@@ -588,9 +671,34 @@ test("internal harness runs a catalog-backed full-journey profile without harnes
     assert.equal(typeof summary.verdict_matrix, "object");
     assert.equal(summary.verdict_matrix.target_selection, "pass");
     assert.equal(summary.verdict_matrix.feature_request_quality, "pass");
+    assert.equal(summary.verdict_matrix.scenario_family, "regress");
+    assert.equal(summary.verdict_matrix.provider_variant_id, "openai-primary");
+    assert.equal(summary.verdict_matrix.feature_size, "small");
+    assert.equal(summary.verdict_matrix.scenario_coverage_status, "pass");
+    assert.equal(summary.verdict_matrix.provider_execution_status, "pass");
+    assert.equal(summary.verdict_matrix.feature_size_fit_status, "pass");
     assert.equal(summary.verdict_matrix.overall_verdict, "pass_with_findings");
     assert.equal(fs.existsSync(summary.artifacts.feature_request_file), true);
     assert.equal(fs.existsSync(summary.learning_loop_handoff_file), true);
+    assert.deepEqual(summary.matrix_cell, {
+      cell_id: "local-target.regress.small.openai",
+      target_catalog_id: "local-target",
+      feature_mission_id: "local-mission",
+      scenario_family: "regress",
+      provider_variant_id: "openai-primary",
+      feature_size: "small",
+      coverage_tier: "required",
+    });
+    assert.equal(summary.coverage_follow_up.current_cell_required, true);
+    assert.equal(Array.isArray(summary.artifacts.provider_route_override_files), true);
+    assert.ok(summary.artifacts.provider_route_override_files.length > 0);
+    const reviewReport = JSON.parse(fs.readFileSync(summary.artifacts.review_report_file, "utf8"));
+    assert.equal(reviewReport.provider_traceability.requested_provider, "openai");
+    assert.equal(reviewReport.provider_traceability.actual_provider, "openai");
+    assert.equal(reviewReport.provider_traceability.actual_adapter, "codex-cli");
+    assert.equal(reviewReport.feature_size_fit.feature_size, "small");
+    const learningHandoff = JSON.parse(fs.readFileSync(summary.learning_loop_handoff_file, "utf8"));
+    assert.equal(learningHandoff.matrix_cell.provider_variant_id, "openai-primary");
   });
 });
 
@@ -599,6 +707,7 @@ test("full-journey mode defaults to packaged bootstrap assets when --examples-ro
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
     const fakeCodex = createFakeCodexBinary({ tempRoot });
     const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
     writeLocalCatalogTarget({
       catalogRoot,
       catalogId: "local-target",
@@ -629,6 +738,51 @@ test("full-journey mode defaults to packaged bootstrap assets when --examples-ro
     assert.equal(summary.control_surfaces.examples_root, null);
     assert.equal(fs.existsSync(summary.generated_project_profile_file), true);
     assert.equal(fs.existsSync(summary.artifacts.target_examples_root), true);
+  });
+});
+
+test("full-journey mode applies anthropic provider-pinned route overrides", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    configureClaudeExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.anthropic.local.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      providerVariantId: "anthropic-primary",
+    });
+
+    const result = runHarness({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-local-anthropic",
+      catalogRoot,
+    });
+    assert.equal(result.live_e2e_run_status, "pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "pass");
+    assert.equal(summary.verdict_matrix.provider_variant_id, "anthropic-primary");
+    assert.equal(summary.verdict_matrix.provider_execution_status, "pass");
+    const reviewReport = JSON.parse(fs.readFileSync(summary.artifacts.review_report_file, "utf8"));
+    assert.equal(reviewReport.provider_traceability.requested_provider, "anthropic");
+    assert.equal(reviewReport.provider_traceability.actual_provider, "anthropic");
+    assert.equal(reviewReport.provider_traceability.actual_adapter, "claude-code");
+    assert.ok(
+      summary.artifacts.provider_route_override_files.some((filePath) => filePath.includes("anthropic-primary")),
+    );
   });
 });
 
@@ -675,6 +829,7 @@ test("full-journey mode rejects unknown feature missions", () => {
     const examplesRoot = createExamplesRoot({ tempRoot });
     configureCodexExternalRuntimeSuccess({ examplesRoot });
     const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
     writeLocalCatalogTarget({
       catalogRoot,
       catalogId: "local-target",
@@ -713,12 +868,245 @@ test("full-journey mode rejects unknown feature missions", () => {
   });
 });
 
+test("full-journey mode rejects profiles without scenario_family", () => {
+  withTempRoot((tempRoot) => {
+    const profilePath = path.join(tempRoot, "full-journey.missing-scenario.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+    const profile = /** @type {Record<string, unknown>} */ (parseYaml(fs.readFileSync(profilePath, "utf8")));
+    delete profile.scenario_family;
+    fs.writeFileSync(profilePath, stringifyYaml(profile), "utf8");
+
+    const run = spawnSync(
+      process.execPath,
+      [harnessScriptPath, "--project-ref", workspaceRoot, "--runtime-root", path.join(tempRoot, "runtime"), "--profile", profilePath],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /Full-journey profiles require scenario_family/u);
+  });
+});
+
+test("full-journey mode rejects profiles without provider_variant_id", () => {
+  withTempRoot((tempRoot) => {
+    const profilePath = path.join(tempRoot, "full-journey.missing-provider.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+    const profile = /** @type {Record<string, unknown>} */ (parseYaml(fs.readFileSync(profilePath, "utf8")));
+    delete profile.provider_variant_id;
+    fs.writeFileSync(profilePath, stringifyYaml(profile), "utf8");
+
+    const run = spawnSync(
+      process.execPath,
+      [harnessScriptPath, "--project-ref", workspaceRoot, "--runtime-root", path.join(tempRoot, "runtime"), "--profile", profilePath],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /Full-journey profiles require provider_variant_id/u);
+  });
+});
+
+test("full-journey mode rejects unknown provider variants", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.unknown-provider.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      providerVariantId: "missing-provider",
+    });
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        harnessScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--runtime-root",
+        path.join(tempRoot, "runtime"),
+        "--examples-root",
+        examplesRoot,
+        "--profile",
+        profilePath,
+        "--catalog-root",
+        catalogRoot,
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /Provider variant 'missing-provider' was not found/u);
+  });
+});
+
+test("full-journey mode rejects unknown scenario families", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.unknown-scenario.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      scenarioFamily: "unsupported-scenario",
+    });
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        harnessScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--runtime-root",
+        path.join(tempRoot, "runtime"),
+        "--examples-root",
+        examplesRoot,
+        "--profile",
+        profilePath,
+        "--catalog-root",
+        catalogRoot,
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /Scenario policy 'unsupported-scenario' was not found/u);
+  });
+});
+
+test("full-journey mode rejects unsupported mission scenario combinations", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const targetPath = path.join(catalogRoot, "targets", "local-target.yaml");
+    const targetDocument = /** @type {Record<string, unknown>} */ (parseYaml(fs.readFileSync(targetPath, "utf8")));
+    const mission = /** @type {Array<Record<string, unknown>>} */ (targetDocument.feature_missions)[0];
+    mission.supported_scenarios = ["release"];
+    fs.writeFileSync(targetPath, stringifyYaml(targetDocument), "utf8");
+
+    const profilePath = path.join(tempRoot, "full-journey.unsupported-scenario.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      scenarioFamily: "regress",
+    });
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        harnessScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--runtime-root",
+        path.join(tempRoot, "runtime"),
+        "--examples-root",
+        examplesRoot,
+        "--profile",
+        profilePath,
+        "--catalog-root",
+        catalogRoot,
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /Scenario 'regress' is not allowed/u);
+  });
+});
+
+test("full-journey mode rejects unsupported mission provider combinations", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const targetPath = path.join(catalogRoot, "targets", "local-target.yaml");
+    const targetDocument = /** @type {Record<string, unknown>} */ (parseYaml(fs.readFileSync(targetPath, "utf8")));
+    const mission = /** @type {Array<Record<string, unknown>>} */ (targetDocument.feature_missions)[0];
+    mission.recommended_provider_variants = ["openai-primary"];
+    fs.writeFileSync(targetPath, stringifyYaml(targetDocument), "utf8");
+
+    const profilePath = path.join(tempRoot, "full-journey.unsupported-provider.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      providerVariantId: "anthropic-primary",
+    });
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        harnessScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--runtime-root",
+        path.join(tempRoot, "runtime"),
+        "--examples-root",
+        examplesRoot,
+        "--profile",
+        profilePath,
+        "--catalog-root",
+        catalogRoot,
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /Provider variant 'anthropic-primary' is not allowed/u);
+  });
+});
+
 test("full-journey mode fails when discovery artifacts are not mission-traceable", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
     const examplesRoot = createExamplesRoot({ tempRoot });
     configureCodexExternalRuntimeSuccess({ examplesRoot });
     const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
     writeLocalCatalogTarget({
       catalogRoot,
       catalogId: "local-target",
@@ -757,6 +1145,7 @@ test("full-journey mode fails when approved handoff validation is blocked", () =
     const examplesRoot = createExamplesRoot({ tempRoot });
     configureCodexExternalRuntimeSuccess({ examplesRoot });
     const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
     writeLocalCatalogTarget({
       catalogRoot,
       catalogId: "local-target",
@@ -794,6 +1183,7 @@ test("full-journey mode fails when review detects control-plane leakage", () => 
     const examplesRoot = createExamplesRoot({ tempRoot });
     configureCodexExternalRuntimeForbiddenWrite({ examplesRoot });
     const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
     writeLocalCatalogTarget({
       catalogRoot,
       catalogId: "local-target",
@@ -831,6 +1221,7 @@ test("full-journey mode fails when delivery prepare is blocked", () => {
     const examplesRoot = createExamplesRoot({ tempRoot });
     configureCodexExternalRuntimeSuccess({ examplesRoot });
     const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
     writeLocalCatalogTarget({
       catalogRoot,
       catalogId: "local-target",
@@ -869,6 +1260,7 @@ test("full-journey mode fails when public learning closure outputs are missing",
     const examplesRoot = createExamplesRoot({ tempRoot });
     configureCodexExternalRuntimeSuccess({ examplesRoot });
     const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
     writeLocalCatalogTarget({
       catalogRoot,
       catalogId: "local-target",
@@ -898,5 +1290,51 @@ test("full-journey mode fails when public learning closure outputs are missing",
     assert.equal(summary.status, "fail");
     assert.equal(summary.command_results.some((entry) => entry.label === "learning-handoff"), true);
     assert.match(String(summary.error), /Learning handoff did not materialize the required public closure artifacts/u);
+  });
+});
+
+test("full-journey mode fails when scenario policy required evidence is missing", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const regressPolicyPath = path.join(catalogRoot, "scenarios", "regress.yaml");
+    const regressPolicy = parseYaml(fs.readFileSync(regressPolicyPath, "utf8"));
+    regressPolicy.required_evidence = [...new Set([...(regressPolicy.required_evidence ?? []), "release-packet"])];
+    fs.writeFileSync(regressPolicyPath, stringifyYaml(regressPolicy), "utf8");
+
+    const profilePath = path.join(tempRoot, "full-journey.scenario-coverage-gap.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+
+    const result = runHarness({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-scenario-coverage-gap",
+      catalogRoot,
+    });
+    assert.equal(result.live_e2e_run_status, "fail");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.verdict_matrix.scenario_coverage_status, "fail");
+    assert.equal(summary.verdict_matrix.overall_verdict, "fail");
+    assert.match(String(summary.error), /Required scenario evidence 'release-packet' was not materialized/u);
+    assert.match(
+      String(summary.artifacts.scenario_coverage.findings.join("\n")),
+      /Required scenario evidence 'release-packet' was not materialized/u,
+    );
   });
 });

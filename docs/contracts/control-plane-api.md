@@ -92,6 +92,7 @@ Full-journey execution baseline (W13):
 - `run start` is the canonical public execution entrypoint for full-journey live runs;
 - successful execution emits one run-linked `step-result` plus terminal `live-run-event` lineage;
 - `run status` resolves that execution lineage without requiring harness-private execution state.
+- `project verify` and `run start` both accept `route_overrides` and `policy_overrides` so live E2E can apply provider-pinned matrix-cell routing deterministically through the public CLI surface.
 
 ## Delivery/release baseline (module operations)
 
@@ -151,13 +152,14 @@ Audit runs baseline:
 Review run baseline:
 - `review run` is report-only and must not block subsequent commands by exit code alone when verdict is `warn|fail`;
 - response includes `review_report_file`, `review_overall_status`, and `review_recommendation`;
-- `review-report` must cover `feature_traceability`, `discovery_quality`, `artifact_quality`, `code_quality`, `findings`, and `evidence_refs`;
+- `review-report` must cover `feature_traceability`, `discovery_quality`, `artifact_quality`, `code_quality`, `feature_size_fit`, `provider_traceability`, `findings`, and `evidence_refs`;
 - artifact review must treat bootstrap-owned files and runner-produced request-input files as non-code when computing target code-scope findings.
 
 Learning handoff baseline:
 - `learning handoff` writes one public `learning-loop-scorecard` and one public `learning-loop-handoff`;
 - existing public `incident-report` linkage is preserved instead of replaced when incident open/recertify already ran;
-- closure artifacts are derived from public run, review, eval, audit, and incident evidence, not from harness-private observability shortcuts.
+- closure artifacts are derived from public run, review, eval, audit, and incident evidence, not from harness-private observability shortcuts;
+- closure artifacts preserve matrix-cell and coverage-follow-up metadata so the next required live E2E cell remains machine-readable.
 
 Context lifecycle read baseline (W8-S09):
 - run-level read surfaces expose context lifecycle details when context promotions are present;

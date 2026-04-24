@@ -1,0 +1,20 @@
+{
+  "packet_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky.artifact.intake.ky-header-regression.v1",
+  "project_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky",
+  "packet_type": "intake-request",
+  "version": 1,
+  "status": "ready",
+  "summary": "Preserve narrow header-normalization regression coverage",
+  "body_ref": "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/artifacts/sindresorhus-ky-w14-s07.full-journey-regress-ky.artifact.intake.ky-header-regression.v1.body.json",
+  "invocation_context": {
+    "command": "aor intake create",
+    "project_root": "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky",
+    "project_profile_ref": "project.aor.yaml",
+    "mission_id": "ky-header-regression"
+  },
+  "evidence_refs": [
+    "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/state",
+    "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/reports",
+    "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/requests/feature-request-w14-s07.full-journey-regress-ky-ky-header-regression.json"
+  ]
+}

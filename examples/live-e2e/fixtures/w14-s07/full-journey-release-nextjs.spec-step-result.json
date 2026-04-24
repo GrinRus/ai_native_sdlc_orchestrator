@@ -1,0 +1,1145 @@
+{
+  "step_result_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1.step.spec",
+  "run_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1",
+  "step_id": "routed.spec",
+  "step_class": "artifact",
+  "status": "passed",
+  "summary": "Routed dry-run for step 'spec' completed with selected adapter 'none' and mock execution.",
+  "evidence_refs": [
+    "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/project.aor.yaml",
+    "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/delivery-plan-spec-1777031622696.json",
+    "compiled-context://compiled-context.belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1.routed.spec.spec.attempt.1.artifact-default",
+    "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/reports/compiled-context-belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "evidence://mock-adapter/routed-spec-spec-route-spec-default-openai-primary-dry-run"
+  ],
+  "routed_execution": {
+    "mode": "dry-run",
+    "no_write_enforced": true,
+    "started_at": "2026-04-24T11:53:42.149Z",
+    "finished_at": "2026-04-24T11:53:42.714Z",
+    "route_resolution": {
+      "step_class": "spec",
+      "resolved_route_id": "route.spec.default.openai-primary",
+      "resolution_source": {
+        "kind": "step-override",
+        "field": "step_overrides.spec"
+      },
+      "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+      "route_profile": {
+        "route_id": "route.spec.default.openai-primary",
+        "step": "spec",
+        "route_class": "artifact",
+        "risk_tier": "low",
+        "primary": {
+          "adapter": "none",
+          "provider": "openai",
+          "model": "planning-primary"
+        },
+        "required_adapter_capabilities": [],
+        "constraints": {
+          "timeout_sec": 300,
+          "max_cost_usd": 4,
+          "allow_scope_expansion": false
+        },
+        "promotion_channel": "stable"
+      }
+    },
+    "asset_resolution": {
+      "step_class": "spec",
+      "route": {
+        "step_class": "spec",
+        "resolved_route_id": "route.spec.default.openai-primary",
+        "resolution_source": {
+          "kind": "step-override",
+          "field": "step_overrides.spec"
+        },
+        "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+        "route_profile": {
+          "route_id": "route.spec.default.openai-primary",
+          "step": "spec",
+          "route_class": "artifact",
+          "risk_tier": "low",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 4,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      "wrapper": {
+        "wrapper_ref": "wrapper.artifact.default@v1",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_wrapper_profiles.artifact"
+        },
+        "profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/wrappers/wrapper-artifact-default.yaml",
+        "profile": {
+          "wrapper_id": "wrapper.artifact.default",
+          "version": 1,
+          "step_class": "artifact"
+        }
+      },
+      "prompt_bundle": {
+        "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_prompt_bundles.spec"
+        },
+        "profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/prompts/artifact-default.yaml",
+        "profile": {
+          "prompt_bundle_id": "artifact-default",
+          "version": 1,
+          "step_class": "artifact",
+          "required_inputs": {
+            "packets": {
+              "required": [
+                "step-input-context"
+              ],
+              "optional": [
+                "related-packets"
+              ]
+            },
+            "files": {
+              "recommended": []
+            }
+          }
+        }
+      },
+      "context_bundles": {
+        "bundle_refs": [
+          "context-bundle://context.bundle.artifact.foundation@v1"
+        ],
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_context_bundles.spec"
+        },
+        "bundles": [
+          {
+            "context_bundle_ref": "context-bundle://context.bundle.artifact.foundation@v1",
+            "profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/context/bundles/artifact-foundation.yaml",
+            "profile": {
+              "context_bundle_id": "context.bundle.artifact.foundation",
+              "version": 1,
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": []
+            },
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": []
+          }
+        ],
+        "expanded_refs": {
+          "context_doc_refs": [
+            "context-doc://context.doc.repo-map.core@v1"
+          ],
+          "context_rule_refs": [
+            "context-rule://context.rule.public-repo-safety@v1"
+          ],
+          "context_skill_refs": []
+        }
+      },
+      "provenance": {
+        "project_profile_path": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/project.aor.yaml",
+        "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+        "wrapper_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/wrappers/wrapper-artifact-default.yaml",
+        "prompt_bundle_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/prompts/artifact-default.yaml",
+        "context_bundle_sources": [
+          "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/context/bundles/artifact-foundation.yaml"
+        ]
+      }
+    },
+    "policy_resolution": {
+      "step_class": "spec",
+      "route": {
+        "step_class": "spec",
+        "resolved_route_id": "route.spec.default.openai-primary",
+        "resolution_source": {
+          "kind": "step-override",
+          "field": "step_overrides.spec"
+        },
+        "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+        "route_profile": {
+          "route_id": "route.spec.default.openai-primary",
+          "step": "spec",
+          "route_class": "artifact",
+          "risk_tier": "low",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 4,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      "policy": {
+        "policy_id": "policy.step.artifact.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_step_policies.artifact"
+        },
+        "profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/policies/step-artifact-default.yaml",
+        "profile": {
+          "policy_id": "policy.step.artifact.default",
+          "step_class": "artifact",
+          "pre_validators": [
+            "contract-shape",
+            "route-resolved"
+          ],
+          "post_validators": [
+            "output-schema",
+            "evidence-complete"
+          ],
+          "quality_gate": {
+            "required": false
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout"
+            ]
+          },
+          "repair": {
+            "max_attempts": 2,
+            "on": [
+              "missing-evidence",
+              "incomplete-artifact"
+            ]
+          },
+          "escalation": {
+            "after_total_failures": 3,
+            "on": [
+              "business-ambiguity"
+            ]
+          },
+          "blocking_rules": [
+            "route-unavailable"
+          ]
+        }
+      },
+      "resolved_bounds": {
+        "budget": {
+          "max_cost_usd": 4,
+          "timeout_sec": 300,
+          "max_cost_source": "route.constraints.max_cost_usd (route.spec.default.openai-primary)",
+          "timeout_source": "route.constraints.timeout_sec (route.spec.default.openai-primary)"
+        },
+        "retry": {
+          "max_attempts": 2,
+          "on": [
+            "provider-timeout"
+          ],
+          "source": "step-policy-profile.retry"
+        },
+        "command_constraints": {
+          "allowed_commands": [
+            "yarn g:lint",
+            "yarn g:typecheck",
+            "yarn workspace @your-org/ts-utils test-unit",
+            "yarn workspace @your-org/core-lib test-unit",
+            "yarn install --immutable"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "repos[*].{build_commands,test_commands,lint_commands}"
+          }
+        },
+        "writeback_mode": {
+          "mode": "pull-request",
+          "allow_direct_write": false,
+          "require_delivery_manifest": true,
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "writeback_policy.default_delivery_mode"
+          }
+        }
+      },
+      "guardrails": {
+        "approval_required": true,
+        "provider_allowlist_enforced": true,
+        "redact_secrets": true,
+        "blocking_rules": [
+          "route-unavailable"
+        ]
+      },
+      "governance_decision": {
+        "decision": "allow",
+        "route_risk_tier": "low",
+        "high_risk_delivery": false,
+        "reasons": []
+      },
+      "provenance": {
+        "project_profile_path": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/project.aor.yaml",
+        "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+        "policy_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/policies/step-artifact-default.yaml"
+      }
+    },
+    "delivery_plan": {
+      "plan_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.delivery-plan.spec.1777031622696",
+      "delivery_mode": "fork-first-pr",
+      "status": "blocked",
+      "writeback_allowed": false,
+      "delivery_plan_file": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/delivery-plan-spec-1777031622696.json"
+    },
+    "adapter_resolution": {
+      "step_class": "spec",
+      "route_id": "route.spec.default.openai-primary",
+      "adapter": {
+        "adapter_id": "none",
+        "resolution_source": {
+          "kind": "route-primary",
+          "field": "route.primary.adapter"
+        },
+        "profile_source": null,
+        "profile": null
+      },
+      "capability_check": {
+        "required": [],
+        "satisfied": [],
+        "missing": [],
+        "status": "not-required"
+      },
+      "lifecycle_hooks": [
+        "before_step",
+        "invoke_adapter",
+        "after_step",
+        "on_retry",
+        "on_repair",
+        "on_escalation"
+      ],
+      "provenance": {
+        "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+        "adapter_profile_source": null
+      }
+    },
+    "adapter_request": {
+      "request_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1.step.spec.request",
+      "run_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1",
+      "step_id": "routed.spec",
+      "step_class": "spec",
+      "route": {
+        "step_class": "spec",
+        "resolved_route_id": "route.spec.default.openai-primary",
+        "resolution_source": {
+          "kind": "step-override",
+          "field": "step_overrides.spec"
+        },
+        "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+        "route_profile": {
+          "route_id": "route.spec.default.openai-primary",
+          "step": "spec",
+          "route_class": "artifact",
+          "risk_tier": "low",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 4,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      "asset_bundle": {
+        "step_class": "spec",
+        "route": {
+          "step_class": "spec",
+          "resolved_route_id": "route.spec.default.openai-primary",
+          "resolution_source": {
+            "kind": "step-override",
+            "field": "step_overrides.spec"
+          },
+          "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+          "route_profile": {
+            "route_id": "route.spec.default.openai-primary",
+            "step": "spec",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 4,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.artifact.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.artifact"
+          },
+          "profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/wrappers/wrapper-artifact-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.artifact.default",
+            "version": 1,
+            "step_class": "artifact"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.spec"
+          },
+          "profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/prompts/artifact-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "artifact-default",
+            "version": 1,
+            "step_class": "artifact",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "step-input-context"
+                ],
+                "optional": [
+                  "related-packets"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.artifact.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.spec"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.artifact.foundation@v1",
+              "profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/context/bundles/artifact-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.artifact.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": []
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": []
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": []
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/project.aor.yaml",
+          "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+          "wrapper_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/wrappers/wrapper-artifact-default.yaml",
+          "prompt_bundle_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/prompts/artifact-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/context/bundles/artifact-foundation.yaml"
+          ]
+        }
+      },
+      "policy_bundle": {
+        "step_class": "spec",
+        "route": {
+          "step_class": "spec",
+          "resolved_route_id": "route.spec.default.openai-primary",
+          "resolution_source": {
+            "kind": "step-override",
+            "field": "step_overrides.spec"
+          },
+          "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+          "route_profile": {
+            "route_id": "route.spec.default.openai-primary",
+            "step": "spec",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 4,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.artifact.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.artifact"
+          },
+          "profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/policies/step-artifact-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.artifact.default",
+            "step_class": "artifact",
+            "pre_validators": [
+              "contract-shape",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "missing-evidence",
+                "incomplete-artifact"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 3,
+              "on": [
+                "business-ambiguity"
+              ]
+            },
+            "blocking_rules": [
+              "route-unavailable"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 4,
+            "timeout_sec": 300,
+            "max_cost_source": "route.constraints.max_cost_usd (route.spec.default.openai-primary)",
+            "timeout_source": "route.constraints.timeout_sec (route.spec.default.openai-primary)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "yarn g:lint",
+              "yarn g:typecheck",
+              "yarn workspace @your-org/ts-utils test-unit",
+              "yarn workspace @your-org/core-lib test-unit",
+              "yarn install --immutable"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "route-unavailable"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "low",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/project.aor.yaml",
+          "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+          "policy_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/policies/step-artifact-default.yaml"
+        }
+      },
+      "input_packet_refs": [
+        "packet://step-input-context"
+      ],
+      "dry_run": true,
+      "context": {
+        "compiled_context_ref": "compiled-context://compiled-context.belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1.routed.spec.spec.attempt.1.artifact-default",
+        "compiled_context_id": "compiled-context.belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1.routed.spec.spec.attempt.1.artifact-default",
+        "compiled_context_fingerprint": "867d6f3535a47d21a6728e3bdfffeef87e75c283ddc03c82988386833a8ff457",
+        "context_bundle_refs": [
+          "context-bundle://context.bundle.artifact.foundation@v1"
+        ],
+        "context_doc_refs": [
+          "context-doc://context.doc.repo-map.core@v1"
+        ],
+        "context_rule_refs": [
+          "context-rule://context.rule.public-repo-safety@v1"
+        ],
+        "context_skill_refs": [],
+        "packet_refs": [
+          "packet://step-input-context"
+        ],
+        "instruction_set": {
+          "objective": "materialize discovery, research and spec packets with explicit assumptions and gaps",
+          "instructions": {
+            "role": "Produce a machine-usable artifact packet from the provided context.\nPreserve uncertainty, constraints, risks and open questions explicitly.\n",
+            "priorities": [
+              "prefer explicit structure over narrative filler",
+              "do not invent repo facts without evidence",
+              "highlight missing prerequisites and unresolved decisions"
+            ]
+          },
+          "output_contract_hints": {
+            "format": "structured-markdown",
+            "required_sections": [
+              "objective",
+              "context",
+              "constraints",
+              "open-questions",
+              "risks"
+            ],
+            "required_evidence": [
+              "source-refs"
+            ]
+          },
+          "stop_conditions": [
+            "evidence-insufficient",
+            "conflicting-inputs"
+          ],
+          "redaction_expectations": [
+            "never include secrets or tokens in the packet"
+          ],
+          "skills": [
+            {
+              "skill_ref": "skill.artifact.default@v1",
+              "summary": "deterministic artifact workflow for discovery, research, and specification outputs",
+              "workflow": [
+                {
+                  "id": "gather-facts",
+                  "instruction": "collect only evidence-backed facts and unresolved assumptions"
+                },
+                {
+                  "id": "structure-artifact",
+                  "instruction": "produce machine-usable sections for objective, constraints, and open questions"
+                },
+                {
+                  "id": "record-evidence",
+                  "instruction": "attach source references and unresolved risks explicitly"
+                }
+              ],
+              "expected_outputs": [
+                "artifact-packet"
+              ]
+            }
+          ]
+        },
+        "required_inputs_resolved": {
+          "packets": {
+            "required": [
+              {
+                "packet": "step-input-context",
+                "required": true,
+                "found": true,
+                "resolved_ref": "packet://step-input-context",
+                "source": "input-packet-refs"
+              }
+            ],
+            "optional": [
+              {
+                "packet": "related-packets",
+                "required": false,
+                "found": false,
+                "resolved_ref": null,
+                "source": null
+              }
+            ],
+            "missing_required": []
+          },
+          "files": {
+            "required": [],
+            "recommended": [],
+            "missing_required": []
+          },
+          "status": "ready"
+        },
+        "guardrails": {
+          "policy_id": "policy.step.artifact.default",
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "route-unavailable"
+          ],
+          "quality_gate": {
+            "required": false
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "yarn g:lint",
+              "yarn g:typecheck",
+              "yarn workspace @your-org/ts-utils test-unit",
+              "yarn workspace @your-org/core-lib test-unit",
+              "yarn install --immutable"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "skill_refs": [
+          "skill.artifact.default@v1"
+        ],
+        "provenance": {
+          "project_profile_path": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/project.aor.yaml",
+          "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml",
+          "wrapper_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/wrappers/wrapper-artifact-default.yaml",
+          "prompt_bundle_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/prompts/artifact-default.yaml",
+          "policy_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/policies/step-artifact-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/context/bundles/artifact-foundation.yaml"
+          ],
+          "skill_profile_sources": [
+            "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/skills/skill-artifact-default.yaml"
+          ],
+          "route_resolution_source": {
+            "kind": "step-override",
+            "field": "step_overrides.spec"
+          },
+          "wrapper_resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.artifact"
+          },
+          "prompt_bundle_resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.spec"
+          },
+          "policy_resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.artifact"
+          },
+          "skill_resolution_source": {
+            "kind": "project-default",
+            "field": "default_skill_profiles.artifact"
+          },
+          "input_packet_refs": [
+            "packet://step-input-context"
+          ],
+          "runtime_evidence_refs": []
+        }
+      }
+    },
+    "adapter_response": {
+      "request_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1.step.spec.request",
+      "adapter_id": "mock-runner",
+      "status": "success",
+      "summary": "Mock adapter completed spec",
+      "output": {
+        "deterministic_seed": "routed.spec:spec:route.spec.default.openai-primary:dry-run",
+        "mode": "dry-run",
+        "route_id": "route.spec.default.openai-primary"
+      },
+      "evidence_refs": [
+        "evidence://mock-adapter/routed-spec-spec-route-spec-default-openai-primary-dry-run"
+      ],
+      "tool_traces": [
+        {
+          "phase": "invoke_adapter",
+          "kind": "mock-run",
+          "detail": "deterministic_seed=routed.spec:spec:route.spec.default.openai-primary:dry-run"
+        }
+      ]
+    },
+    "context_compilation": {
+      "compiled_context_ref": "compiled-context://compiled-context.belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1.routed.spec.spec.attempt.1.artifact-default",
+      "compiled_context_file": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/reports/compiled-context-belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1.routed.spec.spec.attempt.1.json",
+      "compiled_context_artifact": {
+        "compiled_context_id": "compiled-context.belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.routed-execution.v1.routed.spec.spec.attempt.1.artifact-default",
+        "version": 1,
+        "step": "spec",
+        "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+        "context_bundle_refs": [
+          "context-bundle://context.bundle.artifact.foundation@v1"
+        ],
+        "context_doc_refs": [
+          "context-doc://context.doc.repo-map.core@v1"
+        ],
+        "context_rule_refs": [
+          "context-rule://context.rule.public-repo-safety@v1"
+        ],
+        "context_skill_refs": [],
+        "packet_refs": [
+          "packet://step-input-context"
+        ],
+        "hashes": {
+          "prompt_hash": "sha256:a0cb8b2608ff3c6d7569a80441273bd5e56816e831f6e037b88d61ba4c893530",
+          "context_hash": "sha256:867d6f3535a47d21a6728e3bdfffeef87e75c283ddc03c82988386833a8ff457"
+        },
+        "provenance": {
+          "compiler_revision_ref": "compiler://runtime-context-compiler@v1",
+          "project_profile_ref": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/project.aor.yaml",
+          "route_profile_ref": "route.spec.default.openai-primary",
+          "wrapper_profile_ref": "wrapper.artifact.default@v1",
+          "generated_at": "2026-04-24T11:53:42.713Z"
+        }
+      },
+      "diagnostics": {
+        "included_sources": [
+          {
+            "kind": "project-profile",
+            "reference": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/project.aor.yaml"
+          },
+          {
+            "kind": "route-profile",
+            "reference": "route.spec.default.openai-primary",
+            "source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/routes/spec-openai-primary.yaml"
+          },
+          {
+            "kind": "wrapper-profile",
+            "reference": "wrapper.artifact.default@v1",
+            "source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/wrappers/wrapper-artifact-default.yaml"
+          },
+          {
+            "kind": "prompt-bundle",
+            "reference": "prompt-bundle://artifact-default@v1",
+            "source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/prompts/artifact-default.yaml"
+          },
+          {
+            "kind": "context-bundles",
+            "reference": [
+              "context-bundle://context.bundle.artifact.foundation@v1"
+            ],
+            "source": [
+              "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/context/bundles/artifact-foundation.yaml"
+            ]
+          },
+          {
+            "kind": "step-policy-profile",
+            "reference": "policy.step.artifact.default",
+            "source": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/policies/step-artifact-default.yaml"
+          },
+          {
+            "kind": "skill-profiles",
+            "reference": [
+              "skill.artifact.default@v1"
+            ],
+            "source": [
+              "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/examples/skills/skill-artifact-default.yaml"
+            ]
+          }
+        ],
+        "dropped_sources": [
+          {
+            "kind": "runtime-evidence-ref",
+            "value": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/project.aor.yaml",
+            "reason": "volatile-local-path"
+          }
+        ],
+        "dropped_runtime_evidence_refs": [
+          {
+            "kind": "runtime-evidence-ref",
+            "value": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/project.aor.yaml",
+            "reason": "volatile-local-path"
+          }
+        ],
+        "missing_required_inputs": [],
+        "required_inputs_status": "ready",
+        "compiled_context_fingerprint": "867d6f3535a47d21a6728e3bdfffeef87e75c283ddc03c82988386833a8ff457",
+        "resolved_input_packet_refs": [
+          "packet://step-input-context"
+        ],
+        "skill_refs": [
+          "skill.artifact.default@v1"
+        ]
+      }
+    },
+    "feature_traceability": {
+      "status": "pass",
+      "input_packet_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.artifact.intake.nextjs-shared-package-release.v1.json",
+      "mission_id": "nextjs-shared-package-release",
+      "scenario_family": "release",
+      "provider_variant_id": "openai-primary",
+      "feature_size": "large",
+      "matrix_cell": {
+        "cell_id": "nextjs.release.large.openai",
+        "target_catalog_id": "nextjs-monorepo-example",
+        "feature_mission_id": "nextjs-shared-package-release",
+        "scenario_family": "release",
+        "provider_variant_id": "openai-primary",
+        "feature_size": "large",
+        "coverage_tier": "required"
+      },
+      "coverage_follow_up": {
+        "current_cell_required": true,
+        "next_required_matrix_cell": {
+          "cell_id": "nextjs.repair.medium.anthropic",
+          "scenario_family": "repair",
+          "feature_size": "medium",
+          "feature_mission_id": "nextjs-workspace-repair-shared-config",
+          "provider_variant_id": "anthropic-primary"
+        },
+        "remaining_required_matrix_cells": [
+          {
+            "cell_id": "nextjs.repair.medium.anthropic",
+            "scenario_family": "repair",
+            "feature_size": "medium",
+            "feature_mission_id": "nextjs-workspace-repair-shared-config",
+            "provider_variant_id": "anthropic-primary"
+          },
+          {
+            "cell_id": "nextjs.governance.large.openai",
+            "scenario_family": "governance",
+            "feature_size": "large",
+            "feature_mission_id": "nextjs-shared-package-release",
+            "provider_variant_id": "openai-primary"
+          }
+        ]
+      },
+      "request_title": "Prepare one shared-package release-shaped change",
+      "request_brief": "Update one shared package and one consuming app with bounded release evidence and no upstream write-back.",
+      "allowed_paths": [
+        "apps/**",
+        "packages/**"
+      ],
+      "forbidden_paths": [
+        "docs/**",
+        ".github/**",
+        "scripts/**",
+        "examples/**",
+        "context/**"
+      ],
+      "expected_evidence": [
+        "delivery-manifest",
+        "release-packet",
+        "review-report"
+      ],
+      "change_budget": {
+        "max_changed_files": 14,
+        "max_added_lines": 420
+      },
+      "source_kind": "catalog-feature-mission"
+    },
+    "discovery_completeness_gate": {
+      "status": "pass",
+      "blocking": false,
+      "analysis_report_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.analysis.v1",
+      "analysis_report_file": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/reports/project-analysis-report.json",
+      "checks": [
+        {
+          "check_id": "route-matrix-coverage",
+          "status": "pass",
+          "blocking": true,
+          "summary": "Route matrix includes every supported step class.",
+          "expected": 10,
+          "actual": 10
+        },
+        {
+          "check_id": "asset-matrix-coverage",
+          "status": "pass",
+          "blocking": true,
+          "summary": "Asset matrix includes wrapper and prompt provenance for every supported step class.",
+          "expected": 10,
+          "actual": 10
+        },
+        {
+          "check_id": "policy-matrix-coverage",
+          "status": "pass",
+          "blocking": true,
+          "summary": "Policy matrix includes deterministic bounds for every supported step class.",
+          "expected": 10,
+          "actual": 10
+        },
+        {
+          "check_id": "evaluation-registry-coverage",
+          "status": "pass",
+          "blocking": true,
+          "summary": "Evaluation registry exposes suite and dataset refs for downstream quality flows.",
+          "expected": "at least one dataset and one suite",
+          "actual": "datasets=2, suites=6"
+        }
+      ]
+    },
+    "architecture_traceability": {
+      "architecture_doc_refs": [
+        "docs/architecture/04-system-of-record-and-core-entities.md",
+        "docs/architecture/12-orchestrator-operating-model.md",
+        "docs/architecture/14-cli-command-catalog.md"
+      ],
+      "contract_refs": [
+        "docs/contracts/project-analysis-report.md",
+        "docs/contracts/step-result.md",
+        "docs/contracts/wave-ticket.md",
+        "docs/contracts/handoff-packet.md"
+      ],
+      "planning_artifact_families": [
+        "project-analysis-report",
+        "step-result",
+        "wave-ticket",
+        "handoff-packet"
+      ],
+      "step_linkage": [
+        {
+          "step_class": "discovery",
+          "route_id": "route.discovery.default.openai-primary",
+          "wrapper_ref": "wrapper.artifact.default@v1",
+          "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+          "policy_id": "policy.step.artifact.default"
+        },
+        {
+          "step_class": "research",
+          "route_id": "route.research.default.openai-primary",
+          "wrapper_ref": "wrapper.artifact.default@v1",
+          "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+          "policy_id": "policy.step.artifact.default"
+        },
+        {
+          "step_class": "spec",
+          "route_id": "route.spec.default.openai-primary",
+          "wrapper_ref": "wrapper.artifact.default@v1",
+          "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+          "policy_id": "policy.step.artifact.default"
+        },
+        {
+          "step_class": "planning",
+          "route_id": "route.plan.default.openai-primary",
+          "wrapper_ref": "wrapper.planner.default@v1",
+          "prompt_bundle_ref": "prompt-bundle://planner-default@v1",
+          "policy_id": "policy.step.planner.default"
+        },
+        {
+          "step_class": "implement",
+          "route_id": "route.implement.default.openai-primary",
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "policy_id": "policy.step.runner.default"
+        },
+        {
+          "step_class": "review",
+          "route_id": "route.review.default.openai-primary",
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "policy_id": "policy.step.runner.default"
+        },
+        {
+          "step_class": "qa",
+          "route_id": "route.qa.default.openai-primary",
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "policy_id": "policy.step.runner.default"
+        },
+        {
+          "step_class": "repair",
+          "route_id": "route.repair.default.openai-primary",
+          "wrapper_ref": "wrapper.repair.default@v1",
+          "prompt_bundle_ref": "prompt-bundle://repair-default@v1",
+          "policy_id": "policy.step.repair.default"
+        },
+        {
+          "step_class": "eval",
+          "route_id": "route.eval.default.openai-primary",
+          "wrapper_ref": "wrapper.eval.default@v1",
+          "prompt_bundle_ref": "prompt-bundle://eval-default@v1",
+          "policy_id": "policy.step.eval.default"
+        },
+        {
+          "step_class": "harness",
+          "route_id": "route.harness.default.openai-primary",
+          "wrapper_ref": "wrapper.harness.default@v1",
+          "prompt_bundle_ref": "prompt-bundle://harness-default@v1",
+          "policy_id": "policy.step.harness.default"
+        }
+      ],
+      "evaluation_refs": {
+        "suite_refs": [
+          "suite.cert.core@v4",
+          "suite.regress.long@v1",
+          "suite.regress.short@v1",
+          "suite.release.core@v1",
+          "suite.release.long@v1",
+          "suite.release.short@v1"
+        ],
+        "dataset_refs": [
+          "dataset://run-regression@2026-04-20T08:00:00Z",
+          "dataset://wrapper-certification@2026-04-20T08:00:00Z"
+        ]
+      },
+      "selected_step": {
+        "step_class": "spec",
+        "route_id": "route.spec.default.openai-primary",
+        "wrapper_ref": "wrapper.artifact.default@v1",
+        "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+        "policy_id": "policy.step.artifact.default",
+        "adapter_id": "none"
+      }
+    },
+    "blocked_next_step": null,
+    "evidence_root": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/reports"
+  }
+}

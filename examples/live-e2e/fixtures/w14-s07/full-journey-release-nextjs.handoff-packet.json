@@ -1,0 +1,70 @@
+{
+  "packet_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.handoff.bootstrap.v1",
+  "project_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs",
+  "ticket_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.wave.bootstrap.v1",
+  "version": 1,
+  "status": "approved",
+  "risk_tier": "medium",
+  "approved_objective": "Prepare one shared-package release-shaped change",
+  "repo_scopes": [
+    {
+      "repo_id": "target",
+      "paths": [
+        "**"
+      ]
+    }
+  ],
+  "allowed_paths": [
+    "**"
+  ],
+  "allowed_commands": [
+    "yarn install --immutable",
+    "yarn g:lint",
+    "yarn g:typecheck",
+    "yarn workspace @your-org/ts-utils test-unit",
+    "yarn workspace @your-org/core-lib test-unit"
+  ],
+  "verification_plan": {
+    "validators": [
+      "contract-shape",
+      "approval-state",
+      "repo-scope"
+    ],
+    "commands": [
+      "yarn install --immutable",
+      "yarn g:lint",
+      "yarn g:typecheck"
+    ]
+  },
+  "scope_constraints": {
+    "require_bounded_scope": true,
+    "max_repo_scopes": 1,
+    "max_changed_files": 24
+  },
+  "command_policy": {
+    "owner": "project-profile",
+    "allow_unlisted_commands": false
+  },
+  "writeback_mode": "pull-request",
+  "approval_state": {
+    "required": true,
+    "state": "approved",
+    "approval_refs": [
+      "approval://live-e2e/full-journey/w14-s07.full-journey-release-nextjs"
+    ],
+    "approved_by": "operator",
+    "approved_at": "2026-04-24T11:53:43.368Z"
+  },
+  "feature_traceability": {
+    "mission_id": "nextjs-shared-package-release",
+    "source_kind": "catalog-feature-mission",
+    "request_title": "Prepare one shared-package release-shaped change",
+    "request_brief": "Update one shared package and one consuming app with bounded release evidence and no upstream write-back."
+  },
+  "source_refs": {
+    "wave_ticket_file": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/wave-ticket-belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.wave.bootstrap.v1.json",
+    "artifact_packet_file": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.artifact.intake.nextjs-shared-package-release.v1.json",
+    "project_profile_ref": "project.aor.yaml"
+  },
+  "blocked_next_step": null
+}

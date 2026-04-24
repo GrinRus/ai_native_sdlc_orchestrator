@@ -136,6 +136,12 @@ export function materializeIntakeArtifactPacket(options) {
   const packetFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.json`);
   const packetBodyFile = path.join(options.runtimeLayout.artifactsRoot, `${packetId}.body.json`);
 
+  const requestDocumentBody = loadRequestDocument(requestFile);
+  const requestDocument =
+    typeof requestDocumentBody === "object" && requestDocumentBody !== null && !Array.isArray(requestDocumentBody)
+      ? /** @type {Record<string, unknown>} */ (requestDocumentBody)
+      : {};
+
   const packetBody = {
     generated_from: {
       command: options.command,
@@ -148,13 +154,30 @@ export function materializeIntakeArtifactPacket(options) {
     mission_traceability: {
       mission_id: missionId,
       source_kind: missionId ? "catalog-feature-mission" : "manual-request",
+      scenario_family:
+        typeof requestDocument.scenario_family === "string" ? requestDocument.scenario_family : null,
+      provider_variant_id:
+        typeof requestDocument.provider_variant_id === "string" ? requestDocument.provider_variant_id : null,
+      feature_size: typeof requestDocument.feature_size === "string" ? requestDocument.feature_size : null,
+      matrix_cell:
+        typeof requestDocument.matrix_cell === "object" &&
+        requestDocument.matrix_cell !== null &&
+        !Array.isArray(requestDocument.matrix_cell)
+          ? requestDocument.matrix_cell
+          : null,
+      coverage_follow_up:
+        typeof requestDocument.coverage_follow_up === "object" &&
+        requestDocument.coverage_follow_up !== null &&
+        !Array.isArray(requestDocument.coverage_follow_up)
+          ? requestDocument.coverage_follow_up
+          : null,
     },
     feature_request: {
       title: requestTitle,
       brief: requestBrief,
       constraints: requestConstraints,
       request_file: requestFile,
-      request_document: loadRequestDocument(requestFile),
+      request_document: requestDocumentBody,
     },
     evidence_roots: {
       reports_root: options.runtimeLayout.reportsRoot,

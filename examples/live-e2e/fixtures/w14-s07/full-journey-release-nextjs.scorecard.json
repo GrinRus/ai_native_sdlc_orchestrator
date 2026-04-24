@@ -1,0 +1,39 @@
+{
+  "scorecard_id": "w14-s07.full-journey-release-nextjs.scorecard.belgattitude/nextjs-monorepo-example",
+  "run_id": "w14-s07.full-journey-release-nextjs",
+  "profile_ref": "./scripts/live-e2e/profiles/full-journey-release-nextjs.yaml",
+  "profile_id": "live-e2e.full-journey.release.nextjs",
+  "scenario_id": null,
+  "scenario_family": "release",
+  "provider_variant_id": "openai-primary",
+  "feature_size": "large",
+  "flow_kind": "release",
+  "duration_class": "long",
+  "matrix_cell": {
+    "cell_id": "nextjs.release.large.openai",
+    "target_catalog_id": "nextjs-monorepo-example",
+    "feature_mission_id": "nextjs-shared-package-release",
+    "scenario_family": "release",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "large",
+    "coverage_tier": "required"
+  },
+  "target_repo": {
+    "repo_id": "belgattitude/nextjs-monorepo-example",
+    "repo_url": "https://github.com/belgattitude/nextjs-monorepo-example.git",
+    "ref": "main"
+  },
+  "stage_counts": {
+    "pass": 10,
+    "fail": 0,
+    "pending": 1,
+    "skipped": 0
+  },
+  "status": "pass",
+  "scenario_coverage_status": "pass",
+  "provider_execution_status": "pass",
+  "feature_size_fit_status": "pass",
+  "summary_ref": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/reports/live-e2e-run-summary-w14-s07.full-journey-release-nextjs.json",
+  "command_count": 18,
+  "generated_at": "2026-04-24T11:53:47.672Z"
+}

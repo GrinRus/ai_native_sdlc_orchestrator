@@ -321,7 +321,7 @@ test("executeRoutedStep reports missing external runner prerequisites as blocked
   });
 });
 
-test("executeRoutedStep blocks live execution deterministically for unapproved or unsupported adapter paths", () => {
+test("executeRoutedStep blocks live execution deterministically for unapproved or misconfigured adapter paths", () => {
   withTempRepo((repoRoot) => {
     const unapproved = executeRoutedStep({
       projectRef: repoRoot,
@@ -342,7 +342,7 @@ test("executeRoutedStep blocks live execution deterministically for unapproved o
       ),
     );
 
-    const unsupported = executeRoutedStep({
+    const misconfigured = executeRoutedStep({
       projectRef: repoRoot,
       cwd: repoRoot,
       stepClass: "implement",
@@ -354,13 +354,16 @@ test("executeRoutedStep blocks live execution deterministically for unapproved o
       },
     });
 
-    assert.equal(unsupported.stepResult.status, "failed");
-    assert.match(unsupported.stepResult.summary, /supported adapters: codex-cli/i);
-    assert.equal(unsupported.stepResult.routed_execution.adapter_response.status, "blocked");
-    assert.equal(unsupported.stepResult.routed_execution.adapter_response.output.failure_kind, "adapter-not-supported");
+    assert.equal(misconfigured.stepResult.status, "failed");
+    assert.match(misconfigured.stepResult.summary, /live runtime is misconfigured/i);
+    assert.equal(misconfigured.stepResult.routed_execution.adapter_response.status, "blocked");
+    assert.equal(
+      misconfigured.stepResult.routed_execution.adapter_response.output.failure_kind,
+      "missing-prerequisite",
+    );
     assert.match(
-      String(unsupported.stepResult.routed_execution.blocked_next_step),
-      /supported live adapter|routed-dry-run-step/i,
+      String(misconfigured.stepResult.routed_execution.blocked_next_step),
+      /Install\/configure external runner prerequisites|routed-dry-run-step/i,
     );
   });
 });

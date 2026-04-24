@@ -1,0 +1,39 @@
+{
+  "scorecard_id": "w14-s07.full-journey-regress-ky.scorecard.sindresorhus/ky",
+  "run_id": "w14-s07.full-journey-regress-ky",
+  "profile_ref": "./scripts/live-e2e/profiles/full-journey-regress-ky.yaml",
+  "profile_id": "live-e2e.full-journey.regress.ky",
+  "scenario_id": null,
+  "scenario_family": "regress",
+  "provider_variant_id": "openai-primary",
+  "feature_size": "small",
+  "flow_kind": "regress",
+  "duration_class": "long",
+  "matrix_cell": {
+    "cell_id": "ky.regress.small.openai",
+    "target_catalog_id": "ky",
+    "feature_mission_id": "ky-header-regression",
+    "scenario_family": "regress",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "small",
+    "coverage_tier": "required"
+  },
+  "target_repo": {
+    "repo_id": "sindresorhus/ky",
+    "repo_url": "https://github.com/sindresorhus/ky.git",
+    "ref": "main"
+  },
+  "stage_counts": {
+    "pass": 9,
+    "fail": 0,
+    "pending": 1,
+    "skipped": 1
+  },
+  "status": "pass",
+  "scenario_coverage_status": "pass",
+  "provider_execution_status": "pass",
+  "feature_size_fit_status": "pass",
+  "summary_ref": "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/reports/live-e2e-run-summary-w14-s07.full-journey-regress-ky.json",
+  "command_count": 17,
+  "generated_at": "2026-04-24T11:51:11.350Z"
+}

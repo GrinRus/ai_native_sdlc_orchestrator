@@ -1275,6 +1275,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     assert.equal(incidentOpenPayload.incident_status, "open");
     assert.equal(incidentOpenPayload.incident_run_ref, `run://${runId}`);
     assert.equal(fs.existsSync(incidentOpenPayload.incident_file), true);
+    assert.equal(incidentOpenPayload.incident_report_file, incidentOpenPayload.incident_file);
     assert.ok(incidentOpenPayload.incident_linked_asset_refs.includes("evidence://external/manual-note"));
     const incidentDocument = JSON.parse(fs.readFileSync(incidentOpenPayload.incident_file, "utf8"));
     const incidentFixture = JSON.parse(
@@ -1378,6 +1379,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     assert.equal(rollbackRecertifyResult.exitCode, 0, rollbackRecertifyResult.stderr);
     const rollbackRecertifyPayload = JSON.parse(rollbackRecertifyResult.stdout);
     assert.equal(rollbackRecertifyPayload.incident_status, recertificationFixture.rollback.incident_status);
+    assert.equal(rollbackRecertifyPayload.incident_report_file, rollbackRecertifyPayload.incident_file);
     assert.equal(rollbackRecertifyPayload.incident_recertification_decision, "re-enable");
     assert.equal(rollbackRecertifyPayload.incident_recertification_gate, recertificationFixture.rollback.gate);
     assert.equal(
@@ -2646,6 +2648,45 @@ test("W13 run start, review run, and learning handoff produce durable execution 
             allowed_paths: ["source/**", "test/**"],
             forbidden_paths: ["docs/**", "examples/**", "context/**", ".agents/**", "scripts/live-e2e/**"],
             expected_evidence: ["verify-summary", "routed-step-result", "review-report"],
+            scenario_family: "regress",
+            provider_variant_id: "openai-primary",
+            feature_size: "small",
+            provider_variant: {
+              provider: "openai",
+              primary_adapter: "codex-cli",
+            },
+            matrix_cell: {
+              cell_id: "fixture.regress.small.openai",
+              target_catalog_id: "fixture-target",
+              feature_mission_id: "fixture-review-mission",
+              scenario_family: "regress",
+              provider_variant_id: "openai-primary",
+              feature_size: "small",
+              coverage_tier: "required",
+            },
+            coverage_follow_up: {
+              current_cell_required: true,
+              next_required_matrix_cell: {
+                cell_id: "fixture.repair.medium.anthropic",
+                scenario_family: "repair",
+                feature_size: "medium",
+                feature_mission_id: "fixture-repair-mission",
+                provider_variant_id: "anthropic-primary",
+              },
+              remaining_required_matrix_cells: [
+                {
+                  cell_id: "fixture.repair.medium.anthropic",
+                  scenario_family: "repair",
+                  feature_size: "medium",
+                  feature_mission_id: "fixture-repair-mission",
+                  provider_variant_id: "anthropic-primary",
+                },
+              ],
+            },
+            size_budget: {
+              max_changed_files: 6,
+              max_added_lines: 220,
+            },
             change_budget: { max_changed_files: 6, max_added_lines: 220 },
           },
           null,
@@ -2653,6 +2694,17 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         )}\n`,
         "utf8",
       );
+      const implementRoutePath = path.join(projectRoot, "examples", "routes", "implement-w14-test.yaml");
+      const implementRoute = parseYaml(
+        fs.readFileSync(path.join(projectRoot, "examples", "routes", "implement-default.yaml"), "utf8"),
+      );
+      implementRoute.route_id = "route.implement.w14-test";
+      implementRoute.primary = {
+        ...implementRoute.primary,
+        provider: "openai",
+        adapter: "codex-cli",
+      };
+      fs.writeFileSync(implementRoutePath, `${JSON.stringify(implementRoute, null, 2)}\n`, "utf8");
 
       const intakeResult = invokeCli([
         "intake",
@@ -2724,6 +2776,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         "project.aor.yaml",
         "--routed-dry-run-step",
         "implement",
+        "--route-overrides",
+        "implement=route.implement.w14-test",
       ]);
       assert.equal(preflightVerify.exitCode, 0, preflightVerify.stderr);
       const preflightPayload = JSON.parse(preflightVerify.stdout);
@@ -2744,6 +2798,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         approvedPayload.handoff_packet_file,
         "--promotion-evidence-refs",
         [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        "--route-overrides",
+        "implement=route.implement.w14-test",
       ]);
       assert.equal(runStart.exitCode, 0, runStart.stderr);
       const runStartPayload = JSON.parse(runStart.stdout);
@@ -2764,10 +2820,20 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       const reviewPayload = JSON.parse(reviewRun.stdout);
       assert.equal(reviewPayload.review_overall_status, "pass");
       assert.equal(reviewPayload.review_recommendation, "proceed");
+      assert.equal(reviewPayload.review_feature_size_fit_status, "pass");
+      assert.equal(reviewPayload.review_provider_traceability_status, "pass");
       const reviewReport = JSON.parse(fs.readFileSync(reviewPayload.review_report_file, "utf8"));
       assert.equal(reviewReport.feature_traceability.mission_id, "fixture-review-mission");
+      assert.equal(reviewReport.feature_traceability.scenario_family, "regress");
+      assert.equal(reviewReport.feature_traceability.provider_variant_id, "openai-primary");
+      assert.equal(reviewReport.feature_traceability.feature_size, "small");
       assert.equal(reviewReport.code_quality.status, "pass");
       assert.equal(reviewReport.discovery_quality.status, "pass");
+      assert.equal(reviewReport.feature_size_fit.status, "pass");
+      assert.equal(reviewReport.provider_traceability.status, "pass");
+      assert.equal(reviewReport.provider_traceability.actual_provider, "openai");
+      assert.equal(reviewReport.provider_traceability.actual_adapter, "codex-cli");
+      assert.equal(reviewReport.provider_traceability.route_id, "route.implement.w14-test");
       assert.equal(
         validateContractDocument({
           family: "review-report",
@@ -2786,7 +2852,13 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         runId,
       ]);
       assert.equal(auditRun.exitCode, 0, auditRun.stderr);
-      assert.equal(JSON.parse(auditRun.stdout).run_audit_records.length, 1);
+      const auditPayload = JSON.parse(auditRun.stdout);
+      assert.equal(auditPayload.run_audit_records.length, 1);
+      assert.equal(auditPayload.run_audit_records[0].scenario_family, "regress");
+      assert.equal(auditPayload.run_audit_records[0].provider_variant_id, "openai-primary");
+      assert.equal(auditPayload.run_audit_records[0].feature_size, "small");
+      assert.equal(auditPayload.run_audit_records[0].provider_execution_status, "pass");
+      assert.equal(auditPayload.run_audit_records[0].feature_size_fit_status, "pass");
 
       const learningRun = invokeCli([
         "learning",
@@ -2819,6 +2891,238 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         }).ok,
         true,
       );
+      assert.equal(learningScorecard.matrix_cell.provider_variant_id, "openai-primary");
+      assert.equal(learningHandoff.matrix_cell.feature_size, "small");
+      assert.equal(learningHandoff.coverage_follow_up.current_cell_required, true);
+    });
+  });
+});
+
+test("review run reports feature_size_fit=fail when a small mission exceeds its declared budget", () => {
+  withTempProject((projectRoot) => {
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    fs.mkdirSync(path.join(projectRoot, "source"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, "test"), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, "source", "mission.js"), "export const mission = 'baseline';\n", "utf8");
+    fs.writeFileSync(
+      path.join(projectRoot, "test", "mission.test.js"),
+      "import test from 'node:test';\nimport assert from 'node:assert/strict';\n\ntest('mission smoke', () => {\n  assert.equal(1, 1);\n});\n",
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify(
+        {
+          name: "fixture",
+          scripts: {
+            lint: "node -e \"process.exit(0)\"",
+            test: "node --test ./test/mission.test.js",
+            build: "node -e \"process.exit(0)\"",
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    fs.writeFileSync(path.join(projectRoot, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\\n", "utf8");
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "baseline"] });
+    fs.appendFileSync(
+      path.join(projectRoot, "source", "mission.js"),
+      "export const missionPatch = 'updated';\nexport const oversizedPatchOne = 'x';\nexport const oversizedPatchTwo = 'y';\n",
+      "utf8",
+    );
+
+    withBootstrapAssetsEnv(() => {
+      const initResult = invokeCli([
+        "project",
+        "init",
+        "--project-ref",
+        projectRoot,
+        "--materialize-project-profile",
+        "--materialize-bootstrap-assets",
+      ]);
+      assert.equal(initResult.exitCode, 0, initResult.stderr);
+      configureCodexExternalRuntimeSuccess({ projectRoot });
+
+      const requestFile = path.join(projectRoot, "feature-request-tight-budget.json");
+      fs.writeFileSync(
+        requestFile,
+        `${JSON.stringify(
+          {
+            allowed_paths: ["source/**", "test/**"],
+            forbidden_paths: ["docs/**", "examples/**", "context/**", ".agents/**", "scripts/live-e2e/**"],
+            expected_evidence: ["verify-summary", "routed-step-result", "review-report"],
+            scenario_family: "regress",
+            provider_variant_id: "openai-primary",
+            feature_size: "small",
+            provider_variant: {
+              provider: "openai",
+              primary_adapter: "codex-cli",
+            },
+            matrix_cell: {
+              cell_id: "fixture.regress.small.openai.tight-budget",
+              target_catalog_id: "fixture-target",
+              feature_mission_id: "fixture-tight-budget-mission",
+              scenario_family: "regress",
+              provider_variant_id: "openai-primary",
+              feature_size: "small",
+              coverage_tier: "required",
+            },
+            coverage_follow_up: {
+              current_cell_required: true,
+            },
+            size_budget: {
+              max_changed_files: 1,
+              max_added_lines: 1,
+            },
+            change_budget: { max_changed_files: 1, max_added_lines: 1 },
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+      const implementRoutePath = path.join(projectRoot, "examples", "routes", "implement-w14-budget-test.yaml");
+      const implementRoute = parseYaml(
+        fs.readFileSync(path.join(projectRoot, "examples", "routes", "implement-default.yaml"), "utf8"),
+      );
+      implementRoute.route_id = "route.implement.w14-budget-test";
+      implementRoute.primary = {
+        ...implementRoute.primary,
+        provider: "openai",
+        adapter: "codex-cli",
+      };
+      fs.writeFileSync(implementRoutePath, `${JSON.stringify(implementRoute, null, 2)}\n`, "utf8");
+
+      const intakeResult = invokeCli([
+        "intake",
+        "create",
+        "--project-ref",
+        projectRoot,
+        "--mission-id",
+        "fixture-tight-budget-mission",
+        "--request-title",
+        "Fixture tight budget mission",
+        "--request-brief",
+        "Exercise feature-size-fit failure reporting.",
+        "--request-file",
+        requestFile,
+      ]);
+      assert.equal(intakeResult.exitCode, 0, intakeResult.stderr);
+      const intakePayload = JSON.parse(intakeResult.stdout);
+      const newerTimestamp = new Date(Date.now() + 5_000);
+      fs.utimesSync(intakePayload.artifact_packet_body_file, newerTimestamp, newerTimestamp);
+
+      assert.equal(
+        invokeCli([
+          "discovery",
+          "run",
+          "--project-ref",
+          projectRoot,
+          "--input-packet",
+          intakePayload.artifact_packet_file,
+        ]).exitCode,
+        0,
+      );
+      assert.equal(invokeCli(["spec", "build", "--project-ref", projectRoot]).exitCode, 0);
+
+      const waveResult = invokeCli(["wave", "create", "--project-ref", projectRoot]);
+      assert.equal(waveResult.exitCode, 0, waveResult.stderr);
+      const wavePayload = JSON.parse(waveResult.stdout);
+
+      const approveResult = invokeCli([
+        "handoff",
+        "approve",
+        "--project-ref",
+        projectRoot,
+        "--handoff-packet",
+        wavePayload.handoff_packet_file,
+        "--approval-ref",
+        "approval://W14-2001",
+      ]);
+      assert.equal(approveResult.exitCode, 0, approveResult.stderr);
+      const approvedPayload = JSON.parse(approveResult.stdout);
+
+      const preflightVerify = invokeCli([
+        "project",
+        "verify",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--routed-dry-run-step",
+        "implement",
+        "--route-overrides",
+        "implement=route.implement.w14-budget-test",
+      ]);
+      assert.equal(preflightVerify.exitCode, 0, preflightVerify.stderr);
+      const preflightPayload = JSON.parse(preflightVerify.stdout);
+
+      const runId = "w14-feature-size-fit-fail";
+      const runStart = invokeCli([
+        "run",
+        "start",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--target-step",
+        "implement",
+        "--approved-handoff-ref",
+        approvedPayload.handoff_packet_file,
+        "--promotion-evidence-refs",
+        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        "--route-overrides",
+        "implement=route.implement.w14-budget-test",
+      ]);
+      assert.equal(runStart.exitCode, 0, runStart.stderr);
+
+      const reviewRun = invokeCli([
+        "review",
+        "run",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+      ]);
+      assert.equal(reviewRun.exitCode, 0, reviewRun.stderr);
+      const reviewPayload = JSON.parse(reviewRun.stdout);
+      assert.equal(reviewPayload.review_overall_status, "fail");
+      assert.equal(reviewPayload.review_recommendation, "repair");
+      assert.equal(reviewPayload.review_feature_size_fit_status, "fail");
+      assert.equal(reviewPayload.review_provider_traceability_status, "pass");
+      const reviewReport = JSON.parse(fs.readFileSync(reviewPayload.review_report_file, "utf8"));
+      assert.equal(reviewReport.feature_size_fit.status, "fail");
+      assert.equal(reviewReport.feature_size_fit.feature_size, "small");
+      assert.equal(reviewReport.feature_size_fit.size_budget.max_added_lines, 1);
+      assert.ok(reviewReport.feature_size_fit.actual_change.added_lines > 1);
+      assert.ok(
+        reviewReport.feature_size_fit.findings.some((finding) =>
+          String(finding.summary).includes("declared size budget"),
+        ),
+      );
+      assert.equal(reviewReport.provider_traceability.status, "pass");
+
+      const auditRun = invokeCli([
+        "audit",
+        "runs",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+      ]);
+      assert.equal(auditRun.exitCode, 0, auditRun.stderr);
+      const auditPayload = JSON.parse(auditRun.stdout);
+      assert.equal(auditPayload.run_audit_records[0].feature_size_fit_status, "fail");
+      assert.equal(auditPayload.run_audit_records[0].provider_execution_status, "pass");
     });
   });
 });

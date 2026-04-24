@@ -1,0 +1,38 @@
+{
+  "scorecard_id": "w14-s07.full-journey-governance-nextjs-large-openai.learning-loop.scorecard.v1",
+  "project_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai",
+  "run_id": "w14-s07.full-journey-governance-nextjs-large-openai",
+  "source_kind": "cli-learning-handoff",
+  "status": "pass",
+  "summary": "Run 'w14-s07.full-journey-governance-nextjs-large-openai' completed public learning-loop handoff.",
+  "evidence_refs": [
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/artifacts/delivery-plan-implement-1777032707197.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/artifacts/delivery-plan-implement-1777032703214.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/artifacts/delivery-manifest-fork-first-pr-w14-s07.full-journey-governance-nextjs-large-openai-1777032707669.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/artifacts/release-packet-fork-first-pr-w14-s07.full-journey-governance-nextjs-large-openai-1777032707670.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/step-result-routed-w14-s07.full-journey-governance-nextjs-large-openai.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/review-report-w14-s07.full-journey-governance-nextjs-large-openai.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/learning-loop-scorecard-delivery-w14-s07.full-journey-governance-nextjs-large-openai.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/learning-loop-handoff-w14-s07.full-journey-governance-nextjs-large-openai.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/review-report-w14-s07.full-journey-governance-nextjs-large-openai.json"
+  ],
+  "linked_eval_suite_refs": [],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "matrix_cell": {
+    "cell_id": "nextjs.governance.large.openai",
+    "target_catalog_id": "nextjs-monorepo-example",
+    "feature_mission_id": "nextjs-shared-package-release",
+    "scenario_family": "governance",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "large",
+    "coverage_tier": "required"
+  },
+  "generated_at": "2026-04-24T12:11:49.511Z"
+}

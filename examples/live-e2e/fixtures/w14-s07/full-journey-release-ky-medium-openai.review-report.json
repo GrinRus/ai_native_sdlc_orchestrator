@@ -1,0 +1,142 @@
+{
+  "review_report_id": "w14-s07.full-journey-release-ky-medium-openai.review-report.v1",
+  "project_id": "sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai",
+  "run_id": "w14-s07.full-journey-release-ky-medium-openai",
+  "generated_at": "2026-04-24T12:18:48.677Z",
+  "overall_status": "warn",
+  "review_recommendation": "required-human-review",
+  "feature_traceability": {
+    "status": "pass",
+    "mission_id": "ky-release-doc-typing",
+    "input_packet_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.artifact.intake.ky-release-doc-typing.v1.json",
+    "request_title": "Prepare one release-shaped typed API adjustment",
+    "request_brief": "Land one bounded API or typing fix with matching regression coverage and release-ready lineage.",
+    "scenario_family": "release",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "medium",
+    "matrix_cell": {
+      "cell_id": "ky.release.medium.openai",
+      "target_catalog_id": "ky",
+      "feature_mission_id": "ky-release-doc-typing",
+      "scenario_family": "release",
+      "provider_variant_id": "openai-primary",
+      "feature_size": "medium",
+      "coverage_tier": "required"
+    },
+    "coverage_follow_up": {
+      "current_cell_required": true,
+      "next_required_matrix_cell": {
+        "cell_id": "ky.regress.small.openai",
+        "scenario_family": "regress",
+        "feature_size": "small",
+        "feature_mission_id": "ky-header-regression",
+        "provider_variant_id": "openai-primary"
+      },
+      "remaining_required_matrix_cells": [
+        {
+          "cell_id": "ky.regress.small.openai",
+          "scenario_family": "regress",
+          "feature_size": "small",
+          "feature_mission_id": "ky-header-regression",
+          "provider_variant_id": "openai-primary"
+        },
+        {
+          "cell_id": "ky.regress.medium.anthropic",
+          "scenario_family": "regress",
+          "feature_size": "medium",
+          "feature_mission_id": "ky-fetch-options-regression",
+          "provider_variant_id": "anthropic-primary"
+        }
+      ]
+    }
+  },
+  "discovery_quality": {
+    "status": "pass",
+    "analysis_report_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/project-analysis-report.json",
+    "spec_step_result_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/step-result-routed-sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "handoff_packet_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.handoff.bootstrap.v1.json",
+    "findings": []
+  },
+  "artifact_quality": {
+    "status": "pass",
+    "verify_summary_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/verify-summary.json",
+    "execution_step_result_refs": [
+      "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/step-result-routed-w14-s07.full-journey-release-ky-medium-openai.run.start.implement.implement.attempt.1.json"
+    ],
+    "delivery_manifest_ref": null,
+    "release_packet_ref": null,
+    "findings": []
+  },
+  "code_quality": {
+    "status": "warn",
+    "changed_paths": [],
+    "allowed_paths": [
+      "source/**",
+      "test/**",
+      "index.d.ts"
+    ],
+    "forbidden_paths": [
+      "docs/**",
+      ".github/**",
+      "scripts/**",
+      "examples/**",
+      "context/**"
+    ],
+    "findings": [
+      {
+        "finding_id": "code-quality.01",
+        "severity": "warn",
+        "category": "code-quality",
+        "summary": "No non-bootstrap changed paths were detected for the reviewed run.",
+        "evidence_refs": [
+          "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/step-result-routed-w14-s07.full-journey-release-ky-medium-openai.run.start.implement.implement.attempt.1.json"
+        ]
+      }
+    ]
+  },
+  "feature_size_fit": {
+    "status": "pass",
+    "feature_size": "medium",
+    "size_budget": {
+      "max_changed_files": 8,
+      "max_added_lines": 260
+    },
+    "actual_change": {
+      "changed_files": 0,
+      "added_lines": 0,
+      "deleted_lines": 0,
+      "touched_lines": 0
+    },
+    "findings": []
+  },
+  "provider_traceability": {
+    "status": "pass",
+    "provider_variant_id": "openai-primary",
+    "requested_provider": "openai",
+    "requested_adapter": "codex-cli",
+    "actual_provider": "openai",
+    "actual_adapter": "codex-cli",
+    "route_id": "route.implement.default.openai-primary",
+    "route_profile_source": "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/examples/routes/implement-openai-primary.yaml",
+    "findings": []
+  },
+  "findings": [
+    {
+      "finding_id": "code-quality.01",
+      "severity": "warn",
+      "category": "code-quality",
+      "summary": "No non-bootstrap changed paths were detected for the reviewed run.",
+      "evidence_refs": [
+        "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/step-result-routed-w14-s07.full-journey-release-ky-medium-openai.run.start.implement.implement.attempt.1.json"
+      ]
+    }
+  ],
+  "evidence_refs": [
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.artifact.intake.ky-release-doc-typing.v1.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/project-analysis-report.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/step-result-routed-sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.handoff.bootstrap.v1.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/step-result-routed-w14-s07.full-journey-release-ky-medium-openai.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/verify-summary.json"
+  ]
+}

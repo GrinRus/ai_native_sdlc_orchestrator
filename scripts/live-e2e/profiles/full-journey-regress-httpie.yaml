@@ -5,6 +5,8 @@ flow_kind: regress
 duration_class: long
 target_catalog_id: httpie-cli
 feature_mission_id: httpie-cli-output-regression
+scenario_family: regress
+provider_variant_id: openai-primary
 bootstrap_template: github-default
 runtime:
   mode: ephemeral

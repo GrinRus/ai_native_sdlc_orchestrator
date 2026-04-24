@@ -1,0 +1,20 @@
+{
+  "packet_id": "sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.artifact.intake.ky-release-doc-typing.v1",
+  "project_id": "sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai",
+  "packet_type": "intake-request",
+  "version": 1,
+  "status": "ready",
+  "summary": "Prepare one release-shaped typed API adjustment",
+  "body_ref": "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.artifact.intake.ky-release-doc-typing.v1.body.json",
+  "invocation_context": {
+    "command": "aor intake create",
+    "project_root": "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai",
+    "project_profile_ref": "project.aor.yaml",
+    "mission_id": "ky-release-doc-typing"
+  },
+  "evidence_refs": [
+    "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/state",
+    "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports",
+    "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/requests/feature-request-w14-s07.full-journey-release-ky-medium-openai-ky-release-doc-typing.json"
+  ]
+}

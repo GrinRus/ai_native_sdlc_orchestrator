@@ -1,0 +1,68 @@
+{
+  "packet_id": "sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.handoff.bootstrap.v1",
+  "project_id": "sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai",
+  "ticket_id": "sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.wave.bootstrap.v1",
+  "version": 1,
+  "status": "approved",
+  "risk_tier": "medium",
+  "approved_objective": "Prepare one release-shaped typed API adjustment",
+  "repo_scopes": [
+    {
+      "repo_id": "target",
+      "paths": [
+        "**"
+      ]
+    }
+  ],
+  "allowed_paths": [
+    "**"
+  ],
+  "allowed_commands": [
+    "npm install",
+    "npx playwright install",
+    "npm test"
+  ],
+  "verification_plan": {
+    "validators": [
+      "contract-shape",
+      "approval-state",
+      "repo-scope"
+    ],
+    "commands": [
+      "npm install",
+      "npx playwright install",
+      "npm test"
+    ]
+  },
+  "scope_constraints": {
+    "require_bounded_scope": true,
+    "max_repo_scopes": 1,
+    "max_changed_files": 24
+  },
+  "command_policy": {
+    "owner": "project-profile",
+    "allow_unlisted_commands": false
+  },
+  "writeback_mode": "pull-request",
+  "approval_state": {
+    "required": true,
+    "state": "approved",
+    "approval_refs": [
+      "approval://live-e2e/full-journey/w14-s07.full-journey-release-ky-medium-openai"
+    ],
+    "approved_by": "operator",
+    "approved_at": "2026-04-24T12:18:45.455Z"
+  },
+  "feature_traceability": {
+    "mission_id": "ky-release-doc-typing",
+    "source_kind": "catalog-feature-mission",
+    "request_title": "Prepare one release-shaped typed API adjustment",
+    "request_brief": "Land one bounded API or typing fix with matching regression coverage and release-ready lineage."
+  },
+  "source_refs": {
+    "wave_ticket_file": "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/wave-ticket-sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.wave.bootstrap.v1.json",
+    "artifact_packet_file": "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.artifact.intake.ky-release-doc-typing.v1.json",
+    "project_profile_ref": "project.aor.yaml"
+  },
+  "blocked_next_step": null
+}

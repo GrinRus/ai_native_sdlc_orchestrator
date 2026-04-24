@@ -1,0 +1,20 @@
+{
+  "packet_id": "httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai.artifact.intake.httpie-cli-repair-exit-codes.v1",
+  "project_id": "httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai",
+  "packet_type": "intake-request",
+  "version": 1,
+  "status": "ready",
+  "summary": "Repair one bounded CLI exit-code and formatting seam",
+  "body_ref": "./.aor/w14-s07-proof/runtime-httpie-governance/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/artifacts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai.artifact.intake.httpie-cli-repair-exit-codes.v1.body.json",
+  "invocation_context": {
+    "command": "aor intake create",
+    "project_root": "./.aor/w14-s07-proof/runtime-httpie-governance/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai",
+    "project_profile_ref": "project.aor.yaml",
+    "mission_id": "httpie-cli-repair-exit-codes"
+  },
+  "evidence_refs": [
+    "./.aor/w14-s07-proof/runtime-httpie-governance/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/state",
+    "./.aor/w14-s07-proof/runtime-httpie-governance/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports",
+    "./.aor/w14-s07-proof/runtime-httpie-governance/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/.aor/requests/feature-request-w14-s07.full-journey-governance-httpie-medium-openai-httpie-cli-repair-exit-codes.json"
+  ]
+}

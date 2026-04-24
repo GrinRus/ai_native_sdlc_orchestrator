@@ -86,4 +86,5 @@ When a run fails or a release causes trouble:
 For full-journey live E2E, the same loop must also leave behind:
 - a feature-linked review verdict;
 - a learning-loop scorecard;
-- a learning-loop handoff that points backlog follow-up back to the curated mission and target repo.
+- a learning-loop handoff that points backlog follow-up back to the curated mission and target repo;
+- matrix-cell traceability for scenario family, provider variant, and declared feature size.

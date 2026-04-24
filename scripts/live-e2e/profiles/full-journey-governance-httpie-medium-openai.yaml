@@ -1,0 +1,37 @@
+profile_id: live-e2e.full-journey.governance.httpie.medium.openai
+version: 1
+journey_mode: full-journey
+flow_kind: governance
+duration_class: long
+target_catalog_id: httpie-cli
+feature_mission_id: httpie-cli-repair-exit-codes
+scenario_family: governance
+provider_variant_id: openai-primary
+bootstrap_template: github-default
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - learning
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  eval_suites:
+    - suite.regress.short@v1
+  harness:
+    enabled: false
+output_policy:
+  materialize_release_packet: false
+  write_back_to_remote: false
+  preferred_delivery_mode: patch

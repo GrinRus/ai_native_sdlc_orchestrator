@@ -1,0 +1,142 @@
+{
+  "review_report_id": "w14-s07.full-journey-regress-ky-medium-anthropic-rerun.review-report.v1",
+  "project_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun",
+  "run_id": "w14-s07.full-journey-regress-ky-medium-anthropic-rerun",
+  "generated_at": "2026-04-24T12:16:46.316Z",
+  "overall_status": "warn",
+  "review_recommendation": "required-human-review",
+  "feature_traceability": {
+    "status": "pass",
+    "mission_id": "ky-fetch-options-regression",
+    "input_packet_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.artifact.intake.ky-fetch-options-regression.v1.json",
+    "request_title": "Extend one bounded fetch-options regression across source and typings",
+    "request_brief": "Adjust one multi-file options-handling or retry-surface regression with matching tests and the smallest typing touch needed to keep the public API coherent.",
+    "scenario_family": "regress",
+    "provider_variant_id": "anthropic-primary",
+    "feature_size": "medium",
+    "matrix_cell": {
+      "cell_id": "ky.regress.medium.anthropic",
+      "target_catalog_id": "ky",
+      "feature_mission_id": "ky-fetch-options-regression",
+      "scenario_family": "regress",
+      "provider_variant_id": "anthropic-primary",
+      "feature_size": "medium",
+      "coverage_tier": "required"
+    },
+    "coverage_follow_up": {
+      "current_cell_required": true,
+      "next_required_matrix_cell": {
+        "cell_id": "ky.regress.small.openai",
+        "scenario_family": "regress",
+        "feature_size": "small",
+        "feature_mission_id": "ky-header-regression",
+        "provider_variant_id": "openai-primary"
+      },
+      "remaining_required_matrix_cells": [
+        {
+          "cell_id": "ky.regress.small.openai",
+          "scenario_family": "regress",
+          "feature_size": "small",
+          "feature_mission_id": "ky-header-regression",
+          "provider_variant_id": "openai-primary"
+        },
+        {
+          "cell_id": "ky.release.medium.openai",
+          "scenario_family": "release",
+          "feature_size": "medium",
+          "feature_mission_id": "ky-release-doc-typing",
+          "provider_variant_id": "openai-primary"
+        }
+      ]
+    }
+  },
+  "discovery_quality": {
+    "status": "pass",
+    "analysis_report_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/project-analysis-report.json",
+    "spec_step_result_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/step-result-routed-sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "handoff_packet_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.handoff.bootstrap.v1.json",
+    "findings": []
+  },
+  "artifact_quality": {
+    "status": "pass",
+    "verify_summary_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/verify-summary.json",
+    "execution_step_result_refs": [
+      "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/step-result-routed-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.run.start.implement.implement.attempt.1.json"
+    ],
+    "delivery_manifest_ref": null,
+    "release_packet_ref": null,
+    "findings": []
+  },
+  "code_quality": {
+    "status": "warn",
+    "changed_paths": [],
+    "allowed_paths": [
+      "source/**",
+      "test/**",
+      "index.d.ts"
+    ],
+    "forbidden_paths": [
+      "docs/**",
+      ".github/**",
+      "scripts/**",
+      "examples/**",
+      "context/**"
+    ],
+    "findings": [
+      {
+        "finding_id": "code-quality.01",
+        "severity": "warn",
+        "category": "code-quality",
+        "summary": "No non-bootstrap changed paths were detected for the reviewed run.",
+        "evidence_refs": [
+          "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/step-result-routed-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.run.start.implement.implement.attempt.1.json"
+        ]
+      }
+    ]
+  },
+  "feature_size_fit": {
+    "status": "pass",
+    "feature_size": "medium",
+    "size_budget": {
+      "max_changed_files": 8,
+      "max_added_lines": 300
+    },
+    "actual_change": {
+      "changed_files": 0,
+      "added_lines": 0,
+      "deleted_lines": 0,
+      "touched_lines": 0
+    },
+    "findings": []
+  },
+  "provider_traceability": {
+    "status": "pass",
+    "provider_variant_id": "anthropic-primary",
+    "requested_provider": "anthropic",
+    "requested_adapter": "claude-code",
+    "actual_provider": "anthropic",
+    "actual_adapter": "claude-code",
+    "route_id": "route.implement.default.anthropic-primary",
+    "route_profile_source": "./.aor/w14-s07-proof/runtime-ky-medium-anthropic-rerun/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/examples/routes/implement-anthropic-primary.yaml",
+    "findings": []
+  },
+  "findings": [
+    {
+      "finding_id": "code-quality.01",
+      "severity": "warn",
+      "category": "code-quality",
+      "summary": "No non-bootstrap changed paths were detected for the reviewed run.",
+      "evidence_refs": [
+        "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/step-result-routed-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.run.start.implement.implement.attempt.1.json"
+      ]
+    }
+  ],
+  "evidence_refs": [
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.artifact.intake.ky-fetch-options-regression.v1.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/project-analysis-report.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/step-result-routed-sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.handoff.bootstrap.v1.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/step-result-routed-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/verify-summary.json"
+  ]
+}

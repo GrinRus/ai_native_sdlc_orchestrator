@@ -1,0 +1,68 @@
+{
+  "packet_id": "httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic.handoff.bootstrap.v1",
+  "project_id": "httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic",
+  "ticket_id": "httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic.wave.bootstrap.v1",
+  "version": 1,
+  "status": "approved",
+  "risk_tier": "medium",
+  "approved_objective": "Repair one bounded CLI exit-code and formatting seam",
+  "repo_scopes": [
+    {
+      "repo_id": "target",
+      "paths": [
+        "**"
+      ]
+    }
+  ],
+  "allowed_paths": [
+    "**"
+  ],
+  "allowed_commands": [
+    "make install",
+    "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+    "make codestyle"
+  ],
+  "verification_plan": {
+    "validators": [
+      "contract-shape",
+      "approval-state",
+      "repo-scope"
+    ],
+    "commands": [
+      "make install",
+      "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+      "make codestyle"
+    ]
+  },
+  "scope_constraints": {
+    "require_bounded_scope": true,
+    "max_repo_scopes": 1,
+    "max_changed_files": 24
+  },
+  "command_policy": {
+    "owner": "project-profile",
+    "allow_unlisted_commands": false
+  },
+  "writeback_mode": "pull-request",
+  "approval_state": {
+    "required": true,
+    "state": "approved",
+    "approval_refs": [
+      "approval://live-e2e/full-journey/w14-s07.full-journey-repair-httpie-medium-anthropic"
+    ],
+    "approved_by": "operator",
+    "approved_at": "2026-04-24T11:52:53.373Z"
+  },
+  "feature_traceability": {
+    "mission_id": "httpie-cli-repair-exit-codes",
+    "source_kind": "catalog-feature-mission",
+    "request_title": "Repair one bounded CLI exit-code and formatting seam",
+    "request_brief": "Fix one multi-file CLI contract issue across command handling and tests while preserving the bounded pytest and codestyle slice."
+  },
+  "source_refs": {
+    "wave_ticket_file": "./.aor/w14-s07-proof/runtime-httpie-repair/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/artifacts/wave-ticket-httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic.wave.bootstrap.v1.json",
+    "artifact_packet_file": "./.aor/w14-s07-proof/runtime-httpie-repair/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/artifacts/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic.artifact.intake.httpie-cli-repair-exit-codes.v1.json",
+    "project_profile_ref": "project.aor.yaml"
+  },
+  "blocked_next_step": null
+}

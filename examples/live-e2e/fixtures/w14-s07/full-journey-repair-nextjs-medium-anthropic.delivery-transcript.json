@@ -1,0 +1,91 @@
+{
+  "transcript_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.delivery-transcript.fork-first-pr.1777033139279",
+  "project_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic",
+  "run_id": "w14-s07.full-journey-repair-nextjs-medium-anthropic",
+  "step_id": "deliver.prepare",
+  "mode": "fork-first-pr",
+  "status": "success",
+  "started_at": "2026-04-24T12:18:59.279Z",
+  "finished_at": "2026-04-24T12:18:59.381Z",
+  "execution_root": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic",
+  "delivery_plan_ref": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/delivery-plan-implement-1777033139273.json",
+  "ownership": {
+    "source_run_id": "w14-s07.full-journey-repair-nextjs-medium-anthropic",
+    "source_step_class": "implement"
+  },
+  "coordination": {
+    "required": false,
+    "status": "not-required",
+    "repo_ids": [
+      "target"
+    ],
+    "evidence_refs": []
+  },
+  "recovery_scope": {
+    "requested": false,
+    "status": "not-requested",
+    "rerun_of_run_ref": null,
+    "failed_step_ref": null,
+    "packet_boundary": "delivery-manifest",
+    "strategy": null,
+    "blocking_reasons": []
+  },
+  "git": {
+    "head_before": {
+      "branch": "main",
+      "commit": "b7953382e5efc3173356bf977dfa6e88f28d8bfc"
+    },
+    "head_after": {
+      "branch": "main",
+      "commit": "b7953382e5efc3173356bf977dfa6e88f28d8bfc"
+    },
+    "commands": [
+      "git remote get-url origin",
+      "git diff --name-only HEAD",
+      "git diff --numstat HEAD"
+    ]
+  },
+  "changed_paths": [],
+  "diff_stats": {
+    "files": [],
+    "totals": {
+      "files": 0,
+      "added": 0,
+      "deleted": 0
+    }
+  },
+  "outputs": {
+    "fork_target": {
+      "host": "github.com",
+      "upstream_repo": "belgattitude/nextjs-monorepo-example",
+      "fork_repo": "aor-bot/nextjs-monorepo-example"
+    },
+    "branch_ref": {
+      "base_ref": "main",
+      "head_ref": "refs/heads/aor/w14-s07.full-journey-repair-nextjs-medium-anthropic",
+      "head_branch": "aor/w14-s07.full-journey-repair-nextjs-medium-anthropic"
+    },
+    "pr_draft": {
+      "title": "AOR delivery w14-s07.full-journey-repair-nextjs-medium-anthropic",
+      "body": "Draft PR prepared by AOR fork-first delivery planning mode. No network write was executed in this run.",
+      "is_draft": true,
+      "base_repo": "belgattitude/nextjs-monorepo-example",
+      "base_branch": "main",
+      "head_repo": "aor-bot/nextjs-monorepo-example",
+      "head_branch": "aor/w14-s07.full-journey-repair-nextjs-medium-anthropic"
+    },
+    "api_intent_file": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/fork-first-intent-w14-s07.full-journey-repair-nextjs-medium-anthropic-1777033139380.json",
+    "network_mode": "stubbed",
+    "network_write": {
+      "requested": false,
+      "executed": false
+    },
+    "delivery_manifest_file": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/delivery-manifest-fork-first-pr-w14-s07.full-journey-repair-nextjs-medium-anthropic-1777033139420.json",
+    "release_packet_file": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/release-packet-fork-first-pr-w14-s07.full-journey-repair-nextjs-medium-anthropic-1777033139420.json",
+    "learning_loop_scorecard_file": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/learning-loop-scorecard-delivery-w14-s07.full-journey-repair-nextjs-medium-anthropic.json",
+    "learning_loop_handoff_file": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/learning-loop-handoff-w14-s07.full-journey-repair-nextjs-medium-anthropic.json",
+    "incident_report_file": null
+  },
+  "error": null,
+  "recovery_steps": null
+}

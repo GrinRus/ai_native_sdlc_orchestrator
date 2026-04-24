@@ -15,10 +15,106 @@ verification:
 safety_defaults:
   write_back_to_remote: false
   preferred_delivery_mode: fork-first-pr
+required_matrix_cells:
+  - cell_id: nextjs.release.large.openai
+    scenario_family: release
+    feature_size: large
+    feature_mission_id: nextjs-shared-package-release
+    provider_variant_id: openai-primary
+    coverage_tier: required
+  - cell_id: nextjs.repair.medium.anthropic
+    scenario_family: repair
+    feature_size: medium
+    feature_mission_id: nextjs-workspace-repair-shared-config
+    provider_variant_id: anthropic-primary
+    coverage_tier: required
+  - cell_id: nextjs.governance.large.openai
+    scenario_family: governance
+    feature_size: large
+    feature_mission_id: nextjs-shared-package-release
+    provider_variant_id: openai-primary
+    coverage_tier: required
+provider_comparison_pairs:
+  - pair_id: nextjs.release.large
+    scenario_family: release
+    feature_size: large
+    feature_mission_id: nextjs-shared-package-release
+    provider_variants:
+      - openai-primary
+      - anthropic-primary
 feature_missions:
+  - mission_id: nextjs-shared-util-regression
+    title: Preserve one narrow shared-package regression
+    brief: Fix one narrowly scoped shared-package regression with the smallest app or package touch needed to keep the monorepo green.
+    feature_size: small
+    allowed_paths:
+      - apps/**
+      - packages/**
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+    acceptance_checks:
+      - keep the change inside one shared package or one consuming app boundary
+      - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
+    supported_scenarios:
+      - regress
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 8
+      max_added_lines: 260
+    size_rationale: Small monorepo missions should stay inside one package or one consumer boundary with limited diff size.
+    change_budget:
+      max_changed_files: 8
+      max_added_lines: 260
+  - mission_id: nextjs-workspace-repair-shared-config
+    title: Repair one bounded workspace configuration or shared package seam
+    brief: Fix one bounded monorepo breakage across a shared package and one consuming app or config boundary, with strong delivery and audit lineage.
+    feature_size: medium
+    allowed_paths:
+      - apps/**
+      - packages/**
+      - tooling/**
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the change inside monorepo apps, packages, and bounded tooling surfaces
+      - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
+      - keep delivery evidence anchored to the target checkout
+    supported_scenarios:
+      - repair
+      - governance
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 12
+      max_added_lines: 360
+    size_rationale: Medium monorepo missions may cross one package-to-app or package-to-tooling boundary, but should remain explicitly bounded.
+    change_budget:
+      max_changed_files: 12
+      max_added_lines: 360
   - mission_id: nextjs-shared-package-release
     title: Prepare one shared-package release-shaped change
     brief: Update one shared package and one consuming app with bounded release evidence and no upstream write-back.
+    feature_size: large
     allowed_paths:
       - apps/**
       - packages/**
@@ -35,6 +131,17 @@ feature_missions:
     acceptance_checks:
       - keep changes inside apps and packages only
       - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
+    supported_scenarios:
+      - release
+      - governance
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+      - open-code-primary
+    size_budget:
+      max_changed_files: 14
+      max_added_lines: 420
+    size_rationale: Large monorepo release missions may cross multiple packages and one consuming app, but must remain bounded to apps/packages and strict release evidence.
     change_budget:
       max_changed_files: 14
       max_added_lines: 420

@@ -1,0 +1,20 @@
+{
+  "packet_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.artifact.intake.nextjs-workspace-repair-shared-config.v1",
+  "project_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic",
+  "packet_type": "intake-request",
+  "version": 1,
+  "status": "ready",
+  "summary": "Repair one bounded workspace configuration or shared package seam",
+  "body_ref": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.artifact.intake.nextjs-workspace-repair-shared-config.v1.body.json",
+  "invocation_context": {
+    "command": "aor intake create",
+    "project_root": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic",
+    "project_profile_ref": "project.aor.yaml",
+    "mission_id": "nextjs-workspace-repair-shared-config"
+  },
+  "evidence_refs": [
+    "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/state",
+    "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports",
+    "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/requests/feature-request-w14-s07.full-journey-repair-nextjs-medium-anthropic-nextjs-workspace-repair-shared-config.json"
+  ]
+}

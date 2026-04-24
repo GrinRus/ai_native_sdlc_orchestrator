@@ -1,0 +1,135 @@
+{
+  "mission_id": "nextjs-shared-package-release",
+  "title": "Prepare one shared-package release-shaped change",
+  "brief": "Update one shared package and one consuming app with bounded release evidence and no upstream write-back.",
+  "allowed_paths": [
+    "apps/**",
+    "packages/**"
+  ],
+  "forbidden_paths": [
+    "docs/**",
+    ".github/**",
+    "scripts/**",
+    "examples/**",
+    "context/**"
+  ],
+  "expected_evidence": [
+    "delivery-manifest",
+    "release-packet",
+    "review-report"
+  ],
+  "acceptance_checks": [
+    "keep changes inside apps and packages only",
+    "preserve monorepo lint/typecheck plus shared-package unit smoke linkage"
+  ],
+  "scenario_family": "release",
+  "provider_variant_id": "openai-primary",
+  "feature_size": "large",
+  "supported_scenarios": [
+    "release",
+    "governance"
+  ],
+  "recommended_provider_variants": [
+    "openai-primary",
+    "anthropic-primary",
+    "open-code-primary"
+  ],
+  "size_budget": {
+    "max_changed_files": 14,
+    "max_added_lines": 420
+  },
+  "size_rationale": "Large monorepo release missions may cross multiple packages and one consuming app, but must remain bounded to apps/packages and strict release evidence.",
+  "change_budget": {
+    "max_changed_files": 14,
+    "max_added_lines": 420
+  },
+  "provider_variant": {
+    "provider_variant_id": "openai-primary",
+    "provider": "openai",
+    "primary_adapter": "codex-cli",
+    "route_override_policy": {
+      "strategy": "pin-primary-only",
+      "steps": [
+        "discovery",
+        "research",
+        "spec",
+        "planning",
+        "implement",
+        "review",
+        "qa",
+        "repair",
+        "eval",
+        "harness"
+      ]
+    }
+  },
+  "scenario_policy": {
+    "scenario_family": "release",
+    "required_stages": [
+      "bootstrap",
+      "discovery",
+      "spec",
+      "planning",
+      "handoff",
+      "execution",
+      "review",
+      "qa",
+      "delivery",
+      "release",
+      "learning"
+    ],
+    "required_evidence": [
+      "verify-summary",
+      "routed-step-result",
+      "review-report",
+      "delivery-manifest",
+      "release-packet",
+      "learning-loop-handoff"
+    ],
+    "delivery_mode_policy": "fork-first-pr",
+    "release_required": true,
+    "incident_policy": {
+      "open_on_review_fail": true,
+      "open_on_execution_fail": true
+    },
+    "governance_policy": {
+      "mode": "release-shaped",
+      "audit_required": true
+    }
+  },
+  "matrix_cell": {
+    "cell_id": "nextjs.release.large.openai",
+    "target_catalog_id": "nextjs-monorepo-example",
+    "feature_mission_id": "nextjs-shared-package-release",
+    "scenario_family": "release",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "large",
+    "coverage_tier": "required"
+  },
+  "coverage_follow_up": {
+    "current_cell_required": true,
+    "next_required_matrix_cell": {
+      "cell_id": "nextjs.repair.medium.anthropic",
+      "scenario_family": "repair",
+      "feature_size": "medium",
+      "feature_mission_id": "nextjs-workspace-repair-shared-config",
+      "provider_variant_id": "anthropic-primary"
+    },
+    "remaining_required_matrix_cells": [
+      {
+        "cell_id": "nextjs.repair.medium.anthropic",
+        "scenario_family": "repair",
+        "feature_size": "medium",
+        "feature_mission_id": "nextjs-workspace-repair-shared-config",
+        "provider_variant_id": "anthropic-primary"
+      },
+      {
+        "cell_id": "nextjs.governance.large.openai",
+        "scenario_family": "governance",
+        "feature_size": "large",
+        "feature_mission_id": "nextjs-shared-package-release",
+        "provider_variant_id": "openai-primary"
+      }
+    ]
+  }
+}

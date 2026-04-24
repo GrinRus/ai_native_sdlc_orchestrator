@@ -1,0 +1,117 @@
+{
+  "manifest_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky.delivery-manifest.patch-only.1777031470923",
+  "project_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky",
+  "ticket_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky.wave.w14-s07.full-journey-regress-ky",
+  "run_refs": [
+    "w14-s07.full-journey-regress-ky"
+  ],
+  "step_ref": "deliver.prepare",
+  "delivery_mode": "patch-only",
+  "writeback_policy": {
+    "mode": "patch-only",
+    "mode_source": {
+      "resolved_mode": "patch-only",
+      "canonical_mode": "patch-only",
+      "resolution_kind": "step-override",
+      "resolution_field": "--mode"
+    },
+    "writeback_allowed": true,
+    "blocking_reasons": [],
+    "network_mode": "local"
+  },
+  "repo_deliveries": [
+    {
+      "repo_id": "main",
+      "repo_root": "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky",
+      "repo_root_ref": "evidence://./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky",
+      "checkout_provenance": {
+        "head_before": {
+          "branch": "main",
+          "commit": "e0fcf780de2bd69af2528e4b7b87ccae6bb727b1"
+        },
+        "head_after": {
+          "branch": "main",
+          "commit": "e0fcf780de2bd69af2528e4b7b87ccae6bb727b1"
+        }
+      },
+      "base_ref": "main",
+      "head_ref": "main",
+      "branch_name": null,
+      "changed_paths": [],
+      "diff_totals": {
+        "files": 0,
+        "added": 0,
+        "deleted": 0
+      },
+      "commit_refs": [],
+      "writeback_result": "patch-materialized",
+      "coordination": {
+        "required": false,
+        "status": "not-required",
+        "repo_ids": [
+          "target"
+        ]
+      }
+    }
+  ],
+  "verification_refs": [
+    "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/artifacts/sindresorhus-ky-w14-s07.full-journey-regress-ky.handoff.bootstrap.v1.json",
+    "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/reports/step-result-routed-w14-s07.full-journey-regress-ky.run.start.implement.implement.attempt.1.json",
+    "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/reports/evaluation-report-suite.regress.short-v1-1777031470644.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/reports/delivery-transcript-patch-only-w14-s07.full-journey-regress-ky-1777031470818.json"
+  ],
+  "approval_context": {
+    "approved_handoff": {
+      "required": true,
+      "status": "present",
+      "ref": "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/artifacts/sindresorhus-ky-w14-s07.full-journey-regress-ky.handoff.bootstrap.v1.json"
+    },
+    "promotion_evidence": {
+      "required": true,
+      "status": "present",
+      "refs": [
+        "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/reports/step-result-routed-w14-s07.full-journey-regress-ky.run.start.implement.implement.attempt.1.json",
+        "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/reports/evaluation-report-suite.regress.short-v1-1777031470644.json"
+      ]
+    },
+    "coordination_evidence": {
+      "required": false,
+      "status": "not-required",
+      "refs": []
+    },
+    "evidence_refs": [
+      "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/artifacts/sindresorhus-ky-w14-s07.full-journey-regress-ky.handoff.bootstrap.v1.json",
+      "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/reports/step-result-routed-w14-s07.full-journey-regress-ky.run.start.implement.implement.attempt.1.json",
+      "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/reports/evaluation-report-suite.regress.short-v1-1777031470644.json"
+    ]
+  },
+  "coordination": {
+    "required": false,
+    "status": "not-required",
+    "repo_ids": [
+      "target"
+    ],
+    "evidence_refs": []
+  },
+  "rerun_recovery": {
+    "requested": false,
+    "status": "not-requested",
+    "rerun_of_run_ref": null,
+    "failed_step_ref": null,
+    "packet_boundary": "delivery-manifest",
+    "strategy": null,
+    "blocking_reasons": []
+  },
+  "evidence_root": "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/reports",
+  "source_refs": {
+    "delivery_plan_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/artifacts/delivery-plan-implement-1777031470813.json",
+    "delivery_transcript_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/reports/delivery-transcript-patch-only-w14-s07.full-journey-regress-ky-1777031470818.json",
+    "delivery_execution_root": "./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky",
+    "delivery_execution_root_ref": "evidence://./.aor/w14-s07-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky",
+    "delivery_output_refs": [
+      "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky/artifacts/delivery-patch-w14-s07.full-journey-regress-ky-1777031470863.patch"
+    ]
+  },
+  "status": "submitted",
+  "created_at": "2026-04-24T11:51:10.894Z"
+}

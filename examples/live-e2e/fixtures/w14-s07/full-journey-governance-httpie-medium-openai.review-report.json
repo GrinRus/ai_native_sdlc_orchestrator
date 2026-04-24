@@ -1,0 +1,141 @@
+{
+  "review_report_id": "w14-s07.full-journey-governance-httpie-medium-openai.review-report.v1",
+  "project_id": "httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai",
+  "run_id": "w14-s07.full-journey-governance-httpie-medium-openai",
+  "generated_at": "2026-04-24T11:52:58.591Z",
+  "overall_status": "warn",
+  "review_recommendation": "required-human-review",
+  "feature_traceability": {
+    "status": "pass",
+    "mission_id": "httpie-cli-repair-exit-codes",
+    "input_packet_ref": "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/artifacts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai.artifact.intake.httpie-cli-repair-exit-codes.v1.json",
+    "request_title": "Repair one bounded CLI exit-code and formatting seam",
+    "request_brief": "Fix one multi-file CLI contract issue across command handling and tests while preserving the bounded pytest and codestyle slice.",
+    "scenario_family": "governance",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "medium",
+    "matrix_cell": {
+      "cell_id": "httpie-cli.governance.medium.openai",
+      "target_catalog_id": "httpie-cli",
+      "feature_mission_id": "httpie-cli-repair-exit-codes",
+      "scenario_family": "governance",
+      "provider_variant_id": "openai-primary",
+      "feature_size": "medium",
+      "coverage_tier": "required"
+    },
+    "coverage_follow_up": {
+      "current_cell_required": true,
+      "next_required_matrix_cell": {
+        "cell_id": "httpie-cli.regress.small.openai",
+        "scenario_family": "regress",
+        "feature_size": "small",
+        "feature_mission_id": "httpie-cli-output-regression",
+        "provider_variant_id": "openai-primary"
+      },
+      "remaining_required_matrix_cells": [
+        {
+          "cell_id": "httpie-cli.regress.small.openai",
+          "scenario_family": "regress",
+          "feature_size": "small",
+          "feature_mission_id": "httpie-cli-output-regression",
+          "provider_variant_id": "openai-primary"
+        },
+        {
+          "cell_id": "httpie-cli.repair.medium.anthropic",
+          "scenario_family": "repair",
+          "feature_size": "medium",
+          "feature_mission_id": "httpie-cli-repair-exit-codes",
+          "provider_variant_id": "anthropic-primary"
+        }
+      ]
+    }
+  },
+  "discovery_quality": {
+    "status": "pass",
+    "analysis_report_ref": "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports/project-analysis-report.json",
+    "spec_step_result_ref": "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports/step-result-routed-httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "handoff_packet_ref": "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/artifacts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai.handoff.bootstrap.v1.json",
+    "findings": []
+  },
+  "artifact_quality": {
+    "status": "pass",
+    "verify_summary_ref": "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports/verify-summary.json",
+    "execution_step_result_refs": [
+      "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports/step-result-routed-w14-s07.full-journey-governance-httpie-medium-openai.run.start.implement.implement.attempt.1.json"
+    ],
+    "delivery_manifest_ref": null,
+    "release_packet_ref": null,
+    "findings": []
+  },
+  "code_quality": {
+    "status": "warn",
+    "changed_paths": [],
+    "allowed_paths": [
+      "httpie/**",
+      "tests/**"
+    ],
+    "forbidden_paths": [
+      "docs/**",
+      ".github/**",
+      "scripts/**",
+      "examples/**",
+      "context/**"
+    ],
+    "findings": [
+      {
+        "finding_id": "code-quality.01",
+        "severity": "warn",
+        "category": "code-quality",
+        "summary": "No non-bootstrap changed paths were detected for the reviewed run.",
+        "evidence_refs": [
+          "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports/step-result-routed-w14-s07.full-journey-governance-httpie-medium-openai.run.start.implement.implement.attempt.1.json"
+        ]
+      }
+    ]
+  },
+  "feature_size_fit": {
+    "status": "pass",
+    "feature_size": "medium",
+    "size_budget": {
+      "max_changed_files": 12,
+      "max_added_lines": 420
+    },
+    "actual_change": {
+      "changed_files": 0,
+      "added_lines": 0,
+      "deleted_lines": 0,
+      "touched_lines": 0
+    },
+    "findings": []
+  },
+  "provider_traceability": {
+    "status": "pass",
+    "provider_variant_id": "openai-primary",
+    "requested_provider": "openai",
+    "requested_adapter": "codex-cli",
+    "actual_provider": "openai",
+    "actual_adapter": "codex-cli",
+    "route_id": "route.implement.default.openai-primary",
+    "route_profile_source": "./.aor/w14-s07-proof/runtime-httpie-governance/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/examples/routes/implement-openai-primary.yaml",
+    "findings": []
+  },
+  "findings": [
+    {
+      "finding_id": "code-quality.01",
+      "severity": "warn",
+      "category": "code-quality",
+      "summary": "No non-bootstrap changed paths were detected for the reviewed run.",
+      "evidence_refs": [
+        "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports/step-result-routed-w14-s07.full-journey-governance-httpie-medium-openai.run.start.implement.implement.attempt.1.json"
+      ]
+    }
+  ],
+  "evidence_refs": [
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/artifacts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai.artifact.intake.httpie-cli-repair-exit-codes.v1.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports/project-analysis-report.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports/step-result-routed-httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/artifacts/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai.handoff.bootstrap.v1.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports/step-result-routed-w14-s07.full-journey-governance-httpie-medium-openai.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-governance-httpie-medium-openai/reports/verify-summary.json"
+  ]
+}

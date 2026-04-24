@@ -1,0 +1,39 @@
+{
+  "scorecard_id": "w14-s07.full-journey-governance-nextjs-large-openai.scorecard.belgattitude/nextjs-monorepo-example",
+  "run_id": "w14-s07.full-journey-governance-nextjs-large-openai",
+  "profile_ref": "./scripts/live-e2e/profiles/full-journey-governance-nextjs-large-openai.yaml",
+  "profile_id": "live-e2e.full-journey.governance.nextjs.large.openai",
+  "scenario_id": null,
+  "scenario_family": "governance",
+  "provider_variant_id": "openai-primary",
+  "feature_size": "large",
+  "flow_kind": "governance",
+  "duration_class": "long",
+  "matrix_cell": {
+    "cell_id": "nextjs.governance.large.openai",
+    "target_catalog_id": "nextjs-monorepo-example",
+    "feature_mission_id": "nextjs-shared-package-release",
+    "scenario_family": "governance",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "large",
+    "coverage_tier": "required"
+  },
+  "target_repo": {
+    "repo_id": "belgattitude/nextjs-monorepo-example",
+    "repo_url": "https://github.com/belgattitude/nextjs-monorepo-example.git",
+    "ref": "main"
+  },
+  "stage_counts": {
+    "pass": 9,
+    "fail": 0,
+    "pending": 1,
+    "skipped": 1
+  },
+  "status": "pass",
+  "scenario_coverage_status": "pass",
+  "provider_execution_status": "pass",
+  "feature_size_fit_status": "pass",
+  "summary_ref": "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/reports/live-e2e-run-summary-w14-s07.full-journey-governance-nextjs-large-openai.json",
+  "command_count": 17,
+  "generated_at": "2026-04-24T12:11:49.528Z"
+}

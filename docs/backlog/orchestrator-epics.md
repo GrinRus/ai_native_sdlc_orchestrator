@@ -10,6 +10,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W11:** `W11-S01` Source-of-truth reality repair
 - **W12:** `W12-S01` Public surface realignment
 - **W13:** `W13-S01` Backlog-first full-journey live E2E realignment
+- **W14:** `W14-S01` Backlog and source-of-truth realignment
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -46,6 +47,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W8:** `W8-S05` Later QA and AI platform baseline comparison maturity; `W8-S09` Context asset lifecycle and quality-gated update flow
 - **W9:** `W9-S05` Public harness replay command surface; `W9-S06` Asset promote/freeze command surface completion
 - **W13:** `W13-S05` Public review and learning-loop closure surfaces
+- **W14:** `W14-S06` Review, audit, and closure alignment
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -86,3 +88,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W11:** `W11-S02` Target workspace materialization for live E2E; `W11-S05` Fresh external proof bundle for catalog targets
 - **W12:** `W12-S02` Internal black-box installed-user harness; `W12-S04` Proof refresh after surface cleanup
 - **W13:** `W13-S02` Curated target and feature mission catalog; `W13-S06` Full-journey harness and restored runner skill
+- **W14:** `W14-S02` Scenario and provider catalogs; `W14-S03` Feature-size taxonomy and target mission expansion; `W14-S04` Provider-pinned full-journey profiles; `W14-S05` Harness and verdict expansion; `W14-S07` Proof bundle and skill refresh

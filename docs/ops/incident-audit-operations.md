@@ -19,7 +19,8 @@ aor incident open \
 
 Expected signals:
 - `incident_id` is returned.
-- `incident_file` exists under `.aor/projects/<project_id>/reports/incident-report-*.json`.
+- `incident_report_file` exists under `.aor/projects/<project_id>/reports/incident-report-*.json`.
+- `incident_file` may still be present as a backward-compatible alias for the same path.
 - `incident_run_ref` matches `run://<RUN_ID>`.
 
 ## Show incidents

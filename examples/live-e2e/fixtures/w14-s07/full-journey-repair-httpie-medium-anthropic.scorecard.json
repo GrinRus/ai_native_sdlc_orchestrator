@@ -1,0 +1,39 @@
+{
+  "scorecard_id": "w14-s07.full-journey-repair-httpie-medium-anthropic.scorecard.httpie/cli",
+  "run_id": "w14-s07.full-journey-repair-httpie-medium-anthropic",
+  "profile_ref": "./scripts/live-e2e/profiles/full-journey-repair-httpie-medium-anthropic.yaml",
+  "profile_id": "live-e2e.full-journey.repair.httpie.medium.anthropic",
+  "scenario_id": null,
+  "scenario_family": "repair",
+  "provider_variant_id": "anthropic-primary",
+  "feature_size": "medium",
+  "flow_kind": "repair",
+  "duration_class": "long",
+  "matrix_cell": {
+    "cell_id": "httpie-cli.repair.medium.anthropic",
+    "target_catalog_id": "httpie-cli",
+    "feature_mission_id": "httpie-cli-repair-exit-codes",
+    "scenario_family": "repair",
+    "provider_variant_id": "anthropic-primary",
+    "feature_size": "medium",
+    "coverage_tier": "required"
+  },
+  "target_repo": {
+    "repo_id": "httpie/cli",
+    "repo_url": "https://github.com/httpie/cli.git",
+    "ref": "master"
+  },
+  "stage_counts": {
+    "pass": 9,
+    "fail": 0,
+    "pending": 1,
+    "skipped": 1
+  },
+  "status": "pass",
+  "scenario_coverage_status": "pass",
+  "provider_execution_status": "pass",
+  "feature_size_fit_status": "pass",
+  "summary_ref": "./.aor/w14-s07-proof/runtime-httpie-repair/projects/aor-core/reports/live-e2e-run-summary-w14-s07.full-journey-repair-httpie-medium-anthropic.json",
+  "command_count": 17,
+  "generated_at": "2026-04-24T11:53:02.247Z"
+}

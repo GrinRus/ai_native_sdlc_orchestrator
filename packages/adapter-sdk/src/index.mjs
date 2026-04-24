@@ -464,12 +464,6 @@ export function createLiveAdapter(options) {
       : path.resolve(process.cwd(), requestedExecutionRoot)
     : process.cwd();
 
-  if (adapterId !== "codex-cli") {
-    throw new Error(
-      `Live adapter '${adapterId}' is not supported in the current baseline. Supported adapters: codex-cli.`,
-    );
-  }
-
   return {
     adapter_id: adapterId,
     lifecycle_hooks: STEP_LIFECYCLE_HOOKS,

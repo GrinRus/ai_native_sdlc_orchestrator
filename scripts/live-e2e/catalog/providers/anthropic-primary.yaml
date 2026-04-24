@@ -1,0 +1,20 @@
+provider_variant_id: anthropic-primary
+provider: anthropic
+coverage_tier: required
+primary_adapter: claude-code
+fallback_policy:
+  mode: none
+  allow_fallback: false
+route_override_policy:
+  strategy: pin-primary-only
+  steps:
+    - discovery
+    - research
+    - spec
+    - planning
+    - implement
+    - review
+    - qa
+    - repair
+    - eval
+    - harness

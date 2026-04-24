@@ -1,0 +1,135 @@
+{
+  "mission_id": "ky-release-doc-typing",
+  "title": "Prepare one release-shaped typed API adjustment",
+  "brief": "Land one bounded API or typing fix with matching regression coverage and release-ready lineage.",
+  "allowed_paths": [
+    "source/**",
+    "test/**",
+    "index.d.ts"
+  ],
+  "forbidden_paths": [
+    "docs/**",
+    ".github/**",
+    "scripts/**",
+    "examples/**",
+    "context/**"
+  ],
+  "expected_evidence": [
+    "delivery-manifest",
+    "release-packet",
+    "review-report"
+  ],
+  "acceptance_checks": [
+    "keep release evidence anchored to the target checkout",
+    "avoid any upstream write-back"
+  ],
+  "scenario_family": "release",
+  "provider_variant_id": "openai-primary",
+  "feature_size": "medium",
+  "supported_scenarios": [
+    "release",
+    "governance"
+  ],
+  "recommended_provider_variants": [
+    "openai-primary",
+    "anthropic-primary"
+  ],
+  "size_budget": {
+    "max_changed_files": 8,
+    "max_added_lines": 260
+  },
+  "size_rationale": "Release-shaped ky work can span code, tests, and typings, but should still stay within one bounded public API adjustment.",
+  "change_budget": {
+    "max_changed_files": 8,
+    "max_added_lines": 260
+  },
+  "provider_variant": {
+    "provider_variant_id": "openai-primary",
+    "provider": "openai",
+    "primary_adapter": "codex-cli",
+    "route_override_policy": {
+      "strategy": "pin-primary-only",
+      "steps": [
+        "discovery",
+        "research",
+        "spec",
+        "planning",
+        "implement",
+        "review",
+        "qa",
+        "repair",
+        "eval",
+        "harness"
+      ]
+    }
+  },
+  "scenario_policy": {
+    "scenario_family": "release",
+    "required_stages": [
+      "bootstrap",
+      "discovery",
+      "spec",
+      "planning",
+      "handoff",
+      "execution",
+      "review",
+      "qa",
+      "delivery",
+      "release",
+      "learning"
+    ],
+    "required_evidence": [
+      "verify-summary",
+      "routed-step-result",
+      "review-report",
+      "delivery-manifest",
+      "release-packet",
+      "learning-loop-handoff"
+    ],
+    "delivery_mode_policy": "fork-first-pr",
+    "release_required": true,
+    "incident_policy": {
+      "open_on_review_fail": true,
+      "open_on_execution_fail": true
+    },
+    "governance_policy": {
+      "mode": "release-shaped",
+      "audit_required": true
+    }
+  },
+  "matrix_cell": {
+    "cell_id": "ky.release.medium.openai",
+    "target_catalog_id": "ky",
+    "feature_mission_id": "ky-release-doc-typing",
+    "scenario_family": "release",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "medium",
+    "coverage_tier": "required"
+  },
+  "coverage_follow_up": {
+    "current_cell_required": true,
+    "next_required_matrix_cell": {
+      "cell_id": "ky.regress.small.openai",
+      "scenario_family": "regress",
+      "feature_size": "small",
+      "feature_mission_id": "ky-header-regression",
+      "provider_variant_id": "openai-primary"
+    },
+    "remaining_required_matrix_cells": [
+      {
+        "cell_id": "ky.regress.small.openai",
+        "scenario_family": "regress",
+        "feature_size": "small",
+        "feature_mission_id": "ky-header-regression",
+        "provider_variant_id": "openai-primary"
+      },
+      {
+        "cell_id": "ky.regress.medium.anthropic",
+        "scenario_family": "regress",
+        "feature_size": "medium",
+        "feature_mission_id": "ky-fetch-options-regression",
+        "provider_variant_id": "anthropic-primary"
+      }
+    ]
+  }
+}

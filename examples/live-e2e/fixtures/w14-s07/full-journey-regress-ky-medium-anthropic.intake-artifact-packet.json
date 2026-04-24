@@ -1,0 +1,20 @@
+{
+  "packet_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.artifact.intake.ky-fetch-options-regression.v1",
+  "project_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun",
+  "packet_type": "intake-request",
+  "version": 1,
+  "status": "ready",
+  "summary": "Extend one bounded fetch-options regression across source and typings",
+  "body_ref": "./.aor/w14-s07-proof/runtime-ky-medium-anthropic-rerun/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.artifact.intake.ky-fetch-options-regression.v1.body.json",
+  "invocation_context": {
+    "command": "aor intake create",
+    "project_root": "./.aor/w14-s07-proof/runtime-ky-medium-anthropic-rerun/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun",
+    "project_profile_ref": "project.aor.yaml",
+    "mission_id": "ky-fetch-options-regression"
+  },
+  "evidence_refs": [
+    "./.aor/w14-s07-proof/runtime-ky-medium-anthropic-rerun/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/state",
+    "./.aor/w14-s07-proof/runtime-ky-medium-anthropic-rerun/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports",
+    "./.aor/w14-s07-proof/runtime-ky-medium-anthropic-rerun/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/.aor/requests/feature-request-w14-s07.full-journey-regress-ky-medium-anthropic-rerun-ky-fetch-options-regression.json"
+  ]
+}

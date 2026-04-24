@@ -1,0 +1,39 @@
+{
+  "scorecard_id": "w14-s07.full-journey-release-ky-medium-openai.scorecard.sindresorhus/ky",
+  "run_id": "w14-s07.full-journey-release-ky-medium-openai",
+  "profile_ref": "./scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml",
+  "profile_id": "live-e2e.full-journey.release.ky.medium.openai",
+  "scenario_id": null,
+  "scenario_family": "release",
+  "provider_variant_id": "openai-primary",
+  "feature_size": "medium",
+  "flow_kind": "release",
+  "duration_class": "long",
+  "matrix_cell": {
+    "cell_id": "ky.release.medium.openai",
+    "target_catalog_id": "ky",
+    "feature_mission_id": "ky-release-doc-typing",
+    "scenario_family": "release",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "medium",
+    "coverage_tier": "required"
+  },
+  "target_repo": {
+    "repo_id": "sindresorhus/ky",
+    "repo_url": "https://github.com/sindresorhus/ky.git",
+    "ref": "main"
+  },
+  "stage_counts": {
+    "pass": 10,
+    "fail": 0,
+    "pending": 1,
+    "skipped": 0
+  },
+  "status": "pass",
+  "scenario_coverage_status": "pass",
+  "provider_execution_status": "pass",
+  "feature_size_fit_status": "pass",
+  "summary_ref": "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/reports/live-e2e-run-summary-w14-s07.full-journey-release-ky-medium-openai.json",
+  "command_count": 18,
+  "generated_at": "2026-04-24T12:18:53.186Z"
+}

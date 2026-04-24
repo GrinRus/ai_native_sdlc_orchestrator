@@ -133,6 +133,44 @@ function resolveFeatureTraceability(options) {
     inputPacketPath: packetPath,
     inputPacketRef: toEvidenceRef(options.projectRoot, packetPath),
     missionId: typeof missionTraceability.mission_id === "string" ? missionTraceability.mission_id : null,
+    scenarioFamily:
+      typeof missionTraceability.scenario_family === "string"
+        ? missionTraceability.scenario_family
+        : typeof requestDocument.scenario_family === "string"
+          ? requestDocument.scenario_family
+          : null,
+    providerVariantId:
+      typeof missionTraceability.provider_variant_id === "string"
+        ? missionTraceability.provider_variant_id
+        : typeof requestDocument.provider_variant_id === "string"
+          ? requestDocument.provider_variant_id
+          : null,
+    featureSize:
+      typeof missionTraceability.feature_size === "string"
+        ? missionTraceability.feature_size
+        : typeof requestDocument.feature_size === "string"
+          ? requestDocument.feature_size
+          : null,
+    matrixCell:
+      typeof missionTraceability.matrix_cell === "object" &&
+      missionTraceability.matrix_cell !== null &&
+      !Array.isArray(missionTraceability.matrix_cell)
+        ? missionTraceability.matrix_cell
+        : typeof requestDocument.matrix_cell === "object" &&
+            requestDocument.matrix_cell !== null &&
+            !Array.isArray(requestDocument.matrix_cell)
+          ? requestDocument.matrix_cell
+          : null,
+    coverageFollowUp:
+      typeof missionTraceability.coverage_follow_up === "object" &&
+      missionTraceability.coverage_follow_up !== null &&
+      !Array.isArray(missionTraceability.coverage_follow_up)
+        ? missionTraceability.coverage_follow_up
+        : typeof requestDocument.coverage_follow_up === "object" &&
+            requestDocument.coverage_follow_up !== null &&
+            !Array.isArray(requestDocument.coverage_follow_up)
+          ? requestDocument.coverage_follow_up
+          : null,
     requestTitle: typeof featureRequest.title === "string" ? featureRequest.title : null,
     requestBrief: typeof featureRequest.brief === "string" ? featureRequest.brief : null,
     allowedPaths: Array.isArray(requestDocument.allowed_paths)
@@ -706,6 +744,11 @@ export function analyzeProjectRuntime(options = {}) {
           status: featureTraceability.missionId || featureTraceability.inputPacketRef ? "pass" : "warn",
           input_packet_ref: featureTraceability.inputPacketRef,
           mission_id: featureTraceability.missionId,
+          scenario_family: featureTraceability.scenarioFamily,
+          provider_variant_id: featureTraceability.providerVariantId,
+          feature_size: featureTraceability.featureSize,
+          matrix_cell: featureTraceability.matrixCell,
+          coverage_follow_up: featureTraceability.coverageFollowUp,
           request_title: featureTraceability.requestTitle,
           request_brief: featureTraceability.requestBrief,
           allowed_paths: featureTraceability.allowedPaths,

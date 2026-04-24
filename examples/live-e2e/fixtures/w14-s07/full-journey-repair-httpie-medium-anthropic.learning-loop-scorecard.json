@@ -1,0 +1,38 @@
+{
+  "scorecard_id": "w14-s07.full-journey-repair-httpie-medium-anthropic.learning-loop.scorecard.v1",
+  "project_id": "httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic",
+  "run_id": "w14-s07.full-journey-repair-httpie-medium-anthropic",
+  "source_kind": "cli-learning-handoff",
+  "status": "pass",
+  "summary": "Run 'w14-s07.full-journey-repair-httpie-medium-anthropic' completed public learning-loop handoff.",
+  "evidence_refs": [
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/artifacts/delivery-plan-implement-1777031580749.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/artifacts/delivery-plan-implement-1777031576886.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/artifacts/delivery-manifest-patch-only-w14-s07.full-journey-repair-httpie-medium-anthropic-1777031581030.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/artifacts/release-packet-patch-only-w14-s07.full-journey-repair-httpie-medium-anthropic-1777031581031.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/reports/step-result-routed-w14-s07.full-journey-repair-httpie-medium-anthropic.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/reports/review-report-w14-s07.full-journey-repair-httpie-medium-anthropic.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/reports/learning-loop-scorecard-delivery-w14-s07.full-journey-repair-httpie-medium-anthropic.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/reports/learning-loop-handoff-w14-s07.full-journey-repair-httpie-medium-anthropic.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-repair-httpie-medium-anthropic/reports/review-report-w14-s07.full-journey-repair-httpie-medium-anthropic.json"
+  ],
+  "linked_eval_suite_refs": [],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "matrix_cell": {
+    "cell_id": "httpie-cli.repair.medium.anthropic",
+    "target_catalog_id": "httpie-cli",
+    "feature_mission_id": "httpie-cli-repair-exit-codes",
+    "scenario_family": "repair",
+    "provider_variant_id": "anthropic-primary",
+    "feature_size": "medium",
+    "coverage_tier": "required"
+  },
+  "generated_at": "2026-04-24T11:53:02.235Z"
+}
