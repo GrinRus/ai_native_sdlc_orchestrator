@@ -97,7 +97,13 @@ function resolveFeatureTraceability(options) {
   if (!packetPath) {
     const candidates = fs
       .readdirSync(options.runtimeLayout.artifactsRoot, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && /\.json$/u.test(entry.name) && entry.name.includes(".artifact.intake."))
+      .filter(
+        (entry) =>
+          entry.isFile() &&
+          /\.json$/u.test(entry.name) &&
+          entry.name.includes(".artifact.intake.") &&
+          !entry.name.endsWith(".body.json"),
+      )
       .map((entry) => path.join(options.runtimeLayout.artifactsRoot, entry.name))
       .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
     packetPath = candidates[0] ?? null;

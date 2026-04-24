@@ -148,7 +148,13 @@ function resolveArtifactPacketPath(options) {
 
   const intakeCandidates = fs
     .readdirSync(options.runtimeLayout.artifactsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.includes(".artifact.intake.") && entry.name.endsWith(".json"))
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.includes(".artifact.intake.") &&
+        entry.name.endsWith(".json") &&
+        !entry.name.endsWith(".body.json"),
+    )
     .map((entry) => path.join(options.runtimeLayout.artifactsRoot, entry.name))
     .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
   if (intakeCandidates.length > 0) {

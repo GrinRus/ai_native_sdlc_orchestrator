@@ -2564,6 +2564,8 @@ test("intake create preserves mission traceability and discovery run consumes ex
     assert.equal(intakeBody.mission_traceability.mission_id, "fixture-mission");
     assert.equal(intakeBody.feature_request.request_file, requestFile);
     assert.deepEqual(intakeBody.feature_request.request_document.allowed_paths, ["source/**", "test/**"]);
+    const newerTimestamp = new Date(Date.now() + 5_000);
+    fs.utimesSync(intakePayload.artifact_packet_body_file, newerTimestamp, newerTimestamp);
 
     const discoveryResult = invokeCli([
       "discovery",
@@ -2580,6 +2582,13 @@ test("intake create preserves mission traceability and discovery run consumes ex
     assert.equal(analysisReport.feature_traceability.mission_id, "fixture-mission");
     assert.equal(analysisReport.feature_traceability.input_packet_ref, intakePacketRef);
     assert.deepEqual(analysisReport.feature_traceability.allowed_paths, ["source/**", "test/**"]);
+
+    const autoDiscoveryResult = invokeCli(["discovery", "run", "--project-ref", projectRoot]);
+    assert.equal(autoDiscoveryResult.exitCode, 0, autoDiscoveryResult.stderr);
+    const autoDiscoveryPayload = JSON.parse(autoDiscoveryResult.stdout);
+    const autoAnalysisReport = JSON.parse(fs.readFileSync(autoDiscoveryPayload.analysis_report_file, "utf8"));
+    assert.equal(autoAnalysisReport.feature_traceability.mission_id, "fixture-mission");
+    assert.equal(autoAnalysisReport.feature_traceability.input_packet_ref, intakePacketRef);
   });
 });
 
@@ -2661,6 +2670,8 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       ]);
       assert.equal(intakeResult.exitCode, 0, intakeResult.stderr);
       const intakePayload = JSON.parse(intakeResult.stdout);
+      const newerTimestamp = new Date(Date.now() + 5_000);
+      fs.utimesSync(intakePayload.artifact_packet_body_file, newerTimestamp, newerTimestamp);
 
       const discoveryResult = invokeCli([
         "discovery",
