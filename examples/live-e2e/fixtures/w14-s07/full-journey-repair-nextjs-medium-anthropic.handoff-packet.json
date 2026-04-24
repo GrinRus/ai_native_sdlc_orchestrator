@@ -1,0 +1,70 @@
+{
+  "packet_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.handoff.bootstrap.v1",
+  "project_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic",
+  "ticket_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.wave.bootstrap.v1",
+  "version": 1,
+  "status": "approved",
+  "risk_tier": "medium",
+  "approved_objective": "Repair one bounded workspace configuration or shared package seam",
+  "repo_scopes": [
+    {
+      "repo_id": "target",
+      "paths": [
+        "**"
+      ]
+    }
+  ],
+  "allowed_paths": [
+    "**"
+  ],
+  "allowed_commands": [
+    "yarn install --immutable",
+    "yarn g:lint",
+    "yarn g:typecheck",
+    "yarn workspace @your-org/ts-utils test-unit",
+    "yarn workspace @your-org/core-lib test-unit"
+  ],
+  "verification_plan": {
+    "validators": [
+      "contract-shape",
+      "approval-state",
+      "repo-scope"
+    ],
+    "commands": [
+      "yarn install --immutable",
+      "yarn g:lint",
+      "yarn g:typecheck"
+    ]
+  },
+  "scope_constraints": {
+    "require_bounded_scope": true,
+    "max_repo_scopes": 1,
+    "max_changed_files": 24
+  },
+  "command_policy": {
+    "owner": "project-profile",
+    "allow_unlisted_commands": false
+  },
+  "writeback_mode": "pull-request",
+  "approval_state": {
+    "required": true,
+    "state": "approved",
+    "approval_refs": [
+      "approval://live-e2e/full-journey/w14-s07.full-journey-repair-nextjs-medium-anthropic"
+    ],
+    "approved_by": "operator",
+    "approved_at": "2026-04-24T12:18:56.898Z"
+  },
+  "feature_traceability": {
+    "mission_id": "nextjs-workspace-repair-shared-config",
+    "source_kind": "catalog-feature-mission",
+    "request_title": "Repair one bounded workspace configuration or shared package seam",
+    "request_brief": "Fix one bounded monorepo breakage across a shared package and one consuming app or config boundary, with strong delivery and audit lineage."
+  },
+  "source_refs": {
+    "wave_ticket_file": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/wave-ticket-belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.wave.bootstrap.v1.json",
+    "artifact_packet_file": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.artifact.intake.nextjs-workspace-repair-shared-config.v1.json",
+    "project_profile_ref": "project.aor.yaml"
+  },
+  "blocked_next_step": null
+}

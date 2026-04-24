@@ -29,7 +29,10 @@ export type ContractFamily =
   | "live-run-event"
   | "learning-loop-scorecard"
   | "learning-loop-handoff"
-  | "control-plane-api";
+  | "control-plane-api"
+  | "live-e2e-provider-variant"
+  | "live-e2e-scenario-policy"
+  | "live-e2e-target-catalog";
 
 export type ContractFieldType = "string" | "number" | "boolean" | "array" | "object";
 

@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-12-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-14-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -23,6 +23,8 @@ The authoritative planning model for implementation lives in:
 | W10 | Reopen production-facing gaps left after the baseline audit across external runner execution, networked fork-first delivery, detached mutation transport, and live target-catalog proof. | 5 | EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-10-implementation-slices.md` |
 | W11 | Close the remaining target-backed live E2E proof gap through source-of-truth repair, target-checkout execution, target-anchored delivery evidence, and refreshed external proof. | 5 | EPIC-0, EPIC-3, EPIC-5, EPIC-7 | `docs/backlog/wave-11-implementation-slices.md` |
 | W12 | Remove public live-E2E product surfaces, move rehearsal to an internal black-box harness, and refresh proof through installed-user style execution. | 4 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-12-implementation-slices.md` |
+| W13 | Add a full user-journey live E2E layer on curated public repositories, start each run from a concrete feature mission, and evaluate runtime plus quality verdicts through public surfaces. | 6 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-7 | `docs/backlog/wave-13-implementation-slices.md` |
+| W14 | Expand live E2E into a curated matrix across scenario families, pinned providers, and size-classed feature missions with matrix-aware review, audit, and closure evidence. | 7 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-14-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -246,6 +248,20 @@ The authoritative planning model for implementation lives in:
 - restored `live-e2e-runner` skill can prepare the feature request, run the public flow, and return a multi-axis verdict matrix
 
 **Detailed slices:** `docs/backlog/wave-13-implementation-slices.md`
+
+## W14 — live E2E scenario/provider/feature-size matrix
+**Goal:** Turn curated full-journey live E2E into a matrix across scenario family, pinned provider variant, and size-classed feature missions while keeping the matrix curated rather than Cartesian-complete.
+
+**Exit criteria:**
+- curated live E2E catalogs define scenario policies, provider variants, and target missions with explicit `small`, `medium`, and `large` size classes
+- full-journey profiles pin `target_catalog_id`, `feature_mission_id`, `scenario_family`, and `provider_variant_id`
+- the live harness rejects invalid matrix cells and materializes deterministic provider-pinned route overrides for accepted cells
+- review, audit, summary, and learning-loop artifacts preserve matrix-cell metadata plus feature-size/provider execution verdicts
+- operator docs, runner skill guidance, tests, and proof bundles describe live E2E as a curated matrix with required repo-specific coverage cells
+
+**Detailed slices:** `docs/backlog/wave-14-implementation-slices.md`
+
+**Current status note:** `W14-S07` is now closed with matrix-aware proof under `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`. The refreshed bundle proves all `9/9` required matrix cells, all `3/3` repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs, and all mandatory scenario families (`regress`, `release`, `repair`, `governance`).
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

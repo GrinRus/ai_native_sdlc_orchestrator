@@ -319,9 +319,29 @@ test("live adapter reports failed when external runner exits non-zero", () => {
   assert.match(response.summary, /exited with code 17/i);
 });
 
-test("live adapter baseline rejects unsupported adapter ids", () => {
-  assert.throws(
-    () => createLiveAdapter({ adapterId: "open-code" }),
-    /supported adapters: codex-cli/i,
-  );
+test("live adapter baseline accepts non-codex adapter ids when an external runner profile is supplied", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "open-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        "const fs=require('node:fs');fs.readFileSync(0,'utf8');process.stdout.write(JSON.stringify({status:'success',summary:'ok',output:{runner:'node-inline'},evidence_refs:['evidence://adapter-live/open-code/test']}));",
+      ],
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-open-code",
+    run_id: "run-open-code",
+    step_id: "step-open-code",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.adapter_id, "open-code");
 });

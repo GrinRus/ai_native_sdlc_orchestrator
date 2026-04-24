@@ -174,6 +174,56 @@ function listChangedPaths(projectRoot) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @param {string[]} changedPaths
+ * @returns {{ addedLines: number, deletedLines: number, touchedLines: number }}
+ */
+function summarizeDiffBudget(projectRoot, changedPaths) {
+  if (changedPaths.length === 0) {
+    return {
+      addedLines: 0,
+      deletedLines: 0,
+      touchedLines: 0,
+    };
+  }
+
+  const run = spawnSync("git", ["diff", "--numstat", "--", ...changedPaths], {
+    cwd: projectRoot,
+    encoding: "utf8",
+  });
+  if (run.status !== 0) {
+    return {
+      addedLines: 0,
+      deletedLines: 0,
+      touchedLines: 0,
+    };
+  }
+
+  let addedLines = 0;
+  let deletedLines = 0;
+  for (const line of (run.stdout ?? "").split(/\r?\n/u)) {
+    if (!line.trim()) {
+      continue;
+    }
+    const [added, deleted] = line.split(/\t/u);
+    const addedValue = Number.parseInt(added, 10);
+    const deletedValue = Number.parseInt(deleted, 10);
+    if (Number.isFinite(addedValue)) {
+      addedLines += addedValue;
+    }
+    if (Number.isFinite(deletedValue)) {
+      deletedLines += deletedValue;
+    }
+  }
+
+  return {
+    addedLines,
+    deletedLines,
+    touchedLines: addedLines + deletedLines,
+  };
+}
+
+/**
  * @param {string} pattern
  * @param {string} candidate
  * @returns {boolean}
@@ -260,6 +310,20 @@ export function materializeReviewReport(options) {
   const featureRequest = asRecord(intakePacketBody.feature_request);
   const requestDocument = asRecord(featureRequest.request_document);
   const missionId = asString(missionTraceability.mission_id);
+  const scenarioFamily =
+    asString(missionTraceability.scenario_family) ?? asString(requestDocument.scenario_family);
+  const providerVariantId =
+    asString(missionTraceability.provider_variant_id) ?? asString(requestDocument.provider_variant_id);
+  const featureSize = asString(missionTraceability.feature_size) ?? asString(requestDocument.feature_size);
+  const matrixCell =
+    asRecord(missionTraceability.matrix_cell).cell_id || Object.keys(asRecord(missionTraceability.matrix_cell)).length > 0
+      ? asRecord(missionTraceability.matrix_cell)
+      : asRecord(requestDocument.matrix_cell);
+  const coverageFollowUp =
+    asRecord(missionTraceability.coverage_follow_up).current_cell_required !== undefined ||
+    Object.keys(asRecord(missionTraceability.coverage_follow_up)).length > 0
+      ? asRecord(missionTraceability.coverage_follow_up)
+      : asRecord(requestDocument.coverage_follow_up);
 
   const latestSpecStep =
     stepResults.find((artifact) => asString(artifact.document.step_id)?.includes("spec") === true) ?? null;
@@ -313,6 +377,33 @@ export function materializeReviewReport(options) {
       evidenceRefs: [analysisReport.artifact_ref],
     });
   }
+  if (scenarioFamily && asString(analysisFeatureTraceability.scenario_family) !== scenarioFamily) {
+    pushFinding({
+      findings: featureTraceabilityFindings,
+      severity: "fail",
+      category: "feature-traceability",
+      summary: "Discovery analysis does not preserve the selected scenario family.",
+      evidenceRefs: analysisReport ? [analysisReport.artifact_ref] : [],
+    });
+  }
+  if (providerVariantId && asString(analysisFeatureTraceability.provider_variant_id) !== providerVariantId) {
+    pushFinding({
+      findings: featureTraceabilityFindings,
+      severity: "fail",
+      category: "feature-traceability",
+      summary: "Discovery analysis does not preserve the selected provider variant.",
+      evidenceRefs: analysisReport ? [analysisReport.artifact_ref] : [],
+    });
+  }
+  if (featureSize && asString(analysisFeatureTraceability.feature_size) !== featureSize) {
+    pushFinding({
+      findings: featureTraceabilityFindings,
+      severity: "fail",
+      category: "feature-traceability",
+      summary: "Discovery analysis does not preserve the selected feature size.",
+      evidenceRefs: analysisReport ? [analysisReport.artifact_ref] : [],
+    });
+  }
 
   /** @type {Array<Record<string, unknown>>} */
   const discoveryFindings = [];
@@ -331,6 +422,24 @@ export function materializeReviewReport(options) {
         severity: "fail",
         category: "discovery-quality",
         summary: "Spec step-result is not traceable to the selected feature mission.",
+        evidenceRefs: [latestSpecStep.artifact_ref],
+      });
+    }
+    if (scenarioFamily && asString(specFeatureTraceability.scenario_family) !== scenarioFamily) {
+      pushFinding({
+        findings: discoveryFindings,
+        severity: "fail",
+        category: "discovery-quality",
+        summary: "Spec step-result is not traceable to the selected scenario family.",
+        evidenceRefs: [latestSpecStep.artifact_ref],
+      });
+    }
+    if (providerVariantId && asString(specFeatureTraceability.provider_variant_id) !== providerVariantId) {
+      pushFinding({
+        findings: discoveryFindings,
+        severity: "fail",
+        category: "discovery-quality",
+        summary: "Spec step-result is not traceable to the selected provider variant.",
         evidenceRefs: [latestSpecStep.artifact_ref],
       });
     }
@@ -473,11 +582,121 @@ export function materializeReviewReport(options) {
     }
   }
 
+  /** @type {Array<Record<string, unknown>>} */
+  const featureSizeFindings = [];
+  const declaredSizeBudget =
+    Object.keys(asRecord(requestDocument.size_budget)).length > 0
+      ? asRecord(requestDocument.size_budget)
+      : asRecord(requestDocument.change_budget);
+  const diffBudget = summarizeDiffBudget(init.projectRoot, codeChangedPaths);
+  const maxChangedFiles =
+    typeof declaredSizeBudget.max_changed_files === "number" ? declaredSizeBudget.max_changed_files : null;
+  const maxAddedLines =
+    typeof declaredSizeBudget.max_added_lines === "number" ? declaredSizeBudget.max_added_lines : null;
+  const maxTouchedLines =
+    typeof declaredSizeBudget.max_touched_lines === "number" ? declaredSizeBudget.max_touched_lines : null;
+  if (featureSize && !["small", "medium", "large"].includes(featureSize)) {
+    pushFinding({
+      findings: featureSizeFindings,
+      severity: "warn",
+      category: "feature-size-fit",
+      summary: `Declared feature size '${featureSize}' is outside the shared small/medium/large taxonomy.`,
+      evidenceRefs: intakePacket ? [intakePacket.artifact_ref] : [],
+    });
+  }
+  if (maxChangedFiles !== null && codeChangedPaths.length > maxChangedFiles) {
+    pushFinding({
+      findings: featureSizeFindings,
+      severity: "fail",
+      category: "feature-size-fit",
+      summary: `Changed ${codeChangedPaths.length} files, which exceeds the declared size budget of ${maxChangedFiles}.`,
+      evidenceRefs: implementStep ? [implementStep.artifact_ref] : [],
+    });
+  }
+  if (maxAddedLines !== null && diffBudget.addedLines > maxAddedLines) {
+    pushFinding({
+      findings: featureSizeFindings,
+      severity: "fail",
+      category: "feature-size-fit",
+      summary: `Added ${diffBudget.addedLines} lines, which exceeds the declared size budget of ${maxAddedLines}.`,
+      evidenceRefs: implementStep ? [implementStep.artifact_ref] : [],
+    });
+  }
+  if (maxTouchedLines !== null && diffBudget.touchedLines > maxTouchedLines) {
+    pushFinding({
+      findings: featureSizeFindings,
+      severity: "fail",
+      category: "feature-size-fit",
+      summary: `Touched ${diffBudget.touchedLines} lines, which exceeds the declared size budget of ${maxTouchedLines}.`,
+      evidenceRefs: implementStep ? [implementStep.artifact_ref] : [],
+    });
+  }
+
+  /** @type {Array<Record<string, unknown>>} */
+  const providerTraceabilityFindings = [];
+  const implementRoutedExecution = implementStep ? asRecord(implementStep.document.routed_execution) : {};
+  const implementRouteResolution = asRecord(implementRoutedExecution.route_resolution);
+  const implementRouteProfile = asRecord(implementRouteResolution.route_profile);
+  const implementPrimary = asRecord(implementRouteProfile.primary);
+  const adapterResolution = asRecord(implementRoutedExecution.adapter_resolution);
+  const adapter = asRecord(adapterResolution.adapter);
+  const actualProvider = asString(implementPrimary.provider);
+  const actualAdapterId = asString(adapter.adapter_id);
+  if (!implementStep) {
+    pushFinding({
+      findings: providerTraceabilityFindings,
+      severity: "fail",
+      category: "provider-traceability",
+      summary: "No execution step-result is available to prove provider traceability.",
+    });
+  } else {
+    if (!actualProvider) {
+      pushFinding({
+        findings: providerTraceabilityFindings,
+        severity: "fail",
+        category: "provider-traceability",
+        summary: "Execution step-result does not record the actual provider path.",
+        evidenceRefs: [implementStep.artifact_ref],
+      });
+    }
+    if (!actualAdapterId) {
+      pushFinding({
+        findings: providerTraceabilityFindings,
+        severity: "fail",
+        category: "provider-traceability",
+        summary: "Execution step-result does not record the actual adapter path.",
+        evidenceRefs: [implementStep.artifact_ref],
+      });
+    }
+    const requestedProvider = asString(asRecord(requestDocument.provider_variant).provider);
+    const requestedAdapter = asString(asRecord(requestDocument.provider_variant).primary_adapter);
+    if (requestedProvider && actualProvider && requestedProvider !== actualProvider) {
+      pushFinding({
+        findings: providerTraceabilityFindings,
+        severity: "fail",
+        category: "provider-traceability",
+        summary: `Execution used provider '${actualProvider}' instead of requested '${requestedProvider}'.`,
+        evidenceRefs: [implementStep.artifact_ref],
+      });
+    }
+    if (requestedAdapter && actualAdapterId && requestedAdapter !== actualAdapterId) {
+      pushFinding({
+        findings: providerTraceabilityFindings,
+        severity: "fail",
+        category: "provider-traceability",
+        summary: `Execution used adapter '${actualAdapterId}' instead of requested '${requestedAdapter}'.`,
+        evidenceRefs: [implementStep.artifact_ref],
+      });
+    }
+  }
+
   const allFindings = [
     ...featureTraceabilityFindings,
     ...discoveryFindings,
     ...artifactFindings,
     ...codeFindings,
+    ...featureSizeFindings,
+    ...providerTraceabilityFindings,
   ];
   const overallStatus = summarizeFindings(allFindings);
   const reviewRecommendation =
@@ -505,6 +724,11 @@ export function materializeReviewReport(options) {
       input_packet_ref: intakePacket?.artifact_ref ?? null,
       request_title: asString(featureRequest.title),
       request_brief: asString(featureRequest.brief),
+      scenario_family: scenarioFamily,
+      provider_variant_id: providerVariantId,
+      feature_size: featureSize,
+      matrix_cell: Object.keys(matrixCell).length > 0 ? matrixCell : {},
+      coverage_follow_up: Object.keys(coverageFollowUp).length > 0 ? coverageFollowUp : {},
     },
     discovery_quality: {
       status: summarizeFindings(discoveryFindings),
@@ -527,6 +751,29 @@ export function materializeReviewReport(options) {
       allowed_paths: allowedPaths,
       forbidden_paths: forbiddenPaths,
       findings: codeFindings,
+    },
+    feature_size_fit: {
+      status: summarizeFindings(featureSizeFindings),
+      feature_size: featureSize,
+      size_budget: declaredSizeBudget,
+      actual_change: {
+        changed_files: codeChangedPaths.length,
+        added_lines: diffBudget.addedLines,
+        deleted_lines: diffBudget.deletedLines,
+        touched_lines: diffBudget.touchedLines,
+      },
+      findings: featureSizeFindings,
+    },
+    provider_traceability: {
+      status: summarizeFindings(providerTraceabilityFindings),
+      provider_variant_id: providerVariantId,
+      requested_provider: asString(asRecord(requestDocument.provider_variant).provider),
+      requested_adapter: asString(asRecord(requestDocument.provider_variant).primary_adapter),
+      actual_provider: actualProvider,
+      actual_adapter: actualAdapterId,
+      route_id: asString(implementRouteResolution.resolved_route_id),
+      route_profile_source: asString(implementRouteResolution.route_profile_source),
+      findings: providerTraceabilityFindings,
     },
     findings: allFindings,
     evidence_refs: evidenceRefs,

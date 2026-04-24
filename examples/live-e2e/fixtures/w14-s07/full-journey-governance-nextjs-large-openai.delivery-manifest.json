@@ -1,0 +1,125 @@
+{
+  "manifest_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai.delivery-manifest.fork-first-pr.1777032707669",
+  "project_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai",
+  "ticket_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai.wave.w14-s07.full-journey-governance-nextjs-large-openai",
+  "run_refs": [
+    "w14-s07.full-journey-governance-nextjs-large-openai"
+  ],
+  "step_ref": "deliver.prepare",
+  "delivery_mode": "fork-first-pr",
+  "writeback_policy": {
+    "mode": "fork-first-pr",
+    "mode_source": {
+      "resolved_mode": "fork-first-pr",
+      "canonical_mode": "fork-first-pr",
+      "resolution_kind": "step-override",
+      "resolution_field": "--mode"
+    },
+    "writeback_allowed": true,
+    "blocking_reasons": [],
+    "network_mode": "stubbed"
+  },
+  "repo_deliveries": [
+    {
+      "repo_id": "main",
+      "repo_root": "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai",
+      "repo_root_ref": "evidence://./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai",
+      "checkout_provenance": {
+        "head_before": {
+          "branch": "main",
+          "commit": "b7953382e5efc3173356bf977dfa6e88f28d8bfc"
+        },
+        "head_after": {
+          "branch": "main",
+          "commit": "b7953382e5efc3173356bf977dfa6e88f28d8bfc"
+        }
+      },
+      "base_ref": "main",
+      "head_ref": "main",
+      "branch_name": null,
+      "changed_paths": [],
+      "diff_totals": {
+        "files": 0,
+        "added": 0,
+        "deleted": 0
+      },
+      "commit_refs": [],
+      "writeback_result": "fork-pr-planned",
+      "coordination": {
+        "required": false,
+        "status": "not-required",
+        "repo_ids": [
+          "target"
+        ]
+      },
+      "pr_draft": {
+        "title": "AOR delivery w14-s07.full-journey-governance-nextjs-large-openai",
+        "base_repo": "belgattitude/nextjs-monorepo-example",
+        "base_branch": "main",
+        "head_repo": "aor-bot/nextjs-monorepo-example",
+        "head_branch": "aor/w14-s07.full-journey-governance-nextjs-large-openai",
+        "is_draft": true
+      }
+    }
+  ],
+  "verification_refs": [
+    "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai.handoff.bootstrap.v1.json",
+    "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/step-result-routed-w14-s07.full-journey-governance-nextjs-large-openai.run.start.implement.implement.attempt.1.json",
+    "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/evaluation-report-suite.release.short-v1-1777032706437.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/delivery-transcript-fork-first-pr-w14-s07.full-journey-governance-nextjs-large-openai-1777032707211.json"
+  ],
+  "approval_context": {
+    "approved_handoff": {
+      "required": true,
+      "status": "present",
+      "ref": "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai.handoff.bootstrap.v1.json"
+    },
+    "promotion_evidence": {
+      "required": true,
+      "status": "present",
+      "refs": [
+        "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/step-result-routed-w14-s07.full-journey-governance-nextjs-large-openai.run.start.implement.implement.attempt.1.json",
+        "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/evaluation-report-suite.release.short-v1-1777032706437.json"
+      ]
+    },
+    "coordination_evidence": {
+      "required": false,
+      "status": "not-required",
+      "refs": []
+    },
+    "evidence_refs": [
+      "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai.handoff.bootstrap.v1.json",
+      "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/step-result-routed-w14-s07.full-journey-governance-nextjs-large-openai.run.start.implement.implement.attempt.1.json",
+      "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/evaluation-report-suite.release.short-v1-1777032706437.json"
+    ]
+  },
+  "coordination": {
+    "required": false,
+    "status": "not-required",
+    "repo_ids": [
+      "target"
+    ],
+    "evidence_refs": []
+  },
+  "rerun_recovery": {
+    "requested": false,
+    "status": "not-requested",
+    "rerun_of_run_ref": null,
+    "failed_step_ref": null,
+    "packet_boundary": "delivery-manifest",
+    "strategy": null,
+    "blocking_reasons": []
+  },
+  "evidence_root": "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports",
+  "source_refs": {
+    "delivery_plan_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/artifacts/delivery-plan-implement-1777032707197.json",
+    "delivery_transcript_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/reports/delivery-transcript-fork-first-pr-w14-s07.full-journey-governance-nextjs-large-openai-1777032707211.json",
+    "delivery_execution_root": "./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai",
+    "delivery_execution_root_ref": "evidence://./.aor/w14-s07-proof/runtime-nextjs-governance/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai",
+    "delivery_output_refs": [
+      "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-governance-nextjs-large-openai/artifacts/fork-first-intent-w14-s07.full-journey-governance-nextjs-large-openai-1777032707558.json"
+    ]
+  },
+  "status": "submitted",
+  "created_at": "2026-04-24T12:11:47.559Z"
+}

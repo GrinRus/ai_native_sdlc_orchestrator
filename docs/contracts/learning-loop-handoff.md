@@ -14,11 +14,13 @@ Durable handoff that closes one run into backlog, incident, and follow-up qualit
 - `backlog_refs`
 - `quality_refs`
 - `evidence_refs`
+- `matrix_cell`
+- `coverage_follow_up`
 - `generated_at`
 
 ## Optional fields
 - `summary`
-- `recommended_actions`
+- `next_actions`
 
 ## Notes
 `incident_ref` may be null when the linked run completed without incident escalation.

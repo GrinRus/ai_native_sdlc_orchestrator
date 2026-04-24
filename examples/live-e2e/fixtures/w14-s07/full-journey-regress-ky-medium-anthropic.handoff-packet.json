@@ -1,0 +1,68 @@
+{
+  "packet_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.handoff.bootstrap.v1",
+  "project_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun",
+  "ticket_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.wave.bootstrap.v1",
+  "version": 1,
+  "status": "approved",
+  "risk_tier": "medium",
+  "approved_objective": "Extend one bounded fetch-options regression across source and typings",
+  "repo_scopes": [
+    {
+      "repo_id": "target",
+      "paths": [
+        "**"
+      ]
+    }
+  ],
+  "allowed_paths": [
+    "**"
+  ],
+  "allowed_commands": [
+    "npm install",
+    "npx playwright install",
+    "npm test"
+  ],
+  "verification_plan": {
+    "validators": [
+      "contract-shape",
+      "approval-state",
+      "repo-scope"
+    ],
+    "commands": [
+      "npm install",
+      "npx playwright install",
+      "npm test"
+    ]
+  },
+  "scope_constraints": {
+    "require_bounded_scope": true,
+    "max_repo_scopes": 1,
+    "max_changed_files": 24
+  },
+  "command_policy": {
+    "owner": "project-profile",
+    "allow_unlisted_commands": false
+  },
+  "writeback_mode": "pull-request",
+  "approval_state": {
+    "required": true,
+    "state": "approved",
+    "approval_refs": [
+      "approval://live-e2e/full-journey/w14-s07.full-journey-regress-ky-medium-anthropic-rerun"
+    ],
+    "approved_by": "operator",
+    "approved_at": "2026-04-24T12:16:43.731Z"
+  },
+  "feature_traceability": {
+    "mission_id": "ky-fetch-options-regression",
+    "source_kind": "catalog-feature-mission",
+    "request_title": "Extend one bounded fetch-options regression across source and typings",
+    "request_brief": "Adjust one multi-file options-handling or retry-surface regression with matching tests and the smallest typing touch needed to keep the public API coherent."
+  },
+  "source_refs": {
+    "wave_ticket_file": "./.aor/w14-s07-proof/runtime-ky-medium-anthropic-rerun/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/wave-ticket-sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.wave.bootstrap.v1.json",
+    "artifact_packet_file": "./.aor/w14-s07-proof/runtime-ky-medium-anthropic-rerun/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.artifact.intake.ky-fetch-options-regression.v1.json",
+    "project_profile_ref": "project.aor.yaml"
+  },
+  "blocked_next_step": null
+}

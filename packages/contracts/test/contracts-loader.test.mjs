@@ -46,6 +46,19 @@ function listYamlFiles(root) {
   return files;
 }
 
+/**
+ * @param {string} root
+ * @param {import("../src/index.d.ts").ContractFamily} family
+ */
+function assertDirectoryContractsLoad(root, family) {
+  const files = listYamlFiles(root);
+  assert.ok(files.length > 0, `expected at least one YAML document under ${root}`);
+  for (const filePath of files) {
+    const loaded = loadContractFile({ filePath, family });
+    assert.equal(loaded.ok, true, `${path.relative(workspaceRoot, filePath)} should load as ${family}`);
+  }
+}
+
 test("loads all examples through the shared contracts path", () => {
   const examplesRoot = path.join(workspaceRoot, "examples");
   const expectedYamlCount = listYamlFiles(examplesRoot).length;
@@ -255,6 +268,27 @@ test("wrapper-profile rejects legacy prompt and session bootstrap fields", () =>
       (problem) => problem.code === "unsupported_field_present" && problem.field === "session_bootstrap",
     ),
     "expected unsupported_field_present for session_bootstrap",
+  );
+});
+
+test("W14 live-e2e provider variant catalog documents validate", () => {
+  assertDirectoryContractsLoad(
+    path.join(workspaceRoot, "scripts/live-e2e/catalog/providers"),
+    "live-e2e-provider-variant",
+  );
+});
+
+test("W14 live-e2e scenario policy documents validate", () => {
+  assertDirectoryContractsLoad(
+    path.join(workspaceRoot, "scripts/live-e2e/catalog/scenarios"),
+    "live-e2e-scenario-policy",
+  );
+});
+
+test("W14 live-e2e target catalog documents validate", () => {
+  assertDirectoryContractsLoad(
+    path.join(workspaceRoot, "scripts/live-e2e/catalog/targets"),
+    "live-e2e-target-catalog",
   );
 });
 

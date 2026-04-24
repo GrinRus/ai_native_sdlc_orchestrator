@@ -150,5 +150,16 @@ This is the master index for the implementation slices across all defined waves.
 | W13-S05 | Public review and learning-loop closure surfaces | EPIC-4 | done | `apps/cli`, `packages/contracts`, `packages/observability`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W13-S04 |
 | W13-S06 | Full-journey harness and restored runner skill | EPIC-7 | done | `scripts/live-e2e/**`, `.agents/skills/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/cli/test/**` | W13-S05 |
 
+## W14 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W14-S01 | Backlog and source-of-truth realignment | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/architecture/**`, `docs/ops/**` | none |
+| W14-S02 | Scenario and provider catalogs | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `docs/contracts/**`, `docs/ops/**` | W14-S01 |
+| W14-S03 | Feature-size taxonomy and target mission expansion | EPIC-7 | done | `scripts/live-e2e/catalog/targets/**`, `docs/ops/**`, `docs/backlog/**` | W14-S02 |
+| W14-S04 | Provider-pinned full-journey profiles | EPIC-7 | done | `scripts/live-e2e/profiles/**`, `scripts/live-e2e/catalog/**`, `docs/ops/**` | W14-S03 |
+| W14-S05 | Harness and verdict expansion | EPIC-7 | done | `scripts/live-e2e/**`, `apps/cli`, `packages/orchestrator-core`, `docs/ops/**` | W14-S04 |
+| W14-S06 | Review, audit, and closure alignment | EPIC-4 | done | `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`, `docs/contracts/**`, `docs/architecture/**` | W14-S05 |
+| W14-S07 | Proof bundle and skill refresh | EPIC-7 | done | `.agents/skills/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/test/**` | W14-S06 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

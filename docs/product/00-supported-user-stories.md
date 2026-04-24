@@ -79,6 +79,8 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Approve risky actions and replay failures through harness.
 - Review installed-user rehearsal evidence produced by the internal black-box harness on real repositories.
 - Run full-journey live acceptance only on curated repositories and curated feature missions.
+- Select the required matrix cell by scenario family, pinned provider variant, and declared feature size.
+- Track which required matrix cells are still uncovered after each live E2E run.
 
 ### Security / compliance
 - Enforce provider and adapter allowlists.

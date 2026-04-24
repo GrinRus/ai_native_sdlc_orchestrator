@@ -15,6 +15,7 @@ Durable scorecard that links one completed run to backlog, quality, and incident
 - `linked_eval_suite_refs`
 - `linked_harness_capture_refs`
 - `linked_backlog_refs`
+- `matrix_cell`
 - `generated_at`
 
 ## Status semantics

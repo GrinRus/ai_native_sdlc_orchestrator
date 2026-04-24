@@ -160,6 +160,8 @@ function resolveReportsRoot(runtimeLayout) {
  *   forceIncident?: boolean,
  *   existingIncidentFile?: string,
  *   existingIncidentRef?: string,
+ *   matrixCell?: Record<string, unknown> | null,
+ *   coverageFollowUp?: Record<string, unknown> | null,
  *   timestamp?: string,
  * }} options
  */
@@ -187,6 +189,10 @@ export function materializeLearningLoopArtifacts(options) {
     linked_eval_suite_refs: evalSuiteRefs,
     linked_harness_capture_refs: harnessRefs,
     linked_backlog_refs: backlogRefs,
+    matrix_cell:
+      options.matrixCell && typeof options.matrixCell === "object" && !Array.isArray(options.matrixCell)
+        ? options.matrixCell
+        : {},
     generated_at: generatedAt,
   };
   const scorecardFile = path.join(
@@ -278,6 +284,18 @@ export function materializeLearningLoopArtifacts(options) {
     backlog_refs: backlogRefs,
     quality_refs: evalSuiteRefs,
     evidence_refs: uniqueStrings([...evidenceRefs, scorecardRef, ...(incidentRef ? [incidentRef] : [])]),
+    matrix_cell:
+      options.matrixCell && typeof options.matrixCell === "object" && !Array.isArray(options.matrixCell)
+        ? options.matrixCell
+        : {},
+    coverage_follow_up:
+      options.coverageFollowUp && typeof options.coverageFollowUp === "object" && !Array.isArray(options.coverageFollowUp)
+        ? options.coverageFollowUp
+        : {
+            current_cell_required: false,
+            next_required_matrix_cell: null,
+            remaining_required_matrix_cells: [],
+          },
     next_actions: [
       "Review learning-loop artifacts and incident context.",
       "Map follow-up work into docs/backlog/mvp-implementation-backlog.md and the owning wave slice.",

@@ -13,10 +13,38 @@ verification:
 safety_defaults:
   write_back_to_remote: false
   preferred_delivery_mode: patch
+required_matrix_cells:
+  - cell_id: httpie-cli.regress.small.openai
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: httpie-cli-output-regression
+    provider_variant_id: openai-primary
+    coverage_tier: required
+  - cell_id: httpie-cli.repair.medium.anthropic
+    scenario_family: repair
+    feature_size: medium
+    feature_mission_id: httpie-cli-repair-exit-codes
+    provider_variant_id: anthropic-primary
+    coverage_tier: required
+  - cell_id: httpie-cli.governance.medium.openai
+    scenario_family: governance
+    feature_size: medium
+    feature_mission_id: httpie-cli-repair-exit-codes
+    provider_variant_id: openai-primary
+    coverage_tier: required
+provider_comparison_pairs:
+  - pair_id: httpie-cli.regress.small
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: httpie-cli-output-regression
+    provider_variants:
+      - openai-primary
+      - anthropic-primary
 feature_missions:
   - mission_id: httpie-cli-output-regression
     title: Preserve one bounded CLI output regression
     brief: Implement one narrow CLI behavior fix with matching regression coverage and keep the blast radius inside the relevant command surface.
+    feature_size: small
     allowed_paths:
       - httpie/**
       - tests/**
@@ -33,6 +61,87 @@ feature_missions:
     acceptance_checks:
       - keep the change isolated to one CLI behavior surface
       - preserve bounded CLI regression smoke plus codestyle linkage
+    supported_scenarios:
+      - regress
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 10
+      max_added_lines: 320
+    size_rationale: Small httpie missions should remain inside one CLI surface with one focused regression slice.
     change_budget:
       max_changed_files: 10
       max_added_lines: 320
+  - mission_id: httpie-cli-repair-exit-codes
+    title: Repair one bounded CLI exit-code and formatting seam
+    brief: Fix one multi-file CLI contract issue across command handling and tests while preserving the bounded pytest and codestyle slice.
+    feature_size: medium
+    allowed_paths:
+      - httpie/**
+      - tests/**
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the fix inside the CLI/runtime surface and its tests
+      - preserve bounded pytest smoke plus codestyle linkage
+      - keep delivery evidence anchored to the target checkout
+    supported_scenarios:
+      - repair
+      - governance
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 12
+      max_added_lines: 420
+    size_rationale: Medium httpie missions can cross one producer-consumer CLI boundary but should remain inside one subsystem and test slice.
+    change_budget:
+      max_changed_files: 12
+      max_added_lines: 420
+  - mission_id: httpie-cli-config-surface-hardening
+    title: Govern one broader CLI config and request-surface hardening change
+    brief: Touch a broader CLI configuration or request-handling surface with strict audit and learning closure, but keep the scope bounded to the runtime package and tests.
+    feature_size: large
+    allowed_paths:
+      - httpie/**
+      - tests/**
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+      - learning-loop-handoff
+    acceptance_checks:
+      - keep governance evidence tied to the target checkout
+      - preserve bounded pytest smoke plus codestyle linkage
+      - avoid any upstream write-back
+    supported_scenarios:
+      - governance
+      - release
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+      - open-code-primary
+    size_budget:
+      max_changed_files: 16
+      max_added_lines: 620
+    size_rationale: Large httpie missions may cross several CLI/config seams, but must remain inside the application package and explicit test boundaries.
+    change_budget:
+      max_changed_files: 16
+      max_added_lines: 620

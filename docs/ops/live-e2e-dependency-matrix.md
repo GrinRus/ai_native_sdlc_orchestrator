@@ -58,23 +58,42 @@ Observed failure signatures and safety defaults:
 Canonical fixture bundle:
 - `examples/live-e2e/fixtures/w12-s04/w12-s04-evidence-bundle.json`
 
-## W13-S06 refreshed curated full-journey proof bundle (2026-04-24)
+## W14 scenario/provider/size matrix notes (2026-04-24)
+
+Mandatory matrix axes:
+- `scenario_family`: `regress`, `release`, `repair`, `governance`
+- `provider_variant_id`: `openai-primary`, `anthropic-primary`, `open-code-primary`
+- `feature_size`: `small`, `medium`, `large`
+
+Operational rules:
+- one live run proves exactly one pinned provider path;
+- each curated repo must expose `small`, `medium`, and `large` missions in its target catalog;
+- review and learning closure artifacts must carry `matrix_cell` and `coverage_follow_up`;
+- provider comparison coverage is required between `openai-primary` and `anthropic-primary` for at least one equivalent mission class per curated repo.
+- `openai-primary` and `anthropic-primary` are mandatory provider variants; `open-code-primary` remains extended coverage.
+
+## W14-S07 refreshed matrix full-journey proof bundle (2026-04-24)
 
 Refreshed curated runs:
-- `w13-s06.full-journey-regress-ky` status `pass` on mission `ky-header-regression`
-- `w13-s06.full-journey-regress-httpie` status `pass` on mission `httpie-cli-output-regression`
-- `w13-s06.full-journey-release-nextjs` status `pass` on mission `nextjs-shared-package-release`
+- `ky` required cells: `w14-s07.full-journey-regress-ky`, `w14-s07.full-journey-regress-ky-medium-anthropic-rerun`, `w14-s07.full-journey-release-ky-medium-openai`
+- `ky` provider comparison pair: `w14-s07.full-journey-regress-ky` and `w14-s07.full-journey-regress-ky-anthropic`
+- `httpie/cli` required cells: `w14-s07.full-journey-regress-httpie`, `w14-s07.full-journey-repair-httpie-medium-anthropic`, `w14-s07.full-journey-governance-httpie-medium-openai`
+- `httpie/cli` provider comparison pair: `w14-s07.full-journey-regress-httpie` and `w14-s07.full-journey-regress-httpie-anthropic`
+- `nextjs-monorepo-example` required cells: `w14-s07.full-journey-release-nextjs`, `w14-s07.full-journey-repair-nextjs-medium-anthropic`, `w14-s07.full-journey-governance-nextjs-large-openai`
+- `nextjs-monorepo-example` provider comparison pair: `w14-s07.full-journey-release-nextjs` and `w14-s07.full-journey-release-nextjs-anthropic`
 
 Observed prerequisite confirmations:
 - full-journey `project init` preserved target-specific verification commands through public repo command overrides instead of harness-side profile generation;
-- `httpie/cli` bootstrap now uses `make install`, and its full-journey verification uses a bounded CLI pytest slice plus `make codestyle`;
-- `nextjs-monorepo-example` full-journey verification uses monorepo `g:lint`, `g:typecheck`, and shared-package unit smoke instead of the broader `g:test-unit` matrix.
+- provider-pinned route overrides were materialized for both `codex-cli` and `claude-code` matrix cells;
+- `httpie/cli` bootstrap used `make install`, and its full-journey verification used a bounded CLI pytest slice plus `make codestyle`;
+- `nextjs-monorepo-example` full-journey verification used monorepo `g:lint`, `g:typecheck`, and shared-package unit smoke instead of the broader `g:test-unit` matrix.
 
 Observed artifact and closure guarantees:
 - each run materialized mission-generated feature request, intake packet, discovery analysis, spec step-result, and handoff packet;
-- review verdicts are backed by public `review-report`;
+- review verdicts are backed by public `review-report` with `provider_traceability` and `feature_size_fit`;
 - closure is backed by public `audit runs` and `learning handoff`;
-- release-shaped proof keeps `delivery-manifest` and `release-packet` anchored to the target checkout.
+- release-shaped proof keeps `delivery-manifest` and `release-packet` anchored to the target checkout;
+- the committed bundle proves all `9/9` required matrix cells, all `3/3` catalog provider-comparison pairs, and all mandatory scenario families.
 
 Canonical fixture bundle:
-- `examples/live-e2e/fixtures/w13-s06/w13-s06-evidence-bundle.json`
+- `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`

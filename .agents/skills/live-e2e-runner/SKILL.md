@@ -1,11 +1,21 @@
 ---
 name: live-e2e-runner
-description: Use when you need to run or assess AOR live E2E profiles, especially catalog-backed full-journey missions on curated repositories.
+description: Use when you need to run or assess AOR live E2E profiles, especially catalog-backed full-journey matrix cells on curated repositories.
 ---
 
 1. Start with `docs/ops/live-e2e-standard-runner.md` and `docs/ops/live-e2e-target-catalog.md`.
 2. Decide whether the requested run is bounded rehearsal or full-journey acceptance.
-3. For full-journey acceptance, resolve both the curated target repo and curated feature mission from `scripts/live-e2e/catalog/targets/*.yaml` and `scripts/live-e2e/profiles/full-journey-*.yaml`.
+3. For full-journey acceptance, resolve one curated matrix cell from:
+   - `scripts/live-e2e/catalog/targets/*.yaml`
+   - `scripts/live-e2e/catalog/scenarios/*.yaml`
+   - `scripts/live-e2e/catalog/providers/*.yaml`
+   - `scripts/live-e2e/profiles/full-journey-*.yaml`
+4. The matrix cell must pin:
+   - target repo
+   - feature mission
+   - `scenario_family`
+   - `provider_variant_id`
+   - declared `feature_size`
 4. Use the internal harness entrypoint:
    - `node ./scripts/live-e2e/run-profile.mjs --project-ref . --profile <profile>`
 5. For full-journey runs, ensure the public lifecycle is exercised end-to-end:
@@ -32,17 +42,26 @@ description: Use when you need to run or assess AOR live E2E profiles, especiall
    - `learning handoff`
 6. The runner is responsible for preparing the feature request input itself. Do not skip directly to execution or rely on harness-side synthetic discovery.
 7. Inspect the resulting artifacts and return one verdict matrix with:
+   - `scenario_family`
+   - `provider_variant_id`
+   - `feature_size`
    - `target_selection`
    - `feature_request_quality`
    - `discovery_quality`
    - `runtime_success`
    - `artifact_quality`
    - `code_quality`
+   - `provider_execution_status`
+   - `feature_size_fit_status`
+   - `scenario_coverage_status`
    - `delivery_release_quality`
    - `learning_loop_closure`
    - `overall_verdict`
-8. Treat the run as failed when any of these are true:
+8. Explain why the chosen matrix cell was selected and which required cells remain uncovered for that repo.
+9. Treat the run as failed when any of these are true:
    - repo or mission is not in the curated catalog
+   - scenario family or provider variant is not allowed for that mission
    - `review-report` returns `fail`
+   - `review-report.provider_traceability` or `review-report.feature_size_fit` returns `fail`
    - critical delivery or release lineage is missing
    - learning-loop closure artifacts are missing

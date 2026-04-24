@@ -1,0 +1,41 @@
+{
+  "scorecard_id": "w14-s07.full-journey-release-nextjs.learning-loop.scorecard.v1",
+  "project_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs",
+  "run_id": "w14-s07.full-journey-release-nextjs",
+  "source_kind": "cli-learning-handoff",
+  "status": "pass",
+  "summary": "Run 'w14-s07.full-journey-release-nextjs' completed public learning-loop handoff.",
+  "evidence_refs": [
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/delivery-plan-implement-1777031626664.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/delivery-plan-implement-1777031626098.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/delivery-plan-implement-1777031624255.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/delivery-manifest-fork-first-pr-w14-s07.full-journey-release-nextjs-1777031626831.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/delivery-manifest-fork-first-pr-w14-s07.full-journey-release-nextjs-1777031626311.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/release-packet-fork-first-pr-w14-s07.full-journey-release-nextjs-1777031626831.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/release-packet-fork-first-pr-w14-s07.full-journey-release-nextjs-1777031626311.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/reports/step-result-routed-w14-s07.full-journey-release-nextjs.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/reports/review-report-w14-s07.full-journey-release-nextjs.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/reports/learning-loop-scorecard-delivery-w14-s07.full-journey-release-nextjs.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/reports/learning-loop-handoff-w14-s07.full-journey-release-nextjs.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/reports/review-report-w14-s07.full-journey-release-nextjs.json"
+  ],
+  "linked_eval_suite_refs": [],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "matrix_cell": {
+    "cell_id": "nextjs.release.large.openai",
+    "target_catalog_id": "nextjs-monorepo-example",
+    "feature_mission_id": "nextjs-shared-package-release",
+    "scenario_family": "release",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "large",
+    "coverage_tier": "required"
+  },
+  "generated_at": "2026-04-24T11:53:47.665Z"
+}

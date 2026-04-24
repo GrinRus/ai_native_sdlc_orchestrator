@@ -1,0 +1,142 @@
+{
+  "review_report_id": "w14-s07.full-journey-repair-nextjs-medium-anthropic.review-report.v1",
+  "project_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic",
+  "run_id": "w14-s07.full-journey-repair-nextjs-medium-anthropic",
+  "generated_at": "2026-04-24T12:18:58.768Z",
+  "overall_status": "warn",
+  "review_recommendation": "required-human-review",
+  "feature_traceability": {
+    "status": "pass",
+    "mission_id": "nextjs-workspace-repair-shared-config",
+    "input_packet_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.artifact.intake.nextjs-workspace-repair-shared-config.v1.json",
+    "request_title": "Repair one bounded workspace configuration or shared package seam",
+    "request_brief": "Fix one bounded monorepo breakage across a shared package and one consuming app or config boundary, with strong delivery and audit lineage.",
+    "scenario_family": "repair",
+    "provider_variant_id": "anthropic-primary",
+    "feature_size": "medium",
+    "matrix_cell": {
+      "cell_id": "nextjs.repair.medium.anthropic",
+      "target_catalog_id": "nextjs-monorepo-example",
+      "feature_mission_id": "nextjs-workspace-repair-shared-config",
+      "scenario_family": "repair",
+      "provider_variant_id": "anthropic-primary",
+      "feature_size": "medium",
+      "coverage_tier": "required"
+    },
+    "coverage_follow_up": {
+      "current_cell_required": true,
+      "next_required_matrix_cell": {
+        "cell_id": "nextjs.release.large.openai",
+        "scenario_family": "release",
+        "feature_size": "large",
+        "feature_mission_id": "nextjs-shared-package-release",
+        "provider_variant_id": "openai-primary"
+      },
+      "remaining_required_matrix_cells": [
+        {
+          "cell_id": "nextjs.release.large.openai",
+          "scenario_family": "release",
+          "feature_size": "large",
+          "feature_mission_id": "nextjs-shared-package-release",
+          "provider_variant_id": "openai-primary"
+        },
+        {
+          "cell_id": "nextjs.governance.large.openai",
+          "scenario_family": "governance",
+          "feature_size": "large",
+          "feature_mission_id": "nextjs-shared-package-release",
+          "provider_variant_id": "openai-primary"
+        }
+      ]
+    }
+  },
+  "discovery_quality": {
+    "status": "pass",
+    "analysis_report_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/project-analysis-report.json",
+    "spec_step_result_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/step-result-routed-belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "handoff_packet_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.handoff.bootstrap.v1.json",
+    "findings": []
+  },
+  "artifact_quality": {
+    "status": "pass",
+    "verify_summary_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/verify-summary.json",
+    "execution_step_result_refs": [
+      "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/step-result-routed-w14-s07.full-journey-repair-nextjs-medium-anthropic.run.start.implement.implement.attempt.1.json"
+    ],
+    "delivery_manifest_ref": null,
+    "release_packet_ref": null,
+    "findings": []
+  },
+  "code_quality": {
+    "status": "warn",
+    "changed_paths": [],
+    "allowed_paths": [
+      "apps/**",
+      "packages/**",
+      "tooling/**"
+    ],
+    "forbidden_paths": [
+      "docs/**",
+      ".github/**",
+      "scripts/**",
+      "examples/**",
+      "context/**"
+    ],
+    "findings": [
+      {
+        "finding_id": "code-quality.01",
+        "severity": "warn",
+        "category": "code-quality",
+        "summary": "No non-bootstrap changed paths were detected for the reviewed run.",
+        "evidence_refs": [
+          "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/step-result-routed-w14-s07.full-journey-repair-nextjs-medium-anthropic.run.start.implement.implement.attempt.1.json"
+        ]
+      }
+    ]
+  },
+  "feature_size_fit": {
+    "status": "pass",
+    "feature_size": "medium",
+    "size_budget": {
+      "max_changed_files": 12,
+      "max_added_lines": 360
+    },
+    "actual_change": {
+      "changed_files": 0,
+      "added_lines": 0,
+      "deleted_lines": 0,
+      "touched_lines": 0
+    },
+    "findings": []
+  },
+  "provider_traceability": {
+    "status": "pass",
+    "provider_variant_id": "anthropic-primary",
+    "requested_provider": "anthropic",
+    "requested_adapter": "claude-code",
+    "actual_provider": "anthropic",
+    "actual_adapter": "claude-code",
+    "route_id": "route.implement.default.anthropic-primary",
+    "route_profile_source": "./.aor/w14-s07-proof/runtime-nextjs-repair-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/examples/routes/implement-anthropic-primary.yaml",
+    "findings": []
+  },
+  "findings": [
+    {
+      "finding_id": "code-quality.01",
+      "severity": "warn",
+      "category": "code-quality",
+      "summary": "No non-bootstrap changed paths were detected for the reviewed run.",
+      "evidence_refs": [
+        "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/step-result-routed-w14-s07.full-journey-repair-nextjs-medium-anthropic.run.start.implement.implement.attempt.1.json"
+      ]
+    }
+  ],
+  "evidence_refs": [
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.artifact.intake.nextjs-workspace-repair-shared-config.v1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/project-analysis-report.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/step-result-routed-belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic.handoff.bootstrap.v1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/step-result-routed-w14-s07.full-journey-repair-nextjs-medium-anthropic.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-repair-nextjs-medium-anthropic/reports/verify-summary.json"
+  ]
+}

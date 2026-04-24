@@ -1,0 +1,37 @@
+profile_id: live-e2e.full-journey.regress.ky.medium.anthropic
+version: 1
+journey_mode: full-journey
+flow_kind: regress
+duration_class: long
+target_catalog_id: ky
+feature_mission_id: ky-fetch-options-regression
+scenario_family: regress
+provider_variant_id: anthropic-primary
+bootstrap_template: github-default
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - learning
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  eval_suites:
+    - suite.regress.short@v1
+  harness:
+    enabled: false
+output_policy:
+  materialize_release_packet: false
+  write_back_to_remote: false
+  preferred_delivery_mode: patch

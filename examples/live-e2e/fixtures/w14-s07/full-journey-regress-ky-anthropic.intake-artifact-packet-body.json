@@ -1,0 +1,210 @@
+{
+  "generated_from": {
+    "command": "aor intake create",
+    "project_root": "./.aor/w14-s07-proof/runtime-ky-anthropic/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic",
+    "project_profile_ref": "project.aor.yaml"
+  },
+  "project_identity": {
+    "project_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic"
+  },
+  "mission_traceability": {
+    "mission_id": "ky-header-regression",
+    "source_kind": "catalog-feature-mission",
+    "scenario_family": "regress",
+    "provider_variant_id": "anthropic-primary",
+    "feature_size": "small",
+    "matrix_cell": {
+      "cell_id": "ky.regress.anthropic-primary",
+      "target_catalog_id": "ky",
+      "feature_mission_id": "ky-header-regression",
+      "scenario_family": "regress",
+      "provider_variant_id": "anthropic-primary",
+      "feature_size": "small",
+      "coverage_tier": "extended"
+    },
+    "coverage_follow_up": {
+      "current_cell_required": false,
+      "next_required_matrix_cell": {
+        "cell_id": "ky.regress.small.openai",
+        "scenario_family": "regress",
+        "feature_size": "small",
+        "feature_mission_id": "ky-header-regression",
+        "provider_variant_id": "openai-primary"
+      },
+      "remaining_required_matrix_cells": [
+        {
+          "cell_id": "ky.regress.small.openai",
+          "scenario_family": "regress",
+          "feature_size": "small",
+          "feature_mission_id": "ky-header-regression",
+          "provider_variant_id": "openai-primary"
+        },
+        {
+          "cell_id": "ky.regress.medium.anthropic",
+          "scenario_family": "regress",
+          "feature_size": "medium",
+          "feature_mission_id": "ky-fetch-options-regression",
+          "provider_variant_id": "anthropic-primary"
+        },
+        {
+          "cell_id": "ky.release.medium.openai",
+          "scenario_family": "release",
+          "feature_size": "medium",
+          "feature_mission_id": "ky-release-doc-typing",
+          "provider_variant_id": "openai-primary"
+        }
+      ]
+    }
+  },
+  "feature_request": {
+    "title": "Preserve narrow header-normalization regression coverage",
+    "brief": "Add or adjust one bounded regression test around header handling and the smallest source fix needed to satisfy it.",
+    "constraints": [
+      "keep changes inside source and test folders only",
+      "preserve npm test as the primary regression gate"
+    ],
+    "request_file": "./.aor/w14-s07-proof/runtime-ky-anthropic/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic/.aor/requests/feature-request-w14-s07.full-journey-regress-ky-anthropic-ky-header-regression.json",
+    "request_document": {
+      "mission_id": "ky-header-regression",
+      "title": "Preserve narrow header-normalization regression coverage",
+      "brief": "Add or adjust one bounded regression test around header handling and the smallest source fix needed to satisfy it.",
+      "allowed_paths": [
+        "source/**",
+        "test/**"
+      ],
+      "forbidden_paths": [
+        "docs/**",
+        ".github/**",
+        "scripts/**",
+        "examples/**",
+        "context/**"
+      ],
+      "expected_evidence": [
+        "verify-summary",
+        "routed-step-result",
+        "review-report"
+      ],
+      "acceptance_checks": [
+        "keep changes inside source and test folders only",
+        "preserve npm test as the primary regression gate"
+      ],
+      "scenario_family": "regress",
+      "provider_variant_id": "anthropic-primary",
+      "feature_size": "small",
+      "supported_scenarios": [
+        "regress"
+      ],
+      "recommended_provider_variants": [
+        "openai-primary",
+        "anthropic-primary"
+      ],
+      "size_budget": {
+        "max_changed_files": 6,
+        "max_added_lines": 220
+      },
+      "size_rationale": "One narrow library regression should stay inside one behavior surface and one test seam.",
+      "change_budget": {
+        "max_changed_files": 6,
+        "max_added_lines": 220
+      },
+      "provider_variant": {
+        "provider_variant_id": "anthropic-primary",
+        "provider": "anthropic",
+        "primary_adapter": "claude-code",
+        "route_override_policy": {
+          "strategy": "pin-primary-only",
+          "steps": [
+            "discovery",
+            "research",
+            "spec",
+            "planning",
+            "implement",
+            "review",
+            "qa",
+            "repair",
+            "eval",
+            "harness"
+          ]
+        }
+      },
+      "scenario_policy": {
+        "scenario_family": "regress",
+        "required_stages": [
+          "bootstrap",
+          "discovery",
+          "spec",
+          "planning",
+          "handoff",
+          "execution",
+          "review",
+          "qa",
+          "delivery",
+          "learning"
+        ],
+        "required_evidence": [
+          "verify-summary",
+          "routed-step-result",
+          "review-report",
+          "evaluation-report",
+          "learning-loop-handoff"
+        ],
+        "delivery_mode_policy": "patch-only",
+        "release_required": false,
+        "incident_policy": {
+          "open_on_review_fail": true,
+          "open_on_execution_fail": true
+        },
+        "governance_policy": {
+          "mode": "bounded-regression",
+          "audit_required": true
+        }
+      },
+      "matrix_cell": {
+        "cell_id": "ky.regress.anthropic-primary",
+        "target_catalog_id": "ky",
+        "feature_mission_id": "ky-header-regression",
+        "scenario_family": "regress",
+        "provider_variant_id": "anthropic-primary",
+        "feature_size": "small",
+        "coverage_tier": "extended"
+      },
+      "coverage_follow_up": {
+        "current_cell_required": false,
+        "next_required_matrix_cell": {
+          "cell_id": "ky.regress.small.openai",
+          "scenario_family": "regress",
+          "feature_size": "small",
+          "feature_mission_id": "ky-header-regression",
+          "provider_variant_id": "openai-primary"
+        },
+        "remaining_required_matrix_cells": [
+          {
+            "cell_id": "ky.regress.small.openai",
+            "scenario_family": "regress",
+            "feature_size": "small",
+            "feature_mission_id": "ky-header-regression",
+            "provider_variant_id": "openai-primary"
+          },
+          {
+            "cell_id": "ky.regress.medium.anthropic",
+            "scenario_family": "regress",
+            "feature_size": "medium",
+            "feature_mission_id": "ky-fetch-options-regression",
+            "provider_variant_id": "anthropic-primary"
+          },
+          {
+            "cell_id": "ky.release.medium.openai",
+            "scenario_family": "release",
+            "feature_size": "medium",
+            "feature_mission_id": "ky-release-doc-typing",
+            "provider_variant_id": "openai-primary"
+          }
+        ]
+      }
+    }
+  },
+  "evidence_roots": {
+    "reports_root": "./.aor/w14-s07-proof/runtime-ky-anthropic/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic/reports",
+    "state_root": "./.aor/w14-s07-proof/runtime-ky-anthropic/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic/state"
+  }
+}

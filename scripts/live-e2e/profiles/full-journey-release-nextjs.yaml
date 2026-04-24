@@ -5,6 +5,8 @@ flow_kind: release
 duration_class: long
 target_catalog_id: nextjs-monorepo-example
 feature_mission_id: nextjs-shared-package-release
+scenario_family: release
+provider_variant_id: openai-primary
 bootstrap_template: github-default
 runtime:
   mode: ephemeral
@@ -34,3 +36,8 @@ output_policy:
   materialize_release_packet: true
   write_back_to_remote: false
   preferred_delivery_mode: fork-first-pr
+learning_loop:
+  backlog_refs:
+    - docs/backlog/mvp-implementation-backlog.md
+    - docs/backlog/mvp-roadmap.md
+    - docs/ops/live-e2e-standard-runner.md

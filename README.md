@@ -28,7 +28,7 @@ What exists today:
 - contributor guidance through `AGENTS.md`, nested `AGENTS.md` files, and reusable root skills;
 - root repository-integrity commands and CI for roadmap, guidance, and community-file consistency;
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
-- a layered live E2E model: bounded rehearsal profiles plus a catalog-backed full-journey layer on curated repositories and curated feature missions tracked through `W13`;
+- a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
 - implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an internal black-box rehearsal harness tracked through `W12`.
 - expanded implementation backlog through W11 slices with active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - reopened post-audit productionization queue for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and a dedicated W11 target-backed proof-closure wave.
@@ -194,7 +194,15 @@ See:
 - `docs/ops/live-e2e-release-short.md`
 - `docs/ops/live-e2e-release-long.md`
 
-The W13 full-journey layer resolves these repositories and feature missions through an internal machine-readable catalog under `scripts/live-e2e/catalog/**`. Bounded `regress/release short/long` profiles remain, but they no longer claim to prove the entire installed-user journey.
+The W14 full-journey layer resolves these repositories through an internal machine-readable matrix under `scripts/live-e2e/catalog/**`. Each full-journey run now pins:
+- `target_catalog_id`
+- `feature_mission_id`
+- `scenario_family`
+- `provider_variant_id`
+
+Target catalogs carry one curated `small`, `medium`, and `large` mission per repo plus required matrix cells. `openai-primary` and `anthropic-primary` are the mandatory provider variants for W14 matrix coverage; `open-code-primary` starts as extended coverage only. Bounded `regress/release short/long` profiles remain, but they no longer claim to prove the entire installed-user journey.
+
+The current committed matrix proof bundle lives at `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json` and proves all W14 required matrix cells plus all repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs.
 
 ## Roadmap
 

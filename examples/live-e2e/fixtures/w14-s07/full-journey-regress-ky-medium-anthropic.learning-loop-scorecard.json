@@ -1,0 +1,38 @@
+{
+  "scorecard_id": "w14-s07.full-journey-regress-ky-medium-anthropic-rerun.learning-loop.scorecard.v1",
+  "project_id": "sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun",
+  "run_id": "w14-s07.full-journey-regress-ky-medium-anthropic-rerun",
+  "source_kind": "cli-learning-handoff",
+  "status": "pass",
+  "summary": "Run 'w14-s07.full-journey-regress-ky-medium-anthropic-rerun' completed public learning-loop handoff.",
+  "evidence_refs": [
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/delivery-plan-implement-1777033007352.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/delivery-plan-implement-1777033004906.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/delivery-manifest-patch-only-w14-s07.full-journey-regress-ky-medium-anthropic-rerun-1777033007573.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/artifacts/release-packet-patch-only-w14-s07.full-journey-regress-ky-medium-anthropic-rerun-1777033007574.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/step-result-routed-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/review-report-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/learning-loop-scorecard-delivery-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/learning-loop-handoff-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-medium-anthropic-rerun/reports/review-report-w14-s07.full-journey-regress-ky-medium-anthropic-rerun.json"
+  ],
+  "linked_eval_suite_refs": [],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "matrix_cell": {
+    "cell_id": "ky.regress.medium.anthropic",
+    "target_catalog_id": "ky",
+    "feature_mission_id": "ky-fetch-options-regression",
+    "scenario_family": "regress",
+    "provider_variant_id": "anthropic-primary",
+    "feature_size": "medium",
+    "coverage_tier": "required"
+  },
+  "generated_at": "2026-04-24T12:16:48.581Z"
+}

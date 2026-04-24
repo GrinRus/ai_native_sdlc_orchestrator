@@ -637,6 +637,16 @@ function asStringArray(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? /** @type {Record<string, unknown>} */ (value)
+    : {};
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -981,6 +991,8 @@ function executeImplementedCommand(command, flags, cwd) {
   let reviewReportFile = null;
   let reviewOverallStatus = null;
   let reviewRecommendation = null;
+  let reviewFeatureSizeFitStatus = null;
+  let reviewProviderTraceabilityStatus = null;
   let learningLoopScorecardFile = null;
   let learningLoopHandoffFile = null;
   let evaluationReportId = null;
@@ -1256,6 +1268,8 @@ function executeImplementedCommand(command, flags, cwd) {
     handoffPacketFile = validateResult.handoffPacketFile;
   } else if (command === "project verify") {
     ensureRequiredFlags(command, flags);
+    const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
+    const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
 
     validationGateEnforced = resolveOptionalBooleanFlag(
       "require-validation-pass",
@@ -1301,6 +1315,8 @@ function executeImplementedCommand(command, flags, cwd) {
           "promotion-evidence-refs",
           flags["promotion-evidence-refs"],
         ),
+        routeOverrides,
+        policyOverrides,
       });
 
       routedStepResultId = routedResult.stepResultId;
@@ -1569,6 +1585,8 @@ function executeImplementedCommand(command, flags, cwd) {
       "promotion-evidence-refs",
       flags["promotion-evidence-refs"],
     );
+    const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
+    const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
 
     if (runAction !== "start" && runAction !== "steer" && targetStep) {
       throw new CliUsageError(`Flag '--target-step' is only valid for 'aor run start' or 'aor run steer'.`);
@@ -1581,6 +1599,12 @@ function executeImplementedCommand(command, flags, cwd) {
     }
     if (runAction !== "start" && promotionEvidenceRefs.length > 0) {
       throw new CliUsageError(`Flag '--promotion-evidence-refs' is only valid for 'aor run start'.`);
+    }
+    if (runAction !== "start" && flags["route-overrides"] !== undefined) {
+      throw new CliUsageError(`Flag '--route-overrides' is only valid for 'aor run start'.`);
+    }
+    if (runAction !== "start" && flags["policy-overrides"] !== undefined) {
+      throw new CliUsageError(`Flag '--policy-overrides' is only valid for 'aor run start'.`);
     }
 
     const controlResult = applyRunControlAction({
@@ -1638,6 +1662,8 @@ function executeImplementedCommand(command, flags, cwd) {
         requireDiscoveryCompleteness: true,
         approvedHandoffRef: approvedHandoffRef ?? undefined,
         promotionEvidenceRefs,
+        routeOverrides,
+        policyOverrides,
       });
       routedStepResultId = routedExecution.stepResult.step_result_id;
       routedStepResultFile = routedExecution.stepResultPath;
@@ -1809,6 +1835,15 @@ function executeImplementedCommand(command, flags, cwd) {
     reviewReportFile = reviewResult.reviewReportFile;
     reviewOverallStatus = reviewResult.reviewReport.overall_status;
     reviewRecommendation = reviewResult.reviewReport.review_recommendation;
+    reviewFeatureSizeFitStatus =
+      typeof reviewResult.reviewReport.feature_size_fit === "object" && reviewResult.reviewReport.feature_size_fit
+        ? reviewResult.reviewReport.feature_size_fit.status
+        : null;
+    reviewProviderTraceabilityStatus =
+      typeof reviewResult.reviewReport.provider_traceability === "object" &&
+      reviewResult.reviewReport.provider_traceability
+        ? reviewResult.reviewReport.provider_traceability.status
+        : null;
     readOnly = false;
     futureControlHooks = [
       `audit runs --run-id ${runId}`,
@@ -1865,6 +1900,10 @@ function executeImplementedCommand(command, flags, cwd) {
       reviewOverallStatus === "fail"
         ? `Run '${runId}' requires repair before follow-up closure.`
         : `Run '${runId}' completed public learning-loop handoff.`;
+    const reviewArtifact =
+      qualityForRun.find((artifact) => artifact.family === "review-report") ?? null;
+    const reviewDocument = asPlainObject(reviewArtifact?.document);
+    const reviewFeatureTraceability = asPlainObject(reviewDocument.feature_traceability);
     const learningLoop = materializeLearningLoopArtifacts({
       projectId: projectState.project_id,
       projectRoot: projectState.project_root,
@@ -1888,6 +1927,8 @@ function executeImplementedCommand(command, flags, cwd) {
       forceIncident: false,
       existingIncidentFile: existingIncident?.file,
       existingIncidentRef: existingIncident?.artifact_ref,
+      matrixCell: asPlainObject(reviewFeatureTraceability.matrix_cell),
+      coverageFollowUp: asPlainObject(reviewFeatureTraceability.coverage_follow_up),
     });
     learningLoopScorecardFile = learningLoop.scorecardFile;
     learningLoopHandoffFile = learningLoop.handoffFile;
@@ -2655,6 +2696,19 @@ function executeImplementedCommand(command, flags, cwd) {
         ...run.quality_refs,
         ...incidentMatches.flatMap((artifact) => asStringArray(artifact.document.linked_asset_refs)),
       ]);
+      const reviewArtifact =
+        qualityArtifacts.find(
+          (artifact) => artifact.family === "review-report" && run.quality_refs.includes(artifact.artifact_ref),
+        ) ?? null;
+      const reviewDocument = asPlainObject(reviewArtifact?.document);
+      const reviewFeatureTraceability = asPlainObject(reviewDocument.feature_traceability);
+      const reviewProviderTraceability = asPlainObject(reviewDocument.provider_traceability);
+      const reviewFeatureSizeFit = asPlainObject(reviewDocument.feature_size_fit);
+      const learningHandoffArtifact =
+        qualityArtifacts.find(
+          (artifact) => artifact.family === "learning-loop-handoff" && run.quality_refs.includes(artifact.artifact_ref),
+        ) ?? null;
+      const learningHandoffDocument = asPlainObject(learningHandoffArtifact?.document);
 
       return {
         run_id: run.run_id,
@@ -2668,6 +2722,27 @@ function executeImplementedCommand(command, flags, cwd) {
         scorecard_refs: scorecardRefs,
         evidence_refs: evidenceRefs,
         evidence_root: projectState.runtime_layout.reports_root,
+        scenario_family:
+          typeof reviewFeatureTraceability.scenario_family === "string"
+            ? reviewFeatureTraceability.scenario_family
+            : null,
+        provider_variant_id:
+          typeof reviewFeatureTraceability.provider_variant_id === "string"
+            ? reviewFeatureTraceability.provider_variant_id
+            : null,
+        feature_size:
+          typeof reviewFeatureTraceability.feature_size === "string"
+            ? reviewFeatureTraceability.feature_size
+            : null,
+        matrix_cell:
+          Object.keys(asPlainObject(learningHandoffDocument.matrix_cell)).length > 0
+            ? asPlainObject(learningHandoffDocument.matrix_cell)
+            : asPlainObject(reviewFeatureTraceability.matrix_cell),
+        coverage_follow_up: asPlainObject(learningHandoffDocument.coverage_follow_up),
+        provider_execution_status:
+          typeof reviewProviderTraceability.status === "string" ? reviewProviderTraceability.status : null,
+        feature_size_fit_status:
+          typeof reviewFeatureSizeFit.status === "string" ? reviewFeatureSizeFit.status : null,
       };
     });
 
@@ -2808,6 +2883,8 @@ function executeImplementedCommand(command, flags, cwd) {
     review_report_file: reviewReportFile,
     review_overall_status: reviewOverallStatus,
     review_recommendation: reviewRecommendation,
+    review_feature_size_fit_status: reviewFeatureSizeFitStatus,
+    review_provider_traceability_status: reviewProviderTraceabilityStatus,
     evaluation_report_id: evaluationReportId,
     evaluation_report_file: evaluationReportFile,
     evaluation_status: evaluationStatus,

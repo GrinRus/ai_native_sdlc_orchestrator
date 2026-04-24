@@ -37,6 +37,9 @@
 - `live-run-event.md`
 - `learning-loop-scorecard.md`
 - `learning-loop-handoff.md`
+- `live-e2e-provider-variant.md`
+- `live-e2e-scenario-policy.md`
+- `live-e2e-target-catalog.md`
 - `control-plane-api.md`
 
 ## Loader coverage

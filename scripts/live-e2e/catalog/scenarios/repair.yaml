@@ -1,0 +1,27 @@
+scenario_family: repair
+required_stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - learning
+required_evidence:
+  - verify-summary
+  - routed-step-result
+  - review-report
+  - delivery-manifest
+  - audit-runs
+  - learning-loop-handoff
+delivery_mode_policy: patch-only
+release_required: false
+incident_policy:
+  open_on_review_fail: true
+  open_on_execution_fail: true
+governance_policy:
+  mode: repair-closure
+  audit_required: true

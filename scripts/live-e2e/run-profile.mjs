@@ -353,9 +353,129 @@ function loadCatalogTarget(options) {
   if (!fileExists(filePath)) {
     throw new UsageError(`Target catalog '${options.targetCatalogId}' was not found under '${options.catalogRoot}/targets'.`);
   }
+  const loaded = loadContractFile({
+    filePath,
+    family: "live-e2e-target-catalog",
+  });
+  if (!loaded.ok) {
+    const issues = loaded.validation.issues.map((issue) => issue.message).join("; ");
+    throw new UsageError(`Target catalog '${options.targetCatalogId}' failed contract validation: ${issues}`);
+  }
   return {
     filePath,
-    entry: readYamlDocument(filePath),
+    entry: asRecord(loaded.document),
+  };
+}
+
+/**
+ * @param {{ catalogRoot: string, scenarioFamily: string }} options
+ */
+function loadCatalogScenarioPolicy(options) {
+  const filePath = path.join(options.catalogRoot, "scenarios", `${normalizeId(options.scenarioFamily)}.yaml`);
+  if (!fileExists(filePath)) {
+    throw new UsageError(
+      `Scenario policy '${options.scenarioFamily}' was not found under '${options.catalogRoot}/scenarios'.`,
+    );
+  }
+  const loaded = loadContractFile({
+    filePath,
+    family: "live-e2e-scenario-policy",
+  });
+  if (!loaded.ok) {
+    const issues = loaded.validation.issues.map((issue) => issue.message).join("; ");
+    throw new UsageError(`Scenario policy '${options.scenarioFamily}' failed contract validation: ${issues}`);
+  }
+  return {
+    filePath,
+    entry: asRecord(loaded.document),
+  };
+}
+
+/**
+ * @param {{ catalogRoot: string, providerVariantId: string }} options
+ */
+function loadCatalogProviderVariant(options) {
+  const filePath = path.join(options.catalogRoot, "providers", `${normalizeId(options.providerVariantId)}.yaml`);
+  if (!fileExists(filePath)) {
+    throw new UsageError(
+      `Provider variant '${options.providerVariantId}' was not found under '${options.catalogRoot}/providers'.`,
+    );
+  }
+  const loaded = loadContractFile({
+    filePath,
+    family: "live-e2e-provider-variant",
+  });
+  if (!loaded.ok) {
+    const issues = loaded.validation.issues.map((issue) => issue.message).join("; ");
+    throw new UsageError(`Provider variant '${options.providerVariantId}' failed contract validation: ${issues}`);
+  }
+  return {
+    filePath,
+    entry: asRecord(loaded.document),
+  };
+}
+
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isFeatureSize(value) {
+  return value === "small" || value === "medium" || value === "large";
+}
+
+/**
+ * @param {Record<string, unknown>} catalogEntry
+ * @param {string} featureMissionId
+ * @param {string} scenarioFamily
+ * @param {string} providerVariantId
+ */
+function resolveMatrixCell(catalogEntry, featureMissionId, scenarioFamily, providerVariantId) {
+  const requiredCells = Array.isArray(catalogEntry.required_matrix_cells)
+    ? /** @type {Array<Record<string, unknown>>} */ (catalogEntry.required_matrix_cells)
+    : [];
+  const matchingCell =
+    requiredCells.find(
+      (cell) =>
+        asNonEmptyString(cell.feature_mission_id) === featureMissionId &&
+        asNonEmptyString(cell.scenario_family) === scenarioFamily &&
+        asNonEmptyString(cell.provider_variant_id) === providerVariantId,
+    ) ?? null;
+  const remainingRequiredCells = requiredCells.filter((cell) => cell !== matchingCell);
+  return {
+    coverageTier: matchingCell ? asNonEmptyString(matchingCell.coverage_tier) || "required" : "extended",
+    currentCell: {
+      cell_id:
+        asNonEmptyString(asRecord(matchingCell ?? {}).cell_id) ||
+        `${normalizeId(asNonEmptyString(catalogEntry.catalog_id) || "catalog")}.${normalizeId(scenarioFamily)}.${normalizeId(
+          providerVariantId,
+        )}`,
+      target_catalog_id: asNonEmptyString(catalogEntry.catalog_id) || null,
+      feature_mission_id: featureMissionId,
+      scenario_family: scenarioFamily,
+      provider_variant_id: providerVariantId,
+      feature_size: null,
+      coverage_tier: matchingCell ? asNonEmptyString(asRecord(matchingCell).coverage_tier) || "required" : "extended",
+    },
+    coverageFollowUp: {
+      current_cell_required: matchingCell !== null,
+      next_required_matrix_cell:
+        remainingRequiredCells.length > 0
+          ? {
+              cell_id: asNonEmptyString(asRecord(remainingRequiredCells[0]).cell_id) || null,
+              scenario_family: asNonEmptyString(asRecord(remainingRequiredCells[0]).scenario_family) || null,
+              feature_size: asNonEmptyString(asRecord(remainingRequiredCells[0]).feature_size) || null,
+              feature_mission_id: asNonEmptyString(asRecord(remainingRequiredCells[0]).feature_mission_id) || null,
+              provider_variant_id: asNonEmptyString(asRecord(remainingRequiredCells[0]).provider_variant_id) || null,
+            }
+          : null,
+      remaining_required_matrix_cells: remainingRequiredCells.map((cell) => ({
+        cell_id: asNonEmptyString(cell.cell_id) || null,
+        scenario_family: asNonEmptyString(cell.scenario_family) || null,
+        feature_size: asNonEmptyString(cell.feature_size) || null,
+        feature_mission_id: asNonEmptyString(cell.feature_mission_id) || null,
+        provider_variant_id: asNonEmptyString(cell.provider_variant_id) || null,
+      })),
+    },
   };
 }
 
@@ -381,16 +501,32 @@ function resolveFullJourneyProfile(options) {
 
   const targetCatalogId = asNonEmptyString(options.profile.target_catalog_id);
   const featureMissionId = asNonEmptyString(options.profile.feature_mission_id);
+  const scenarioFamily = asNonEmptyString(options.profile.scenario_family);
+  const providerVariantId = asNonEmptyString(options.profile.provider_variant_id);
   if (!targetCatalogId) {
     throw new UsageError("Full-journey profiles require target_catalog_id.");
   }
   if (!featureMissionId) {
     throw new UsageError("Full-journey profiles require feature_mission_id.");
   }
+  if (!scenarioFamily) {
+    throw new UsageError("Full-journey profiles require scenario_family.");
+  }
+  if (!providerVariantId) {
+    throw new UsageError("Full-journey profiles require provider_variant_id.");
+  }
 
   const catalogTarget = loadCatalogTarget({
     catalogRoot: options.catalogRoot,
     targetCatalogId,
+  });
+  const scenarioPolicy = loadCatalogScenarioPolicy({
+    catalogRoot: options.catalogRoot,
+    scenarioFamily,
+  });
+  const providerVariant = loadCatalogProviderVariant({
+    catalogRoot: options.catalogRoot,
+    providerVariantId,
   });
   const catalogEntry = asRecord(catalogTarget.entry);
   const missions = Array.isArray(catalogEntry.feature_missions)
@@ -400,6 +536,40 @@ function resolveFullJourneyProfile(options) {
   if (!mission) {
     throw new UsageError(`Feature mission '${featureMissionId}' was not found in catalog '${targetCatalogId}'.`);
   }
+  const featureSize = asNonEmptyString(asRecord(mission).feature_size);
+  if (!isFeatureSize(featureSize)) {
+    throw new UsageError(
+      `Feature mission '${featureMissionId}' in catalog '${targetCatalogId}' must declare feature_size as small, medium, or large.`,
+    );
+  }
+  const supportedScenarios = asStringArray(asRecord(mission).supported_scenarios);
+  if (supportedScenarios.length > 0 && !supportedScenarios.includes(scenarioFamily)) {
+    throw new UsageError(
+      `Scenario '${scenarioFamily}' is not allowed for mission '${featureMissionId}' in catalog '${targetCatalogId}'.`,
+    );
+  }
+  const recommendedProviders = asStringArray(asRecord(mission).recommended_provider_variants);
+  if (recommendedProviders.length > 0 && !recommendedProviders.includes(providerVariantId)) {
+    throw new UsageError(
+      `Provider variant '${providerVariantId}' is not allowed for mission '${featureMissionId}' in catalog '${targetCatalogId}'.`,
+    );
+  }
+  const requiredStages = asStringArray(asRecord(scenarioPolicy.entry).required_stages);
+  const declaredStages = getProfileStages(options.profile);
+  const missingStages = requiredStages.filter((stage) => !declaredStages.includes(stage));
+  if (missingStages.length > 0) {
+    throw new UsageError(
+      `Full-journey profile '${asNonEmptyString(options.profile.profile_id) || "unknown"}' is missing required stages for scenario '${scenarioFamily}': ${missingStages.join(", ")}.`,
+    );
+  }
+  const releaseRequired = asRecord(scenarioPolicy.entry).release_required === true;
+  if (releaseRequired && asRecord(options.profile.output_policy).materialize_release_packet !== true) {
+    throw new UsageError(
+      `Scenario '${scenarioFamily}' requires output_policy.materialize_release_packet=true.`,
+    );
+  }
+  const matrixCell = resolveMatrixCell(catalogEntry, featureMissionId, scenarioFamily, providerVariantId);
+  matrixCell.currentCell.feature_size = featureSize;
 
   const resolvedProfile = /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(options.profile)));
   resolvedProfile.target_repo = asRecord(JSON.parse(JSON.stringify(asRecord(catalogEntry.repo))));
@@ -413,11 +583,21 @@ function resolveFullJourneyProfile(options) {
   };
   resolvedProfile.target_catalog_ref = catalogTarget.filePath;
   resolvedProfile.feature_mission_ref = `${catalogTarget.filePath}#${featureMissionId}`;
+  resolvedProfile.scenario_policy_ref = scenarioPolicy.filePath;
+  resolvedProfile.provider_variant_ref = providerVariant.filePath;
   return {
     resolvedProfile,
     catalogTargetPath: catalogTarget.filePath,
     catalogEntry,
     mission,
+    scenarioPolicyPath: scenarioPolicy.filePath,
+    scenarioPolicy: asRecord(scenarioPolicy.entry),
+    providerVariantPath: providerVariant.filePath,
+    providerVariant: asRecord(providerVariant.entry),
+    featureSize,
+    matrixCell: matrixCell.currentCell,
+    coverageFollowUp: matrixCell.coverageFollowUp,
+    coverageTier: matrixCell.coverageTier,
   };
 }
 
@@ -426,6 +606,13 @@ function resolveFullJourneyProfile(options) {
  *   targetCheckoutRoot: string,
  *   mission: Record<string, unknown>,
  *   runId: string,
+ *   scenarioFamily: string,
+ *   providerVariantId: string,
+ *   providerVariant: Record<string, unknown>,
+ *   scenarioPolicy: Record<string, unknown>,
+ *   featureSize: string,
+ *   matrixCell: Record<string, unknown>,
+ *   coverageFollowUp: Record<string, unknown>,
  * }} options
  */
 function materializeFeatureRequestFile(options) {
@@ -441,7 +628,31 @@ function materializeFeatureRequestFile(options) {
     forbidden_paths: asStringArray(options.mission.forbidden_paths),
     expected_evidence: asStringArray(options.mission.expected_evidence),
     acceptance_checks: asStringArray(options.mission.acceptance_checks),
+    scenario_family: options.scenarioFamily,
+    provider_variant_id: options.providerVariantId,
+    feature_size: options.featureSize,
+    supported_scenarios: asStringArray(options.mission.supported_scenarios),
+    recommended_provider_variants: asStringArray(options.mission.recommended_provider_variants),
+    size_budget: asRecord(options.mission.size_budget),
+    size_rationale: asNonEmptyString(options.mission.size_rationale) || null,
     change_budget: asRecord(options.mission.change_budget),
+    provider_variant: {
+      provider_variant_id: options.providerVariantId,
+      provider: asNonEmptyString(options.providerVariant.provider) || null,
+      primary_adapter: asNonEmptyString(options.providerVariant.primary_adapter) || null,
+      route_override_policy: asRecord(options.providerVariant.route_override_policy),
+    },
+    scenario_policy: {
+      scenario_family: options.scenarioFamily,
+      required_stages: asStringArray(options.scenarioPolicy.required_stages),
+      required_evidence: asStringArray(options.scenarioPolicy.required_evidence),
+      delivery_mode_policy: asNonEmptyString(options.scenarioPolicy.delivery_mode_policy) || null,
+      release_required: options.scenarioPolicy.release_required === true,
+      incident_policy: asRecord(options.scenarioPolicy.incident_policy),
+      governance_policy: asRecord(options.scenarioPolicy.governance_policy),
+    },
+    matrix_cell: options.matrixCell,
+    coverage_follow_up: options.coverageFollowUp,
   };
   writeJson(filePath, requestDocument);
   return {
@@ -770,6 +981,93 @@ function materializeGeneratedProjectProfile(options) {
 }
 
 /**
+ * @param {Record<string, unknown>} route
+ * @returns {Record<string, unknown>}
+ */
+function cloneRouteDocument(route) {
+  return /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(route)));
+}
+
+/**
+ * @param {{
+ *   targetCheckoutRoot: string,
+ *   providerVariant: Record<string, unknown>,
+ *   providerVariantId: string,
+ * }} options
+ */
+function materializeProviderPinnedRouteOverrides(options) {
+  const routesRoot = path.join(options.targetCheckoutRoot, "examples", "routes");
+  if (!fileExists(routesRoot) || !fs.statSync(routesRoot).isDirectory()) {
+    throw new Error(`Routes root '${routesRoot}' was not found for provider override materialization.`);
+  }
+  const overrideSteps = asStringArray(asRecord(options.providerVariant.route_override_policy).steps);
+  const pinnedProvider = asNonEmptyString(options.providerVariant.provider);
+  const pinnedAdapter = asNonEmptyString(options.providerVariant.primary_adapter);
+  if (!pinnedProvider || !pinnedAdapter) {
+    throw new Error(`Provider variant '${options.providerVariantId}' must declare provider and primary_adapter.`);
+  }
+
+  /** @type {Record<string, string>} */
+  const routeOverrides = {};
+  /** @type {string[]} */
+  const routeFiles = [];
+  const routeSources = fs
+    .readdirSync(routesRoot)
+    .filter((entry) => entry.endsWith(".yaml") || entry.endsWith(".yml"))
+    .map((entry) => path.join(routesRoot, entry));
+
+  for (const routePath of routeSources) {
+    const routeDocument = asRecord(readYamlDocument(routePath));
+    const step = asNonEmptyString(routeDocument.step);
+    if (!step || !overrideSteps.includes(step)) {
+      continue;
+    }
+
+    const pinnedRoute = cloneRouteDocument(routeDocument);
+    const originalRouteId = asNonEmptyString(routeDocument.route_id) || `route.${step}.default`;
+    const primary = asRecord(pinnedRoute.primary);
+    primary.provider = pinnedProvider;
+    if (asNonEmptyString(primary.adapter) !== "none") {
+      primary.adapter = pinnedAdapter;
+    }
+    pinnedRoute.primary = primary;
+    pinnedRoute.fallback = [];
+    pinnedRoute.route_id = `${originalRouteId}.${normalizeId(options.providerVariantId)}`;
+
+    const validation = validateContractDocument({
+      family: "provider-route-profile",
+      document: pinnedRoute,
+      source: `runtime://provider-route-override/${normalizeId(options.providerVariantId)}/${step}`,
+    });
+    if (!validation.ok) {
+      const issues = validation.issues.map((issue) => issue.message).join("; ");
+      throw new Error(`Generated provider-pinned route for step '${step}' failed validation: ${issues}`);
+    }
+
+    const routeFile = path.join(routesRoot, `${step}-${normalizeId(options.providerVariantId)}.yaml`);
+    fs.writeFileSync(routeFile, stringifyYaml(pinnedRoute), "utf8");
+    routeOverrides[step] = /** @type {string} */ (pinnedRoute.route_id);
+    routeFiles.push(routeFile);
+  }
+
+  return {
+    routeOverrides,
+    routeFiles,
+  };
+}
+
+/**
+ * @param {Record<string, string>} routeOverrides
+ * @returns {string | null}
+ */
+function serializeRouteOverrides(routeOverrides) {
+  const pairs = Object.entries(routeOverrides)
+    .filter(([, routeId]) => typeof routeId === "string" && routeId.length > 0)
+    .map(([step, routeId]) => `${step}=${routeId}`);
+  return pairs.length > 0 ? pairs.join(",") : null;
+}
+
+/**
  * @param {string} value
  * @returns {boolean}
  */
@@ -985,6 +1283,63 @@ function normalizeVerdictStatus(value) {
   if (normalized === "fail") return "fail";
   if (normalized === "warn") return "warn";
   return "pass";
+}
+
+/**
+ * @param {{
+ *   scenarioPolicy: Record<string, unknown>,
+ *   stageResults: Array<{ stage: string, status: string, evidence_refs: string[], summary: string | null }>,
+ *   artifacts: Record<string, unknown>,
+ *   auditPayload: Record<string, unknown>,
+ * }} options
+ */
+function evaluateScenarioCoverage(options) {
+  const requiredStages = asStringArray(options.scenarioPolicy.required_stages);
+  const requiredEvidence = asStringArray(options.scenarioPolicy.required_evidence);
+  const stageStatuses = new Map(
+    options.stageResults.map((stageResult) => [stageResult.stage, asNonEmptyString(stageResult.status) || "unknown"]),
+  );
+  /** @type {string[]} */
+  const findings = [];
+
+  for (const stage of requiredStages) {
+    const stageStatus = stageStatuses.get(stage) || "missing";
+    if (stageStatus !== "pass") {
+      findings.push(`Required scenario stage '${stage}' completed with status '${stageStatus}'.`);
+    }
+  }
+
+  const hasAuditRuns =
+    Boolean(options.artifacts.run_audit_file) ||
+    Array.isArray(asRecord(options.auditPayload).run_audit_records) ||
+    Array.isArray(asRecord(options.auditPayload).run_summaries);
+  const evidencePresence = {
+    "verify-summary": Boolean(options.artifacts.verify_summary_file),
+    "routed-step-result": Boolean(options.artifacts.routed_step_result_file),
+    "review-report": Boolean(options.artifacts.review_report_file),
+    "evaluation-report": Boolean(options.artifacts.evaluation_report_file),
+    "delivery-manifest": Boolean(options.artifacts.delivery_manifest_file),
+    "release-packet": Boolean(options.artifacts.release_packet_file),
+    "audit-runs": hasAuditRuns,
+    "learning-loop-scorecard": Boolean(options.artifacts.learning_loop_scorecard_file),
+    "learning-loop-handoff": Boolean(options.artifacts.learning_loop_handoff_file),
+  };
+
+  for (const evidenceId of requiredEvidence) {
+    if (evidencePresence[evidenceId] !== true) {
+      findings.push(`Required scenario evidence '${evidenceId}' was not materialized.`);
+    }
+  }
+
+  return {
+    status: findings.length > 0 ? "fail" : "pass",
+    required_stages: requiredStages,
+    required_evidence: requiredEvidence,
+    findings,
+    summary:
+      findings[0] ??
+      `Scenario policy '${asNonEmptyString(options.scenarioPolicy.scenario_family) || "unknown"}' coverage passed.`,
+  };
 }
 
 /**
@@ -1440,6 +1795,14 @@ function executeInstalledUserFlow(options) {
  *   catalogTargetPath: string,
  *   catalogEntry: Record<string, unknown>,
  *   mission: Record<string, unknown>,
+ *   scenarioPolicyPath: string,
+ *   scenarioPolicy: Record<string, unknown>,
+ *   providerVariantPath: string,
+ *   providerVariant: Record<string, unknown>,
+ *   featureSize: string,
+ *   matrixCell: Record<string, unknown>,
+ *   coverageFollowUp: Record<string, unknown>,
+ *   coverageTier: string,
  * }} options
  */
 function executeFullJourneyFlow(options) {
@@ -1469,7 +1832,15 @@ function executeFullJourneyFlow(options) {
     aor_home: sessionRoots.aorHome,
     codex_home: sessionRoots.codexHome,
     target_catalog_file: options.catalogTargetPath,
+    scenario_policy_file: options.scenarioPolicyPath,
+    provider_variant_file: options.providerVariantPath,
     feature_mission_id: asNonEmptyString(options.mission.mission_id) || null,
+    scenario_family: asNonEmptyString(options.profile.scenario_family) || null,
+    provider_variant_id: asNonEmptyString(options.profile.provider_variant_id) || null,
+    feature_size: options.featureSize,
+    matrix_cell: options.matrixCell,
+    coverage_follow_up: options.coverageFollowUp,
+    coverage_tier: options.coverageTier,
   };
   const startedAt = nowIso();
   const internalTestHooks = asRecord(options.profile.internal_test_hooks);
@@ -1532,18 +1903,33 @@ function executeFullJourneyFlow(options) {
     artifacts.generated_project_profile_file = getStringField(projectInit.payload, "materialized_project_profile_file");
     artifacts.target_examples_root = getStringField(projectInit.payload, "materialized_bootstrap_assets_root");
     artifacts.bootstrap_artifact_packet_file = getStringField(projectInit.payload, "artifact_packet_file");
+    const providerRoutes = materializeProviderPinnedRouteOverrides({
+      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      providerVariant: options.providerVariant,
+      providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
+    });
+    artifacts.provider_route_override_files = providerRoutes.routeFiles;
+    artifacts.provider_route_overrides = providerRoutes.routeOverrides;
+    const routeOverridesFlag = serializeRouteOverrides(providerRoutes.routeOverrides);
     markStage(
       stageMap,
       "bootstrap",
       "pass",
-      uniqueStrings([projectInit.transcriptFile, ...collectStringRefs(projectInit.payload)]),
-      "Public bootstrap materialized project profile and packaged bootstrap assets.",
+      uniqueStrings([projectInit.transcriptFile, ...collectStringRefs(projectInit.payload), ...providerRoutes.routeFiles]),
+      "Public bootstrap materialized project profile, packaged bootstrap assets, and provider-pinned route overrides.",
     );
 
     const featureRequest = materializeFeatureRequestFile({
       targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
       mission: options.mission,
       runId: options.runId,
+      scenarioFamily: asNonEmptyString(options.profile.scenario_family),
+      providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
+      providerVariant: options.providerVariant,
+      scenarioPolicy: options.scenarioPolicy,
+      featureSize: options.featureSize,
+      matrixCell: options.matrixCell,
+      coverageFollowUp: options.coverageFollowUp,
     });
     artifacts.feature_request_file = featureRequest.requestFile;
 
@@ -1576,6 +1962,7 @@ function executeFullJourneyFlow(options) {
       "./project.aor.yaml",
       "--runtime-root",
       ".aor",
+      ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
     ]);
     artifacts.analysis_report_file = getStringField(analyze.payload, "analysis_report_file");
 
@@ -1604,6 +1991,7 @@ function executeFullJourneyFlow(options) {
       "true",
       "--routed-dry-run-step",
       "implement",
+      ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
     ]);
     artifacts.verify_summary_file = getStringField(verifyPreflight.payload, "verify_summary_file");
     artifacts.preflight_step_result_files = getStringArrayField(verifyPreflight.payload, "step_result_files");
@@ -1641,6 +2029,7 @@ function executeFullJourneyFlow(options) {
       ".aor",
       "--input-packet",
       /** @type {string} */ (artifacts.intake_artifact_packet_file),
+      ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
     ]);
     artifacts.discovery_analysis_report_file = getStringField(discovery.payload, "analysis_report_file");
     markStage(
@@ -1665,6 +2054,7 @@ function executeFullJourneyFlow(options) {
       "./project.aor.yaml",
       "--runtime-root",
       ".aor",
+      ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
     ]);
     artifacts.spec_step_result_file = getStringField(specBuild.payload, "routed_step_result_file");
     if (internalTestHooks.drop_spec_step_result_after_spec_build === true && artifacts.spec_step_result_file) {
@@ -1796,6 +2186,7 @@ function executeFullJourneyFlow(options) {
       ...(promotionEvidenceRefs.length > 0
         ? ["--promotion-evidence-refs", promotionEvidenceRefs.join(",")]
         : []),
+      ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
     ]);
     artifacts.routed_step_result_file = getStringField(runStart.payload, "routed_step_result_file");
     artifacts.routed_step_result_id = getStringField(runStart.payload, "routed_step_result_id");
@@ -1866,6 +2257,8 @@ function executeFullJourneyFlow(options) {
       ? readJson(artifacts.review_report_file)
       : {};
     const reviewOverallStatus = normalizeVerdictStatus(reviewReport.overall_status);
+    const featureSizeFitStatus = normalizeVerdictStatus(asRecord(reviewReport.feature_size_fit).status);
+    const providerExecutionStatus = normalizeVerdictStatus(asRecord(reviewReport.provider_traceability).status);
     markStage(
       stageMap,
       "review",
@@ -2055,7 +2448,9 @@ function executeFullJourneyFlow(options) {
         "--summary",
         "Full-journey review verdict failed.",
       ]);
-      artifacts.incident_report_file = getStringField(incidentOpen.payload, "incident_file");
+      artifacts.incident_report_file =
+        getStringField(incidentOpen.payload, "incident_report_file") ||
+        getStringField(incidentOpen.payload, "incident_file");
     }
 
     let learningHandoff;
@@ -2095,7 +2490,21 @@ function executeFullJourneyFlow(options) {
       );
       throw new Error("Learning handoff did not materialize the required public closure artifacts.");
     }
+    markStage(
+      stageMap,
+      "learning",
+      "pass",
+      uniqueStrings([learningHandoff.transcriptFile, ...collectStringRefs(learningHandoff.payload)]),
+      "Public learning-loop closure artifacts materialized.",
+    );
 
+    const scenarioCoverage = evaluateScenarioCoverage({
+      scenarioPolicy: options.scenarioPolicy,
+      stageResults: flattenStageMap(stageMap),
+      artifacts,
+      auditPayload,
+    });
+    artifacts.scenario_coverage = scenarioCoverage;
     const deliveryReleaseQuality =
       asRecord(options.profile.output_policy).materialize_release_packet === true
         ? artifacts.release_packet_file
@@ -2109,12 +2518,18 @@ function executeFullJourneyFlow(options) {
         ? "pass"
         : "fail";
     const verdictMatrix = {
+      scenario_family: asNonEmptyString(options.profile.scenario_family) || null,
+      provider_variant_id: asNonEmptyString(options.profile.provider_variant_id) || null,
+      feature_size: options.featureSize,
       target_selection: "pass",
       feature_request_quality: artifacts.intake_artifact_packet_file && artifacts.feature_request_file ? "pass" : "fail",
+      scenario_coverage_status: scenarioCoverage.status,
+      provider_execution_status: providerExecutionStatus,
       discovery_quality: normalizeVerdictStatus(asRecord(reviewReport.discovery_quality).status),
       runtime_success: artifacts.routed_step_result_file ? "pass" : "fail",
       artifact_quality: normalizeVerdictStatus(asRecord(reviewReport.artifact_quality).status),
       code_quality: normalizeVerdictStatus(asRecord(reviewReport.code_quality).status),
+      feature_size_fit_status: featureSizeFitStatus,
       delivery_release_quality: deliveryReleaseQuality,
       learning_loop_closure: learningLoopClosure,
       overall_verdict: "pass",
@@ -2122,10 +2537,13 @@ function executeFullJourneyFlow(options) {
     const verdictStatuses = [
       verdictMatrix.target_selection,
       verdictMatrix.feature_request_quality,
+      verdictMatrix.scenario_coverage_status,
       verdictMatrix.discovery_quality,
       verdictMatrix.runtime_success,
       verdictMatrix.artifact_quality,
       verdictMatrix.code_quality,
+      verdictMatrix.provider_execution_status,
+      verdictMatrix.feature_size_fit_status,
       verdictMatrix.delivery_release_quality,
       verdictMatrix.learning_loop_closure,
     ];
@@ -2181,14 +2599,25 @@ function executeFullJourneyFlow(options) {
  */
 function buildScorecard(options) {
   const targetRepo = asRecord(options.profile.target_repo);
+  const verdictMatrix =
+    typeof options.flowResult.artifacts.verdict_matrix === "object" && options.flowResult.artifacts.verdict_matrix
+      ? asRecord(options.flowResult.artifacts.verdict_matrix)
+      : {};
   return {
     scorecard_id: `${options.runId}.scorecard.${asNonEmptyString(targetRepo.repo_id) || "target"}`,
     run_id: options.runId,
     profile_ref: options.profilePath,
     profile_id: options.profile.profile_id ?? null,
     scenario_id: options.profile.scenario_id ?? null,
+    scenario_family: options.profile.scenario_family ?? null,
+    provider_variant_id: options.profile.provider_variant_id ?? null,
+    feature_size: options.flowResult.artifacts.feature_size ?? null,
     flow_kind: options.profile.flow_kind ?? null,
     duration_class: options.profile.duration_class ?? null,
+    matrix_cell:
+      typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
+        ? options.flowResult.artifacts.matrix_cell
+        : null,
     target_repo: {
       repo_id: targetRepo.repo_id ?? null,
       repo_url: targetRepo.repo_url ?? null,
@@ -2196,6 +2625,9 @@ function buildScorecard(options) {
     },
     stage_counts: summarizeStageCounts(options.flowResult.stageResults),
     status: options.flowResult.status,
+    scenario_coverage_status: verdictMatrix.scenario_coverage_status ?? null,
+    provider_execution_status: verdictMatrix.provider_execution_status ?? null,
+    feature_size_fit_status: verdictMatrix.feature_size_fit_status ?? null,
     summary_ref: options.summaryFile,
     command_count: options.flowResult.commandResults.length,
     generated_at: nowIso(),
@@ -2237,6 +2669,9 @@ function writeHarnessArtifacts(options) {
     profile_ref: options.profilePath,
     profile_id: options.profile.profile_id ?? null,
     scenario_id: options.profile.scenario_id ?? null,
+    scenario_family: options.profile.scenario_family ?? null,
+    provider_variant_id: options.profile.provider_variant_id ?? null,
+    feature_size: options.flowResult.artifacts.feature_size ?? null,
     flow_kind: options.profile.flow_kind ?? null,
     duration_class: options.profile.duration_class ?? null,
     started_at: options.flowResult.startedAt,
@@ -2266,6 +2701,14 @@ function writeHarnessArtifacts(options) {
     stage_results: options.flowResult.stageResults,
     command_results: options.flowResult.commandResults,
     artifacts: options.flowResult.artifacts,
+    matrix_cell:
+      typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
+        ? options.flowResult.artifacts.matrix_cell
+        : null,
+    coverage_follow_up:
+      typeof options.flowResult.artifacts.coverage_follow_up === "object" && options.flowResult.artifacts.coverage_follow_up
+        ? options.flowResult.artifacts.coverage_follow_up
+        : null,
     verdict_matrix:
       typeof options.flowResult.artifacts.verdict_matrix === "object" && options.flowResult.artifacts.verdict_matrix
         ? options.flowResult.artifacts.verdict_matrix
@@ -2278,7 +2721,12 @@ function writeHarnessArtifacts(options) {
       aor_bin: options.aorLaunch.binaryRef,
       examples_root: options.examplesRoot,
     },
-    error: options.flowResult.status === "fail" ? options.flowResult.stageResults.find((stage) => stage.status === "fail")?.summary ?? null : null,
+    error:
+      options.flowResult.status === "fail"
+        ? options.flowResult.stageResults.find((stage) => stage.status === "fail")?.summary ||
+          asNonEmptyString(asRecord(options.flowResult.artifacts.scenario_coverage).summary) ||
+          "Installed-user rehearsal failed without a stage-level failure summary."
+        : null,
   };
   const scorecard = buildScorecard({
     runId: options.runId,
@@ -2321,6 +2769,14 @@ function writeHarnessArtifacts(options) {
       linkedScorecardRefs: [scorecardFile],
       evalSuiteRefs: getEvalSuites(options.profile),
       backlogRefs: getBacklogRefs(options.profile),
+      matrixCell:
+        typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
+          ? options.flowResult.artifacts.matrix_cell
+          : undefined,
+      coverageFollowUp:
+        typeof options.flowResult.artifacts.coverage_follow_up === "object" && options.flowResult.artifacts.coverage_follow_up
+          ? options.flowResult.artifacts.coverage_follow_up
+          : undefined,
       forceIncident: asRecord(options.profile.learning_loop).force_incident === true,
       incidentSummary: summary.error ?? undefined,
     });
@@ -2431,6 +2887,14 @@ function runCli(rawArgs) {
           catalogTargetPath: fullJourneyResolution.catalogTargetPath,
           catalogEntry: fullJourneyResolution.catalogEntry,
           mission: fullJourneyResolution.mission,
+          scenarioPolicyPath: fullJourneyResolution.scenarioPolicyPath,
+          scenarioPolicy: fullJourneyResolution.scenarioPolicy,
+          providerVariantPath: fullJourneyResolution.providerVariantPath,
+          providerVariant: fullJourneyResolution.providerVariant,
+          featureSize: fullJourneyResolution.featureSize,
+          matrixCell: fullJourneyResolution.matrixCell,
+          coverageFollowUp: fullJourneyResolution.coverageFollowUp,
+          coverageTier: fullJourneyResolution.coverageTier,
         })
       : executeInstalledUserFlow({
           hostRoot,

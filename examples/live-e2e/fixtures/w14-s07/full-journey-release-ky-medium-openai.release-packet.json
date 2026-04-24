@@ -1,0 +1,58 @@
+{
+  "packet_id": "sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.release-packet.patch-only.1777033131502",
+  "project_id": "sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai",
+  "ticket_id": "sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.wave.w14-s07.full-journey-release-ky-medium-openai",
+  "run_refs": [
+    "w14-s07.full-journey-release-ky-medium-openai"
+  ],
+  "change_summary": "Delivery mode 'patch-only' produced 0 changed file(s), +0/-0.",
+  "verification_refs": [
+    "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.handoff.bootstrap.v1.json",
+    "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/step-result-routed-w14-s07.full-journey-release-ky-medium-openai.run.start.implement.implement.attempt.1.json",
+    "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/evaluation-report-suite.release.short-v1-1777033129718.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/delivery-transcript-patch-only-w14-s07.full-journey-release-ky-medium-openai-1777033131264.json",
+    "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/delivery-manifest-patch-only-w14-s07.full-journey-release-ky-medium-openai-1777033131501.json"
+  ],
+  "delivery_manifest_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/delivery-manifest-patch-only-w14-s07.full-journey-release-ky-medium-openai-1777033131501.json",
+  "source_provenance": {
+    "delivery_execution_root": "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai",
+    "delivery_execution_root_ref": "evidence://./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai",
+    "delivery_transcript_ref": "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/delivery-transcript-patch-only-w14-s07.full-journey-release-ky-medium-openai-1777033131264.json"
+  },
+  "evidence_lineage": {
+    "handoff_refs": [
+      "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai.handoff.bootstrap.v1.json"
+    ],
+    "promotion_refs": [],
+    "execution_refs": [
+      "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/delivery-plan-implement-1777033131252.json",
+      "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/delivery-transcript-patch-only-w14-s07.full-journey-release-ky-medium-openai-1777033131264.json",
+      "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/step-result-routed-w14-s07.full-journey-release-ky-medium-openai.run.start.implement.implement.attempt.1.json"
+    ],
+    "coordination_refs": [],
+    "rerun_refs": [],
+    "delivery_output_refs": [
+      "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/delivery-manifest-patch-only-w14-s07.full-journey-release-ky-medium-openai-1777033131501.json",
+      "evidence://.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/artifacts/delivery-patch-w14-s07.full-journey-release-ky-medium-openai-1777033131364.patch"
+    ]
+  },
+  "coordination": {
+    "required": false,
+    "status": "not-required",
+    "repo_ids": [
+      "target"
+    ],
+    "evidence_refs": []
+  },
+  "rerun_recovery": {
+    "requested": false,
+    "status": "not-requested",
+    "rerun_of_run_ref": null,
+    "failed_step_ref": null,
+    "packet_boundary": "delivery-manifest",
+    "strategy": null,
+    "blocking_reasons": []
+  },
+  "status": "ready-for-close",
+  "created_at": "2026-04-24T12:18:51.433Z"
+}

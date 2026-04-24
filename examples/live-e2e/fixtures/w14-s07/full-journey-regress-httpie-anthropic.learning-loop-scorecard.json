@@ -1,0 +1,38 @@
+{
+  "scorecard_id": "w14-s07.full-journey-regress-httpie-anthropic.learning-loop.scorecard.v1",
+  "project_id": "httpie-cli-w14-s07.full-journey-regress-httpie-anthropic",
+  "run_id": "w14-s07.full-journey-regress-httpie-anthropic",
+  "source_kind": "cli-learning-handoff",
+  "status": "pass",
+  "summary": "Run 'w14-s07.full-journey-regress-httpie-anthropic' completed public learning-loop handoff.",
+  "evidence_refs": [
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie-anthropic/artifacts/delivery-plan-implement-1777032535491.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie-anthropic/artifacts/delivery-plan-implement-1777032532767.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie-anthropic/artifacts/delivery-manifest-patch-only-w14-s07.full-journey-regress-httpie-anthropic-1777032535796.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie-anthropic/artifacts/release-packet-patch-only-w14-s07.full-journey-regress-httpie-anthropic-1777032535797.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie-anthropic/reports/step-result-routed-w14-s07.full-journey-regress-httpie-anthropic.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie-anthropic/reports/review-report-w14-s07.full-journey-regress-httpie-anthropic.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie-anthropic/reports/learning-loop-scorecard-delivery-w14-s07.full-journey-regress-httpie-anthropic.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie-anthropic/reports/learning-loop-handoff-w14-s07.full-journey-regress-httpie-anthropic.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie-anthropic/reports/review-report-w14-s07.full-journey-regress-httpie-anthropic.json"
+  ],
+  "linked_eval_suite_refs": [],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "matrix_cell": {
+    "cell_id": "httpie-cli.regress.anthropic-primary",
+    "target_catalog_id": "httpie-cli",
+    "feature_mission_id": "httpie-cli-output-regression",
+    "scenario_family": "regress",
+    "provider_variant_id": "anthropic-primary",
+    "feature_size": "small",
+    "coverage_tier": "extended"
+  },
+  "generated_at": "2026-04-24T12:08:56.969Z"
+}

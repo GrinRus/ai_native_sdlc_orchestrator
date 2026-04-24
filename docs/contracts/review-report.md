@@ -14,6 +14,8 @@ Durable report-only quality verdict for one run after execution evidence, delive
 - `discovery_quality`
 - `artifact_quality`
 - `code_quality`
+- `feature_size_fit`
+- `provider_traceability`
 - `findings`
 - `evidence_refs`
 
@@ -35,6 +37,11 @@ Durable report-only quality verdict for one run after execution evidence, delive
 - `input_packet_ref`
 - `request_title`
 - `request_brief`
+- `scenario_family`
+- `provider_variant_id`
+- `feature_size`
+- `matrix_cell`
+- `coverage_follow_up`
 
 `discovery_quality` should preserve:
 - `status`
@@ -56,6 +63,24 @@ Durable report-only quality verdict for one run after execution evidence, delive
 - `changed_paths`
 - `allowed_paths`
 - `forbidden_paths`
+- `findings`
+
+`feature_size_fit` should preserve:
+- `status`
+- `feature_size`
+- `size_budget`
+- `actual_change`
+- `findings`
+
+`provider_traceability` should preserve:
+- `status`
+- `provider_variant_id`
+- `requested_provider`
+- `requested_adapter`
+- `actual_provider`
+- `actual_adapter`
+- `route_id`
+- `route_profile_source`
 - `findings`
 
 Each finding should keep:

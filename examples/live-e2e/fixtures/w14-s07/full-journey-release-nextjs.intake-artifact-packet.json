@@ -1,0 +1,20 @@
+{
+  "packet_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.artifact.intake.nextjs-shared-package-release.v1",
+  "project_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs",
+  "packet_type": "intake-request",
+  "version": 1,
+  "status": "ready",
+  "summary": "Prepare one shared-package release-shaped change",
+  "body_ref": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs.artifact.intake.nextjs-shared-package-release.v1.body.json",
+  "invocation_context": {
+    "command": "aor intake create",
+    "project_root": "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs",
+    "project_profile_ref": "project.aor.yaml",
+    "mission_id": "nextjs-shared-package-release"
+  },
+  "evidence_refs": [
+    "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/state",
+    "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/reports",
+    "./.aor/w14-s07-proof/runtime-nextjs-release/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs/.aor/requests/feature-request-w14-s07.full-journey-release-nextjs-nextjs-shared-package-release.json"
+  ]
+}

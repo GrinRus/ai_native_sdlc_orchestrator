@@ -13,10 +13,38 @@ verification:
 safety_defaults:
   write_back_to_remote: false
   preferred_delivery_mode: patch
+required_matrix_cells:
+  - cell_id: ky.regress.small.openai
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: ky-header-regression
+    provider_variant_id: openai-primary
+    coverage_tier: required
+  - cell_id: ky.regress.medium.anthropic
+    scenario_family: regress
+    feature_size: medium
+    feature_mission_id: ky-fetch-options-regression
+    provider_variant_id: anthropic-primary
+    coverage_tier: required
+  - cell_id: ky.release.medium.openai
+    scenario_family: release
+    feature_size: medium
+    feature_mission_id: ky-release-doc-typing
+    provider_variant_id: openai-primary
+    coverage_tier: required
+provider_comparison_pairs:
+  - pair_id: ky.regress.small
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: ky-header-regression
+    provider_variants:
+      - openai-primary
+      - anthropic-primary
 feature_missions:
   - mission_id: ky-header-regression
     title: Preserve narrow header-normalization regression coverage
     brief: Add or adjust one bounded regression test around header handling and the smallest source fix needed to satisfy it.
+    feature_size: small
     allowed_paths:
       - source/**
       - test/**
@@ -33,12 +61,58 @@ feature_missions:
     acceptance_checks:
       - keep changes inside source and test folders only
       - preserve npm test as the primary regression gate
+    supported_scenarios:
+      - regress
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 6
+      max_added_lines: 220
+    size_rationale: One narrow library regression should stay inside one behavior surface and one test seam.
     change_budget:
       max_changed_files: 6
       max_added_lines: 220
+  - mission_id: ky-fetch-options-regression
+    title: Extend one bounded fetch-options regression across source and typings
+    brief: Adjust one multi-file options-handling or retry-surface regression with matching tests and the smallest typing touch needed to keep the public API coherent.
+    feature_size: medium
+    allowed_paths:
+      - source/**
+      - test/**
+      - index.d.ts
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the fix inside source, tests, and type surface only
+      - preserve npm test as the primary regression gate
+      - keep delivery evidence anchored to the target checkout
+    supported_scenarios:
+      - regress
+      - repair
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 8
+      max_added_lines: 300
+    size_rationale: Medium ky missions may cross one behavior seam plus one type boundary, but should remain bounded to one package.
+    change_budget:
+      max_changed_files: 8
+      max_added_lines: 300
   - mission_id: ky-release-doc-typing
     title: Prepare one release-shaped typed API adjustment
     brief: Land one bounded API or typing fix with matching regression coverage and release-ready lineage.
+    feature_size: medium
     allowed_paths:
       - source/**
       - test/**
@@ -56,6 +130,54 @@ feature_missions:
     acceptance_checks:
       - keep release evidence anchored to the target checkout
       - avoid any upstream write-back
+    supported_scenarios:
+      - release
+      - governance
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 8
+      max_added_lines: 260
+    size_rationale: Release-shaped ky work can span code, tests, and typings, but should still stay within one bounded public API adjustment.
     change_budget:
       max_changed_files: 8
       max_added_lines: 260
+  - mission_id: ky-retry-hooks-governance
+    title: Exercise one broader retry and hooks governance-safe change
+    brief: Touch one broader request lifecycle surface with bounded regression coverage, stricter audit expectations, and no control-plane leakage.
+    feature_size: large
+    allowed_paths:
+      - source/**
+      - test/**
+      - index.d.ts
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+      - learning-loop-handoff
+    acceptance_checks:
+      - preserve repo-local request lifecycle boundaries
+      - keep governance and audit evidence linked to the target checkout
+      - avoid any upstream write-back
+    supported_scenarios:
+      - governance
+      - repair
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+      - open-code-primary
+    size_budget:
+      max_changed_files: 12
+      max_added_lines: 460
+    size_rationale: Large ky missions can cross multiple request lifecycle seams, but must still remain inside one repository package and explicit bounds.
+    change_budget:
+      max_changed_files: 12
+      max_added_lines: 460

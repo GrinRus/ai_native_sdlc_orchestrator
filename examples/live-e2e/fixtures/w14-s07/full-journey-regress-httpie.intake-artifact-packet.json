@@ -1,0 +1,20 @@
+{
+  "packet_id": "httpie-cli-w14-s07.full-journey-regress-httpie.artifact.intake.httpie-cli-output-regression.v1",
+  "project_id": "httpie-cli-w14-s07.full-journey-regress-httpie",
+  "packet_type": "intake-request",
+  "version": 1,
+  "status": "ready",
+  "summary": "Preserve one bounded CLI output regression",
+  "body_ref": "./.aor/w14-s07-proof/runtime-httpie-regress-openai/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-regress-httpie/.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/artifacts/httpie-cli-w14-s07.full-journey-regress-httpie.artifact.intake.httpie-cli-output-regression.v1.body.json",
+  "invocation_context": {
+    "command": "aor intake create",
+    "project_root": "./.aor/w14-s07-proof/runtime-httpie-regress-openai/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-regress-httpie",
+    "project_profile_ref": "project.aor.yaml",
+    "mission_id": "httpie-cli-output-regression"
+  },
+  "evidence_refs": [
+    "./.aor/w14-s07-proof/runtime-httpie-regress-openai/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-regress-httpie/.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/state",
+    "./.aor/w14-s07-proof/runtime-httpie-regress-openai/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-regress-httpie/.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/reports",
+    "./.aor/w14-s07-proof/runtime-httpie-regress-openai/projects/aor-core/target-checkouts/httpie-cli-w14-s07.full-journey-regress-httpie/.aor/requests/feature-request-w14-s07.full-journey-regress-httpie-httpie-cli-output-regression.json"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "packet_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic.release-packet.fork-first-pr.1777032707649",
+  "project_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic",
+  "ticket_id": "belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic.wave.w14-s07.full-journey-release-nextjs-anthropic",
+  "run_refs": [
+    "w14-s07.full-journey-release-nextjs-anthropic"
+  ],
+  "change_summary": "Delivery mode 'fork-first-pr' produced 0 changed file(s), +0/-0.",
+  "verification_refs": [
+    "./.aor/w14-s07-proof/runtime-nextjs-release-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic.handoff.bootstrap.v1.json",
+    "./.aor/w14-s07-proof/runtime-nextjs-release-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/reports/step-result-routed-w14-s07.full-journey-release-nextjs-anthropic.run.start.implement.implement.attempt.1.json",
+    "./.aor/w14-s07-proof/runtime-nextjs-release-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/reports/evaluation-report-suite.release.short-v1-1777032705375.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/reports/delivery-transcript-fork-first-pr-w14-s07.full-journey-release-nextjs-anthropic-1777032707199.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/artifacts/delivery-manifest-fork-first-pr-w14-s07.full-journey-release-nextjs-anthropic-1777032707648.json"
+  ],
+  "delivery_manifest_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/artifacts/delivery-manifest-fork-first-pr-w14-s07.full-journey-release-nextjs-anthropic-1777032707648.json",
+  "source_provenance": {
+    "delivery_execution_root": "./.aor/w14-s07-proof/runtime-nextjs-release-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic",
+    "delivery_execution_root_ref": "evidence://./.aor/w14-s07-proof/runtime-nextjs-release-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic",
+    "delivery_transcript_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/reports/delivery-transcript-fork-first-pr-w14-s07.full-journey-release-nextjs-anthropic-1777032707199.json"
+  },
+  "evidence_lineage": {
+    "handoff_refs": [
+      "./.aor/w14-s07-proof/runtime-nextjs-release-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/artifacts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic.handoff.bootstrap.v1.json"
+    ],
+    "promotion_refs": [],
+    "execution_refs": [
+      "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/artifacts/delivery-plan-implement-1777032707182.json",
+      "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/reports/delivery-transcript-fork-first-pr-w14-s07.full-journey-release-nextjs-anthropic-1777032707199.json",
+      "./.aor/w14-s07-proof/runtime-nextjs-release-anthropic/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/reports/step-result-routed-w14-s07.full-journey-release-nextjs-anthropic.run.start.implement.implement.attempt.1.json"
+    ],
+    "coordination_refs": [],
+    "rerun_refs": [],
+    "delivery_output_refs": [
+      "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/artifacts/delivery-manifest-fork-first-pr-w14-s07.full-journey-release-nextjs-anthropic-1777032707648.json",
+      "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w14-s07.full-journey-release-nextjs-anthropic/artifacts/fork-first-intent-w14-s07.full-journey-release-nextjs-anthropic-1777032707545.json"
+    ]
+  },
+  "coordination": {
+    "required": false,
+    "status": "not-required",
+    "repo_ids": [
+      "target"
+    ],
+    "evidence_refs": []
+  },
+  "rerun_recovery": {
+    "requested": false,
+    "status": "not-requested",
+    "rerun_of_run_ref": null,
+    "failed_step_ref": null,
+    "packet_boundary": "delivery-manifest",
+    "strategy": null,
+    "blocking_reasons": []
+  },
+  "status": "ready-for-close",
+  "created_at": "2026-04-24T12:11:47.546Z"
+}

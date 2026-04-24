@@ -1,0 +1,38 @@
+{
+  "scorecard_id": "w14-s07.full-journey-regress-httpie.learning-loop.scorecard.v1",
+  "project_id": "httpie-cli-w14-s07.full-journey-regress-httpie",
+  "run_id": "w14-s07.full-journey-regress-httpie",
+  "source_kind": "cli-learning-handoff",
+  "status": "pass",
+  "summary": "Run 'w14-s07.full-journey-regress-httpie' completed public learning-loop handoff.",
+  "evidence_refs": [
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/artifacts/delivery-plan-implement-1777032535755.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/artifacts/delivery-plan-implement-1777032533172.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/artifacts/delivery-manifest-patch-only-w14-s07.full-journey-regress-httpie-1777032536084.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/artifacts/release-packet-patch-only-w14-s07.full-journey-regress-httpie-1777032536085.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/reports/step-result-routed-w14-s07.full-journey-regress-httpie.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/reports/review-report-w14-s07.full-journey-regress-httpie.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/reports/learning-loop-scorecard-delivery-w14-s07.full-journey-regress-httpie.json",
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/reports/learning-loop-handoff-w14-s07.full-journey-regress-httpie.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://.aor/projects/httpie-cli-w14-s07.full-journey-regress-httpie/reports/review-report-w14-s07.full-journey-regress-httpie.json"
+  ],
+  "linked_eval_suite_refs": [],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "matrix_cell": {
+    "cell_id": "httpie-cli.regress.small.openai",
+    "target_catalog_id": "httpie-cli",
+    "feature_mission_id": "httpie-cli-output-regression",
+    "scenario_family": "regress",
+    "provider_variant_id": "openai-primary",
+    "feature_size": "small",
+    "coverage_tier": "required"
+  },
+  "generated_at": "2026-04-24T12:08:57.239Z"
+}
