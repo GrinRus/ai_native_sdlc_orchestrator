@@ -26,7 +26,7 @@ The runners own:
 4. Default to evidence, replay, and certification.
 5. Work for monoliths and bounded multirepo projects.
 6. Stay usable without a web UI.
-7. Rehearse end-to-end flows on real public repositories.
+7. Rehearse end-to-end flows on curated public repositories with mission-specific discovery.
 
 ## Core product objects
 - **Project profile** — persistent configuration of repos, routes, policies, budgets, and write-back rules.
@@ -44,7 +44,7 @@ The runners own:
 1. **Bootstrap** — initialize the project, analyze it, validate the profile, and verify the target.
 2. **Intake and discovery** — ingest a request and turn it into discovery and research packets.
 3. **Specification and planning** — build a spec, wave ticket, and approved handoff packet.
-4. **Execution** — run bounded implementation, review, QA, retry, and repair steps.
+4. **Execution** — run bounded implementation, review, QA, retry, and repair steps from an approved mission-linked handoff.
 5. **Delivery** — prepare patches, branches, or PRs according to policy.
 6. **Release** — materialize release packets and sign-off evidence.
 7. **Learning** — backfill incidents into datasets, suites, and certification decisions.
@@ -101,6 +101,13 @@ AOR ships with four standard rehearsal classes:
 - release long
 
 These profiles are designed to run on real public repositories through read-only, patch, or fork-first delivery defaults.
+
+The W13 full-journey layer adds:
+- curated repository selection instead of arbitrary live targets;
+- curated feature missions per repository;
+- feature-intent intake generated during the run;
+- discovery, spec, handoff, execution, review, delivery, and learning closure through public CLI surfaces;
+- explicit verdicts for discovery quality, artifact quality, generated code quality, delivery/release quality, and learning-loop closure.
 
 ## Non-goals for MVP
 - autonomous organization-wide portfolio optimization;

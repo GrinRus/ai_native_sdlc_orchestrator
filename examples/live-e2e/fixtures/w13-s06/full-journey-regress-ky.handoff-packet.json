@@ -1,0 +1,68 @@
+{
+  "packet_id": "sindresorhus-ky-w13-s06.full-journey-regress-ky.handoff.bootstrap.v1",
+  "project_id": "sindresorhus-ky-w13-s06.full-journey-regress-ky",
+  "ticket_id": "sindresorhus-ky-w13-s06.full-journey-regress-ky.wave.bootstrap.v1",
+  "version": 1,
+  "status": "approved",
+  "risk_tier": "medium",
+  "approved_objective": "Preserve narrow header-normalization regression coverage",
+  "repo_scopes": [
+    {
+      "repo_id": "target",
+      "paths": [
+        "**"
+      ]
+    }
+  ],
+  "allowed_paths": [
+    "**"
+  ],
+  "allowed_commands": [
+    "npm install",
+    "npx playwright install",
+    "npm test"
+  ],
+  "verification_plan": {
+    "validators": [
+      "contract-shape",
+      "approval-state",
+      "repo-scope"
+    ],
+    "commands": [
+      "npm install",
+      "npx playwright install",
+      "npm test"
+    ]
+  },
+  "scope_constraints": {
+    "require_bounded_scope": true,
+    "max_repo_scopes": 1,
+    "max_changed_files": 24
+  },
+  "command_policy": {
+    "owner": "project-profile",
+    "allow_unlisted_commands": false
+  },
+  "writeback_mode": "pull-request",
+  "approval_state": {
+    "required": true,
+    "state": "approved",
+    "approval_refs": [
+      "approval://live-e2e/full-journey/w13-s06.full-journey-regress-ky"
+    ],
+    "approved_by": "operator",
+    "approved_at": "2026-04-24T09:08:34.601Z"
+  },
+  "feature_traceability": {
+    "mission_id": "ky-header-regression",
+    "source_kind": "catalog-feature-mission",
+    "request_title": "Preserve narrow header-normalization regression coverage",
+    "request_brief": "Add or adjust one bounded regression test around header handling and the smallest source fix needed to satisfy it."
+  },
+  "source_refs": {
+    "wave_ticket_file": "./.aor/w13-s06-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w13-s06.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/artifacts/wave-ticket-sindresorhus-ky-w13-s06.full-journey-regress-ky.wave.bootstrap.v1.json",
+    "artifact_packet_file": "./.aor/w13-s06-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w13-s06.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/artifacts/sindresorhus-ky-w13-s06.full-journey-regress-ky.artifact.intake.ky-header-regression.v1.json",
+    "project_profile_ref": "project.aor.yaml"
+  },
+  "blocked_next_step": null
+}

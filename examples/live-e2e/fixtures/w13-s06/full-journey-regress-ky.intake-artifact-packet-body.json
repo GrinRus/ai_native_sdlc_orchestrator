@@ -1,0 +1,56 @@
+{
+  "generated_from": {
+    "command": "aor intake create",
+    "project_root": "./.aor/w13-s06-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w13-s06.full-journey-regress-ky",
+    "project_profile_ref": "project.aor.yaml"
+  },
+  "project_identity": {
+    "project_id": "sindresorhus-ky-w13-s06.full-journey-regress-ky"
+  },
+  "mission_traceability": {
+    "mission_id": "ky-header-regression",
+    "source_kind": "catalog-feature-mission"
+  },
+  "feature_request": {
+    "title": "Preserve narrow header-normalization regression coverage",
+    "brief": "Add or adjust one bounded regression test around header handling and the smallest source fix needed to satisfy it.",
+    "constraints": [
+      "keep changes inside source and test folders only",
+      "preserve npm test as the primary regression gate"
+    ],
+    "request_file": "./.aor/w13-s06-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w13-s06.full-journey-regress-ky/.aor/requests/feature-request-w13-s06.full-journey-regress-ky-ky-header-regression.json",
+    "request_document": {
+      "mission_id": "ky-header-regression",
+      "title": "Preserve narrow header-normalization regression coverage",
+      "brief": "Add or adjust one bounded regression test around header handling and the smallest source fix needed to satisfy it.",
+      "allowed_paths": [
+        "source/**",
+        "test/**"
+      ],
+      "forbidden_paths": [
+        "docs/**",
+        ".github/**",
+        "scripts/**",
+        "examples/**",
+        "context/**"
+      ],
+      "expected_evidence": [
+        "verify-summary",
+        "routed-step-result",
+        "review-report"
+      ],
+      "acceptance_checks": [
+        "keep changes inside source and test folders only",
+        "preserve npm test as the primary regression gate"
+      ],
+      "change_budget": {
+        "max_changed_files": 6,
+        "max_added_lines": 220
+      }
+    }
+  },
+  "evidence_roots": {
+    "reports_root": "./.aor/w13-s06-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w13-s06.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/reports",
+    "state_root": "./.aor/w13-s06-proof/runtime-ky/projects/aor-core/target-checkouts/sindresorhus-ky-w13-s06.full-journey-regress-ky/.aor/projects/sindresorhus-ky-w13-s06.full-journey-regress-ky/state"
+  }
+}

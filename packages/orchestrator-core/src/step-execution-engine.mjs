@@ -137,6 +137,24 @@ function writeCompiledContextArtifact(options) {
 }
 
 /**
+ * @param {{ reportsRoot: string }} runtimeLayout
+ * @returns {Record<string, unknown> | null}
+ */
+function readLatestAnalysisFeatureTraceability(runtimeLayout) {
+  const reportPath = path.join(runtimeLayout.reportsRoot, "project-analysis-report.json");
+  if (!fs.existsSync(reportPath)) {
+    return null;
+  }
+  try {
+    const report = /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(reportPath, "utf8")));
+    const featureTraceability = asRecord(report.feature_traceability);
+    return Object.keys(featureTraceability).length > 0 ? featureTraceability : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @param {{
  *   reportsRoot: string,
  *   runId: string,
@@ -342,6 +360,8 @@ export function executeRoutedStep(options) {
   let compiledContextArtifact = null;
   /** @type {Record<string, unknown> | null} */
   let contextCompilation = null;
+  /** @type {Record<string, unknown> | null} */
+  let featureTraceability = null;
   /** @type {string | null} */
   let compiledContextRef = null;
   /** @type {string | null} */
@@ -460,6 +480,7 @@ export function executeRoutedStep(options) {
       blockedNextStep = "Re-run discovery and close failing completeness checks before executing spec build.";
       evidenceRefs = [...new Set([init.projectProfilePath, discoveryResult.reportPath])];
     }
+    featureTraceability = asRecord(discoveryResult.report.feature_traceability);
   }
 
   if (!discoveryCompletenessGate?.blocking) {
@@ -684,6 +705,9 @@ export function executeRoutedStep(options) {
           ...asStringArray(adapterResponse?.evidence_refs),
         ]),
       ];
+      if (featureTraceability === null) {
+        featureTraceability = readLatestAnalysisFeatureTraceability(init.runtimeLayout);
+      }
     } catch (error) {
       status = "failed";
       summary = error instanceof Error ? error.message : String(error);
@@ -728,6 +752,7 @@ export function executeRoutedStep(options) {
         compiled_context_artifact: compiledContextArtifact,
         diagnostics: contextCompilation,
       },
+      feature_traceability: featureTraceability,
       discovery_completeness_gate: discoveryCompletenessGate,
       architecture_traceability: {
         architecture_doc_refs: discoveryArchitectureTraceability?.architecture_doc_refs ?? [...STEP_ARCHITECTURE_DOC_REFS],

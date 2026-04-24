@@ -9,6 +9,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W9:** `W9-S02` Current-state documentation drift repair
 - **W11:** `W11-S01` Source-of-truth reality repair
 - **W12:** `W12-S01` Public surface realignment
+- **W13:** `W13-S01` Backlog-first full-journey live E2E realignment
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -16,6 +17,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 **Slices by wave:**
 - **W1:** `W1-S02` Project init and profile loading runtime; `W1-S03` Project analysis engine and durable analysis report; `W1-S05` Project verify flow and bounded preflight execution
 - **W8:** `W8-S02` Later discovery and architecture maturity pack
+- **W13:** `W13-S03` Public bootstrap and feature-intent intake
 
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
@@ -32,6 +34,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W9:** `W9-S01` Run-scoped routed evidence durability bugfix; `W9-S08` First real provider adapter and live execution foundation
 - **W10:** `W10-S01` External live adapter execution baseline
 - **W11:** `W11-S03` Profile-driven preflight and routed live execution
+- **W13:** `W13-S04` Feature-driven discovery and execution lifecycle
 
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -42,6 +45,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W7:** `W7-S01` Governance quality guardrails and evidence parity; `W7-S02` AI platform promotion/freeze maturity pack
 - **W8:** `W8-S05` Later QA and AI platform baseline comparison maturity; `W8-S09` Context asset lifecycle and quality-gated update flow
 - **W9:** `W9-S05` Public harness replay command surface; `W9-S06` Asset promote/freeze command surface completion
+- **W13:** `W13-S05` Public review and learning-loop closure surfaces
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -81,3 +85,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W10:** `W10-S05` Externally verified live E2E target-catalog proof
 - **W11:** `W11-S02` Target workspace materialization for live E2E; `W11-S05` Fresh external proof bundle for catalog targets
 - **W12:** `W12-S02` Internal black-box installed-user harness; `W12-S04` Proof refresh after surface cleanup
+- **W13:** `W13-S02` Curated target and feature mission catalog; `W13-S06` Full-journey harness and restored runner skill

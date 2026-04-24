@@ -1,0 +1,77 @@
+{
+  "review_report_id": "w13-s06.full-journey-release-nextjs.review-report.v1",
+  "project_id": "belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs",
+  "run_id": "w13-s06.full-journey-release-nextjs",
+  "generated_at": "2026-04-24T09:12:13.764Z",
+  "overall_status": "warn",
+  "review_recommendation": "required-human-review",
+  "feature_traceability": {
+    "status": "pass",
+    "mission_id": "nextjs-shared-package-release",
+    "input_packet_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.artifact.intake.nextjs-shared-package-release.v1.json",
+    "request_title": "Prepare one shared-package release-shaped change",
+    "request_brief": "Update one shared package and one consuming app with bounded release evidence and no upstream write-back."
+  },
+  "discovery_quality": {
+    "status": "pass",
+    "analysis_report_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/project-analysis-report.json",
+    "spec_step_result_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/step-result-routed-belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "handoff_packet_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.handoff.bootstrap.v1.json",
+    "findings": []
+  },
+  "artifact_quality": {
+    "status": "pass",
+    "verify_summary_ref": "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/verify-summary.json",
+    "execution_step_result_refs": [
+      "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/step-result-routed-w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.json"
+    ],
+    "delivery_manifest_ref": null,
+    "release_packet_ref": null,
+    "findings": []
+  },
+  "code_quality": {
+    "status": "warn",
+    "changed_paths": [],
+    "allowed_paths": [
+      "apps/**",
+      "packages/**"
+    ],
+    "forbidden_paths": [
+      "docs/**",
+      ".github/**",
+      "scripts/**",
+      "examples/**",
+      "context/**"
+    ],
+    "findings": [
+      {
+        "finding_id": "code-quality.01",
+        "severity": "warn",
+        "category": "code-quality",
+        "summary": "No non-bootstrap changed paths were detected for the reviewed run.",
+        "evidence_refs": [
+          "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/step-result-routed-w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.json"
+        ]
+      }
+    ]
+  },
+  "findings": [
+    {
+      "finding_id": "code-quality.01",
+      "severity": "warn",
+      "category": "code-quality",
+      "summary": "No non-bootstrap changed paths were detected for the reviewed run.",
+      "evidence_refs": [
+        "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/step-result-routed-w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.json"
+      ]
+    }
+  ],
+  "evidence_refs": [
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.artifact.intake.nextjs-shared-package-release.v1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/project-analysis-report.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/step-result-routed-belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.routed-execution.v1.routed.spec.spec.attempt.1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/artifacts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs.handoff.bootstrap.v1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/step-result-routed-w13-s06.full-journey-release-nextjs.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/verify-summary.json"
+  ]
+}

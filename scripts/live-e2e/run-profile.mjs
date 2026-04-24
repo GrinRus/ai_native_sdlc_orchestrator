@@ -330,6 +330,127 @@ function loadHarnessProfile(options) {
 }
 
 /**
+ * @param {{ hostRoot: string, catalogRootOverride: string | null }} options
+ * @returns {string}
+ */
+function resolveCatalogRoot(options) {
+  const candidate = options.catalogRootOverride
+    ? path.isAbsolute(options.catalogRootOverride)
+      ? options.catalogRootOverride
+      : path.resolve(options.hostRoot, options.catalogRootOverride)
+    : path.join(options.hostRoot, "scripts/live-e2e/catalog");
+  if (!fileExists(candidate) || !fs.statSync(candidate).isDirectory()) {
+    throw new UsageError(`Catalog root '${candidate}' was not found.`);
+  }
+  return candidate;
+}
+
+/**
+ * @param {{ catalogRoot: string, targetCatalogId: string }} options
+ */
+function loadCatalogTarget(options) {
+  const filePath = path.join(options.catalogRoot, "targets", `${normalizeId(options.targetCatalogId)}.yaml`);
+  if (!fileExists(filePath)) {
+    throw new UsageError(`Target catalog '${options.targetCatalogId}' was not found under '${options.catalogRoot}/targets'.`);
+  }
+  return {
+    filePath,
+    entry: readYamlDocument(filePath),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @returns {boolean}
+ */
+function isFullJourneyProfile(profile) {
+  return asNonEmptyString(profile.journey_mode) === "full-journey" || asNonEmptyString(profile.target_catalog_id).length > 0;
+}
+
+/**
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   catalogRoot: string,
+ * }} options
+ */
+function resolveFullJourneyProfile(options) {
+  const rawTargetRepo = asRecord(options.profile.target_repo);
+  if (asNonEmptyString(rawTargetRepo.repo_url)) {
+    throw new UsageError("Full-journey profiles must resolve target repos from target_catalog_id, not raw target_repo.repo_url.");
+  }
+
+  const targetCatalogId = asNonEmptyString(options.profile.target_catalog_id);
+  const featureMissionId = asNonEmptyString(options.profile.feature_mission_id);
+  if (!targetCatalogId) {
+    throw new UsageError("Full-journey profiles require target_catalog_id.");
+  }
+  if (!featureMissionId) {
+    throw new UsageError("Full-journey profiles require feature_mission_id.");
+  }
+
+  const catalogTarget = loadCatalogTarget({
+    catalogRoot: options.catalogRoot,
+    targetCatalogId,
+  });
+  const catalogEntry = asRecord(catalogTarget.entry);
+  const missions = Array.isArray(catalogEntry.feature_missions)
+    ? /** @type {Array<Record<string, unknown>>} */ (catalogEntry.feature_missions)
+    : [];
+  const mission = missions.find((candidate) => asNonEmptyString(candidate.mission_id) === featureMissionId);
+  if (!mission) {
+    throw new UsageError(`Feature mission '${featureMissionId}' was not found in catalog '${targetCatalogId}'.`);
+  }
+
+  const resolvedProfile = /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(options.profile)));
+  resolvedProfile.target_repo = asRecord(JSON.parse(JSON.stringify(asRecord(catalogEntry.repo))));
+  resolvedProfile.verification = {
+    ...asRecord(catalogEntry.verification),
+    ...asRecord(options.profile.verification),
+  };
+  resolvedProfile.output_policy = {
+    ...asRecord(catalogEntry.safety_defaults),
+    ...asRecord(options.profile.output_policy),
+  };
+  resolvedProfile.target_catalog_ref = catalogTarget.filePath;
+  resolvedProfile.feature_mission_ref = `${catalogTarget.filePath}#${featureMissionId}`;
+  return {
+    resolvedProfile,
+    catalogTargetPath: catalogTarget.filePath,
+    catalogEntry,
+    mission,
+  };
+}
+
+/**
+ * @param {{
+ *   targetCheckoutRoot: string,
+ *   mission: Record<string, unknown>,
+ *   runId: string,
+ * }} options
+ */
+function materializeFeatureRequestFile(options) {
+  const requestsRoot = path.join(options.targetCheckoutRoot, ".aor", "requests");
+  fs.mkdirSync(requestsRoot, { recursive: true });
+  const missionId = asNonEmptyString(options.mission.mission_id) || "feature-mission";
+  const filePath = path.join(requestsRoot, `feature-request-${normalizeId(options.runId)}-${normalizeId(missionId)}.json`);
+  const requestDocument = {
+    mission_id: missionId,
+    title: asNonEmptyString(options.mission.title) || missionId,
+    brief: asNonEmptyString(options.mission.brief) || "Catalog-backed full-journey feature request.",
+    allowed_paths: asStringArray(options.mission.allowed_paths),
+    forbidden_paths: asStringArray(options.mission.forbidden_paths),
+    expected_evidence: asStringArray(options.mission.expected_evidence),
+    acceptance_checks: asStringArray(options.mission.acceptance_checks),
+    change_budget: asRecord(options.mission.change_budget),
+  };
+  writeJson(filePath, requestDocument);
+  return {
+    requestFile: filePath,
+    requestDocument,
+  };
+}
+
+/**
  * @param {Record<string, unknown>} profile
  * @returns {string[]}
  */
@@ -856,6 +977,17 @@ function getEvalSuites(profile) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {"pass" | "warn" | "fail"}
+ */
+function normalizeVerdictStatus(value) {
+  const normalized = asNonEmptyString(value).toLowerCase();
+  if (normalized === "fail") return "fail";
+  if (normalized === "warn") return "warn";
+  return "pass";
+}
+
+/**
  * @param {{
  *   hostRoot: string,
  *   layout: ReturnType<typeof ensureRuntimeLayout>,
@@ -1297,6 +1429,742 @@ function executeInstalledUserFlow(options) {
 
 /**
  * @param {{
+ *   hostRoot: string,
+ *   layout: ReturnType<typeof ensureRuntimeLayout>,
+ *   runId: string,
+ *   profilePath: string,
+ *   profile: Record<string, unknown>,
+ *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
+ *   examplesRoot: string,
+ *   examplesRootOverride: string | null,
+ *   catalogTargetPath: string,
+ *   catalogEntry: Record<string, unknown>,
+ *   mission: Record<string, unknown>,
+ * }} options
+ */
+function executeFullJourneyFlow(options) {
+  const stageMap = createStageMap(getProfileStages(options.profile));
+  const commandResults = [];
+  const transcriptsRoot = path.join(options.layout.reportsRoot, `live-e2e-command-traces-${normalizeId(options.runId)}`);
+  fs.mkdirSync(transcriptsRoot, { recursive: true });
+  const sessionRoots = createSessionRoots({
+    sessionsRoot: options.layout.sessionsRoot,
+    runId: options.runId,
+  });
+  const env = {
+    ...process.env,
+    AOR_HOME: sessionRoots.aorHome,
+    CODEX_HOME: sessionRoots.codexHome,
+    TMPDIR: sessionRoots.tmpRoot,
+  };
+  if (options.examplesRootOverride) {
+    env.AOR_BOOTSTRAP_ASSETS_ROOT = options.examplesRootOverride;
+    env.AOR_EXAMPLES_ROOT = options.examplesRootOverride;
+  }
+
+  const artifacts = {
+    host_runtime_root: options.layout.runtimeRoot,
+    host_reports_root: options.layout.reportsRoot,
+    session_root: sessionRoots.sessionRoot,
+    aor_home: sessionRoots.aorHome,
+    codex_home: sessionRoots.codexHome,
+    target_catalog_file: options.catalogTargetPath,
+    feature_mission_id: asNonEmptyString(options.mission.mission_id) || null,
+  };
+  const startedAt = nowIso();
+  const internalTestHooks = asRecord(options.profile.internal_test_hooks);
+
+  try {
+    const targetCheckout = materializeTargetCheckout({
+      hostRoot: options.hostRoot,
+      layout: options.layout,
+      runId: options.runId,
+      profile: options.profile,
+    });
+    artifacts.target_checkout_root = targetCheckout.targetCheckoutRoot;
+    artifacts.target_repo_ref = targetCheckout.targetRepoRef;
+    artifacts.target_repo_url = targetCheckout.targetRepoUrl;
+
+    let commandIndex = 1;
+    const runCommand = (label, args) => {
+      const result = runAorCommand({
+        launch: options.aorLaunch,
+        cwd: targetCheckout.targetCheckoutRoot,
+        args,
+        env,
+        transcriptsRoot,
+        label,
+        index: commandIndex,
+      });
+      commandIndex += 1;
+      commandResults.push({
+        label,
+        command_surface: result.commandSurface,
+        exit_code: result.exitCode,
+        transcript_file: result.transcriptFile,
+      });
+      if (!result.ok) {
+        const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
+        throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
+      }
+      return result;
+    };
+
+    const bootstrapTemplate = asNonEmptyString(options.profile.bootstrap_template) || "github-default";
+    const catalogVerification = asRecord(options.catalogEntry.verification);
+    const repoLintCommands = asStringArray(catalogVerification.setup_commands);
+    const repoVerificationCommands = asStringArray(catalogVerification.commands);
+    const projectInit = runCommand("project-init", [
+      "project",
+      "init",
+      "--project-ref",
+      ".",
+      "--runtime-root",
+      ".aor",
+      "--materialize-project-profile",
+      "--bootstrap-template",
+      bootstrapTemplate,
+      "--materialize-bootstrap-assets",
+      ...repoVerificationCommands.flatMap((entry) => ["--repo-build-command", entry]),
+      ...repoLintCommands.flatMap((entry) => ["--repo-lint-command", entry]),
+      ...repoVerificationCommands.flatMap((entry) => ["--repo-test-command", entry]),
+    ]);
+    artifacts.generated_project_profile_file = getStringField(projectInit.payload, "materialized_project_profile_file");
+    artifacts.target_examples_root = getStringField(projectInit.payload, "materialized_bootstrap_assets_root");
+    artifacts.bootstrap_artifact_packet_file = getStringField(projectInit.payload, "artifact_packet_file");
+    markStage(
+      stageMap,
+      "bootstrap",
+      "pass",
+      uniqueStrings([projectInit.transcriptFile, ...collectStringRefs(projectInit.payload)]),
+      "Public bootstrap materialized project profile and packaged bootstrap assets.",
+    );
+
+    const featureRequest = materializeFeatureRequestFile({
+      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      mission: options.mission,
+      runId: options.runId,
+    });
+    artifacts.feature_request_file = featureRequest.requestFile;
+
+    const intakeCreate = runCommand("intake-create", [
+      "intake",
+      "create",
+      "--project-ref",
+      ".",
+      "--runtime-root",
+      ".aor",
+      "--request-file",
+      featureRequest.requestFile,
+      "--mission-id",
+      asNonEmptyString(options.mission.mission_id),
+      "--request-title",
+      asNonEmptyString(featureRequest.requestDocument.title),
+      "--request-brief",
+      asNonEmptyString(featureRequest.requestDocument.brief),
+      ...asStringArray(options.mission.acceptance_checks).flatMap((entry) => ["--request-constraints", entry]),
+    ]);
+    artifacts.intake_artifact_packet_file = getStringField(intakeCreate.payload, "artifact_packet_file");
+    artifacts.intake_artifact_packet_body_file = getStringField(intakeCreate.payload, "artifact_packet_body_file");
+
+    const analyze = runCommand("project-analyze", [
+      "project",
+      "analyze",
+      "--project-ref",
+      ".",
+      "--project-profile",
+      "./project.aor.yaml",
+      "--runtime-root",
+      ".aor",
+    ]);
+    artifacts.analysis_report_file = getStringField(analyze.payload, "analysis_report_file");
+
+    const validate = runCommand("project-validate", [
+      "project",
+      "validate",
+      "--project-ref",
+      ".",
+      "--project-profile",
+      "./project.aor.yaml",
+      "--runtime-root",
+      ".aor",
+    ]);
+    artifacts.validation_report_file = getStringField(validate.payload, "validation_report_file");
+
+    const verifyPreflight = runCommand("project-verify-preflight", [
+      "project",
+      "verify",
+      "--project-ref",
+      ".",
+      "--project-profile",
+      "./project.aor.yaml",
+      "--runtime-root",
+      ".aor",
+      "--require-validation-pass",
+      "true",
+      "--routed-dry-run-step",
+      "implement",
+    ]);
+    artifacts.verify_summary_file = getStringField(verifyPreflight.payload, "verify_summary_file");
+    artifacts.preflight_step_result_files = getStringArrayField(verifyPreflight.payload, "step_result_files");
+    const verifySummaryPath = /** @type {string | null} */ (artifacts.verify_summary_file);
+    if (!verifySummaryPath || !fileExists(verifySummaryPath)) {
+      markStage(
+        stageMap,
+        "execution",
+        "fail",
+        uniqueStrings([verifyPreflight.transcriptFile, ...collectStringRefs(verifyPreflight.payload)]),
+        "Dry-run verify summary was not materialized.",
+      );
+      throw new Error("Dry-run verify summary was not materialized.");
+    }
+    const verifySummary = readJson(verifySummaryPath);
+    if (verifySummary.status === "failed") {
+      markStage(
+        stageMap,
+        "execution",
+        "fail",
+        uniqueStrings([verifyPreflight.transcriptFile, verifySummaryPath, ...collectStringRefs(verifyPreflight.payload)]),
+        "Dry-run verify failed before feature-driven discovery planning.",
+      );
+      throw new Error("Dry-run verify failed before feature-driven discovery planning.");
+    }
+
+    const discovery = runCommand("discovery-run", [
+      "discovery",
+      "run",
+      "--project-ref",
+      ".",
+      "--project-profile",
+      "./project.aor.yaml",
+      "--runtime-root",
+      ".aor",
+      "--input-packet",
+      /** @type {string} */ (artifacts.intake_artifact_packet_file),
+    ]);
+    artifacts.discovery_analysis_report_file = getStringField(discovery.payload, "analysis_report_file");
+    markStage(
+      stageMap,
+      "discovery",
+      "pass",
+      uniqueStrings([
+        analyze.transcriptFile,
+        validate.transcriptFile,
+        discovery.transcriptFile,
+        ...collectStringRefs(discovery.payload),
+      ]),
+      "Feature-driven discovery completed from catalog-backed intake request.",
+    );
+
+    const specBuild = runCommand("spec-build", [
+      "spec",
+      "build",
+      "--project-ref",
+      ".",
+      "--project-profile",
+      "./project.aor.yaml",
+      "--runtime-root",
+      ".aor",
+    ]);
+    artifacts.spec_step_result_file = getStringField(specBuild.payload, "routed_step_result_file");
+    if (internalTestHooks.drop_spec_step_result_after_spec_build === true && artifacts.spec_step_result_file) {
+      try {
+        fs.rmSync(artifacts.spec_step_result_file, { force: true });
+      } catch {
+        // ignore test-only cleanup failure and let the artifact check below fail deterministically
+      }
+    }
+    if (!artifacts.spec_step_result_file || !fileExists(artifacts.spec_step_result_file)) {
+      markStage(
+        stageMap,
+        "spec",
+        "fail",
+        uniqueStrings([specBuild.transcriptFile, ...collectStringRefs(specBuild.payload)]),
+        "Spec build did not materialize a routed step-result artifact.",
+      );
+      throw new Error("Spec build did not materialize a routed step-result artifact.");
+    }
+    markStage(
+      stageMap,
+      "spec",
+      "pass",
+      uniqueStrings([specBuild.transcriptFile, ...collectStringRefs(specBuild.payload)]),
+      "Spec build produced feature-traceable dry-run evidence.",
+    );
+
+    const waveCreate = runCommand("wave-create", [
+      "wave",
+      "create",
+      "--project-ref",
+      ".",
+      "--project-profile",
+      "./project.aor.yaml",
+      "--runtime-root",
+      ".aor",
+    ]);
+    artifacts.wave_ticket_file = getStringField(waveCreate.payload, "wave_ticket_file");
+    artifacts.handoff_packet_file = getStringField(waveCreate.payload, "handoff_packet_file");
+    markStage(
+      stageMap,
+      "planning",
+      "pass",
+      uniqueStrings([waveCreate.transcriptFile, ...collectStringRefs(waveCreate.payload)]),
+      "Wave and handoff packets were materialized from the public planning flow.",
+    );
+
+    const handoffApprove = runCommand("handoff-approve", [
+      "handoff",
+      "approve",
+      "--project-ref",
+      ".",
+      "--runtime-root",
+      ".aor",
+      "--handoff-packet",
+      /** @type {string} */ (artifacts.handoff_packet_file),
+      "--approval-ref",
+      `approval://live-e2e/full-journey/${normalizeId(options.runId)}`,
+    ]);
+    artifacts.approved_handoff_packet_file = getStringField(handoffApprove.payload, "handoff_packet_file");
+    if (internalTestHooks.block_approved_handoff_validation === true) {
+      markStage(
+        stageMap,
+        "handoff",
+        "fail",
+        uniqueStrings([handoffApprove.transcriptFile, ...collectStringRefs(handoffApprove.payload)]),
+        "Approved handoff validation was blocked by internal test hook.",
+      );
+      throw new Error("Approved handoff validation was blocked by internal test hook.");
+    }
+    let validateApproved;
+    try {
+      validateApproved = runCommand("project-validate-approved-handoff", [
+        "project",
+        "validate",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        "./project.aor.yaml",
+        "--runtime-root",
+        ".aor",
+        "--require-approved-handoff",
+        "--handoff-packet",
+        /** @type {string} */ (artifacts.approved_handoff_packet_file),
+      ]);
+    } catch (error) {
+      const summary = error instanceof Error ? error.message : String(error);
+      markStage(
+        stageMap,
+        "handoff",
+        "fail",
+        uniqueStrings([handoffApprove.transcriptFile]),
+        summary,
+      );
+      throw error;
+    }
+    artifacts.approved_validation_report_file = getStringField(validateApproved.payload, "validation_report_file");
+    markStage(
+      stageMap,
+      "handoff",
+      "pass",
+      uniqueStrings([handoffApprove.transcriptFile, validateApproved.transcriptFile, ...collectStringRefs(handoffApprove.payload)]),
+      "Approved handoff validated for execution start.",
+    );
+
+    const promotionEvidenceRefs = uniqueStrings([
+      ...(verifySummaryPath ? [verifySummaryPath] : []),
+      ...asStringArray(artifacts.preflight_step_result_files),
+    ]);
+
+    const runStart = runCommand("run-start", [
+      "run",
+      "start",
+      "--project-ref",
+      ".",
+      "--project-profile",
+      "./project.aor.yaml",
+      "--runtime-root",
+      ".aor",
+      "--run-id",
+      options.runId,
+      "--target-step",
+      "implement",
+      "--require-validation-pass",
+      "true",
+      ...(artifacts.approved_handoff_packet_file
+        ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
+        : []),
+      ...(promotionEvidenceRefs.length > 0
+        ? ["--promotion-evidence-refs", promotionEvidenceRefs.join(",")]
+        : []),
+    ]);
+    artifacts.routed_step_result_file = getStringField(runStart.payload, "routed_step_result_file");
+    artifacts.routed_step_result_id = getStringField(runStart.payload, "routed_step_result_id");
+    if (artifacts.routed_step_result_file && fileExists(artifacts.routed_step_result_file)) {
+      const stepResult = readJson(artifacts.routed_step_result_file);
+      const routedExecution = asRecord(stepResult.routed_execution);
+      artifacts.compiled_context_ref = asNonEmptyString(asRecord(routedExecution.context_compilation).compiled_context_ref) || null;
+      artifacts.compiled_context_file = asNonEmptyString(asRecord(routedExecution.context_compilation).compiled_context_file) || null;
+      artifacts.adapter_raw_evidence_ref =
+        asNonEmptyString(asRecord(asRecord(asRecord(routedExecution.adapter_response).output).external_runner).raw_evidence_ref) ||
+        null;
+      if (asNonEmptyString(stepResult.status) !== "passed") {
+        markStage(
+          stageMap,
+          "execution",
+          "fail",
+          uniqueStrings([
+            verifyPreflight.transcriptFile,
+            verifySummaryPath,
+            runStart.transcriptFile,
+            artifacts.routed_step_result_file,
+            ...collectStringRefs(stepResult),
+          ]),
+          asNonEmptyString(stepResult.summary) || "Run start routed execution failed.",
+        );
+        throw new Error(asNonEmptyString(stepResult.summary) || "Run start routed execution failed.");
+      }
+    }
+    const runStatus = runCommand("run-status", [
+      "run",
+      "status",
+      "--project-ref",
+      ".",
+      "--runtime-root",
+      ".aor",
+      "--run-id",
+      options.runId,
+    ]);
+    artifacts.run_status_snapshot_file = runStatus.transcriptFile;
+    markStage(
+      stageMap,
+      "execution",
+      "pass",
+      uniqueStrings([
+        verifyPreflight.transcriptFile,
+        verifySummaryPath,
+        runStart.transcriptFile,
+        runStatus.transcriptFile,
+        ...collectStringRefs(runStart.payload),
+      ]),
+      "Dry-run verify, run start, and run status completed through public execution lifecycle.",
+    );
+
+    const reviewRun = runCommand("review-run", [
+      "review",
+      "run",
+      "--project-ref",
+      ".",
+      "--project-profile",
+      "./project.aor.yaml",
+      "--runtime-root",
+      ".aor",
+      "--run-id",
+      options.runId,
+    ]);
+    artifacts.review_report_file = getStringField(reviewRun.payload, "review_report_file");
+    const reviewReport = artifacts.review_report_file && fileExists(artifacts.review_report_file)
+      ? readJson(artifacts.review_report_file)
+      : {};
+    const reviewOverallStatus = normalizeVerdictStatus(reviewReport.overall_status);
+    markStage(
+      stageMap,
+      "review",
+      reviewOverallStatus === "fail" ? "fail" : "pass",
+      uniqueStrings([reviewRun.transcriptFile, ...collectStringRefs(reviewRun.payload)]),
+      reviewOverallStatus === "fail" ? "Review report failed." : "Review report materialized.",
+    );
+
+    const evalSuites = getEvalSuites(options.profile);
+    if (evalSuites.length > 0) {
+      const evalRun = runCommand("eval-run", [
+        "eval",
+        "run",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        "./project.aor.yaml",
+        "--runtime-root",
+        ".aor",
+        "--suite-ref",
+        evalSuites[0],
+        "--subject-ref",
+        `run://${options.runId}`,
+      ]);
+      artifacts.evaluation_report_file = getStringField(evalRun.payload, "evaluation_report_file");
+      markStage(
+        stageMap,
+        "qa",
+        getStringField(evalRun.payload, "evaluation_status") === "pass" ? "pass" : "fail",
+        uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]),
+        "Evaluation report materialized.",
+      );
+      if (getStringField(evalRun.payload, "evaluation_status") !== "pass") {
+        throw new Error("Evaluation report failed.");
+      }
+    } else {
+      markStage(stageMap, "qa", "skipped", [], "Profile has no eval suites.");
+    }
+
+    const harnessCertification = getHarnessCertification(options.profile);
+    /** @type {string[]} */
+    const deliveryEvidenceRefs = uniqueStrings([
+      ...(artifacts.routed_step_result_file ? [artifacts.routed_step_result_file] : []),
+      ...(artifacts.evaluation_report_file ? [artifacts.evaluation_report_file] : []),
+    ]);
+    if (harnessCertification) {
+      const certify = runCommand("harness-certify", [
+        "harness",
+        "certify",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        "./project.aor.yaml",
+        "--runtime-root",
+        ".aor",
+        "--asset-ref",
+        harnessCertification.assetRef,
+        "--subject-ref",
+        harnessCertification.subjectRef,
+        "--suite-ref",
+        harnessCertification.suiteRef,
+        "--step-class",
+        harnessCertification.stepClass,
+      ]);
+      artifacts.promotion_decision_file = getStringField(certify.payload, "promotion_decision_file");
+      if (artifacts.promotion_decision_file) {
+        deliveryEvidenceRefs.push(artifacts.promotion_decision_file);
+      }
+      if (getStringField(certify.payload, "promotion_decision_status") !== "pass") {
+        throw new Error("Harness certification did not pass.");
+      }
+    }
+
+    let deliverPrepare;
+    try {
+      deliverPrepare = runCommand("deliver-prepare", [
+        "deliver",
+        "prepare",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        "./project.aor.yaml",
+        "--runtime-root",
+        ".aor",
+        "--run-id",
+        options.runId,
+        "--step-class",
+        "implement",
+        "--mode",
+        getPreferredDeliveryMode(options.profile),
+        ...(artifacts.approved_handoff_packet_file
+          ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
+          : []),
+        ...(deliveryEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", deliveryEvidenceRefs.join(",")] : []),
+      ]);
+    } catch (error) {
+      const summary = error instanceof Error ? error.message : String(error);
+      markStage(stageMap, "delivery", "fail", [], summary);
+      throw error;
+    }
+    artifacts.delivery_manifest_file = getStringField(deliverPrepare.payload, "delivery_manifest_file");
+    artifacts.delivery_plan_file = getStringField(deliverPrepare.payload, "delivery_plan_file");
+    artifacts.delivery_transcript_file = getStringField(deliverPrepare.payload, "delivery_transcript_file");
+    if (internalTestHooks.block_delivery_prepare === true) {
+      deliverPrepare.payload.delivery_blocking = true;
+    }
+    markStage(
+      stageMap,
+      "delivery",
+      deliverPrepare.payload?.delivery_blocking === true ? "fail" : "pass",
+      uniqueStrings([deliverPrepare.transcriptFile, ...collectStringRefs(deliverPrepare.payload)]),
+      deliverPrepare.payload?.delivery_blocking === true
+        ? "Delivery prepare was blocked."
+        : "Delivery prepare materialized delivery evidence.",
+    );
+    if (deliverPrepare.payload?.delivery_blocking === true) {
+      throw new Error("Delivery prepare was blocked.");
+    }
+
+    if (asRecord(options.profile.output_policy).materialize_release_packet === true) {
+      const releasePrepare = runCommand("release-prepare", [
+        "release",
+        "prepare",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        "./project.aor.yaml",
+        "--runtime-root",
+        ".aor",
+        "--run-id",
+        options.runId,
+        "--step-class",
+        "implement",
+        "--mode",
+        getPreferredDeliveryMode(options.profile),
+        ...(artifacts.approved_handoff_packet_file
+          ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
+          : []),
+        ...(deliveryEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", deliveryEvidenceRefs.join(",")] : []),
+      ]);
+      artifacts.release_packet_file = getStringField(releasePrepare.payload, "release_packet_file");
+      if (!artifacts.release_packet_file) {
+        markStage(
+          stageMap,
+          "release",
+          "fail",
+          uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
+          "Release prepare did not materialize release packet.",
+        );
+        throw new Error("Release prepare did not materialize release packet.");
+      }
+      markStage(
+        stageMap,
+        "release",
+        "pass",
+        uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
+        "Release prepare materialized release packet evidence.",
+      );
+    } else {
+      markStage(stageMap, "release", "skipped", [], "Profile does not request release packet materialization.");
+    }
+
+    const auditRuns = runCommand("audit-runs", [
+      "audit",
+      "runs",
+      "--project-ref",
+      ".",
+      "--runtime-root",
+      ".aor",
+      "--run-id",
+      options.runId,
+    ]);
+    artifacts.run_audit_file = auditRuns.transcriptFile;
+    const auditPayload = asRecord(auditRuns.payload);
+
+    let incidentOpen = null;
+    if (reviewOverallStatus === "fail") {
+      incidentOpen = runCommand("incident-open", [
+        "incident",
+        "open",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--run-id",
+        options.runId,
+        "--summary",
+        "Full-journey review verdict failed.",
+      ]);
+      artifacts.incident_report_file = getStringField(incidentOpen.payload, "incident_file");
+    }
+
+    let learningHandoff;
+    try {
+      learningHandoff = runCommand("learning-handoff", [
+        "learning",
+        "handoff",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--run-id",
+        options.runId,
+      ]);
+    } catch (error) {
+      const summary = error instanceof Error ? error.message : String(error);
+      markStage(stageMap, "learning", "fail", [], summary);
+      throw error;
+    }
+    if (internalTestHooks.drop_learning_handoff_outputs === true) {
+      delete learningHandoff.payload.learning_loop_handoff_file;
+    }
+    artifacts.learning_loop_scorecard_file = getStringField(learningHandoff.payload, "learning_loop_scorecard_file");
+    artifacts.learning_loop_handoff_file = getStringField(learningHandoff.payload, "learning_loop_handoff_file");
+    artifacts.incident_report_file =
+      getStringField(learningHandoff.payload, "incident_report_file") ||
+      getStringField(learningHandoff.payload, "incident_file") ||
+      artifacts.incident_report_file ||
+      null;
+    if (!artifacts.learning_loop_scorecard_file || !artifacts.learning_loop_handoff_file) {
+      markStage(
+        stageMap,
+        "learning",
+        "fail",
+        uniqueStrings([learningHandoff.transcriptFile, ...collectStringRefs(learningHandoff.payload)]),
+        "Learning handoff did not materialize the required public closure artifacts.",
+      );
+      throw new Error("Learning handoff did not materialize the required public closure artifacts.");
+    }
+
+    const deliveryReleaseQuality =
+      asRecord(options.profile.output_policy).materialize_release_packet === true
+        ? artifacts.release_packet_file
+          ? "pass"
+          : "fail"
+        : artifacts.delivery_manifest_file
+          ? "pass"
+          : "warn";
+    const learningLoopClosure =
+      artifacts.learning_loop_scorecard_file && artifacts.learning_loop_handoff_file && auditPayload.run_audit_records
+        ? "pass"
+        : "fail";
+    const verdictMatrix = {
+      target_selection: "pass",
+      feature_request_quality: artifacts.intake_artifact_packet_file && artifacts.feature_request_file ? "pass" : "fail",
+      discovery_quality: normalizeVerdictStatus(asRecord(reviewReport.discovery_quality).status),
+      runtime_success: artifacts.routed_step_result_file ? "pass" : "fail",
+      artifact_quality: normalizeVerdictStatus(asRecord(reviewReport.artifact_quality).status),
+      code_quality: normalizeVerdictStatus(asRecord(reviewReport.code_quality).status),
+      delivery_release_quality: deliveryReleaseQuality,
+      learning_loop_closure: learningLoopClosure,
+      overall_verdict: "pass",
+    };
+    const verdictStatuses = [
+      verdictMatrix.target_selection,
+      verdictMatrix.feature_request_quality,
+      verdictMatrix.discovery_quality,
+      verdictMatrix.runtime_success,
+      verdictMatrix.artifact_quality,
+      verdictMatrix.code_quality,
+      verdictMatrix.delivery_release_quality,
+      verdictMatrix.learning_loop_closure,
+    ];
+    verdictMatrix.overall_verdict = verdictStatuses.includes("fail")
+      ? "fail"
+      : verdictStatuses.includes("warn")
+        ? "pass_with_findings"
+        : "pass";
+    artifacts.verdict_matrix = verdictMatrix;
+
+    return {
+      startedAt,
+      finishedAt: nowIso(),
+      status: verdictMatrix.overall_verdict === "fail" ? "fail" : "pass",
+      stageResults: flattenStageMap(stageMap),
+      commandResults,
+      artifacts,
+      sessionRoots,
+    };
+  } catch (error) {
+    const summary = error instanceof Error ? error.message : String(error);
+    if (!flattenStageMap(stageMap).some((stage) => stage.status === "fail")) {
+      const fallbackStage = flattenStageMap(stageMap).find((stage) => stage.status === "pending")?.stage ?? "bootstrap";
+      markStage(stageMap, fallbackStage, "fail", [], summary);
+    }
+    return {
+      startedAt,
+      finishedAt: nowIso(),
+      status: "fail",
+      stageResults: flattenStageMap(stageMap),
+      commandResults,
+      artifacts,
+      sessionRoots,
+    };
+  }
+}
+
+/**
+ * @param {{
  *   runId: string,
  *   profilePath: string,
  *   profile: Record<string, unknown>,
@@ -1351,7 +2219,7 @@ function buildScorecard(options) {
  *     artifacts: Record<string, unknown>,
  *   },
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
- *   examplesRoot: string,
+ *   examplesRoot: string | null,
  * }}
  */
 function writeHarnessArtifacts(options) {
@@ -1398,10 +2266,14 @@ function writeHarnessArtifacts(options) {
     stage_results: options.flowResult.stageResults,
     command_results: options.flowResult.commandResults,
     artifacts: options.flowResult.artifacts,
+    verdict_matrix:
+      typeof options.flowResult.artifacts.verdict_matrix === "object" && options.flowResult.artifacts.verdict_matrix
+        ? options.flowResult.artifacts.verdict_matrix
+        : null,
     scorecard_files: [scorecardFile],
     control_surfaces: {
       internal_harness:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>]",
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>]",
       public_cli_sequence: options.flowResult.commandResults.map((result) => result.command_surface).filter(Boolean),
       aor_bin: options.aorLaunch.binaryRef,
       examples_root: options.examplesRoot,
@@ -1419,28 +2291,44 @@ function writeHarnessArtifacts(options) {
   writeJson(summaryFile, summary);
   writeJson(scorecardFile, scorecard);
 
-  const learningLoop = materializeLearningLoopArtifacts({
-    projectId: options.hostProjectId,
-    projectRoot: options.hostRoot,
-    runtimeLayout: { reportsRoot: options.layout.reportsRoot },
-    runId: options.runId,
-    sourceKind: "live-e2e",
-    runStatus: options.flowResult.status,
-    summary:
-      options.flowResult.status === "pass"
-        ? `Installed-user rehearsal '${options.runId}' completed successfully.`
-        : summary.error ?? `Installed-user rehearsal '${options.runId}' failed.`,
-    evidenceRefs: uniqueStrings([summaryFile, scorecardFile, ...collectStringRefs(options.flowResult.artifacts)]),
-    linkedScorecardRefs: [scorecardFile],
-    evalSuiteRefs: getEvalSuites(options.profile),
-    backlogRefs: getBacklogRefs(options.profile),
-    forceIncident: asRecord(options.profile.learning_loop).force_incident === true,
-    incidentSummary: summary.error ?? undefined,
-  });
-  summary.learning_loop_scorecard_file = learningLoop.scorecardFile;
-  summary.learning_loop_handoff_file = learningLoop.handoffFile;
-  summary.incident_report_file = learningLoop.incidentFile;
-  writeJson(summaryFile, summary);
+  let learningLoop;
+  const publicLearningScorecard = asNonEmptyString(options.flowResult.artifacts.learning_loop_scorecard_file);
+  const publicLearningHandoff = asNonEmptyString(options.flowResult.artifacts.learning_loop_handoff_file);
+  const publicIncidentFile = asNonEmptyString(options.flowResult.artifacts.incident_report_file);
+  if (publicLearningScorecard && publicLearningHandoff) {
+    learningLoop = {
+      scorecardFile: publicLearningScorecard,
+      handoffFile: publicLearningHandoff,
+      incidentFile: publicIncidentFile || null,
+    };
+    summary.learning_loop_scorecard_file = publicLearningScorecard;
+    summary.learning_loop_handoff_file = publicLearningHandoff;
+    summary.incident_report_file = publicIncidentFile || null;
+    writeJson(summaryFile, summary);
+  } else {
+    learningLoop = materializeLearningLoopArtifacts({
+      projectId: options.hostProjectId,
+      projectRoot: options.hostRoot,
+      runtimeLayout: { reportsRoot: options.layout.reportsRoot },
+      runId: options.runId,
+      sourceKind: "live-e2e",
+      runStatus: options.flowResult.status,
+      summary:
+        options.flowResult.status === "pass"
+          ? `Installed-user rehearsal '${options.runId}' completed successfully.`
+          : summary.error ?? `Installed-user rehearsal '${options.runId}' failed.`,
+      evidenceRefs: uniqueStrings([summaryFile, scorecardFile, ...collectStringRefs(options.flowResult.artifacts)]),
+      linkedScorecardRefs: [scorecardFile],
+      evalSuiteRefs: getEvalSuites(options.profile),
+      backlogRefs: getBacklogRefs(options.profile),
+      forceIncident: asRecord(options.profile.learning_loop).force_incident === true,
+      incidentSummary: summary.error ?? undefined,
+    });
+    summary.learning_loop_scorecard_file = learningLoop.scorecardFile;
+    summary.learning_loop_handoff_file = learningLoop.handoffFile;
+    summary.incident_report_file = learningLoop.incidentFile;
+    writeJson(summaryFile, summary);
+  }
 
   return {
     summary,
@@ -1458,7 +2346,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>]",
         "",
         "Internal black-box installed-user rehearsal harness.",
       ].join("\n"),
@@ -1480,13 +2368,31 @@ function runCli(rawArgs) {
     })();
   const runtimeRoot = resolveOptionalStringFlag(flags["runtime-root"], "runtime-root");
   const aorBin = resolveOptionalStringFlag(flags["aor-bin"], "aor-bin");
-  const examplesRoot = requireDirectory(
-    resolveOptionalStringFlag(flags["examples-root"], "examples-root") ?? path.join(hostRoot, "examples"),
-  );
-  const { profilePath, profile } = loadHarnessProfile({
+  const catalogRootOverride = resolveOptionalStringFlag(flags["catalog-root"], "catalog-root");
+  const explicitExamplesRoot =
+    Object.prototype.hasOwnProperty.call(flags, "examples-root")
+      ? resolveOptionalStringFlag(flags["examples-root"], "examples-root")
+      : null;
+  const { profilePath, profile: loadedProfile } = loadHarnessProfile({
     hostRoot,
     profileRef,
   });
+  const catalogRoot = resolveCatalogRoot({
+    hostRoot,
+    catalogRootOverride,
+  });
+  const fullJourneyResolution = isFullJourneyProfile(loadedProfile)
+    ? resolveFullJourneyProfile({
+        profile: loadedProfile,
+        catalogRoot,
+      })
+    : null;
+  const profile = fullJourneyResolution?.resolvedProfile ?? loadedProfile;
+  const examplesRoot = explicitExamplesRoot
+    ? requireDirectory(explicitExamplesRoot)
+    : fullJourneyResolution
+      ? null
+      : requireDirectory(path.join(hostRoot, "examples"));
   const hostProjectId = discoverHostProjectId(hostRoot);
   const layout = ensureRuntimeLayout({
     hostRoot,
@@ -1512,15 +2418,33 @@ function runCli(rawArgs) {
   let flowResult;
 
   try {
-    flowResult = executeInstalledUserFlow({
-      hostRoot,
-      layout,
-      runId,
-      profilePath,
-      profile,
-      aorLaunch,
-      examplesRoot,
-    });
+    flowResult = fullJourneyResolution
+      ? executeFullJourneyFlow({
+          hostRoot,
+          layout,
+          runId,
+          profilePath,
+          profile,
+          aorLaunch,
+          examplesRoot: examplesRoot ?? path.join(hostRoot, "examples"),
+          examplesRootOverride: explicitExamplesRoot && examplesRoot ? examplesRoot : null,
+          catalogTargetPath: fullJourneyResolution.catalogTargetPath,
+          catalogEntry: fullJourneyResolution.catalogEntry,
+          mission: fullJourneyResolution.mission,
+        })
+      : executeInstalledUserFlow({
+          hostRoot,
+          layout,
+          runId,
+          profilePath,
+          profile,
+          aorLaunch,
+          examplesRoot:
+            examplesRoot ??
+            (() => {
+              throw new UsageError("Bounded rehearsal requires bootstrap assets under '--examples-root' or '<project-ref>/examples'.");
+            })(),
+        });
   } catch (error) {
     flowResult = {
       startedAt: nowIso(),

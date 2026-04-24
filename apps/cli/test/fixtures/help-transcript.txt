@@ -31,6 +31,8 @@ Implemented commands:
   - aor incident show
   - aor audit runs
   - aor ui attach
+  - aor review run
+  - aor learning handoff
   - aor ui detach
 
 Planned commands (not implemented yet):

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { resolveAdapterMatrix } from "../../adapter-sdk/src/index.mjs";
-import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
 import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
@@ -46,6 +46,111 @@ const ARCHITECTURE_CONTRACT_REFS = Object.freeze([
   "docs/contracts/wave-ticket.md",
   "docs/contracts/handoff-packet.md",
 ]);
+
+/**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toEvidenceRef(projectRoot, filePath) {
+  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? /** @type {Record<string, unknown>} */ (value)
+    : {};
+}
+
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   runtimeLayout: { artifactsRoot: string },
+ *   inputPacketPath?: string,
+ * }} options
+ * @returns {{
+ *   inputPacketPath: string | null,
+ *   inputPacketRef: string | null,
+ *   missionId: string | null,
+ *   requestTitle: string | null,
+ *   requestBrief: string | null,
+ *   allowedPaths: string[],
+ *   forbiddenPaths: string[],
+ *   expectedEvidence: string[],
+ *   changeBudget: Record<string, unknown> | null,
+ *   sourceKind: string | null,
+ * } | null}
+ */
+function resolveFeatureTraceability(options) {
+  const explicitInputPacketPath =
+    typeof options.inputPacketPath === "string" && options.inputPacketPath.trim().length > 0
+      ? path.isAbsolute(options.inputPacketPath)
+        ? options.inputPacketPath
+        : path.resolve(options.projectRoot, options.inputPacketPath)
+      : null;
+
+  let packetPath = explicitInputPacketPath;
+  if (!packetPath) {
+    const candidates = fs
+      .readdirSync(options.runtimeLayout.artifactsRoot, { withFileTypes: true })
+      .filter(
+        (entry) =>
+          entry.isFile() &&
+          /\.json$/u.test(entry.name) &&
+          entry.name.includes(".artifact.intake.") &&
+          !entry.name.endsWith(".body.json"),
+      )
+      .map((entry) => path.join(options.runtimeLayout.artifactsRoot, entry.name))
+      .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
+    packetPath = candidates[0] ?? null;
+  }
+
+  if (!packetPath || !fs.existsSync(packetPath)) {
+    return null;
+  }
+
+  const loadedPacket = loadContractFile({
+    filePath: packetPath,
+    family: "artifact-packet",
+  });
+  if (!loadedPacket.ok) {
+    return null;
+  }
+  const packet = asRecord(loadedPacket.document);
+  const bodyRef = typeof packet.body_ref === "string" && packet.body_ref.trim().length > 0 ? packet.body_ref : null;
+  const packetBody = bodyRef && fs.existsSync(bodyRef)
+    ? /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(bodyRef, "utf8")))
+    : {};
+  const missionTraceability = asRecord(packetBody.mission_traceability);
+  const featureRequest = asRecord(packetBody.feature_request);
+  const requestDocument = asRecord(featureRequest.request_document);
+
+  return {
+    inputPacketPath: packetPath,
+    inputPacketRef: toEvidenceRef(options.projectRoot, packetPath),
+    missionId: typeof missionTraceability.mission_id === "string" ? missionTraceability.mission_id : null,
+    requestTitle: typeof featureRequest.title === "string" ? featureRequest.title : null,
+    requestBrief: typeof featureRequest.brief === "string" ? featureRequest.brief : null,
+    allowedPaths: Array.isArray(requestDocument.allowed_paths)
+      ? requestDocument.allowed_paths.filter((entry) => typeof entry === "string")
+      : [],
+    forbiddenPaths: Array.isArray(requestDocument.forbidden_paths)
+      ? requestDocument.forbidden_paths.filter((entry) => typeof entry === "string")
+      : [],
+    expectedEvidence: Array.isArray(requestDocument.expected_evidence)
+      ? requestDocument.expected_evidence.filter((entry) => typeof entry === "string")
+      : [],
+    changeBudget:
+      typeof requestDocument.change_budget === "object" && requestDocument.change_budget !== null
+        ? asRecord(requestDocument.change_budget)
+        : null,
+    sourceKind: typeof missionTraceability.source_kind === "string" ? missionTraceability.source_kind : null,
+  };
+}
 
 /**
  * @param {{ field: string, reason: string, unknownFacts: Array<{ field: string, confidence: "low", value: "unknown", reason: string }> }} options
@@ -547,6 +652,14 @@ export function analyzeProjectRuntime(options = {}) {
     policyResolutionMatrix,
     evaluationRegistry,
   });
+  const featureTraceability = resolveFeatureTraceability({
+    projectRoot: init.projectRoot,
+    runtimeLayout: init.runtimeLayout,
+    inputPacketPath:
+      typeof options.inputPacketPath === "string" && options.inputPacketPath.trim().length > 0
+        ? options.inputPacketPath
+        : undefined,
+  });
 
   const report = {
     report_id: `${init.projectId}.analysis.v1`,
@@ -588,6 +701,20 @@ export function analyzeProjectRuntime(options = {}) {
       datasets: evaluationRegistry.datasets,
       suites: evaluationRegistry.suites,
     },
+    feature_traceability: featureTraceability
+      ? {
+          status: featureTraceability.missionId || featureTraceability.inputPacketRef ? "pass" : "warn",
+          input_packet_ref: featureTraceability.inputPacketRef,
+          mission_id: featureTraceability.missionId,
+          request_title: featureTraceability.requestTitle,
+          request_brief: featureTraceability.requestBrief,
+          allowed_paths: featureTraceability.allowedPaths,
+          forbidden_paths: featureTraceability.forbiddenPaths,
+          expected_evidence: featureTraceability.expectedEvidence,
+          change_budget: featureTraceability.changeBudget,
+          source_kind: featureTraceability.sourceKind,
+        }
+      : null,
     discovery_completeness: discoveryCompleteness,
     architecture_traceability: architectureTraceability,
     verification_plan: verificationPlan,

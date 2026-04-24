@@ -15,6 +15,7 @@
 - `step-result.md`
 - `validation-report.md`
 - `evaluation-report.md`
+- `review-report.md`
 - `dataset.md`
 - `evaluation-suite.md`
 - `promotion-decision.md`
@@ -34,6 +35,8 @@
 
 ## Operations
 - `live-run-event.md`
+- `learning-loop-scorecard.md`
+- `learning-loop-handoff.md`
 - `control-plane-api.md`
 
 ## Loader coverage

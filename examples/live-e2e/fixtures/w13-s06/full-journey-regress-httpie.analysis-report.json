@@ -1,0 +1,3291 @@
+{
+  "report_id": "httpie-cli-w13-s06.full-journey-regress-httpie.analysis.v1",
+  "project_id": "httpie-cli-w13-s06.full-journey-regress-httpie",
+  "version": 1,
+  "generated_from": {
+    "command": "aor project analyze",
+    "project_root": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie",
+    "selected_profile_ref": "project.aor.yaml"
+  },
+  "repo_facts": {
+    "topology": "single-repo",
+    "package_manager": "unknown",
+    "languages": [
+      "python"
+    ],
+    "ci_systems": [
+      "github-actions"
+    ]
+  },
+  "toolchain_facts": {
+    "build_commands": [
+      "make build"
+    ],
+    "test_commands": [
+      "make test"
+    ],
+    "lint_commands": [
+      "make codestyle"
+    ]
+  },
+  "command_catalog": {
+    "required_for_smoke_verify": [
+      "make codestyle",
+      "make test",
+      "make build"
+    ]
+  },
+  "service_boundaries": [
+    {
+      "service_id": "unknown",
+      "paths": [
+        "unknown"
+      ],
+      "confidence": "low",
+      "reason": "No common service boundary directories found."
+    }
+  ],
+  "route_resolution": {
+    "routes_root": "examples/routes",
+    "applied_overrides": {},
+    "matrix": [
+      {
+        "step_class": "discovery",
+        "resolved_route_id": "route.discovery.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.discovery"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/discovery-default.yaml",
+        "route_profile": {
+          "route_id": "route.discovery.default",
+          "step": "discovery",
+          "route_class": "artifact",
+          "risk_tier": "low",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 180,
+            "max_cost_usd": 2,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "research",
+        "resolved_route_id": "route.research.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.research"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/research-default.yaml",
+        "route_profile": {
+          "route_id": "route.research.default",
+          "step": "research",
+          "route_class": "artifact",
+          "risk_tier": "low",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 3,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "spec",
+        "resolved_route_id": "route.spec.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.spec"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/spec-default.yaml",
+        "route_profile": {
+          "route_id": "route.spec.default",
+          "step": "spec",
+          "route_class": "artifact",
+          "risk_tier": "low",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 4,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "planning",
+        "resolved_route_id": "route.plan.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.planning"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/plan-default.yaml",
+        "route_profile": {
+          "route_id": "route.plan.default",
+          "step": "planning",
+          "route_class": "planner",
+          "risk_tier": "medium",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "planning-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 4,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "implement",
+        "resolved_route_id": "route.implement.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.implement"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/implement-default.yaml",
+        "route_profile": {
+          "route_id": "route.implement.default",
+          "step": "implement",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1800,
+            "max_cost_usd": 25,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "review",
+        "resolved_route_id": "route.review.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.review"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/review-default.yaml",
+        "route_profile": {
+          "route_id": "route.review.default",
+          "step": "review",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_read",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1200,
+            "max_cost_usd": 10,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "qa",
+        "resolved_route_id": "route.qa.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.qa"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/qa-default.yaml",
+        "route_profile": {
+          "route_id": "route.qa.default",
+          "step": "qa",
+          "route_class": "runner",
+          "risk_tier": "medium",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_read",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 1200,
+            "max_cost_usd": 10,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "repair",
+        "resolved_route_id": "route.repair.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.repair"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/repair-default.yaml",
+        "route_profile": {
+          "route_id": "route.repair.default",
+          "step": "repair",
+          "route_class": "repair",
+          "risk_tier": "medium",
+          "primary": {
+            "adapter": "codex-cli",
+            "provider": "openai",
+            "model": "coding-primary"
+          },
+          "required_adapter_capabilities": [
+            "repo_write",
+            "shell_commands",
+            "live_logs"
+          ],
+          "constraints": {
+            "timeout_sec": 900,
+            "max_cost_usd": 8,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "eval",
+        "resolved_route_id": "route.eval.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.eval"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/eval-default.yaml",
+        "route_profile": {
+          "route_id": "route.eval.default",
+          "step": "eval",
+          "route_class": "eval",
+          "risk_tier": "low",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "judge-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 300,
+            "max_cost_usd": 5,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      },
+      {
+        "step_class": "harness",
+        "resolved_route_id": "route.harness.default",
+        "resolution_source": {
+          "kind": "project-default",
+          "field": "default_route_profiles.harness"
+        },
+        "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/harness-default.yaml",
+        "route_profile": {
+          "route_id": "route.harness.default",
+          "step": "harness",
+          "route_class": "harness",
+          "risk_tier": "medium",
+          "primary": {
+            "adapter": "none",
+            "provider": "openai",
+            "model": "judge-primary"
+          },
+          "required_adapter_capabilities": [],
+          "constraints": {
+            "timeout_sec": 900,
+            "max_cost_usd": 6,
+            "allow_scope_expansion": false
+          },
+          "promotion_channel": "stable"
+        }
+      }
+    ]
+  },
+  "asset_resolution": {
+    "wrappers_root": "examples/wrappers",
+    "prompts_root": "examples/prompts",
+    "matrix": [
+      {
+        "step_class": "discovery",
+        "route": {
+          "step_class": "discovery",
+          "resolved_route_id": "route.discovery.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.discovery"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/discovery-default.yaml",
+          "route_profile": {
+            "route_id": "route.discovery.default",
+            "step": "discovery",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 180,
+              "max_cost_usd": 2,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.artifact.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.artifact"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-artifact-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.artifact.default",
+            "version": 1,
+            "step_class": "artifact"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.discovery"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/artifact-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "artifact-default",
+            "version": 1,
+            "step_class": "artifact",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "step-input-context"
+                ],
+                "optional": [
+                  "related-packets"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.artifact.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.discovery"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.artifact.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/artifact-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.artifact.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": []
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": []
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": []
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/discovery-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-artifact-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/artifact-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/artifact-foundation.yaml"
+          ]
+        }
+      },
+      {
+        "step_class": "research",
+        "route": {
+          "step_class": "research",
+          "resolved_route_id": "route.research.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.research"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/research-default.yaml",
+          "route_profile": {
+            "route_id": "route.research.default",
+            "step": "research",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 3,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.artifact.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.artifact"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-artifact-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.artifact.default",
+            "version": 1,
+            "step_class": "artifact"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.research"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/artifact-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "artifact-default",
+            "version": 1,
+            "step_class": "artifact",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "step-input-context"
+                ],
+                "optional": [
+                  "related-packets"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.artifact.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.research"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.artifact.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/artifact-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.artifact.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": []
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": []
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": []
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/research-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-artifact-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/artifact-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/artifact-foundation.yaml"
+          ]
+        }
+      },
+      {
+        "step_class": "spec",
+        "route": {
+          "step_class": "spec",
+          "resolved_route_id": "route.spec.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.spec"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/spec-default.yaml",
+          "route_profile": {
+            "route_id": "route.spec.default",
+            "step": "spec",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 4,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.artifact.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.artifact"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-artifact-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.artifact.default",
+            "version": 1,
+            "step_class": "artifact"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.spec"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/artifact-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "artifact-default",
+            "version": 1,
+            "step_class": "artifact",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "step-input-context"
+                ],
+                "optional": [
+                  "related-packets"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.artifact.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.spec"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.artifact.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/artifact-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.artifact.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": []
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": []
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": []
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/spec-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-artifact-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/artifact-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/artifact-foundation.yaml"
+          ]
+        }
+      },
+      {
+        "step_class": "planning",
+        "route": {
+          "step_class": "planning",
+          "resolved_route_id": "route.plan.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.planning"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/plan-default.yaml",
+          "route_profile": {
+            "route_id": "route.plan.default",
+            "step": "planning",
+            "route_class": "planner",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 4,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.planner.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.planner"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-planner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.planner.default",
+            "version": 1,
+            "step_class": "planner"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://planner-default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.planning"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/planner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "planner-default",
+            "version": 1,
+            "step_class": "planner",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "discovery",
+                  "research",
+                  "spec"
+                ],
+                "optional": [
+                  "project-analysis-report",
+                  "previous-wave"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.planner.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.planning"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.planner.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/planner-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.planner.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": []
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": []
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": []
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/plan-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-planner-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/planner-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/planner-foundation.yaml"
+          ]
+        }
+      },
+      {
+        "step_class": "implement",
+        "route": {
+          "step_class": "implement",
+          "resolved_route_id": "route.implement.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/implement-default.yaml",
+          "route_profile": {
+            "route_id": "route.implement.default",
+            "step": "implement",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1800,
+              "max_cost_usd": 25,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.runner"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-runner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.runner.default",
+            "version": 3,
+            "step_class": "runner"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.implement"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/runner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "runner-default",
+            "version": 3,
+            "step_class": "runner",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "handoff",
+                  "spec"
+                ],
+                "optional": [
+                  "discovery",
+                  "previous-step-result"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.runner.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.implement"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.runner.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/runner-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.runner.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": [
+                  "context-skill://context.skill.runner-verification.default@v1"
+                ]
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": [
+                "context-skill://context.skill.runner-verification.default@v1"
+              ]
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": [
+              "context-skill://context.skill.runner-verification.default@v1"
+            ]
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/implement-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-runner-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/runner-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/runner-foundation.yaml"
+          ]
+        }
+      },
+      {
+        "step_class": "review",
+        "route": {
+          "step_class": "review",
+          "resolved_route_id": "route.review.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.review"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/review-default.yaml",
+          "route_profile": {
+            "route_id": "route.review.default",
+            "step": "review",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_read",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1200,
+              "max_cost_usd": 10,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.runner"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-runner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.runner.default",
+            "version": 3,
+            "step_class": "runner"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.review"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/runner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "runner-default",
+            "version": 3,
+            "step_class": "runner",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "handoff",
+                  "spec"
+                ],
+                "optional": [
+                  "discovery",
+                  "previous-step-result"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.runner.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.review"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.runner.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/runner-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.runner.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": [
+                  "context-skill://context.skill.runner-verification.default@v1"
+                ]
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": [
+                "context-skill://context.skill.runner-verification.default@v1"
+              ]
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": [
+              "context-skill://context.skill.runner-verification.default@v1"
+            ]
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/review-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-runner-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/runner-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/runner-foundation.yaml"
+          ]
+        }
+      },
+      {
+        "step_class": "qa",
+        "route": {
+          "step_class": "qa",
+          "resolved_route_id": "route.qa.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.qa"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/qa-default.yaml",
+          "route_profile": {
+            "route_id": "route.qa.default",
+            "step": "qa",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_read",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1200,
+              "max_cost_usd": 10,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.runner.default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.runner"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-runner-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.runner.default",
+            "version": 3,
+            "step_class": "runner"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.qa"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/runner-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "runner-default",
+            "version": 3,
+            "step_class": "runner",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "handoff",
+                  "spec"
+                ],
+                "optional": [
+                  "discovery",
+                  "previous-step-result"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.runner.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.qa"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.runner.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/runner-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.runner.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": [
+                  "context-skill://context.skill.runner-verification.default@v1"
+                ]
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": [
+                "context-skill://context.skill.runner-verification.default@v1"
+              ]
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": [
+              "context-skill://context.skill.runner-verification.default@v1"
+            ]
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/qa-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-runner-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/runner-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/runner-foundation.yaml"
+          ]
+        }
+      },
+      {
+        "step_class": "repair",
+        "route": {
+          "step_class": "repair",
+          "resolved_route_id": "route.repair.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.repair"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/repair-default.yaml",
+          "route_profile": {
+            "route_id": "route.repair.default",
+            "step": "repair",
+            "route_class": "repair",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 900,
+              "max_cost_usd": 8,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.repair.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.repair"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-repair-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.repair.default",
+            "version": 1,
+            "step_class": "repair"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://repair-default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.repair"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/repair-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "repair-default",
+            "version": 1,
+            "step_class": "repair",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "handoff",
+                  "validation-report"
+                ],
+                "optional": [
+                  "evaluation-report",
+                  "previous-step-result"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.repair.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.repair"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.repair.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/repair-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.repair.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": [
+                  "context-skill://context.skill.runner-verification.default@v1"
+                ]
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": [
+                "context-skill://context.skill.runner-verification.default@v1"
+              ]
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": [
+              "context-skill://context.skill.runner-verification.default@v1"
+            ]
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/repair-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-repair-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/repair-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/repair-foundation.yaml"
+          ]
+        }
+      },
+      {
+        "step_class": "eval",
+        "route": {
+          "step_class": "eval",
+          "resolved_route_id": "route.eval.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.eval"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/eval-default.yaml",
+          "route_profile": {
+            "route_id": "route.eval.default",
+            "step": "eval",
+            "route_class": "eval",
+            "risk_tier": "low",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "judge-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 5,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.eval.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.eval"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-eval-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.eval.default",
+            "version": 1,
+            "step_class": "eval"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://eval-default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.eval"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/eval-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "eval-default",
+            "version": 1,
+            "step_class": "eval",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "subject",
+                  "suite",
+                  "dataset"
+                ],
+                "optional": [
+                  "baseline-subject",
+                  "previous-evaluation"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.eval.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.eval"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.eval.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/eval-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.eval.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": []
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": []
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": []
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/eval-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-eval-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/eval-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/eval-foundation.yaml"
+          ]
+        }
+      },
+      {
+        "step_class": "harness",
+        "route": {
+          "step_class": "harness",
+          "resolved_route_id": "route.harness.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.harness"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/harness-default.yaml",
+          "route_profile": {
+            "route_id": "route.harness.default",
+            "step": "harness",
+            "route_class": "harness",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "judge-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 900,
+              "max_cost_usd": 6,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "wrapper": {
+          "wrapper_ref": "wrapper.harness.default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_wrapper_profiles.harness"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-harness-default.yaml",
+          "profile": {
+            "wrapper_id": "wrapper.harness.default",
+            "version": 1,
+            "step_class": "harness"
+          }
+        },
+        "prompt_bundle": {
+          "prompt_bundle_ref": "prompt-bundle://harness-default@v1",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_prompt_bundles.harness"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/harness-default.yaml",
+          "profile": {
+            "prompt_bundle_id": "harness-default",
+            "version": 1,
+            "step_class": "harness",
+            "required_inputs": {
+              "packets": {
+                "required": [
+                  "subject"
+                ],
+                "optional": [
+                  "baseline-subject",
+                  "evaluation-report",
+                  "release"
+                ]
+              },
+              "files": {
+                "recommended": []
+              }
+            }
+          }
+        },
+        "context_bundles": {
+          "bundle_refs": [
+            "context-bundle://context.bundle.harness.foundation@v1"
+          ],
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_context_bundles.harness"
+          },
+          "bundles": [
+            {
+              "context_bundle_ref": "context-bundle://context.bundle.harness.foundation@v1",
+              "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/harness-foundation.yaml",
+              "profile": {
+                "context_bundle_id": "context.bundle.harness.foundation",
+                "version": 1,
+                "context_doc_refs": [
+                  "context-doc://context.doc.repo-map.core@v1"
+                ],
+                "context_rule_refs": [
+                  "context-rule://context.rule.public-repo-safety@v1"
+                ],
+                "context_skill_refs": []
+              },
+              "context_doc_refs": [
+                "context-doc://context.doc.repo-map.core@v1"
+              ],
+              "context_rule_refs": [
+                "context-rule://context.rule.public-repo-safety@v1"
+              ],
+              "context_skill_refs": []
+            }
+          ],
+          "expanded_refs": {
+            "context_doc_refs": [
+              "context-doc://context.doc.repo-map.core@v1"
+            ],
+            "context_rule_refs": [
+              "context-rule://context.rule.public-repo-safety@v1"
+            ],
+            "context_skill_refs": []
+          }
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/harness-default.yaml",
+          "wrapper_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/wrappers/wrapper-harness-default.yaml",
+          "prompt_bundle_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/prompts/harness-default.yaml",
+          "context_bundle_sources": [
+            "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/context/bundles/harness-foundation.yaml"
+          ]
+        }
+      }
+    ]
+  },
+  "policy_resolution": {
+    "policies_root": "examples/policies",
+    "applied_overrides": {},
+    "matrix": [
+      {
+        "step_class": "discovery",
+        "route": {
+          "step_class": "discovery",
+          "resolved_route_id": "route.discovery.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.discovery"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/discovery-default.yaml",
+          "route_profile": {
+            "route_id": "route.discovery.default",
+            "step": "discovery",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 180,
+              "max_cost_usd": 2,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.artifact.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.artifact"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-artifact-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.artifact.default",
+            "step_class": "artifact",
+            "pre_validators": [
+              "contract-shape",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "missing-evidence",
+                "incomplete-artifact"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 3,
+              "on": [
+                "business-ambiguity"
+              ]
+            },
+            "blocking_rules": [
+              "route-unavailable"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 2,
+            "timeout_sec": 180,
+            "max_cost_source": "route.constraints.max_cost_usd (route.discovery.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.discovery.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+              "make codestyle",
+              "make install"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "route-unavailable"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "low",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/discovery-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-artifact-default.yaml"
+        }
+      },
+      {
+        "step_class": "research",
+        "route": {
+          "step_class": "research",
+          "resolved_route_id": "route.research.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.research"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/research-default.yaml",
+          "route_profile": {
+            "route_id": "route.research.default",
+            "step": "research",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 3,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.artifact.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.artifact"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-artifact-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.artifact.default",
+            "step_class": "artifact",
+            "pre_validators": [
+              "contract-shape",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "missing-evidence",
+                "incomplete-artifact"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 3,
+              "on": [
+                "business-ambiguity"
+              ]
+            },
+            "blocking_rules": [
+              "route-unavailable"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 3,
+            "timeout_sec": 300,
+            "max_cost_source": "route.constraints.max_cost_usd (route.research.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.research.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+              "make codestyle",
+              "make install"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "route-unavailable"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "low",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/research-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-artifact-default.yaml"
+        }
+      },
+      {
+        "step_class": "spec",
+        "route": {
+          "step_class": "spec",
+          "resolved_route_id": "route.spec.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.spec"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/spec-default.yaml",
+          "route_profile": {
+            "route_id": "route.spec.default",
+            "step": "spec",
+            "route_class": "artifact",
+            "risk_tier": "low",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 4,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.artifact.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.artifact"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-artifact-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.artifact.default",
+            "step_class": "artifact",
+            "pre_validators": [
+              "contract-shape",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "missing-evidence",
+                "incomplete-artifact"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 3,
+              "on": [
+                "business-ambiguity"
+              ]
+            },
+            "blocking_rules": [
+              "route-unavailable"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 4,
+            "timeout_sec": 300,
+            "max_cost_source": "route.constraints.max_cost_usd (route.spec.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.spec.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+              "make codestyle",
+              "make install"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "route-unavailable"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "low",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/spec-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-artifact-default.yaml"
+        }
+      },
+      {
+        "step_class": "planning",
+        "route": {
+          "step_class": "planning",
+          "resolved_route_id": "route.plan.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.planning"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/plan-default.yaml",
+          "route_profile": {
+            "route_id": "route.plan.default",
+            "step": "planning",
+            "route_class": "planner",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "planning-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 4,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.planner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.planner"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-planner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.planner.default",
+            "step_class": "planner",
+            "pre_validators": [
+              "contract-shape",
+              "route-resolved",
+              "spec-present"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 1,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 1,
+              "on": [
+                "schema-mismatch",
+                "incomplete-wave-plan"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 2,
+              "on": [
+                "business-ambiguity",
+                "dependency-conflict"
+              ]
+            },
+            "blocking_rules": [
+              "spec-missing",
+              "route-unavailable"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 4,
+            "timeout_sec": 300,
+            "max_cost_source": "route.constraints.max_cost_usd (route.plan.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.plan.default)"
+          },
+          "retry": {
+            "max_attempts": 1,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+              "make codestyle",
+              "make install"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "spec-missing",
+            "route-unavailable"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "medium",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/plan-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-planner-default.yaml"
+        }
+      },
+      {
+        "step_class": "implement",
+        "route": {
+          "step_class": "implement",
+          "resolved_route_id": "route.implement.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.implement"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/implement-default.yaml",
+          "route_profile": {
+            "route_id": "route.implement.default",
+            "step": "implement",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1800,
+              "max_cost_usd": 25,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.runner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.runner"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-runner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.runner.default",
+            "step_class": "runner",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "approval-present",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout",
+                "rate-limit",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed",
+                "missing-evidence"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 4,
+              "on": [
+                "business-ambiguity",
+                "policy-conflict",
+                "security-boundary"
+              ],
+              "reasons": [
+                {
+                  "code": "high-risk-security-review-required",
+                  "message": "escalate when high-risk route requires security review"
+                },
+                {
+                  "code": "high-risk-human-approval-required",
+                  "message": "escalate when high-risk route requires human approval"
+                }
+              ]
+            },
+            "blocking_rules": [
+              "approval-missing",
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 25,
+            "timeout_sec": 1800,
+            "max_cost_source": "route.constraints.max_cost_usd (route.implement.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.implement.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout",
+              "rate-limit",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+              "make codestyle",
+              "make install"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "medium",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/implement-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-runner-default.yaml"
+        }
+      },
+      {
+        "step_class": "review",
+        "route": {
+          "step_class": "review",
+          "resolved_route_id": "route.review.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.review"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/review-default.yaml",
+          "route_profile": {
+            "route_id": "route.review.default",
+            "step": "review",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_read",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1200,
+              "max_cost_usd": 10,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.runner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.runner"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-runner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.runner.default",
+            "step_class": "runner",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "approval-present",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout",
+                "rate-limit",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed",
+                "missing-evidence"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 4,
+              "on": [
+                "business-ambiguity",
+                "policy-conflict",
+                "security-boundary"
+              ],
+              "reasons": [
+                {
+                  "code": "high-risk-security-review-required",
+                  "message": "escalate when high-risk route requires security review"
+                },
+                {
+                  "code": "high-risk-human-approval-required",
+                  "message": "escalate when high-risk route requires human approval"
+                }
+              ]
+            },
+            "blocking_rules": [
+              "approval-missing",
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 10,
+            "timeout_sec": 1200,
+            "max_cost_source": "route.constraints.max_cost_usd (route.review.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.review.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout",
+              "rate-limit",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+              "make codestyle",
+              "make install"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "medium",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/review-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-runner-default.yaml"
+        }
+      },
+      {
+        "step_class": "qa",
+        "route": {
+          "step_class": "qa",
+          "resolved_route_id": "route.qa.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.qa"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/qa-default.yaml",
+          "route_profile": {
+            "route_id": "route.qa.default",
+            "step": "qa",
+            "route_class": "runner",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_read",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 1200,
+              "max_cost_usd": 10,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.runner.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.runner"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-runner-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.runner.default",
+            "step_class": "runner",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "approval-present",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 2,
+              "on": [
+                "provider-timeout",
+                "rate-limit",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed",
+                "missing-evidence"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 4,
+              "on": [
+                "business-ambiguity",
+                "policy-conflict",
+                "security-boundary"
+              ],
+              "reasons": [
+                {
+                  "code": "high-risk-security-review-required",
+                  "message": "escalate when high-risk route requires security review"
+                },
+                {
+                  "code": "high-risk-human-approval-required",
+                  "message": "escalate when high-risk route requires human approval"
+                }
+              ]
+            },
+            "blocking_rules": [
+              "approval-missing",
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 10,
+            "timeout_sec": 1200,
+            "max_cost_source": "route.constraints.max_cost_usd (route.qa.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.qa.default)"
+          },
+          "retry": {
+            "max_attempts": 2,
+            "on": [
+              "provider-timeout",
+              "rate-limit",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+              "make codestyle",
+              "make install"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "approval-missing",
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "medium",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/qa-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-runner-default.yaml"
+        }
+      },
+      {
+        "step_class": "repair",
+        "route": {
+          "step_class": "repair",
+          "resolved_route_id": "route.repair.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.repair"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/repair-default.yaml",
+          "route_profile": {
+            "route_id": "route.repair.default",
+            "step": "repair",
+            "route_class": "repair",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "codex-cli",
+              "provider": "openai",
+              "model": "coding-primary"
+            },
+            "required_adapter_capabilities": [
+              "repo_write",
+              "shell_commands",
+              "live_logs"
+            ],
+            "constraints": {
+              "timeout_sec": 900,
+              "max_cost_usd": 8,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.repair.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.repair"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-repair-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.repair.default",
+            "step_class": "repair",
+            "pre_validators": [
+              "contract-shape",
+              "repo-scope",
+              "route-resolved"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "validation-commands"
+            ],
+            "quality_gate": {
+              "required": true,
+              "suite_ref": "suite.release.core@v1"
+            },
+            "retry": {
+              "max_attempts": 1,
+              "on": [
+                "provider-timeout",
+                "runner-crash"
+              ]
+            },
+            "repair": {
+              "max_attempts": 2,
+              "on": [
+                "schema-mismatch",
+                "lint-failed",
+                "tests-failed"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 3,
+              "on": [
+                "business-ambiguity",
+                "security-boundary"
+              ]
+            },
+            "blocking_rules": [
+              "repo-scope-violation",
+              "frozen-route"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 8,
+            "timeout_sec": 900,
+            "max_cost_source": "route.constraints.max_cost_usd (route.repair.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.repair.default)"
+          },
+          "retry": {
+            "max_attempts": 1,
+            "on": [
+              "provider-timeout",
+              "runner-crash"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+              "make codestyle",
+              "make install"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "repo-scope-violation",
+            "frozen-route"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "medium",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/repair-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-repair-default.yaml"
+        }
+      },
+      {
+        "step_class": "eval",
+        "route": {
+          "step_class": "eval",
+          "resolved_route_id": "route.eval.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.eval"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/eval-default.yaml",
+          "route_profile": {
+            "route_id": "route.eval.default",
+            "step": "eval",
+            "route_class": "eval",
+            "risk_tier": "low",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "judge-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 300,
+              "max_cost_usd": 5,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.eval.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.eval"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-eval-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.eval.default",
+            "step_class": "eval",
+            "pre_validators": [
+              "contract-shape",
+              "suite-present"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 1,
+              "on": [
+                "provider-timeout"
+              ]
+            },
+            "repair": {
+              "max_attempts": 1,
+              "on": [
+                "missing-trace"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 2,
+              "on": [
+                "judge-conflict"
+              ]
+            },
+            "blocking_rules": [
+              "dataset-version-missing"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 5,
+            "timeout_sec": 300,
+            "max_cost_source": "route.constraints.max_cost_usd (route.eval.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.eval.default)"
+          },
+          "retry": {
+            "max_attempts": 1,
+            "on": [
+              "provider-timeout"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+              "make codestyle",
+              "make install"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "dataset-version-missing"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "low",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/eval-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-eval-default.yaml"
+        }
+      },
+      {
+        "step_class": "harness",
+        "route": {
+          "step_class": "harness",
+          "resolved_route_id": "route.harness.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_route_profiles.harness"
+          },
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/harness-default.yaml",
+          "route_profile": {
+            "route_id": "route.harness.default",
+            "step": "harness",
+            "route_class": "harness",
+            "risk_tier": "medium",
+            "primary": {
+              "adapter": "none",
+              "provider": "openai",
+              "model": "judge-primary"
+            },
+            "required_adapter_capabilities": [],
+            "constraints": {
+              "timeout_sec": 900,
+              "max_cost_usd": 6,
+              "allow_scope_expansion": false
+            },
+            "promotion_channel": "stable"
+          }
+        },
+        "policy": {
+          "policy_id": "policy.step.harness.default",
+          "resolution_source": {
+            "kind": "project-default",
+            "field": "default_step_policies.harness"
+          },
+          "profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-harness-default.yaml",
+          "profile": {
+            "policy_id": "policy.step.harness.default",
+            "step_class": "harness",
+            "pre_validators": [
+              "contract-shape",
+              "subject-ref-present",
+              "route-resolved",
+              "environment-pinned"
+            ],
+            "post_validators": [
+              "output-schema",
+              "evidence-complete",
+              "environment-match"
+            ],
+            "quality_gate": {
+              "required": false
+            },
+            "retry": {
+              "max_attempts": 1,
+              "on": [
+                "provider-timeout",
+                "environment-provision-failed"
+              ]
+            },
+            "repair": {
+              "max_attempts": 1,
+              "on": [
+                "missing-trace",
+                "incomplete-comparison"
+              ]
+            },
+            "escalation": {
+              "after_total_failures": 2,
+              "on": [
+                "environment-mismatch",
+                "certification-conflict"
+              ]
+            },
+            "blocking_rules": [
+              "subject-ref-missing",
+              "environment-unpinned"
+            ]
+          }
+        },
+        "resolved_bounds": {
+          "budget": {
+            "max_cost_usd": 6,
+            "timeout_sec": 900,
+            "max_cost_source": "route.constraints.max_cost_usd (route.harness.default)",
+            "timeout_source": "route.constraints.timeout_sec (route.harness.default)"
+          },
+          "retry": {
+            "max_attempts": 1,
+            "on": [
+              "provider-timeout",
+              "environment-provision-failed"
+            ],
+            "source": "step-policy-profile.retry"
+          },
+          "command_constraints": {
+            "allowed_commands": [
+              "venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py",
+              "make codestyle",
+              "make install"
+            ],
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "repos[*].{build_commands,test_commands,lint_commands}"
+            }
+          },
+          "writeback_mode": {
+            "mode": "pull-request",
+            "allow_direct_write": false,
+            "require_delivery_manifest": true,
+            "resolution_source": {
+              "kind": "project-default",
+              "field": "writeback_policy.default_delivery_mode"
+            }
+          }
+        },
+        "guardrails": {
+          "approval_required": true,
+          "provider_allowlist_enforced": true,
+          "redact_secrets": true,
+          "blocking_rules": [
+            "subject-ref-missing",
+            "environment-unpinned"
+          ]
+        },
+        "governance_decision": {
+          "decision": "allow",
+          "route_risk_tier": "medium",
+          "high_risk_delivery": false,
+          "reasons": []
+        },
+        "provenance": {
+          "project_profile_path": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/project.aor.yaml",
+          "route_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/routes/harness-default.yaml",
+          "policy_profile_source": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/examples/policies/step-harness-default.yaml"
+        }
+      }
+    ]
+  },
+  "evaluation_registry": {
+    "examples_root": "examples",
+    "dataset_refs": [
+      "dataset://run-regression@2026-04-20T08:00:00Z",
+      "dataset://wrapper-certification@2026-04-20T08:00:00Z"
+    ],
+    "suite_refs": [
+      "suite.cert.core@v4",
+      "suite.regress.long@v1",
+      "suite.regress.short@v1",
+      "suite.release.core@v1",
+      "suite.release.long@v1",
+      "suite.release.short@v1"
+    ],
+    "datasets": [
+      {
+        "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z",
+        "dataset_id": "run-regression",
+        "version": "2026-04-20T08:00:00Z",
+        "subject_type": "run",
+        "source": "examples/eval/dataset-run-regression.yaml"
+      },
+      {
+        "dataset_ref": "dataset://wrapper-certification@2026-04-20T08:00:00Z",
+        "dataset_id": "wrapper-certification",
+        "version": "2026-04-20T08:00:00Z",
+        "subject_type": "wrapper",
+        "source": "examples/eval/dataset-wrapper-certification.yaml"
+      }
+    ],
+    "suites": [
+      {
+        "suite_ref": "suite.cert.core@v4",
+        "suite_id": "suite.cert.core",
+        "version": 4,
+        "subject_type": "wrapper",
+        "dataset_ref": "dataset://wrapper-certification@2026-04-20T08:00:00Z",
+        "source": "examples/eval/suite-cert-core.yaml"
+      },
+      {
+        "suite_ref": "suite.regress.long@v1",
+        "suite_id": "suite.regress.long",
+        "version": 1,
+        "subject_type": "run",
+        "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z",
+        "source": "examples/eval/suite-regress-long.yaml"
+      },
+      {
+        "suite_ref": "suite.regress.short@v1",
+        "suite_id": "suite.regress.short",
+        "version": 1,
+        "subject_type": "run",
+        "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z",
+        "source": "examples/eval/suite-regress-short.yaml"
+      },
+      {
+        "suite_ref": "suite.release.core@v1",
+        "suite_id": "suite.release.core",
+        "version": 1,
+        "subject_type": "run",
+        "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z",
+        "source": "examples/eval/suite-release-core.yaml"
+      },
+      {
+        "suite_ref": "suite.release.long@v1",
+        "suite_id": "suite.release.long",
+        "version": 1,
+        "subject_type": "run",
+        "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z",
+        "source": "examples/eval/suite-release-long.yaml"
+      },
+      {
+        "suite_ref": "suite.release.short@v1",
+        "suite_id": "suite.release.short",
+        "version": 1,
+        "subject_type": "run",
+        "dataset_ref": "dataset://run-regression@2026-04-20T08:00:00Z",
+        "source": "examples/eval/suite-release-short.yaml"
+      }
+    ]
+  },
+  "feature_traceability": {
+    "status": "pass",
+    "input_packet_ref": "evidence://.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/artifacts/httpie-cli-w13-s06.full-journey-regress-httpie.artifact.intake.httpie-cli-output-regression.v1.json",
+    "mission_id": "httpie-cli-output-regression",
+    "request_title": "Preserve one bounded CLI output regression",
+    "request_brief": "Implement one narrow CLI behavior fix with matching regression coverage and keep the blast radius inside the relevant command surface.",
+    "allowed_paths": [
+      "httpie/**",
+      "tests/**"
+    ],
+    "forbidden_paths": [
+      "docs/**",
+      ".github/**",
+      "scripts/**",
+      "examples/**",
+      "context/**"
+    ],
+    "expected_evidence": [
+      "verify-summary",
+      "routed-step-result",
+      "review-report"
+    ],
+    "change_budget": {
+      "max_changed_files": 10,
+      "max_added_lines": 320
+    },
+    "source_kind": "catalog-feature-mission"
+  },
+  "discovery_completeness": {
+    "status": "pass",
+    "blocking": false,
+    "checks": [
+      {
+        "check_id": "route-matrix-coverage",
+        "status": "pass",
+        "blocking": true,
+        "expected": 10,
+        "actual": 10,
+        "summary": "Route matrix includes every supported step class."
+      },
+      {
+        "check_id": "asset-matrix-coverage",
+        "status": "pass",
+        "blocking": true,
+        "expected": 10,
+        "actual": 10,
+        "summary": "Asset matrix includes wrapper and prompt provenance for every supported step class."
+      },
+      {
+        "check_id": "policy-matrix-coverage",
+        "status": "pass",
+        "blocking": true,
+        "expected": 10,
+        "actual": 10,
+        "summary": "Policy matrix includes deterministic bounds for every supported step class."
+      },
+      {
+        "check_id": "evaluation-registry-coverage",
+        "status": "pass",
+        "blocking": true,
+        "expected": "at least one dataset and one suite",
+        "actual": "datasets=2, suites=6",
+        "summary": "Evaluation registry exposes suite and dataset refs for downstream quality flows."
+      }
+    ]
+  },
+  "architecture_traceability": {
+    "architecture_doc_refs": [
+      "docs/architecture/04-system-of-record-and-core-entities.md",
+      "docs/architecture/12-orchestrator-operating-model.md",
+      "docs/architecture/14-cli-command-catalog.md"
+    ],
+    "contract_refs": [
+      "docs/contracts/project-analysis-report.md",
+      "docs/contracts/step-result.md",
+      "docs/contracts/wave-ticket.md",
+      "docs/contracts/handoff-packet.md"
+    ],
+    "planning_artifact_families": [
+      "project-analysis-report",
+      "step-result",
+      "wave-ticket",
+      "handoff-packet"
+    ],
+    "step_linkage": [
+      {
+        "step_class": "discovery",
+        "route_id": "route.discovery.default",
+        "wrapper_ref": "wrapper.artifact.default@v1",
+        "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+        "policy_id": "policy.step.artifact.default"
+      },
+      {
+        "step_class": "research",
+        "route_id": "route.research.default",
+        "wrapper_ref": "wrapper.artifact.default@v1",
+        "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+        "policy_id": "policy.step.artifact.default"
+      },
+      {
+        "step_class": "spec",
+        "route_id": "route.spec.default",
+        "wrapper_ref": "wrapper.artifact.default@v1",
+        "prompt_bundle_ref": "prompt-bundle://artifact-default@v1",
+        "policy_id": "policy.step.artifact.default"
+      },
+      {
+        "step_class": "planning",
+        "route_id": "route.plan.default",
+        "wrapper_ref": "wrapper.planner.default@v1",
+        "prompt_bundle_ref": "prompt-bundle://planner-default@v1",
+        "policy_id": "policy.step.planner.default"
+      },
+      {
+        "step_class": "implement",
+        "route_id": "route.implement.default",
+        "wrapper_ref": "wrapper.runner.default@v3",
+        "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+        "policy_id": "policy.step.runner.default"
+      },
+      {
+        "step_class": "review",
+        "route_id": "route.review.default",
+        "wrapper_ref": "wrapper.runner.default@v3",
+        "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+        "policy_id": "policy.step.runner.default"
+      },
+      {
+        "step_class": "qa",
+        "route_id": "route.qa.default",
+        "wrapper_ref": "wrapper.runner.default@v3",
+        "prompt_bundle_ref": "prompt-bundle://runner-default@v3",
+        "policy_id": "policy.step.runner.default"
+      },
+      {
+        "step_class": "repair",
+        "route_id": "route.repair.default",
+        "wrapper_ref": "wrapper.repair.default@v1",
+        "prompt_bundle_ref": "prompt-bundle://repair-default@v1",
+        "policy_id": "policy.step.repair.default"
+      },
+      {
+        "step_class": "eval",
+        "route_id": "route.eval.default",
+        "wrapper_ref": "wrapper.eval.default@v1",
+        "prompt_bundle_ref": "prompt-bundle://eval-default@v1",
+        "policy_id": "policy.step.eval.default"
+      },
+      {
+        "step_class": "harness",
+        "route_id": "route.harness.default",
+        "wrapper_ref": "wrapper.harness.default@v1",
+        "prompt_bundle_ref": "prompt-bundle://harness-default@v1",
+        "policy_id": "policy.step.harness.default"
+      }
+    ],
+    "evaluation_refs": {
+      "suite_refs": [
+        "suite.cert.core@v4",
+        "suite.regress.long@v1",
+        "suite.regress.short@v1",
+        "suite.release.core@v1",
+        "suite.release.long@v1",
+        "suite.release.short@v1"
+      ],
+      "dataset_refs": [
+        "dataset://run-regression@2026-04-20T08:00:00Z",
+        "dataset://wrapper-certification@2026-04-20T08:00:00Z"
+      ]
+    }
+  },
+  "verification_plan": {
+    "preflight": [
+      "project-init-state",
+      "project-profile-load",
+      "analysis-report-write"
+    ],
+    "smoke_commands": [
+      "make codestyle",
+      "make test",
+      "make build"
+    ]
+  },
+  "status": "ready-for-bootstrap",
+  "unknown_facts": [
+    {
+      "field": "repo_facts.package_manager",
+      "confidence": "low",
+      "value": "unknown",
+      "reason": "No known JavaScript package-manager lockfile found."
+    },
+    {
+      "field": "service_boundaries",
+      "confidence": "low",
+      "value": "unknown",
+      "reason": "No apps/packages/services/libs directories found."
+    }
+  ]
+}

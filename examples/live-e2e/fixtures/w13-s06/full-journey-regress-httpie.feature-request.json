@@ -1,0 +1,29 @@
+{
+  "mission_id": "httpie-cli-output-regression",
+  "title": "Preserve one bounded CLI output regression",
+  "brief": "Implement one narrow CLI behavior fix with matching regression coverage and keep the blast radius inside the relevant command surface.",
+  "allowed_paths": [
+    "httpie/**",
+    "tests/**"
+  ],
+  "forbidden_paths": [
+    "docs/**",
+    ".github/**",
+    "scripts/**",
+    "examples/**",
+    "context/**"
+  ],
+  "expected_evidence": [
+    "verify-summary",
+    "routed-step-result",
+    "review-report"
+  ],
+  "acceptance_checks": [
+    "keep the change isolated to one CLI behavior surface",
+    "preserve bounded CLI regression smoke plus codestyle linkage"
+  ],
+  "change_budget": {
+    "max_changed_files": 10,
+    "max_added_lines": 320
+  }
+}

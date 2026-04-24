@@ -3,12 +3,14 @@ import path from "node:path";
 
 import {
   applyRunControlAction,
+  appendRunEvent,
   attachUiLifecycle,
   detachUiLifecycle,
   listDeliveryManifests,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
+  readRunControlState,
   readRunEventHistory,
   readRunPolicyHistory,
   listRuns,
@@ -35,12 +37,14 @@ import {
 } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
 import { runEvaluationSuite } from "../../../packages/orchestrator-core/src/eval-runner.mjs";
 import { replayHarnessCapture } from "../../../packages/orchestrator-core/src/harness-capture-replay.mjs";
-import { applyIncidentRecertification } from "../../../packages/observability/src/index.mjs";
+import { applyIncidentRecertification, materializeLearningLoopArtifacts } from "../../../packages/observability/src/index.mjs";
 import { resolveStepPolicyForStep } from "../../../packages/orchestrator-core/src/policy-resolution.mjs";
 import { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { validateProjectRuntime } from "../../../packages/orchestrator-core/src/project-validate.mjs";
 import { verifyProjectRuntime } from "../../../packages/orchestrator-core/src/project-verify.mjs";
+import { materializeIntakeArtifactPacket } from "../../../packages/orchestrator-core/src/artifact-store.mjs";
+import { materializeReviewReport } from "../../../packages/orchestrator-core/src/review-run.mjs";
 import { executeRoutedStep } from "../../../packages/orchestrator-core/src/step-execution-engine.mjs";
 
 import {
@@ -78,10 +82,10 @@ function isHelpFlag(value) {
 
 /**
  * @param {string[]} args
- * @returns {Record<string, string | true>}
+ * @returns {Record<string, string | string[] | true>}
  */
 function parseFlags(args) {
-  /** @type {Record<string, string | true>} */
+  /** @type {Record<string, string | string[] | true>} */
   const flags = {};
 
   for (let index = 0; index < args.length; index += 1) {
@@ -97,22 +101,39 @@ function parseFlags(args) {
       throw new CliUsageError(`Invalid flag '${current}'.`);
     }
 
-    if (Object.prototype.hasOwnProperty.call(flags, flagName)) {
-      throw new CliUsageError(`Duplicate flag '--${flagName}'.`);
-    }
-
     if (inlineValue !== undefined) {
-      flags[flagName] = inlineValue;
+      const existing = flags[flagName];
+      if (existing === undefined) {
+        flags[flagName] = inlineValue;
+      } else if (existing === true) {
+        throw new CliUsageError(`Duplicate flag '--${flagName}'.`);
+      } else if (Array.isArray(existing)) {
+        existing.push(inlineValue);
+      } else {
+        flags[flagName] = [existing, inlineValue];
+      }
       continue;
     }
 
     const next = args[index + 1];
     if (next && !next.startsWith("--")) {
-      flags[flagName] = next;
+      const existing = flags[flagName];
+      if (existing === undefined) {
+        flags[flagName] = next;
+      } else if (existing === true) {
+        throw new CliUsageError(`Duplicate flag '--${flagName}'.`);
+      } else if (Array.isArray(existing)) {
+        existing.push(next);
+      } else {
+        flags[flagName] = [existing, next];
+      }
       index += 1;
       continue;
     }
 
+    if (Object.prototype.hasOwnProperty.call(flags, flagName)) {
+      throw new CliUsageError(`Duplicate flag '--${flagName}'.`);
+    }
     flags[flagName] = true;
   }
 
@@ -138,6 +159,10 @@ function formatCommandHelp(definition) {
             definition.command === "spec build" ||
             definition.command === "wave create"
           ? "Status: implemented in intake and planning shell (W6-S02)"
+        : definition.command === "review run"
+          ? "Status: implemented in review shell (W13-S05)"
+        : definition.command === "learning handoff"
+          ? "Status: implemented in learning-loop shell (W13-S05)"
         : definition.command === "run start" ||
             definition.command === "run pause" ||
             definition.command === "run resume" ||
@@ -165,6 +190,10 @@ function formatCommandHelp(definition) {
           "- --project-ref is optional. When omitted, the command discovers repo root from cwd.",
           "- --project-profile can override default profile discovery in project root.",
           `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
+          "- --materialize-project-profile writes project.aor.yaml from bundled bootstrap templates when the target repo is still clean.",
+          "- --materialize-bootstrap-assets writes packaged examples/context bootstrap assets without harness-side file injection.",
+          "- --repo-build-command, --repo-lint-command, and --repo-test-command override detected verification commands during bootstrap materialization.",
+          "- Re-running bootstrap materialization is idempotent and reports whether existing assets were reused.",
         ]
       : definition.command === "project analyze"
         ? [
@@ -251,13 +280,16 @@ function formatCommandHelp(definition) {
         : definition.command === "intake create"
           ? [
               "- --project-ref must point to an existing directory.",
-              "- Intake create initializes runtime layout and writes the bootstrap artifact-packet.",
+              "- Intake create writes an intake-request artifact-packet with feature request and optional mission traceability.",
+              "- --request-file can carry structured JSON input that discovery and review can trace later.",
+              "- --request-constraints accepts comma-separated values and can be repeated.",
               `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
             ]
           : definition.command === "discovery run"
             ? [
                 "- --project-ref must point to an existing directory.",
                 "- Discovery run materializes project-analysis plus route/asset/policy/eval registry reports.",
+                "- --input-packet links discovery output to one prior intake-request artifact packet.",
                 "- --route-overrides and --policy-overrides accept comma-separated step overrides.",
                 "- Output includes discovery completeness checks and architecture traceability linkage for planning handoff.",
               ]
@@ -276,8 +308,10 @@ function formatCommandHelp(definition) {
                   ]
           : definition.command === "run start"
             ? [
-                "- Starts one deterministic run-control lifecycle and emits live-run events.",
+                "- Starts one deterministic run-control lifecycle, executes one routed live step, and emits live-run events.",
                 "- --run-id is optional; when omitted, CLI generates a bounded run id.",
+                "- --target-step defaults to implement for full-journey execution start.",
+                "- --require-validation-pass defaults to true so execution remains gated by deterministic validation.",
                 "- High-risk guardrails still apply when policy requires approval evidence.",
               ]
             : definition.command === "run pause"
@@ -367,6 +401,18 @@ function formatCommandHelp(definition) {
                         "- Use --run-id to scope one run or --limit for bounded list output.",
                         "- Audit output highlights incident/promotion lineage plus cost/latency signals for traceable governance follow-up.",
                       ]
+                  : definition.command === "review run"
+                    ? [
+                        "- Review run is report-only at the command level and writes one durable review-report artifact.",
+                        "- Review verdict checks feature traceability, discovery quality, artifact quality, and code quality.",
+                        "- A failing review should be consumed by operator flow; it does not imply CLI transport failure on its own.",
+                      ]
+                    : definition.command === "learning handoff"
+                      ? [
+                          "- Learning handoff writes public learning-loop scorecard and handoff artifacts.",
+                          "- Existing incident-report linkage is preserved when incident open/recertify already ran for the same run.",
+                          "- Use audit runs and incident show to inspect closure lineage after handoff materializes.",
+                        ]
                   : definition.command === "ui attach"
                     ? [
                         "- Attach records explicit UI lifecycle state in runtime state artifacts.",
@@ -426,7 +472,7 @@ function formatTopLevelHelp() {
 
 /**
  * @param {string} command
- * @param {Record<string, string | true>} flags
+ * @param {Record<string, string | string[] | true>} flags
  */
 function ensureRequiredFlags(command, flags) {
   const definition = getCommandDefinition(command);
@@ -434,7 +480,13 @@ function ensureRequiredFlags(command, flags) {
 
   for (const required of requiredFlags) {
     const value = flags[required];
-    if (typeof value !== "string" || value.trim().length === 0) {
+    const normalized =
+      typeof value === "string"
+        ? value.trim()
+        : Array.isArray(value)
+          ? value.find((entry) => typeof entry === "string" && entry.trim().length > 0)?.trim() ?? ""
+          : "";
+    if (normalized.length === 0) {
       throw new CliUsageError(`Missing required flag '--${required}' for 'aor ${command}'.`);
     }
   }
@@ -442,13 +494,16 @@ function ensureRequiredFlags(command, flags) {
 
 /**
  * @param {string} flagName
- * @param {string | true | undefined} value
+ * @param {string | string[] | true | undefined} value
  * @returns {string | undefined}
  */
 function resolveOptionalStringFlag(flagName, value) {
   if (value === undefined) return undefined;
   if (value === true) {
     throw new CliUsageError(`Flag '--${flagName}' requires a value.`);
+  }
+  if (Array.isArray(value)) {
+    throw new CliUsageError(`Flag '--${flagName}' accepts only one value.`);
   }
   if (value.trim().length === 0) {
     throw new CliUsageError(`Flag '--${flagName}' cannot be empty.`);
@@ -458,12 +513,15 @@ function resolveOptionalStringFlag(flagName, value) {
 
 /**
  * @param {string} flagName
- * @param {string | true | undefined} value
+ * @param {string | string[] | true | undefined} value
  * @returns {boolean}
  */
 function resolveOptionalBooleanFlag(flagName, value) {
   if (value === undefined) return false;
   if (value === true) return true;
+  if (Array.isArray(value)) {
+    throw new CliUsageError(`Flag '--${flagName}' accepts only one value.`);
+  }
   if (value === "true") return true;
   if (value === "false") return false;
   throw new CliUsageError(`Flag '--${flagName}' accepts only boolean values ('true' or 'false').`);
@@ -471,7 +529,7 @@ function resolveOptionalBooleanFlag(flagName, value) {
 
 /**
  * @param {string} flagName
- * @param {string | true | undefined} value
+ * @param {string | string[] | true | undefined} value
  * @param {{ min?: number }} [options]
  * @returns {number | undefined}
  */
@@ -479,6 +537,9 @@ function resolveOptionalIntegerFlag(flagName, value, options = {}) {
   if (value === undefined) return undefined;
   if (value === true) {
     throw new CliUsageError(`Flag '--${flagName}' requires a value.`);
+  }
+  if (Array.isArray(value)) {
+    throw new CliUsageError(`Flag '--${flagName}' accepts only one value.`);
   }
   if (!/^-?\d+$/.test(value)) {
     throw new CliUsageError(`Flag '--${flagName}' must be an integer.`);
@@ -498,7 +559,7 @@ function resolveOptionalIntegerFlag(flagName, value, options = {}) {
 
 /**
  * @param {string} flagName
- * @param {string | true | undefined} value
+ * @param {string | string[] | true | undefined} value
  * @returns {string[]}
  */
 function resolveOptionalCsvFlag(flagName, value) {
@@ -507,11 +568,32 @@ function resolveOptionalCsvFlag(flagName, value) {
     throw new CliUsageError(`Flag '--${flagName}' requires a value.`);
   }
 
-  const parsed = value
-    .split(",")
+  const values = Array.isArray(value) ? value : [value];
+  const parsed = values
+    .flatMap((entry) => entry.split(","))
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
 
+  if (parsed.length === 0) {
+    throw new CliUsageError(`Flag '--${flagName}' cannot be empty.`);
+  }
+
+  return Array.from(new Set(parsed));
+}
+
+/**
+ * @param {string} flagName
+ * @param {string | string[] | true | undefined} value
+ * @returns {string[]}
+ */
+function resolveOptionalStringListFlag(flagName, value) {
+  if (value === undefined) return [];
+  if (value === true) {
+    throw new CliUsageError(`Flag '--${flagName}' requires a value.`);
+  }
+
+  const values = Array.isArray(value) ? value : [value];
+  const parsed = values.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
   if (parsed.length === 0) {
     throw new CliUsageError(`Flag '--${flagName}' cannot be empty.`);
   }
@@ -525,6 +607,23 @@ function resolveOptionalCsvFlag(flagName, value) {
  */
 function uniqueStrings(values) {
   return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
+}
+
+/**
+ * @param {string} filePath
+ * @returns {Record<string, unknown>}
+ */
+function readJson(filePath) {
+  return /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(filePath, "utf8")));
+}
+
+/**
+ * @param {string} filePath
+ * @param {Record<string, unknown>} payload
+ */
+function writeJson(filePath, payload) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
 /**
@@ -551,6 +650,100 @@ function normalizeForId(value) {
  */
 function toRunRef(runId) {
   return runId.startsWith("run://") ? runId : `run://${runId}`;
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toEvidenceRef(projectRoot, filePath) {
+  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+}
+
+/**
+ * @param {{ cwd: string, projectRoot: string, flagValue: string | undefined, flagName: string }} options
+ * @returns {string | undefined}
+ */
+function resolveOptionalRefOrPathFlag(options) {
+  if (!options.flagValue) {
+    return undefined;
+  }
+  if (options.flagValue.startsWith("evidence://")) {
+    return path.resolve(options.projectRoot, options.flagValue.slice("evidence://".length));
+  }
+  return path.isAbsolute(options.flagValue)
+    ? options.flagValue
+    : path.resolve(options.cwd, options.flagValue);
+}
+
+const DEFAULT_LEARNING_BACKLOG_REFS = Object.freeze([
+  "docs/backlog/mvp-implementation-backlog.md",
+  "docs/backlog/mvp-roadmap.md",
+  "docs/ops/live-e2e-standard-runner.md",
+]);
+
+/**
+ * @param {string | null | undefined} status
+ * @returns {"pass" | "fail" | "aborted" | "running" | "unknown"}
+ */
+function normalizeLearningRunStatus(status) {
+  const normalized = typeof status === "string" ? status.trim().toLowerCase() : "";
+  if (normalized === "completed" || normalized === "pass" || normalized === "passed" || normalized === "success") {
+    return "pass";
+  }
+  if (normalized === "failed" || normalized === "fail") {
+    return "fail";
+  }
+  if (normalized === "canceled" || normalized === "cancelled" || normalized === "aborted") {
+    return "aborted";
+  }
+  if (normalized === "running" || normalized === "paused") {
+    return "running";
+  }
+  return "unknown";
+}
+
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   stateFile: string,
+ *   previousState: Record<string, unknown> | null,
+ *   stepStatus: string,
+ *   targetStep: string,
+ *   stepResultFile: string,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function finalizeRunControlState(options) {
+  const terminalStatus = options.stepStatus === "passed" ? "completed" : "failed";
+  const previousAuditRefs = asStringArray(options.previousState?.audit_refs);
+  const previousEvidenceRefs = asStringArray(options.previousState?.step_result_refs);
+  const stepResultRef = toEvidenceRef(options.projectRoot, options.stepResultFile);
+  const nextStepResultRefs = uniqueStrings([...previousEvidenceRefs, stepResultRef]);
+  const nextState = {
+    schema_version: 1,
+    run_id: typeof options.previousState?.run_id === "string" ? options.previousState.run_id : null,
+    status: terminalStatus,
+    current_step: options.targetStep,
+    last_action: "start",
+    started_at:
+      typeof options.previousState?.started_at === "string"
+        ? options.previousState.started_at
+        : new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    action_sequence:
+      typeof options.previousState?.action_sequence === "number" && Number.isFinite(options.previousState.action_sequence)
+        ? options.previousState.action_sequence
+        : 1,
+    approval_refs: asStringArray(options.previousState?.approval_refs),
+    audit_refs: previousAuditRefs,
+    step_result_refs: nextStepResultRefs,
+    evidence_root:
+      typeof options.previousState?.evidence_root === "string" ? options.previousState.evidence_root : path.dirname(options.stateFile),
+  };
+  writeJson(options.stateFile, nextState);
+  return nextState;
 }
 
 /**
@@ -724,7 +917,7 @@ function parseInvocation(args) {
 
 /**
  * @param {string} command
- * @param {Record<string, string | true>} flags
+ * @param {Record<string, string | string[] | true>} flags
  * @param {string} cwd
  * @returns {CliResult}
  */
@@ -775,10 +968,21 @@ function executeImplementedCommand(command, flags, cwd) {
   let waveTicketFile = null;
   let artifactPacketId = null;
   let artifactPacketFile = null;
+  let artifactPacketBodyFile = null;
+  let bootstrapMaterializationStatus = null;
+  let materializedProjectProfileFile = null;
+  let materializedBootstrapAssetsRoot = null;
+  let bootstrapMaterializationIdempotent = null;
   let verifySummaryFile = null;
   let verifyStepResultFiles = null;
   let routedStepResultId = null;
   let routedStepResultFile = null;
+  let reviewReportId = null;
+  let reviewReportFile = null;
+  let reviewOverallStatus = null;
+  let reviewRecommendation = null;
+  let learningLoopScorecardFile = null;
+  let learningLoopHandoffFile = null;
   let evaluationReportId = null;
   let evaluationReportFile = null;
   let evaluationStatus = null;
@@ -879,6 +1083,18 @@ function executeImplementedCommand(command, flags, cwd) {
       projectRef: resolveOptionalStringFlag("project-ref", flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      materializeProjectProfile: resolveOptionalBooleanFlag(
+        "materialize-project-profile",
+        flags["materialize-project-profile"],
+      ),
+      bootstrapTemplate: resolveOptionalStringFlag("bootstrap-template", flags["bootstrap-template"]),
+      materializeBootstrapAssets: resolveOptionalBooleanFlag(
+        "materialize-bootstrap-assets",
+        flags["materialize-bootstrap-assets"],
+      ),
+      repoBuildCommands: resolveOptionalStringListFlag("repo-build-command", flags["repo-build-command"]),
+      repoLintCommands: resolveOptionalStringListFlag("repo-lint-command", flags["repo-lint-command"]),
+      repoTestCommands: resolveOptionalStringListFlag("repo-test-command", flags["repo-test-command"]),
     });
 
     resolvedProjectRef = initResult.projectRoot;
@@ -888,6 +1104,11 @@ function executeImplementedCommand(command, flags, cwd) {
     projectProfileRef = initResult.projectProfileRef;
     artifactPacketId = initResult.artifactPacketId;
     artifactPacketFile = initResult.artifactPacketFile;
+    artifactPacketBodyFile = initResult.artifactPacketBodyFile;
+    bootstrapMaterializationStatus = initResult.bootstrapMaterializationStatus;
+    materializedProjectProfileFile = initResult.materializedProjectProfileFile;
+    materializedBootstrapAssetsRoot = initResult.materializedBootstrapAssetsRoot;
+    bootstrapMaterializationIdempotent = initResult.bootstrapMaterializationIdempotent;
   } else if (command === "intake create") {
     ensureRequiredFlags(command, flags);
     const intakeResult = initializeProjectRuntime({
@@ -902,8 +1123,31 @@ function executeImplementedCommand(command, flags, cwd) {
     runtimeLayout = intakeResult.runtimeLayout;
     runtimeStateFile = intakeResult.stateFile;
     projectProfileRef = intakeResult.projectProfileRef;
-    artifactPacketId = intakeResult.artifactPacketId;
-    artifactPacketFile = intakeResult.artifactPacketFile;
+    const requestFileInput = resolveOptionalStringFlag("request-file", flags["request-file"]);
+    const requestFile = resolveOptionalRefOrPathFlag({
+      cwd,
+      projectRoot: intakeResult.projectRoot,
+      flagValue: requestFileInput,
+      flagName: "request-file",
+    });
+    if (requestFile && !fs.existsSync(requestFile)) {
+      throw new CliUsageError(`Request file '${requestFileInput}' was not found.`);
+    }
+    const intakePacket = materializeIntakeArtifactPacket({
+      projectId: intakeResult.projectId,
+      projectRoot: intakeResult.projectRoot,
+      projectProfileRef: intakeResult.projectProfileRef,
+      runtimeLayout: intakeResult.runtimeLayout,
+      command: "aor intake create",
+      missionId: resolveOptionalStringFlag("mission-id", flags["mission-id"]) ?? null,
+      requestTitle: resolveOptionalStringFlag("request-title", flags["request-title"]) ?? null,
+      requestBrief: resolveOptionalStringFlag("request-brief", flags["request-brief"]) ?? null,
+      requestConstraints: resolveOptionalCsvFlag("request-constraints", flags["request-constraints"]),
+      requestFile: requestFile ?? null,
+    });
+    artifactPacketId = intakePacket.packet.packet_id;
+    artifactPacketFile = intakePacket.packetFile;
+    artifactPacketBodyFile = intakePacket.packetBodyFile;
   } else if (command === "project analyze") {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
@@ -942,6 +1186,15 @@ function executeImplementedCommand(command, flags, cwd) {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
     const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
+    const inputPacketPath = resolveOptionalRefOrPathFlag({
+      cwd,
+      projectRoot: resolveProjectRef(/** @type {string} */ (flags["project-ref"]), cwd),
+      flagValue: resolveOptionalStringFlag("input-packet", flags["input-packet"]),
+      flagName: "input-packet",
+    });
+    if (inputPacketPath && !fs.existsSync(inputPacketPath)) {
+      throw new CliUsageError(`Input packet '${resolveOptionalStringFlag("input-packet", flags["input-packet"])}' was not found.`);
+    }
 
     const discoveryResult = analyzeProjectRuntime({
       cwd,
@@ -950,6 +1203,7 @@ function executeImplementedCommand(command, flags, cwd) {
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       routeOverrides,
       policyOverrides,
+      inputPacketPath,
     });
 
     resolvedProjectRef = discoveryResult.projectRoot;
@@ -1306,9 +1560,27 @@ function executeImplementedCommand(command, flags, cwd) {
     const runAction = /** @type {"start" | "pause" | "resume" | "steer" | "cancel"} */ (command.split(" ")[1]);
     const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
     const targetStep = resolveOptionalStringFlag("target-step", flags["target-step"]);
+    const requireValidationPass =
+      flags["require-validation-pass"] === undefined
+        ? runAction === "start"
+        : resolveOptionalBooleanFlag("require-validation-pass", flags["require-validation-pass"]);
+    const approvedHandoffRef = resolveOptionalStringFlag("approved-handoff-ref", flags["approved-handoff-ref"]);
+    const promotionEvidenceRefs = resolveOptionalCsvFlag(
+      "promotion-evidence-refs",
+      flags["promotion-evidence-refs"],
+    );
 
-    if (runAction !== "steer" && targetStep) {
-      throw new CliUsageError(`Flag '--target-step' is only valid for 'aor run steer'.`);
+    if (runAction !== "start" && runAction !== "steer" && targetStep) {
+      throw new CliUsageError(`Flag '--target-step' is only valid for 'aor run start' or 'aor run steer'.`);
+    }
+    if (runAction !== "start" && flags["require-validation-pass"] !== undefined) {
+      throw new CliUsageError(`Flag '--require-validation-pass' is only valid for 'aor run start'.`);
+    }
+    if (runAction !== "start" && approvedHandoffRef) {
+      throw new CliUsageError(`Flag '--approved-handoff-ref' is only valid for 'aor run start'.`);
+    }
+    if (runAction !== "start" && promotionEvidenceRefs.length > 0) {
+      throw new CliUsageError(`Flag '--promotion-evidence-refs' is only valid for 'aor run start'.`);
     }
 
     const controlResult = applyRunControlAction({
@@ -1341,6 +1613,84 @@ function executeImplementedCommand(command, flags, cwd) {
     streamLogFile = controlResult.streamLogFile;
     readOnly = false;
     futureControlHooks = controlResult.nextActions;
+
+    if (runAction === "start" && !controlResult.blocked) {
+      if (requireValidationPass) {
+        const validationGate = validateProjectRuntime({
+          cwd,
+          projectRef: /** @type {string} */ (flags["project-ref"]),
+          runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        });
+        if (validationGate.report.status === "fail") {
+          throw new CliUsageError("Run start requires a passing validation report before execution can begin.");
+        }
+      }
+
+      const routedExecution = executeRoutedStep({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        stepClass: targetStep ?? "implement",
+        dryRun: false,
+        runId: controlResult.runId,
+        stepId: `run.start.${targetStep ?? "implement"}`,
+        requireDiscoveryCompleteness: true,
+        approvedHandoffRef: approvedHandoffRef ?? undefined,
+        promotionEvidenceRefs,
+      });
+      routedStepResultId = routedExecution.stepResult.step_result_id;
+      routedStepResultFile = routedExecution.stepResultPath;
+      runControlState = finalizeRunControlState({
+        projectRoot: controlResult.projectRoot,
+        stateFile: controlResult.stateFile,
+        previousState:
+          typeof controlResult.state === "object" && controlResult.state !== null ? controlResult.state : null,
+        stepStatus: routedExecution.stepResult.status,
+        targetStep: targetStep ?? "implement",
+        stepResultFile: routedExecution.stepResultPath,
+      });
+
+      const stepEvent = appendRunEvent({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId: controlResult.runId,
+        eventType: "step.updated",
+        payload: {
+          step_id: routedExecution.stepResult.step_id,
+          status: routedExecution.stepResult.status,
+          summary: routedExecution.stepResult.summary,
+          step_result_ref: toEvidenceRef(controlResult.projectRoot, routedExecution.stepResultPath),
+        },
+      });
+      const terminalEvent = appendRunEvent({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId: controlResult.runId,
+        eventType: "run.terminal",
+        payload: {
+          status: runControlState.status,
+          summary:
+            routedExecution.stepResult.status === "passed"
+              ? "Run completed through routed execution."
+              : routedExecution.stepResult.summary,
+          step_result_ref: toEvidenceRef(controlResult.projectRoot, routedExecution.stepResultPath),
+        },
+      });
+      evidenceEventId = stepEvent.event.event_id;
+      primaryEventId = terminalEvent.event.event_id;
+      streamLogFile = terminalEvent.logFile;
+      futureControlHooks =
+        routedExecution.stepResult.status === "passed"
+          ? ["run status", `review run --run-id ${controlResult.runId}`, `audit runs --run-id ${controlResult.runId}`]
+          : [
+              `incident open --run-id ${controlResult.runId} --summary <text>`,
+              `review run --run-id ${controlResult.runId}`,
+              `audit runs --run-id ${controlResult.runId}`,
+            ];
+    }
   } else if (command === "run status") {
     ensureRequiredFlags(command, flags);
     const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
@@ -1435,6 +1785,119 @@ function executeImplementedCommand(command, flags, cwd) {
 
     readOnly = true;
     futureControlHooks = ["run start", "run pause", "run resume", "run steer", "run cancel"];
+  } else if (command === "review run") {
+    ensureRequiredFlags(command, flags);
+    const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    if (!runId) {
+      throw new CliUsageError("Missing required flag '--run-id' for 'aor review run'.");
+    }
+
+    const reviewResult = materializeReviewReport({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId,
+    });
+
+    resolvedProjectRef = reviewResult.projectRoot;
+    resolvedRuntimeRoot = reviewResult.runtimeRoot;
+    runtimeLayout = reviewResult.runtimeLayout;
+    runtimeStateFile = reviewResult.stateFile;
+    projectProfileRef = reviewResult.projectProfileRef;
+    reviewReportId = reviewResult.reviewReport.review_report_id;
+    reviewReportFile = reviewResult.reviewReportFile;
+    reviewOverallStatus = reviewResult.reviewReport.overall_status;
+    reviewRecommendation = reviewResult.reviewReport.review_recommendation;
+    readOnly = false;
+    futureControlHooks = [
+      `audit runs --run-id ${runId}`,
+      `learning handoff --run-id ${runId}`,
+      `evidence show --run-id ${runId}`,
+    ];
+  } else if (command === "learning handoff") {
+    ensureRequiredFlags(command, flags);
+    const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    if (!runId) {
+      throw new CliUsageError("Missing required flag '--run-id' for 'aor learning handoff'.");
+    }
+
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    resolvedProjectRef = projectState.project_root;
+    resolvedRuntimeRoot = projectState.runtime_root;
+    runtimeLayout = projectState.runtime_layout;
+    runtimeStateFile = projectState.state_file;
+    projectProfileRef = projectState.project_profile_ref;
+
+    const runState = readRunControlState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId,
+    });
+    const runs = listRuns({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const runSummary = runs.find((entry) => entry.run_id === runId);
+    if (!runSummary) {
+      throw new CliUsageError(`Run '${runId}' was not found for learning handoff.`);
+    }
+
+    const qualityForRun = listQualityArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    }).filter((artifact) => runSummary.quality_refs.includes(artifact.artifact_ref));
+    const existingIncident =
+      qualityForRun.find((artifact) => artifact.family === "incident-report") ?? null;
+    const evalSuiteRefs = uniqueStrings(
+      qualityForRun
+        .filter((artifact) => artifact.family === "evaluation-report")
+        .map((artifact) => (typeof artifact.document.suite_ref === "string" ? artifact.document.suite_ref : "")),
+    );
+    const summary =
+      reviewOverallStatus === "fail"
+        ? `Run '${runId}' requires repair before follow-up closure.`
+        : `Run '${runId}' completed public learning-loop handoff.`;
+    const learningLoop = materializeLearningLoopArtifacts({
+      projectId: projectState.project_id,
+      projectRoot: projectState.project_root,
+      runtimeLayout: { reportsRoot: projectState.runtime_layout.reports_root },
+      runId,
+      sourceKind: "cli-learning-handoff",
+      runStatus: normalizeLearningRunStatus(
+        typeof runState.state?.status === "string" ? runState.state.status : undefined,
+      ),
+      summary,
+      evidenceRefs: uniqueStrings([
+        ...runSummary.packet_refs,
+        ...runSummary.step_result_refs,
+        ...runSummary.quality_refs,
+      ]),
+      linkedScorecardRefs: qualityForRun
+        .filter((artifact) => artifact.family === "review-report")
+        .map((artifact) => artifact.artifact_ref),
+      evalSuiteRefs,
+      backlogRefs: [...DEFAULT_LEARNING_BACKLOG_REFS],
+      forceIncident: false,
+      existingIncidentFile: existingIncident?.file,
+      existingIncidentRef: existingIncident?.artifact_ref,
+    });
+    learningLoopScorecardFile = learningLoop.scorecardFile;
+    learningLoopHandoffFile = learningLoop.handoffFile;
+    incidentFile = learningLoop.incidentFile ?? existingIncident?.file ?? null;
+    readOnly = false;
+    futureControlHooks = [
+      `incident show --run-id ${runId}`,
+      `audit runs --run-id ${runId}`,
+      `evidence show --run-id ${runId}`,
+    ];
   } else if (command === "deliver prepare" || command === "release prepare") {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
@@ -2179,9 +2642,12 @@ function executeImplementedCommand(command, flags, cwd) {
           .map((artifact) => artifact.artifact_ref),
       ]);
       const scorecardRefs = uniqueStrings(
-        incidentMatches
-          .flatMap((artifact) => asStringArray(artifact.document.linked_asset_refs))
-          .filter((ref) => ref.includes("learning-loop-scorecard")),
+        [
+          ...run.quality_refs.filter((ref) => ref.includes("learning-loop-scorecard")),
+          ...incidentMatches
+            .flatMap((artifact) => asStringArray(artifact.document.linked_asset_refs))
+            .filter((ref) => ref.includes("learning-loop-scorecard")),
+        ],
       );
       const evidenceRefs = uniqueStrings([
         ...run.packet_refs,
@@ -2329,10 +2795,19 @@ function executeImplementedCommand(command, flags, cwd) {
     wave_ticket_file: waveTicketFile,
     artifact_packet_id: artifactPacketId,
     artifact_packet_file: artifactPacketFile,
+    artifact_packet_body_file: artifactPacketBodyFile,
+    bootstrap_materialization_status: bootstrapMaterializationStatus,
+    materialized_project_profile_file: materializedProjectProfileFile,
+    materialized_bootstrap_assets_root: materializedBootstrapAssetsRoot,
+    bootstrap_materialization_idempotent: bootstrapMaterializationIdempotent,
     verify_summary_file: verifySummaryFile,
     step_result_files: verifyStepResultFiles,
     routed_step_result_id: routedStepResultId,
     routed_step_result_file: routedStepResultFile,
+    review_report_id: reviewReportId,
+    review_report_file: reviewReportFile,
+    review_overall_status: reviewOverallStatus,
+    review_recommendation: reviewRecommendation,
     evaluation_report_id: evaluationReportId,
     evaluation_report_file: evaluationReportFile,
     evaluation_status: evaluationStatus,
@@ -2391,6 +2866,7 @@ function executeImplementedCommand(command, flags, cwd) {
     delivery_writeback_result: deliveryWritebackResult,
     incident_id: incidentId,
     incident_file: incidentFile,
+    incident_report_file: incidentFile,
     incident_status: incidentStatus,
     incident_run_ref: incidentRunRef,
     incident_linked_asset_refs: incidentLinkedAssetRefs,
@@ -2406,6 +2882,8 @@ function executeImplementedCommand(command, flags, cwd) {
     incident_recertification_quality_evidence_refs: incidentRecertificationQualityEvidenceRefs,
     incident_recertification_finance_evidence_root: incidentRecertificationFinanceEvidenceRoot,
     incident_recertification_quality_evidence_root: incidentRecertificationQualityEvidenceRoot,
+    learning_loop_scorecard_file: learningLoopScorecardFile,
+    learning_loop_handoff_file: learningLoopHandoffFile,
     incident_records: incidentRecords,
     run_audit_records: runAuditRecords,
     audit_evidence_refs: auditEvidenceRefs,

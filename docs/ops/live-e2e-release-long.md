@@ -15,7 +15,7 @@
 Confirm that AOR can:
 - bootstrap a workspace repo with apps and packages;
 - plan a bounded cross-package change;
-- run workspace-wide checks;
+- run mission-scoped monorepo quality checks;
 - materialize delivery and release artifacts for a fork or local mirror.
 
 ## Default task brief
@@ -35,13 +35,13 @@ Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
 6. stop unless no-write gates pass
 
 ## Prerequisites
-- Node + corepack + yarn available.
+- Node + yarn available.
 - Network access for clone and workspace install.
 - Shell resources suitable for workspace lint/typecheck/test commands.
 
 ## Abort conditions
 - Clone or workspace installation fails.
-- `yarn g:lint`, `yarn g:typecheck`, or `yarn g:test-unit` fails in preflight.
+- `yarn g:lint`, `yarn g:typecheck`, or shared-package unit smoke fails in preflight.
 - Delivery or release stage requests upstream write-back.
 
 ## Harness command
@@ -54,7 +54,7 @@ node ./scripts/live-e2e/run-profile.mjs \
 ## Expected verification
 - bootstrap and install succeed;
 - setup command `yarn install --immutable` succeeds;
-- `yarn g:lint`, `yarn g:typecheck`, and `yarn g:test-unit` succeed;
+- `yarn g:lint`, `yarn g:typecheck`, `yarn workspace @your-org/ts-utils test-unit`, and `yarn workspace @your-org/core-lib test-unit` succeed;
 - impacted-repo and changed-path metadata are recorded;
 - release packet and delivery manifest are materialized.
 

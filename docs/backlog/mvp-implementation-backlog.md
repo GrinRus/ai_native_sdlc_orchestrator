@@ -140,5 +140,15 @@ This is the master index for the implementation slices across all defined waves.
 | W12-S03 | Breaking CLI and contract removal | EPIC-6 | done | `apps/cli`, `docs/contracts/**`, `packages/contracts`, `examples/**` | W12-S02 |
 | W12-S04 | Proof refresh after surface cleanup | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/fixtures/**`, `packages/observability`, `scripts/live-e2e/**` | W12-S03 |
 
+## W13 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W13-S01 | Backlog-first full-journey live E2E realignment | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/architecture/**`, `docs/ops/**` | none |
+| W13-S02 | Curated target and feature mission catalog | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**` | W13-S01 |
+| W13-S03 | Public bootstrap and feature-intent intake | EPIC-1 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/architecture/**`, `docs/product/**` | W13-S02 |
+| W13-S04 | Feature-driven discovery and execution lifecycle | EPIC-3 | done | `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W13-S03 |
+| W13-S05 | Public review and learning-loop closure surfaces | EPIC-4 | done | `apps/cli`, `packages/contracts`, `packages/observability`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W13-S04 |
+| W13-S06 | Full-journey harness and restored runner skill | EPIC-7 | done | `scripts/live-e2e/**`, `.agents/skills/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/cli/test/**` | W13-S05 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

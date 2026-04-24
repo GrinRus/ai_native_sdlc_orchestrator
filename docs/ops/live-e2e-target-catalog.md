@@ -1,86 +1,71 @@
 # Live E2E target catalog
 
-This catalog defines the public repositories AOR uses for live end-to-end rehearsals.
+This catalog defines the curated repositories and curated feature missions AOR uses for live end-to-end rehearsal and acceptance.
+
+Human-readable guidance lives here. Machine-readable enforcement lives under `scripts/live-e2e/catalog/targets/*.yaml`.
 
 For canonical setup and verification dependency details per profile, use `docs/ops/live-e2e-dependency-matrix.md`.
 
 ## Safety policy
-- Default to **read-only bootstrap and patch output**.
+- Default to read-only bootstrap and bounded patch output.
 - Never push to upstream public repositories by default.
-- If a delivery rehearsal needs write-back, use a personal fork or a local mirror.
-- Always produce a delivery manifest when the rehearsal reaches delivery.
+- Mandatory full-journey live E2E is allowed only on curated catalog targets and curated feature missions.
+- Full-journey runs must generate the feature request and discovery/spec/handoff during the run.
+- Always materialize review and learning closure artifacts for full-journey runs.
 
 ## Target 1 — `sindresorhus/ky`
+- Catalog id: `ky`
 - Shape: small TypeScript library.
-- Why it is useful: single-package repo, modern Node runtime, small blast radius, and a crisp `test` command.
-- Current signals from the repository:
-  - Node `>=22`
-  - `npm test` runs `xo`, `build`, and `ava`
-  - the project is a tiny HTTP client with no runtime dependencies
-- Best scenarios:
-  - `regress short`
-  - `release short`
-  - `w7 governance integration`
-- Suggested rehearsal task:
-  - add or adjust one narrow regression test;
-  - make the smallest source change needed;
-  - stop at patch, local branch, or fork PR draft.
-- Prerequisites:
-  - Node `>=22` and npm available;
-  - network access for clone and install.
+- Why it is useful: single-package repo, modern Node runtime, small blast radius, and crisp regression scope.
+- Curated missions:
+  - `ky-header-regression`
+    - bounded regression mission inside `source/**` and `test/**`
+    - expected evidence: `verify-summary`, routed `step-result`, `review-report`
+  - `ky-release-doc-typing`
+    - release-shaped mission inside `source/**`, `test/**`, and `index.d.ts`
+    - expected evidence: `delivery-manifest`, `release-packet`, `review-report`
+- Best profiles:
+  - bounded: `regress-short.yaml`, `release-short.yaml`, `w7-governance-integration.yaml`
+  - full-journey: `full-journey-regress-ky.yaml`
 - Failure-safe defaults:
-  - keep `write_back_to_remote=false`;
-  - keep delivery mode in `patch-only`.
-- Abort conditions:
-  - checkout or install fails;
-  - `npm test` fails during preflight.
+  - `write_back_to_remote=false`
+  - preferred delivery mode: `patch`
 
 ## Target 2 — `httpie/cli`
+- Catalog id: `httpie-cli`
 - Shape: medium Python CLI project.
-- Why it is useful: different language, CLI-oriented workflow, stronger local setup, and richer test targets.
-- Current signals from the repository:
-  - main development instructions use `make all`
-  - local checks include `make test`, `make test-cover`, and `make codestyle`
-  - the project uses `pytest`
-- Best scenario:
-  - `regress long`
-- Suggested rehearsal task:
-  - implement a bounded bug fix or UX improvement in one CLI surface;
-  - add or update tests;
-  - verify with `make test` and `make codestyle`.
-- Prerequisites:
-  - Python, pip, and `make` available;
-  - network access for clone and dependency setup.
+- Why it is useful: different language/runtime, CLI-oriented workflow, and stronger local setup demands.
+- Curated missions:
+  - `httpie-cli-output-regression`
+    - bounded CLI regression mission inside `httpie/**` and `tests/**`
+    - expected evidence: `verify-summary`, routed `step-result`, `review-report`
+- Best profiles:
+  - bounded: `regress-long.yaml`
+  - full-journey: `full-journey-regress-httpie.yaml`
+- Bootstrap baseline:
+  - use `make install` before `make test` / `make codestyle`
+- Full-journey verification baseline:
+  - use the bounded CLI pytest slice plus `make codestyle`, not the entire repo-wide `make test` matrix
 - Failure-safe defaults:
-  - keep `write_back_to_remote=false`;
-  - stop at patch output or fork-local branch only.
-- Abort conditions:
-  - checkout or setup path fails;
-  - `make test` or `make codestyle` fails during preflight.
+  - `write_back_to_remote=false`
+  - preferred delivery mode: `patch`
 
 ## Target 3 — `belgattitude/nextjs-monorepo-example`
+- Catalog id: `nextjs-monorepo-example`
 - Shape: public Next.js/Turborepo/Yarn monorepo with apps and packages.
 - Why it is useful: representative monorepo topology, shared packages, app/package boundaries, and workspace-wide checks.
-- Current signals from the repository:
-  - install starts with `corepack enable` and `yarn install`
-  - root scripts include `g:lint`, `g:typecheck`, and `g:test-unit`
-  - the workspace uses `apps/*` and `packages/*`
-- Best scenario:
-  - `release long`
-- Suggested rehearsal task:
-  - update one shared package and one consuming app;
-  - run workspace lint, typecheck, and unit tests;
-  - materialize release packet and delivery manifest for a fork or local mirror.
-- Prerequisites:
-  - Node + corepack + yarn available;
-  - network access for clone and workspace install;
-  - shell resources suitable for monorepo checks.
+- Curated missions:
+  - `nextjs-shared-package-release`
+    - release-shaped mission inside `apps/**` and `packages/**`
+    - expected evidence: `delivery-manifest`, `release-packet`, `review-report`
+- Best profiles:
+  - bounded: `release-long.yaml`
+  - full-journey: `full-journey-release-nextjs.yaml`
 - Failure-safe defaults:
-  - keep `write_back_to_remote=false`;
-  - keep delivery mode in `fork-first-pr` unless policy explicitly changes.
-- Abort conditions:
-  - checkout or workspace install fails;
-  - `yarn g:lint`, `yarn g:typecheck`, or `yarn g:test-unit` fails.
+  - `write_back_to_remote=false`
+  - preferred delivery mode: `fork-first-pr`
+- Full-journey verification baseline:
+  - use monorepo-wide lint and typecheck plus shared-package unit smoke, not the entire repo-wide `g:test-unit` matrix
 
 ## Why these targets
 Together these targets cover:
@@ -88,20 +73,36 @@ Together these targets cover:
 - deeper CLI regressions;
 - monorepo release-shaped delivery;
 - more than one language/runtime;
-- both short and long rehearsal budgets.
+- both bounded rehearsal and full-journey mission-driven acceptance.
+
+## Full-journey acceptance rule
+Mandatory full-journey live E2E is valid only when:
+1. the profile resolves `target_catalog_id` through the curated machine-readable catalog;
+2. the profile resolves `feature_mission_id` through that same catalog entry;
+3. the runner prepares the feature request during the run;
+4. discovery/spec/handoff trace back to that mission;
+5. public `review run`, `audit runs`, and `learning handoff` artifacts are present.
+
+## W13-S06 full-journey proof bundle (2026-04-24)
+Committed evidence proving the curated full-journey layer:
+- `examples/live-e2e/fixtures/w13-s06/w13-s06-evidence-bundle.json`
+- `examples/live-e2e/fixtures/w13-s06/full-journey-regress-ky.review-report.json`
+- `examples/live-e2e/fixtures/w13-s06/full-journey-regress-httpie.review-report.json`
+- `examples/live-e2e/fixtures/w13-s06/full-journey-release-nextjs.release-packet.json`
+
+Bundle guarantees:
+- repo and mission both resolve through the curated machine-readable catalog;
+- feature request, intake packet, discovery analysis, spec step-result, and handoff packet are all generated during the run;
+- review verdict is backed by public `review-report`;
+- closure is backed by public `audit runs` and `learning handoff`.
 
 ## Shared no-write preflight baseline
-All targets must reuse the same baseline sequence before execution-style stages:
+All targets reuse the same baseline before execution-style stages:
 1. clone
 2. inspect
 3. analyze
 4. validate
 5. verify
-6. stop or continue only when no-write safety gates pass
+6. continue only when no-write safety gates pass
 
-See `docs/ops/live-e2e-no-write-preflight.md` for the reusable procedure used by bootstrap, quality, and delivery rehearsals.
-
-## Latest observed evidence bundle
-- `examples/live-e2e/fixtures/w12-s04/w12-s04-evidence-bundle.json` is the current canonical short-profile proof bundle.
-- The bundle links target-backed checkout evidence, routed live adapter raw evidence, and target-root delivery/release lineage for `regress-short` and `release-short`.
-- The proof keeps installed-user black-box CLI execution and uses a deterministic `--examples-root` override only for the adapter external runtime so the bundle stays reproducible.
+See `docs/ops/live-e2e-no-write-preflight.md` for the reusable bounded procedure.

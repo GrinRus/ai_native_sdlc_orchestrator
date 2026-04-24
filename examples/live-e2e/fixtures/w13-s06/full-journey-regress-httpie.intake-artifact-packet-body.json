@@ -1,0 +1,56 @@
+{
+  "generated_from": {
+    "command": "aor intake create",
+    "project_root": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie",
+    "project_profile_ref": "project.aor.yaml"
+  },
+  "project_identity": {
+    "project_id": "httpie-cli-w13-s06.full-journey-regress-httpie"
+  },
+  "mission_traceability": {
+    "mission_id": "httpie-cli-output-regression",
+    "source_kind": "catalog-feature-mission"
+  },
+  "feature_request": {
+    "title": "Preserve one bounded CLI output regression",
+    "brief": "Implement one narrow CLI behavior fix with matching regression coverage and keep the blast radius inside the relevant command surface.",
+    "constraints": [
+      "keep the change isolated to one CLI behavior surface",
+      "preserve bounded CLI regression smoke plus codestyle linkage"
+    ],
+    "request_file": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/.aor/requests/feature-request-w13-s06.full-journey-regress-httpie-httpie-cli-output-regression.json",
+    "request_document": {
+      "mission_id": "httpie-cli-output-regression",
+      "title": "Preserve one bounded CLI output regression",
+      "brief": "Implement one narrow CLI behavior fix with matching regression coverage and keep the blast radius inside the relevant command surface.",
+      "allowed_paths": [
+        "httpie/**",
+        "tests/**"
+      ],
+      "forbidden_paths": [
+        "docs/**",
+        ".github/**",
+        "scripts/**",
+        "examples/**",
+        "context/**"
+      ],
+      "expected_evidence": [
+        "verify-summary",
+        "routed-step-result",
+        "review-report"
+      ],
+      "acceptance_checks": [
+        "keep the change isolated to one CLI behavior surface",
+        "preserve bounded CLI regression smoke plus codestyle linkage"
+      ],
+      "change_budget": {
+        "max_changed_files": 10,
+        "max_added_lines": 320
+      }
+    }
+  },
+  "evidence_roots": {
+    "reports_root": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/reports",
+    "state_root": "./.aor/w13-s06-proof/runtime-httpie/projects/aor-core/target-checkouts/httpie-cli-w13-s06.full-journey-regress-httpie/.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/state"
+  }
+}

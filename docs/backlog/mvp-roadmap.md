@@ -233,5 +233,19 @@ The authoritative planning model for implementation lives in:
 
 **Detailed slices:** `docs/backlog/wave-12-implementation-slices.md`
 
+## W13 — catalog-backed full-journey live E2E and quality verdict expansion
+**Goal:** Add a full user-journey live E2E layer on curated public repositories, start each run from a concrete feature mission, and evaluate runtime success plus discovery, artifact, code, delivery, and learning-loop quality through public surfaces.
+
+**Exit criteria:**
+- machine-readable target and mission catalog exists under `scripts/live-e2e/catalog/` and stays aligned with `docs/ops/live-e2e-target-catalog.md`
+- `aor project init` can bootstrap a clean target repo without harness-side asset injection
+- `aor intake create` and `aor discovery run` can materialize and trace feature-specific mission input
+- `aor run start` launches real execution runs rather than control-state-only transitions
+- public `review run` and `learning handoff` surfaces produce durable `review-report`, `learning-loop-scorecard`, and `learning-loop-handoff` artifacts
+- internal live E2E harness supports a mandatory full-journey layer that runs only on curated repos and curated missions
+- restored `live-e2e-runner` skill can prepare the feature request, run the public flow, and return a multi-axis verdict matrix
+
+**Detailed slices:** `docs/backlog/wave-13-implementation-slices.md`
+
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

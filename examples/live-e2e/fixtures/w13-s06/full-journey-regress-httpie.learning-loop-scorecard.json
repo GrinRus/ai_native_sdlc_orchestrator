@@ -1,0 +1,29 @@
+{
+  "scorecard_id": "w13-s06.full-journey-regress-httpie.learning-loop.scorecard.v1",
+  "project_id": "httpie-cli-w13-s06.full-journey-regress-httpie",
+  "run_id": "w13-s06.full-journey-regress-httpie",
+  "source_kind": "cli-learning-handoff",
+  "status": "pass",
+  "summary": "Run 'w13-s06.full-journey-regress-httpie' completed public learning-loop handoff.",
+  "evidence_refs": [
+    "evidence://.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/artifacts/delivery-plan-implement-1777021774198.json",
+    "evidence://.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/artifacts/delivery-plan-implement-1777021772915.json",
+    "evidence://.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/artifacts/delivery-manifest-patch-only-w13-s06.full-journey-regress-httpie-1777021774342.json",
+    "evidence://.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/artifacts/release-packet-patch-only-w13-s06.full-journey-regress-httpie-1777021774342.json",
+    "evidence://.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/reports/step-result-routed-w13-s06.full-journey-regress-httpie.run.start.implement.implement.attempt.1.json",
+    "evidence://.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/reports/review-report-w13-s06.full-journey-regress-httpie.json",
+    "evidence://.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/reports/learning-loop-scorecard-delivery-w13-s06.full-journey-regress-httpie.json",
+    "evidence://.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/reports/learning-loop-handoff-w13-s06.full-journey-regress-httpie.json"
+  ],
+  "linked_scorecard_refs": [
+    "evidence://.aor/projects/httpie-cli-w13-s06.full-journey-regress-httpie/reports/review-report-w13-s06.full-journey-regress-httpie.json"
+  ],
+  "linked_eval_suite_refs": [],
+  "linked_harness_capture_refs": [],
+  "linked_backlog_refs": [
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/ops/live-e2e-standard-runner.md"
+  ],
+  "generated_at": "2026-04-24T09:09:34.925Z"
+}
