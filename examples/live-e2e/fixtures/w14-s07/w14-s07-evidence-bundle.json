@@ -2,6 +2,8 @@
   "fixture_id": "w14-s07.live-e2e-matrix-proof.v1",
   "slice_id": "W14-S07",
   "generated_at": "2026-04-24T12:22:55.226Z",
+  "proof_scope": "coverage_with_findings",
+  "real_code_change_proof_complete": false,
   "proof_method": {
     "internal_harness": "node ./scripts/live-e2e/run-profile.mjs",
     "profile_root": "scripts/live-e2e/profiles",

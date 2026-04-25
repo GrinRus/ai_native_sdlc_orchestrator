@@ -86,6 +86,23 @@ flowchart TB
   W12S02[W12-S02 Internal black-box installed-user harness]
   W12S03[W12-S03 Breaking CLI and contract removal]
   W12S04[W12-S04 Proof refresh after surface cleanup]
+  W13S01[W13-S01 Backlog-first full-journey live E2E realignment]
+  W13S02[W13-S02 Curated target and feature mission catalog]
+  W13S03[W13-S03 Public bootstrap and feature-intent intake]
+  W13S04[W13-S04 Feature-driven discovery and execution lifecycle]
+  W13S05[W13-S05 Public review and learning-loop closure surfaces]
+  W13S06[W13-S06 Full-journey harness and restored runner skill]
+  W14S01[W14-S01 Backlog and source-of-truth realignment]
+  W14S02[W14-S02 Scenario and provider catalogs]
+  W14S03[W14-S03 Feature-size taxonomy and target mission expansion]
+  W14S04[W14-S04 Provider-pinned full-journey profiles]
+  W14S05[W14-S05 Harness and verdict expansion]
+  W14S06[W14-S06 Review, audit, and closure alignment]
+  W14S07[W14-S07 Proof bundle and skill refresh]
+  W15S01[W15-S01 Source-of-truth and readiness queue repair]
+  W15S02[W15-S02 Package/module workspace alignment]
+  W15S03[W15-S03 Proof verdict integrity gates]
+  W15S04[W15-S04 Real code-changing full-journey proof]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -232,6 +249,20 @@ flowchart TB
   W12S01 --> W12S02
   W12S02 --> W12S03
   W12S03 --> W12S04
+  W13S01 --> W13S02
+  W13S02 --> W13S03
+  W13S03 --> W13S04
+  W13S04 --> W13S05
+  W13S05 --> W13S06
+  W14S01 --> W14S02
+  W14S02 --> W14S03
+  W14S03 --> W14S04
+  W14S04 --> W14S05
+  W14S05 --> W14S06
+  W14S06 --> W14S07
+  W15S01 --> W15S02
+  W15S01 --> W15S03
+  W15S03 --> W15S04
 ```
 
 ## W0 hard dependencies
@@ -349,6 +380,8 @@ flowchart TB
 | W10-S04 | W10-S03 |
 | W10-S05 | W10-S01, W10-S02, W11-S05 |
 
+`W10-S05 -> W11-S05` is a historical closure dependency retained to explain why the final W10 proof closed after W11 target-backed evidence; it is not normal forward implementation order.
+
 ## W11 hard dependencies
 | Slice ID | Depends on |
 |---|---|
@@ -386,6 +419,14 @@ flowchart TB
 | W14-S05 | W14-S04 |
 | W14-S06 | W14-S05 |
 | W14-S07 | W14-S06 |
+
+## W15 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W15-S01 | none |
+| W15-S02 | W15-S01 |
+| W15-S03 | W15-S01 |
+| W15-S04 | W15-S03 |
 
 ## Topological order
 1. W0-S01
@@ -481,6 +522,10 @@ flowchart TB
 91. W14-S05
 92. W14-S06
 93. W14-S07
+94. W15-S01
+95. W15-S02
+96. W15-S03
+97. W15-S04
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

@@ -30,9 +30,10 @@ What exists today:
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
 - a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
 - implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an internal black-box rehearsal harness tracked through `W12`.
-- expanded implementation backlog through W11 slices with active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
-- reopened post-audit productionization queue for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and a dedicated W11 target-backed proof-closure wave.
+- expanded implementation backlog through `W14`, with `W15` reopened for readiness hardening and active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
+- historical W10/W11 productionization closure for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and target-backed proof evidence.
 - first live routed execution baseline for supported `codex-cli` adapter paths with explicit delivery-guardrail blocking semantics.
+- W15 readiness-hardening work that makes source-of-truth drift, package/module-map drift, and mock-backed proof claims machine-checkable.
 
 What does **not** exist yet:
 
@@ -40,6 +41,7 @@ What does **not** exist yet:
 - broad multi-provider production-grade adapter coverage (beyond the first `codex-cli` live baseline);
 - delivery write-back automation to upstream repositories;
 - full planned command surface and production hardening for all operator/delivery controls.
+- a real code-changing full-journey proof with `overall_verdict=pass`; the current W14 matrix proof is coverage evidence with findings.
 
 Use the backlog docs for the implementation roadmap.
 
@@ -202,7 +204,7 @@ The W14 full-journey layer resolves these repositories through an internal machi
 
 Target catalogs carry one curated `small`, `medium`, and `large` mission per repo plus required matrix cells. `openai-primary` and `anthropic-primary` are the mandatory provider variants for W14 matrix coverage; `open-code-primary` starts as extended coverage only. Bounded `regress/release short/long` profiles remain, but they no longer claim to prove the entire installed-user journey.
 
-The current committed matrix proof bundle lives at `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json` and proves all W14 required matrix cells plus all repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs.
+The current committed matrix proof bundle lives at `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json` and proves all W14 required matrix cells plus all repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs as coverage evidence. It is intentionally marked `proof_scope=coverage_with_findings` because deterministic external-runner mocks do not materialize mission code changes; W15 keeps real code-changing proof as a separate blocked slice until a non-mock external runner can produce `overall_verdict=pass`.
 
 ## Roadmap
 

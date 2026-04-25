@@ -203,12 +203,14 @@ export function parseWaveSlices(content, waveFile) {
 
     const state = stateMatch[1].trim();
     ensureState(state, `${waveFile} section '${sliceId}'`);
+    const externalBlockerMatch = section.match(/^-\s+\*\*External blocker:\*\*\s*(.+)\s*$/m);
 
     slices.set(sliceId, {
       sliceId,
       title,
       state,
       hardDependencies: normalizeDeps(depsMatch[1]),
+      externalBlocker: externalBlockerMatch ? externalBlockerMatch[1].trim() : null,
       waveFile,
       localTasks: parseNumberedList(section, "Local tasks"),
       acceptanceCriteria: parseNumberedList(section, "Acceptance criteria"),
@@ -282,6 +284,7 @@ export function loadBacklogModel(rootDir) {
       epic: masterSlice.epic,
       state: masterSlice.state,
       hardDependencies: masterSlice.hardDependencies,
+      externalBlocker: waveSlice.externalBlocker,
       waveFile: waveSlice.waveFile,
       localTasks: waveSlice.localTasks,
       acceptanceCriteria: waveSlice.acceptanceCriteria,
@@ -367,6 +370,18 @@ export function computeStateSyncChanges(model) {
   for (const slice of model.slices.values()) {
     if (slice.state === "done" || slice.state === "active") continue;
 
+    if (slice.externalBlocker) {
+      if (slice.state !== "blocked") {
+        changes.push({
+          sliceId: slice.sliceId,
+          title: slice.title,
+          currentState: slice.state,
+          nextState: "blocked",
+        });
+      }
+      continue;
+    }
+
     const nextState = dependenciesDone(model, slice.sliceId) ? "ready" : "blocked";
     if (nextState !== slice.state) {
       changes.push({
@@ -407,6 +422,7 @@ export function selectNextSlice(model) {
       readyCandidates: [],
       blockedTarget: null,
       blockedChain: [],
+      externalBlocker: null,
     };
   }
 
@@ -422,6 +438,7 @@ export function selectNextSlice(model) {
       readyCandidates,
       blockedTarget: null,
       blockedChain: [],
+      externalBlocker: null,
     };
   }
 
@@ -433,6 +450,7 @@ export function selectNextSlice(model) {
       readyCandidates: [],
       blockedTarget: null,
       blockedChain: [],
+      externalBlocker: null,
     };
   }
 
@@ -453,6 +471,7 @@ export function selectNextSlice(model) {
       readyCandidates: [],
       blockedTarget: target,
       blockedChain: unresolvedDeps,
+      externalBlocker: target.externalBlocker ?? null,
     };
   }
 
@@ -462,6 +481,7 @@ export function selectNextSlice(model) {
     readyCandidates: [],
     blockedTarget: null,
     blockedChain: [],
+    externalBlocker: null,
   };
 }
 
@@ -475,6 +495,7 @@ export function getSlicePlan(model, sliceId) {
     epic: slice.epic,
     state: slice.state,
     hardDependencies: slice.hardDependencies,
+    externalBlocker: slice.externalBlocker,
     waveFile: slice.waveFile,
     localTasks: slice.localTasks,
     acceptanceCriteria: slice.acceptanceCriteria,
@@ -505,7 +526,7 @@ function replaceWaveState(content, sliceId, nextState) {
 
   const sectionStart = headingMatch.index;
   const sectionTail = content.slice(sectionStart);
-  const nextSectionMatch = /^##\s+W\d-S\d+\s+—\s+.+$/m.exec(sectionTail.slice(headingMatch[0].length));
+  const nextSectionMatch = /^##\s+W\d+-S\d+\s+—\s+.+$/m.exec(sectionTail.slice(headingMatch[0].length));
   const sectionEnd = nextSectionMatch
     ? sectionStart + headingMatch[0].length + nextSectionMatch.index
     : content.length;
@@ -530,6 +551,12 @@ export function applySliceStateTransition(model, sliceId, nextState, options = {
   }
 
   const { force = false } = options;
+
+  if (!force && slice.externalBlocker && nextState !== "blocked") {
+    throw new Error(
+      `Cannot set ${sliceId} to ${nextState}: external blocker remains: ${slice.externalBlocker}`,
+    );
+  }
 
   if (!force && nextState === "done" && !dependenciesDone(model, sliceId)) {
     const missing = slice.hardDependencies.filter((depId) => model.slices.get(depId)?.state !== "done");

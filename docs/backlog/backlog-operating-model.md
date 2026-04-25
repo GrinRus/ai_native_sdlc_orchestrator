@@ -50,6 +50,7 @@ Every slice in the shared backlog must include:
 - `outcome`
 - `primary_modules`
 - `hard_dependencies`
+- `external_blocker` when a non-dependency prerequisite intentionally keeps a slice blocked
 - `primary_user_story_surfaces`
 - `local_tasks`
 - `acceptance_criteria`
@@ -61,7 +62,7 @@ Every slice in the shared backlog must include:
 Use these states in the backlog docs:
 
 - **ready** — can be started now because hard dependencies are already satisfied or intentionally absent.
-- **blocked** — waiting on one or more hard dependencies.
+- **blocked** — waiting on one or more hard dependencies, or on an explicit `External blocker` recorded in the owning wave document.
 - **active** — currently being implemented.
 - **done** — accepted against the slice criteria.
 
@@ -116,7 +117,7 @@ Use the helper script to keep this loop deterministic:
 - `pnpm slice:status` — show current state counts and the selected next action.
 - `pnpm slice:next -- --json` — print next slice selection in machine-readable form.
 - `pnpm slice:plan -- W0-S04` — print local tasks, acceptance criteria, and done evidence.
-- `pnpm slice:sync-ready -- --apply` — sync `blocked`/`ready` states from dependency truth.
+- `pnpm slice:sync-ready -- --apply` — sync `blocked`/`ready` states from dependency truth while preserving slices with explicit external blockers.
 - `pnpm slice:complete -- W0-S04 --apply` — mark one slice as `done` in both backlog docs.
 - `pnpm slice:gate` — run the mandatory check gate before commit.
 
@@ -152,19 +153,6 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 ## Current planning coverage
 
-The repo now carries detailed wave documents for all currently defined waves:
-
-- `wave-0-implementation-slices.md`
-- `wave-1-implementation-slices.md`
-- `wave-2-implementation-slices.md`
-- `wave-3-implementation-slices.md`
-- `wave-4-implementation-slices.md`
-- `wave-5-implementation-slices.md`
-- `wave-6-implementation-slices.md`
-- `wave-7-implementation-slices.md`
-- `wave-8-implementation-slices.md`
-- `wave-9-implementation-slices.md`
-- `wave-10-implementation-slices.md`
-- `wave-11-implementation-slices.md`
+The repo carries detailed wave documents for every currently defined `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is `W15`, reopened after W14 matrix coverage to harden readiness signals, package/module evidence, and live E2E proof claims.
 
 The implementation order is still constrained by hard dependencies. A later-wave slice can be described in detail and still remain blocked until earlier-wave slices close.

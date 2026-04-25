@@ -58,6 +58,9 @@ function printSelection(selection) {
     if (selection.blockedChain.length > 0) {
       console.log(`Unresolved dependency chain: ${selection.blockedChain.join(" -> ")}`);
     }
+    if (selection.externalBlocker) {
+      console.log(`External blocker: ${selection.externalBlocker}`);
+    }
   }
 }
 
@@ -69,6 +72,9 @@ function printPlan(plan) {
   console.log(
     `Hard dependencies: ${plan.hardDependencies.length > 0 ? plan.hardDependencies.join(", ") : "none"}`,
   );
+  if (plan.externalBlocker) {
+    console.log(`External blocker: ${plan.externalBlocker}`);
+  }
 
   console.log("\nLocal tasks:");
   if (plan.localTasks.length === 0) {
@@ -190,6 +196,7 @@ function executeNext(args) {
             epic: selection.slice.epic,
             wave_file: selection.slice.waveFile,
             hard_dependencies: selection.slice.hardDependencies,
+            external_blocker: selection.slice.externalBlocker ?? null,
           }
         : null,
       ready_candidates: selection.readyCandidates,
@@ -200,6 +207,7 @@ function executeNext(args) {
           }
         : null,
       blocked_chain: selection.blockedChain,
+      external_blocker: selection.externalBlocker ?? null,
     };
 
     console.log(JSON.stringify(payload, null, 2));
@@ -236,6 +244,7 @@ function executePlan(args) {
           state: plan.state,
           wave_file: plan.waveFile,
           hard_dependencies: plan.hardDependencies,
+          external_blocker: plan.externalBlocker ?? null,
           local_tasks: plan.localTasks,
           acceptance_criteria: plan.acceptanceCriteria,
           done_evidence: plan.doneEvidence,

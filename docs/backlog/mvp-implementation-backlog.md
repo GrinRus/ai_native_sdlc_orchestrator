@@ -161,5 +161,13 @@ This is the master index for the implementation slices across all defined waves.
 | W14-S06 | Review, audit, and closure alignment | EPIC-4 | done | `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`, `docs/contracts/**`, `docs/architecture/**` | W14-S05 |
 | W14-S07 | Proof bundle and skill refresh | EPIC-7 | done | `.agents/skills/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/test/**` | W14-S06 |
 
+## W15 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W15-S01 | Source-of-truth and readiness queue repair | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/ops/**` | none |
+| W15-S02 | Package/module workspace alignment | EPIC-0 | done | `apps/**/package.json`, `packages/**/package.json`, `docs/architecture/**`, `scripts/**` | W15-S01 |
+| W15-S03 | Proof verdict integrity gates | EPIC-7 | done | `scripts/test.mjs`, `examples/live-e2e/**`, `docs/ops/**`, `README.md` | W15-S01 |
+| W15-S04 | Real code-changing full-journey proof | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `.aor/` runtime output | W15-S03 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

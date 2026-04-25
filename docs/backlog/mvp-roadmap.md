@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-14-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-15-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -25,6 +25,7 @@ The authoritative planning model for implementation lives in:
 | W12 | Remove public live-E2E product surfaces, move rehearsal to an internal black-box harness, and refresh proof through installed-user style execution. | 4 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-12-implementation-slices.md` |
 | W13 | Add a full user-journey live E2E layer on curated public repositories, start each run from a concrete feature mission, and evaluate runtime plus quality verdicts through public surfaces. | 6 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-7 | `docs/backlog/wave-13-implementation-slices.md` |
 | W14 | Expand live E2E into a curated matrix across scenario families, pinned providers, and size-classed feature missions with matrix-aware review, audit, and closure evidence. | 7 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-14-implementation-slices.md` |
+| W15 | Harden readiness signals after W14 by reopening the queue, aligning package/module evidence, and separating coverage proof from real code-changing proof. | 4 | EPIC-0, EPIC-7 | `docs/backlog/wave-15-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -71,6 +72,10 @@ The authoritative planning model for implementation lives in:
 | W12-S02 | internal black-box installed-user harness (no direct story closure) |
 | W12-S03 | breaking CLI and contract removal (no direct story closure) |
 | W12-S04 | proof refresh after surface cleanup (no direct story closure) |
+| W15-S01 | readiness hardening: source-of-truth queue repair (no direct story closure) |
+| W15-S02 | readiness hardening: package/module workspace alignment (no direct story closure) |
+| W15-S03 | readiness hardening: proof verdict integrity gates (no direct story closure) |
+| W15-S04 | readiness hardening: real code-changing proof closure (no direct story closure) |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -202,7 +207,7 @@ The authoritative planning model for implementation lives in:
 - detached transport supports bounded authenticated mutation commands for connected operator clients
 - at least one regression target and one release-shaped target from the catalog have fresh live evidence produced through the external runner and real bounded delivery paths
 
-**Current status note:** `W10-S05` is now closed using the replacement target-backed proof bundles, with the latest black-box closure evidence at `examples/live-e2e/fixtures/w12-s04/w12-s04-evidence-bundle.json`. The closure evidence anchors execution and delivery lineage to cloned target checkouts rather than the AOR workspace.
+**Current status note:** `W10-S05` is now closed using the replacement target-backed proof bundles, with the latest black-box closure evidence at `examples/live-e2e/fixtures/w12-s04/w12-s04-evidence-bundle.json`. The `W10-S05 -> W11-S05` dependency is a historical closure dependency, not normal forward implementation order. The closure evidence anchors execution and delivery lineage to cloned target checkouts rather than the AOR workspace.
 
 **Detailed slices:** `docs/backlog/wave-10-implementation-slices.md`
 
@@ -261,7 +266,18 @@ The authoritative planning model for implementation lives in:
 
 **Detailed slices:** `docs/backlog/wave-14-implementation-slices.md`
 
-**Current status note:** `W14-S07` is now closed with matrix-aware proof under `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`. The refreshed bundle proves all `9/9` required matrix cells, all `3/3` repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs, and all mandatory scenario families (`regress`, `release`, `repair`, `governance`).
+**Current status note:** `W14-S07` is now closed with matrix-aware coverage proof under `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`. The refreshed bundle proves all `9/9` required matrix cells, all `3/3` repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs, and all mandatory scenario families (`regress`, `release`, `repair`, `governance`), but it is explicitly `coverage_with_findings` because deterministic external-runner mocks do not materialize mission code changes.
+
+## W15 — readiness hardening and real-proof queue
+**Goal:** Remove false readiness signals after W14 by making source-of-truth drift, package/module map drift, and live E2E proof scope machine-checkable while keeping real code-changing proof blocked until it can be produced honestly.
+
+**Exit criteria:**
+- W15 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
+- the module map and workspace manifests agree on all package-managed apps/packages
+- root checks fail when stale wave-coverage claims or dishonest proof-bundle claims appear
+- `W15-S04` remains blocked until `ky.regress.small.openai` can run without deterministic external-runner mock and reach `overall_verdict=pass`
+
+**Detailed slices:** `docs/backlog/wave-15-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

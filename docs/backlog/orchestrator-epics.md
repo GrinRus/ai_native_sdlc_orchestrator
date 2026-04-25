@@ -11,6 +11,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W12:** `W12-S01` Public surface realignment
 - **W13:** `W13-S01` Backlog-first full-journey live E2E realignment
 - **W14:** `W14-S01` Backlog and source-of-truth realignment
+- **W15:** `W15-S01` Source-of-truth and readiness queue repair; `W15-S02` Package/module workspace alignment
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -89,3 +90,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W12:** `W12-S02` Internal black-box installed-user harness; `W12-S04` Proof refresh after surface cleanup
 - **W13:** `W13-S02` Curated target and feature mission catalog; `W13-S06` Full-journey harness and restored runner skill
 - **W14:** `W14-S02` Scenario and provider catalogs; `W14-S03` Feature-size taxonomy and target mission expansion; `W14-S04` Provider-pinned full-journey profiles; `W14-S05` Harness and verdict expansion; `W14-S07` Proof bundle and skill refresh
+- **W15:** `W15-S03` Proof verdict integrity gates; `W15-S04` Real code-changing full-journey proof

@@ -5,6 +5,7 @@ import process from "node:process";
 import test from "node:test";
 
 import {
+  applySliceStateTransition,
   computeStateSyncChanges,
   getSlicePlan,
   loadBacklogModel,
@@ -22,6 +23,7 @@ function buildSyntheticModel(defs, order) {
       epic: def.epic ?? "EPIC-X",
       state: def.state,
       hardDependencies: def.hardDependencies ?? [],
+      externalBlocker: def.externalBlocker ?? null,
       waveFile: def.waveFile ?? "docs/backlog/wave-0-implementation-slices.md",
       localTasks: [],
       acceptanceCriteria: [],
@@ -113,6 +115,55 @@ test("computeStateSyncChanges promotes/degrades ready and blocked states from de
       { sliceId: "W0-S02", nextState: "ready" },
       { sliceId: "W0-S03", nextState: "blocked" },
     ],
+  );
+});
+
+test("computeStateSyncChanges preserves blocked slices with explicit external blockers", () => {
+  const model = buildSyntheticModel(
+    [
+      { sliceId: "W15-S03", state: "done" },
+      {
+        sliceId: "W15-S04",
+        state: "blocked",
+        hardDependencies: ["W15-S03"],
+        externalBlocker: "External runner credentials are unavailable.",
+      },
+    ],
+    ["W15-S03", "W15-S04"],
+  );
+
+  assert.deepEqual(computeStateSyncChanges(model), []);
+});
+
+test("computeStateSyncChanges degrades ready slices with explicit external blockers", () => {
+  const model = buildSyntheticModel(
+    [
+      { sliceId: "W15-S03", state: "done" },
+      {
+        sliceId: "W15-S04",
+        state: "ready",
+        hardDependencies: ["W15-S03"],
+        externalBlocker: "External runner credentials are unavailable.",
+      },
+    ],
+    ["W15-S03", "W15-S04"],
+  );
+
+  assert.deepEqual(
+    computeStateSyncChanges(model).map((change) => ({
+      sliceId: change.sliceId,
+      currentState: change.currentState,
+      nextState: change.nextState,
+    })),
+    [{ sliceId: "W15-S04", currentState: "ready", nextState: "blocked" }],
+  );
+});
+
+test("applySliceStateTransition requires force to bypass an explicit external blocker", () => {
+  const model = loadBacklogModel(process.cwd());
+  assert.throws(
+    () => applySliceStateTransition(model, "W15-S04", "done"),
+    /Cannot set W15-S04 to done: external blocker remains:/,
   );
 });
 
