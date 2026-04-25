@@ -13,6 +13,83 @@ function exists(file) {
   return fs.existsSync(path.join(root, file));
 }
 
+function normalizePath(file) {
+  return file.split(path.sep).join(path.posix.sep);
+}
+
+function listWorkspacePackageDirs() {
+  const workspaceBases = ["apps", "packages"];
+  const dirs = [];
+
+  for (const base of workspaceBases) {
+    const basePath = path.join(root, base);
+    if (!fs.existsSync(basePath)) continue;
+
+    for (const entry of fs.readdirSync(basePath, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+
+      const relativeDir = path.posix.join(base, entry.name);
+      if (exists(path.posix.join(relativeDir, "package.json"))) {
+        dirs.push(relativeDir);
+      }
+    }
+  }
+
+  return dirs.sort();
+}
+
+function parseModuleMapPackagePaths(content) {
+  return [
+    ...new Set(
+      [...content.matchAll(/`((?:apps|packages)\/[^`/\s]+)`/g)]
+        .map((match) => normalizePath(match[1]))
+        .sort(),
+    ),
+  ];
+}
+
+function assertPackageModuleMapIntegrity() {
+  const moduleMapPath = "docs/architecture/13-package-and-module-map.md";
+  const moduleMap = read(moduleMapPath);
+  const documentedPaths = parseModuleMapPackagePaths(moduleMap);
+  const documentedPathSet = new Set(documentedPaths);
+  const workspacePackageDirs = listWorkspacePackageDirs();
+
+  for (const modulePath of documentedPaths) {
+    if (!exists(modulePath)) {
+      console.error(`${moduleMapPath} lists ${modulePath}, but the directory does not exist.`);
+      process.exit(1);
+    }
+    if (!exists(path.posix.join(modulePath, "package.json"))) {
+      console.error(`${moduleMapPath} lists ${modulePath}, but it has no package.json.`);
+      process.exit(1);
+    }
+
+    const manifestPath = path.posix.join(modulePath, "package.json");
+    const manifest = JSON.parse(read(manifestPath));
+    const missingManifestFields = [];
+    if (typeof manifest.name !== "string" || manifest.name.length === 0) missingManifestFields.push("name");
+    if (manifest.private !== true) missingManifestFields.push("private=true");
+    if (typeof manifest.version !== "string" || manifest.version.length === 0) missingManifestFields.push("version");
+    if (manifest.type !== "module") missingManifestFields.push("type=module");
+    if (!manifest.exports) missingManifestFields.push("exports");
+
+    if (missingManifestFields.length > 0) {
+      console.error(`${manifestPath} is missing required package-managed manifest fields: ${missingManifestFields.join(", ")}.`);
+      process.exit(1);
+    }
+  }
+
+  for (const workspacePackageDir of workspacePackageDirs) {
+    if (!documentedPathSet.has(workspacePackageDir)) {
+      console.error(`${workspacePackageDir} has package.json but is missing from ${moduleMapPath}.`);
+      process.exit(1);
+    }
+  }
+
+  console.log(`package/module map integrity ok: ${documentedPaths.length} package-managed apps/packages`);
+}
+
 function discoverWaveFiles() {
   const backlogDir = path.join(root, "docs/backlog");
   const entries = fs
@@ -81,6 +158,8 @@ if (missing.length > 0) {
   for (const file of missing) console.error(`- ${file}`);
   process.exit(1);
 }
+
+assertPackageModuleMapIntegrity();
 
 const packageJson = JSON.parse(read("package.json"));
 if (packageJson.license !== "Apache-2.0") {

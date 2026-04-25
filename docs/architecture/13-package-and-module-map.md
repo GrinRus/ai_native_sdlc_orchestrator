@@ -1,11 +1,15 @@
 # Package and module map
 
 ## Apps
+All apps listed here are package-managed workspace entries, not just folders.
+
 - `apps/api` — module-backed control-plane query/control shell plus detached HTTP/SSE transport baseline for connected read/follow and bounded run-control/ui-lifecycle mutations
 - `apps/cli` — operator CLI and bootstrap surface
 - `apps/web` — detachable operator console
 
 ## Packages
+All packages listed here are package-managed workspace entries with private manifests.
+
 - `packages/contracts` — schemas, parsers, and validation helpers
 - `packages/orchestrator-core` — workflow decisions, packet lifecycle logic, delivery-plan policy gating, bounded patch/local-branch delivery drivers, fork-first PR intent planning, and delivery-manifest/release-packet materialization
 - `packages/provider-routing` — route resolution and promotion-aware routing

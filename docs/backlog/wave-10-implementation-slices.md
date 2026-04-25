@@ -12,7 +12,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 ## Parallel start and sequencing notes
 - `W10-S01`, `W10-S02`, and `W10-S03` can start in parallel because they close separate production-facing gaps on top of completed baselines.
 - `W10-S04` starts after `W10-S03` so auth and permission work hardens an already-defined mutation surface rather than a hypothetical one.
-- `W10-S05` closed after `W11-S05` landed with replacement target-backed evidence in `examples/live-e2e/fixtures/w11-s05/w11-s05-evidence-bundle.json`.
+- `W10-S05` closed after `W11-S05` landed with replacement target-backed evidence in `examples/live-e2e/fixtures/w11-s05/w11-s05-evidence-bundle.json`; this is a historical closure dependency, not normal forward implementation order.
 
 ---
 

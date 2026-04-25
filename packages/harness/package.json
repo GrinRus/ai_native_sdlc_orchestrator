@@ -1,0 +1,10 @@
+{
+  "name": "@aor/harness",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./capture-format": "./src/capture-format.mjs",
+    "./scorer-interface": "./src/scorer-interface.mjs"
+  }
+}

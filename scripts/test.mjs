@@ -54,6 +54,14 @@ function discoverWaveFiles() {
 }
 
 const waveFiles = discoverWaveFiles();
+const latestWaveIndex = Math.max(
+  ...waveFiles.map((file) => {
+    const match = /^wave-(\d+)-implementation-slices\.md$/.exec(path.basename(file));
+    return match ? Number(match[1]) : Number.NEGATIVE_INFINITY;
+  }),
+);
+const latestWaveLabel = `W${latestWaveIndex}`;
+const latestWaveFileName = `wave-${latestWaveIndex}-implementation-slices.md`;
 
 function parseWaveSlices(content) {
   const regex = /^## (W\d+-S\d+) — .+$/gm;
@@ -153,6 +161,129 @@ function sameSet(a, b) {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
+function assertLatestWaveSourceOfTruth() {
+  const requiredLatestWaveDocs = [
+    "README.md",
+    "docs/backlog/backlog-operating-model.md",
+    "docs/backlog/mvp-roadmap.md",
+    "docs/backlog/mvp-implementation-backlog.md",
+    "docs/backlog/orchestrator-epics.md",
+    "docs/backlog/slice-dependency-graph.md",
+  ];
+
+  for (const file of requiredLatestWaveDocs) {
+    const content = read(file);
+    if (!content.includes(latestWaveLabel) && !content.includes(latestWaveFileName)) {
+      console.error(`${file} must reference latest defined wave ${latestWaveLabel}.`);
+      process.exit(1);
+    }
+  }
+
+  if (latestWaveIndex > 11) {
+    const staleClaimFiles = ["README.md", "docs/backlog/backlog-operating-model.md"];
+    for (const file of staleClaimFiles) {
+      const content = read(file);
+      if (/\bthrough\s+(?:wave\s*)?W?11\b/iu.test(content)) {
+        console.error(`${file} contains a stale planning-coverage claim through W11.`);
+        process.exit(1);
+      }
+    }
+  }
+
+  const operatingModel = read("docs/backlog/backlog-operating-model.md");
+  const currentCoverageHeading = /^## Current planning coverage\s*$/m.exec(operatingModel);
+  if (currentCoverageHeading) {
+    const sectionStart = currentCoverageHeading.index + currentCoverageHeading[0].length;
+    const sectionTail = operatingModel.slice(sectionStart);
+    const nextSectionIndex = sectionTail.search(/\n##\s+/);
+    const currentCoverageSection =
+      nextSectionIndex >= 0 ? sectionTail.slice(0, nextSectionIndex) : sectionTail;
+    if (!currentCoverageSection.includes(latestWaveLabel)) {
+      console.error(`docs/backlog/backlog-operating-model.md current planning coverage must mention ${latestWaveLabel}.`);
+      process.exit(1);
+    }
+  } else {
+    console.error(`docs/backlog/backlog-operating-model.md current planning coverage must mention ${latestWaveLabel}.`);
+    process.exit(1);
+  }
+
+  const roadmap = read("docs/backlog/mvp-roadmap.md");
+  const roadmapWaveRangeMatch = /wave-0-implementation-slices\.md` through `docs\/backlog\/wave-(\d+)-implementation-slices\.md`/u.exec(
+    roadmap,
+  );
+  if (roadmapWaveRangeMatch && Number(roadmapWaveRangeMatch[1]) !== latestWaveIndex) {
+    console.error(`docs/backlog/mvp-roadmap.md wave document range must end at ${latestWaveFileName}.`);
+    process.exit(1);
+  }
+
+  console.log(`source-of-truth latest-wave checks ok: ${latestWaveLabel}`);
+}
+
+function assertProofBundleIntegrity() {
+  const bundlePath = "examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json";
+  const proof = JSON.parse(read(bundlePath));
+  const targetVerdicts = Array.isArray(proof.targets)
+    ? proof.targets.map((target) => target.overall_verdict).filter(Boolean)
+    : [];
+  const hasPassWithFindings = targetVerdicts.includes("pass_with_findings");
+  const externalRunnerMode = String(proof.proof_method?.external_runner_mode ?? "");
+
+  if (hasPassWithFindings) {
+    if (proof.proof_scope !== "coverage_with_findings") {
+      console.error(`${bundlePath} uses pass_with_findings but lacks proof_scope=coverage_with_findings.`);
+      process.exit(1);
+    }
+    if (proof.real_code_change_proof_complete !== false) {
+      console.error(`${bundlePath} uses pass_with_findings but does not set real_code_change_proof_complete=false.`);
+      process.exit(1);
+    }
+  }
+
+  if (proof.proof_scope === "coverage_with_findings" && !externalRunnerMode.includes("mock")) {
+    console.error(`${bundlePath} is coverage_with_findings but does not record a mock external runner mode.`);
+    process.exit(1);
+  }
+
+  if (proof.proof_scope === "full_code_changing_runtime") {
+    if (proof.real_code_change_proof_complete !== true) {
+      console.error(`${bundlePath} claims full_code_changing_runtime without real_code_change_proof_complete=true.`);
+      process.exit(1);
+    }
+    if (targetVerdicts.some((verdict) => verdict !== "pass")) {
+      console.error(`${bundlePath} claims full_code_changing_runtime but not all target verdicts are pass.`);
+      process.exit(1);
+    }
+    if (externalRunnerMode.includes("mock")) {
+      console.error(`${bundlePath} claims full_code_changing_runtime but records a mock external runner mode.`);
+      process.exit(1);
+    }
+  }
+
+  const proofClaimFiles = ["README.md", "docs/ops/live-e2e-standard-runner.md"];
+  if (proof.proof_scope === "coverage_with_findings") {
+    for (const file of proofClaimFiles) {
+      const content = read(file);
+      if (content.includes("pass_with_findings") && !content.includes("coverage_with_findings")) {
+        console.error(`${file} mentions pass_with_findings without coverage_with_findings proof scope.`);
+        process.exit(1);
+      }
+
+      const forbiddenPositiveClaims = [
+        /\bW14\b[^\n.]*\bfull production pass\b/iu,
+        /\bW14\b[^\n.]*\bfull runtime pass\b/iu,
+        /\bW14\b[^\n.]*\bfull product pass\b/iu,
+        /\bW14\b[^\n.]*\bproduction-ready proof\b/iu,
+      ];
+      if (forbiddenPositiveClaims.some((pattern) => pattern.test(content))) {
+        console.error(`${file} overstates W14 coverage proof as production/full-runtime proof.`);
+        process.exit(1);
+      }
+    }
+  }
+
+  console.log(`proof integrity ok: W14 bundle is ${proof.proof_scope}`);
+}
+
 if (!sameSet(waveSliceIds, uniqueMasterSliceIds)) {
   console.error("Wave docs and master backlog disagree about slice ids.");
   process.exit(1);
@@ -233,6 +364,8 @@ for (const file of waveFiles) {
 }
 
 console.log(`backlog consistency ok: ${waveSliceIds.length} slices across ${waveFiles.length} waves`);
+assertLatestWaveSourceOfTruth();
+assertProofBundleIntegrity();
 
 const readme = read("README.md");
 const readmeCommandSurfaceMatch = readme.match(

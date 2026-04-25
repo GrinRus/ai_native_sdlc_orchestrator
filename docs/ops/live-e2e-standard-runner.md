@@ -153,4 +153,5 @@ Evidence note:
 - the committed bundle preserves catalog-backed repo and mission resolution, scenario/provider/size matrix-cell validation, provider-pinned route overrides, public `project init`, mission-generated intake/discovery/spec/handoff artifacts, public `review run`, public `audit runs`, and public `learning handoff` closure artifacts.
 - the bundle proves all `9/9` repo-level required matrix cells and all `3/3` catalog provider-comparison pairs across `ky`, `httpie/cli`, and `nextjs-monorepo-example`.
 - the bundle proves all mandatory scenario families: `regress`, `release`, `repair`, and `governance`.
+- the bundle is explicitly classified as `proof_scope=coverage_with_findings` with `real_code_change_proof_complete=false`; it is coverage evidence, not full code-changing runtime proof.
 - `overall_verdict` remains `pass_with_findings` in the committed proof because the deterministic external runner mock does not materialize mission code changes, leaving `review-report.code_quality=warn`.
