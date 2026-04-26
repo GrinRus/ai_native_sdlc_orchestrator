@@ -92,18 +92,18 @@ Close the reopened target-catalog proof gap by making standard live E2E target-b
 1. Execute `verification.setup_commands` and `verification.commands` inside the cloned target checkout during preflight.
 2. Pass an explicit execution root through the live adapter and routed execution path instead of relying on process cwd.
 3. Persist routed step, compiled-context, and raw adapter evidence for successful target-backed runs.
-4. Cover success, missing-prerequisite, and policy-blocked branches in docs and tests.
+4. Cover success, missing-command, missing-live-runtime, and policy-blocked branches in docs and tests.
 
 ### Acceptance criteria
 1. Successful target-backed runs record routed step results, compiled-context references, and raw adapter evidence references in the run summary.
-2. Missing external runners block the run with `missing-prerequisite` semantics rather than falling through to a mock-only success path.
+2. Missing external runners block the run with explicit missing-command semantics rather than falling through to a mock-only success path.
 3. Short proof profiles no longer pass through a mock-only execution path.
 4. Tests cover target-root command execution, explicit execution-root adapter invocation, and blocked failure branches.
 
 ### Done evidence
 - tests for profile-driven verification command execution and explicit adapter execution roots
 - target-backed run summary or fixture linking step, context, and raw adapter evidence
-- updated runbooks for success, missing-prerequisite, and policy-blocked live execution branches
+- updated runbooks for success, missing-command, missing-live-runtime, and policy-blocked live execution branches
 
 ### Out of scope
 - adding live support for a second external adapter

@@ -46,6 +46,8 @@ node ./scripts/live-e2e/run-profile.mjs \
   --profile ./scripts/live-e2e/profiles/full-journey-regress-ky.yaml
 ```
 
+By default, live E2E uses `--runner-auth-mode host`: AOR runtime state remains isolated under `.aor/`, while external runners reuse the operator's local CLI authentication. This means `codex` uses the normal `~/.codex` or caller-provided `CODEX_HOME`, and `claude` uses the normal local Claude Code auth/config sources. Use `--runner-auth-mode isolated` only for CI, proof, or fixture runs that deliberately need a session-scoped runner home.
+
 Optional override for local catalog experiments:
 ```bash
 node ./scripts/live-e2e/run-profile.mjs \
@@ -78,6 +80,7 @@ Bounded rehearsal layer:
 Full-journey layer:
 - resolves `target_catalog_id`, `feature_mission_id`, `scenario_family`, and `provider_variant_id` from the curated internal catalog;
 - uses public `aor project init --materialize-project-profile --materialize-bootstrap-assets` plus repo command overrides derived from the curated catalog;
+- preflights the selected provider adapter before execution so missing live runtime metadata, missing commands, auth failures, and permission-mode blocks fail before `run start`;
 - has the runner prepare one structured feature request input;
 - materializes provider-pinned route overrides for the selected provider variant before execution starts;
 - runs the public lifecycle through `intake create`, `project analyze`, `project validate`, `project verify --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, `review run`, `eval run`, optional `harness certify`, `deliver prepare`, optional `release prepare`, `audit runs`, conditional incident handling, and `learning handoff`.

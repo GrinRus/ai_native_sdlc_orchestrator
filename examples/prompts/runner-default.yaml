@@ -36,7 +36,8 @@ output_contract_hints:
 stop_conditions:
   - business-ambiguity
   - scope-expansion-needed
-  - missing-prerequisite
+  - missing-command
+  - missing-live-runtime
 redaction_expectations:
   - never echo secrets from environment or config
   - reference sensitive values symbolically

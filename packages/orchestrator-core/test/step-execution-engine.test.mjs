@@ -312,7 +312,7 @@ test("executeRoutedStep reports missing external runner prerequisites as blocked
     assert.equal(result.stepResult.routed_execution.adapter_response.status, "blocked");
     assert.equal(
       result.stepResult.routed_execution.adapter_response.output.failure_kind,
-      "missing-prerequisite",
+      "missing-command",
     );
     assert.match(
       String(result.stepResult.routed_execution.blocked_next_step),
@@ -359,7 +359,7 @@ test("executeRoutedStep blocks live execution deterministically for unapproved o
     assert.equal(misconfigured.stepResult.routed_execution.adapter_response.status, "blocked");
     assert.equal(
       misconfigured.stepResult.routed_execution.adapter_response.output.failure_kind,
-      "missing-prerequisite",
+      "missing-live-runtime",
     );
     assert.match(
       String(misconfigured.stepResult.routed_execution.blocked_next_step),

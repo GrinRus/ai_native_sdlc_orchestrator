@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
-import { validateExampleReferences } from "../src/index.mjs";
+import { validateExampleReferences, validateLiveE2eCatalogReferences } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -21,6 +21,12 @@ const workspaceRoot = path.resolve(currentDir, "../../..");
 function withTempWorkspace(callback) {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w0-s03-"));
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(tempRoot, "examples"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "scripts/live-e2e/catalog"), { recursive: true });
+  fs.cpSync(
+    path.join(workspaceRoot, "scripts/live-e2e/catalog/providers"),
+    path.join(tempRoot, "scripts/live-e2e/catalog/providers"),
+    { recursive: true },
+  );
 
   try {
     return callback(tempRoot);
@@ -48,6 +54,72 @@ test("reference integrity passes for current examples graph", () => {
   assert.equal(result.issues.length, 0, "expected zero reference integrity issues");
   assert.ok(result.checkedReferences > 0, "expected validator to check at least one reference");
   assert.ok(result.checkedCompatibility > 0, "expected validator to check at least one compatibility edge");
+});
+
+test("live e2e provider catalog required variants point at live-runnable adapters", () => {
+  const result = validateLiveE2eCatalogReferences({ workspaceRoot });
+  assert.equal(result.ok, true, "expected live E2E provider catalog references to pass");
+  assert.equal(result.issues.length, 0, "expected zero live E2E catalog reference issues");
+  assert.ok(result.checkedReferences >= 3, "expected provider variants to be checked");
+  assert.ok(result.checkedCompatibility >= 2, "expected required provider live-runtime compatibility checks");
+});
+
+test("live e2e provider catalog rejects required variants without adapter execution runtime", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/adapters/claude-code.yaml", (document) => {
+      delete document.execution;
+    });
+
+    const result = validateLiveE2eCatalogReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_incompatible" &&
+        candidate.field === "primary_adapter" &&
+        candidate.reference === "claude-code",
+    );
+    assert.ok(issue, "expected required anthropic provider adapter runtime compatibility issue");
+  });
+});
+
+test("live e2e provider catalog keeps mandatory primary providers live-runnable independent of coverage tier", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "scripts/live-e2e/catalog/providers/openai-primary.yaml", (document) => {
+      document.coverage_tier = "extended";
+    });
+    mutateYamlFile(tempRoot, "examples/adapters/codex-cli.yaml", (document) => {
+      delete document.execution;
+    });
+
+    const result = validateLiveE2eCatalogReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_incompatible" &&
+        candidate.field === "primary_adapter" &&
+        candidate.reference === "codex-cli",
+    );
+    assert.ok(issue, "expected mandatory openai-primary adapter runtime compatibility issue");
+  });
+});
+
+test("live e2e provider catalog rejects missing mandatory primary providers", () => {
+  withTempWorkspace((tempRoot) => {
+    fs.rmSync(path.join(tempRoot, "scripts/live-e2e/catalog/providers/anthropic-primary.yaml"));
+
+    const result = validateLiveE2eCatalogReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_missing" &&
+        candidate.field === "provider_variant_id" &&
+        candidate.reference === "anthropic-primary",
+    );
+    assert.ok(issue, "expected missing mandatory anthropic-primary provider catalog issue");
+  });
 });
 
 test("missing default wrapper profile reference fails with reference_target_missing", () => {

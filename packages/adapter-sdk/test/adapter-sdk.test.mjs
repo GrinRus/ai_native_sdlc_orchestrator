@@ -40,21 +40,25 @@ function withTempRepo(callback) {
  *   command: string,
  *   args: string[],
  *   timeoutMs?: number,
+ *   handler?: string | null,
  * }} options
  */
 function buildExternalRunnerProfile(options) {
-  return {
-    execution: {
-      runtime_mode: "external-process",
-      handler: "codex-cli-external-runner",
-      evidence_namespace: "evidence://adapter-live/codex-cli",
-      external_runtime: {
-        command: options.command,
-        args: options.args,
-        request_via_stdin: true,
-        timeout_ms: options.timeoutMs ?? 30000,
-      },
+  const execution = {
+    runtime_mode: "external-process",
+    evidence_namespace: "evidence://adapter-live/codex-cli",
+    external_runtime: {
+      command: options.command,
+      args: options.args,
+      request_via_stdin: true,
+      timeout_ms: options.timeoutMs ?? 30000,
     },
+  };
+  if (options.handler !== null) {
+    execution.handler = options.handler ?? "codex-cli-external-runner";
+  }
+  return {
+    execution,
   };
 }
 
@@ -290,8 +294,41 @@ test("live adapter reports blocked when external runner command is missing", () 
   });
 
   assert.equal(response.status, "blocked");
-  assert.equal(response.output.failure_kind, "missing-prerequisite");
+  assert.equal(response.output.failure_kind, "missing-command");
   assert.match(response.summary, /not available on PATH/i);
+});
+
+test("live adapter normalizes external runner launch errors", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-launch-error-"));
+  const runnerPath = path.join(tempRoot, "runner");
+  fs.writeFileSync(runnerPath, "#!/bin/sh\necho should-not-run\n", { mode: 0o644 });
+
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: buildExternalRunnerProfile({
+        command: runnerPath,
+        args: [],
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-live-launch-error",
+      run_id: "run-live-launch-error",
+      step_id: "step-live-launch-error",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "failed");
+    assert.equal(response.output.failure_kind, "external-runner-failed");
+    assert.match(response.summary, /launch failed/i);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test("live adapter reports failed when external runner exits non-zero", () => {
@@ -319,6 +356,33 @@ test("live adapter reports failed when external runner exits non-zero", () => {
   assert.match(response.summary, /exited with code 17/i);
 });
 
+test("live adapter reports timeout distinctly from launch failures", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "setTimeout(() => {}, 1000);"],
+      timeoutMs: 10,
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-live-timeout",
+    run_id: "run-live-timeout",
+    step_id: "step-live-timeout",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "failed");
+  assert.equal(response.output.failure_kind, "external-runner-timeout");
+  assert.equal(response.output.external_runner.timed_out, true);
+});
+
 test("live adapter baseline accepts non-codex adapter ids when an external runner profile is supplied", () => {
   const adapter = createLiveAdapter({
     adapterId: "open-code",
@@ -328,6 +392,7 @@ test("live adapter baseline accepts non-codex adapter ids when an external runne
         "-e",
         "const fs=require('node:fs');fs.readFileSync(0,'utf8');process.stdout.write(JSON.stringify({status:'success',summary:'ok',output:{runner:'node-inline'},evidence_refs:['evidence://adapter-live/open-code/test']}));",
       ],
+      handler: null,
     }),
   });
 
@@ -344,4 +409,139 @@ test("live adapter baseline accepts non-codex adapter ids when an external runne
 
   assert.equal(response.status, "success");
   assert.equal(response.adapter_id, "open-code");
+  assert.equal(response.tool_traces[0].kind, "open-code-external-runner");
+});
+
+test("live adapter parses JSONL runner output without requiring an AOR envelope", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stdout.write(JSON.stringify({type:'session.started',id:'one'})+'\\n');",
+          "process.stdout.write(JSON.stringify({type:'message.completed',result:'ok'})+'\\n');",
+        ].join(""),
+      ],
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-jsonl",
+    run_id: "run-jsonl",
+    step_id: "step-jsonl",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.runner_output.jsonl_events.length, 2);
+  assert.equal(response.output.runner_output.jsonl_events[1].result, "ok");
+});
+
+test("live adapter preserves single JSON runner output without requiring an AOR envelope", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        "process.stdout.write(JSON.stringify({type:'message.completed',result:'ok',runner:'plain-json'}));",
+      ],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-single-json",
+    run_id: "run-single-json",
+    step_id: "step-single-json",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.runner_output.type, "message.completed");
+  assert.equal(response.output.runner_output.runner, "plain-json");
+  assert.equal(response.tool_traces[0].kind, "claude-code-external-runner");
+});
+
+test("live adapter preserves raw stdout fallback when runner output is not JSON", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "process.stdout.write('plain runner output');"],
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-raw-stdout",
+    run_id: "run-raw-stdout",
+    step_id: "step-raw-stdout",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.runner_output.raw_stdout, "plain runner output");
+});
+
+test("live adapter classifies external runner auth failures", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "process.stderr.write('401 Unauthorized: Missing bearer authentication');process.exit(1);"],
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-auth-failed",
+    run_id: "run-auth-failed",
+    step_id: "step-auth-failed",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "auth-failed");
+});
+
+test("live adapter classifies external runner permission blocks", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "process.stderr.write('Permission denied: approval required');process.exit(1);"],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-permission-blocked",
+    run_id: "run-permission-blocked",
+    step_id: "step-permission-blocked",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "permission-mode-blocked");
 });

@@ -1953,7 +1953,7 @@ test("project verify routed live execution reports missing external runner prere
     assert.equal(routedStepResult.routed_execution.adapter_response.status, "blocked");
     assert.equal(
       routedStepResult.routed_execution.adapter_response.output.failure_kind,
-      "missing-prerequisite",
+      "missing-command",
     );
     assert.match(
       String(routedStepResult.routed_execution.blocked_next_step),

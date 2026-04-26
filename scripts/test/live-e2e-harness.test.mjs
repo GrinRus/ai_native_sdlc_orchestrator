@@ -144,6 +144,38 @@ function createFakeCodexBinary(options) {
 }
 
 /**
+ * @param {{ tempRoot: string }} options
+ */
+function createFakeClaudeBinary(options) {
+  const binRoot = path.join(options.tempRoot, "fake-claude-bin");
+  fs.mkdirSync(binRoot, { recursive: true });
+  const claudePath = path.join(binRoot, "claude");
+  fs.writeFileSync(
+    claudePath,
+    [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      "const input = JSON.parse(fs.readFileSync(0, 'utf8'));",
+      "const request = input.request || {};",
+      "process.stdout.write(JSON.stringify({",
+      "  status: 'success',",
+      "  summary: 'fake claude ok',",
+      "  output: { runner: 'fake-claude', step_class: request.step_class || null, execution_root: process.cwd() },",
+      "  evidence_refs: ['evidence://external-runner/live-e2e-harness-fake-claude'],",
+      "  tool_traces: [{ phase: 'invoke_adapter', kind: 'fake-claude', detail: 'path-override' }],",
+      "}));",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  fs.chmodSync(claudePath, 0o755);
+  return {
+    binRoot,
+    claudePath,
+  };
+}
+
+/**
  * @param {{
  *   examplesRoot: string,
  *   command: string,
@@ -173,6 +205,16 @@ function configureAdapterExternalRuntime(options) {
 }
 
 /**
+ * @param {{ examplesRoot: string, adapterFileName: string }} options
+ */
+function removeAdapterExternalRuntime(options) {
+  const adapterPath = path.join(options.examplesRoot, "adapters", options.adapterFileName);
+  const source = fs.readFileSync(adapterPath, "utf8");
+  const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, "sandbox_mode:");
+  fs.writeFileSync(adapterPath, updated, "utf8");
+}
+
+/**
  * @param {{ examplesRoot: string }} options
  */
 function configureCodexExternalRuntimeSuccess(options) {
@@ -192,6 +234,32 @@ function configureCodexExternalRuntimeSuccess(options) {
         "output:{runner:'node-inline',step_class:request.step_class||null,execution_root:process.cwd()},",
         "evidence_refs:['evidence://external-runner/live-e2e-harness-success'],",
         "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline'}]",
+        "}));",
+      ].join(""),
+    ],
+  });
+}
+
+/**
+ * @param {{ examplesRoot: string }} options
+ */
+function configureCodexExternalRuntimeEchoAuth(options) {
+  configureAdapterExternalRuntime({
+    examplesRoot: options.examplesRoot,
+    adapterFileName: "codex-cli.yaml",
+    command: process.execPath,
+    args: [
+      "-e",
+      [
+        "const fs=require('node:fs');",
+        "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+        "const request=input.request||{};",
+        "process.stdout.write(JSON.stringify({",
+        "status:'success',",
+        "summary:'external runner auth echo ok',",
+        "output:{runner:'node-inline',step_class:request.step_class||null,codex_home:process.env.CODEX_HOME||null},",
+        "evidence_refs:['evidence://external-runner/live-e2e-harness-auth-echo'],",
+        "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'auth-echo'}]",
         "}));",
       ].join(""),
     ],
@@ -429,6 +497,8 @@ function writeLocalFullJourneyProfile(options) {
  *   catalogRoot?: string,
  *   omitExamplesRoot?: boolean,
  *   extraEnv?: NodeJS.ProcessEnv,
+ *   runnerAuthMode?: string,
+ *   skipRunnerAuthProbe?: boolean,
  * }} options
  */
 function runHarness(options) {
@@ -449,6 +519,12 @@ function runHarness(options) {
   }
   if (options.catalogRoot) {
     args.push("--catalog-root", options.catalogRoot);
+  }
+  if (options.runnerAuthMode) {
+    args.push("--runner-auth-mode", options.runnerAuthMode);
+  }
+  if (options.skipRunnerAuthProbe) {
+    args.push("--skip-runner-auth-probe");
   }
   const run = spawnSync(process.execPath, args, {
     cwd: workspaceRoot,
@@ -503,6 +579,72 @@ test("internal harness runs a valid short profile through public CLI subprocesse
     const routedStepResult = JSON.parse(fs.readFileSync(summary.routed_step_result_file, "utf8"));
     assert.equal(routedStepResult.status, "passed");
     assert.equal(routedStepResult.routed_execution.adapter_response.status, "success");
+  });
+});
+
+test("internal harness host auth mode preserves caller CODEX_HOME for external runners", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeEchoAuth({ examplesRoot });
+    const profilePath = path.join(tempRoot, "regress-short.host-auth.yaml");
+    writeLocalHarnessProfile({
+      templateProfilePath: path.join(workspaceRoot, "scripts/live-e2e/profiles/regress-short.yaml"),
+      outputProfilePath: profilePath,
+      targetRepoRoot: targetRepo.targetRepoRoot,
+      targetRef: targetRepo.targetRef,
+    });
+    const hostCodexHome = path.join(tempRoot, "host-codex-home");
+
+    const result = runHarness({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "installed-user-host-auth",
+      extraEnv: {
+        CODEX_HOME: hostCodexHome,
+      },
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    const routedStepResult = JSON.parse(fs.readFileSync(summary.routed_step_result_file, "utf8"));
+    assert.equal(summary.runner_auth_mode, "host");
+    assert.equal(summary.runner_auth_source, "host");
+    assert.equal(summary.artifacts.codex_home_isolated, false);
+    assert.equal(routedStepResult.routed_execution.adapter_response.output.runner_output.codex_home, hostCodexHome);
+  });
+});
+
+test("internal harness isolated auth mode assigns session-scoped CODEX_HOME", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeEchoAuth({ examplesRoot });
+    const profilePath = path.join(tempRoot, "regress-short.isolated-auth.yaml");
+    writeLocalHarnessProfile({
+      templateProfilePath: path.join(workspaceRoot, "scripts/live-e2e/profiles/regress-short.yaml"),
+      outputProfilePath: profilePath,
+      targetRepoRoot: targetRepo.targetRepoRoot,
+      targetRef: targetRepo.targetRef,
+    });
+
+    const result = runHarness({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "installed-user-isolated-auth",
+      runnerAuthMode: "isolated",
+      extraEnv: {
+        CODEX_HOME: path.join(tempRoot, "host-codex-home"),
+      },
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    const routedStepResult = JSON.parse(fs.readFileSync(summary.routed_step_result_file, "utf8"));
+    assert.equal(summary.runner_auth_mode, "isolated");
+    assert.equal(summary.runner_auth_source, "isolated");
+    assert.equal(summary.artifacts.codex_home_isolated, true);
+    assert.equal(routedStepResult.routed_execution.adapter_response.output.runner_output.codex_home, summary.artifacts.codex_home);
   });
 });
 
@@ -564,7 +706,7 @@ test("internal harness surfaces missing external runner prerequisites", () => {
     const routedStepResult = JSON.parse(fs.readFileSync(summary.artifacts.routed_step_result_file, "utf8"));
     assert.equal(routedStepResult.status, "failed");
     assert.equal(routedStepResult.routed_execution.adapter_response.status, "blocked");
-    assert.equal(routedStepResult.routed_execution.adapter_response.output.failure_kind, "missing-prerequisite");
+    assert.equal(routedStepResult.routed_execution.adapter_response.output.failure_kind, "missing-command");
   });
 });
 
@@ -776,6 +918,9 @@ test("full-journey mode applies anthropic provider-pinned route overrides", () =
     assert.equal(summary.status, "pass");
     assert.equal(summary.verdict_matrix.provider_variant_id, "anthropic-primary");
     assert.equal(summary.verdict_matrix.provider_execution_status, "pass");
+    assert.equal(summary.artifacts.live_adapter_preflight.status, "pass");
+    assert.equal(summary.artifacts.live_adapter_preflight.primary_adapter, "claude-code");
+    assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.status, "pass");
     const reviewReport = JSON.parse(fs.readFileSync(summary.artifacts.review_report_file, "utf8"));
     assert.equal(reviewReport.provider_traceability.requested_provider, "anthropic");
     assert.equal(reviewReport.provider_traceability.actual_provider, "anthropic");
@@ -783,6 +928,91 @@ test("full-journey mode applies anthropic provider-pinned route overrides", () =
     assert.ok(
       summary.artifacts.provider_route_override_files.some((filePath) => filePath.includes("anthropic-primary")),
     );
+  });
+});
+
+test("full-journey mode runs anthropic packaged assets with fake claude on PATH", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const fakeClaude = createFakeClaudeBinary({ tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.anthropic.packaged-fake-claude.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      providerVariantId: "anthropic-primary",
+    });
+
+    const result = runHarness({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      profilePath,
+      runId: "full-journey-packaged-fake-claude",
+      catalogRoot,
+      omitExamplesRoot: true,
+      extraEnv: {
+        PATH: `${fakeClaude.binRoot}${path.delimiter}${process.env.PATH ?? ""}`,
+      },
+    });
+
+    assert.equal(result.live_e2e_run_status, "pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "pass");
+    assert.equal(summary.artifacts.live_adapter_preflight.primary_adapter, "claude-code");
+    assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.status, "pass");
+    const routedStepResult = JSON.parse(fs.readFileSync(summary.artifacts.routed_step_result_file, "utf8"));
+    assert.equal(routedStepResult.routed_execution.adapter_response.output.runner_output.runner, "fake-claude");
+  });
+});
+
+test("full-journey mode fails live adapter preflight before run start when required provider lacks execution runtime", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    removeAdapterExternalRuntime({
+      examplesRoot,
+      adapterFileName: "claude-code.yaml",
+    });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.anthropic.missing-runtime.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      providerVariantId: "anthropic-primary",
+    });
+
+    const result = runHarness({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-anthropic-missing-runtime",
+      catalogRoot,
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "missing-live-runtime");
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+    assert.match(String(summary.error), /execution\.runtime_mode must be 'external-process'/u);
   });
 });
 
