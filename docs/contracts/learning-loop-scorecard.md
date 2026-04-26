@@ -28,3 +28,4 @@ Durable scorecard that links one completed run to backlog, quality, and incident
 
 ## Notes
 The scorecard is a closure artifact, not a replacement for incident, evaluation, or certification evidence. It should aggregate refs rather than duplicate those payloads.
+When a Runtime Harness report exists for the run, the scorecard should link it as evidence rather than duplicating diagnosis payloads.

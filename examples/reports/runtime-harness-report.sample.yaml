@@ -1,0 +1,86 @@
+report_id: run.sample.runtime-harness-report.v1
+project_id: aor-core
+run_id: run.sample
+generated_at: "2026-04-26T00:00:00.000Z"
+mission_type: code-changing
+strictness_profile: strict-code-changing
+overall_decision: repair
+step_decisions:
+  - step_id: run.start.implement
+    step_class: runner
+    compiled_context_ref: compiled-context://compiled-context.aor-core.run.sample.run-start.implement.runner-default
+    adapter_status: blocked
+    failure_class: permission-mode-blocked
+    mission_outcome: not_satisfied
+    runtime_harness_decision: repair
+    repair_attempts:
+      - attempt: 0
+        status: pending
+        trigger: permission-mode-blocked
+        failure_class: permission-mode-blocked
+        runtime_harness_decision: repair
+        policy_action: repair
+        input_evidence_refs:
+          - evidence://reports/step-result-routed-run-sample.json
+        repair_route_ref: null
+        repair_compiled_context_ref: null
+        result: not_started
+        exhausted_budget: false
+        policy_budget:
+          max_attempts: 1
+          failure_class_listed: false
+          on:
+            - schema-mismatch
+            - lint-failed
+            - tests-failed
+            - missing-evidence
+    verification_status: not_run
+    stage_timings:
+      started_at: "2026-04-26T00:00:00.000Z"
+      finished_at: "2026-04-26T00:00:01.000Z"
+      duration_sec: 1
+    mission_semantics:
+      git_status_available: true
+      changed_paths: []
+      non_bootstrap_changed_paths: []
+      non_input_changed_paths: []
+      mission_scoped_changed_paths: []
+      ignored_input_files:
+        - feature-request.json
+      allowed_paths:
+        - src/**
+        - test/**
+      forbidden_paths:
+        - docs/**
+      forbidden_changed_paths: []
+      out_of_scope_changed_paths: []
+      scope_violation_paths: []
+      strict_code_changing_noop: true
+    evidence_refs:
+      - evidence://reports/step-result-routed-run-sample.json
+run_findings:
+  - finding_id: run.sample.runtime.permission-mode-blocked
+    severity: fail
+    category: runtime
+    summary: External runner permission mode blocked the implementation step.
+    evidence_refs:
+      - evidence://reports/step-result-routed-run-sample.json
+recommendations:
+  - recommendation_id: run.sample.repair.permission-mode
+    action: repair
+    summary: Fix non-interactive edit permissions before rerunning implementation.
+    evidence_refs:
+      - evidence://reports/step-result-routed-run-sample.json
+impacted_asset_refs:
+  - adapter://claude-code
+promotion_recommendations:
+  - asset_ref: adapter://claude-code
+    recommendation: recertify-before-promotion
+    reason: Runtime failure indicates adapter permission behavior needs certification evidence.
+unresolved_gaps:
+  - gap_id: run.sample.no-implementation-proof
+    summary: Code-changing mission has no meaningful patch.
+    evidence_refs:
+      - evidence://reports/step-result-routed-run-sample.json
+evidence_refs:
+  - evidence://reports/step-result-routed-run-sample.json

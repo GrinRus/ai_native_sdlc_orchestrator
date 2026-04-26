@@ -5,18 +5,18 @@ Add a catalog-backed full-journey live E2E layer that starts from a concrete fea
 
 ## Wave exit criteria
 - curated repo and feature-mission catalog exists under `scripts/live-e2e/catalog/` and remains aligned with operator runbooks
-- `aor project init` can bootstrap a clean target repository without harness-side asset injection
+- `aor project init` can bootstrap a clean target repository without proof-runner-side asset injection
 - `aor intake create` and `aor discovery run` materialize feature-specific mission input and preserve traceability
 - `aor run start` launches real execution and `aor review run` / `aor learning handoff` expose public verdict and closure artifacts
-- internal live E2E harness supports mandatory full-journey catalog profiles in addition to bounded rehearsal profiles
+- internal live E2E proof runner supports mandatory full-journey catalog profiles in addition to bounded rehearsal profiles
 - restored `live-e2e-runner` skill can prepare the mission request, run the public flow, and report a verdict matrix across runtime, discovery, artifact, code, delivery, and learning dimensions
 
 ## Parallel start and sequencing notes
 - `W13-S01` starts first because the source-of-truth docs and shared backlog must define the layered full-journey model before runtime work proceeds.
-- `W13-S02` follows `W13-S01` so curated repos and feature missions exist before bootstrap or harness changes rely on them.
+- `W13-S02` follows `W13-S01` so curated repos and feature missions exist before bootstrap or proof-runner changes rely on them.
 - `W13-S03` must land before `W13-S04` because full-journey live E2E needs a real public bootstrap plus feature-intent intake path.
 - `W13-S04` must land before `W13-S05` because review and learning closure depend on feature-driven discovery and real execution runs.
-- `W13-S06` closes the wave after the public surfaces exist and the harness plus skills can exercise them end-to-end.
+- `W13-S06` closes the wave after the public surfaces exist and the proof runner plus skills can exercise them end-to-end.
 
 ---
 
@@ -46,7 +46,7 @@ Add a catalog-backed full-journey live E2E layer that starts from a concrete fea
 
 ### Out of scope
 - implementing new CLI/runtime surfaces in this slice
-- changing harness internals in this slice
+- changing proof-runner internals in this slice
 
 ---
 
@@ -84,7 +84,7 @@ Add a catalog-backed full-journey live E2E layer that starts from a concrete fea
 ## W13-S03 — Public bootstrap and feature-intent intake
 - **Epic:** EPIC-1 Bootstrap and onboarding
 - **State:** done
-- **Outcome:** Extend public bootstrap and intake surfaces so a clean target repo can be turned into an AOR-ready workspace and one feature mission can be materialized without harness-side file injection.
+- **Outcome:** Extend public bootstrap and intake surfaces so a clean target repo can be turned into an AOR-ready workspace and one feature mission can be materialized without proof-runner-side file injection.
 - **Primary modules:** `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/architecture/**`, `docs/product/**`
 - **Hard dependencies:** W13-S02
 - **Primary user-story surfaces:** project bootstrap / onboarding, product sponsor / owner, delivery engineer
@@ -130,7 +130,7 @@ Add a catalog-backed full-journey live E2E layer that starts from a concrete fea
 1. Discovery output is traceable to the selected mission input.
 2. Wave and handoff artifacts preserve mission-linked planning context.
 3. `run start` launches actual execution and no longer acts as control-state-only for the full-journey path.
-4. CLI and harness tests cover execution success and failure branches through `run start`.
+4. CLI and proof-runner tests cover execution success and failure branches through `run start`.
 
 ### Done evidence
 - discovery output with mission traceability
@@ -154,7 +154,7 @@ Add a catalog-backed full-journey live E2E layer that starts from a concrete fea
 ### Local tasks
 1. Add `review-report`, `learning-loop-scorecard`, and `learning-loop-handoff` contract families.
 2. Implement `aor review run` with discovery, artifact, and code-quality verdict sections.
-3. Implement `aor learning handoff` with public closure artifacts instead of internal harness helpers.
+3. Implement `aor learning handoff` with public closure artifacts instead of proof-runner helpers.
 4. Update audit and operator docs to reference the new surfaces and their verdict semantics.
 
 ### Acceptance criteria
@@ -174,28 +174,28 @@ Add a catalog-backed full-journey live E2E layer that starts from a concrete fea
 
 ---
 
-## W13-S06 — Full-journey harness and restored runner skill
+## W13-S06 — Full-journey proof runner and restored runner skill
 - **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** done
-- **Outcome:** Update the internal harness for curated full-journey runs, keep bounded profiles, and restore a dedicated runner skill that prepares feature missions and assembles a verdict matrix.
+- **Outcome:** Update the installed-user proof runner for curated full-journey runs, keep bounded profiles, and restore a dedicated runner skill that prepares feature missions and assembles a verdict matrix.
 - **Primary modules:** `scripts/live-e2e/**`, `.agents/skills/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/cli/test/**`
 - **Hard dependencies:** W13-S05
 - **Primary user-story surfaces:** operator / SRE, reviewer / QA, delivery engineer
 
 ### Local tasks
-1. Add full-journey harness mode that resolves curated repo and mission catalog entries.
-2. Make the harness execute the public bootstrap, intake, discovery, planning, execution, review, audit, and learning flow.
+1. Add full-journey proof runner mode that resolves curated repo and mission catalog entries.
+2. Make the proof runner execute the public bootstrap, intake, discovery, planning, execution, review, audit, and learning flow.
 3. Restore `live-e2e-runner` skill and keep `live-e2e-preflight` narrow.
 4. Refresh runbooks, profiles, tests, and proof fixtures for the W13 full-journey layer.
 
 ### Acceptance criteria
-1. Full-journey harness mode rejects uncataloged repos and missing missions.
-2. Full-journey harness mode prepares a mission-linked feature request and discovery path before execution.
+1. Full-journey proof runner mode rejects uncataloged repos and missing missions.
+2. Full-journey proof runner mode prepares a mission-linked feature request and discovery path before execution.
 3. The restored runner skill reports verdicts across target selection, feature request quality, discovery quality, runtime success, artifact quality, code quality, delivery/release quality, and learning-loop closure.
 4. Bounded profiles remain usable as fast rehearsal coverage.
 
 ### Done evidence
-- full-journey harness mode with curated repo and mission resolution
+- full-journey proof runner mode with curated repo and mission resolution
 - restored `live-e2e-runner` skill plus updated `live-e2e-preflight`
 - updated runbooks and tests showing both bounded and full-journey rehearsal layers
 - committed W13 proof bundle under `examples/live-e2e/fixtures/w13-s06/` covering `ky`, `httpie/cli`, and `nextjs-monorepo-example`

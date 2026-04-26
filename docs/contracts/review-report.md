@@ -92,3 +92,5 @@ Each finding should keep:
 
 ## Notes
 `review-report` is report-only. A failing review must remain machine-readable without forcing command failure unless the CLI itself encounters usage, runtime, or contract-resolution errors.
+
+For strict code-changing missions, no non-bootstrap changed paths is a `fail` code-quality finding. Docs-only and no-write rehearsal flows may use softer strictness profiles, but that softness belongs to mission/runtime policy rather than the review report hiding a code-changing no-op.

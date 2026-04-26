@@ -83,7 +83,7 @@ flowchart TB
   W11S04[W11-S04 Target-anchored delivery and release evidence]
   W11S05[W11-S05 Fresh external proof bundle for catalog targets]
   W12S01[W12-S01 Public surface realignment]
-  W12S02[W12-S02 Internal black-box installed-user harness]
+  W12S02[W12-S02 Live E2E Installed-User Proof Runner]
   W12S03[W12-S03 Breaking CLI and contract removal]
   W12S04[W12-S04 Proof refresh after surface cleanup]
   W13S01[W13-S01 Backlog-first full-journey live E2E realignment]

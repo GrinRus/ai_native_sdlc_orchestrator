@@ -21,16 +21,19 @@ For each step AOR resolves:
 6. step policy
 7. adapter/provider/model execution
 
-## Standard step phases
-1. load context and required packets
-2. resolve route, wrappers, prompt bundle, and policy
-3. compile working context from prompt instructions, wrapper bootstrap, resolved required inputs, guardrails, and skill workflows
-4. pre-validate prerequisites
-5. execute the step
-6. normalize output into a step result
-7. run post-validation
-8. optionally run eval or harness
-9. retry, repair, escalate, or close
+## Runtime Harness step lifecycle
+For routed adapter-backed steps, AOR uses a prepare-first lifecycle:
+1. load context and required packets;
+2. resolve route, wrappers, prompt bundle, context docs/rules/skills, and policy;
+3. compile and persist the `compiled-context` artifact;
+4. execute the step through the adapter request/response envelope;
+5. classify the adapter/runtime outcome;
+6. validate mission semantics such as changed paths, allowed scope, expected evidence, and delivery lineage;
+7. decide `pass`, `retry`, `repair`, `escalate`, `block`, or `fail`;
+8. run deterministic verification or eval when policy requires it;
+9. persist `step-result` decision metadata and update run-level Runtime Harness evidence.
+
+Simple read, list, and approval commands may participate in run evidence without compiling prompt/context artifacts.
 
 ## Adapter SDK baseline (W2-S04 + W9-S08)
 Adapter invocation uses one stable envelope pair:
@@ -71,3 +74,6 @@ A single step model keeps:
 - routing consistent;
 - audits easier to read;
 - platform-asset changes comparable across flows.
+
+## Boundary with certification
+The `harness` step class and `aor harness certify` command remain asset-certification capabilities for capture/replay and promotion decisions. They are not the internal Runtime Harness controller, although the controller may recommend recertification when a run exposes asset-related failures.

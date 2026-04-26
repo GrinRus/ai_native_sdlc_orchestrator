@@ -100,7 +100,7 @@ Expected W10-S01 signals:
 - successful path records external runner metadata and raw execution evidence reference under `adapter_response.output.external_runner`;
 - missing command/runtime prerequisites produce `failure_kind=missing-command` or `failure_kind=missing-live-runtime` without synthetic success;
 - delivery guardrails continue to block execution when required approval/promotion evidence is missing.
-- the internal `node ./scripts/live-e2e/run-profile.mjs` harness reuses the same branch signatures and exposes routed evidence via `routed_step_result_file`, `compiled_context_ref`, and `adapter_raw_evidence_ref`.
+- the internal `node ./scripts/live-e2e/run-profile.mjs` proof runner reuses the same branch signatures and exposes routed evidence via `routed_step_result_file`, `compiled_context_ref`, and `adapter_raw_evidence_ref`.
 
 Evidence fixtures captured for this procedure:
 - `examples/live-e2e/fixtures/w10-s01/external-live-adapter-transcript.json`

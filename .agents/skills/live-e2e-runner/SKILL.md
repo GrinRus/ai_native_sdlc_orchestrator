@@ -16,7 +16,7 @@ description: Use when you need to run or assess AOR live E2E profiles, especiall
    - `scenario_family`
    - `provider_variant_id`
    - declared `feature_size`
-4. Use the internal harness entrypoint:
+4. Use the installed-user proof runner entrypoint:
    - `node ./scripts/live-e2e/run-profile.mjs --project-ref . --profile <profile>`
 5. For full-journey runs, ensure the public lifecycle is exercised end-to-end:
    - `project init`
@@ -34,13 +34,13 @@ description: Use when you need to run or assess AOR live E2E profiles, especiall
    - `run status`
    - `review run`
    - `eval run`
-   - `harness certify` when the profile requires certification
+   - asset certification when the profile requires certification
    - `deliver prepare`
    - `release prepare` for release-shaped missions
    - `audit runs`
    - `incident open` or `incident recertify` on degraded branches
    - `learning handoff`
-6. The runner is responsible for preparing the feature request input itself. Do not skip directly to execution or rely on harness-side synthetic discovery.
+6. The runner is responsible for preparing the feature request input itself. Do not skip directly to execution or rely on proof-runner-side synthetic discovery.
 7. Inspect the resulting artifacts and return one verdict matrix with:
    - `scenario_family`
    - `provider_variant_id`
@@ -56,6 +56,7 @@ description: Use when you need to run or assess AOR live E2E profiles, especiall
    - `scenario_coverage_status`
    - `delivery_release_quality`
    - `learning_loop_closure`
+   - `runtime_harness_decision`
    - `overall_verdict`
 8. Explain why the chosen matrix cell was selected and which required cells remain uncovered for that repo.
 9. Treat the run as failed when any of these are true:
@@ -64,4 +65,5 @@ description: Use when you need to run or assess AOR live E2E profiles, especiall
    - `review-report` returns `fail`
    - `review-report.provider_traceability` or `review-report.feature_size_fit` returns `fail`
    - critical delivery or release lineage is missing
+   - `runtime-harness-report` is missing or masks permission/no-op failure as success
    - learning-loop closure artifacts are missing

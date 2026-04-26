@@ -3,6 +3,8 @@
 ## Purpose
 Run a baseline certification flow that converts deterministic validation + eval + harness evidence into a durable promotion decision artifact with explicit governance guardrails.
 
+This is an Asset Certification Capability, not the internal AOR Runtime Harness and not completed-run diagnosis. The command creates fresh certification evidence for platform asset lifecycle decisions. It may link to a run for provenance, but `runtime-harness-report` owns run diagnosis and learning-loop artifacts own follow-up closure.
+
 ## Command
 ```bash
 aor harness certify \

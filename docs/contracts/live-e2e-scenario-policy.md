@@ -19,5 +19,6 @@ Machine-readable internal policy document that defines required stages, evidence
 - `governance`
 
 ## Notes
-- Scenario policies are used by the internal live E2E harness and runner skill to validate curated matrix cells before execution starts.
+- Scenario policies are used by the installed-user Live E2E proof runner and runner skill to validate curated matrix cells before execution starts.
+- Live E2E validates proof coverage and the presence of Runtime Harness evidence. It does not define internal Runtime Harness repair semantics.
 - `release_required=true` means the selected profile must materialize release lineage through the public CLI flow.

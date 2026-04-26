@@ -25,3 +25,4 @@ Durable handoff that closes one run into backlog, incident, and follow-up qualit
 ## Notes
 `incident_ref` may be null when the linked run completed without incident escalation.
 `quality_refs` should point to suites or other quality artifacts that guided the follow-up recommendation.
+Learning handoff aggregates evidence refs and next actions. It must not replace feature review, Runtime Harness diagnosis, or asset certification decisions, and it must not promote or freeze platform assets directly.

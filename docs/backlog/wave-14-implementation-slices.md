@@ -7,7 +7,7 @@ Expand catalog-backed full-journey live E2E into a curated matrix across scenari
 - machine-readable provider-variant and scenario-policy catalogs exist under `scripts/live-e2e/catalog/**`
 - curated target catalogs define at least one `small`, one `medium`, and one `large` mission per repo together with supported scenarios and pinned-provider recommendations
 - full-journey profiles pin `target_catalog_id`, `feature_mission_id`, `scenario_family`, and `provider_variant_id`
-- the internal harness rejects invalid matrix cells and applies deterministic provider-pinned route overrides for accepted cells
+- the installed-user proof runner rejects invalid matrix cells and applies deterministic provider-pinned route overrides for accepted cells
 - review, audit, summary, and learning-loop artifacts preserve scenario/provider/size metadata plus provider-execution and feature-size-fit verdicts
 - runner skill, runbooks, tests, and proof fixtures describe and prove the curated matrix rather than a single profile per repo
 
@@ -16,8 +16,8 @@ Expand catalog-backed full-journey live E2E into a curated matrix across scenari
 - `W14-S02` follows `W14-S01` so scenario and provider taxonomy exists before target catalogs and profiles bind to it.
 - `W14-S03` depends on `W14-S02` because target missions must bind to defined scenario families and provider variants.
 - `W14-S04` depends on `W14-S03` because provider-pinned full-journey profiles require the expanded target catalogs.
-- `W14-S05` depends on `W14-S04` because harness/runtime validation needs concrete matrix-aware profiles and catalogs.
-- `W14-S06` depends on `W14-S05` because review, audit, and closure semantics must read the new matrix-aware runtime evidence.
+- `W14-S05` depends on `W14-S04` because proof-runner/runtime validation needs concrete matrix-aware profiles and catalogs.
+- `W14-S06` depends on `W14-S05` because review, audit, and closure semantics must read the new matrix-aware proof evidence.
 - `W14-S07` closes the wave after proof, skill guidance, and runbooks reflect the matrix model end to end.
 
 ---
@@ -79,7 +79,7 @@ Expand catalog-backed full-journey live E2E into a curated matrix across scenari
 
 ### Out of scope
 - target-specific mission expansion in this slice
-- harness runtime enforcement in this slice
+- proof-runner runtime enforcement in this slice
 
 ---
 
@@ -108,7 +108,7 @@ Expand catalog-backed full-journey live E2E into a curated matrix across scenari
 - updated target-catalog runbook showing mission-size and scenario suitability
 
 ### Out of scope
-- harness runtime enforcement in this slice
+- proof-runner runtime enforcement in this slice
 - proof fixture refresh in this slice
 
 ---
@@ -138,15 +138,15 @@ Expand catalog-backed full-journey live E2E into a curated matrix across scenari
 - tests proving full-journey profiles fail when matrix keys are missing
 
 ### Out of scope
-- harness runtime verdict expansion in this slice
+- proof-runner runtime verdict expansion in this slice
 - proof fixture refresh in this slice
 
 ---
 
-## W14-S05 — Harness and verdict expansion
+## W14-S05 — Proof runner and verdict expansion
 - **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** done
-- **Outcome:** Teach the live harness to validate matrix cells, materialize provider-pinned route overrides, and extend summaries plus verdict matrices with matrix metadata.
+- **Outcome:** Teach the installed-user proof runner to validate matrix cells, materialize provider-pinned route overrides, and extend summaries plus verdict matrices with matrix metadata.
 - **Primary modules:** `scripts/live-e2e/**`, `apps/cli`, `packages/orchestrator-core`, `docs/ops/**`
 - **Hard dependencies:** W14-S04
 - **Primary user-story surfaces:** operator / SRE, AI platform owner, reviewer / QA
@@ -158,15 +158,15 @@ Expand catalog-backed full-journey live E2E into a curated matrix across scenari
 4. Extend run summary, scorecard, and verdict matrix with `scenario_family`, `provider_variant_id`, `feature_size`, `scenario_coverage_status`, `provider_execution_status`, and `feature_size_fit_status`.
 
 ### Acceptance criteria
-1. The harness rejects unknown scenarios, unknown providers, and unsupported mission/scenario/provider combinations.
-2. The harness uses deterministic provider-pinned route overrides instead of default fallback routing for matrix-cell runs.
+1. The proof runner rejects unknown scenarios, unknown providers, and unsupported mission/scenario/provider combinations.
+2. The proof runner uses deterministic provider-pinned route overrides instead of default fallback routing for matrix-cell runs.
 3. Summaries and verdict matrices preserve matrix metadata and expanded verdict dimensions.
-4. Harness tests cover invalid matrix cells and successful provider-pinned execution.
+4. Proof-runner tests cover invalid matrix cells and successful provider-pinned execution.
 
 ### Done evidence
-- matrix-aware harness runtime with provider-pinned route overrides
+- matrix-aware proof runner runtime with provider-pinned route overrides
 - expanded summary and verdict artifacts
-- harness tests covering invalid and valid matrix-cell execution
+- proof-runner tests covering invalid and valid matrix-cell execution
 
 ### Out of scope
 - review/audit/closure artifact changes in this slice
@@ -226,7 +226,7 @@ Expand catalog-backed full-journey live E2E into a curated matrix across scenari
 ### Done evidence
 - refreshed runner skill and runbooks
 - committed W14 proof bundle under `examples/live-e2e/fixtures/w14-s07/` covering all required matrix cells and provider-comparison pairs
-- updated harness/tests proving matrix-cell metadata persists into evidence
+- updated proof-runner tests proving matrix-cell metadata persists into evidence
 
 ### Out of scope
 - expanding live E2E into a Cartesian product across every possible repo/provider/scenario combination

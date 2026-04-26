@@ -14,6 +14,7 @@ Durable decision record that moves a platform asset or route between draft, cand
 
 ## Notes
 Promotion decisions should always point to certification evidence and approver context when needed.
+`run_id` and `linked_run_refs` may be used for provenance when a run triggered or motivated certification, but certification evidence remains fresh and separate from completed-run diagnosis.
 `status` semantics for certification baseline:
 - `pass` — evidence bar is fully satisfied; promotion can proceed.
 - `hold` — evidence is incomplete or incompatible; promotion must wait.

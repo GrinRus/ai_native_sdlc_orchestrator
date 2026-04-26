@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -17,6 +18,12 @@ import { compileStepContext } from "./context-compiler.mjs";
 import { materializeDeliveryPlan } from "./delivery-plan.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { analyzeProjectRuntime } from "./project-analysis.mjs";
+import {
+  classifyRuntimeStepOutcome,
+  materializeRuntimeHarnessReport,
+  resolveRuntimeMissionProfile,
+  synthesizeRepairAttempts,
+} from "./runtime-harness-report.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
 
 const STEP_CLASS_TO_RESULT_CLASS = Object.freeze({
@@ -42,6 +49,8 @@ const STEP_ARCHITECTURE_CONTRACT_REFS = Object.freeze([
   "docs/contracts/wave-ticket.md",
   "docs/contracts/handoff-packet.md",
 ]);
+const BOOTSTRAP_OWNED_PREFIXES = ["examples/", "context/", ".aor/"];
+const BOOTSTRAP_OWNED_FILES = new Set(["project.aor.yaml"]);
 
 /**
  * @param {unknown} value
@@ -89,10 +98,216 @@ function asRecord(value) {
 
 /**
  * @param {unknown} value
+ * @returns {Array<Record<string, unknown>>}
+ */
+function asRecordArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
+    : [];
+}
+
+/**
+ * @param {string} filePath
+ * @returns {Record<string, unknown> | null}
+ */
+function readJsonFile(filePath) {
+  try {
+    return /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(filePath, "utf8")));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {unknown} value
  * @returns {string[]}
  */
 function uniqueStrings(value) {
   return [...new Set(asStringArray(value))];
+}
+
+/**
+ * @param {unknown} startedAt
+ * @param {unknown} finishedAt
+ * @returns {number | null}
+ */
+function resolveDurationSeconds(startedAt, finishedAt) {
+  if (typeof startedAt !== "string" || typeof finishedAt !== "string") {
+    return null;
+  }
+  const startedMs = Date.parse(startedAt);
+  const finishedMs = Date.parse(finishedAt);
+  if (!Number.isFinite(startedMs) || !Number.isFinite(finishedMs) || finishedMs < startedMs) {
+    return null;
+  }
+  return Math.round(((finishedMs - startedMs) / 1000) * 1000) / 1000;
+}
+
+/**
+ * @param {string} root
+ * @returns {{ available: boolean, changedPaths: string[] }}
+ */
+function listChangedPaths(root) {
+  if (!fs.existsSync(root)) {
+    return { available: false, changedPaths: [] };
+  }
+  const run = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (run.status !== 0) {
+    return { available: false, changedPaths: [] };
+  }
+  const changedPaths = (run.stdout ?? "")
+    .split(/\r?\n/u)
+    .filter((line) => line.trim().length > 0)
+    .map((line) => line.slice(3).trim())
+    .map((candidate) => {
+      const renameParts = candidate.split(" -> ");
+      return renameParts.length > 1 ? renameParts[renameParts.length - 1] : candidate;
+    })
+    .map((candidate) => candidate.replace(/\\/g, "/"));
+  return { available: true, changedPaths };
+}
+
+/**
+ * @param {string[]} changedPaths
+ * @returns {string[]}
+ */
+function filterNonBootstrapChangedPaths(changedPaths) {
+  return changedPaths.filter((candidate) => {
+    if (BOOTSTRAP_OWNED_FILES.has(candidate)) return false;
+    return !BOOTSTRAP_OWNED_PREFIXES.some((prefix) => candidate === prefix.slice(0, -1) || candidate.startsWith(prefix));
+  });
+}
+
+/**
+ * @param {string} pattern
+ * @param {string} candidate
+ * @returns {boolean}
+ */
+function matchesScopePattern(pattern, candidate) {
+  const normalizedPattern = pattern.replace(/\\/g, "/");
+  const normalizedCandidate = candidate.replace(/\\/g, "/");
+  if (normalizedPattern === "**" || normalizedPattern === "**/*") return true;
+  if (normalizedPattern.endsWith("/**")) {
+    const prefix = normalizedPattern.slice(0, -3);
+    return normalizedCandidate === prefix || normalizedCandidate.startsWith(`${prefix}/`);
+  }
+  if (normalizedPattern.endsWith("/*")) {
+    const prefix = normalizedPattern.slice(0, -1);
+    return normalizedCandidate.startsWith(prefix) && !normalizedCandidate.slice(prefix.length).includes("/");
+  }
+  if (!normalizedPattern.includes("*")) {
+    return normalizedCandidate === normalizedPattern;
+  }
+  const wildcardPrefix = normalizedPattern.slice(0, normalizedPattern.indexOf("*"));
+  return normalizedCandidate.startsWith(wildcardPrefix);
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string | null} filePath
+ * @returns {string | null}
+ */
+function resolveProjectRelativeFile(projectRoot, filePath) {
+  if (!filePath) return null;
+  const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(projectRoot, filePath);
+  const relative = path.relative(projectRoot, resolved).replace(/\\/g, "/");
+  return relative.startsWith("../") || relative === "" ? null : relative;
+}
+
+/**
+ * @param {string} dirPath
+ * @returns {string[]}
+ */
+function listJsonFiles(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    return [];
+  }
+  return fs
+    .readdirSync(dirPath)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => path.join(dirPath, entry))
+    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} artifactsRoot
+ * @returns {{ ignoredInputFiles: string[], allowedPaths: string[], forbiddenPaths: string[] }}
+ */
+function loadMissionScope(projectRoot, artifactsRoot) {
+  const packetFiles = listJsonFiles(artifactsRoot).filter((filePath) => path.basename(filePath).includes(".artifact."));
+  for (const packetFile of packetFiles) {
+    const packet = readJsonFile(packetFile);
+    if (asString(packet?.packet_type) !== "intake-request") continue;
+    const bodyRef = asString(packet?.body_ref);
+    if (!bodyRef || !fs.existsSync(bodyRef)) continue;
+    const body = readJsonFile(bodyRef);
+    const featureRequest = asRecord(body?.feature_request);
+    const requestDocument = asRecord(featureRequest.request_document);
+    const requestFile = resolveProjectRelativeFile(projectRoot, asString(featureRequest.request_file));
+    return {
+      ignoredInputFiles: requestFile ? [requestFile] : [],
+      allowedPaths: asStringArray(requestDocument.allowed_paths),
+      forbiddenPaths: asStringArray(requestDocument.forbidden_paths),
+    };
+  }
+  return { ignoredInputFiles: [], allowedPaths: [], forbiddenPaths: [] };
+}
+
+/**
+ * @param {string[]} changedPaths
+ * @param {{ ignoredInputFiles: string[], allowedPaths: string[], forbiddenPaths: string[] }} missionScope
+ */
+function resolveMissionScopedChanges(changedPaths, missionScope) {
+  const ignoredInputFiles = new Set(missionScope.ignoredInputFiles);
+  const scopeCandidates = changedPaths.filter((changedPath) => !ignoredInputFiles.has(changedPath));
+  const forbiddenChangedPaths = scopeCandidates.filter((changedPath) =>
+    missionScope.forbiddenPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
+  );
+  const outOfScopeChangedPaths =
+    missionScope.allowedPaths.length > 0
+      ? scopeCandidates.filter(
+          (changedPath) => !missionScope.allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
+        )
+      : [];
+  const missionScopedChangedPaths =
+    missionScope.allowedPaths.length > 0
+      ? scopeCandidates.filter((changedPath) =>
+          missionScope.allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
+        )
+      : scopeCandidates;
+  return {
+    ignoredInputFiles: missionScope.ignoredInputFiles,
+    allowedPaths: missionScope.allowedPaths,
+    forbiddenPaths: missionScope.forbiddenPaths,
+    nonInputChangedPaths: scopeCandidates,
+    missionScopedChangedPaths,
+    forbiddenChangedPaths,
+    outOfScopeChangedPaths,
+    scopeViolationPaths: uniqueStrings([...forbiddenChangedPaths, ...outOfScopeChangedPaths]),
+  };
+}
+
+/**
+ * @param {string[]} before
+ * @param {string[]} after
+ * @returns {string[]}
+ */
+function diffChangedPaths(before, after) {
+  const beforeSet = new Set(before);
+  return after.filter((changedPath) => !beforeSet.has(changedPath));
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toEvidenceRef(projectRoot, filePath) {
+  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
 }
 
 /**
@@ -248,6 +463,191 @@ function writeStepResult(options) {
 
 /**
  * @param {{
+ *   runtimeLayout: ReturnType<typeof initializeProjectRuntime>["runtimeLayout"],
+ *   stepResultPath: string,
+ *   stepResult: Record<string, unknown>,
+ * }} options
+ */
+function rewriteStepResult(options) {
+  return writeStepResult({
+    runtimeLayout: options.runtimeLayout,
+    stepResultFileName: path.basename(options.stepResultPath),
+    stepResult: options.stepResult,
+  });
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @returns {"pass" | "retry" | "repair" | "escalate" | "block" | "fail"}
+ */
+function resolveRuntimeHarnessDecision(stepResult) {
+  const decision = asString(stepResult.runtime_harness_decision);
+  if (
+    decision === "pass" ||
+    decision === "retry" ||
+    decision === "repair" ||
+    decision === "escalate" ||
+    decision === "block" ||
+    decision === "fail"
+  ) {
+    return decision;
+  }
+  return asString(stepResult.status) === "passed" ? "pass" : "repair";
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @param {"retry" | "repair" | "escalate"} action
+ * @returns {number}
+ */
+function resolveActionBudget(stepResult, action) {
+  const pendingAttempt = asRecordArray(stepResult.repair_attempts).find(
+    (attempt) => asString(attempt.policy_action) === action || asString(attempt.runtime_harness_decision) === action,
+  );
+  const policyBudget = asRecord(pendingAttempt?.policy_budget);
+  const maxAttempts = typeof policyBudget.max_attempts === "number" && Number.isFinite(policyBudget.max_attempts)
+    ? Math.max(0, Math.floor(policyBudget.max_attempts))
+    : null;
+  if (maxAttempts !== null) {
+    return maxAttempts;
+  }
+  return action === "escalate" ? 0 : 1;
+}
+
+/**
+ * @param {ReturnType<typeof executeRoutedStep>} result
+ * @param {Array<Record<string, unknown>>} attempts
+ * @param {"pending" | "not_required" | "succeeded_after_retry" | "succeeded_after_repair" | "exhausted" | "blocked"} status
+ */
+function persistRuntimeHarnessAttemptLedger(result, attempts, status) {
+  result.stepResult.repair_attempts = attempts;
+  result.stepResult.repair_status = status;
+  rewriteStepResult({
+    runtimeLayout: result.runtimeLayout,
+    stepResultPath: result.stepResultPath,
+    stepResult: result.stepResult,
+  });
+}
+
+/**
+ * @param {{
+ *   result: ReturnType<typeof executeRoutedStep>,
+ *   attempts: Array<Record<string, unknown>>,
+ *   action: "retry" | "repair",
+ *   exhausted: boolean,
+ * }} options
+ */
+function persistExhaustedRuntimeDecision(options) {
+  const finalDecision = options.exhausted ? "block" : "escalate";
+  const attempts = options.attempts.map((attempt, index) =>
+    options.exhausted && index === options.attempts.length - 1
+      ? {
+          ...attempt,
+          status: "exhausted",
+          result: "exhausted",
+          exhausted_budget: true,
+        }
+      : attempt,
+  );
+  options.result.stepResult.status = "failed";
+  options.result.stepResult.mission_outcome = "not_satisfied";
+  options.result.stepResult.runtime_harness_decision = finalDecision;
+  options.result.stepResult.repair_status = options.exhausted ? "exhausted" : "blocked";
+  options.result.stepResult.summary = `Runtime Harness ${options.action} budget exhausted for failure class '${asString(options.result.stepResult.failure_class) ?? "unknown"}'.`;
+  const routedExecution = asRecord(options.result.stepResult.routed_execution);
+  routedExecution.blocked_next_step =
+    "Inspect Runtime Harness repair ledger and address unresolved failure evidence before continuing delivery.";
+  options.result.stepResult.routed_execution = routedExecution;
+  options.result.stepResult.repair_attempts = attempts;
+  rewriteStepResult({
+    runtimeLayout: options.result.runtimeLayout,
+    stepResultPath: options.result.stepResultPath,
+    stepResult: options.result.stepResult,
+  });
+}
+
+/**
+ * @param {ReturnType<typeof executeRoutedStep>} result
+ */
+function refreshRuntimeHarnessReportForStep(result) {
+  materializeRuntimeHarnessReport({
+    projectRef: result.projectRoot,
+    cwd: result.projectRoot,
+    runtimeRoot: result.runtimeRoot,
+    runId: result.runId,
+  });
+}
+
+/**
+ * @param {{
+ *   result: ReturnType<typeof executeRoutedStep>,
+ *   attempt: number,
+ *   inputEvidenceRefs: string[],
+ * }} options
+ * @returns {{ repairInputFile: string, repairInputRef: string }}
+ */
+function writeRuntimeRepairInput(options) {
+  const runtimeHarness = materializeRuntimeHarnessReport({
+    projectRef: options.result.projectRoot,
+    cwd: options.result.projectRoot,
+    runtimeRoot: options.result.runtimeRoot,
+    runId: options.result.runId,
+  });
+  const routedExecution = asRecord(options.result.stepResult.routed_execution);
+  const adapterResponse = asRecord(routedExecution.adapter_response);
+  const adapterOutput = asRecord(adapterResponse.output);
+  const repairInputFile = path.join(
+    options.result.runtimeLayout.reportsRoot,
+    `runtime-harness-repair-input-${normalizeRefSuffix(options.result.runId)}-${normalizeRefSuffix(options.result.stepId)}-attempt-${options.attempt}.json`,
+  );
+  const repairInput = {
+    repair_input_id: `${options.result.runId}.${options.result.stepId}.repair-input.${options.attempt}`,
+    run_id: options.result.runId,
+    failed_step_id: options.result.stepId,
+    failed_step_result_ref: toEvidenceRef(options.result.projectRoot, options.result.stepResultPath),
+    failed_step_result_file: options.result.stepResultPath,
+    attempt: options.attempt,
+    created_at: new Date().toISOString(),
+    previous_findings: [
+      {
+        failure_class: asString(options.result.stepResult.failure_class) ?? "unknown",
+        runtime_harness_decision: asString(options.result.stepResult.runtime_harness_decision) ?? "unknown",
+        mission_outcome: asString(options.result.stepResult.mission_outcome) ?? "unknown",
+        summary: asString(options.result.stepResult.summary) ?? "Runtime Harness repair trigger.",
+      },
+    ],
+    failed_transcript_refs: uniqueStrings([
+      asString(asRecord(adapterOutput.external_runner).raw_evidence_ref) ?? "",
+      ...asStringArray(adapterResponse.evidence_refs),
+      ...asStringArray(options.result.stepResult.evidence_refs),
+    ]),
+    diff_status: asRecord(options.result.stepResult.mission_semantics),
+    adapter_evidence: {
+      status: asString(adapterResponse.status),
+      failure_kind: asString(adapterOutput.failure_kind),
+      summary: asString(adapterResponse.summary),
+      evidence_refs: asStringArray(adapterResponse.evidence_refs),
+      tool_traces: Array.isArray(adapterResponse.tool_traces) ? adapterResponse.tool_traces : [],
+      output: adapterOutput,
+    },
+    validator_findings: {
+      discovery_completeness_gate: asRecord(routedExecution.discovery_completeness_gate),
+      verification: asRecord(options.result.stepResult.verification),
+    },
+    runtime_harness_report_ref: runtimeHarness.reportRef,
+    runtime_harness_report_file: runtimeHarness.reportPath,
+    runtime_findings: Array.isArray(runtimeHarness.report.run_findings) ? runtimeHarness.report.run_findings : [],
+    input_evidence_refs: uniqueStrings(options.inputEvidenceRefs),
+  };
+  fs.writeFileSync(repairInputFile, `${JSON.stringify(repairInput, null, 2)}\n`, "utf8");
+  return {
+    repairInputFile,
+    repairInputRef: toEvidenceRef(options.result.projectRoot, repairInputFile),
+  };
+}
+
+/**
+ * @param {{
  *   cwd?: string,
  *   projectRef?: string,
  *   projectProfile?: string,
@@ -274,6 +674,7 @@ function writeStepResult(options) {
  *   approvedHandoffRef?: string,
  *   promotionEvidenceRefs?: string[],
  *   coordinationEvidenceRefs?: string[],
+ *   runtimeEvidenceRefs?: string[],
  * }} options
  */
 export function executeRoutedStep(options) {
@@ -319,6 +720,7 @@ export function executeRoutedStep(options) {
       ? options.executionRoot
       : path.resolve(init.projectRoot, options.executionRoot)
     : init.projectRoot;
+  const changedPathStatusBefore = listChangedPaths(executionRoot);
 
   const requestedStepClass = options.stepClass;
   const resultStepClass = STEP_CLASS_TO_RESULT_CLASS[requestedStepClass] ?? "runner";
@@ -367,7 +769,7 @@ export function executeRoutedStep(options) {
   /** @type {string | null} */
   let compiledContextArtifactPath = null;
   /** @type {string[]} */
-  let evidenceRefs = [init.projectProfilePath];
+  let evidenceRefs = uniqueStrings([init.projectProfilePath, ...asStringArray(options.runtimeEvidenceRefs)]);
   /** @type {"passed" | "failed"} */
   let status = "passed";
   let summary = dryRun
@@ -478,7 +880,11 @@ export function executeRoutedStep(options) {
       summary =
         "Spec build blocked by discovery completeness checks. Run 'aor discovery run' and resolve failed checks before planning handoff.";
       blockedNextStep = "Re-run discovery and close failing completeness checks before executing spec build.";
-      evidenceRefs = [...new Set([init.projectProfilePath, discoveryResult.reportPath])];
+      evidenceRefs = uniqueStrings([
+        init.projectProfilePath,
+        discoveryResult.reportPath,
+        ...asStringArray(options.runtimeEvidenceRefs),
+      ]);
     }
     featureTraceability = asRecord(discoveryResult.report.feature_traceability);
   }
@@ -705,6 +1111,7 @@ export function executeRoutedStep(options) {
       evidenceRefs = [
         ...new Set([
           init.projectProfilePath,
+          ...asStringArray(options.runtimeEvidenceRefs),
           ...(deliveryPlanResult ? [deliveryPlanResult.deliveryPlanFile] : []),
           ...(compiledContextRef ? [compiledContextRef] : []),
           ...(compiledContextArtifactPath ? [compiledContextArtifactPath] : []),
@@ -724,6 +1131,22 @@ export function executeRoutedStep(options) {
   }
 
   const finishedAt = new Date().toISOString();
+  const changedPathStatusAfter = listChangedPaths(executionRoot);
+  const changedPathsDuringStep =
+    changedPathStatusBefore.available && changedPathStatusAfter.available
+      ? diffChangedPaths(changedPathStatusBefore.changedPaths, changedPathStatusAfter.changedPaths)
+      : [];
+  const nonBootstrapChangedPaths = filterNonBootstrapChangedPaths(changedPathStatusAfter.changedPaths);
+  const nonBootstrapChangedPathsDuringStep = filterNonBootstrapChangedPaths(changedPathsDuringStep);
+  const missionScope = loadMissionScope(init.projectRoot, init.runtimeLayout.artifactsRoot);
+  const missionProfile = resolveRuntimeMissionProfile(init.projectRoot, init.runtimeLayout.artifactsRoot);
+  const missionScopedChanges = resolveMissionScopedChanges(nonBootstrapChangedPaths, missionScope);
+  const strictCodeChangingNoop =
+    !dryRun &&
+    requestedStepClass === "implement" &&
+    (missionProfile.missionType === "code-changing" || missionProfile.missionType === "release") &&
+    changedPathStatusBefore.available &&
+    changedPathStatusAfter.available;
   const stepResult = {
     step_result_id: stepResultId,
     run_id: runId,
@@ -801,7 +1224,66 @@ export function executeRoutedStep(options) {
       blocked_next_step: blockedNextStep,
       evidence_root: init.runtimeLayout.reportsRoot,
     },
+    mission_semantics: {
+      git_status_available: changedPathStatusBefore.available && changedPathStatusAfter.available,
+      git_status_root: executionRoot,
+      changed_paths_before_step: changedPathStatusBefore.changedPaths,
+      changed_paths_after_step: changedPathStatusAfter.changedPaths,
+      changed_paths_during_step: changedPathsDuringStep,
+      non_bootstrap_changed_paths: nonBootstrapChangedPaths,
+      non_bootstrap_changed_paths_during_step: nonBootstrapChangedPathsDuringStep,
+      non_input_changed_paths: missionScopedChanges.nonInputChangedPaths,
+      mission_scoped_changed_paths: missionScopedChanges.missionScopedChangedPaths,
+      ignored_input_files: missionScopedChanges.ignoredInputFiles,
+      allowed_paths: missionScopedChanges.allowedPaths,
+      forbidden_paths: missionScopedChanges.forbiddenPaths,
+      forbidden_changed_paths: missionScopedChanges.forbiddenChangedPaths,
+      out_of_scope_changed_paths: missionScopedChanges.outOfScopeChangedPaths,
+      scope_violation_paths: missionScopedChanges.scopeViolationPaths,
+      strict_code_changing_noop: strictCodeChangingNoop,
+      mission_type: missionProfile.missionType,
+      strictness_profile: missionProfile.strictnessProfile,
+    },
   };
+  const runtimeOutcome = classifyRuntimeStepOutcome(stepResult, {
+    gitStatusAvailable: changedPathStatusBefore.available && changedPathStatusAfter.available,
+    strictCodeChangingNoop,
+    nonBootstrapChangedPaths,
+    missionScopedChangedPaths: missionScopedChanges.missionScopedChangedPaths,
+    scopeViolationPaths: missionScopedChanges.scopeViolationPaths,
+  });
+  stepResult.mission_outcome = runtimeOutcome.missionOutcome;
+  stepResult.failure_class = runtimeOutcome.failureClass;
+  stepResult.runtime_harness_decision = runtimeOutcome.decision;
+  stepResult.repair_attempts = synthesizeRepairAttempts(
+    stepResult,
+    runtimeOutcome,
+    toEvidenceRef(init.projectRoot, path.join(init.runtimeLayout.reportsRoot, stepResultFileName)),
+  );
+  stepResult.repair_status = runtimeOutcome.decision === "repair" ? "pending" : "not_required";
+  stepResult.stage_timings = {
+    started_at: startedAt,
+    finished_at: finishedAt,
+    duration_sec: resolveDurationSeconds(startedAt, finishedAt),
+  };
+  stepResult.permission_denials =
+    runtimeOutcome.failureClass === "permission-mode-blocked" || runtimeOutcome.failureClass === "edit-denied"
+      ? [
+          {
+            failure_class: runtimeOutcome.failureClass,
+            summary,
+            evidence_refs: evidenceRefs,
+          },
+        ]
+      : [];
+  stepResult.requested_interaction =
+    runtimeOutcome.failureClass === "interactive-question-requested"
+      ? {
+          requested: true,
+          summary,
+          evidence_refs: evidenceRefs,
+        }
+      : null;
 
   const stepResultPath = writeStepResult({
     runtimeLayout: init.runtimeLayout,
@@ -817,4 +1299,213 @@ export function executeRoutedStep(options) {
     stepResult,
     stepResultPath,
   };
+}
+
+/**
+ * Execute a routed step through the AOR Runtime Harness controller.
+ *
+ * The one-shot `executeRoutedStep` surface remains the primitive that writes a
+ * single routed step result. This controller is the normal runtime surface for
+ * `run start`: it records the first decision, applies bounded retry/repair
+ * policy, reruns the original step after repair, and blocks delivery semantics
+ * when the policy budget is exhausted.
+ *
+ * @param {Parameters<typeof executeRoutedStep>[0]} options
+ * @returns {ReturnType<typeof executeRoutedStep>}
+ */
+export function executeRuntimeHarnessControlledStep(options) {
+  let current = executeRoutedStep(options);
+  refreshRuntimeHarnessReportForStep(current);
+
+  if (options.stepClass === "repair") {
+    const repairDecision = resolveRuntimeHarnessDecision(current.stepResult);
+    if (repairDecision !== "pass") {
+      persistExhaustedRuntimeDecision({
+        result: current,
+        attempts: asRecordArray(current.stepResult.repair_attempts),
+        action: "repair",
+        exhausted: true,
+      });
+      refreshRuntimeHarnessReportForStep(current);
+    }
+    return current;
+  }
+
+  /** @type {Array<Record<string, unknown>>} */
+  const executedAttempts = [];
+  const counters = {
+    retry: 0,
+    repair: 0,
+  };
+
+  for (let loopIndex = 0; loopIndex < 20; loopIndex += 1) {
+    const decision = resolveRuntimeHarnessDecision(current.stepResult);
+    if (decision === "pass") {
+      if (executedAttempts.length > 0) {
+        persistRuntimeHarnessAttemptLedger(
+          current,
+          executedAttempts,
+          executedAttempts.some((attempt) => asString(attempt.policy_action) === "repair")
+            ? "succeeded_after_repair"
+            : "succeeded_after_retry",
+        );
+        refreshRuntimeHarnessReportForStep(current);
+      }
+      return current;
+    }
+    if (decision === "fail" || decision === "block" || decision === "escalate") {
+      if (asString(current.stepResult.status) === "passed") {
+        current.stepResult.status = "failed";
+        current.stepResult.summary = `Runtime Harness blocked step '${current.stepId}' with decision '${decision}' and failure class '${asString(current.stepResult.failure_class) ?? "unknown"}'.`;
+        rewriteStepResult({
+          runtimeLayout: current.runtimeLayout,
+          stepResultPath: current.stepResultPath,
+          stepResult: current.stepResult,
+        });
+        refreshRuntimeHarnessReportForStep(current);
+      }
+      return current;
+    }
+    if (decision !== "retry" && decision !== "repair") {
+      return current;
+    }
+
+    const maxAttempts = resolveActionBudget(current.stepResult, decision);
+    counters[decision] += 1;
+    if (counters[decision] > maxAttempts) {
+      const exhaustedAttempts = executedAttempts.map((attempt) => ({ ...attempt }));
+      if (exhaustedAttempts.length > 0) {
+        exhaustedAttempts[exhaustedAttempts.length - 1] = {
+          ...exhaustedAttempts[exhaustedAttempts.length - 1],
+          exhausted_budget: true,
+        };
+      }
+      persistExhaustedRuntimeDecision({
+        result: current,
+        attempts: exhaustedAttempts,
+        action: decision,
+        exhausted: true,
+      });
+      refreshRuntimeHarnessReportForStep(current);
+      return current;
+    }
+
+    const attemptStartedAt = new Date().toISOString();
+    const baseEvidenceRefs = uniqueStrings([
+      toEvidenceRef(current.projectRoot, current.stepResultPath),
+      ...asStringArray(current.stepResult.evidence_refs),
+    ]);
+
+    if (decision === "retry") {
+      const retried = executeRoutedStep(options);
+      const attemptFinishedAt = new Date().toISOString();
+      executedAttempts.push({
+        attempt: executedAttempts.length + 1,
+        status: resolveRuntimeHarnessDecision(retried.stepResult) === "pass" ? "pass" : "fail",
+        trigger: asString(current.stepResult.failure_class) ?? "unknown",
+        failure_class: asString(current.stepResult.failure_class) ?? "unknown",
+        runtime_harness_decision: "retry",
+        policy_action: "retry",
+        started_at: attemptStartedAt,
+        finished_at: attemptFinishedAt,
+        duration_sec: resolveDurationSeconds(attemptStartedAt, attemptFinishedAt),
+        input_evidence_refs: baseEvidenceRefs,
+        output_evidence_refs: uniqueStrings([
+          toEvidenceRef(retried.projectRoot, retried.stepResultPath),
+          ...asStringArray(retried.stepResult.evidence_refs),
+        ]),
+        repair_route_ref: null,
+        repair_compiled_context_ref: null,
+        result: resolveRuntimeHarnessDecision(retried.stepResult) === "pass" ? "pass" : "fail",
+        exhausted_budget: counters.retry >= maxAttempts && resolveRuntimeHarnessDecision(retried.stepResult) !== "pass",
+        policy_budget: {
+          max_attempts: maxAttempts,
+        },
+      });
+      persistRuntimeHarnessAttemptLedger(retried, executedAttempts, "pending");
+      current = retried;
+      refreshRuntimeHarnessReportForStep(current);
+      continue;
+    }
+
+    const repairStepId = `${current.stepId}.repair.${counters.repair}`;
+    const repairInput = writeRuntimeRepairInput({
+      result: current,
+      attempt: counters.repair,
+      inputEvidenceRefs: baseEvidenceRefs,
+    });
+    const repairInputEvidenceRefs = uniqueStrings([
+      repairInput.repairInputRef,
+      ...baseEvidenceRefs,
+    ]);
+    const repair = executeRoutedStep({
+      ...options,
+      stepClass: "repair",
+      stepId: repairStepId,
+      requireDiscoveryCompleteness: false,
+      runtimeEvidenceRefs: repairInputEvidenceRefs,
+    });
+    const repairFinishedAt = new Date().toISOString();
+    const repairDecision = resolveRuntimeHarnessDecision(repair.stepResult);
+    const repairContext = asRecord(asRecord(repair.stepResult.routed_execution).context_compilation);
+    const repairRouteResolution = asRecord(asRecord(repair.stepResult.routed_execution).route_resolution);
+    const repairAttempt = {
+      attempt: executedAttempts.length + 1,
+      status: repairDecision === "pass" ? "pass" : "fail",
+      trigger: asString(current.stepResult.failure_class) ?? "unknown",
+      failure_class: asString(current.stepResult.failure_class) ?? "unknown",
+      runtime_harness_decision: "repair",
+      policy_action: "repair",
+      started_at: attemptStartedAt,
+      finished_at: repairFinishedAt,
+      duration_sec: resolveDurationSeconds(attemptStartedAt, repairFinishedAt),
+      input_evidence_refs: repairInputEvidenceRefs,
+      output_evidence_refs: uniqueStrings([
+        toEvidenceRef(repair.projectRoot, repair.stepResultPath),
+        ...asStringArray(repair.stepResult.evidence_refs),
+      ]),
+      repair_route_ref: asString(repairRouteResolution.resolved_route_id)
+        ? `route://${asString(repairRouteResolution.resolved_route_id)}`
+        : null,
+      repair_compiled_context_ref: asString(repairContext.compiled_context_ref),
+      result: repairDecision === "pass" ? "pass" : "fail",
+      exhausted_budget: false,
+      policy_budget: {
+        max_attempts: maxAttempts,
+      },
+    };
+    executedAttempts.push(repairAttempt);
+    persistRuntimeHarnessAttemptLedger(current, executedAttempts, "pending");
+    refreshRuntimeHarnessReportForStep(repair);
+
+    if (repairDecision !== "pass") {
+      executedAttempts[executedAttempts.length - 1] = {
+        ...repairAttempt,
+        result: repairDecision === "block" ? "blocked" : "fail",
+        exhausted_budget: counters.repair >= maxAttempts,
+      };
+      persistExhaustedRuntimeDecision({
+        result: current,
+        attempts: executedAttempts,
+        action: "repair",
+        exhausted: counters.repair >= maxAttempts,
+      });
+      refreshRuntimeHarnessReportForStep(current);
+      return current;
+    }
+
+    const rerun = executeRoutedStep(options);
+    persistRuntimeHarnessAttemptLedger(rerun, executedAttempts, "pending");
+    current = rerun;
+    refreshRuntimeHarnessReportForStep(current);
+  }
+
+  persistExhaustedRuntimeDecision({
+    result: current,
+    attempts: executedAttempts,
+    action: "repair",
+    exhausted: true,
+  });
+  refreshRuntimeHarnessReportForStep(current);
+  return current;
 }

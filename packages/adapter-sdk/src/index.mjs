@@ -99,6 +99,23 @@ export function classifyExternalRunnerFailure(options) {
     return "auth-failed";
   }
   if (
+    combined.includes("askuserquestion") ||
+    combined.includes("ask user question") ||
+    combined.includes("clarifying question") ||
+    combined.includes("requires user input") ||
+    combined.includes("interactive prompt")
+  ) {
+    return "interactive-question-requested";
+  }
+  if (
+    combined.includes("edit denied") ||
+    combined.includes("edit tool denied") ||
+    combined.includes("tool denied: edit") ||
+    combined.includes("denied tool edit")
+  ) {
+    return "edit-denied";
+  }
+  if (
     combined.includes("permission denied") ||
     combined.includes("permission-mode") ||
     combined.includes("permissions") ||
@@ -824,6 +841,33 @@ export function createLiveAdapter(options) {
             ...baseOutput,
             blocked: failureKind === "auth-failed" || failureKind === "permission-mode-blocked",
             failure_kind: failureKind,
+          },
+          evidence_refs: evidenceRefs,
+          tool_traces: toolTraces,
+        });
+      }
+
+      const semanticFailureKind = classifyExternalRunnerFailure({
+        stdout,
+        stderr,
+        defaultFailureKind: "",
+      });
+      if (semanticFailureKind) {
+        const blocked = [
+          "auth-failed",
+          "permission-mode-blocked",
+          "edit-denied",
+          "interactive-question-requested",
+        ].includes(semanticFailureKind);
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: blocked ? "blocked" : "failed",
+          summary: `External runner command '${runtimeCommand}' completed but emitted '${semanticFailureKind}' evidence for adapter '${adapterId}'.`,
+          output: {
+            ...baseOutput,
+            blocked,
+            failure_kind: semanticFailureKind,
           },
           evidence_refs: evidenceRefs,
           tool_traces: toolTraces,

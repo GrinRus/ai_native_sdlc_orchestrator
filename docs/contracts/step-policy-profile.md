@@ -19,7 +19,7 @@ Policy definition for one step class: validators, quality gates, retry rules, re
 - `writeback_policy.mode`
 
 ## Notes
-Step policies decide how the orchestrator reacts after a step finishes.
+Step policies decide how the Runtime Harness reacts after a step finishes. `retry`, `repair`, and `escalation` are executable policy, not descriptive metadata.
 Runtime policy resolution merges policy fields with route constraints and project defaults before execution begins.
 Later-maturity governance flows should expose explicit deny/escalation reason codes in resolved policy outputs for delivery/release guardrails.
 

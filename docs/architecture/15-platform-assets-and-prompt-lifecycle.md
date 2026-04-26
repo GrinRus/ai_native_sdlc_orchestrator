@@ -75,3 +75,8 @@ Policy resolution is deterministic and runs before any adapter invocation:
 6. persist a delivery-plan artifact before write-back, and block non-read-only modes without approved handoff and promotion evidence.
 
 Any missing or conflicting required policy source must fail deterministically before runner execution starts.
+
+## Context as runtime asset
+Prompt bundles, context docs, context rules, context skills, wrappers, routes, policies, and adapters are runtime assets. They must be versioned, compiled into a `compiled-context` artifact during the Runtime Harness prepare phase, traced through adapter execution, and evaluated through validation, eval, and certification evidence like other software artifacts.
+
+Runtime Harness reports may identify impacted asset refs and recommend recertification. Promotion or freeze remains owned by Asset Certification Capability and `promotion-decision`, not by learning handoff or run diagnosis.

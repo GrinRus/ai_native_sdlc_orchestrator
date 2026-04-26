@@ -22,7 +22,7 @@ The authoritative planning model for implementation lives in:
 | W9 | Stabilize post-audit findings across routed evidence durability, source-of-truth docs, public quality surfaces, detached transport, and live execution foundations. | 8 | EPIC-0, EPIC-3, EPIC-4, EPIC-6 | `docs/backlog/wave-9-implementation-slices.md` |
 | W10 | Reopen production-facing gaps left after the baseline audit across external runner execution, networked fork-first delivery, detached mutation transport, and live target-catalog proof. | 5 | EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-10-implementation-slices.md` |
 | W11 | Close the remaining target-backed live E2E proof gap through source-of-truth repair, target-checkout execution, target-anchored delivery evidence, and refreshed external proof. | 5 | EPIC-0, EPIC-3, EPIC-5, EPIC-7 | `docs/backlog/wave-11-implementation-slices.md` |
-| W12 | Remove public live-E2E product surfaces, move rehearsal to an internal black-box harness, and refresh proof through installed-user style execution. | 4 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-12-implementation-slices.md` |
+| W12 | Remove public live-E2E product surfaces, move rehearsal to an internal installed-user black-box proof runner, and refresh proof through installed-user style execution. | 4 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-12-implementation-slices.md` |
 | W13 | Add a full user-journey live E2E layer on curated public repositories, start each run from a concrete feature mission, and evaluate runtime plus quality verdicts through public surfaces. | 6 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-7 | `docs/backlog/wave-13-implementation-slices.md` |
 | W14 | Expand live E2E into a curated matrix across scenario families, pinned providers, and size-classed feature missions with matrix-aware review, audit, and closure evidence. | 7 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-14-implementation-slices.md` |
 | W15 | Harden readiness signals after W14 by reopening the queue, aligning package/module evidence, and separating coverage proof from real code-changing proof. | 4 | EPIC-0, EPIC-7 | `docs/backlog/wave-15-implementation-slices.md` |
@@ -69,7 +69,7 @@ The authoritative planning model for implementation lives in:
 | W11-S04 | productionization gap closure: target-anchored delivery evidence (no direct story closure) |
 | W11-S05 | productionization gap closure: refreshed target-catalog proof bundle (no direct story closure) |
 | W12-S01 | public surface realignment and breaking removal planning (no direct story closure) |
-| W12-S02 | internal black-box installed-user harness (no direct story closure) |
+| W12-S02 | Live E2E Installed-User Proof Runner (no direct story closure) |
 | W12-S03 | breaking CLI and contract removal (no direct story closure) |
 | W12-S04 | proof refresh after surface cleanup (no direct story closure) |
 | W15-S01 | readiness hardening: source-of-truth queue repair (no direct story closure) |
@@ -223,18 +223,18 @@ The authoritative planning model for implementation lives in:
 
 **Detailed slices:** `docs/backlog/wave-11-implementation-slices.md`
 
-## W12 — public-surface removal and internal harness conversion
-**Goal:** Remove public `live-e2e` CLI and contract surfaces, move rehearsal to repo-maintainer-only tooling, and prove the same target scenarios through an internal installed-user black-box harness.
+## W12 — public-surface removal and installed-user proof conversion
+**Goal:** Remove public `live-e2e` CLI and contract surfaces, move rehearsal to repo-maintainer-only tooling, and prove the same target scenarios through an internal installed-user black-box proof runner.
 
 **Exit criteria:**
 - public CLI/help/catalog/contracts no longer expose `live-e2e` command or profile surfaces
 - public project-profile examples no longer advertise `live_e2e_defaults`
 - internal rehearsal runs execute installed-user style through external `aor` subprocesses rather than direct runtime imports
-- refreshed proof bundles and runbooks use the internal black-box harness and no longer depend on removed `aor live-e2e *` commands
+- refreshed proof bundles and runbooks use the installed-user black-box proof runner and no longer depend on removed `aor live-e2e *` commands
 
 **Closure evidence:**
-- internal harness: `scripts/live-e2e/run-profile.mjs`
-- black-box coverage: `scripts/test/live-e2e-harness.test.mjs`
+- installed-user proof runner: `scripts/live-e2e/run-profile.mjs`
+- black-box coverage: `scripts/test/live-e2e-proof-runner.test.mjs`
 - refreshed operator runbooks: `docs/ops/live-e2e-standard-runner.md`, `docs/ops/live-e2e-learning-loop.md`, `docs/ops/live-e2e-no-write-preflight.md`
 - refreshed proof fixtures: `examples/live-e2e/fixtures/w10-s05/*.json`, `examples/live-e2e/fixtures/w11-s05/*.json`, `examples/live-e2e/fixtures/w12-s04/*.json`, `examples/live-e2e/fixtures/w7-s05/w7-governance-integration-rehearsal.sample.md`
 
@@ -245,11 +245,11 @@ The authoritative planning model for implementation lives in:
 
 **Exit criteria:**
 - machine-readable target and mission catalog exists under `scripts/live-e2e/catalog/` and stays aligned with `docs/ops/live-e2e-target-catalog.md`
-- `aor project init` can bootstrap a clean target repo without harness-side asset injection
+- `aor project init` can bootstrap a clean target repo without proof-runner-side asset injection
 - `aor intake create` and `aor discovery run` can materialize and trace feature-specific mission input
 - `aor run start` launches real execution runs rather than control-state-only transitions
 - public `review run` and `learning handoff` surfaces produce durable `review-report`, `learning-loop-scorecard`, and `learning-loop-handoff` artifacts
-- internal live E2E harness supports a mandatory full-journey layer that runs only on curated repos and curated missions
+- internal live E2E proof runner supports a mandatory full-journey layer that runs only on curated repos and curated missions
 - restored `live-e2e-runner` skill can prepare the feature request, run the public flow, and return a multi-axis verdict matrix
 
 **Detailed slices:** `docs/backlog/wave-13-implementation-slices.md`
@@ -260,7 +260,7 @@ The authoritative planning model for implementation lives in:
 **Exit criteria:**
 - curated live E2E catalogs define scenario policies, provider variants, and target missions with explicit `small`, `medium`, and `large` size classes
 - full-journey profiles pin `target_catalog_id`, `feature_mission_id`, `scenario_family`, and `provider_variant_id`
-- the live harness rejects invalid matrix cells and materializes deterministic provider-pinned route overrides for accepted cells
+- the installed-user proof runner rejects invalid matrix cells and materializes deterministic provider-pinned route overrides for accepted cells
 - review, audit, summary, and learning-loop artifacts preserve matrix-cell metadata plus feature-size/provider execution verdicts
 - operator docs, runner skill guidance, tests, and proof bundles describe live E2E as a curated matrix with required repo-specific coverage cells
 
@@ -275,7 +275,7 @@ The authoritative planning model for implementation lives in:
 - W15 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
 - the module map and workspace manifests agree on all package-managed apps/packages
 - root checks fail when stale wave-coverage claims or dishonest proof-bundle claims appear
-- `W15-S04` remains blocked until `ky.regress.small.openai` can run without deterministic external-runner mock and reach `overall_verdict=pass`
+- `W15-S04` remains blocked until a required full-journey matrix cell can run with usable non-interactive edit permissions, meaningful target changes, `runtime_harness_report.overall_decision=pass`, and `overall_verdict=pass`
 
 **Detailed slices:** `docs/backlog/wave-15-implementation-slices.md`
 

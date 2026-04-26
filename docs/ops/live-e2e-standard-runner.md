@@ -1,9 +1,11 @@
 # Runbook: live E2E standard runner
 
 ## Purpose
-Provide one internal black-box harness for both live E2E layers:
+Provide one installed-user black-box proof runner for both live E2E layers:
 - bounded rehearsal profiles for fast regression and release smoke;
 - catalog-backed full-journey profiles for mandatory installed-user acceptance on curated repositories and curated feature missions.
+
+Live E2E simulates a user who has installed AOR, initializes or attaches a target repository, walks the public SDLC flow through CLI/API surfaces, and then emits a per-step diagnostic summary. It must not call private runtime internals to repair the run. It proves whether AOR works as a product from the public surface and whether produced artifacts explain each pass, failure, block, and missing-evidence gap.
 
 W14 extends the full-journey layer into a curated matrix across:
 - `scenario_family`
@@ -74,21 +76,22 @@ Expected output includes:
 ## Layer behavior
 Bounded rehearsal layer:
 - clones the target checkout;
-- materializes run-scoped bootstrap assets and generated project profile under harness control;
+- materializes run-scoped bootstrap assets and generated project profile under proof-runner control;
 - proves one bounded black-box execution path quickly.
 
 Full-journey layer:
 - resolves `target_catalog_id`, `feature_mission_id`, `scenario_family`, and `provider_variant_id` from the curated internal catalog;
 - uses public `aor project init --materialize-project-profile --materialize-bootstrap-assets` plus repo command overrides derived from the curated catalog;
-- preflights the selected provider adapter before execution so missing live runtime metadata, missing commands, auth failures, and permission-mode blocks fail before `run start`;
+- preflights the selected provider adapter before execution so missing live runtime metadata, missing commands, auth failures, edit-readiness failures, and permission-mode blocks fail before `run start`;
+- records auth probe attempts and retries one transient auth/runtime probe failure before failing the proof;
 - has the runner prepare one structured feature request input;
 - materializes provider-pinned route overrides for the selected provider variant before execution starts;
-- runs the public lifecycle through `intake create`, `project analyze`, `project validate`, `project verify --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, `review run`, `eval run`, optional `harness certify`, `deliver prepare`, optional `release prepare`, `audit runs`, conditional incident handling, and `learning handoff`.
+- runs the public lifecycle through `intake create`, `project analyze`, `project validate`, `project verify --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, `review run`, `eval run`, `deliver prepare`, optional `release prepare`, `audit runs`, conditional incident handling, and `learning handoff`.
 
-No harness-side `examples/context/project profile` injection is allowed on the full-journey path.
+No proof-runner-side `examples/context/project profile` injection is allowed on the full-journey path.
 
 ## Inspect
-The harness is a one-shot command. Inspect `live_e2e_run_summary_file` directly:
+The proof runner is a one-shot command. Inspect `live_e2e_run_summary_file` directly:
 - read `status`, `stage_results`, and `command_results`;
 - inspect `artifacts.routed_step_result_file`, `artifacts.review_report_file`, delivery/release artifacts, and public closure artifacts when present;
 - inspect `artifacts.verdict_matrix` for the final operator verdict dimensions.
@@ -96,10 +99,13 @@ The harness is a one-shot command. Inspect `live_e2e_run_summary_file` directly:
 Full-journey summaries must carry:
 - `feature_request_file`
 - `intake_artifact_packet_file`
+- `runtime_harness_report_file`
 - `review_report_file`
 - `learning_loop_scorecard_file`
 - `learning_loop_handoff_file`
 - `verdict_matrix`
+
+Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for proof success when produced artifacts show no-op implementation, permission denial, blocked semantics, or missing Runtime Harness evidence.
 
 Bounded summaries continue to carry:
 - `target_checkout_root`
@@ -133,14 +139,14 @@ Full-journey summaries include one verdict matrix with:
 - `target_checkout_root` exists and is a cloned checkout, not the control-plane repository root.
 - Full-journey runs resolve repo and mission from the curated catalog; they must not rely on raw `repo_url` plus free-form objective text.
 - Full-journey runs resolve one explicit matrix cell and preserve `matrix_cell` plus `coverage_follow_up` in summary, review, audit, and learning artifacts.
-- Full-journey runs use public `project init` outputs (`materialized_project_profile_file`, `materialized_bootstrap_assets_root`) rather than harness-generated profile injection.
+- Full-journey runs use public `project init` outputs (`materialized_project_profile_file`, `materialized_bootstrap_assets_root`) rather than proof-runner-generated profile injection.
 - `routed_step_result_file` exists and references a routed step with `mode=execute`.
 - `review_report_file` exists and is contract-valid.
 - `review-report.provider_traceability` matches the requested provider variant and adapter path.
 - `review-report.feature_size_fit` stays inside the declared size budget for the mission.
 - `learning_loop_scorecard_file` and `learning_loop_handoff_file` exist and are contract-valid.
 - Release-shaped runs keep `delivery_manifest_file` and `release_packet_file` anchored to the target checkout.
-- Harness execution stays CLI-only and remains valid with web UI detached.
+- Proof runner execution stays CLI-only and remains valid with web UI detached.
 
 ## W14-S07 matrix proof bundle (2026-04-24)
 Observed curated runs:
