@@ -9,6 +9,7 @@ import {
   stringify as stringifyYaml,
 } from "../../packages/contracts/node_modules/yaml/dist/index.js";
 
+import { classifyExternalRunnerFailure } from "../../packages/adapter-sdk/src/index.mjs";
 import { loadContractFile, validateContractDocument } from "../../packages/contracts/src/index.mjs";
 import { materializeLearningLoopArtifacts } from "../../packages/observability/src/index.mjs";
 
@@ -109,6 +110,31 @@ function asStringArray(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @returns {number}
+ */
+function asPositiveInteger(value, fallback) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+  const rounded = Math.floor(value);
+  return rounded > 0 ? rounded : fallback;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, string>}
+ */
+function asStringMap(value) {
+  const record = asRecord(value);
+  const entries = Object.entries(record).filter(
+    ([key, entry]) => typeof key === "string" && typeof entry === "string" && entry.trim().length > 0,
+  );
+  return Object.fromEntries(entries.map(([key, entry]) => [key, entry.trim()]));
+}
+
+/**
  * @param {string[]} values
  * @returns {string[]}
  */
@@ -192,6 +218,21 @@ function resolveOptionalBooleanFlag(value, flagName) {
   if (normalized === "true") return true;
   if (normalized === "false") return false;
   throw new UsageError(`Flag '--${flagName}' must be true or false.`);
+}
+
+/**
+ * @param {string | null} value
+ * @returns {"host" | "isolated"}
+ */
+function resolveRunnerAuthMode(value) {
+  const normalized = value ? value.toLowerCase() : "host";
+  if (normalized === "host") {
+    return "host";
+  }
+  if (normalized === "isolated") {
+    return "isolated";
+  }
+  throw new UsageError("Flag '--runner-auth-mode' must be either 'host' or 'isolated'.");
 }
 
 /**
@@ -305,6 +346,29 @@ function createSessionRoots(options) {
     aorHome,
     codexHome,
     tmpRoot,
+  };
+}
+
+/**
+ * @param {{
+ *   sessionRoots: ReturnType<typeof createSessionRoots>,
+ *   runnerAuthMode: "host" | "isolated",
+ * }} options
+ * @returns {{ env: NodeJS.ProcessEnv, runnerAuthMode: string, runnerAuthSource: string }}
+ */
+function createHarnessEnvironment(options) {
+  const env = {
+    ...process.env,
+    AOR_HOME: options.sessionRoots.aorHome,
+    TMPDIR: options.sessionRoots.tmpRoot,
+  };
+  if (options.runnerAuthMode === "isolated") {
+    env.CODEX_HOME = options.sessionRoots.codexHome;
+  }
+  return {
+    env,
+    runnerAuthMode: options.runnerAuthMode,
+    runnerAuthSource: options.runnerAuthMode,
   };
 }
 
@@ -1057,6 +1121,278 @@ function materializeProviderPinnedRouteOverrides(options) {
 }
 
 /**
+ * @param {string} command
+ * @param {NodeJS.ProcessEnv} env
+ * @param {string} cwd
+ * @returns {string | null}
+ */
+function resolveCommandForPreflight(command, env, cwd) {
+  if (path.isAbsolute(command)) {
+    try {
+      fs.accessSync(command, fs.constants.X_OK);
+      return command;
+    } catch {
+      return null;
+    }
+  }
+
+  if (command.includes("/") || command.includes("\\")) {
+    const candidate = path.resolve(cwd, command);
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+      return null;
+    }
+  }
+
+  const pathValue = env.PATH ?? process.env.PATH ?? "";
+  for (const dirPath of pathValue.split(path.delimiter).filter((entry) => entry.length > 0)) {
+    const candidate = path.join(dirPath, command);
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+      // Keep searching PATH.
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {{
+ *   targetCheckoutRoot: string,
+ *   providerVariant: Record<string, unknown>,
+ *   providerVariantId: string,
+ *   coverageTier: string,
+ *   env: NodeJS.ProcessEnv,
+ *   runnerAuthMode: string,
+ *   runnerAuthSource: string,
+ *   skipRunnerAuthProbe: boolean,
+ *   runId: string,
+ *   reportsRoot: string,
+ * }} options
+ * @returns {{ status: string, summary: string, report: Record<string, unknown>, reportFile: string }}
+ */
+function runLiveAdapterPreflight(options) {
+  const adapterId = asNonEmptyString(options.providerVariant.primary_adapter);
+  const provider = asNonEmptyString(options.providerVariant.provider);
+  const providerCoverageTier = asNonEmptyString(options.providerVariant.coverage_tier);
+  const requiredProvider = options.coverageTier === "required" || providerCoverageTier === "required";
+  const adapterProfileFile = path.join(options.targetCheckoutRoot, "examples", "adapters", `${normalizeId(adapterId)}.yaml`);
+  const reportFile = path.join(
+    options.reportsRoot,
+    `live-adapter-preflight-${normalizeId(options.runId)}-${normalizeId(options.providerVariantId)}.json`,
+  );
+  const baseReport = {
+    status: "pass",
+    run_id: options.runId,
+    provider_variant_id: options.providerVariantId,
+    provider,
+    primary_adapter: adapterId || null,
+    coverage_tier: options.coverageTier,
+    provider_coverage_tier: providerCoverageTier || null,
+    required_provider: requiredProvider,
+    runner_auth_mode: options.runnerAuthMode,
+    runner_auth_source: options.runnerAuthSource,
+    adapter_profile_file: adapterProfileFile,
+    auth_probe: {
+      enabled: !options.skipRunnerAuthProbe,
+      status: options.skipRunnerAuthProbe ? "skipped" : "pending",
+    },
+    checked_at: nowIso(),
+  };
+  const fail = (failureKind, summary, extra = {}) => {
+    const report = {
+      ...baseReport,
+      ...extra,
+      status: "fail",
+      failure_kind: failureKind,
+      summary,
+    };
+    writeJson(reportFile, report);
+    return {
+      status: "fail",
+      summary,
+      report,
+      reportFile,
+    };
+  };
+
+  if (!adapterId) {
+    return fail("missing-live-runtime", `Provider variant '${options.providerVariantId}' does not declare primary_adapter.`);
+  }
+  if (!fileExists(adapterProfileFile)) {
+    return fail(
+      "missing-live-runtime",
+      `Provider variant '${options.providerVariantId}' references adapter '${adapterId}', but its adapter profile was not found.`,
+    );
+  }
+
+  const loaded = loadContractFile({
+    filePath: adapterProfileFile,
+    family: "adapter-capability-profile",
+  });
+  if (!loaded.ok) {
+    const issues = loaded.validation.issues.map((issue) => issue.message).join("; ");
+    return fail("missing-live-runtime", `Adapter profile '${adapterId}' failed contract validation: ${issues}`);
+  }
+
+  const adapterProfile = asRecord(loaded.document);
+  const execution = asRecord(adapterProfile.execution);
+  const externalRuntime = asRecord(execution.external_runtime);
+  const runtimeMode = asNonEmptyString(execution.runtime_mode);
+  const liveBaseline = execution.live_baseline === true;
+  const runtimeCommand = asNonEmptyString(externalRuntime.command);
+  const runtimeArgs = asStringArray(externalRuntime.args);
+  const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
+  const probeTimeoutMs = Math.min(timeoutMs, 30000);
+  const envOverrides = asStringMap(externalRuntime.env);
+  const runnerEnv = {
+    ...options.env,
+    ...envOverrides,
+  };
+  const runtimeReport = {
+    runtime_mode: runtimeMode || null,
+    live_baseline: liveBaseline,
+    external_runtime: {
+      command: runtimeCommand || null,
+      args: runtimeArgs,
+      timeout_ms: timeoutMs,
+      auth_probe_timeout_ms: probeTimeoutMs,
+    },
+  };
+
+  if (runtimeMode !== "external-process") {
+    return fail(
+      "missing-live-runtime",
+      `Adapter '${adapterId}' live runtime is misconfigured: execution.runtime_mode must be 'external-process'.`,
+      runtimeReport,
+    );
+  }
+  if (!runtimeCommand) {
+    return fail(
+      "missing-live-runtime",
+      `Adapter '${adapterId}' live runtime is missing execution.external_runtime.command.`,
+      runtimeReport,
+    );
+  }
+  if (requiredProvider && !liveBaseline) {
+    return fail(
+      "missing-live-runtime",
+      `Required provider variant '${options.providerVariantId}' points at adapter '${adapterId}', but execution.live_baseline is not true.`,
+      runtimeReport,
+    );
+  }
+
+  const resolvedCommand = resolveCommandForPreflight(runtimeCommand, runnerEnv, options.targetCheckoutRoot);
+  if (!resolvedCommand) {
+    return fail(
+      "missing-command",
+      `External runner command '${runtimeCommand}' is not available on PATH for adapter '${adapterId}'.`,
+      runtimeReport,
+    );
+  }
+
+  if (options.skipRunnerAuthProbe) {
+    const report = {
+      ...baseReport,
+      ...runtimeReport,
+      resolved_command: resolvedCommand,
+      auth_probe: {
+        enabled: false,
+        status: "skipped",
+      },
+      summary: `Live adapter preflight passed for provider variant '${options.providerVariantId}' with auth probe skipped.`,
+    };
+    writeJson(reportFile, report);
+    return {
+      status: "pass",
+      summary: asNonEmptyString(report.summary),
+      report,
+      reportFile,
+    };
+  }
+
+  const probeInput = `${JSON.stringify({
+    request: {
+      request_id: "live-adapter-preflight",
+      run_id: options.runId,
+      step_id: "live-adapter-preflight",
+      step_class: "preflight",
+      objective: "Confirm that the external runner can authenticate and complete a minimal non-interactive invocation.",
+    },
+    adapter: {
+      adapter_id: adapterId,
+      provider_variant_id: options.providerVariantId,
+    },
+  })}\n`;
+  const probe = spawnSync(runtimeCommand, runtimeArgs, {
+    cwd: options.targetCheckoutRoot,
+    env: runnerEnv,
+    encoding: "utf8",
+    input: probeInput,
+    timeout: probeTimeoutMs,
+    maxBuffer: 1024 * 1024,
+  });
+  const probeError = probe.error instanceof Error ? probe.error : null;
+  const probeTimedOut =
+    probeError?.code === "ETIMEDOUT" || (probe.signal === "SIGTERM" && probe.status === null);
+  const probeFailed = probeError !== null || probeTimedOut || probe.status !== 0;
+  if (probeFailed) {
+    const failureKind =
+      probeError?.code === "ENOENT"
+        ? "missing-command"
+        : probeTimedOut
+          ? "external-runner-timeout"
+          : classifyExternalRunnerFailure({
+              stdout: probe.stdout ?? "",
+              stderr: probe.stderr ?? "",
+              errorMessage: probeError?.message ?? null,
+              defaultFailureKind: "external-runner-failed",
+            });
+    return fail(
+      failureKind,
+      `Live adapter preflight failed for adapter '${adapterId}' before run start.`,
+      {
+        ...runtimeReport,
+        resolved_command: resolvedCommand,
+        auth_probe: {
+          enabled: true,
+          status: "fail",
+          exit_code: probe.status,
+          signal: probe.signal,
+          timed_out: probeTimedOut,
+          failure_kind: failureKind,
+          error_code: probeError?.code ?? null,
+        },
+      },
+    );
+  }
+
+  const report = {
+    ...baseReport,
+    ...runtimeReport,
+    resolved_command: resolvedCommand,
+    auth_probe: {
+      enabled: true,
+      status: "pass",
+      exit_code: probe.status,
+      signal: probe.signal,
+      timed_out: false,
+    },
+    summary: `Live adapter preflight passed for provider variant '${options.providerVariantId}'.`,
+  };
+  writeJson(reportFile, report);
+  return {
+    status: "pass",
+    summary: asNonEmptyString(report.summary),
+    report,
+    reportFile,
+  };
+}
+
+/**
  * @param {Record<string, string>} routeOverrides
  * @returns {string | null}
  */
@@ -1351,6 +1687,7 @@ function evaluateScenarioCoverage(options) {
  *   profile: Record<string, unknown>,
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
  *   examplesRoot: string,
+ *   runnerAuthMode: "host" | "isolated",
  * }}
  */
 function executeInstalledUserFlow(options) {
@@ -1362,12 +1699,11 @@ function executeInstalledUserFlow(options) {
     sessionsRoot: options.layout.sessionsRoot,
     runId: options.runId,
   });
-  const env = {
-    ...process.env,
-    AOR_HOME: sessionRoots.aorHome,
-    CODEX_HOME: sessionRoots.codexHome,
-    TMPDIR: sessionRoots.tmpRoot,
-  };
+  const harnessEnvironment = createHarnessEnvironment({
+    sessionRoots,
+    runnerAuthMode: options.runnerAuthMode,
+  });
+  const env = harnessEnvironment.env;
 
   const artifacts = {
     host_runtime_root: options.layout.runtimeRoot,
@@ -1375,6 +1711,9 @@ function executeInstalledUserFlow(options) {
     session_root: sessionRoots.sessionRoot,
     aor_home: sessionRoots.aorHome,
     codex_home: sessionRoots.codexHome,
+    codex_home_isolated: options.runnerAuthMode === "isolated",
+    runner_auth_mode: harnessEnvironment.runnerAuthMode,
+    runner_auth_source: harnessEnvironment.runnerAuthSource,
   };
   const startedAt = nowIso();
   try {
@@ -1803,6 +2142,8 @@ function executeInstalledUserFlow(options) {
  *   matrixCell: Record<string, unknown>,
  *   coverageFollowUp: Record<string, unknown>,
  *   coverageTier: string,
+ *   runnerAuthMode: "host" | "isolated",
+ *   skipRunnerAuthProbe: boolean,
  * }} options
  */
 function executeFullJourneyFlow(options) {
@@ -1814,12 +2155,11 @@ function executeFullJourneyFlow(options) {
     sessionsRoot: options.layout.sessionsRoot,
     runId: options.runId,
   });
-  const env = {
-    ...process.env,
-    AOR_HOME: sessionRoots.aorHome,
-    CODEX_HOME: sessionRoots.codexHome,
-    TMPDIR: sessionRoots.tmpRoot,
-  };
+  const harnessEnvironment = createHarnessEnvironment({
+    sessionRoots,
+    runnerAuthMode: options.runnerAuthMode,
+  });
+  const env = harnessEnvironment.env;
   if (options.examplesRootOverride) {
     env.AOR_BOOTSTRAP_ASSETS_ROOT = options.examplesRootOverride;
     env.AOR_EXAMPLES_ROOT = options.examplesRootOverride;
@@ -1831,6 +2171,9 @@ function executeFullJourneyFlow(options) {
     session_root: sessionRoots.sessionRoot,
     aor_home: sessionRoots.aorHome,
     codex_home: sessionRoots.codexHome,
+    codex_home_isolated: options.runnerAuthMode === "isolated",
+    runner_auth_mode: harnessEnvironment.runnerAuthMode,
+    runner_auth_source: harnessEnvironment.runnerAuthSource,
     target_catalog_file: options.catalogTargetPath,
     scenario_policy_file: options.scenarioPolicyPath,
     provider_variant_file: options.providerVariantPath,
@@ -1911,12 +2254,41 @@ function executeFullJourneyFlow(options) {
     artifacts.provider_route_override_files = providerRoutes.routeFiles;
     artifacts.provider_route_overrides = providerRoutes.routeOverrides;
     const routeOverridesFlag = serializeRouteOverrides(providerRoutes.routeOverrides);
+    const liveAdapterPreflight = runLiveAdapterPreflight({
+      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      providerVariant: options.providerVariant,
+      providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
+      coverageTier: options.coverageTier,
+      env,
+      runnerAuthMode: harnessEnvironment.runnerAuthMode,
+      runnerAuthSource: harnessEnvironment.runnerAuthSource,
+      skipRunnerAuthProbe: options.skipRunnerAuthProbe,
+      runId: options.runId,
+      reportsRoot: options.layout.reportsRoot,
+    });
+    artifacts.live_adapter_preflight_file = liveAdapterPreflight.reportFile;
+    artifacts.live_adapter_preflight = liveAdapterPreflight.report;
+    if (liveAdapterPreflight.status !== "pass") {
+      markStage(
+        stageMap,
+        "bootstrap",
+        "fail",
+        uniqueStrings([projectInit.transcriptFile, liveAdapterPreflight.reportFile, ...collectStringRefs(projectInit.payload)]),
+        liveAdapterPreflight.summary,
+      );
+      throw new Error(liveAdapterPreflight.summary);
+    }
     markStage(
       stageMap,
       "bootstrap",
       "pass",
-      uniqueStrings([projectInit.transcriptFile, ...collectStringRefs(projectInit.payload), ...providerRoutes.routeFiles]),
-      "Public bootstrap materialized project profile, packaged bootstrap assets, and provider-pinned route overrides.",
+      uniqueStrings([
+        projectInit.transcriptFile,
+        liveAdapterPreflight.reportFile,
+        ...collectStringRefs(projectInit.payload),
+        ...providerRoutes.routeFiles,
+      ]),
+      "Public bootstrap materialized project profile, packaged bootstrap assets, provider-pinned route overrides, and live adapter preflight.",
     );
 
     const featureRequest = materializeFeatureRequestFile({
@@ -2716,11 +3088,13 @@ function writeHarnessArtifacts(options) {
     scorecard_files: [scorecardFile],
     control_surfaces: {
       internal_harness:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>]",
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--skip-runner-auth-probe]",
       public_cli_sequence: options.flowResult.commandResults.map((result) => result.command_surface).filter(Boolean),
       aor_bin: options.aorLaunch.binaryRef,
       examples_root: options.examplesRoot,
     },
+    runner_auth_mode: asNonEmptyString(options.flowResult.artifacts.runner_auth_mode) || null,
+    runner_auth_source: asNonEmptyString(options.flowResult.artifacts.runner_auth_source) || null,
     error:
       options.flowResult.status === "fail"
         ? options.flowResult.stageResults.find((stage) => stage.status === "fail")?.summary ||
@@ -2802,7 +3176,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--skip-runner-auth-probe]",
         "",
         "Internal black-box installed-user rehearsal harness.",
       ].join("\n"),
@@ -2825,6 +3199,8 @@ function runCli(rawArgs) {
   const runtimeRoot = resolveOptionalStringFlag(flags["runtime-root"], "runtime-root");
   const aorBin = resolveOptionalStringFlag(flags["aor-bin"], "aor-bin");
   const catalogRootOverride = resolveOptionalStringFlag(flags["catalog-root"], "catalog-root");
+  const runnerAuthMode = resolveRunnerAuthMode(resolveOptionalStringFlag(flags["runner-auth-mode"], "runner-auth-mode"));
+  const skipRunnerAuthProbe = resolveOptionalBooleanFlag(flags["skip-runner-auth-probe"], "skip-runner-auth-probe");
   const explicitExamplesRoot =
     Object.prototype.hasOwnProperty.call(flags, "examples-root")
       ? resolveOptionalStringFlag(flags["examples-root"], "examples-root")
@@ -2895,6 +3271,8 @@ function runCli(rawArgs) {
           matrixCell: fullJourneyResolution.matrixCell,
           coverageFollowUp: fullJourneyResolution.coverageFollowUp,
           coverageTier: fullJourneyResolution.coverageTier,
+          runnerAuthMode,
+          skipRunnerAuthProbe,
         })
       : executeInstalledUserFlow({
           hostRoot,
@@ -2903,6 +3281,7 @@ function runCli(rawArgs) {
           profilePath,
           profile,
           aorLaunch,
+          runnerAuthMode,
           examplesRoot:
             examplesRoot ??
             (() => {

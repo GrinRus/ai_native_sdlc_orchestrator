@@ -27,3 +27,4 @@ log_features:
 certification_state: candidate
 limitations:
   - Non-interactive automation requires wrapper/policy constraints before promotion.
+  - Not a live_baseline adapter until a stable non-interactive external runtime is certified.

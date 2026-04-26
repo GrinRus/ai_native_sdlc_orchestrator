@@ -98,6 +98,12 @@ export interface LoadExampleContractsOptions {
   examplesRoot?: string;
 }
 
+export interface ValidateLiveE2eCatalogReferencesOptions {
+  workspaceRoot?: string;
+  examplesRoot?: string;
+  catalogRoot?: string;
+}
+
 export interface LoadedExampleContracts {
   ok: boolean;
   workspaceRoot: string;
@@ -144,3 +150,7 @@ export function loadContractFile(options: LoadContractFileOptions): LoadedContra
 export function loadExampleContracts(options?: LoadExampleContractsOptions): LoadedExampleContracts;
 
 export function validateExampleReferences(options?: LoadExampleContractsOptions): ReferenceValidationResult;
+
+export function validateLiveE2eCatalogReferences(
+  options?: ValidateLiveE2eCatalogReferencesOptions,
+): ReferenceValidationResult;

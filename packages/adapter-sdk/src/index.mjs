@@ -80,6 +80,113 @@ function asStringMap(value) {
 }
 
 /**
+ * @param {{ stdout?: string, stderr?: string, errorMessage?: string | null, defaultFailureKind: string }} options
+ * @returns {string}
+ */
+export function classifyExternalRunnerFailure(options) {
+  const combined = `${options.stdout ?? ""}\n${options.stderr ?? ""}\n${options.errorMessage ?? ""}`.toLowerCase();
+  if (
+    /\b401\b/u.test(combined) ||
+    combined.includes("unauthorized") ||
+    combined.includes("not authenticated") ||
+    combined.includes("authentication") ||
+    combined.includes("missing bearer") ||
+    combined.includes("api key") ||
+    combined.includes("apikey") ||
+    combined.includes("setup-token") ||
+    combined.includes("login required")
+  ) {
+    return "auth-failed";
+  }
+  if (
+    combined.includes("permission denied") ||
+    combined.includes("permission-mode") ||
+    combined.includes("permissions") ||
+    combined.includes("approval required") ||
+    combined.includes("workspace trust") ||
+    combined.includes("not trusted") ||
+    combined.includes("sandbox")
+  ) {
+    return "permission-mode-blocked";
+  }
+  return options.defaultFailureKind;
+}
+
+/**
+ * @param {unknown} parsed
+ * @returns {{ runnerPayload: Record<string, unknown>, runnerEvidenceRefs: string[], runnerToolTraces: Array<Record<string, unknown>> }}
+ */
+function extractRunnerOutput(parsed) {
+  const parsedRecord = asRecord(parsed);
+  const hasEnvelopeOutput = Object.prototype.hasOwnProperty.call(parsedRecord, "output");
+  return {
+    runnerPayload: hasEnvelopeOutput ? asRecord(parsedRecord.output) : parsedRecord,
+    runnerEvidenceRefs: asStringArray(parsedRecord.evidence_refs),
+    runnerToolTraces: Array.isArray(parsedRecord.tool_traces)
+      ? parsedRecord.tool_traces.map((trace) => asRecord(trace))
+      : [],
+  };
+}
+
+/**
+ * @param {string} stdout
+ * @returns {{ runnerPayload: Record<string, unknown>, runnerEvidenceRefs: string[], runnerToolTraces: Array<Record<string, unknown>> }}
+ */
+function parseExternalRunnerStdout(stdout) {
+  const stdoutTrimmed = stdout.trim();
+  if (stdoutTrimmed.length === 0) {
+    return {
+      runnerPayload: {},
+      runnerEvidenceRefs: [],
+      runnerToolTraces: [],
+    };
+  }
+
+  try {
+    return extractRunnerOutput(JSON.parse(stdoutTrimmed));
+  } catch {
+    // Continue below and try JSONL before preserving raw stdout.
+  }
+
+  const jsonlRecords = [];
+  const lines = stdoutTrimmed.split(/\r?\n/u).filter((line) => line.trim().length > 0);
+  let allJsonLines = lines.length > 0;
+  for (const line of lines) {
+    try {
+      jsonlRecords.push(JSON.parse(line));
+    } catch {
+      allJsonLines = false;
+      break;
+    }
+  }
+
+  if (allJsonLines) {
+    const runnerEvidenceRefs = [];
+    const runnerToolTraces = [];
+    for (const record of jsonlRecords) {
+      const extracted = extractRunnerOutput(record);
+      runnerEvidenceRefs.push(...extracted.runnerEvidenceRefs);
+      runnerToolTraces.push(...extracted.runnerToolTraces);
+    }
+    return {
+      runnerPayload: {
+        jsonl_events: jsonlRecords,
+      },
+      runnerEvidenceRefs,
+      runnerToolTraces,
+    };
+  }
+
+  return {
+    runnerPayload: {
+      raw_stdout: stdoutTrimmed,
+    },
+    runnerEvidenceRefs: [],
+    runnerToolTraces: [],
+  };
+}
+
+/**
  * @param {string | null} projectRoot
  * @param {string} filePath
  * @returns {string}
@@ -447,6 +554,7 @@ export function createLiveAdapter(options) {
   const executionProfile = asRecord(adapterProfile.execution);
   const runtimeMode = asOptionalString(executionProfile.runtime_mode);
   const handler = asOptionalString(executionProfile.handler);
+  const handlerKind = handler ?? `${adapterId}-external-runner`;
   const evidenceNamespace =
     asOptionalString(executionProfile.evidence_namespace) ?? `evidence://adapter-live/${adapterId}`;
   const externalRuntime = asRecord(executionProfile.external_runtime);
@@ -508,14 +616,14 @@ export function createLiveAdapter(options) {
             route_id: routeId,
             provider_adapter: adapterId,
             compiled_context_ref: compiledContextRef,
-            failure_kind: "missing-prerequisite",
+            failure_kind: "missing-live-runtime",
             runtime_mode: runtimeMode,
           },
           evidence_refs: [`${evidenceNamespace}/${normalizedEvidenceToken}`],
           tool_traces: [
             {
               phase: "invoke_adapter",
-              kind: handler ?? "codex-cli-external-runner",
+              kind: handlerKind,
               detail: "runtime_mode is not external-process",
             },
           ],
@@ -534,13 +642,13 @@ export function createLiveAdapter(options) {
             route_id: routeId,
             provider_adapter: adapterId,
             compiled_context_ref: compiledContextRef,
-            failure_kind: "missing-prerequisite",
+            failure_kind: "missing-live-runtime",
           },
           evidence_refs: [`${evidenceNamespace}/${normalizedEvidenceToken}`],
           tool_traces: [
             {
               phase: "invoke_adapter",
-              kind: handler ?? "codex-cli-external-runner",
+              kind: handlerKind,
               detail: "external_runtime.command is missing",
             },
           ],
@@ -571,7 +679,8 @@ export function createLiveAdapter(options) {
       const finishedAt = new Date().toISOString();
 
       const invocationError = invocation.error instanceof Error ? invocation.error : null;
-      const invocationTimedOut = invocation.signal === "SIGTERM" && invocation.status === null;
+      const invocationTimedOut =
+        invocationError?.code === "ETIMEDOUT" || (invocation.signal === "SIGTERM" && invocation.status === null);
       const invocationFailed = invocationError !== null || invocation.status !== 0;
       const stdout = typeof invocation.stdout === "string" ? invocation.stdout : "";
       const stderr = typeof invocation.stderr === "string" ? invocation.stderr : "";
@@ -621,28 +730,7 @@ export function createLiveAdapter(options) {
         rawEvidenceRef = toEvidenceRef(projectRoot, rawEvidenceFile);
       }
 
-      /** @type {Record<string, unknown>} */
-      let runnerPayload = {};
-      /** @type {string[]} */
-      let runnerEvidenceRefs = [];
-      /** @type {Array<Record<string, unknown>>} */
-      let runnerToolTraces = [];
-      const stdoutTrimmed = stdout.trim();
-      if (stdoutTrimmed.length > 0) {
-        try {
-          const parsed = JSON.parse(stdoutTrimmed);
-          const parsedRecord = asRecord(parsed);
-          runnerPayload = asRecord(parsedRecord.output);
-          runnerEvidenceRefs = asStringArray(parsedRecord.evidence_refs);
-          runnerToolTraces = Array.isArray(parsedRecord.tool_traces)
-            ? parsedRecord.tool_traces.map((trace) => asRecord(trace))
-            : [];
-        } catch {
-          runnerPayload = {
-            raw_stdout: stdoutTrimmed,
-          };
-        }
-      }
+      const { runnerPayload, runnerEvidenceRefs, runnerToolTraces } = parseExternalRunnerStdout(stdout);
 
       const baseOutput = {
         mode: "execute",
@@ -670,30 +758,11 @@ export function createLiveAdapter(options) {
       const toolTraces = [
         {
           phase: "invoke_adapter",
-          kind: handler ?? "codex-cli-external-runner",
+          kind: handlerKind,
           detail: `command=${runtimeCommand} exit_code=${invocation.status ?? "null"} signal=${invocation.signal ?? "none"}`,
         },
         ...runnerToolTraces,
       ];
-
-      if (invocationError) {
-        const missingCommand = invocationError.code === "ENOENT";
-        return createAdapterResponseEnvelope({
-          request_id: envelope.request_id,
-          adapter_id: adapterId,
-          status: missingCommand ? "blocked" : "failed",
-          summary: missingCommand
-            ? `External runner command '${runtimeCommand}' is not available on PATH for adapter '${adapterId}'.`
-            : `External runner launch failed for adapter '${adapterId}': ${invocationError.message}.`,
-          output: {
-            ...baseOutput,
-            blocked: missingCommand,
-            failure_kind: missingCommand ? "missing-prerequisite" : "external-runner-launch-failed",
-          },
-          evidence_refs: evidenceRefs,
-          tool_traces: toolTraces,
-        });
-      }
 
       if (invocationTimedOut) {
         return createAdapterResponseEnvelope({
@@ -710,17 +779,51 @@ export function createLiveAdapter(options) {
         });
       }
 
-      if (invocationFailed) {
+      if (invocationError) {
+        const missingCommand = invocationError.code === "ENOENT";
+        const failureKind = missingCommand
+          ? "missing-command"
+          : classifyExternalRunnerFailure({
+              stdout,
+              stderr,
+              errorMessage: invocationError.message,
+              defaultFailureKind: "external-runner-failed",
+            });
+        const blocked = missingCommand || failureKind === "auth-failed" || failureKind === "permission-mode-blocked";
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,
           adapter_id: adapterId,
-          status: "failed",
+          status: blocked ? "blocked" : "failed",
+          summary: missingCommand
+            ? `External runner command '${runtimeCommand}' is not available on PATH for adapter '${adapterId}'.`
+            : `External runner launch failed for adapter '${adapterId}': ${invocationError.message}.`,
+          output: {
+            ...baseOutput,
+            blocked,
+            failure_kind: failureKind,
+          },
+          evidence_refs: evidenceRefs,
+          tool_traces: toolTraces,
+        });
+      }
+
+      if (invocationFailed) {
+        const failureKind = classifyExternalRunnerFailure({
+          stdout,
+          stderr,
+          defaultFailureKind: "external-runner-failed",
+        });
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: failureKind === "auth-failed" || failureKind === "permission-mode-blocked" ? "blocked" : "failed",
           summary: `External runner command '${runtimeCommand}' exited with code ${String(
             invocation.status ?? "null",
           )} for adapter '${adapterId}'.`,
           output: {
             ...baseOutput,
-            failure_kind: "external-runner-failed",
+            blocked: failureKind === "auth-failed" || failureKind === "permission-mode-blocked",
+            failure_kind: failureKind,
           },
           evidence_refs: evidenceRefs,
           tool_traces: toolTraces,

@@ -34,7 +34,7 @@ Reopen the roadmap after the baseline audit by turning the current live-executio
 1. Supported live adapter execution launches an external runner path rather than returning a synthetic in-process success envelope.
 2. Successful, blocked, and failed live executions preserve compiled-context and evidence lineage semantics.
 3. Dry-run and mock paths still work without requiring external runner dependencies.
-4. Tests and docs cover success, missing-prerequisite, and policy-blocked live branches.
+4. Tests and docs cover success, missing-command, missing-live-runtime, and policy-blocked live branches.
 
 ### Done evidence
 - external live adapter execution transcript or fixture

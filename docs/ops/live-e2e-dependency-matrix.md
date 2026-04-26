@@ -33,7 +33,7 @@ pnpm check
 
 - Profiles declare `verification.setup_commands` and `verification.commands`; the internal `scripts/live-e2e/run-profile.mjs` harness executes them from a cloned target workspace as the canonical path.
 - Standard run summaries should expose `target_checkout_root` and `generated_project_profile_file` so target-workspace provenance is machine-checkable.
-- Routed live execution should surface explicit branch signatures: `success`, `missing-prerequisite`, and policy-blocked (`blocking_reasons` / unsupported-adapter) without mock-only fallthrough.
+- Routed live execution should surface explicit branch signatures: `success`, `missing-command`, `missing-live-runtime`, auth/permission blocks, and policy-blocked (`blocking_reasons` / unsupported-adapter) without mock-only fallthrough.
 - Release-shaped runs should anchor `delivery-manifest.repo_deliveries[].repo_root` and `release-packet.source_provenance.delivery_execution_root` to the same target checkout root.
 - Public-repo rehearsals keep `write_back_to_remote=false` by default.
 - If an external CDN/network dependency is unavailable (for example Playwright browser download), mark the run as external `inconclusive` for smoke tracking.
@@ -51,7 +51,7 @@ Observed prerequisite confirmations:
 - proof generation kept the installed-user black-box CLI flow and used a deterministic `--examples-root` override only for the adapter external runtime.
 
 Observed failure signatures and safety defaults:
-- missing-prerequisite and policy-blocked signatures remain explicit in standard runbook expectations; no silent mock-only fallback was observed.
+- missing-command, missing-live-runtime, auth/permission, and policy-blocked signatures remain explicit in standard runbook expectations; no silent mock-only fallback was observed.
 - release-shaped rehearsal anchored `delivery-manifest.repo_deliveries[0].repo_root` and `release-packet.source_provenance.delivery_execution_root` to the exercised target checkout.
 - no-write safety defaults (`write_back_to_remote=false`) remained effective while still materializing delivery/release evidence.
 

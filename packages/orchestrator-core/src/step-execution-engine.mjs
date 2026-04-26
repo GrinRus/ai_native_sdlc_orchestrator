@@ -669,9 +669,15 @@ export function executeRoutedStep(options) {
               summary = asString(adapterResponse.summary) ?? summary;
               const adapterOutput = asRecord(adapterResponse.output);
               const failureKind = asString(adapterOutput.failure_kind);
-              if (failureKind === "missing-prerequisite") {
+              if (failureKind === "missing-command" || failureKind === "missing-live-runtime") {
                 blockedNextStep =
                   "Install/configure external runner prerequisites for the selected adapter or use '--routed-dry-run-step'.";
+              } else if (failureKind === "auth-failed") {
+                blockedNextStep =
+                  "Authenticate the selected external runner CLI in the current runner auth mode, then retry live execution.";
+              } else if (failureKind === "permission-mode-blocked") {
+                blockedNextStep =
+                  "Adjust external runner permission mode or live E2E policy, then retry live execution.";
               } else {
                 blockedNextStep =
                   "Inspect adapter response evidence/tool traces, fix external runner execution, then retry live execution.";

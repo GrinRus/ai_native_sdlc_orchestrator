@@ -26,8 +26,11 @@ execution:
     args:
       - exec
       - --json
+      - --ephemeral
+      - --sandbox
+      - workspace-write
     request_via_stdin: true
-    timeout_ms: 30000
+    timeout_ms: 600000
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true

@@ -16,6 +16,22 @@ constraints:
   requires_local_runtime: true
   default_network_mode: deny-by-default
   supports_no_write_rehearsal: true
+execution:
+  live_baseline: true
+  runtime_mode: external-process
+  handler: claude-code-external-runner
+  evidence_namespace: evidence://adapter-live/claude-code
+  external_runtime:
+    command: claude
+    args:
+      - --print
+      - --output-format
+      - json
+      - --no-session-persistence
+      - --permission-mode
+      - auto
+    request_via_stdin: true
+    timeout_ms: 600000
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true
