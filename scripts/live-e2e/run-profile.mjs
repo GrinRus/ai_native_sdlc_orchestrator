@@ -11,7 +11,6 @@ import {
 
 import { classifyExternalRunnerFailure } from "../../packages/adapter-sdk/src/index.mjs";
 import { loadContractFile, validateContractDocument } from "../../packages/contracts/src/index.mjs";
-import { materializeLearningLoopArtifacts } from "../../packages/observability/src/index.mjs";
 
 const DEFAULT_STAGES = Object.freeze([
   "bootstrap",
@@ -356,7 +355,7 @@ function createSessionRoots(options) {
  * }} options
  * @returns {{ env: NodeJS.ProcessEnv, runnerAuthMode: string, runnerAuthSource: string }}
  */
-function createHarnessEnvironment(options) {
+function createProofRunnerEnvironment(options) {
   const env = {
     ...process.env,
     AOR_HOME: options.sessionRoots.aorHome,
@@ -375,7 +374,7 @@ function createHarnessEnvironment(options) {
 /**
  * @param {{ hostRoot: string, profileRef: string }} options
  */
-function loadHarnessProfile(options) {
+function loadProofRunnerProfile(options) {
   const candidates = [
     path.resolve(process.cwd(), options.profileRef),
     path.resolve(options.hostRoot, options.profileRef),
@@ -736,10 +735,10 @@ function getProfileStages(profile) {
 
 /**
  * @param {string[]} stages
- * @returns {Record<string, { stage: string, status: string, evidence_refs: string[], summary: string | null }>}
+ * @returns {Record<string, { stage: string, status: string, evidence_refs: string[], summary: string | null, started_at: string | null, finished_at: string | null, duration_sec: number | null, failure_class: string | null, missing_evidence: string[], recommendation: string }>}
  */
 function createStageMap(stages) {
-  /** @type {Record<string, { stage: string, status: string, evidence_refs: string[], summary: string | null }>} */
+  /** @type {Record<string, { stage: string, status: string, evidence_refs: string[], summary: string | null, started_at: string | null, finished_at: string | null, duration_sec: number | null, failure_class: string | null, missing_evidence: string[], recommendation: string }>} */
   const map = {};
   for (const stage of stages) {
     map[stage] = {
@@ -747,43 +746,135 @@ function createStageMap(stages) {
       status: "pending",
       evidence_refs: [],
       summary: null,
+      started_at: null,
+      finished_at: null,
+      duration_sec: null,
+      failure_class: null,
+      missing_evidence: [],
+      recommendation: "await-stage-execution",
     };
   }
   return map;
 }
 
 /**
- * @param {Record<string, { stage: string, status: string, evidence_refs: string[], summary: string | null }>} stageMap
+ * @param {string[]} evidenceRefs
+ * @returns {{ startedAt: string | null, finishedAt: string | null, durationSec: number | null }}
+ */
+function resolveStageTimingFromEvidence(evidenceRefs) {
+  const timings = evidenceRefs
+    .filter((evidenceRef) => path.isAbsolute(evidenceRef) && fileExists(evidenceRef))
+    .map((evidenceRef) => {
+      try {
+        const document = readJson(evidenceRef);
+        return {
+          startedAt: asNonEmptyString(document.started_at) || null,
+          finishedAt: asNonEmptyString(document.finished_at) || null,
+        };
+      } catch {
+        return { startedAt: null, finishedAt: null };
+      }
+    })
+    .filter((timing) => timing.startedAt && timing.finishedAt);
+  if (timings.length === 0) {
+    return { startedAt: null, finishedAt: null, durationSec: null };
+  }
+
+  const startedAt = timings
+    .map((timing) => /** @type {string} */ (timing.startedAt))
+    .sort((left, right) => Date.parse(left) - Date.parse(right))[0];
+  const finishedAt = timings
+    .map((timing) => /** @type {string} */ (timing.finishedAt))
+    .sort((left, right) => Date.parse(right) - Date.parse(left))[0];
+  return {
+    startedAt,
+    finishedAt,
+    durationSec: resolveDurationSeconds(startedAt, finishedAt),
+  };
+}
+
+/**
+ * @param {string} status
+ * @param {string | null} summary
+ * @returns {string | null}
+ */
+function classifyStageFailure(status, summary) {
+  if (status !== "fail") return null;
+  const normalized = (summary ?? "").toLowerCase();
+  if (normalized.includes("permission")) return "permission-denied";
+  if (normalized.includes("no-op") || normalized.includes("no non-bootstrap")) return "no-op";
+  if (normalized.includes("adapter") || normalized.includes("runner")) return "adapter-failure";
+  if (normalized.includes("handoff")) return "handoff-failed";
+  if (normalized.includes("validation")) return "validation-failed";
+  if (normalized.includes("delivery")) return "delivery-failed";
+  if (normalized.includes("learning")) return "learning-closure-gap";
+  if (normalized.includes("missing") || normalized.includes("did not materialize")) return "missing-evidence";
+  return "stage-failed";
+}
+
+/**
+ * @param {string} status
+ * @param {string | null} failureClass
+ * @returns {string}
+ */
+function buildStageRecommendation(status, failureClass) {
+  if (status === "pass") return "continue";
+  if (status === "pending") return "await-stage-execution";
+  if (failureClass === "permission-denied") return "inspect adapter permission evidence and runner auth mode";
+  if (failureClass === "no-op") return "inspect Runtime Harness report and rerun implementation with meaningful changes";
+  if (failureClass === "missing-evidence") return "inspect expected artifacts and rerun the failed public command";
+  return "inspect stage evidence refs and command transcripts";
+}
+
+/**
+ * @param {Record<string, { stage: string, status: string, evidence_refs: string[], summary: string | null, started_at: string | null, finished_at: string | null, duration_sec: number | null, failure_class: string | null, missing_evidence: string[], recommendation: string }>} stageMap
  * @param {string} stage
  * @param {string} status
  * @param {string[]} [evidenceRefs]
  * @param {string | null} [summary]
  */
 function markStage(stageMap, stage, status, evidenceRefs = [], summary = null) {
+  const currentTime = nowIso();
+  const timing = resolveStageTimingFromEvidence(evidenceRefs);
+  const failureClass = classifyStageFailure(status, summary);
+  const missingEvidence = status === "fail" && evidenceRefs.length === 0 ? ["stage-evidence"] : [];
   if (!stageMap[stage]) {
     stageMap[stage] = {
       stage,
       status,
       evidence_refs: uniqueStrings(evidenceRefs),
       summary,
+      started_at: timing.startedAt ?? currentTime,
+      finished_at: timing.finishedAt ?? currentTime,
+      duration_sec: timing.durationSec ?? 0,
+      failure_class: failureClass,
+      missing_evidence: missingEvidence,
+      recommendation: buildStageRecommendation(status, failureClass),
     };
     return;
   }
   stageMap[stage].status = status;
   stageMap[stage].evidence_refs = uniqueStrings(evidenceRefs);
   stageMap[stage].summary = summary;
+  stageMap[stage].started_at = stageMap[stage].started_at ?? timing.startedAt ?? currentTime;
+  stageMap[stage].finished_at = timing.finishedAt ?? currentTime;
+  stageMap[stage].duration_sec =
+    timing.durationSec ?? resolveDurationSeconds(stageMap[stage].started_at, stageMap[stage].finished_at) ?? 0;
+  stageMap[stage].failure_class = failureClass;
+  stageMap[stage].missing_evidence = missingEvidence;
+  stageMap[stage].recommendation = buildStageRecommendation(status, failureClass);
 }
 
 /**
- * @param {Record<string, { stage: string, status: string, evidence_refs: string[], summary: string | null }>} stageMap
- * @returns {Array<{ stage: string, status: string, evidence_refs: string[], summary: string | null }>}
+ * @param {Record<string, { stage: string, status: string, evidence_refs: string[], summary: string | null, started_at: string | null, finished_at: string | null, duration_sec: number | null, failure_class: string | null, missing_evidence: string[], recommendation: string }>} stageMap
+ * @returns {Array<{ stage: string, status: string, evidence_refs: string[], summary: string | null, started_at: string | null, finished_at: string | null, duration_sec: number | null, failure_class: string | null, missing_evidence: string[], recommendation: string }>}
  */
 function flattenStageMap(stageMap) {
   return Object.values(stageMap);
 }
 
 /**
- * @param {Array<{ stage: string, status: string, evidence_refs: string[], summary: string | null }>} stageResults
+ * @param {Array<{ stage: string, status: string }>} stageResults
  */
 function summarizeStageCounts(stageResults) {
   let pass = 0;
@@ -857,7 +948,7 @@ function materializeTargetCheckout(options) {
   const targetRepoId = asNonEmptyString(targetRepo.repo_id) || "target";
   const checkoutStrategy = asNonEmptyString(targetRepo.checkout_strategy) || "full";
   if (!targetRepoUrl) {
-    throw new Error("Harness profile must declare target_repo.repo_url.");
+    throw new Error("Proof runner profile must declare target_repo.repo_url.");
   }
 
   const targetCheckoutRoot = path.join(
@@ -970,7 +1061,7 @@ function normalizeDeliveryMode(value) {
 function materializeGeneratedProjectProfile(options) {
   const templateRef = asNonEmptyString(options.profile.project_profile_template_ref);
   if (!templateRef) {
-    throw new Error("Harness profile must declare project_profile_template_ref.");
+    throw new Error("Proof runner profile must declare project_profile_template_ref.");
   }
 
   const candidates = [
@@ -1121,6 +1212,21 @@ function materializeProviderPinnedRouteOverrides(options) {
 }
 
 /**
+ * @param {Record<string, unknown>} profile
+ * @returns {boolean}
+ */
+function resolveAuthProbeRequired(profile) {
+  const liveAdapterPreflight = asRecord(profile.live_adapter_preflight);
+  const liveExecution = asRecord(profile.live_execution);
+  const internalPolicy = asRecord(profile.internal_policy);
+  return (
+    liveAdapterPreflight.auth_probe_required !== false &&
+    liveExecution.auth_probe_required !== false &&
+    internalPolicy.auth_probe_required !== false
+  );
+}
+
+/**
  * @param {string} command
  * @param {NodeJS.ProcessEnv} env
  * @param {string} cwd
@@ -1168,7 +1274,7 @@ function resolveCommandForPreflight(command, env, cwd) {
  *   env: NodeJS.ProcessEnv,
  *   runnerAuthMode: string,
  *   runnerAuthSource: string,
- *   skipRunnerAuthProbe: boolean,
+ *   authProbeRequired: boolean,
  *   runId: string,
  *   reportsRoot: string,
  * }} options
@@ -1197,8 +1303,13 @@ function runLiveAdapterPreflight(options) {
     runner_auth_source: options.runnerAuthSource,
     adapter_profile_file: adapterProfileFile,
     auth_probe: {
-      enabled: !options.skipRunnerAuthProbe,
-      status: options.skipRunnerAuthProbe ? "skipped" : "pending",
+      enabled: options.authProbeRequired,
+      status: options.authProbeRequired ? "pending" : "skipped",
+      attempts: [],
+    },
+    edit_readiness: {
+      enabled: false,
+      status: "not_required",
     },
     checked_at: nowIso(),
   };
@@ -1294,7 +1405,7 @@ function runLiveAdapterPreflight(options) {
     );
   }
 
-  if (options.skipRunnerAuthProbe) {
+  if (!options.authProbeRequired) {
     const report = {
       ...baseReport,
       ...runtimeReport,
@@ -1302,6 +1413,7 @@ function runLiveAdapterPreflight(options) {
       auth_probe: {
         enabled: false,
         status: "skipped",
+        attempts: [],
       },
       summary: `Live adapter preflight passed for provider variant '${options.providerVariantId}' with auth probe skipped.`,
     };
@@ -1314,43 +1426,90 @@ function runLiveAdapterPreflight(options) {
     };
   }
 
-  const probeInput = `${JSON.stringify({
+  const buildProbeInput = (stepClass, objective) => `${JSON.stringify({
     request: {
-      request_id: "live-adapter-preflight",
+      request_id: `live-adapter-preflight.${stepClass}`,
       run_id: options.runId,
-      step_id: "live-adapter-preflight",
-      step_class: "preflight",
-      objective: "Confirm that the external runner can authenticate and complete a minimal non-interactive invocation.",
+      step_id: `live-adapter-preflight.${stepClass}`,
+      step_class: stepClass,
+      objective,
+      non_interactive: true,
     },
     adapter: {
       adapter_id: adapterId,
       provider_variant_id: options.providerVariantId,
     },
   })}\n`;
-  const probe = spawnSync(runtimeCommand, runtimeArgs, {
-    cwd: options.targetCheckoutRoot,
-    env: runnerEnv,
-    encoding: "utf8",
-    input: probeInput,
-    timeout: probeTimeoutMs,
-    maxBuffer: 1024 * 1024,
-  });
-  const probeError = probe.error instanceof Error ? probe.error : null;
-  const probeTimedOut =
-    probeError?.code === "ETIMEDOUT" || (probe.signal === "SIGTERM" && probe.status === null);
-  const probeFailed = probeError !== null || probeTimedOut || probe.status !== 0;
-  if (probeFailed) {
+  const runProbeAttempt = (kind, attempt, objective) => {
+    const probe = spawnSync(resolvedCommand, runtimeArgs, {
+      cwd: options.targetCheckoutRoot,
+      env: runnerEnv,
+      encoding: "utf8",
+      input: buildProbeInput(kind, objective),
+      timeout: probeTimeoutMs,
+      maxBuffer: 1024 * 1024,
+    });
+    const probeError = probe.error instanceof Error ? probe.error : null;
+    const probeTimedOut =
+      probeError?.code === "ETIMEDOUT" || (probe.signal === "SIGTERM" && probe.status === null);
+    const commandFailed = probeError !== null || probeTimedOut || probe.status !== 0;
+    const semanticFailureKind = classifyExternalRunnerFailure({
+      stdout: probe.stdout ?? "",
+      stderr: probe.stderr ?? "",
+      errorMessage: probeError?.message ?? null,
+      defaultFailureKind: "none",
+    });
     const failureKind =
       probeError?.code === "ENOENT"
         ? "missing-command"
         : probeTimedOut
           ? "external-runner-timeout"
-          : classifyExternalRunnerFailure({
-              stdout: probe.stdout ?? "",
-              stderr: probe.stderr ?? "",
-              errorMessage: probeError?.message ?? null,
-              defaultFailureKind: "external-runner-failed",
-            });
+          : commandFailed
+            ? classifyExternalRunnerFailure({
+                stdout: probe.stdout ?? "",
+                stderr: probe.stderr ?? "",
+                errorMessage: probeError?.message ?? null,
+                defaultFailureKind: "external-runner-failed",
+              })
+            : semanticFailureKind === "none"
+              ? null
+              : semanticFailureKind;
+    return {
+      attempt,
+      kind,
+      status: failureKind ? "fail" : "pass",
+      exit_code: probe.status,
+      signal: probe.signal,
+      timed_out: probeTimedOut,
+      failure_kind: failureKind,
+      error_code: probeError?.code ?? null,
+      stdout_excerpt: (probe.stdout ?? "").slice(0, 4000),
+      stderr_excerpt: (probe.stderr ?? "").slice(0, 4000),
+    };
+  };
+  const authAttempts = [];
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const attemptResult = runProbeAttempt(
+      "preflight",
+      attempt,
+      "Confirm that the external runner can authenticate and complete a minimal non-interactive invocation.",
+    );
+    authAttempts.push(attemptResult);
+    if (attemptResult.status === "pass") {
+      break;
+    }
+    const retryable =
+      attempt === 1 &&
+      ["external-runner-timeout", "auth-failed", "external-runner-failed"].includes(
+        asNonEmptyString(attemptResult.failure_kind) || "",
+      );
+    if (!retryable) {
+      break;
+    }
+  }
+  const finalAuthAttempt = authAttempts[authAttempts.length - 1];
+  if (!finalAuthAttempt || finalAuthAttempt.status !== "pass") {
+    const failureKind = asNonEmptyString(finalAuthAttempt?.failure_kind) || "external-runner-failed";
     return fail(
       failureKind,
       `Live adapter preflight failed for adapter '${adapterId}' before run start.`,
@@ -1360,11 +1519,45 @@ function runLiveAdapterPreflight(options) {
         auth_probe: {
           enabled: true,
           status: "fail",
-          exit_code: probe.status,
-          signal: probe.signal,
-          timed_out: probeTimedOut,
+          attempts: authAttempts,
+          exit_code: finalAuthAttempt?.exit_code ?? null,
+          signal: finalAuthAttempt?.signal ?? null,
+          timed_out: finalAuthAttempt?.timed_out === true,
           failure_kind: failureKind,
-          error_code: probeError?.code ?? null,
+          error_code: finalAuthAttempt?.error_code ?? null,
+        },
+      },
+    );
+  }
+
+  const editReadiness = requiredProvider
+    ? runProbeAttempt(
+        "preflight-edit-readiness",
+        1,
+        "Confirm that the external runner is allowed to perform bounded non-interactive edits in this isolated target checkout. Do not ask questions.",
+      )
+    : null;
+  if (editReadiness && editReadiness.status !== "pass") {
+    const failureKind = asNonEmptyString(editReadiness.failure_kind) || "permission-mode-blocked";
+    return fail(
+      failureKind,
+      `Live adapter preflight failed edit-readiness for adapter '${adapterId}' before run start.`,
+      {
+        ...runtimeReport,
+        resolved_command: resolvedCommand,
+        auth_probe: {
+          enabled: true,
+          status: "pass",
+          attempts: authAttempts,
+          exit_code: finalAuthAttempt.exit_code,
+          signal: finalAuthAttempt.signal,
+          timed_out: false,
+        },
+        edit_readiness: {
+          enabled: true,
+          status: "fail",
+          failure_kind: failureKind,
+          attempts: [editReadiness],
         },
       },
     );
@@ -1377,10 +1570,21 @@ function runLiveAdapterPreflight(options) {
     auth_probe: {
       enabled: true,
       status: "pass",
-      exit_code: probe.status,
-      signal: probe.signal,
+      attempts: authAttempts,
+      exit_code: finalAuthAttempt.exit_code,
+      signal: finalAuthAttempt.signal,
       timed_out: false,
     },
+    edit_readiness: editReadiness
+      ? {
+          enabled: true,
+          status: "pass",
+          attempts: [editReadiness],
+        }
+      : {
+          enabled: false,
+          status: "not_required",
+        },
     summary: `Live adapter preflight passed for provider variant '${options.providerVariantId}'.`,
   };
   writeJson(reportFile, report);
@@ -1512,14 +1716,53 @@ function runAorCommand(options) {
   };
   writeJson(transcriptFile, transcript);
   return {
+    label: options.label,
     ok: run.status === 0 && parsed !== null,
     exitCode: run.status ?? -1,
     stdout: run.stdout ?? "",
     stderr: run.stderr ?? "",
     payload: parsed,
     transcriptFile,
+    startedAt,
+    finishedAt,
+    durationSec: resolveDurationSeconds(startedAt, finishedAt),
     commandSurface:
       options.args.length >= 2 ? `aor ${options.args[0]} ${options.args[1]}` : `aor ${options.args.join(" ")}`.trim(),
+  };
+}
+
+/**
+ * @param {string} startedAt
+ * @param {string} finishedAt
+ * @returns {number | null}
+ */
+function resolveDurationSeconds(startedAt, finishedAt) {
+  const startedMs = Date.parse(startedAt);
+  const finishedMs = Date.parse(finishedAt);
+  if (!Number.isFinite(startedMs) || !Number.isFinite(finishedMs) || finishedMs < startedMs) {
+    return null;
+  }
+  return Math.round(((finishedMs - startedMs) / 1000) * 1000) / 1000;
+}
+
+/**
+ * @param {ReturnType<typeof runAorCommand>} result
+ * @returns {Record<string, unknown>}
+ */
+function buildCommandDiagnostic(result) {
+  return {
+    label: result.label,
+    command_surface: result.commandSurface,
+    status: result.ok ? "pass" : "fail",
+    exit_code: result.exitCode,
+    started_at: result.startedAt,
+    finished_at: result.finishedAt,
+    duration_sec: result.durationSec,
+    transcript_file: result.transcriptFile,
+    artifact_refs: uniqueStrings(collectStringRefs(result.payload)),
+    failure_class: result.ok ? null : "command-failed",
+    missing_evidence: [],
+    recommendation: result.ok ? "continue" : "inspect transcript and command stderr",
   };
 }
 
@@ -1652,6 +1895,7 @@ function evaluateScenarioCoverage(options) {
   const evidencePresence = {
     "verify-summary": Boolean(options.artifacts.verify_summary_file),
     "routed-step-result": Boolean(options.artifacts.routed_step_result_file),
+    "runtime-harness-report": Boolean(options.artifacts.runtime_harness_report_file),
     "review-report": Boolean(options.artifacts.review_report_file),
     "evaluation-report": Boolean(options.artifacts.evaluation_report_file),
     "delivery-manifest": Boolean(options.artifacts.delivery_manifest_file),
@@ -1699,11 +1943,11 @@ function executeInstalledUserFlow(options) {
     sessionsRoot: options.layout.sessionsRoot,
     runId: options.runId,
   });
-  const harnessEnvironment = createHarnessEnvironment({
+  const proofRunnerEnvironment = createProofRunnerEnvironment({
     sessionRoots,
     runnerAuthMode: options.runnerAuthMode,
   });
-  const env = harnessEnvironment.env;
+  const env = proofRunnerEnvironment.env;
 
   const artifacts = {
     host_runtime_root: options.layout.runtimeRoot,
@@ -1712,8 +1956,8 @@ function executeInstalledUserFlow(options) {
     aor_home: sessionRoots.aorHome,
     codex_home: sessionRoots.codexHome,
     codex_home_isolated: options.runnerAuthMode === "isolated",
-    runner_auth_mode: harnessEnvironment.runnerAuthMode,
-    runner_auth_source: harnessEnvironment.runnerAuthSource,
+    runner_auth_mode: proofRunnerEnvironment.runnerAuthMode,
+    runner_auth_source: proofRunnerEnvironment.runnerAuthSource,
   };
   const startedAt = nowIso();
   try {
@@ -1765,12 +2009,7 @@ function executeInstalledUserFlow(options) {
         index: commandIndex,
       });
       commandIndex += 1;
-      commandResults.push({
-        label,
-        command_surface: result.commandSurface,
-        exit_code: result.exitCode,
-        transcript_file: result.transcriptFile,
-      });
+      commandResults.push(buildCommandDiagnostic(result));
       if (!result.ok) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -2143,7 +2382,7 @@ function executeInstalledUserFlow(options) {
  *   coverageFollowUp: Record<string, unknown>,
  *   coverageTier: string,
  *   runnerAuthMode: "host" | "isolated",
- *   skipRunnerAuthProbe: boolean,
+ *   authProbeRequired: boolean,
  * }} options
  */
 function executeFullJourneyFlow(options) {
@@ -2155,11 +2394,11 @@ function executeFullJourneyFlow(options) {
     sessionsRoot: options.layout.sessionsRoot,
     runId: options.runId,
   });
-  const harnessEnvironment = createHarnessEnvironment({
+  const proofRunnerEnvironment = createProofRunnerEnvironment({
     sessionRoots,
     runnerAuthMode: options.runnerAuthMode,
   });
-  const env = harnessEnvironment.env;
+  const env = proofRunnerEnvironment.env;
   if (options.examplesRootOverride) {
     env.AOR_BOOTSTRAP_ASSETS_ROOT = options.examplesRootOverride;
     env.AOR_EXAMPLES_ROOT = options.examplesRootOverride;
@@ -2172,8 +2411,8 @@ function executeFullJourneyFlow(options) {
     aor_home: sessionRoots.aorHome,
     codex_home: sessionRoots.codexHome,
     codex_home_isolated: options.runnerAuthMode === "isolated",
-    runner_auth_mode: harnessEnvironment.runnerAuthMode,
-    runner_auth_source: harnessEnvironment.runnerAuthSource,
+    runner_auth_mode: proofRunnerEnvironment.runnerAuthMode,
+    runner_auth_source: proofRunnerEnvironment.runnerAuthSource,
     target_catalog_file: options.catalogTargetPath,
     scenario_policy_file: options.scenarioPolicyPath,
     provider_variant_file: options.providerVariantPath,
@@ -2211,12 +2450,7 @@ function executeFullJourneyFlow(options) {
         index: commandIndex,
       });
       commandIndex += 1;
-      commandResults.push({
-        label,
-        command_surface: result.commandSurface,
-        exit_code: result.exitCode,
-        transcript_file: result.transcriptFile,
-      });
+      commandResults.push(buildCommandDiagnostic(result));
       if (!result.ok) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -2260,9 +2494,9 @@ function executeFullJourneyFlow(options) {
       providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
       coverageTier: options.coverageTier,
       env,
-      runnerAuthMode: harnessEnvironment.runnerAuthMode,
-      runnerAuthSource: harnessEnvironment.runnerAuthSource,
-      skipRunnerAuthProbe: options.skipRunnerAuthProbe,
+      runnerAuthMode: proofRunnerEnvironment.runnerAuthMode,
+      runnerAuthSource: proofRunnerEnvironment.runnerAuthSource,
+      authProbeRequired: options.authProbeRequired,
       runId: options.runId,
       reportsRoot: options.layout.reportsRoot,
     });
@@ -2562,6 +2796,8 @@ function executeFullJourneyFlow(options) {
     ]);
     artifacts.routed_step_result_file = getStringField(runStart.payload, "routed_step_result_file");
     artifacts.routed_step_result_id = getStringField(runStart.payload, "routed_step_result_id");
+    artifacts.runtime_harness_report_file = getStringField(runStart.payload, "runtime_harness_report_file");
+    artifacts.runtime_harness_overall_decision = getStringField(runStart.payload, "runtime_harness_overall_decision");
     if (artifacts.routed_step_result_file && fileExists(artifacts.routed_step_result_file)) {
       const stepResult = readJson(artifacts.routed_step_result_file);
       const routedExecution = asRecord(stepResult.routed_execution);
@@ -2625,6 +2861,11 @@ function executeFullJourneyFlow(options) {
       options.runId,
     ]);
     artifacts.review_report_file = getStringField(reviewRun.payload, "review_report_file");
+    artifacts.runtime_harness_report_file =
+      getStringField(reviewRun.payload, "runtime_harness_report_file") || artifacts.runtime_harness_report_file;
+    artifacts.runtime_harness_overall_decision =
+      getStringField(reviewRun.payload, "runtime_harness_overall_decision") ||
+      artifacts.runtime_harness_overall_decision;
     const reviewReport = artifacts.review_report_file && fileExists(artifacts.review_report_file)
       ? readJson(artifacts.review_report_file)
       : {};
@@ -2847,6 +3088,11 @@ function executeFullJourneyFlow(options) {
     }
     artifacts.learning_loop_scorecard_file = getStringField(learningHandoff.payload, "learning_loop_scorecard_file");
     artifacts.learning_loop_handoff_file = getStringField(learningHandoff.payload, "learning_loop_handoff_file");
+    artifacts.runtime_harness_report_file =
+      getStringField(learningHandoff.payload, "runtime_harness_report_file") || artifacts.runtime_harness_report_file;
+    artifacts.runtime_harness_overall_decision =
+      getStringField(learningHandoff.payload, "runtime_harness_overall_decision") ||
+      artifacts.runtime_harness_overall_decision;
     artifacts.incident_report_file =
       getStringField(learningHandoff.payload, "incident_report_file") ||
       getStringField(learningHandoff.payload, "incident_file") ||
@@ -2869,6 +3115,18 @@ function executeFullJourneyFlow(options) {
       uniqueStrings([learningHandoff.transcriptFile, ...collectStringRefs(learningHandoff.payload)]),
       "Public learning-loop closure artifacts materialized.",
     );
+
+    if (internalTestHooks.drop_runtime_harness_report_outputs === true) {
+      if (typeof artifacts.runtime_harness_report_file === "string") {
+        try {
+          fs.rmSync(artifacts.runtime_harness_report_file, { force: true });
+        } catch {
+          // Test hook only: scenario coverage below will fail on the missing proof artifact.
+        }
+      }
+      artifacts.runtime_harness_report_file = null;
+      artifacts.runtime_harness_overall_decision = null;
+    }
 
     const scenarioCoverage = evaluateScenarioCoverage({
       scenarioPolicy: options.scenarioPolicy,
@@ -2898,7 +3156,13 @@ function executeFullJourneyFlow(options) {
       scenario_coverage_status: scenarioCoverage.status,
       provider_execution_status: providerExecutionStatus,
       discovery_quality: normalizeVerdictStatus(asRecord(reviewReport.discovery_quality).status),
-      runtime_success: artifacts.routed_step_result_file ? "pass" : "fail",
+      runtime_success:
+        artifacts.routed_step_result_file &&
+        artifacts.runtime_harness_report_file &&
+        artifacts.runtime_harness_overall_decision === "pass"
+          ? "pass"
+          : "fail",
+      runtime_harness_decision: artifacts.runtime_harness_overall_decision || "unknown",
       artifact_quality: normalizeVerdictStatus(asRecord(reviewReport.artifact_quality).status),
       code_quality: normalizeVerdictStatus(asRecord(reviewReport.code_quality).status),
       feature_size_fit_status: featureSizeFitStatus,
@@ -3026,7 +3290,7 @@ function buildScorecard(options) {
  *   examplesRoot: string | null,
  * }}
  */
-function writeHarnessArtifacts(options) {
+function writeProofRunnerArtifacts(options) {
   const summaryFile = path.join(
     options.layout.reportsRoot,
     `live-e2e-run-summary-${normalizeId(options.runId)}.json`,
@@ -3062,6 +3326,10 @@ function writeHarnessArtifacts(options) {
       typeof options.flowResult.artifacts.routed_step_result_file === "string"
         ? options.flowResult.artifacts.routed_step_result_file
         : null,
+    runtime_harness_report_file:
+      typeof options.flowResult.artifacts.runtime_harness_report_file === "string"
+        ? options.flowResult.artifacts.runtime_harness_report_file
+        : null,
     compiled_context_ref:
       typeof options.flowResult.artifacts.compiled_context_ref === "string"
         ? options.flowResult.artifacts.compiled_context_ref
@@ -3087,8 +3355,8 @@ function writeHarnessArtifacts(options) {
         : null,
     scorecard_files: [scorecardFile],
     control_surfaces: {
-      internal_harness:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--skip-runner-auth-probe]",
+      installed_user_proof_runner:
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated]",
       public_cli_sequence: options.flowResult.commandResults.map((result) => result.command_surface).filter(Boolean),
       aor_bin: options.aorLaunch.binaryRef,
       examples_root: options.examplesRoot,
@@ -3113,7 +3381,7 @@ function writeHarnessArtifacts(options) {
   writeJson(summaryFile, summary);
   writeJson(scorecardFile, scorecard);
 
-  let learningLoop;
+  let learningLoop = null;
   const publicLearningScorecard = asNonEmptyString(options.flowResult.artifacts.learning_loop_scorecard_file);
   const publicLearningHandoff = asNonEmptyString(options.flowResult.artifacts.learning_loop_handoff_file);
   const publicIncidentFile = asNonEmptyString(options.flowResult.artifacts.incident_report_file);
@@ -3126,37 +3394,6 @@ function writeHarnessArtifacts(options) {
     summary.learning_loop_scorecard_file = publicLearningScorecard;
     summary.learning_loop_handoff_file = publicLearningHandoff;
     summary.incident_report_file = publicIncidentFile || null;
-    writeJson(summaryFile, summary);
-  } else {
-    learningLoop = materializeLearningLoopArtifacts({
-      projectId: options.hostProjectId,
-      projectRoot: options.hostRoot,
-      runtimeLayout: { reportsRoot: options.layout.reportsRoot },
-      runId: options.runId,
-      sourceKind: "live-e2e",
-      runStatus: options.flowResult.status,
-      summary:
-        options.flowResult.status === "pass"
-          ? `Installed-user rehearsal '${options.runId}' completed successfully.`
-          : summary.error ?? `Installed-user rehearsal '${options.runId}' failed.`,
-      evidenceRefs: uniqueStrings([summaryFile, scorecardFile, ...collectStringRefs(options.flowResult.artifacts)]),
-      linkedScorecardRefs: [scorecardFile],
-      evalSuiteRefs: getEvalSuites(options.profile),
-      backlogRefs: getBacklogRefs(options.profile),
-      matrixCell:
-        typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
-          ? options.flowResult.artifacts.matrix_cell
-          : undefined,
-      coverageFollowUp:
-        typeof options.flowResult.artifacts.coverage_follow_up === "object" && options.flowResult.artifacts.coverage_follow_up
-          ? options.flowResult.artifacts.coverage_follow_up
-          : undefined,
-      forceIncident: asRecord(options.profile.learning_loop).force_incident === true,
-      incidentSummary: summary.error ?? undefined,
-    });
-    summary.learning_loop_scorecard_file = learningLoop.scorecardFile;
-    summary.learning_loop_handoff_file = learningLoop.handoffFile;
-    summary.incident_report_file = learningLoop.incidentFile;
     writeJson(summaryFile, summary);
   }
 
@@ -3176,9 +3413,9 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--skip-runner-auth-probe]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated]",
         "",
-        "Internal black-box installed-user rehearsal harness.",
+        "Installed-user black-box proof runner.",
       ].join("\n"),
     );
     return 0;
@@ -3200,12 +3437,11 @@ function runCli(rawArgs) {
   const aorBin = resolveOptionalStringFlag(flags["aor-bin"], "aor-bin");
   const catalogRootOverride = resolveOptionalStringFlag(flags["catalog-root"], "catalog-root");
   const runnerAuthMode = resolveRunnerAuthMode(resolveOptionalStringFlag(flags["runner-auth-mode"], "runner-auth-mode"));
-  const skipRunnerAuthProbe = resolveOptionalBooleanFlag(flags["skip-runner-auth-probe"], "skip-runner-auth-probe");
   const explicitExamplesRoot =
     Object.prototype.hasOwnProperty.call(flags, "examples-root")
       ? resolveOptionalStringFlag(flags["examples-root"], "examples-root")
       : null;
-  const { profilePath, profile: loadedProfile } = loadHarnessProfile({
+  const { profilePath, profile: loadedProfile } = loadProofRunnerProfile({
     hostRoot,
     profileRef,
   });
@@ -3272,7 +3508,7 @@ function runCli(rawArgs) {
           coverageFollowUp: fullJourneyResolution.coverageFollowUp,
           coverageTier: fullJourneyResolution.coverageTier,
           runnerAuthMode,
-          skipRunnerAuthProbe,
+          authProbeRequired: resolveAuthProbeRequired(profile),
         })
       : executeInstalledUserFlow({
           hostRoot,
@@ -3309,7 +3545,7 @@ function runCli(rawArgs) {
     };
   }
 
-  const written = writeHarnessArtifacts({
+  const written = writeProofRunnerArtifacts({
     hostRoot,
     hostProjectId,
     layout,
@@ -3330,9 +3566,9 @@ function runCli(rawArgs) {
         live_e2e_run_status: written.summary.status,
         live_e2e_run_summary_file: written.summaryFile,
         live_e2e_scorecard_files: [written.scorecardFile],
-        learning_loop_scorecard_file: written.learningLoop.scorecardFile,
-        learning_loop_handoff_file: written.learningLoop.handoffFile,
-        incident_report_file: written.learningLoop.incidentFile,
+        learning_loop_scorecard_file: written.learningLoop?.scorecardFile ?? null,
+        learning_loop_handoff_file: written.learningLoop?.handoffFile ?? null,
+        incident_report_file: written.learningLoop?.incidentFile ?? null,
       },
       null,
       2,

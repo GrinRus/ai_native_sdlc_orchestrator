@@ -45,7 +45,11 @@ import { validateProjectRuntime } from "../../../packages/orchestrator-core/src/
 import { verifyProjectRuntime } from "../../../packages/orchestrator-core/src/project-verify.mjs";
 import { materializeIntakeArtifactPacket } from "../../../packages/orchestrator-core/src/artifact-store.mjs";
 import { materializeReviewReport } from "../../../packages/orchestrator-core/src/review-run.mjs";
-import { executeRoutedStep } from "../../../packages/orchestrator-core/src/step-execution-engine.mjs";
+import { materializeRuntimeHarnessReport } from "../../../packages/orchestrator-core/src/runtime-harness-report.mjs";
+import {
+  executeRoutedStep,
+  executeRuntimeHarnessControlledStep,
+} from "../../../packages/orchestrator-core/src/step-execution-engine.mjs";
 
 import {
   RUNTIME_ROOT_DIRNAME,
@@ -191,7 +195,7 @@ function formatCommandHelp(definition) {
           "- --project-profile can override default profile discovery in project root.",
           `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
           "- --materialize-project-profile writes project.aor.yaml from bundled bootstrap templates when the target repo is still clean.",
-          "- --materialize-bootstrap-assets writes packaged examples/context bootstrap assets without harness-side file injection.",
+          "- --materialize-bootstrap-assets writes packaged examples/context bootstrap assets without proof-runner-side file injection.",
           "- --repo-build-command, --repo-lint-command, and --repo-test-command override detected verification commands during bootstrap materialization.",
           "- Re-running bootstrap materialization is idempotent and reports whether existing assets were reused.",
         ]
@@ -715,6 +719,60 @@ function normalizeLearningRunStatus(status) {
 }
 
 /**
+ * @param {Record<string, unknown>} report
+ * @returns {boolean}
+ */
+function isStrictRuntimeHarnessReport(report) {
+  const strictnessProfile = typeof report.strictness_profile === "string" ? report.strictness_profile : "";
+  const missionType = typeof report.mission_type === "string" ? report.mission_type : "";
+  return (
+    strictnessProfile === "strict-code-changing" ||
+    strictnessProfile === "strict-release" ||
+    missionType === "code-changing" ||
+    missionType === "release"
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @returns {boolean}
+ */
+function runtimeHarnessReportHasMeaningfulPatch(report) {
+  const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
+  return stepDecisions.some((entry) => {
+    const decision = asPlainObject(entry);
+    const semantics = asPlainObject(decision.mission_semantics);
+    return asStringArray(semantics.mission_scoped_changed_paths).length > 0;
+  });
+}
+
+/**
+ * @param {{ report: Record<string, unknown>, command: string }} options
+ */
+function assertRuntimeHarnessAllowsDelivery(options) {
+  if (!isStrictRuntimeHarnessReport(options.report)) {
+    return;
+  }
+  const stepDecisions = Array.isArray(options.report.step_decisions) ? options.report.step_decisions : [];
+  if (stepDecisions.length === 0) {
+    throw new CliUsageError(
+      `${options.command} blocked because Runtime Harness has no routed step decisions for a strict mission. Run 'aor run start' and close Runtime Harness findings before delivery or release.`,
+    );
+  }
+  const overallDecision = typeof options.report.overall_decision === "string" ? options.report.overall_decision : "unknown";
+  if (overallDecision !== "pass") {
+    throw new CliUsageError(
+      `${options.command} blocked by Runtime Harness decision '${overallDecision}'. Resolve runtime findings before delivery or release.`,
+    );
+  }
+  if (!runtimeHarnessReportHasMeaningfulPatch(options.report)) {
+    throw new CliUsageError(
+      `${options.command} blocked because Runtime Harness found no meaningful mission-scoped patch for a strict mission.`,
+    );
+  }
+}
+
+/**
  * @param {{
  *   projectRoot: string,
  *   stateFile: string,
@@ -993,6 +1051,9 @@ function executeImplementedCommand(command, flags, cwd) {
   let reviewRecommendation = null;
   let reviewFeatureSizeFitStatus = null;
   let reviewProviderTraceabilityStatus = null;
+  let runtimeHarnessReportId = null;
+  let runtimeHarnessReportFile = null;
+  let runtimeHarnessOverallDecision = null;
   let learningLoopScorecardFile = null;
   let learningLoopHandoffFile = null;
   let evaluationReportId = null;
@@ -1303,7 +1364,8 @@ function executeImplementedCommand(command, flags, cwd) {
 
     const selectedRoutedStep = routedDryRunStep ?? routedLiveStep;
     if (selectedRoutedStep) {
-      const routedResult = executeRoutedStep({
+      const routedExecutor = routedLiveStep ? executeRuntimeHarnessControlledStep : executeRoutedStep;
+      const routedResult = routedExecutor({
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
         projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
@@ -1650,7 +1712,7 @@ function executeImplementedCommand(command, flags, cwd) {
         }
       }
 
-      const routedExecution = executeRoutedStep({
+      const routedExecution = executeRuntimeHarnessControlledStep({
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
         projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
@@ -1708,9 +1770,23 @@ function executeImplementedCommand(command, flags, cwd) {
       evidenceEventId = stepEvent.event.event_id;
       primaryEventId = terminalEvent.event.event_id;
       streamLogFile = terminalEvent.logFile;
+      const runtimeHarness = materializeRuntimeHarnessReport({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId: controlResult.runId,
+      });
+      runtimeHarnessReportId = runtimeHarness.report.report_id;
+      runtimeHarnessReportFile = runtimeHarness.reportPath;
+      runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
       futureControlHooks =
-        routedExecution.stepResult.status === "passed"
-          ? ["run status", `review run --run-id ${controlResult.runId}`, `audit runs --run-id ${controlResult.runId}`]
+        runtimeHarnessOverallDecision === "pass"
+          ? [
+              "run status",
+              `review run --run-id ${controlResult.runId}`,
+              `audit runs --run-id ${controlResult.runId}`,
+            ]
           : [
               `incident open --run-id ${controlResult.runId} --summary <text>`,
               `review run --run-id ${controlResult.runId}`,
@@ -1844,6 +1920,16 @@ function executeImplementedCommand(command, flags, cwd) {
       reviewResult.reviewReport.provider_traceability
         ? reviewResult.reviewReport.provider_traceability.status
         : null;
+    const runtimeHarness = materializeRuntimeHarnessReport({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId,
+    });
+    runtimeHarnessReportId = runtimeHarness.report.report_id;
+    runtimeHarnessReportFile = runtimeHarness.reportPath;
+    runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
     readOnly = false;
     futureControlHooks = [
       `audit runs --run-id ${runId}`,
@@ -1879,10 +1965,25 @@ function executeImplementedCommand(command, flags, cwd) {
       projectRef: /** @type {string} */ (flags["project-ref"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
-    const runSummary = runs.find((entry) => entry.run_id === runId);
+    let runSummary = runs.find((entry) => entry.run_id === runId);
     if (!runSummary) {
       throw new CliUsageError(`Run '${runId}' was not found for learning handoff.`);
     }
+    const runtimeHarness = materializeRuntimeHarnessReport({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId,
+    });
+    runtimeHarnessReportId = runtimeHarness.report.report_id;
+    runtimeHarnessReportFile = runtimeHarness.reportPath;
+    runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
+    runSummary =
+      listRuns({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      }).find((entry) => entry.run_id === runId) ?? runSummary;
 
     const qualityForRun = listQualityArtifacts({
       cwd,
@@ -1896,13 +1997,19 @@ function executeImplementedCommand(command, flags, cwd) {
         .filter((artifact) => artifact.family === "evaluation-report")
         .map((artifact) => (typeof artifact.document.suite_ref === "string" ? artifact.document.suite_ref : "")),
     );
-    const summary =
-      reviewOverallStatus === "fail"
-        ? `Run '${runId}' requires repair before follow-up closure.`
-        : `Run '${runId}' completed public learning-loop handoff.`;
     const reviewArtifact =
       qualityForRun.find((artifact) => artifact.family === "review-report") ?? null;
     const reviewDocument = asPlainObject(reviewArtifact?.document);
+    reviewOverallStatus =
+      typeof reviewDocument.overall_status === "string" ? reviewDocument.overall_status : reviewOverallStatus;
+    reviewRecommendation =
+      typeof reviewDocument.review_recommendation === "string"
+        ? reviewDocument.review_recommendation
+        : reviewRecommendation;
+    const summary =
+      reviewOverallStatus === "fail" || runtimeHarnessOverallDecision !== "pass"
+        ? `Run '${runId}' requires follow-up before learning closure can be considered healthy.`
+        : `Run '${runId}' completed public learning-loop handoff.`;
     const reviewFeatureTraceability = asPlainObject(reviewDocument.feature_traceability);
     const learningLoop = materializeLearningLoopArtifacts({
       projectId: projectState.project_id,
@@ -1918,6 +2025,7 @@ function executeImplementedCommand(command, flags, cwd) {
         ...runSummary.packet_refs,
         ...runSummary.step_result_refs,
         ...runSummary.quality_refs,
+        runtimeHarness.reportRef,
       ]),
       linkedScorecardRefs: qualityForRun
         .filter((artifact) => artifact.family === "review-report")
@@ -1960,6 +2068,20 @@ function executeImplementedCommand(command, flags, cwd) {
     const runId =
       resolveOptionalStringFlag("run-id", flags["run-id"]) ??
       `${init.projectId}.${command === "deliver prepare" ? "delivery" : "release"}.prepare.v1`;
+    const runtimeHarness = materializeRuntimeHarnessReport({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId,
+    });
+    runtimeHarnessReportId = runtimeHarness.report.report_id;
+    runtimeHarnessReportFile = runtimeHarness.reportPath;
+    runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
+    assertRuntimeHarnessAllowsDelivery({
+      report: runtimeHarness.report,
+      command,
+    });
     const resolvedPolicy = resolveStepPolicyForStep({
       projectProfilePath: init.projectProfilePath,
       routesRoot: path.join(init.projectRoot, "examples/routes"),
@@ -2885,6 +3007,9 @@ function executeImplementedCommand(command, flags, cwd) {
     review_recommendation: reviewRecommendation,
     review_feature_size_fit_status: reviewFeatureSizeFitStatus,
     review_provider_traceability_status: reviewProviderTraceabilityStatus,
+    runtime_harness_report_id: runtimeHarnessReportId,
+    runtime_harness_report_file: runtimeHarnessReportFile,
+    runtime_harness_overall_decision: runtimeHarnessOverallDecision,
     evaluation_report_id: evaluationReportId,
     evaluation_report_file: evaluationReportFile,
     evaluation_status: evaluationStatus,

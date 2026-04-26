@@ -41,6 +41,30 @@ function runGitChecked(options) {
 }
 
 /**
+ * @param {{ projectRoot: string, missionId: string }} options
+ */
+function materializeSoftNoWriteIntake(options) {
+  const requestFile = path.join(options.projectRoot, `${options.missionId}.request.json`);
+  fs.writeFileSync(
+    requestFile,
+    `${JSON.stringify({ mission_type: "no-write-rehearsal", write_mode: "no-write" }, null, 2)}\n`,
+    "utf8",
+  );
+  const intakeResult = invokeCli([
+    "intake",
+    "create",
+    "--project-ref",
+    options.projectRoot,
+    "--mission-id",
+    options.missionId,
+    "--request-file",
+    requestFile,
+  ]);
+  assert.equal(intakeResult.exitCode, 0, intakeResult.stderr);
+  return JSON.parse(intakeResult.stdout);
+}
+
+/**
  * @param {{ family: import("../../../packages/contracts/src/index.d.ts").ContractFamily, filePath: string, document: Record<string, unknown> }} options
  */
 function writeContractFixture(options) {
@@ -89,6 +113,7 @@ function configureCodexExternalRuntimeSuccess(options) {
         "const fs=require('node:fs');",
         "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
         "const request=input.request||{};",
+        "if(request.dry_run===false){fs.mkdirSync('source',{recursive:true});fs.writeFileSync('source/external-runner-output.txt','implemented by fixture runner\\n');}",
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
         "summary:'external runner ok',",
@@ -800,6 +825,7 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
     runGitChecked({ cwd: projectRoot, args: ["remote", "add", "origin", "https://github.com/openai/openai.git"] });
 
     const targetFile = path.join(projectRoot, "examples/project.aor.yaml");
+    materializeSoftNoWriteIntake({ projectRoot, missionId: "w6-delivery-soft-rehearsal" });
 
     const noWriteResult = invokeCli([
       "deliver",
@@ -952,6 +978,36 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
   });
 });
 
+test("strict delivery prepare blocks without Runtime Harness routed step decisions", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+
+    const result = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "strict-delivery-without-runtime-harness",
+      "--mode",
+      "patch-only",
+      "--approved-handoff-ref",
+      "evidence://handoff/strict-empty-report",
+      "--promotion-evidence-refs",
+      "evidence://promotion/strict-empty-report",
+    ]);
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /Runtime Harness has no routed step decisions for a strict mission/u);
+  });
+});
+
 test("delivery and release outputs enforce multi-repo coordination evidence and preserve rerun scope", () => {
   withTempProject((projectRoot) => {
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
@@ -980,6 +1036,7 @@ test("delivery and release outputs enforce multi-repo coordination evidence and 
       ),
       "utf8",
     );
+    materializeSoftNoWriteIntake({ projectRoot, missionId: "w8-delivery-coordination-soft-rehearsal" });
 
     const blockedRelease = invokeCli([
       "release",
@@ -1043,6 +1100,7 @@ test("delivery and release surfaces explicit governance deny/escalation reasons 
       profileContent.replace("  - openai\n  - anthropic\n  - open-code", "  - anthropic\n  - open-code"),
       "utf8",
     );
+    materializeSoftNoWriteIntake({ projectRoot, missionId: "w8-governance-deny-soft-rehearsal" });
 
     const denyResult = invokeCli([
       "release",
@@ -1071,6 +1129,7 @@ test("delivery and release surfaces explicit governance deny/escalation reasons 
     const routePath = path.join(projectRoot, "examples/routes/implement-default.yaml");
     const routeContent = fs.readFileSync(routePath, "utf8");
     fs.writeFileSync(routePath, routeContent.replace("risk_tier: medium", "risk_tier: high"), "utf8");
+    materializeSoftNoWriteIntake({ projectRoot, missionId: "w8-governance-escalate-soft-rehearsal" });
 
     const escalateResult = invokeCli([
       "release",
@@ -2805,6 +2864,13 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       const runStartPayload = JSON.parse(runStart.stdout);
       assert.equal(runStartPayload.run_control_state.status, "completed");
       assert.equal(fs.existsSync(runStartPayload.routed_step_result_file), true);
+      assert.equal(fs.existsSync(runStartPayload.runtime_harness_report_file), true);
+      assert.equal(runStartPayload.runtime_harness_overall_decision, "pass");
+      const runStartRuntimeHarnessReport = JSON.parse(
+        fs.readFileSync(runStartPayload.runtime_harness_report_file, "utf8"),
+      );
+      assert.equal(runStartRuntimeHarnessReport.run_id, runId);
+      assert.equal(runStartRuntimeHarnessReport.step_decisions[0].runtime_harness_decision, "pass");
 
       const reviewRun = invokeCli([
         "review",
@@ -2822,7 +2888,19 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       assert.equal(reviewPayload.review_recommendation, "proceed");
       assert.equal(reviewPayload.review_feature_size_fit_status, "pass");
       assert.equal(reviewPayload.review_provider_traceability_status, "pass");
+      assert.equal(fs.existsSync(reviewPayload.runtime_harness_report_file), true);
       const reviewReport = JSON.parse(fs.readFileSync(reviewPayload.review_report_file, "utf8"));
+      const runtimeHarnessReport = JSON.parse(fs.readFileSync(reviewPayload.runtime_harness_report_file, "utf8"));
+      assert.equal(runtimeHarnessReport.overall_decision, "pass");
+      assert.ok(runtimeHarnessReport.evidence_refs.some((ref) => ref.includes("review-report")));
+      assert.equal(
+        validateContractDocument({
+          family: "runtime-harness-report",
+          document: runtimeHarnessReport,
+          source: "fixture://runtime-harness-report",
+        }).ok,
+        true,
+      );
       assert.equal(reviewReport.feature_traceability.mission_id, "fixture-review-mission");
       assert.equal(reviewReport.feature_traceability.scenario_family, "regress");
       assert.equal(reviewReport.feature_traceability.provider_variant_id, "openai-primary");
@@ -2872,6 +2950,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       const learningPayload = JSON.parse(learningRun.stdout);
       assert.equal(fs.existsSync(learningPayload.learning_loop_scorecard_file), true);
       assert.equal(fs.existsSync(learningPayload.learning_loop_handoff_file), true);
+      assert.equal(fs.existsSync(learningPayload.runtime_harness_report_file), true);
       assert.equal(Object.prototype.hasOwnProperty.call(learningPayload, "incident_report_file"), true);
       const learningScorecard = JSON.parse(fs.readFileSync(learningPayload.learning_loop_scorecard_file, "utf8"));
       const learningHandoff = JSON.parse(fs.readFileSync(learningPayload.learning_loop_handoff_file, "utf8"));

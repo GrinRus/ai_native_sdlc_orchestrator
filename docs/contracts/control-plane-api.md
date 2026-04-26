@@ -42,7 +42,7 @@ Current enum constraints:
 
 Project bootstrap baseline:
 - `project init` may materialize a clean target repo through public bootstrap flags only;
-- `project init` accepts optional repo verification overrides via repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs so curated live E2E targets can preserve required setup and verification commands without harness-side profile generation.
+- `project init` accepts optional repo verification overrides via repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs so curated live E2E targets can preserve required setup and verification commands without proof-runner-side profile generation.
 
 ## Query families
 - projects
@@ -255,5 +255,5 @@ Deferred beyond this baseline:
 - keep the control-plane surface usable without the web UI;
 - keep ids and references visible in responses;
 - expose explicit approval and dry-run paths for risky actions;
-- expose verdict and closure artifacts through public module surfaces before relying on harness-side aggregation;
+- expose verdict and closure artifacts through public module surfaces before relying on proof-runner-side aggregation;
 - keep operation and query shapes aligned with contract docs and CLI catalog.

@@ -7,12 +7,12 @@ Reopen the completed queue with readiness-hardening work that removes false read
 - source-of-truth docs describe W15 as the active readiness-hardening queue after W14 matrix coverage
 - package/module map entries are backed by package-managed workspace manifests
 - root checks fail on stale wave-coverage wording, package/module map drift, or dishonest proof-bundle claims
-- real code-changing full-journey proof remains explicitly blocked until a non-mock external runner can produce `overall_verdict=pass`
+- real code-changing full-journey proof remains explicitly blocked until a fresh required matrix cell proves usable non-interactive edit permissions, meaningful target code changes, `runtime_harness_report.overall_decision=pass`, and `overall_verdict=pass`
 
 ## Sequencing notes
 - `W15-S01` starts first because the shared backlog and source-of-truth docs must reopen the queue before implementation hardening is accepted.
 - `W15-S02` and `W15-S03` depend on `W15-S01` because package/proof checks need the W15 policy language to be authoritative.
-- `W15-S04` depends on `W15-S03` and stays blocked until real external-runner prerequisites exist.
+- `W15-S04` depends on `W15-S03` and stays blocked until a non-mock external runner produces non-no-op code changes under strict Runtime Harness gates.
 
 ---
 
@@ -112,24 +112,26 @@ Reopen the completed queue with readiness-hardening work that removes false read
 ## W15-S04 — Real code-changing full-journey proof
 - **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** blocked
-- **Outcome:** Produce a full-journey proof for `ky.regress.small.openai` that materializes real mission code changes through a non-mock external runner and reaches `overall_verdict=pass`.
+- **Outcome:** Produce a full-journey proof for the selected required matrix cell that materializes real mission code changes, records Runtime Harness evidence, and reaches `overall_verdict=pass`.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `.aor/` runtime output
 - **Hard dependencies:** W15-S03
-- **External blocker:** Non-mock external runner credentials/binary are not yet available for a real `ky.regress.small.openai` code-changing proof.
+- **External blocker:** Runtime Harness outcome gates, strict no-op detection, and completed-run diagnosis now exist; the remaining blocker is a fresh non-mock Claude or OpenAI full-journey run with usable non-interactive edit permissions, meaningful target changes, `runtime_harness_report.overall_decision=pass`, and `overall_verdict=pass`.
 - **Primary user-story surfaces:** delivery engineer, reviewer / QA, operator / SRE
 
 ### Local tasks
-1. Run `scripts/live-e2e/profiles/full-journey-regress-ky.yaml` without `--examples-root` fixture override.
-2. Use a real supported external runner rather than deterministic external-runner mock.
+1. Run a required full-journey profile without `--examples-root` fixture override.
+2. Use a real supported external runner and host/CI auth without deterministic external-runner mock.
 3. Confirm the target checkout contains mission code changes and review reports `code_quality.status=pass`.
-4. Commit only curated proof fixtures, keeping raw runtime output under `.aor/`.
+4. Confirm the run summary links `runtime_harness_report_file` and the report closes step decisions without masked no-op or permission-denial success.
+5. Commit only curated proof fixtures, keeping raw runtime output under `.aor/`.
 
 ### Acceptance criteria
-1. The selected required matrix cell is `ky.regress.small.openai`.
+1. The selected required matrix cell is explicitly recorded in the run summary.
 2. The proof records `external_runner_mode` as non-mock external execution.
-3. The run summary has `verdict_matrix.overall_verdict=pass`.
+3. The run summary has `runtime_harness_report_file` and `verdict_matrix.overall_verdict=pass`.
 4. The review report has `code_quality.status=pass`.
-5. The committed proof bundle has `proof_scope=full_code_changing_runtime` and `real_code_change_proof_complete=true`.
+5. The Runtime Harness report has `overall_decision=pass`.
+6. The committed proof bundle has `proof_scope=full_code_changing_runtime` and `real_code_change_proof_complete=true`.
 
 ### Done evidence
 - verified run summary and review report from a non-mock full-journey run

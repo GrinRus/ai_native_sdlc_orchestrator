@@ -16,6 +16,7 @@
 - `validation-report.md`
 - `evaluation-report.md`
 - `review-report.md`
+- `runtime-harness-report.md`
 - `dataset.md`
 - `evaluation-suite.md`
 - `promotion-decision.md`

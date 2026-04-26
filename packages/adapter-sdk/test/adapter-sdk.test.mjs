@@ -545,3 +545,53 @@ test("live adapter classifies external runner permission blocks", () => {
   assert.equal(response.status, "blocked");
   assert.equal(response.output.failure_kind, "permission-mode-blocked");
 });
+
+test("live adapter blocks successful runner exits that still emit tool denial evidence", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "process.stderr.write('Tool denied: Edit was not allowed');process.exit(0);"],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-edit-denied-success",
+    run_id: "run-edit-denied-success",
+    step_id: "step-edit-denied-success",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "edit-denied");
+});
+
+test("live adapter blocks successful runner exits that ask interactive questions", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "process.stdout.write('AskUserQuestion: which file should I edit?');process.exit(0);"],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-interactive-success",
+    run_id: "run-interactive-success",
+    step_id: "step-interactive-success",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "interactive-question-requested");
+});

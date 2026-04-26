@@ -87,7 +87,7 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W8:** `W8-S06` Later incident and platform recertification maturity
 - **W10:** `W10-S05` Externally verified live E2E target-catalog proof
 - **W11:** `W11-S02` Target workspace materialization for live E2E; `W11-S05` Fresh external proof bundle for catalog targets
-- **W12:** `W12-S02` Internal black-box installed-user harness; `W12-S04` Proof refresh after surface cleanup
+- **W12:** `W12-S02` Live E2E Installed-User Proof Runner; `W12-S04` Proof refresh after surface cleanup
 - **W13:** `W13-S02` Curated target and feature mission catalog; `W13-S06` Full-journey harness and restored runner skill
 - **W14:** `W14-S02` Scenario and provider catalogs; `W14-S03` Feature-size taxonomy and target mission expansion; `W14-S04` Provider-pinned full-journey profiles; `W14-S05` Harness and verdict expansion; `W14-S07` Proof bundle and skill refresh
 - **W15:** `W15-S03` Proof verdict integrity gates; `W15-S04` Real code-changing full-journey proof

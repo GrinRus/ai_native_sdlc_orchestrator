@@ -12,6 +12,7 @@ export type ContractFamily =
   | "validation-report"
   | "evaluation-report"
   | "review-report"
+  | "runtime-harness-report"
   | "dataset"
   | "evaluation-suite"
   | "promotion-decision"

@@ -136,7 +136,7 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W12-S01 | Public surface realignment | EPIC-0 | done | `README.md`, `docs/product/**`, `docs/architecture/**`, `docs/ops/**`, `docs/backlog/**` | none |
-| W12-S02 | Internal black-box installed-user harness | EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W12-S01 |
+| W12-S02 | Live E2E Installed-User Proof Runner | EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, `packages/observability` | W12-S01 |
 | W12-S03 | Breaking CLI and contract removal | EPIC-6 | done | `apps/cli`, `docs/contracts/**`, `packages/contracts`, `examples/**` | W12-S02 |
 | W12-S04 | Proof refresh after surface cleanup | EPIC-7 | done | `docs/ops/**`, `examples/live-e2e/fixtures/**`, `packages/observability`, `scripts/live-e2e/**` | W12-S03 |
 

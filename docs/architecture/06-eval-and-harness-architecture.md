@@ -21,10 +21,15 @@ Each run persists a durable `evaluation-report` with:
 - scorer metadata and per-grader results (`scorer_metadata`, `grader_results`);
 - summary metrics and threshold verdicts for baseline comparisons across asset changes.
 
-### Harness
-Replay, certification, compare-to-baseline, and failure-mode workflows.
+### Runtime Harness
+Internal AOR runtime controller for routed step execution, outcome classification, mission-semantic validation, retry/repair/escalation decisions, verification hand-off, and completed-run diagnosis.
 
-Harness consumes validated assets and eval outputs to produce replay/certification evidence. Harness logic must not replace structural validation rules.
+Runtime Harness evidence is persisted in `step-result` decision metadata and `runtime-harness-report`. It does not replace validation, eval, review, delivery, learning, or promotion decisions.
+
+### Asset certification capability
+Replay, certification, compare-to-baseline, and failure-mode workflows for platform assets.
+
+Asset certification consumes validated assets and eval outputs to produce replay/certification evidence. Certification logic must not replace structural validation rules or completed-run diagnosis.
 Harness capture artifacts include:
 - step input envelope (`adapter_request`);
 - selected route/wrapper/prompt/policy/adapter snapshots;
@@ -43,6 +48,9 @@ Decision layer that moves an asset or route from candidate to stable or frozen.
 
 Certification baseline stores a durable `promotion-decision` artifact with `pass|hold|fail` semantics and an explicit evidence set (`evaluation-report`, `harness-capture`, `harness-replay` refs).
 
+### Live E2E installed-user proof
+Live E2E is a black-box proof runner. It simulates a user who installed AOR, runs the public SDLC flow through CLI/API surfaces, and produces a per-step summary with command status, duration, transcripts, artifacts, failure classes, missing evidence, and recommendations. Live E2E verifies Runtime Harness evidence; it does not implement private repair semantics.
+
 ## Datasets and suites
 A dataset stores cases for a specific subject type. A suite defines how those cases are graded and how pass/fail is decided.
 
@@ -59,7 +67,7 @@ AOR needs suites for:
 - incident backfill,
 - live E2E rehearshal.
 
-## Harness workflows
+## Asset certification workflows
 - packet replay
 - execution replay
 - transcript replay
@@ -71,9 +79,10 @@ AOR needs suites for:
 Storage, retention, and cleanup rules are documented in `docs/ops/harness-capture-lifecycle.md`.
 
 ## Key rule
-Harness is not an external add-on. It is part of the same orchestration model and should reuse the same routes, wrappers, policies, and evidence model.
+Runtime Harness is not an external add-on. It is part of the same orchestration model and should reuse the same routes, wrappers, policies, and evidence model.
 
 Deterministic validation, judge-based eval, and harness replay are separate layers with explicit hand-off:
 1. validation checks shape, refs, and compatibility;
 2. eval scores behavior on datasets/suites;
-3. harness replays and compares evidence for certification and promotion decisions.
+3. Runtime Harness controls step outcomes and records diagnosis;
+4. asset certification replays and compares evidence for certification and promotion decisions.

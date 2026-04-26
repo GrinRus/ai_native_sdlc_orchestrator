@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { executeRoutedStep } from "../src/step-execution-engine.mjs";
+import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
+import { initializeProjectRuntime } from "../src/project-init.mjs";
+import { executeRoutedStep, executeRuntimeHarnessControlledStep } from "../src/step-execution-engine.mjs";
+import { materializeRuntimeHarnessReport } from "../src/runtime-harness-report.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -16,7 +20,8 @@ const workspaceRoot = path.resolve(currentDir, "../../..");
  */
 function withTempRepo(callback) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w2-s05-"));
-  fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
+  const gitInit = spawnSync("git", ["init"], { cwd: repoRoot, encoding: "utf8" });
+  assert.equal(gitInit.status, 0, gitInit.stderr || gitInit.stdout);
   fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
 
   try {
@@ -77,6 +82,11 @@ test("executeRoutedStep resolves route/assets/policy/adapter and persists compil
       assert.equal(fs.existsSync(result.stepResult.routed_execution.delivery_plan.delivery_plan_file), true);
       assert.equal(result.stepResult.routed_execution.adapter_resolution.adapter.adapter_id, "codex-cli");
       assert.equal(result.stepResult.routed_execution.adapter_response.adapter_id, "mock-runner");
+      assert.equal(result.stepResult.mission_outcome, "satisfied");
+      assert.equal(result.stepResult.failure_class, "none");
+      assert.equal(result.stepResult.runtime_harness_decision, "pass");
+      assert.deepEqual(result.stepResult.repair_attempts, []);
+      assert.equal(typeof result.stepResult.stage_timings.duration_sec, "number");
       assert.ok(Array.isArray(result.stepResult.evidence_refs));
       assert.ok(result.stepResult.evidence_refs.length > 0);
       assert.ok(Array.isArray(result.stepResult.routed_execution.architecture_traceability.contract_refs));
@@ -106,6 +116,132 @@ test("executeRoutedStep resolves route/assets/policy/adapter and persists compil
         result.stepResult.evidence_refs.includes(contextCompilation.compiled_context_ref),
       );
     }
+  });
+});
+
+test("materializeRuntimeHarnessReport aggregates routed step decisions for one run", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "runtime-harness-smoke";
+    const step = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+      runId,
+      stepId: "run.start.implement",
+    });
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+    });
+
+    assert.equal(fs.existsSync(report.reportPath), true);
+    assert.equal(report.report.run_id, runId);
+    assert.equal(report.report.overall_decision, "pass");
+    assert.equal(report.report.step_decisions.length, 1);
+    assert.equal(report.report.step_decisions[0].compiled_context_ref, step.stepResult.routed_execution.context_compilation.compiled_context_ref);
+    assert.equal(report.report.step_decisions[0].runtime_harness_decision, "pass");
+  });
+});
+
+test("materializeRuntimeHarnessReport links eval reports by subject_ref run URI", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "runtime-harness-eval-fail";
+    const step = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+      runId,
+      stepId: "run.start.implement",
+    });
+    const evalReportPath = path.join(step.runtimeLayout.reportsRoot, `evaluation-report-${runId}.json`);
+    fs.writeFileSync(
+      evalReportPath,
+      `${JSON.stringify(
+        {
+          report_id: `${runId}.evaluation-report.v1`,
+          subject_ref: `run://${runId}`,
+          subject_type: "run",
+          subject_fingerprint: "sha256:test-eval-fail",
+          suite_ref: "suite.regress.short@v1",
+          dataset_ref: "dataset.regress.short@v1",
+          scorer_metadata: [{ scorer_id: "deterministic", mode: "deterministic", implementation: "test" }],
+          grader_results: { deterministic: { passed: 0, failed: 1 } },
+          summary_metrics: { total_cases: 1, passed_cases: 0, failed_cases: 1, pass_rate: 0 },
+          status: "fail",
+          evidence_refs: ["evidence://eval/fail"],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+    });
+
+    assert.equal(report.report.overall_decision, "fail");
+    assert.equal(
+      report.report.run_findings.some((finding) => finding.failure_class === "eval-failed"),
+      true,
+    );
+  });
+});
+
+test("materializeRuntimeHarnessReport flags strict code-changing empty delivery patch", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "runtime-harness-empty-delivery";
+    const step = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+      runId,
+      stepId: "run.start.implement",
+    });
+    const deliveryManifestPath = path.join(step.runtimeLayout.artifactsRoot, `delivery-manifest-${runId}.json`);
+    fs.writeFileSync(
+      deliveryManifestPath,
+      `${JSON.stringify(
+        {
+          manifest_id: `${runId}.delivery-manifest.v1`,
+          project_id: "aor-core",
+          ticket_id: "ticket.runtime-harness-empty-delivery",
+          run_refs: [`run://${runId}`],
+          step_ref: `step://${runId}/run.start.implement`,
+          delivery_mode: "patch-only",
+          writeback_policy: { mode: "patch-only", network_mode: "disabled" },
+          repo_deliveries: [{ repo_id: "main", changed_paths: [], writeback_result: "patch-only" }],
+          verification_refs: [],
+          approval_context: {},
+          evidence_root: "evidence://delivery/empty",
+          source_refs: {},
+          status: "submitted",
+          created_at: "2026-04-26T00:00:00.000Z",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+    });
+
+    assert.equal(report.report.overall_decision, "fail");
+    assert.equal(
+      report.report.run_findings.some((finding) => finding.failure_class === "delivery-empty-patch"),
+      true,
+    );
   });
 });
 
@@ -289,6 +425,408 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
         result.stepResult.routed_execution.context_compilation.compiled_context_ref,
       ),
     );
+  });
+});
+
+test("materializeRuntimeHarnessReport marks strict code-changing live no-op as repair", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "runtime-harness-no-op";
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+          "const request=input.request||{};",
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'external runner ok without edits',",
+          "output:{runner:'node-inline',step_class:request.step_class||null,cwd:process.cwd()},",
+          "evidence_refs:['evidence://external-runner/no-op-success'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline-no-op'}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    const step = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId,
+      stepId: "run.start.implement",
+      approvedHandoffRef: "evidence://handoff/approved-no-op",
+      promotionEvidenceRefs: ["evidence://promotion/pass-no-op"],
+      executionRoot: repoRoot,
+    });
+
+    assert.equal(step.stepResult.failure_class, "no-op");
+    assert.equal(step.stepResult.mission_outcome, "not_satisfied");
+    assert.equal(step.stepResult.runtime_harness_decision, "repair");
+    assert.equal(step.stepResult.repair_attempts.length, 1);
+    assert.equal(step.stepResult.mission_semantics.strict_code_changing_noop, true);
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+    });
+
+    assert.equal(report.report.overall_decision, "repair");
+    assert.equal(report.report.step_decisions[0].failure_class, "no-op");
+    assert.equal(report.report.step_decisions[0].mission_outcome, "not_satisfied");
+    assert.equal(report.report.step_decisions[0].runtime_harness_decision, "repair");
+    assert.equal(report.report.step_decisions[0].repair_attempts.length, 1);
+    assert.equal(report.report.step_decisions[0].repair_attempts[0].failure_class, "no-op");
+    assert.equal(report.report.step_decisions[0].repair_attempts[0].policy_budget.max_attempts, 2);
+    assert.deepEqual(report.report.step_decisions[0].mission_semantics.non_bootstrap_changed_paths, []);
+  });
+});
+
+test("executeRuntimeHarnessControlledStep repairs a failed implement step and reruns the original step", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "runtime-harness-controller-repair-pass";
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const path=require('node:path');",
+          "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+          "const request=input.request||{};",
+          "if(request.step_class==='repair'){fs.mkdirSync('src',{recursive:true});fs.writeFileSync(path.join('src','repaired.js'),'export const repaired = true;\\n');}",
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'runtime harness controller fixture ok',",
+          "output:{runner:'node-inline',step_class:request.step_class||null,cwd:process.cwd()},",
+          "evidence_refs:['evidence://external-runner/controller-repair'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'controller-repair'}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    const result = executeRuntimeHarnessControlledStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId,
+      stepId: "run.start.implement",
+      approvedHandoffRef: "evidence://handoff/controller-repair",
+      promotionEvidenceRefs: ["evidence://promotion/controller-repair"],
+      executionRoot: repoRoot,
+    });
+
+    assert.equal(result.stepResult.status, "passed");
+    assert.equal(result.stepResult.runtime_harness_decision, "pass");
+    assert.equal(result.stepResult.repair_status, "succeeded_after_repair");
+    assert.equal(result.stepResult.repair_attempts.length, 1);
+    assert.equal(result.stepResult.repair_attempts[0].policy_action, "repair");
+    assert.equal(result.stepResult.repair_attempts[0].result, "pass");
+    assert.equal(typeof result.stepResult.repair_attempts[0].repair_compiled_context_ref, "string");
+    assert.ok(
+      result.stepResult.repair_attempts[0].input_evidence_refs.some((ref) =>
+        String(ref).includes("runtime-harness-repair-input"),
+      ),
+    );
+    assert.equal(fs.existsSync(path.join(repoRoot, "src/repaired.js")), true);
+    const repairStepResultFile = fs
+      .readdirSync(result.runtimeLayout.reportsRoot)
+      .find((entry) => entry.startsWith("step-result-") && entry.includes("run.start.implement.repair.1.repair"));
+    assert.equal(typeof repairStepResultFile, "string");
+    const repairStepResult = JSON.parse(
+      fs.readFileSync(path.join(result.runtimeLayout.reportsRoot, /** @type {string} */ (repairStepResultFile)), "utf8"),
+    );
+    assert.ok(
+      repairStepResult.routed_execution.adapter_request.context.provenance.runtime_evidence_refs.some((ref) =>
+        String(ref).includes("runtime-harness-repair-input"),
+      ),
+    );
+    assert.ok(
+      repairStepResult.evidence_refs.some((ref) => String(ref).includes("runtime-harness-repair-input")),
+    );
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+    });
+    assert.equal(report.report.overall_decision, "pass");
+    assert.equal(
+      report.report.step_decisions.some((decision) => decision.repair_attempts?.[0]?.policy_action === "repair"),
+      true,
+    );
+  });
+});
+
+test("executeRuntimeHarnessControlledStep exhausts repair budget without recursive repair", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "runtime-harness-controller-repair-exhausted";
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+          "const request=input.request||{};",
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'runtime harness no-op fixture',",
+          "output:{runner:'node-inline-noop',step_class:request.step_class||null,cwd:process.cwd()},",
+          "evidence_refs:['evidence://external-runner/controller-noop'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'controller-noop'}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    const result = executeRuntimeHarnessControlledStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId,
+      stepId: "run.start.implement",
+      approvedHandoffRef: "evidence://handoff/controller-exhausted",
+      promotionEvidenceRefs: ["evidence://promotion/controller-exhausted"],
+      executionRoot: repoRoot,
+    });
+
+    assert.equal(result.stepResult.status, "failed");
+    assert.equal(result.stepResult.runtime_harness_decision, "block");
+    assert.equal(result.stepResult.repair_status, "exhausted");
+    assert.ok(result.stepResult.repair_attempts.length >= 1);
+    assert.equal(result.stepResult.repair_attempts.every((attempt) => attempt.policy_action === "repair"), true);
+    assert.equal(result.stepResult.repair_attempts.at(-1).result, "exhausted");
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+    });
+    assert.equal(report.report.overall_decision, "fail");
+    assert.equal(
+      report.report.step_decisions.filter((decision) => decision.step_class === "repair").length <= 2,
+      true,
+    );
+  });
+});
+
+test("Runtime Harness applies soft mission strictness for docs-only no-op runs", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "runtime-harness-docs-only-noop";
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const requestFile = path.join(repoRoot, "docs-only-request.json");
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify(
+        {
+          mission_type: "docs-only",
+          allowed_paths: ["docs/**"],
+          forbidden_paths: ["src/**"],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    materializeIntakeArtifactPacket({
+      projectId: init.projectId,
+      projectRoot: init.projectRoot,
+      projectProfileRef: init.projectProfileRef,
+      runtimeLayout: init.runtimeLayout,
+      command: "aor intake create",
+      missionId: "docs-only-noop",
+      requestFile,
+    });
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+          "const request=input.request||{};",
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'docs-only noop ok',",
+          "output:{runner:'node-inline-noop',step_class:request.step_class||null,cwd:process.cwd()},",
+          "evidence_refs:['evidence://external-runner/docs-only-noop'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'docs-only-noop'}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    const result = executeRuntimeHarnessControlledStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId,
+      stepId: "run.start.implement",
+      approvedHandoffRef: "evidence://handoff/docs-only-noop",
+      promotionEvidenceRefs: ["evidence://promotion/docs-only-noop"],
+      executionRoot: repoRoot,
+    });
+
+    assert.equal(result.stepResult.runtime_harness_decision, "pass");
+    assert.equal(result.stepResult.mission_semantics.strict_code_changing_noop, false);
+    assert.equal(result.stepResult.mission_semantics.mission_type, "docs-only");
+    assert.equal(result.stepResult.mission_semantics.strictness_profile, "soft-docs");
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+    });
+    assert.equal(report.report.mission_type, "docs-only");
+    assert.equal(report.report.strictness_profile, "soft-docs");
+    assert.equal(report.report.overall_decision, "pass");
+  });
+});
+
+test("Runtime Harness no-op detection ignores mission input files and enforces allowed scope", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const requestFile = path.join(repoRoot, "feature-request.json");
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify(
+        {
+          allowed_paths: ["src/**", "test/**"],
+          forbidden_paths: ["docs/**"],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    materializeIntakeArtifactPacket({
+      projectId: init.projectId,
+      projectRoot: init.projectRoot,
+      projectProfileRef: init.projectProfileRef,
+      runtimeLayout: init.runtimeLayout,
+      command: "aor intake create",
+      missionId: "scope-noop",
+      requestFile,
+    });
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+          "const request=input.request||{};",
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'external runner ok without mission changes',",
+          "output:{runner:'node-inline',step_class:request.step_class||null,cwd:process.cwd()},",
+          "evidence_refs:['evidence://external-runner/input-only-noop'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline-input-only-noop'}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    const step = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId: "runtime-harness-input-only-noop",
+      stepId: "run.start.implement",
+      approvedHandoffRef: "evidence://handoff/approved-input-only-noop",
+      promotionEvidenceRefs: ["evidence://promotion/pass-input-only-noop"],
+      executionRoot: repoRoot,
+    });
+
+    assert.equal(step.stepResult.failure_class, "no-op");
+    assert.deepEqual(step.stepResult.mission_semantics.ignored_input_files, ["feature-request.json"]);
+    assert.deepEqual(step.stepResult.mission_semantics.mission_scoped_changed_paths, []);
+    assert.deepEqual(step.stepResult.mission_semantics.scope_violation_paths, []);
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "runtime-harness-input-only-noop",
+    });
+
+    assert.equal(report.report.overall_decision, "repair");
+    assert.deepEqual(report.report.step_decisions[0].mission_semantics.ignored_input_files, ["feature-request.json"]);
+    assert.deepEqual(report.report.step_decisions[0].mission_semantics.mission_scoped_changed_paths, []);
+  });
+});
+
+test("Runtime Harness fails strict runs with forbidden mission-scope changes", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const requestFile = path.join(repoRoot, "feature-request.json");
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify({ allowed_paths: ["src/**"], forbidden_paths: ["docs/**"] }, null, 2)}\n`,
+      "utf8",
+    );
+    materializeIntakeArtifactPacket({
+      projectId: init.projectId,
+      projectRoot: init.projectRoot,
+      projectProfileRef: init.projectProfileRef,
+      runtimeLayout: init.runtimeLayout,
+      command: "aor intake create",
+      missionId: "scope-violation",
+      requestFile,
+    });
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+          "const request=input.request||{};",
+          "fs.mkdirSync('docs',{recursive:true});",
+          "fs.writeFileSync('docs/out-of-scope.md','forbidden change\\n');",
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'external runner wrote forbidden scope',",
+          "output:{runner:'node-inline',step_class:request.step_class||null,cwd:process.cwd()},",
+          "evidence_refs:['evidence://external-runner/forbidden-scope'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline-forbidden-scope'}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    const step = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId: "runtime-harness-scope-violation",
+      stepId: "run.start.implement",
+      approvedHandoffRef: "evidence://handoff/approved-scope-violation",
+      promotionEvidenceRefs: ["evidence://promotion/pass-scope-violation"],
+      executionRoot: repoRoot,
+    });
+
+    assert.equal(step.stepResult.failure_class, "repo-scope-violation");
+    assert.equal(step.stepResult.runtime_harness_decision, "fail");
+    assert.deepEqual(step.stepResult.mission_semantics.scope_violation_paths, ["docs/out-of-scope.md"]);
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "runtime-harness-scope-violation",
+    });
+
+    assert.equal(report.report.overall_decision, "fail");
+    assert.equal(report.report.step_decisions[0].failure_class, "repo-scope-violation");
   });
 });
 

@@ -31,7 +31,7 @@ pnpm check
 
 ## Notes
 
-- Profiles declare `verification.setup_commands` and `verification.commands`; the internal `scripts/live-e2e/run-profile.mjs` harness executes them from a cloned target workspace as the canonical path.
+- Profiles declare `verification.setup_commands` and `verification.commands`; the internal `scripts/live-e2e/run-profile.mjs` proof runner executes them from a cloned target workspace as the canonical path.
 - Standard run summaries should expose `target_checkout_root` and `generated_project_profile_file` so target-workspace provenance is machine-checkable.
 - Routed live execution should surface explicit branch signatures: `success`, `missing-command`, `missing-live-runtime`, auth/permission blocks, and policy-blocked (`blocking_reasons` / unsupported-adapter) without mock-only fallthrough.
 - Release-shaped runs should anchor `delivery-manifest.repo_deliveries[].repo_root` and `release-packet.source_provenance.delivery_execution_root` to the same target checkout root.
@@ -83,7 +83,7 @@ Refreshed curated runs:
 - `nextjs-monorepo-example` provider comparison pair: `w14-s07.full-journey-release-nextjs` and `w14-s07.full-journey-release-nextjs-anthropic`
 
 Observed prerequisite confirmations:
-- full-journey `project init` preserved target-specific verification commands through public repo command overrides instead of harness-side profile generation;
+- full-journey `project init` preserved target-specific verification commands through public repo command overrides instead of proof-runner-side profile generation;
 - provider-pinned route overrides were materialized for both `codex-cli` and `claude-code` matrix cells;
 - `httpie/cli` bootstrap used `make install`, and its full-journey verification used a bounded CLI pytest slice plus `make codestyle`;
 - `nextjs-monorepo-example` full-journey verification used monorepo `g:lint`, `g:typecheck`, and shared-package unit smoke instead of the broader `g:test-unit` matrix.

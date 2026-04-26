@@ -29,7 +29,7 @@ What exists today:
 - root repository-integrity commands and CI for roadmap, guidance, and community-file consistency;
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
 - a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
-- implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an internal black-box rehearsal harness tracked through `W12`.
+- implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
 - expanded implementation backlog through `W14`, with `W15` reopened for readiness hardening and active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - historical W10/W11 productionization closure for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and target-backed proof evidence.
 - first live routed execution baseline for supported `codex-cli` adapter paths with explicit delivery-guardrail blocking semantics.
@@ -102,20 +102,20 @@ For internal rehearsal dependency requirements, see `docs/ops/live-e2e-dependenc
 
 At a high level, AOR is intended to work like this:
 
-1. **Bootstrap the target repository**  
+1. **Bootstrap the target repository**
    Load a project profile, inspect the repo, validate configuration, and verify bounded runnable prerequisites.
 
-2. **Materialize durable artifacts**  
+2. **Materialize durable artifacts**
    Create project-analysis reports, validation reports, step results, packets, manifests, and release evidence under `.aor/`.
 
-3. **Resolve runtime assets**  
-   For each step, resolve the route, wrapper, prompt bundle, and step policy before adapter execution begins.
+3. **Resolve and compile runtime assets**
+   For each routed adapter-backed step, resolve the route, wrapper, prompt bundle, context assets, and step policy, then persist the compiled context before adapter execution begins.
 
-4. **Execute through adapters**  
-   Send bounded work to a selected runner through the adapter SDK while preserving policy and provenance metadata.
+4. **Execute through the Runtime Harness**
+   Send bounded work to a selected runner through the adapter SDK, classify outcomes, validate mission semantics, decide retry/repair/escalation, and preserve policy/provenance metadata.
 
-5. **Validate, evaluate, and replay**  
-   Run deterministic validation first, then offline evals, harness replay, certification, and promotion decisions.
+5. **Validate, evaluate, and certify separately**
+   Run deterministic validation first, then offline evals. Runtime Harness reports diagnose runs; asset certification uses capture/replay and promotion decisions for platform assets.
 
 6. **Deliver through bounded write-back modes**  
    Start with no-write, patch, and local-branch modes; then expand to fork-first GitHub delivery when the quality bar is met.
@@ -124,7 +124,7 @@ At a high level, AOR is intended to work like this:
    Keep the runtime headless-first, with optional live event streams and a detachable web console.
 
 8. **Feed learning back into the platform**  
-   Turn installed-user rehearsal output, review verdicts, scorecards, and incidents into new evals, harness captures, and backlog work.
+   Turn installed-user proof output, Runtime Harness reports, review verdicts, scorecards, and incidents into new evals, recertification recommendations, and backlog work.
 
 ## Command surface status
 
@@ -169,7 +169,8 @@ For exact command inputs/outputs and contract linkage, use `docs/architecture/14
 - `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, delivery, incident, and UI-lifecycle command baseline with planned extensions.
 - `apps/web/` — implemented detachable operator console baseline with planned production-hardening extensions.
 - `packages/**` — implemented shared runtime modules (contracts, orchestrator core, routing, adapter SDK, harness, observability) with roadmap extensions.
-- `scripts/live-e2e/**` — internal black-box installed-user rehearsal harness and private scenario profiles.
+- `packages/harness/` — asset certification capture/replay primitives used by certification and promotion decisions.
+- `scripts/live-e2e/**` — installed-user black-box proof runner and private scenario profiles.
 
 ### Contributor support
 - `.agents/skills/**` — reusable repo skills for agents.

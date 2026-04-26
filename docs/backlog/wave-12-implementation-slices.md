@@ -6,14 +6,14 @@ Remove public live-E2E product surfaces, move rehearsal to repo-maintainer-only 
 ## Wave exit criteria
 - public CLI, help, and contract docs no longer expose `aor live-e2e *`
 - public project-profile examples no longer expose `live_e2e_defaults`
-- target-catalog rehearsal runs execute through an internal black-box harness that launches external `aor` subprocesses
+- target-catalog rehearsal runs execute through an installed-user black-box proof runner that launches external `aor` subprocesses
 - refreshed proof bundles and runbooks show installed-user style execution without removed public live-E2E commands
 
 ## Parallel start and sequencing notes
 - `W12-S01` starts first because source-of-truth docs and backlog must describe the breaking cleanup before runtime work proceeds.
-- `W12-S02` follows `W12-S01` so the replacement internal harness exists before public surface removal lands.
+- `W12-S02` follows `W12-S01` so the replacement installed-user proof runner exists before public surface removal lands.
 - `W12-S03` depends on `W12-S02` because the public CLI and contract removal must not leave the repository without a rehearsal path.
-- `W12-S04` closes the wave only after fresh proof fixtures and runbooks exist for the internal harness.
+- `W12-S04` closes the wave only after fresh proof fixtures and runbooks exist for the installed-user proof runner.
 
 ---
 
@@ -43,12 +43,12 @@ Remove public live-E2E product surfaces, move rehearsal to repo-maintainer-only 
 - passing slice-cycle integrity checks after the planning update
 
 ### Out of scope
-- implementing the harness in this slice
+- implementing the proof runner in this slice
 - deleting contracts or CLI code in this slice
 
 ---
 
-## W12-S02 — Internal black-box installed-user harness
+## W12-S02 — Live E2E Installed-User Proof Runner
 - **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** done
 - **Outcome:** Add internal maintainer tooling under `scripts/live-e2e/` that launches installed-user style `aor` subprocesses against real target repositories without importing runtime functions directly.
@@ -57,21 +57,21 @@ Remove public live-E2E product surfaces, move rehearsal to repo-maintainer-only 
 - **Primary user-story surfaces:** operator / SRE, delivery engineer, finance / audit / hygiene
 
 ### Local tasks
-1. Add a black-box harness entrypoint that prepares temp home and runtime roots, target checkouts, and external `aor` invocation.
-2. Move scenario-profile configuration from the public example and contract zone into internal harness-owned config.
+1. Add a black-box proof runner entrypoint that prepares temp home and runtime roots, target checkouts, and external `aor` invocation.
+2. Move scenario-profile configuration from the public example and contract zone into proof-runner-owned config.
 3. Collect `.aor`, stdout, stderr, scorecard, and learning-loop evidence from the black-box run.
-4. Add tests or smoke coverage for valid, invalid-ref, missing-runner, and policy-blocked harness branches.
+4. Add tests or smoke coverage for valid, invalid-ref, missing-runner, and policy-blocked proof runner branches.
 
 ### Acceptance criteria
 1. The short regression scenario can run through external `aor` subprocesses without direct runtime imports.
-2. Harness-owned config lives under `scripts/live-e2e/` rather than the public example and contract surface.
-3. The harness records target checkout, runtime artifact, and normalized evidence locations for follow-up proof generation.
+2. Proof-runner-owned config lives under `scripts/live-e2e/` rather than the public example and contract surface.
+3. The proof runner records target checkout, runtime artifact, and normalized evidence locations for follow-up proof generation.
 4. Tests or smoke paths cover success and key blocked or failed branches.
 
 ### Done evidence
-- internal harness script and config under `scripts/live-e2e/**`
+- installed-user proof runner script and config under `scripts/live-e2e/**`
 - black-box smoke coverage for target execution and blocked branches
-- internal harness transcript or fixture showing external `aor` subprocess usage
+- installed-user proof transcript or fixture showing external `aor` subprocess usage
 
 ### Out of scope
 - adding a second live adapter
@@ -82,7 +82,7 @@ Remove public live-E2E product surfaces, move rehearsal to repo-maintainer-only 
 ## W12-S03 — Breaking CLI and contract removal
 - **Epic:** EPIC-6 Operator surface
 - **State:** done
-- **Outcome:** Remove public `live-e2e` CLI, contract, and config surfaces with no compatibility layer once the internal harness exists.
+- **Outcome:** Remove public `live-e2e` CLI, contract, and config surfaces with no compatibility layer once the installed-user proof runner exists.
 - **Primary modules:** `apps/cli`, `docs/contracts/**`, `packages/contracts`, `examples/**`
 - **Hard dependencies:** W12-S02
 - **Primary user-story surfaces:** project bootstrap / onboarding, operator / SRE, AI platform owner
@@ -113,26 +113,26 @@ Remove public live-E2E product surfaces, move rehearsal to repo-maintainer-only 
 ## W12-S04 — Proof refresh after surface cleanup
 - **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** done
-- **Outcome:** Refresh proof fixtures and operator runbooks so catalog-backed evidence references the internal black-box harness and removed public commands do not appear in proof docs.
+- **Outcome:** Refresh proof fixtures and operator runbooks so catalog-backed evidence references the installed-user black-box proof runner and removed public commands do not appear in proof docs.
 - **Primary modules:** `docs/ops/**`, `examples/live-e2e/fixtures/**`, `packages/observability`, `scripts/live-e2e/**`
 - **Hard dependencies:** W12-S03
 - **Primary user-story surfaces:** operator / SRE, delivery engineer, finance / audit / hygiene
 
 ### Local tasks
-1. Regenerate short-profile proof artifacts through the internal black-box harness.
-2. Update runbooks and dependency matrix to use the internal harness commands and new failure signatures.
+1. Regenerate short-profile proof artifacts through the installed-user black-box proof runner.
+2. Update runbooks and dependency matrix to use the installed-user proof runner commands and new failure signatures.
 3. Refresh evidence bundles so they point at installed-user style execution outputs.
 4. Link the refreshed W12 proof back into roadmap and backlog closure text.
 
 ### Acceptance criteria
 1. Refreshed proof bundles no longer rely on removed `aor live-e2e *` commands.
-2. Runbooks and dependency docs describe the internal harness path and observed blocked or failed branches accurately.
+2. Runbooks and dependency docs describe the installed-user proof path and observed blocked or failed branches accurately.
 3. Refreshed evidence still anchors delivery and release lineage to target checkouts and `.aor` artifacts.
 4. The resulting evidence is sufficient to close the W12 wave without narrative-only assumptions.
 
 ### Done evidence
-- refreshed short-profile proof fixtures produced by the internal harness
-- updated runbooks and dependency matrix pointing at internal harness execution
+- refreshed short-profile proof fixtures produced by the installed-user proof runner
+- updated runbooks and dependency matrix pointing at installed-user proof execution
 - backlog references linking W12 closure evidence to the breaking cleanup
 
 ### Out of scope

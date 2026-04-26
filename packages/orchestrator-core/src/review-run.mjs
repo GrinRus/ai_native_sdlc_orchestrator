@@ -545,9 +545,9 @@ export function materializeReviewReport(options) {
   if (codeChangedPaths.length === 0) {
     pushFinding({
       findings: codeFindings,
-      severity: "warn",
+      severity: "fail",
       category: "code-quality",
-      summary: "No non-bootstrap changed paths were detected for the reviewed run.",
+      summary: "No non-bootstrap changed paths were detected for the strict code-changing reviewed run.",
       evidenceRefs: implementStep ? [implementStep.artifact_ref] : [],
     });
   }

@@ -23,7 +23,7 @@ Confirm that AOR can:
 2. Confirm install and verification commands.
 3. Apply one narrow regression-test-backed change.
 4. Produce patch output or a local/fork branch.
-5. Run the internal harness through preflight verify plus routed live execution before any delivery-stage action.
+5. Run the installed-user proof runner through preflight verify plus routed live execution before any delivery-stage action.
 
 ## No-write preflight
 Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
@@ -48,7 +48,7 @@ Isolation mode defaults:
 - `npm test` fails during preflight verification.
 - Any requested delivery mode requires upstream write-back.
 
-## Harness command
+## Proof runner command
 ```bash
 node ./scripts/live-e2e/run-profile.mjs \
   --project-ref . \

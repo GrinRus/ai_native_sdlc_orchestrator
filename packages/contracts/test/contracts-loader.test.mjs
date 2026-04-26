@@ -307,6 +307,15 @@ test("new runtime context family examples load through the shared contract path"
   }
 });
 
+test("runtime harness report example loads through the shared contract path", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/runtime-harness-report.sample.yaml"),
+    family: "runtime-harness-report",
+  });
+
+  assert.equal(loaded.ok, true, "expected runtime-harness-report example to load");
+});
+
 test("context assets require metadata and source reference fields in the supported shape", () => {
   const source = path.join(workspaceRoot, "examples/context/skills/runner-verification-default.yaml");
   const loaded = loadContractFile({ filePath: source, family: "context-skill" });

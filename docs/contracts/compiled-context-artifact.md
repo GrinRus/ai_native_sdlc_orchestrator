@@ -23,5 +23,7 @@ This contract family is introduced in `W6-S02` so downstream runtime, harness, a
 
 Runtime outputs are run/step scoped: `compiled_context_id` and the persisted report filename include run identity, step identity, and execution attempt so repeated same-step executions in one runtime root do not overwrite prior artifacts.
 
+Compiled context is the prepare-phase artifact for routed adapter-backed steps. Runtime execution must be able to trace adapter invocation back to the prompt bundle, context docs, context rules, context skills, wrapper, policy, packet refs, guardrails, and provenance used to build the request.
+
 ## Example
 See `examples/context/compiled/*.yaml`.

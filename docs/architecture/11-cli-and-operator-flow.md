@@ -22,4 +22,4 @@ The CLI is the primary operator surface for AOR. It must remain usable when the 
 
 `aor project verify --routed-dry-run-step <step_class>` remains the baseline smoke path for routed no-write execution and durable step-result emission. The full-journey live path additionally uses public `review run` and `learning handoff` surfaces after real execution.
 
-Installed-user proof for AOR itself runs through the internal `scripts/live-e2e/*` harness and is not part of the public CLI command surface.
+Installed-user proof for AOR itself runs through the internal `scripts/live-e2e/*` proof runner and is not part of the public CLI command surface.
