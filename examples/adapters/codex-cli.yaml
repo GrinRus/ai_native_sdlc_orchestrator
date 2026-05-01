@@ -29,6 +29,25 @@ execution:
       - --ephemeral
       - --sandbox
       - workspace-write
+    permission_policy:
+      default_mode: full-bypass
+      modes:
+        full-bypass:
+          args:
+            - --ask-for-approval
+            - never
+            - exec
+            - --json
+            - --ephemeral
+            - --sandbox
+            - workspace-write
+        restricted:
+          args:
+            - exec
+            - --json
+            - --ephemeral
+            - --sandbox
+            - workspace-write
     request_via_stdin: true
     timeout_ms: 600000
 sandbox_mode: local-or-container

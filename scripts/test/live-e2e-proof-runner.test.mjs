@@ -99,6 +99,13 @@ function createExamplesRoot(options) {
   return examplesRoot;
 }
 
+function permissionProbeSnippet() {
+  return [
+    "const probe=request.permission_probe||{};",
+    "if(request.step_class==='preflight-permission-readiness'&&probe.nonce_file&&probe.marker_file){const value=fs.readFileSync(probe.nonce_file,'utf8').trim();fs.mkdirSync(require('node:path').dirname(probe.marker_file),{recursive:true});fs.writeFileSync(probe.marker_file,value);}",
+  ];
+}
+
 /**
  * @param {{ catalogRoot: string }} options
  */
@@ -126,6 +133,7 @@ function createFakeCodexBinary(options) {
       "const path = require('node:path');",
       "const input = JSON.parse(fs.readFileSync(0, 'utf8'));",
       "const request = input.request || {};",
+      ...permissionProbeSnippet(),
       "if (request.step_class === 'implement' && fs.existsSync(path.join(process.cwd(), 'src', 'index.js'))) {",
       "  fs.appendFileSync(path.join(process.cwd(), 'src', 'index.js'), 'export const liveE2eCodexPatch = true;\\n');",
       "}",
@@ -162,6 +170,7 @@ function createFakeClaudeBinary(options) {
       "const path = require('node:path');",
       "const input = JSON.parse(fs.readFileSync(0, 'utf8'));",
       "const request = input.request || {};",
+      ...permissionProbeSnippet(),
       "if (request.step_class === 'implement' && fs.existsSync(path.join(process.cwd(), 'src', 'index.js'))) {",
       "  fs.appendFileSync(path.join(process.cwd(), 'src', 'index.js'), 'export const liveE2eClaudePatch = true;\\n');",
       "}",
@@ -188,6 +197,7 @@ function createFakeClaudeBinary(options) {
  *   examplesRoot: string,
  *   command: string,
  *   args: string[],
+ *   includePermissionPolicy?: boolean,
  * }} options
  */
 function configureAdapterExternalRuntime(options) {
@@ -203,6 +213,19 @@ function configureAdapterExternalRuntime(options) {
     `    command: ${JSON.stringify(options.command)}`,
     "    args:",
     ...options.args.map((argument) => `      - ${JSON.stringify(argument)}`),
+    ...(options.includePermissionPolicy !== false && options.args.length > 0
+      ? [
+          "    permission_policy:",
+          "      default_mode: full-bypass",
+          "      modes:",
+          "        full-bypass:",
+          "          args:",
+          ...options.args.map((argument) => `            - ${JSON.stringify(argument)}`),
+          "        restricted:",
+          "          args:",
+          ...options.args.map((argument) => `            - ${JSON.stringify(argument)}`),
+        ]
+      : []),
     "    request_via_stdin: true",
     "    timeout_ms: 30000",
   ].join("\n");
@@ -237,6 +260,7 @@ function configureCodexExternalRuntimeSuccess(options) {
         "const path=require('node:path');",
         "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
         "const request=input.request||{};",
+        ...permissionProbeSnippet(),
         "if(request.step_class==='implement'&&fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eAdapterPatch = true;\\n');}",
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
@@ -264,6 +288,7 @@ function configureCodexExternalRuntimeNoop(options) {
         "const fs=require('node:fs');",
         "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
         "const request=input.request||{};",
+        ...permissionProbeSnippet(),
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
         "summary:'external runner ok without code changes',",
@@ -291,6 +316,7 @@ function configureCodexExternalRuntimeEchoAuth(options) {
         "const path=require('node:path');",
         "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
         "const request=input.request||{};",
+        ...permissionProbeSnippet(),
         "if(request.step_class==='implement'&&fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eClaudeAdapterPatch = true;\\n');}",
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
@@ -316,10 +342,11 @@ function configureCodexExternalRuntimeForbiddenWrite(options) {
       "-e",
       [
         "const fs=require('node:fs');",
-        "fs.mkdirSync('docs',{recursive:true});",
-        "fs.writeFileSync('docs/control-plane-leak.md','# leaked from target run\\n');",
         "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
         "const request=input.request||{};",
+        ...permissionProbeSnippet(),
+        "fs.mkdirSync('docs',{recursive:true});",
+        "fs.writeFileSync('docs/control-plane-leak.md','# leaked from target run\\n');",
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
         "summary:'external runner wrote forbidden docs path',",
@@ -347,6 +374,7 @@ function configureClaudeExternalRuntimeSuccess(options) {
         "const path=require('node:path');",
         "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
         "const request=input.request||{};",
+        ...permissionProbeSnippet(),
         "if(request.step_class==='implement'&&fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eClaudeAdapterPatch = true;\\n');}",
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
@@ -374,6 +402,7 @@ function configureClaudeExternalRuntimeEditDenied(options) {
         "const fs=require('node:fs');",
         "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
         "const request=input.request||{};",
+        ...permissionProbeSnippet(),
         "if(request.step_class==='preflight-edit-readiness'){process.stdout.write('Edit denied by permission mode');process.exit(0);}",
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
@@ -381,6 +410,94 @@ function configureClaudeExternalRuntimeEditDenied(options) {
         "output:{runner:'node-inline-claude',step_class:request.step_class||null,execution_root:process.cwd()},",
         "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-claude-auth-ok'],",
         "tool_traces:[{phase:'invoke_adapter',kind:'claude-edit-denied-fixture',detail:'auth-ok'}]",
+        "}));",
+      ].join(""),
+    ],
+  });
+}
+
+/**
+ * @param {{ examplesRoot: string }} options
+ */
+function configureClaudeExternalRuntimePermissionPrompt(options) {
+  configureAdapterExternalRuntime({
+    examplesRoot: options.examplesRoot,
+    adapterFileName: "claude-code.yaml",
+    command: process.execPath,
+    args: [
+      "-e",
+      [
+        "const fs=require('node:fs');",
+        "const path=require('node:path');",
+        "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+        "const request=input.request||{};",
+        "if(request.step_class==='preflight-permission-readiness'){process.stdout.write(JSON.stringify({type:'result',subtype:'success',result:'Could you grant permission to read the nonce file?',permission_denials:[{tool_name:'Read',tool_input:{file_path:request.permission_probe&&request.permission_probe.nonce_file}}]}));process.exit(0);}",
+        ...permissionProbeSnippet(),
+        "if(request.step_class==='implement'&&fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eClaudePermissionPromptPatch = true;\\n');}",
+        "process.stdout.write(JSON.stringify({",
+        "status:'success',",
+        "summary:'claude external runner permission prompt fixture ok',",
+        "output:{runner:'node-inline-claude-permission-prompt',step_class:request.step_class||null,execution_root:process.cwd()},",
+        "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-claude-permission-prompt'],",
+        "tool_traces:[{phase:'invoke_adapter',kind:'claude-permission-prompt-fixture',detail:'permission-prompt'}]",
+        "}));",
+      ].join(""),
+    ],
+  });
+}
+
+/**
+ * @param {{ examplesRoot: string }} options
+ */
+function configureClaudeExternalRuntimeStructuredPermissionDenial(options) {
+  configureAdapterExternalRuntime({
+    examplesRoot: options.examplesRoot,
+    adapterFileName: "claude-code.yaml",
+    command: process.execPath,
+    args: [
+      "-e",
+      [
+        "const fs=require('node:fs');",
+        "const path=require('node:path');",
+        "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+        "const request=input.request||{};",
+        ...permissionProbeSnippet(),
+        "if(request.step_class==='preflight-permission-readiness'){process.stdout.write(JSON.stringify({type:'result',subtype:'success',result:'blocked',permission_denials:[{tool_name:'Read',tool_input:{file_path:request.permission_probe&&request.permission_probe.nonce_file}}]}));process.exit(0);}",
+        "if(request.step_class==='implement'&&fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eClaudeStructuredDenialPatch = true;\\n');}",
+        "process.stdout.write(JSON.stringify({",
+        "status:'success',",
+        "summary:'claude external runner structured denial fixture ok',",
+        "output:{runner:'node-inline-claude-structured-denial',step_class:request.step_class||null,execution_root:process.cwd()},",
+        "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-claude-structured-denial'],",
+        "tool_traces:[{phase:'invoke_adapter',kind:'claude-structured-denial-fixture',detail:'permission-denial'}]",
+        "}));",
+      ].join(""),
+    ],
+  });
+}
+
+/**
+ * @param {{ examplesRoot: string }} options
+ */
+function configureClaudeExternalRuntimeLegacyPermissionArgs(options) {
+  configureAdapterExternalRuntime({
+    examplesRoot: options.examplesRoot,
+    adapterFileName: "claude-code.yaml",
+    command: process.execPath,
+    includePermissionPolicy: false,
+    args: [
+      "-e",
+      [
+        "const fs=require('node:fs');",
+        "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+        "const request=input.request||{};",
+        ...permissionProbeSnippet(),
+        "process.stdout.write(JSON.stringify({",
+        "status:'success',",
+        "summary:'claude legacy permission fixture ok',",
+        "output:{runner:'node-inline-claude-legacy',step_class:request.step_class||null,execution_root:process.cwd()},",
+        "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-claude-legacy'],",
+        "tool_traces:[{phase:'invoke_adapter',kind:'claude-legacy-permission-fixture',detail:'legacy'}]",
         "}));",
       ].join(""),
     ],
@@ -402,6 +519,7 @@ function configureClaudeExternalRuntimeAuthRetry(options) {
         "const path=require('node:path');",
         "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
         "const request=input.request||{};",
+        ...permissionProbeSnippet(),
         "const marker=process.env.AOR_FAKE_AUTH_RETRY_MARKER;",
         "if(request.step_class==='preflight'&&marker&&!fs.existsSync(marker)){fs.mkdirSync(path.dirname(marker),{recursive:true});fs.writeFileSync(marker,'seen');process.stderr.write('authentication transient');process.exit(1);}",
         "if(request.step_class==='implement'&&fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eClaudeRetryPatch = true;\\n');}",
@@ -545,6 +663,7 @@ function writeLocalCatalogTarget(options) {
  *   scenarioFamily?: string,
  *   providerVariantId?: string,
  *   internalTestHooks?: Record<string, unknown>,
+ *   liveAdapterPreflight?: Record<string, unknown>,
  *   outputPolicy?: Record<string, unknown>,
  * }} options
  */
@@ -579,6 +698,7 @@ function writeLocalFullJourneyProfile(options) {
         preferred_delivery_mode: "patch",
         ...(options.outputPolicy ?? {}),
       },
+      ...(options.liveAdapterPreflight ? { live_adapter_preflight: options.liveAdapterPreflight } : {}),
       ...(options.internalTestHooks ? { internal_test_hooks: options.internalTestHooks } : {}),
     }),
     "utf8",
@@ -595,6 +715,7 @@ function writeLocalFullJourneyProfile(options) {
  *   omitExamplesRoot?: boolean,
  *   extraEnv?: NodeJS.ProcessEnv,
  *   runnerAuthMode?: string,
+ *   runtimeAgentPermissionMode?: string,
  * }} options
  */
 function runProofRunner(options) {
@@ -618,6 +739,9 @@ function runProofRunner(options) {
   }
   if (options.runnerAuthMode) {
     args.push("--runner-auth-mode", options.runnerAuthMode);
+  }
+  if (options.runtimeAgentPermissionMode) {
+    args.push("--runtime-agent-permission-mode", options.runtimeAgentPermissionMode);
   }
   const run = spawnSync(process.execPath, args, {
     cwd: workspaceRoot,
@@ -883,6 +1007,7 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     );
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
     assert.equal(summary.status, "pass");
+    assert.equal(summary.runtime_agent_permission_mode, "full-bypass");
     assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor project init"), true);
     assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor intake create"), true);
     assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor discovery run"), true);
@@ -948,6 +1073,9 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     assert.equal(summary.coverage_follow_up.current_cell_required, true);
     assert.equal(Array.isArray(summary.artifacts.provider_route_override_files), true);
     assert.ok(summary.artifacts.provider_route_override_files.length > 0);
+    assert.equal(summary.artifacts.live_adapter_preflight.runtime_agent_permission_mode, "full-bypass");
+    assert.equal(summary.artifacts.live_adapter_preflight.external_runtime.permission_mode, "full-bypass");
+    assert.equal(summary.artifacts.live_adapter_preflight.permission_readiness.status, "pass");
     const reviewReport = JSON.parse(fs.readFileSync(summary.artifacts.review_report_file, "utf8"));
     assert.equal(reviewReport.provider_traceability.requested_provider, "openai");
     assert.equal(reviewReport.provider_traceability.actual_provider, "openai");
@@ -1043,6 +1171,8 @@ test("full-journey mode applies anthropic provider-pinned route overrides", () =
     assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.status, "pass");
     assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.attempts.length, 1);
     assert.equal(summary.artifacts.live_adapter_preflight.edit_readiness.status, "pass");
+    assert.equal(summary.artifacts.live_adapter_preflight.permission_readiness.status, "pass");
+    assert.equal(summary.artifacts.live_adapter_preflight.external_runtime.permission_mode, "full-bypass");
     const reviewReport = JSON.parse(fs.readFileSync(summary.artifacts.review_report_file, "utf8"));
     assert.equal(reviewReport.provider_traceability.requested_provider, "anthropic");
     assert.equal(reviewReport.provider_traceability.actual_provider, "anthropic");
@@ -1091,6 +1221,7 @@ test("full-journey mode runs anthropic packaged assets with fake claude on PATH"
     assert.equal(summary.artifacts.live_adapter_preflight.primary_adapter, "claude-code");
     assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.status, "pass");
     assert.equal(summary.artifacts.live_adapter_preflight.edit_readiness.status, "pass");
+    assert.equal(summary.artifacts.live_adapter_preflight.permission_readiness.status, "pass");
     const routedStepResult = JSON.parse(fs.readFileSync(summary.artifacts.routed_step_result_file, "utf8"));
     assert.equal(routedStepResult.routed_execution.adapter_response.output.runner_output.runner, "fake-claude");
   });
@@ -1220,6 +1351,183 @@ test("full-journey mode fails live adapter preflight before run start when edit 
     assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.attempts.length, 1);
     assert.equal(summary.artifacts.live_adapter_preflight.edit_readiness.status, "fail");
     assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "edit-denied");
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+  });
+});
+
+test("full-journey mode fails live adapter preflight when restricted mode asks for permissions", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureClaudeExternalRuntimePermissionPrompt({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.anthropic.permission-prompt.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      providerVariantId: "anthropic-primary",
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-anthropic-permission-prompt",
+      catalogRoot,
+      runtimeAgentPermissionMode: "restricted",
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.runtime_agent_permission_mode, "restricted");
+    assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "permission-mode-blocked");
+    assert.equal(summary.artifacts.live_adapter_preflight.external_runtime.permission_mode, "restricted");
+    assert.equal(summary.artifacts.live_adapter_preflight.permission_readiness.status, "fail");
+    assert.equal(
+      summary.artifacts.live_adapter_preflight.permission_readiness.attempts[0].marker_status,
+      "missing",
+    );
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+  });
+});
+
+test("full-journey mode still runs permission readiness when auth probe is skipped", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureClaudeExternalRuntimePermissionPrompt({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.anthropic.auth-skipped-permission-prompt.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      providerVariantId: "anthropic-primary",
+      liveAdapterPreflight: {
+        auth_probe_required: false,
+      },
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-anthropic-auth-skipped-permission-prompt",
+      catalogRoot,
+      runtimeAgentPermissionMode: "restricted",
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.status, "skipped");
+    assert.equal(summary.artifacts.live_adapter_preflight.permission_readiness.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "permission-mode-blocked");
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+  });
+});
+
+test("full-journey mode fails permission readiness on structured denials even when marker is written", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureClaudeExternalRuntimeStructuredPermissionDenial({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.anthropic.structured-permission-denial.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      providerVariantId: "anthropic-primary",
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-anthropic-structured-permission-denial",
+      catalogRoot,
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "permission-mode-blocked");
+    assert.equal(summary.artifacts.live_adapter_preflight.permission_readiness.status, "fail");
+    assert.equal(
+      summary.artifacts.live_adapter_preflight.permission_readiness.attempts[0].marker_status,
+      "present",
+    );
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+  });
+});
+
+test("full-journey mode fails live adapter preflight when selected permission mode is not reported", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureClaudeExternalRuntimeLegacyPermissionArgs({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.anthropic.legacy-permission.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      providerVariantId: "anthropic-primary",
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-anthropic-legacy-permission",
+      catalogRoot,
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.runtime_agent_permission_mode, "full-bypass");
+    assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "permission-policy-invalid");
+    assert.equal(summary.artifacts.live_adapter_preflight.external_runtime.permission_mode, "legacy");
     assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
   });
 });

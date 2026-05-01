@@ -13,6 +13,7 @@ import {
   createMockAdapter,
   resolveAdapterForRoute,
   resolveAdapterMatrix,
+  resolveExternalRuntimePermissionPolicy,
 } from "../src/index.mjs";
 import { resolveRouteForStep, resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
 
@@ -41,6 +42,7 @@ function withTempRepo(callback) {
  *   args: string[],
  *   timeoutMs?: number,
  *   handler?: string | null,
+ *   permissionPolicy?: Record<string, unknown>,
  * }} options
  */
 function buildExternalRunnerProfile(options) {
@@ -52,6 +54,7 @@ function buildExternalRunnerProfile(options) {
       args: options.args,
       request_via_stdin: true,
       timeout_ms: options.timeoutMs ?? 30000,
+      ...(options.permissionPolicy ? { permission_policy: options.permissionPolicy } : {}),
     },
   };
   if (options.handler !== null) {
@@ -205,6 +208,137 @@ test("mock adapter executes deterministic dry-run outputs for rehearsal coverage
   assert.equal(first.status, "success");
   assert.equal(first.output.mode, "dry-run");
   assert.ok(first.evidence_refs[0].startsWith("evidence://mock-adapter/"));
+});
+
+test("external runtime permission policy resolves env-selected args before adapter defaults", () => {
+  const externalRuntime = {
+    args: ["legacy"],
+    permission_policy: {
+      default_mode: "full-bypass",
+      modes: {
+        "full-bypass": {
+          args: ["full"],
+        },
+        restricted: {
+          args: ["restricted"],
+        },
+      },
+    },
+  };
+
+  assert.deepEqual(resolveExternalRuntimePermissionPolicy({ externalRuntime, requestedMode: null }), {
+    ok: true,
+    args: ["full"],
+    permissionMode: "full-bypass",
+    source: "permission_policy.default_mode",
+  });
+  assert.deepEqual(resolveExternalRuntimePermissionPolicy({ externalRuntime, requestedMode: "restricted" }), {
+    ok: true,
+    args: ["restricted"],
+    permissionMode: "restricted",
+    source: "AOR_RUNTIME_AGENT_PERMISSION_MODE",
+  });
+  assert.deepEqual(resolveExternalRuntimePermissionPolicy({ externalRuntime: { args: ["legacy"] }, requestedMode: "restricted" }), {
+    ok: true,
+    args: ["legacy"],
+    permissionMode: "legacy",
+    source: "external_runtime.args",
+  });
+
+  const invalid = resolveExternalRuntimePermissionPolicy({ externalRuntime, requestedMode: "missing" });
+  assert.equal(invalid.ok, false);
+  assert.equal(invalid.permissionMode, "missing");
+  assert.equal(invalid.failureKind, "permission-policy-invalid");
+});
+
+test("live adapter uses selected permission policy args and records the selected mode", () => {
+  const previousMode = process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE;
+  process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE = "restricted";
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", "process.stdout.write(JSON.stringify({runner:'legacy'}));"],
+        permissionPolicy: {
+          default_mode: "full-bypass",
+          modes: {
+            "full-bypass": {
+              args: ["-e", "process.stdout.write(JSON.stringify({runner:'full-bypass'}));"],
+            },
+            restricted: {
+              args: ["-e", "process.stdout.write(JSON.stringify({runner:'restricted'}));"],
+            },
+          },
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-permission-policy",
+      run_id: "run-permission-policy",
+      step_id: "step-permission-policy",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.runner_output.runner, "restricted");
+    assert.equal(response.output.external_runner.permission_mode, "restricted");
+    assert.equal(response.output.external_runner.permission_mode_source, "AOR_RUNTIME_AGENT_PERMISSION_MODE");
+  } finally {
+    if (previousMode === undefined) {
+      delete process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE;
+    } else {
+      process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE = previousMode;
+    }
+  }
+});
+
+test("live adapter blocks unknown permission policy modes before launching the runner", () => {
+  const previousMode = process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE;
+  process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE = "missing";
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", "process.stdout.write('should-not-run')"],
+        permissionPolicy: {
+          default_mode: "full-bypass",
+          modes: {
+            "full-bypass": {
+              args: ["-e", "process.stdout.write('ok')"],
+            },
+          },
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-permission-policy-invalid",
+      run_id: "run-permission-policy-invalid",
+      step_id: "step-permission-policy-invalid",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "permission-policy-invalid");
+    assert.equal(response.output.external_runner.permission_mode, "missing");
+  } finally {
+    if (previousMode === undefined) {
+      delete process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE;
+    } else {
+      process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE = previousMode;
+    }
+  }
 });
 
 test("live adapter executes external runner path for supported codex-cli requests", () => {
@@ -544,6 +678,77 @@ test("live adapter classifies external runner permission blocks", () => {
 
   assert.equal(response.status, "blocked");
   assert.equal(response.output.failure_kind, "permission-mode-blocked");
+});
+
+test("live adapter blocks successful Claude JSON results that include permission denials", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stdout.write(JSON.stringify({",
+          "type:'result',",
+          "subtype:'success',",
+          "result:'Could you grant permission to read the handoff packet?',",
+          "permission_denials:[{tool_name:'Read',tool_input:{file_path:'.aor/projects/run/artifacts/handoff.json'}}]",
+          "}));",
+        ].join(""),
+      ],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-structured-permission-denial",
+    run_id: "run-structured-permission-denial",
+    step_id: "step-structured-permission-denial",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "permission-mode-blocked");
+  assert.equal(response.output.runner_output.permission_denials.length, 1);
+});
+
+test("live adapter blocks nested runner_output permission denials without relying on raw text", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'runner completed',",
+          "output:{runner_output:{permission_denials:[{tool_name:'Read',tool_input:{file_path:'.aor/spec.json'}}]}}",
+          "}));",
+        ].join(""),
+      ],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-nested-structured-permission-denial",
+    run_id: "run-nested-structured-permission-denial",
+    step_id: "step-nested-structured-permission-denial",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "permission-mode-blocked");
+  assert.equal(response.output.runner_output.runner_output.permission_denials.length, 1);
 });
 
 test("live adapter blocks successful runner exits that still emit tool denial evidence", () => {

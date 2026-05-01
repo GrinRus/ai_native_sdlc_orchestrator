@@ -80,6 +80,41 @@ function asStringMap(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function stableJsonText(value) {
+  try {
+    return JSON.stringify(value) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function hasNonEmptyPermissionDenials(value) {
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasNonEmptyPermissionDenials(entry));
+  }
+
+  const record = asRecord(value);
+  const entries = Object.entries(record);
+  if (entries.length === 0) {
+    return false;
+  }
+
+  const permissionDenials = record.permission_denials;
+  if (Array.isArray(permissionDenials) && permissionDenials.length > 0) {
+    return true;
+  }
+
+  return entries.some(([, entry]) => hasNonEmptyPermissionDenials(entry));
+}
+
+/**
  * @param {{ stdout?: string, stderr?: string, errorMessage?: string | null, defaultFailureKind: string }} options
  * @returns {string}
  */
@@ -117,9 +152,12 @@ export function classifyExternalRunnerFailure(options) {
   }
   if (
     combined.includes("permission denied") ||
+    combined.includes("permission denial") ||
     combined.includes("permission-mode") ||
     combined.includes("permissions") ||
     combined.includes("approval required") ||
+    combined.includes("requesting permission") ||
+    combined.includes("grant permission") ||
     combined.includes("workspace trust") ||
     combined.includes("not trusted") ||
     combined.includes("sandbox")
@@ -127,6 +165,104 @@ export function classifyExternalRunnerFailure(options) {
     return "permission-mode-blocked";
   }
   return options.defaultFailureKind;
+}
+
+/**
+ * @param {{ runnerPayload?: Record<string, unknown>, runnerToolTraces?: Array<Record<string, unknown>> }} options
+ * @returns {string}
+ */
+function classifyStructuredRunnerFailure(options) {
+  const runnerPayload = asRecord(options.runnerPayload);
+  if (hasNonEmptyPermissionDenials(runnerPayload) || hasNonEmptyPermissionDenials(options.runnerToolTraces)) {
+    return "permission-mode-blocked";
+  }
+
+  const combined = stableJsonText({
+    runnerPayload,
+    runnerToolTraces: Array.isArray(options.runnerToolTraces) ? options.runnerToolTraces : [],
+  }).toLowerCase();
+
+  if (
+    combined.includes("askuserquestion") ||
+    combined.includes("ask user question") ||
+    combined.includes("clarifying question") ||
+    combined.includes("requires user input") ||
+    combined.includes("interactive prompt")
+  ) {
+    return "interactive-question-requested";
+  }
+  if (
+    combined.includes("edit denied") ||
+    combined.includes("edit tool denied") ||
+    combined.includes("tool denied: edit") ||
+    combined.includes("denied tool edit")
+  ) {
+    return "edit-denied";
+  }
+  if (
+    combined.includes("permission denial") ||
+    combined.includes("permission denied") ||
+    combined.includes("approval required") ||
+    combined.includes("requesting permission") ||
+    combined.includes("grant permission") ||
+    combined.includes("tool_use_denied") ||
+    combined.includes("tool denied")
+  ) {
+    return "permission-mode-blocked";
+  }
+  return "";
+}
+
+/**
+ * @param {{ externalRuntime: Record<string, unknown>, requestedMode?: string | null }} options
+ * @returns {{ ok: true, args: string[], permissionMode: string, source: string } | { ok: false, args: string[], permissionMode: string, source: string, failureKind: string, message: string }}
+ */
+export function resolveExternalRuntimePermissionPolicy(options) {
+  const externalRuntime = asRecord(options.externalRuntime);
+  const legacyArgs = asStringArray(externalRuntime.args);
+  const policy = asRecord(externalRuntime.permission_policy);
+  const hasPolicy = Object.keys(policy).length > 0;
+  if (!hasPolicy) {
+    return {
+      ok: true,
+      args: legacyArgs,
+      permissionMode: "legacy",
+      source: "external_runtime.args",
+    };
+  }
+
+  const requestedMode = asOptionalString(options.requestedMode);
+  const defaultMode = asOptionalString(policy.default_mode);
+  const selectedMode = requestedMode ?? defaultMode;
+  if (!selectedMode) {
+    return {
+      ok: true,
+      args: legacyArgs,
+      permissionMode: "legacy",
+      source: "external_runtime.args",
+    };
+  }
+
+  const modes = asRecord(policy.modes);
+  const modeProfile = asRecord(modes[selectedMode]);
+  const modeArgs = asStringArray(modeProfile.args);
+  if (modeArgs.length === 0) {
+    return {
+      ok: false,
+      args: [],
+      permissionMode: selectedMode,
+      source: requestedMode ? "AOR_RUNTIME_AGENT_PERMISSION_MODE" : "permission_policy.default_mode",
+      failureKind: "permission-policy-invalid",
+      message: `External runtime permission policy mode '${selectedMode}' is not declared with non-empty args.`,
+    };
+  }
+
+  return {
+    ok: true,
+    args: modeArgs,
+    permissionMode: selectedMode,
+    source: requestedMode ? "AOR_RUNTIME_AGENT_PERMISSION_MODE" : "permission_policy.default_mode",
+  };
 }
 
 /**
@@ -576,7 +712,7 @@ export function createLiveAdapter(options) {
     asOptionalString(executionProfile.evidence_namespace) ?? `evidence://adapter-live/${adapterId}`;
   const externalRuntime = asRecord(executionProfile.external_runtime);
   const runtimeCommand = asOptionalString(externalRuntime.command);
-  const runtimeArgs = asStringArray(externalRuntime.args);
+  const legacyRuntimeArgs = asStringArray(externalRuntime.args);
   const requestViaStdin = externalRuntime.request_via_stdin !== false;
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
   const envOverrides = asStringMap(externalRuntime.env);
@@ -620,6 +756,14 @@ export function createLiveAdapter(options) {
           : null;
       const invocationToken = `${envelope.run_id}:${envelope.step_id}:${envelope.request_id}:${Date.now()}`;
       const normalizedEvidenceToken = invocationToken.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const runnerEnv = {
+        ...process.env,
+        ...envOverrides,
+      };
+      const runtimeInvocation = resolveExternalRuntimePermissionPolicy({
+        externalRuntime,
+        requestedMode: asOptionalString(runnerEnv.AOR_RUNTIME_AGENT_PERMISSION_MODE),
+      });
 
       if (runtimeMode !== "external-process") {
         return createAdapterResponseEnvelope({
@@ -635,6 +779,14 @@ export function createLiveAdapter(options) {
             compiled_context_ref: compiledContextRef,
             failure_kind: "missing-live-runtime",
             runtime_mode: runtimeMode,
+            external_runner: {
+              runtime_mode: runtimeMode,
+              command: runtimeCommand,
+              args: legacyRuntimeArgs,
+              permission_mode: runtimeInvocation.permissionMode,
+              permission_mode_source: runtimeInvocation.source,
+              execution_root: executionRoot,
+            },
           },
           evidence_refs: [`${evidenceNamespace}/${normalizedEvidenceToken}`],
           tool_traces: [
@@ -660,6 +812,14 @@ export function createLiveAdapter(options) {
             provider_adapter: adapterId,
             compiled_context_ref: compiledContextRef,
             failure_kind: "missing-live-runtime",
+            external_runner: {
+              runtime_mode: runtimeMode,
+              command: runtimeCommand,
+              args: legacyRuntimeArgs,
+              permission_mode: runtimeInvocation.permissionMode,
+              permission_mode_source: runtimeInvocation.source,
+              execution_root: executionRoot,
+            },
           },
           evidence_refs: [`${evidenceNamespace}/${normalizedEvidenceToken}`],
           tool_traces: [
@@ -672,6 +832,40 @@ export function createLiveAdapter(options) {
         });
       }
 
+      if (!runtimeInvocation.ok) {
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: "blocked",
+          summary: `Adapter '${adapterId}' live runtime permission policy is invalid: ${runtimeInvocation.message}`,
+          output: {
+            mode: "execute",
+            blocked: true,
+            route_id: routeId,
+            provider_adapter: adapterId,
+            compiled_context_ref: compiledContextRef,
+            failure_kind: runtimeInvocation.failureKind,
+            external_runner: {
+              runtime_mode: runtimeMode,
+              command: runtimeCommand,
+              args: runtimeInvocation.args,
+              permission_mode: runtimeInvocation.permissionMode,
+              permission_mode_source: runtimeInvocation.source,
+              execution_root: executionRoot,
+            },
+          },
+          evidence_refs: [`${evidenceNamespace}/${normalizedEvidenceToken}`],
+          tool_traces: [
+            {
+              phase: "invoke_adapter",
+              kind: handlerKind,
+              detail: `permission_mode=${runtimeInvocation.permissionMode} invalid`,
+            },
+          ],
+        });
+      }
+
+      const runtimeArgs = runtimeInvocation.args;
       const startedAt = new Date().toISOString();
       const runnerInput = {
         request: envelope,
@@ -679,15 +873,13 @@ export function createLiveAdapter(options) {
           adapter_id: adapterId,
           route_id: routeId,
           compiled_context_ref: compiledContextRef,
+          permission_mode: runtimeInvocation.permissionMode,
         },
       };
 
       const invocation = spawnSync(runtimeCommand, runtimeArgs, {
         cwd: executionRoot,
-        env: {
-          ...process.env,
-          ...envOverrides,
-        },
+        env: runnerEnv,
         encoding: "utf8",
         input: requestViaStdin ? `${JSON.stringify(runnerInput)}\n` : undefined,
         timeout: timeoutMs,
@@ -718,6 +910,8 @@ export function createLiveAdapter(options) {
           timeout_ms: timeoutMs,
           request_via_stdin: requestViaStdin,
           execution_root: executionRoot,
+          permission_mode: runtimeInvocation.permissionMode,
+          permission_mode_source: runtimeInvocation.source,
         },
         process: {
           exit_code: invocation.status,
@@ -759,6 +953,8 @@ export function createLiveAdapter(options) {
           command: runtimeCommand,
           args: runtimeArgs,
           execution_root: executionRoot,
+          permission_mode: runtimeInvocation.permissionMode,
+          permission_mode_source: runtimeInvocation.source,
           exit_code: invocation.status,
           signal: invocation.signal,
           timed_out: invocationTimedOut,
@@ -825,11 +1021,13 @@ export function createLiveAdapter(options) {
       }
 
       if (invocationFailed) {
-        const failureKind = classifyExternalRunnerFailure({
-          stdout,
-          stderr,
-          defaultFailureKind: "external-runner-failed",
-        });
+        const failureKind =
+          classifyStructuredRunnerFailure({ runnerPayload, runnerToolTraces }) ||
+          classifyExternalRunnerFailure({
+            stdout,
+            stderr,
+            defaultFailureKind: "external-runner-failed",
+          });
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,
           adapter_id: adapterId,
@@ -847,11 +1045,13 @@ export function createLiveAdapter(options) {
         });
       }
 
-      const semanticFailureKind = classifyExternalRunnerFailure({
-        stdout,
-        stderr,
-        defaultFailureKind: "",
-      });
+      const semanticFailureKind =
+        classifyStructuredRunnerFailure({ runnerPayload, runnerToolTraces }) ||
+        classifyExternalRunnerFailure({
+          stdout,
+          stderr,
+          defaultFailureKind: "",
+        });
       if (semanticFailureKind) {
         const blocked = [
           "auth-failed",

@@ -57,6 +57,29 @@ function asRecordArray(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function hasNonEmptyPermissionDenials(value) {
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasNonEmptyPermissionDenials(entry));
+  }
+
+  const record = asRecord(value);
+  const entries = Object.entries(record);
+  if (entries.length === 0) {
+    return false;
+  }
+
+  const permissionDenials = record.permission_denials;
+  if (Array.isArray(permissionDenials) && permissionDenials.length > 0) {
+    return true;
+  }
+
+  return entries.some(([, entry]) => hasNonEmptyPermissionDenials(entry));
+}
+
+/**
  * @param {string[]} values
  * @returns {string[]}
  */
@@ -356,6 +379,43 @@ function documentLinksRun(document, runId) {
 }
 
 /**
+ * @param {Record<string, unknown>} adapterOutput
+ * @returns {string | null}
+ */
+function permissionFailureKindFromAdapterOutput(adapterOutput) {
+  const runnerOutput = asRecord(adapterOutput.runner_output);
+  if (hasNonEmptyPermissionDenials(runnerOutput)) {
+    return "permission-mode-blocked";
+  }
+
+  let serialized = "";
+  try {
+    serialized = JSON.stringify(runnerOutput) ?? "";
+  } catch {
+    serialized = "";
+  }
+  const normalized = serialized.toLowerCase();
+  if (
+    normalized.includes("edit denied") ||
+    normalized.includes("edit tool denied") ||
+    normalized.includes("tool denied: edit") ||
+    normalized.includes("denied tool edit")
+  ) {
+    return "edit-denied";
+  }
+  if (
+    normalized.includes("permission denial") ||
+    normalized.includes("permission denied") ||
+    normalized.includes("requesting permission") ||
+    normalized.includes("grant permission") ||
+    normalized.includes("approval required")
+  ) {
+    return "permission-mode-blocked";
+  }
+  return null;
+}
+
+/**
  * @param {Record<string, unknown>} stepResult
  * @param {{ gitStatusAvailable?: boolean, strictCodeChangingNoop?: boolean, nonBootstrapChangedPaths?: string[], missionScopedChangedPaths?: string[], scopeViolationPaths?: string[] }} [options]
  * @returns {{ failureClass: string, decision: "pass" | "retry" | "repair" | "escalate" | "block" | "fail", missionOutcome: string }}
@@ -367,6 +427,7 @@ export function classifyRuntimeStepOutcome(stepResult, options = {}) {
   const stepStatus = asString(stepResult.status);
   const adapterStatus = asString(adapterResponse.status);
   const failureKind = asString(adapterOutput.failure_kind);
+  const permissionFailureKind = permissionFailureKindFromAdapterOutput(adapterOutput);
   const existingDecision = asString(stepResult.runtime_harness_decision);
   const existingOutcome = asString(stepResult.mission_outcome);
   const stepClass = asString(stepResult.step_class);
@@ -374,6 +435,13 @@ export function classifyRuntimeStepOutcome(stepResult, options = {}) {
   const meaningfulChangedPaths = Array.isArray(options.missionScopedChangedPaths)
     ? options.missionScopedChangedPaths
     : options.nonBootstrapChangedPaths;
+
+  if (permissionFailureKind === "permission-mode-blocked") {
+    return { failureClass: "permission-mode-blocked", decision: "repair", missionOutcome: "not_satisfied" };
+  }
+  if (permissionFailureKind === "edit-denied") {
+    return { failureClass: "edit-denied", decision: "repair", missionOutcome: "not_satisfied" };
+  }
 
   if (
     stepClass === "runner" &&

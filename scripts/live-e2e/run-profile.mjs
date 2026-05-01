@@ -9,7 +9,10 @@ import {
   stringify as stringifyYaml,
 } from "../../packages/contracts/node_modules/yaml/dist/index.js";
 
-import { classifyExternalRunnerFailure } from "../../packages/adapter-sdk/src/index.mjs";
+import {
+  classifyExternalRunnerFailure,
+  resolveExternalRuntimePermissionPolicy,
+} from "../../packages/adapter-sdk/src/index.mjs";
 import { loadContractFile, validateContractDocument } from "../../packages/contracts/src/index.mjs";
 
 const DEFAULT_STAGES = Object.freeze([
@@ -134,6 +137,63 @@ function asStringMap(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function hasNonEmptyPermissionDenials(value) {
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasNonEmptyPermissionDenials(entry));
+  }
+
+  const record = asRecord(value);
+  const entries = Object.entries(record);
+  if (entries.length === 0) {
+    return false;
+  }
+
+  const permissionDenials = record.permission_denials;
+  if (Array.isArray(permissionDenials) && permissionDenials.length > 0) {
+    return true;
+  }
+
+  return entries.some(([, entry]) => hasNonEmptyPermissionDenials(entry));
+}
+
+/**
+ * @param {string} stdout
+ * @returns {boolean}
+ */
+function stdoutHasStructuredPermissionDenials(stdout) {
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  try {
+    return hasNonEmptyPermissionDenials(JSON.parse(trimmed));
+  } catch {
+    // Try JSONL below.
+  }
+
+  const lines = trimmed.split(/\r?\n/u).filter((line) => line.trim().length > 0);
+  if (lines.length === 0) {
+    return false;
+  }
+
+  for (const line of lines) {
+    try {
+      if (hasNonEmptyPermissionDenials(JSON.parse(line))) {
+        return true;
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/**
  * @param {string[]} values
  * @returns {string[]}
  */
@@ -232,6 +292,21 @@ function resolveRunnerAuthMode(value) {
     return "isolated";
   }
   throw new UsageError("Flag '--runner-auth-mode' must be either 'host' or 'isolated'.");
+}
+
+/**
+ * @param {string | null} value
+ * @returns {"full-bypass" | "restricted"}
+ */
+function resolveRuntimeAgentPermissionMode(value) {
+  const normalized = value ? value.toLowerCase() : "full-bypass";
+  if (normalized === "full-bypass") {
+    return "full-bypass";
+  }
+  if (normalized === "restricted") {
+    return "restricted";
+  }
+  throw new UsageError("Flag '--runtime-agent-permission-mode' must be either 'full-bypass' or 'restricted'.");
 }
 
 /**
@@ -1274,6 +1349,7 @@ function resolveCommandForPreflight(command, env, cwd) {
  *   env: NodeJS.ProcessEnv,
  *   runnerAuthMode: string,
  *   runnerAuthSource: string,
+ *   runtimeAgentPermissionMode: string,
  *   authProbeRequired: boolean,
  *   runId: string,
  *   reportsRoot: string,
@@ -1301,6 +1377,7 @@ function runLiveAdapterPreflight(options) {
     required_provider: requiredProvider,
     runner_auth_mode: options.runnerAuthMode,
     runner_auth_source: options.runnerAuthSource,
+    runtime_agent_permission_mode: options.runtimeAgentPermissionMode,
     adapter_profile_file: adapterProfileFile,
     auth_probe: {
       enabled: options.authProbeRequired,
@@ -1308,6 +1385,10 @@ function runLiveAdapterPreflight(options) {
       attempts: [],
     },
     edit_readiness: {
+      enabled: false,
+      status: "not_required",
+    },
+    permission_readiness: {
       enabled: false,
       status: "not_required",
     },
@@ -1355,7 +1436,6 @@ function runLiveAdapterPreflight(options) {
   const runtimeMode = asNonEmptyString(execution.runtime_mode);
   const liveBaseline = execution.live_baseline === true;
   const runtimeCommand = asNonEmptyString(externalRuntime.command);
-  const runtimeArgs = asStringArray(externalRuntime.args);
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
   const probeTimeoutMs = Math.min(timeoutMs, 30000);
   const envOverrides = asStringMap(externalRuntime.env);
@@ -1363,14 +1443,22 @@ function runLiveAdapterPreflight(options) {
     ...options.env,
     ...envOverrides,
   };
+  const requestedPermissionMode =
+    asNonEmptyString(runnerEnv.AOR_RUNTIME_AGENT_PERMISSION_MODE) || options.runtimeAgentPermissionMode;
+  const runtimeInvocation = resolveExternalRuntimePermissionPolicy({
+    externalRuntime,
+    requestedMode: requestedPermissionMode,
+  });
   const runtimeReport = {
     runtime_mode: runtimeMode || null,
     live_baseline: liveBaseline,
     external_runtime: {
       command: runtimeCommand || null,
-      args: runtimeArgs,
+      args: runtimeInvocation.args,
       timeout_ms: timeoutMs,
       auth_probe_timeout_ms: probeTimeoutMs,
+      permission_mode: runtimeInvocation.permissionMode,
+      permission_mode_source: runtimeInvocation.source,
     },
   };
 
@@ -1385,6 +1473,20 @@ function runLiveAdapterPreflight(options) {
     return fail(
       "missing-live-runtime",
       `Adapter '${adapterId}' live runtime is missing execution.external_runtime.command.`,
+      runtimeReport,
+    );
+  }
+  if (!runtimeInvocation.ok) {
+    return fail(
+      runtimeInvocation.failureKind,
+      `Adapter '${adapterId}' live runtime permission policy is invalid: ${runtimeInvocation.message}`,
+      runtimeReport,
+    );
+  }
+  if (requiredProvider && runtimeInvocation.permissionMode !== requestedPermissionMode) {
+    return fail(
+      "permission-policy-invalid",
+      `Adapter '${adapterId}' did not report selected runtime-agent permission mode '${requestedPermissionMode}'.`,
       runtimeReport,
     );
   }
@@ -1405,28 +1507,17 @@ function runLiveAdapterPreflight(options) {
     );
   }
 
-  if (!options.authProbeRequired) {
-    const report = {
-      ...baseReport,
-      ...runtimeReport,
-      resolved_command: resolvedCommand,
-      auth_probe: {
-        enabled: false,
-        status: "skipped",
-        attempts: [],
-      },
-      summary: `Live adapter preflight passed for provider variant '${options.providerVariantId}' with auth probe skipped.`,
-    };
-    writeJson(reportFile, report);
-    return {
-      status: "pass",
-      summary: asNonEmptyString(report.summary),
-      report,
-      reportFile,
-    };
-  }
+  const permissionProbeRoot = path.join(
+    options.targetCheckoutRoot,
+    ".aor",
+    "live-e2e-preflight",
+    normalizeId(options.runId),
+  );
+  const permissionNonceFile = path.join(permissionProbeRoot, "permission-nonce.txt");
+  const permissionMarkerFile = path.join(permissionProbeRoot, "permission-marker.txt");
+  const permissionMarkerContents = `permission-readiness:${options.runId}`;
 
-  const buildProbeInput = (stepClass, objective) => `${JSON.stringify({
+  const buildProbeInput = (stepClass, objective, extraRequest = {}) => `${JSON.stringify({
     request: {
       request_id: `live-adapter-preflight.${stepClass}`,
       run_id: options.runId,
@@ -1434,18 +1525,20 @@ function runLiveAdapterPreflight(options) {
       step_class: stepClass,
       objective,
       non_interactive: true,
+      ...extraRequest,
     },
     adapter: {
       adapter_id: adapterId,
       provider_variant_id: options.providerVariantId,
+      permission_mode: runtimeInvocation.permissionMode,
     },
   })}\n`;
-  const runProbeAttempt = (kind, attempt, objective) => {
-    const probe = spawnSync(resolvedCommand, runtimeArgs, {
+  const runProbeAttempt = (kind, attempt, objective, extraRequest = {}) => {
+    const probe = spawnSync(resolvedCommand, runtimeInvocation.args, {
       cwd: options.targetCheckoutRoot,
       env: runnerEnv,
       encoding: "utf8",
-      input: buildProbeInput(kind, objective),
+      input: buildProbeInput(kind, objective, extraRequest),
       timeout: probeTimeoutMs,
       maxBuffer: 1024 * 1024,
     });
@@ -1453,11 +1546,23 @@ function runLiveAdapterPreflight(options) {
     const probeTimedOut =
       probeError?.code === "ETIMEDOUT" || (probe.signal === "SIGTERM" && probe.status === null);
     const commandFailed = probeError !== null || probeTimedOut || probe.status !== 0;
-    const semanticFailureKind = classifyExternalRunnerFailure({
-      stdout: probe.stdout ?? "",
-      stderr: probe.stderr ?? "",
+    const stdout = probe.stdout ?? "";
+    const stderr = probe.stderr ?? "";
+    const structuredFailureKind = stdoutHasStructuredPermissionDenials(stdout) ? "permission-mode-blocked" : "none";
+    const semanticFailureKind =
+      structuredFailureKind !== "none"
+        ? structuredFailureKind
+        : classifyExternalRunnerFailure({
+            stdout,
+            stderr,
+            errorMessage: probeError?.message ?? null,
+            defaultFailureKind: "none",
+          });
+    const commandFailureKind = classifyExternalRunnerFailure({
+      stdout,
+      stderr,
       errorMessage: probeError?.message ?? null,
-      defaultFailureKind: "none",
+      defaultFailureKind: "external-runner-failed",
     });
     const failureKind =
       probeError?.code === "ENOENT"
@@ -1465,12 +1570,9 @@ function runLiveAdapterPreflight(options) {
         : probeTimedOut
           ? "external-runner-timeout"
           : commandFailed
-            ? classifyExternalRunnerFailure({
-                stdout: probe.stdout ?? "",
-                stderr: probe.stderr ?? "",
-                errorMessage: probeError?.message ?? null,
-                defaultFailureKind: "external-runner-failed",
-              })
+            ? structuredFailureKind !== "none"
+              ? structuredFailureKind
+              : commandFailureKind
             : semanticFailureKind === "none"
               ? null
               : semanticFailureKind;
@@ -1483,51 +1585,66 @@ function runLiveAdapterPreflight(options) {
       timed_out: probeTimedOut,
       failure_kind: failureKind,
       error_code: probeError?.code ?? null,
-      stdout_excerpt: (probe.stdout ?? "").slice(0, 4000),
-      stderr_excerpt: (probe.stderr ?? "").slice(0, 4000),
+      stdout_excerpt: stdout.slice(0, 4000),
+      stderr_excerpt: stderr.slice(0, 4000),
     };
   };
   const authAttempts = [];
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const attemptResult = runProbeAttempt(
-      "preflight",
-      attempt,
-      "Confirm that the external runner can authenticate and complete a minimal non-interactive invocation.",
-    );
-    authAttempts.push(attemptResult);
-    if (attemptResult.status === "pass") {
-      break;
-    }
-    const retryable =
-      attempt === 1 &&
-      ["external-runner-timeout", "auth-failed", "external-runner-failed"].includes(
-        asNonEmptyString(attemptResult.failure_kind) || "",
+  let authProbeReport = {
+    enabled: false,
+    status: "skipped",
+    attempts: authAttempts,
+  };
+  if (options.authProbeRequired) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const attemptResult = runProbeAttempt(
+        "preflight",
+        attempt,
+        "Confirm that the external runner can authenticate and complete a minimal non-interactive invocation.",
       );
-    if (!retryable) {
-      break;
+      authAttempts.push(attemptResult);
+      if (attemptResult.status === "pass") {
+        break;
+      }
+      const retryable =
+        attempt === 1 &&
+        ["external-runner-timeout", "auth-failed", "external-runner-failed"].includes(
+          asNonEmptyString(attemptResult.failure_kind) || "",
+        );
+      if (!retryable) {
+        break;
+      }
     }
-  }
-  const finalAuthAttempt = authAttempts[authAttempts.length - 1];
-  if (!finalAuthAttempt || finalAuthAttempt.status !== "pass") {
-    const failureKind = asNonEmptyString(finalAuthAttempt?.failure_kind) || "external-runner-failed";
-    return fail(
-      failureKind,
-      `Live adapter preflight failed for adapter '${adapterId}' before run start.`,
-      {
-        ...runtimeReport,
-        resolved_command: resolvedCommand,
-        auth_probe: {
-          enabled: true,
-          status: "fail",
-          attempts: authAttempts,
-          exit_code: finalAuthAttempt?.exit_code ?? null,
-          signal: finalAuthAttempt?.signal ?? null,
-          timed_out: finalAuthAttempt?.timed_out === true,
-          failure_kind: failureKind,
-          error_code: finalAuthAttempt?.error_code ?? null,
+    const finalAuthAttempt = authAttempts[authAttempts.length - 1];
+    if (!finalAuthAttempt || finalAuthAttempt.status !== "pass") {
+      const failureKind = asNonEmptyString(finalAuthAttempt?.failure_kind) || "external-runner-failed";
+      return fail(
+        failureKind,
+        `Live adapter preflight failed for adapter '${adapterId}' before run start.`,
+        {
+          ...runtimeReport,
+          resolved_command: resolvedCommand,
+          auth_probe: {
+            enabled: true,
+            status: "fail",
+            attempts: authAttempts,
+            exit_code: finalAuthAttempt?.exit_code ?? null,
+            signal: finalAuthAttempt?.signal ?? null,
+            timed_out: finalAuthAttempt?.timed_out === true,
+            failure_kind: failureKind,
+            error_code: finalAuthAttempt?.error_code ?? null,
+          },
         },
-      },
-    );
+      );
+    }
+    authProbeReport = {
+      enabled: true,
+      status: "pass",
+      attempts: authAttempts,
+      exit_code: finalAuthAttempt.exit_code,
+      signal: finalAuthAttempt.signal,
+      timed_out: false,
+    };
   }
 
   const editReadiness = requiredProvider
@@ -1545,14 +1662,7 @@ function runLiveAdapterPreflight(options) {
       {
         ...runtimeReport,
         resolved_command: resolvedCommand,
-        auth_probe: {
-          enabled: true,
-          status: "pass",
-          attempts: authAttempts,
-          exit_code: finalAuthAttempt.exit_code,
-          signal: finalAuthAttempt.signal,
-          timed_out: false,
-        },
+        auth_probe: authProbeReport,
         edit_readiness: {
           enabled: true,
           status: "fail",
@@ -1563,23 +1673,106 @@ function runLiveAdapterPreflight(options) {
     );
   }
 
+  let permissionReadiness = null;
+  if (requiredProvider) {
+    fs.mkdirSync(permissionProbeRoot, { recursive: true });
+    fs.writeFileSync(permissionNonceFile, `${permissionMarkerContents}\n`, "utf8");
+    fs.rmSync(permissionMarkerFile, { force: true });
+    permissionReadiness = runProbeAttempt(
+      "preflight-permission-readiness",
+      1,
+      [
+        "Confirm that the external runner can read a nonce file and write a marker file in the isolated runtime root.",
+        `Read ${permissionNonceFile}.`,
+        `Write exactly '${permissionMarkerContents}' to ${permissionMarkerFile}.`,
+        "Do not ask questions.",
+      ].join(" "),
+      {
+        permission_probe: {
+          nonce_file: permissionNonceFile,
+          marker_file: permissionMarkerFile,
+          expected_marker_contents: permissionMarkerContents,
+        },
+      },
+    );
+    const markerContents = fileExists(permissionMarkerFile)
+      ? fs.readFileSync(permissionMarkerFile, "utf8").trim()
+      : "";
+    const markerStatus =
+      markerContents === permissionMarkerContents
+        ? "present"
+        : markerContents
+          ? "unexpected-contents"
+          : "missing";
+    if (permissionReadiness.status === "pass" && markerContents !== permissionMarkerContents) {
+      permissionReadiness = {
+        ...permissionReadiness,
+        status: "fail",
+        failure_kind: "permission-mode-blocked",
+        marker_file: permissionMarkerFile,
+        marker_status: markerStatus,
+      };
+    } else {
+      permissionReadiness = {
+        ...permissionReadiness,
+        marker_file: permissionMarkerFile,
+        marker_status: markerStatus,
+      };
+    }
+  }
+  if (permissionReadiness && permissionReadiness.status !== "pass") {
+    const failureKind = asNonEmptyString(permissionReadiness.failure_kind) || "permission-mode-blocked";
+    return fail(
+      failureKind,
+      `Live adapter preflight failed permission-readiness for adapter '${adapterId}' before run start.`,
+      {
+        ...runtimeReport,
+        resolved_command: resolvedCommand,
+        auth_probe: authProbeReport,
+        edit_readiness: editReadiness
+          ? {
+              enabled: true,
+              status: "pass",
+              attempts: [editReadiness],
+            }
+          : {
+              enabled: false,
+              status: "not_required",
+            },
+        permission_readiness: {
+          enabled: true,
+          status: "fail",
+          failure_kind: failureKind,
+          attempts: [permissionReadiness],
+          nonce_file: permissionNonceFile,
+          marker_file: permissionMarkerFile,
+        },
+      },
+    );
+  }
+
   const report = {
     ...baseReport,
     ...runtimeReport,
     resolved_command: resolvedCommand,
-    auth_probe: {
-      enabled: true,
-      status: "pass",
-      attempts: authAttempts,
-      exit_code: finalAuthAttempt.exit_code,
-      signal: finalAuthAttempt.signal,
-      timed_out: false,
-    },
+    auth_probe: authProbeReport,
     edit_readiness: editReadiness
       ? {
           enabled: true,
           status: "pass",
           attempts: [editReadiness],
+        }
+      : {
+          enabled: false,
+          status: "not_required",
+        },
+    permission_readiness: permissionReadiness
+      ? {
+          enabled: true,
+          status: "pass",
+          attempts: [permissionReadiness],
+          nonce_file: permissionNonceFile,
+          marker_file: permissionMarkerFile,
         }
       : {
           enabled: false,
@@ -1932,6 +2125,7 @@ function evaluateScenarioCoverage(options) {
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
  *   examplesRoot: string,
  *   runnerAuthMode: "host" | "isolated",
+ *   runtimeAgentPermissionMode: "full-bypass" | "restricted",
  * }}
  */
 function executeInstalledUserFlow(options) {
@@ -1948,6 +2142,7 @@ function executeInstalledUserFlow(options) {
     runnerAuthMode: options.runnerAuthMode,
   });
   const env = proofRunnerEnvironment.env;
+  env.AOR_RUNTIME_AGENT_PERMISSION_MODE = options.runtimeAgentPermissionMode;
 
   const artifacts = {
     host_runtime_root: options.layout.runtimeRoot,
@@ -1958,6 +2153,7 @@ function executeInstalledUserFlow(options) {
     codex_home_isolated: options.runnerAuthMode === "isolated",
     runner_auth_mode: proofRunnerEnvironment.runnerAuthMode,
     runner_auth_source: proofRunnerEnvironment.runnerAuthSource,
+    runtime_agent_permission_mode: options.runtimeAgentPermissionMode,
   };
   const startedAt = nowIso();
   try {
@@ -2382,6 +2578,7 @@ function executeInstalledUserFlow(options) {
  *   coverageFollowUp: Record<string, unknown>,
  *   coverageTier: string,
  *   runnerAuthMode: "host" | "isolated",
+ *   runtimeAgentPermissionMode: "full-bypass" | "restricted",
  *   authProbeRequired: boolean,
  * }} options
  */
@@ -2399,6 +2596,7 @@ function executeFullJourneyFlow(options) {
     runnerAuthMode: options.runnerAuthMode,
   });
   const env = proofRunnerEnvironment.env;
+  env.AOR_RUNTIME_AGENT_PERMISSION_MODE = options.runtimeAgentPermissionMode;
   if (options.examplesRootOverride) {
     env.AOR_BOOTSTRAP_ASSETS_ROOT = options.examplesRootOverride;
     env.AOR_EXAMPLES_ROOT = options.examplesRootOverride;
@@ -2413,6 +2611,7 @@ function executeFullJourneyFlow(options) {
     codex_home_isolated: options.runnerAuthMode === "isolated",
     runner_auth_mode: proofRunnerEnvironment.runnerAuthMode,
     runner_auth_source: proofRunnerEnvironment.runnerAuthSource,
+    runtime_agent_permission_mode: options.runtimeAgentPermissionMode,
     target_catalog_file: options.catalogTargetPath,
     scenario_policy_file: options.scenarioPolicyPath,
     provider_variant_file: options.providerVariantPath,
@@ -2496,6 +2695,7 @@ function executeFullJourneyFlow(options) {
       env,
       runnerAuthMode: proofRunnerEnvironment.runnerAuthMode,
       runnerAuthSource: proofRunnerEnvironment.runnerAuthSource,
+      runtimeAgentPermissionMode: options.runtimeAgentPermissionMode,
       authProbeRequired: options.authProbeRequired,
       runId: options.runId,
       reportsRoot: options.layout.reportsRoot,
@@ -3356,13 +3556,14 @@ function writeProofRunnerArtifacts(options) {
     scorecard_files: [scorecardFile],
     control_surfaces: {
       installed_user_proof_runner:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated]",
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted]",
       public_cli_sequence: options.flowResult.commandResults.map((result) => result.command_surface).filter(Boolean),
       aor_bin: options.aorLaunch.binaryRef,
       examples_root: options.examplesRoot,
     },
     runner_auth_mode: asNonEmptyString(options.flowResult.artifacts.runner_auth_mode) || null,
     runner_auth_source: asNonEmptyString(options.flowResult.artifacts.runner_auth_source) || null,
+    runtime_agent_permission_mode: asNonEmptyString(options.flowResult.artifacts.runtime_agent_permission_mode) || null,
     error:
       options.flowResult.status === "fail"
         ? options.flowResult.stageResults.find((stage) => stage.status === "fail")?.summary ||
@@ -3413,7 +3614,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted]",
         "",
         "Installed-user black-box proof runner.",
       ].join("\n"),
@@ -3437,6 +3638,9 @@ function runCli(rawArgs) {
   const aorBin = resolveOptionalStringFlag(flags["aor-bin"], "aor-bin");
   const catalogRootOverride = resolveOptionalStringFlag(flags["catalog-root"], "catalog-root");
   const runnerAuthMode = resolveRunnerAuthMode(resolveOptionalStringFlag(flags["runner-auth-mode"], "runner-auth-mode"));
+  const runtimeAgentPermissionMode = resolveRuntimeAgentPermissionMode(
+    resolveOptionalStringFlag(flags["runtime-agent-permission-mode"], "runtime-agent-permission-mode"),
+  );
   const explicitExamplesRoot =
     Object.prototype.hasOwnProperty.call(flags, "examples-root")
       ? resolveOptionalStringFlag(flags["examples-root"], "examples-root")
@@ -3508,6 +3712,7 @@ function runCli(rawArgs) {
           coverageFollowUp: fullJourneyResolution.coverageFollowUp,
           coverageTier: fullJourneyResolution.coverageTier,
           runnerAuthMode,
+          runtimeAgentPermissionMode,
           authProbeRequired: resolveAuthProbeRequired(profile),
         })
       : executeInstalledUserFlow({
@@ -3518,6 +3723,7 @@ function runCli(rawArgs) {
           profile,
           aorLaunch,
           runnerAuthMode,
+          runtimeAgentPermissionMode,
           examplesRoot:
             examplesRoot ??
             (() => {
@@ -3541,6 +3747,7 @@ function runCli(rawArgs) {
       artifacts: {
         host_runtime_root: layout.runtimeRoot,
         host_reports_root: layout.reportsRoot,
+        runtime_agent_permission_mode: runtimeAgentPermissionMode,
       },
     };
   }
