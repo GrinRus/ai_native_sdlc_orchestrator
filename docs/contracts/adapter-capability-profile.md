@@ -25,6 +25,13 @@ Live adapter baselines can add optional execution metadata without changing requ
 
 `execution.external_runtime.env` is optional and should only carry safe, non-secret runner overrides. Installed-user live E2E runs should inherit host CLI authentication by default instead of encoding auth paths or secrets in adapter profiles.
 
+`execution.external_runtime.permission_policy` is optional for backwards compatibility. When present, it declares named non-interactive permission modes:
+- `default_mode` selects the adapter default when `AOR_RUNTIME_AGENT_PERMISSION_MODE` is not set.
+- `modes.<mode>.args` replaces `execution.external_runtime.args` for that selected mode.
+
+Live E2E defaults to `full-bypass` so installed-user acceptance runs do not hang on runtime-agent approval prompts inside isolated target checkouts. `restricted` should preserve the safer adapter-native prompting mode for local diagnostics. If `AOR_RUNTIME_AGENT_PERMISSION_MODE` requests a mode that the profile does not declare, adapter execution must return blocked semantics with `failure_kind=permission-policy-invalid`. Profiles without `permission_policy` keep using legacy `execution.external_runtime.args`.
+In-process adapters without `execution.external_runtime`, such as `mock-runner`, may declare profile-level `permission_policy: not_applicable` as informational evidence that runtime-agent approval prompts do not apply.
+
 When live runtime prerequisites are missing (for example command not found on PATH), adapter execution should return explicit blocked semantics instead of synthetic success.
 Live E2E preflight must reject required provider variants whose primary adapter lacks the external-live metadata above. Extended provider variants may reference candidate adapters that are not yet live baselines.
 

@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 import { executeRoutedStep, executeRuntimeHarnessControlledStep } from "../src/step-execution-engine.mjs";
-import { materializeRuntimeHarnessReport } from "../src/runtime-harness-report.mjs";
+import { classifyRuntimeStepOutcome, materializeRuntimeHarnessReport } from "../src/runtime-harness-report.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -143,6 +143,99 @@ test("materializeRuntimeHarnessReport aggregates routed step decisions for one r
     assert.equal(report.report.step_decisions.length, 1);
     assert.equal(report.report.step_decisions[0].compiled_context_ref, step.stepResult.routed_execution.context_compilation.compiled_context_ref);
     assert.equal(report.report.step_decisions[0].runtime_harness_decision, "pass");
+  });
+});
+
+test("runtime harness classifies structured permission denials before strict no-op repair", () => {
+  const outcome = classifyRuntimeStepOutcome(
+    {
+      step_result_id: "run.permission.step.implement",
+      run_id: "run.permission",
+      step_id: "run.start.implement",
+      step_class: "runner",
+      status: "passed",
+      summary: "Adapter completed without changes.",
+      evidence_refs: [],
+      routed_execution: {
+        mode: "execute",
+        adapter_response: {
+          status: "success",
+          output: {
+            runner_output: {
+              type: "result",
+              result: "Could you grant permission to read the handoff packet?",
+              permission_denials: [
+                {
+                  tool_name: "Read",
+                  tool_input: {
+                    file_path: ".aor/projects/run/artifacts/handoff.json",
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+    {
+      gitStatusAvailable: true,
+      strictCodeChangingNoop: true,
+      missionScopedChangedPaths: [],
+      scopeViolationPaths: [],
+    },
+  );
+
+  assert.deepEqual(outcome, {
+    failureClass: "permission-mode-blocked",
+    decision: "repair",
+    missionOutcome: "not_satisfied",
+  });
+
+  const nestedOutcome = classifyRuntimeStepOutcome(
+    {
+      step_result_id: "run.permission.step.implement.nested",
+      run_id: "run.permission",
+      step_id: "run.start.implement",
+      step_class: "runner",
+      status: "passed",
+      summary: "Adapter completed without changes.",
+      evidence_refs: [],
+      routed_execution: {
+        mode: "execute",
+        adapter_response: {
+          status: "success",
+          output: {
+            runner_output: {
+              jsonl_events: [
+                {
+                  type: "tool_result",
+                  permission_denials: [
+                    {
+                      tool_name: "Read",
+                      tool_input: {
+                        file_path: ".aor/projects/run/artifacts/spec.json",
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+    {
+      gitStatusAvailable: true,
+      strictCodeChangingNoop: true,
+      missionScopedChangedPaths: [],
+      scopeViolationPaths: [],
+    },
+  );
+
+  assert.deepEqual(nestedOutcome, {
+    failureClass: "permission-mode-blocked",
+    decision: "repair",
+    missionOutcome: "not_satisfied",
   });
 });
 
@@ -402,6 +495,8 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
     assert.equal(result.stepResult.routed_execution.adapter_response.status, "success");
     assert.equal(result.stepResult.routed_execution.adapter_response.output.mode, "execute");
     assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.command, process.execPath);
+    assert.equal(result.stepResult.external_runner.command, process.execPath);
+    assert.equal(result.stepResult.external_runner.permission_mode, "legacy");
     assert.equal(
       fs.realpathSync(result.stepResult.routed_execution.adapter_response.output.external_runner.execution_root),
       fs.realpathSync(executionRoot),

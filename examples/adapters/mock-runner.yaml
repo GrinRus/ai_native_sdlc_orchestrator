@@ -16,6 +16,7 @@ constraints:
   default_network_mode: deny-by-default
   supports_no_write_rehearsal: true
 sandbox_mode: in-process
+permission_policy: not_applicable
 approval_features:
   supports_human_approval: false
   supports_pause_resume: false

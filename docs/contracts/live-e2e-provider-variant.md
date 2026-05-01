@@ -17,3 +17,4 @@ Machine-readable internal catalog document that pins one full-journey live E2E r
 - Provider variants may additionally carry `coverage_tier` so the curated matrix can distinguish mandatory coverage (`required`) from extended coverage (`extended`).
 - `coverage_tier=required` variants must point `primary_adapter` at an adapter capability profile with `execution.live_baseline=true`, `execution.runtime_mode=external-process`, and an executable `execution.external_runtime.command`.
 - `coverage_tier=extended` variants may point at candidate adapters that are cataloged but not yet certified as live baselines.
+- Provider variants inherit the selected runtime-agent permission mode from the live E2E runner. The mode is resolved by the primary adapter profile and recorded in preflight and adapter evidence.

@@ -30,6 +30,24 @@ execution:
       - --no-session-persistence
       - --permission-mode
       - auto
+    permission_policy:
+      default_mode: full-bypass
+      modes:
+        full-bypass:
+          args:
+            - --print
+            - --output-format
+            - json
+            - --no-session-persistence
+            - --dangerously-skip-permissions
+        restricted:
+          args:
+            - --print
+            - --output-format
+            - json
+            - --no-session-persistence
+            - --permission-mode
+            - auto
     request_via_stdin: true
     timeout_ms: 600000
 sandbox_mode: local-or-container

@@ -1147,6 +1147,8 @@ export function executeRoutedStep(options) {
     (missionProfile.missionType === "code-changing" || missionProfile.missionType === "release") &&
     changedPathStatusBefore.available &&
     changedPathStatusAfter.available;
+  const adapterOutputForStep = asRecord(adapterResponse?.output);
+  const externalRunnerForStep = asRecord(adapterOutputForStep.external_runner);
   const stepResult = {
     step_result_id: stepResultId,
     run_id: runId,
@@ -1245,6 +1247,9 @@ export function executeRoutedStep(options) {
       strictness_profile: missionProfile.strictnessProfile,
     },
   };
+  if (Object.keys(externalRunnerForStep).length > 0) {
+    stepResult.external_runner = externalRunnerForStep;
+  }
   const runtimeOutcome = classifyRuntimeStepOutcome(stepResult, {
     gitStatusAvailable: changedPathStatusBefore.available && changedPathStatusAfter.available,
     strictCodeChangingNoop,
