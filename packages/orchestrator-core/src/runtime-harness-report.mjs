@@ -195,6 +195,26 @@ function filterNonBootstrapChangedPaths(changedPaths) {
 }
 
 /**
+ * @param {string} candidate
+ * @returns {boolean}
+ */
+function isTransientBackupPath(candidate) {
+  const basename = path.posix.basename(candidate.replace(/\\/g, "/")).toLowerCase();
+  return (
+    basename.startsWith(".#") ||
+    /(?:~|\.bak|\.backup|\.orig|\.rej|\.tmp|\.swp|\.swo|\.old)$/u.test(basename)
+  );
+}
+
+/**
+ * @param {string[]} changedPaths
+ * @returns {string[]}
+ */
+function filterMeaningfulCodeChangedPaths(changedPaths) {
+  return changedPaths.filter((candidate) => !isTransientBackupPath(candidate));
+}
+
+/**
  * @param {string} pattern
  * @param {string} candidate
  * @returns {boolean}
@@ -319,7 +339,9 @@ export function resolveRuntimeMissionProfile(projectRoot, artifactsRoot) {
  */
 function resolveMissionScopedChanges(changedPaths, missionScope) {
   const ignoredInputFiles = new Set(missionScope.ignoredInputFiles);
-  const scopeCandidates = changedPaths.filter((changedPath) => !ignoredInputFiles.has(changedPath));
+  const scopeCandidates = changedPaths.filter(
+    (changedPath) => !ignoredInputFiles.has(changedPath) && !isTransientBackupPath(changedPath),
+  );
   const forbiddenChangedPaths = scopeCandidates.filter((changedPath) =>
     missionScope.forbiddenPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
   );
@@ -404,11 +426,20 @@ function permissionFailureKindFromAdapterOutput(adapterOutput) {
     return "edit-denied";
   }
   if (
-    normalized.includes("permission denial") ||
-    normalized.includes("permission denied") ||
-    normalized.includes("requesting permission") ||
-    normalized.includes("grant permission") ||
-    normalized.includes("approval required")
+    normalized.includes("tool_use_denied") ||
+    normalized.includes("tool use denied") ||
+    normalized.includes("tool denied") ||
+    normalized.includes("approval required for tool") ||
+    normalized.includes("approval is required for tool") ||
+    normalized.includes("requesting permission to use") ||
+    normalized.includes("grant permission to use") ||
+    /\bpermissions?\s+(?:is\s+|are\s+)?required\s+for\s+(?:tool|edit|write|command)\b/u.test(normalized) ||
+    /\bpermission[- ]mode\s+(?:blocked|denied|requires|required)\b/u.test(normalized) ||
+    /\b(?:blocked|denied)\s+by\s+permission[- ]mode\b/u.test(normalized) ||
+    normalized.includes("workspace trust") ||
+    normalized.includes("not trusted") ||
+    /\brunner\s+sandbox\s+(?:blocked|denied|violation|requires|required)\b/u.test(normalized) ||
+    /\btool\s+sandbox\s+(?:blocked|denied|violation|requires|required)\b/u.test(normalized)
   ) {
     return "permission-mode-blocked";
   }
@@ -857,7 +888,7 @@ function resolveDeliveryFindings(deliveryArtifacts, missionSemantics) {
     }
 
     const changedPaths = extractDeliveryChangedPaths(artifact.document);
-    const nonBootstrapChangedPaths = filterNonBootstrapChangedPaths(changedPaths);
+    const nonBootstrapChangedPaths = filterMeaningfulCodeChangedPaths(filterNonBootstrapChangedPaths(changedPaths));
     if (missionSemantics.strictCodeChangingNoop && nonBootstrapChangedPaths.length === 0) {
       findings.push({
         finding_id: `${manifestId}.delivery-empty-patch`,

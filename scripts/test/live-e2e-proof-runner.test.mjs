@@ -23,7 +23,9 @@ function withTempRoot(callback) {
   try {
     callback(tempRoot);
   } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
+    if (process.env.AOR_KEEP_TEST_TEMP !== "1") {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   }
 }
 
@@ -195,9 +197,12 @@ function createFakeClaudeBinary(options) {
 /**
  * @param {{
  *   examplesRoot: string,
+ *   adapterFileName: string,
  *   command: string,
  *   args: string[],
  *   includePermissionPolicy?: boolean,
+ *   timeoutMs?: number,
+ *   preflightTimeoutMs?: number,
  * }} options
  */
 function configureAdapterExternalRuntime(options) {
@@ -227,7 +232,10 @@ function configureAdapterExternalRuntime(options) {
         ]
       : []),
     "    request_via_stdin: true",
-    "    timeout_ms: 30000",
+    ...(typeof options.preflightTimeoutMs === "number"
+      ? [`    preflight_timeout_ms: ${String(options.preflightTimeoutMs)}`]
+      : []),
+    `    timeout_ms: ${String(options.timeoutMs ?? 30000)}`,
   ].join("\n");
   const updated = source.includes("execution:\n")
     ? source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`)
@@ -295,6 +303,41 @@ function configureCodexExternalRuntimeNoop(options) {
         "output:{runner:'node-inline-noop',step_class:request.step_class||null,execution_root:process.cwd()},",
         "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-noop'],",
         "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline-noop'}]",
+        "}));",
+      ].join(""),
+    ],
+  });
+}
+
+/**
+ * @param {{ examplesRoot: string }} options
+ */
+function configureCodexExternalRuntimeWeakensTest(options) {
+  configureAdapterExternalRuntime({
+    examplesRoot: options.examplesRoot,
+    adapterFileName: "codex-cli.yaml",
+    command: process.execPath,
+    args: [
+      "-e",
+      [
+        "const fs=require('node:fs');",
+        "const path=require('node:path');",
+        "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+        "const request=input.request||{};",
+        ...permissionProbeSnippet(),
+        "if(request.step_class==='implement'&&fs.existsSync(path.join(process.cwd(),'test','local.test.js'))){",
+        "const testPath=path.join(process.cwd(),'test','local.test.js');",
+        "const source=fs.readFileSync(testPath,'utf8');",
+        "fs.writeFileSync(testPath,source.replace('t.plan(4)','t.plan(3)').replace(\"\\n  t.true(true);\",''));",
+        "fs.writeFileSync(path.join(process.cwd(),'src','index.js.bak'),'transient backup\\n');",
+        "if(fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eWeakeningPatch = true;\\n');}",
+        "}",
+        "process.stdout.write(JSON.stringify({",
+        "status:'success',",
+        "summary:'external runner weakened a test fixture',",
+        "output:{runner:'node-inline-weakens-test',step_class:request.step_class||null,execution_root:process.cwd()},",
+        "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-weakens-test'],",
+        "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'weakens-test'}]",
         "}));",
       ].join(""),
     ],
@@ -479,6 +522,37 @@ function configureClaudeExternalRuntimeStructuredPermissionDenial(options) {
 /**
  * @param {{ examplesRoot: string }} options
  */
+function configureClaudeExternalRuntimePermissionMarkerTimeout(options) {
+  configureAdapterExternalRuntime({
+    examplesRoot: options.examplesRoot,
+    adapterFileName: "claude-code.yaml",
+    command: process.execPath,
+    preflightTimeoutMs: 1000,
+    args: [
+      "-e",
+      [
+        "const fs=require('node:fs');",
+        "const path=require('node:path');",
+        "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+        "const request=input.request||{};",
+        ...permissionProbeSnippet(),
+        "if(request.step_class==='preflight-permission-readiness'){setTimeout(()=>{},5000);}else{",
+        "if(request.step_class==='implement'&&fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eClaudeMarkerTimeoutPatch = true;\\n');}",
+        "process.stdout.write(JSON.stringify({",
+        "status:'success',",
+        "summary:'claude external runner marker-timeout fixture ok',",
+        "output:{runner:'node-inline-claude-marker-timeout',step_class:request.step_class||null,execution_root:process.cwd()},",
+        "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-claude-marker-timeout'],",
+        "tool_traces:[{phase:'invoke_adapter',kind:'claude-marker-timeout-fixture',detail:'marker-timeout'}]",
+        "}));}",
+      ].join(""),
+    ],
+  });
+}
+
+/**
+ * @param {{ examplesRoot: string }} options
+ */
 function configureClaudeExternalRuntimeLegacyPermissionArgs(options) {
   configureAdapterExternalRuntime({
     examplesRoot: options.examplesRoot,
@@ -577,6 +651,9 @@ function writeLocalProofRunnerProfile(options) {
  *   repoUrl: string,
  *   ref: string,
  *   missionId: string,
+ *   setupCommands?: string[],
+ *   verifyCommands?: string[],
+ *   postRunQuality?: Record<string, unknown>,
  * }} options
  */
 function writeLocalCatalogTarget(options) {
@@ -593,8 +670,8 @@ function writeLocalCatalogTarget(options) {
         checkout_strategy: "full",
       },
       verification: {
-        setup_commands: ['node -e "process.stdout.write(\'setup ok\\n\')"'],
-        commands: ['node -e "process.stdout.write(\'verify ok\\n\')"'],
+        setup_commands: options.setupCommands ?? ['node -e "process.stdout.write(\'setup ok\\n\')"'],
+        commands: options.verifyCommands ?? ['node -e "process.stdout.write(\'verify ok\\n\')"'],
       },
       safety_defaults: {
         write_back_to_remote: false,
@@ -648,6 +725,7 @@ function writeLocalCatalogTarget(options) {
             max_changed_files: 4,
             max_added_lines: 120,
           },
+          ...(options.postRunQuality ? { post_run_quality: options.postRunQuality } : {}),
         },
       ],
     }),
@@ -1007,6 +1085,8 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     );
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
     assert.equal(summary.status, "pass");
+    assert.equal(summary.target_catalog_id, "local-target");
+    assert.equal(summary.feature_mission_id, "local-mission");
     assert.equal(summary.runtime_agent_permission_mode, "full-bypass");
     assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor project init"), true);
     assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor intake create"), true);
@@ -1029,6 +1109,7 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
         "project-validate-approved-handoff",
         "run-start",
         "run-status",
+        "project-verify-post-run-primary",
         "review-run",
         "eval-run",
         "deliver-prepare",
@@ -1055,9 +1136,28 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     assert.equal(summary.verdict_matrix.feature_size, "small");
     assert.equal(summary.verdict_matrix.scenario_coverage_status, "pass");
     assert.equal(summary.verdict_matrix.provider_execution_status, "pass");
+    assert.equal(summary.verdict_matrix.target_baseline_status, "pass");
+    assert.equal(summary.verdict_matrix.post_run_verification_status, "pass");
+    assert.equal(summary.verdict_matrix.real_code_change_status, "pass");
+    assert.equal(summary.verdict_matrix.run_start_runtime_harness_decision, "pass");
+    assert.equal(summary.verdict_matrix.latest_runtime_harness_decision, "pass");
+    assert.equal(summary.verdict_matrix.quality_gate_decision, "pass");
     assert.equal(summary.verdict_matrix.feature_size_fit_status, "pass");
     assert.equal(summary.verdict_matrix.overall_verdict, "pass");
+    assert.equal(summary.baseline_verify_status, "pass");
+    assert.equal(summary.post_run_verify_status, "pass");
+    assert.equal(summary.provider_execution_status, "pass");
+    assert.equal(summary.real_code_change_status, "pass");
+    assert.equal(summary.runtime_harness_decision, "pass");
+    assert.equal(summary.run_start_runtime_harness_decision, "pass");
+    assert.equal(summary.latest_runtime_harness_decision, "pass");
+    assert.equal(summary.quality_gate_decision, "pass");
     assert.equal(fs.existsSync(summary.artifacts.feature_request_file), true);
+    assert.equal(summary.baseline_verify_summary_file, summary.artifacts.baseline_verify_summary_file);
+    assert.equal(summary.post_run_verify_summary_file, summary.artifacts.post_run_verify_summary_file);
+    assert.equal(fs.existsSync(summary.artifacts.baseline_verify_summary_file), true);
+    assert.equal(fs.existsSync(summary.artifacts.post_run_verify_summary_file), true);
+    assert.equal(fs.existsSync(summary.artifacts.execution_readiness_file), true);
     assert.equal(fs.existsSync(summary.runtime_harness_report_file), true);
     assert.equal(summary.verdict_matrix.runtime_harness_decision, "pass");
     assert.equal(fs.existsSync(summary.learning_loop_handoff_file), true);
@@ -1080,16 +1180,27 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     assert.equal(reviewReport.provider_traceability.requested_provider, "openai");
     assert.equal(reviewReport.provider_traceability.actual_provider, "openai");
     assert.equal(reviewReport.provider_traceability.actual_adapter, "codex-cli");
+    const postRunVerifyProjectId = path.basename(path.dirname(path.dirname(summary.artifacts.post_run_verify_summary_file)));
+    assert.equal(
+      reviewReport.artifact_quality.verify_summary_ref,
+      `evidence://.aor/projects/${postRunVerifyProjectId}/reports/verify-summary-post-run-primary.json`,
+    );
     assert.equal(reviewReport.feature_size_fit.feature_size, "small");
     assert.equal(summary.artifacts.artifact_consistency.status, "pass");
     assert.deepEqual(reviewReport.feature_traceability.matrix_cell, summary.matrix_cell);
     assert.deepEqual(reviewReport.feature_traceability.coverage_follow_up, summary.coverage_follow_up);
     const auditTranscript = JSON.parse(fs.readFileSync(summary.artifacts.run_audit_file, "utf8"));
     const auditRecord = auditTranscript.parsed_json.run_audit_records[0];
+    assert.equal(auditRecord.provider_execution_status, "pass");
     assert.deepEqual(auditRecord.matrix_cell, summary.matrix_cell);
     assert.deepEqual(auditRecord.coverage_follow_up, summary.coverage_follow_up);
     const learningScorecard = JSON.parse(fs.readFileSync(summary.artifacts.learning_loop_scorecard_file, "utf8"));
     const learningHandoff = JSON.parse(fs.readFileSync(summary.learning_loop_handoff_file, "utf8"));
+    const targetScorecard = JSON.parse(fs.readFileSync(summary.scorecard_files[0], "utf8"));
+    assert.equal(targetScorecard.target_catalog_id, "local-target");
+    assert.equal(targetScorecard.feature_mission_id, "local-mission");
+    assert.equal(targetScorecard.run_start_runtime_harness_decision, "pass");
+    assert.equal(targetScorecard.latest_runtime_harness_decision, "pass");
     assert.deepEqual(learningScorecard.matrix_cell, summary.matrix_cell);
     assert.deepEqual(learningScorecard.coverage_follow_up, summary.coverage_follow_up);
     assert.deepEqual(learningHandoff.matrix_cell, summary.matrix_cell);
@@ -1133,6 +1244,243 @@ test("full-journey mode defaults to packaged bootstrap assets when --examples-ro
     assert.equal(summary.control_surfaces.examples_root, null);
     assert.equal(fs.existsSync(summary.generated_project_profile_file), true);
     assert.equal(fs.existsSync(summary.artifacts.target_examples_root), true);
+  });
+});
+
+test("full-journey mode treats baseline target verification failure as diagnostic when post-run quality passes", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+      verifyCommands: [
+        "node -e \"const fs=require('node:fs');const text=fs.readFileSync('src/index.js','utf8');process.exit(text.includes('liveE2eAdapterPatch')?0:1)\"",
+      ],
+    });
+    const profilePath = path.join(tempRoot, "full-journey.baseline-diagnostic.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-baseline-diagnostic",
+      catalogRoot,
+    });
+
+    assert.equal(
+      result.live_e2e_run_status,
+      "pass",
+      fs.existsSync(result.live_e2e_run_summary_file)
+        ? fs.readFileSync(result.live_e2e_run_summary_file, "utf8")
+        : result.live_e2e_run_summary_file,
+    );
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "pass");
+    assert.equal(summary.artifacts.baseline_verify_status, "warn");
+    assert.equal(summary.artifacts.baseline_verify_gate_decision.decision, "continue_with_warnings");
+    assert.equal(summary.artifacts.post_run_verify_status, "pass");
+    assert.equal(summary.verdict_matrix.target_baseline_status, "warn");
+    assert.equal(summary.verdict_matrix.post_run_verification_status, "pass");
+    assert.equal(summary.verdict_matrix.real_code_change_status, "pass");
+    assert.equal(summary.verdict_matrix.overall_verdict, "pass_with_findings");
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), true);
+    assert.equal(summary.command_results.some((entry) => entry.label === "project-verify-post-run-primary"), true);
+    assert.equal(fs.existsSync(summary.artifacts.execution_readiness_file), true);
+  });
+});
+
+test("full-journey mode treats mission diagnostic post-run failures as findings after primary gate passes", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+      postRunQuality: {
+        primary_commands: [
+          "node -e \"const fs=require('node:fs');const text=fs.readFileSync('src/index.js','utf8');process.exit(text.includes('liveE2eAdapterPatch')?0:1)\"",
+        ],
+        diagnostic_commands: ["node -e \"process.exit(1)\""],
+        diagnostic_failure_mode: "warn",
+      },
+    });
+    const profilePath = path.join(tempRoot, "full-journey.diagnostic-post-run.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-diagnostic-post-run",
+      catalogRoot,
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(result.live_e2e_run_status, "pass");
+    assert.equal(summary.status, "pass");
+    assert.equal(summary.artifacts.post_run_verify_status, "pass");
+    assert.equal(summary.artifacts.post_run_diagnostic_status, "warn");
+    assert.equal(summary.verdict_matrix.post_run_verification_status, "pass");
+    assert.equal(summary.verdict_matrix.post_run_diagnostic_status, "warn");
+    assert.equal(summary.verdict_matrix.overall_verdict, "pass_with_findings");
+    assert.equal(summary.command_results.some((entry) => entry.label === "project-verify-post-run-diagnostic"), true);
+  });
+});
+
+test("full-journey mode blocks before provider execution when readiness setup commands fail", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+      setupCommands: ["node -e \"process.exit(1)\""],
+      verifyCommands: ['node -e "process.stdout.write(\'verify ok\\n\')"'],
+    });
+    const profilePath = path.join(tempRoot, "full-journey.setup-failure.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-setup-failure",
+      catalogRoot,
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.artifacts.baseline_verify_status, "fail");
+    assert.equal(summary.artifacts.baseline_verify_gate_decision.decision, "block");
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+  });
+});
+
+test("full-journey mode blocks before provider execution when baseline routed dry-run evidence is missing", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.missing-routed-dry-run.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      internalTestHooks: {
+        drop_baseline_routed_dry_run_after_preflight: true,
+      },
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-missing-routed-dry-run",
+      catalogRoot,
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.artifacts.baseline_verify_status, "fail");
+    assert.equal(summary.artifacts.baseline_verify_gate_decision.decision, "block");
+    assert.ok(summary.artifacts.baseline_verify_gate_decision.blocking_reasons.includes("routed-dry-run-missing"));
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+  });
+});
+
+test("full-journey mode fails final verdict when post-run verification fails after provider execution", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+      verifyCommands: ["node -e \"process.exit(1)\""],
+    });
+    const profilePath = path.join(tempRoot, "full-journey.post-run-failure.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-post-run-failure",
+      catalogRoot,
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.artifacts.baseline_verify_status, "warn");
+    assert.equal(summary.artifacts.post_run_verify_status, "fail");
+    assert.ok(
+      summary.verdict_matrix,
+      JSON.stringify({
+        error: summary.error,
+        commands: summary.command_results.map((entry) => ({
+          label: entry.label,
+          status: entry.status,
+          exit_code: entry.exit_code,
+        })),
+      }),
+    );
+    assert.equal(summary.verdict_matrix.post_run_verification_status, "fail");
+    assert.equal(summary.verdict_matrix.quality_gate_decision, "fail");
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), true);
+    assert.equal(summary.command_results.some((entry) => entry.label === "project-verify-post-run-primary"), true);
   });
 });
 
@@ -1499,6 +1847,55 @@ test("full-journey mode fails permission readiness on structured denials even wh
       "present",
     );
     assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+  });
+});
+
+test("full-journey mode passes permission readiness when marker is written before runner timeout", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureClaudeExternalRuntimePermissionMarkerTimeout({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.anthropic.marker-timeout.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      providerVariantId: "anthropic-primary",
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-anthropic-marker-timeout",
+      catalogRoot,
+    });
+
+    assert.equal(
+      result.live_e2e_run_status,
+      "pass",
+      fs.existsSync(result.live_e2e_run_summary_file)
+        ? fs.readFileSync(result.live_e2e_run_summary_file, "utf8")
+        : result.live_e2e_run_summary_file,
+    );
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    const permissionReadiness = summary.artifacts.live_adapter_preflight.permission_readiness;
+    assert.equal(summary.status, "pass");
+    assert.equal(summary.artifacts.live_adapter_preflight.status, "pass");
+    assert.equal(permissionReadiness.status, "pass");
+    assert.equal(permissionReadiness.attempts[0].timed_out, true);
+    assert.equal(permissionReadiness.attempts[0].marker_status, "present");
+    assert.equal(permissionReadiness.attempts[0].warning_kind, "post-marker-timeout");
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), true);
   });
 });
 
@@ -2015,10 +2412,126 @@ test("full-journey mode fails when runtime harness detects code-changing no-op",
       runtimeHarnessReport.step_decisions.some((decision) => decision.failure_class === "no-op"),
       true,
     );
-    assert.equal(summary.learning_loop_scorecard_file ?? null, null);
-    assert.equal(summary.learning_loop_handoff_file ?? null, null);
+    assert.equal(summary.verdict_matrix.provider_execution_status, "pass");
+    assert.equal(summary.verdict_matrix.real_code_change_status, "fail");
+    assert.equal(summary.verdict_matrix.post_run_verification_status, "pass");
+    assert.equal(summary.learning_loop_scorecard_file && fs.existsSync(summary.learning_loop_scorecard_file), true);
+    assert.equal(summary.learning_loop_handoff_file && fs.existsSync(summary.learning_loop_handoff_file), true);
+    assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), true);
+    assert.equal(summary.command_results.some((entry) => entry.label === "learning-handoff"), true);
     assert.equal(Array.isArray(summary.scorecard_files), true);
     assert.equal(fs.existsSync(summary.scorecard_files[0]), true);
+  });
+});
+
+test("full-journey mode fails provider execution when adapter raw evidence is missing", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.raw-evidence-gap.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      internalTestHooks: {
+        drop_adapter_raw_evidence_after_run_start: true,
+      },
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-raw-evidence-gap",
+      catalogRoot,
+    });
+    assert.equal(result.live_e2e_run_status, "fail");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.provider_execution_status, "fail");
+    assert.equal(summary.verdict_matrix.provider_execution_status, "fail");
+    assert.equal(summary.verdict_matrix.real_code_change_status, "pass");
+    assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), true);
+    assert.equal(summary.command_results.some((entry) => entry.label === "learning-handoff"), true);
+    const auditTranscript = JSON.parse(fs.readFileSync(summary.artifacts.run_audit_file, "utf8"));
+    assert.equal(auditTranscript.parsed_json.run_audit_records[0].provider_execution_status, "fail");
+  });
+});
+
+test("full-journey review flags lowered test plans as code-quality findings", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    fs.writeFileSync(
+      path.join(targetRepo.targetRepoRoot, "test", "local.test.js"),
+      [
+        "import test from 'ava';",
+        "",
+        "test('local behavior', t => {",
+        "  t.plan(4);",
+        "  t.true(true);",
+        "  t.is(1, 1);",
+        "  t.deepEqual({ok: true}, {ok: true});",
+        "  t.regex('headers', /headers/);",
+        "});",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    runGitChecked({ cwd: targetRepo.targetRepoRoot, args: ["add", "test/local.test.js"] });
+    runGitChecked({ cwd: targetRepo.targetRepoRoot, args: ["commit", "-m", "add ava-style test fixture"] });
+
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeWeakensTest({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.review-test-weakening.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-review-test-weakening",
+      catalogRoot,
+    });
+    assert.equal(result.live_e2e_run_status, "pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.verdict_matrix.code_quality, "warn");
+    assert.equal(summary.verdict_matrix.overall_verdict, "pass_with_findings");
+    const reviewReport = JSON.parse(fs.readFileSync(summary.artifacts.review_report_file, "utf8"));
+    assert.equal(
+      reviewReport.code_quality.findings.some((finding) =>
+        String(finding.summary).includes("Test plan count was lowered"),
+      ),
+      true,
+    );
+    assert.equal(
+      reviewReport.code_quality.findings.some((finding) =>
+        String(finding.summary).includes("backup or transient editor artifact"),
+      ),
+      true,
+    );
   });
 });
 

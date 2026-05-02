@@ -60,7 +60,16 @@ feature_missions:
       - review-report
     acceptance_checks:
       - keep changes inside source and test folders only
-      - preserve npm test as the primary regression gate
+      - preserve npm test as full-suite diagnostic evidence
+      - pass the mission-scoped headers regression gate
+    post_run_quality:
+      primary_commands:
+        - npx xo
+        - npm run build
+        - npx ava test/headers.ts
+      diagnostic_commands:
+        - npm test
+      diagnostic_failure_mode: warn
     supported_scenarios:
       - regress
     recommended_provider_variants:

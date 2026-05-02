@@ -676,6 +676,64 @@ function toEvidenceRef(projectRoot, filePath) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @param {string | null | undefined} evidenceRef
+ * @returns {boolean}
+ */
+function evidenceRefExists(projectRoot, evidenceRef) {
+  if (typeof evidenceRef !== "string" || evidenceRef.trim().length === 0) {
+    return false;
+  }
+  const normalized = evidenceRef.trim();
+  if (path.isAbsolute(normalized)) {
+    return fs.existsSync(normalized);
+  }
+  if (!normalized.startsWith("evidence://")) {
+    return false;
+  }
+  const evidencePath = normalized.slice("evidence://".length);
+  if (!evidencePath) {
+    return false;
+  }
+  const resolved = path.isAbsolute(evidencePath)
+    ? evidencePath
+    : path.resolve(projectRoot, evidencePath);
+  return fs.existsSync(resolved);
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @returns {string[]}
+ */
+function extractAdapterRawEvidenceRefs(stepResult) {
+  const routedExecution = asPlainObject(stepResult.routed_execution);
+  const adapterResponse = asPlainObject(routedExecution.adapter_response);
+  const adapterOutput = asPlainObject(adapterResponse.output);
+  const externalRunner = asPlainObject(adapterOutput.external_runner);
+  const topLevelExternalRunner = asPlainObject(stepResult.external_runner);
+  return uniqueStrings([
+    typeof externalRunner.raw_evidence_ref === "string" ? externalRunner.raw_evidence_ref : "",
+    typeof topLevelExternalRunner.raw_evidence_ref === "string" ? topLevelExternalRunner.raw_evidence_ref : "",
+  ]);
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {Array<{ document: Record<string, unknown> }>} stepArtifacts
+ * @returns {"pass" | "fail" | null}
+ */
+function resolveProviderExecutionStatus(projectRoot, stepArtifacts) {
+  if (stepArtifacts.length === 0) {
+    return null;
+  }
+  return stepArtifacts.some((artifact) =>
+    extractAdapterRawEvidenceRefs(artifact.document).some((ref) => evidenceRefExists(projectRoot, ref)),
+  )
+    ? "pass"
+    : "fail";
+}
+
+/**
  * @param {{ cwd: string, projectRoot: string, flagValue: string | undefined, flagName: string }} options
  * @returns {string | undefined}
  */
@@ -1025,6 +1083,7 @@ function executeImplementedCommand(command, flags, cwd) {
   let validationBlocking = null;
   let validationGateEnforced = false;
   let validationGateStatus = null;
+  let verificationLabel = null;
   let handoffGateEnforced = false;
   let handoffGateStatus = null;
   let handoffGateBlocking = null;
@@ -1336,6 +1395,7 @@ function executeImplementedCommand(command, flags, cwd) {
       "require-validation-pass",
       flags["require-validation-pass"],
     );
+    verificationLabel = resolveOptionalStringFlag("verification-label", flags["verification-label"]) ?? "default";
 
     const verifyResult = verifyProjectRuntime({
       cwd,
@@ -1343,6 +1403,10 @@ function executeImplementedCommand(command, flags, cwd) {
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       requireValidationPass: validationGateEnforced,
+      verificationLabel,
+      repoBuildCommands: resolveOptionalStringListFlag("repo-build-command", flags["repo-build-command"]),
+      repoLintCommands: resolveOptionalStringListFlag("repo-lint-command", flags["repo-lint-command"]),
+      repoTestCommands: resolveOptionalStringListFlag("repo-test-command", flags["repo-test-command"]),
     });
 
     resolvedProjectRef = verifyResult.projectRoot;
@@ -2785,6 +2849,11 @@ function executeImplementedCommand(command, flags, cwd) {
       projectRef: /** @type {string} */ (flags["project-ref"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
+    const stepArtifacts = listStepResults({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
     const incidents = qualityArtifacts.filter((artifact) => artifact.family === "incident-report");
     const promotions = qualityArtifacts.filter((artifact) => artifact.family === "promotion-decision");
 
@@ -2824,7 +2893,6 @@ function executeImplementedCommand(command, flags, cwd) {
         ) ?? null;
       const reviewDocument = asPlainObject(reviewArtifact?.document);
       const reviewFeatureTraceability = asPlainObject(reviewDocument.feature_traceability);
-      const reviewProviderTraceability = asPlainObject(reviewDocument.provider_traceability);
       const reviewFeatureSizeFit = asPlainObject(reviewDocument.feature_size_fit);
       const learningHandoffArtifact =
         qualityArtifacts.find(
@@ -2833,6 +2901,8 @@ function executeImplementedCommand(command, flags, cwd) {
       const learningHandoffDocument = asPlainObject(learningHandoffArtifact?.document);
       const reviewCoverageFollowUp = asPlainObject(reviewFeatureTraceability.coverage_follow_up);
       const learningCoverageFollowUp = asPlainObject(learningHandoffDocument.coverage_follow_up);
+      const runStepArtifacts = stepArtifacts.filter((artifact) => run.step_result_refs.includes(artifact.artifact_ref));
+      const providerExecutionStatus = resolveProviderExecutionStatus(projectState.project_root, runStepArtifacts);
 
       return {
         run_id: run.run_id,
@@ -2864,8 +2934,7 @@ function executeImplementedCommand(command, flags, cwd) {
             : asPlainObject(reviewFeatureTraceability.matrix_cell),
         coverage_follow_up:
           Object.keys(reviewCoverageFollowUp).length > 0 ? reviewCoverageFollowUp : learningCoverageFollowUp,
-        provider_execution_status:
-          typeof reviewProviderTraceability.status === "string" ? reviewProviderTraceability.status : null,
+        provider_execution_status: providerExecutionStatus,
         feature_size_fit_status:
           typeof reviewFeatureSizeFit.status === "string" ? reviewFeatureSizeFit.status : null,
       };
@@ -2984,6 +3053,7 @@ function executeImplementedCommand(command, flags, cwd) {
     validation_blocking: validationBlocking,
     validation_gate_enforced: validationGateEnforced,
     validation_gate_status: validationGateStatus,
+    verification_label: verificationLabel,
     handoff_gate_enforced: handoffGateEnforced,
     handoff_gate_status: handoffGateStatus,
     handoff_gate_blocking: handoffGateBlocking,

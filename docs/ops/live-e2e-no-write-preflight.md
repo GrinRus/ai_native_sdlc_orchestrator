@@ -25,7 +25,7 @@ Cleanup policy is controlled by `runtime_defaults.workspace_cleanup`:
 3. **Analyze** target topology and candidate verification commands.
 4. **Validate** profile, refs, and policy defaults.
 5. **Verify** bounded local commands.
-6. **Stop** (or proceed to later stages only when all no-write gates pass).
+6. **Stop** for bounded rehearsals when verify fails. For full-journey acceptance, continue only when setup/readiness, validation, routed dry-run, adapter readiness, and no-write safety gates pass; target verification command failures are baseline diagnostics unless the profile sets `verification.baseline_gate.mode=blocking`.
 
 ## Bootstrap rehearsal procedure (W1 baseline)
 Use this exact sequence when validating bootstrap flow readiness without delivery automation:
@@ -72,6 +72,7 @@ Expected routed rehearsal signals:
 - `handoff approve` returns `handoff_status=approved`;
 - validation handoff gate returns `pass`;
 - `project verify` materializes `routed_step_result_file`;
+- labeled `project verify` summaries identify whether evidence came from baseline diagnostics, primary post-run quality, or diagnostic full-suite checks;
 - routed `step-result` and `compiled-context` artifacts use run/step-scoped names (for example `step-result-routed-<run>.<step>.attempt.<n>.json`) and keep prior same-step artifacts intact;
 - the routed `step-result` contains route, asset, policy, and adapter resolution metadata with `mode=dry-run`.
 
@@ -167,10 +168,12 @@ Each profile and runbook must provide:
 ## Abort conditions
 Abort the rehearsal when any of these conditions occur:
 - checkout, setup, or dependency installation fails;
-- required verification commands fail;
+- required verification commands fail in bounded rehearsal or in a profile with `verification.baseline_gate.mode=blocking`;
 - a command path requires upstream write-back in a no-write rehearsal;
-- routed dry-run step result status is `failed`;
+- routed dry-run step result is missing or has status `failed`;
 - budget limits are exceeded before safety gates pass.
+
+Full-journey acceptance additionally runs target verification again after provider execution. That post-run verification is a quality gate: failure makes the final verdict fail even if provider execution produced artifacts.
 
 ## Reuse map for later waves
 - **Bootstrap rehearsals:** reuse clone/inspect/analyze/validate/verify gating before packet materialization.

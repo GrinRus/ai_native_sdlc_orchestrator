@@ -318,6 +318,22 @@ function fileExists(filePath) {
 }
 
 /**
+ * @param {string | null | undefined} evidenceRef
+ * @param {string} projectRoot
+ * @returns {boolean}
+ */
+function evidenceRefMaterialized(evidenceRef, projectRoot) {
+  const ref = asNonEmptyString(evidenceRef);
+  if (!ref) return false;
+  if (path.isAbsolute(ref)) return fileExists(ref);
+  if (!ref.startsWith("evidence://")) return false;
+  const evidencePath = ref.slice("evidence://".length);
+  if (!evidencePath) return false;
+  const resolvedPath = path.isAbsolute(evidencePath) ? evidencePath : path.resolve(projectRoot, evidencePath);
+  return fileExists(resolvedPath);
+}
+
+/**
  * @param {string} filePath
  * @returns {string}
  */
@@ -1437,7 +1453,7 @@ function runLiveAdapterPreflight(options) {
   const liveBaseline = execution.live_baseline === true;
   const runtimeCommand = asNonEmptyString(externalRuntime.command);
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
-  const probeTimeoutMs = Math.min(timeoutMs, 30000);
+  const probeTimeoutMs = asPositiveInteger(externalRuntime.preflight_timeout_ms, Math.min(timeoutMs, 120000));
   const envOverrides = asStringMap(externalRuntime.env);
   const runnerEnv = {
     ...options.env,
@@ -1456,6 +1472,7 @@ function runLiveAdapterPreflight(options) {
       command: runtimeCommand || null,
       args: runtimeInvocation.args,
       timeout_ms: timeoutMs,
+      preflight_timeout_ms: probeTimeoutMs,
       auth_probe_timeout_ms: probeTimeoutMs,
       permission_mode: runtimeInvocation.permissionMode,
       permission_mode_source: runtimeInvocation.source,
@@ -1567,12 +1584,14 @@ function runLiveAdapterPreflight(options) {
     const failureKind =
       probeError?.code === "ENOENT"
         ? "missing-command"
-        : probeTimedOut
-          ? "external-runner-timeout"
+        : structuredFailureKind !== "none"
+          ? structuredFailureKind
           : commandFailed
-            ? structuredFailureKind !== "none"
-              ? structuredFailureKind
-              : commandFailureKind
+            ? commandFailureKind !== "external-runner-failed"
+              ? commandFailureKind
+              : probeTimedOut
+                ? "external-runner-timeout"
+                : commandFailureKind
             : semanticFailureKind === "none"
               ? null
               : semanticFailureKind;
@@ -1704,7 +1723,27 @@ function runLiveAdapterPreflight(options) {
         : markerContents
           ? "unexpected-contents"
           : "missing";
-    if (permissionReadiness.status === "pass" && markerContents !== permissionMarkerContents) {
+    if (
+      permissionReadiness.status === "fail" &&
+      permissionReadiness.failure_kind === "external-runner-timeout" &&
+      markerContents === permissionMarkerContents
+    ) {
+      permissionReadiness = {
+        ...permissionReadiness,
+        status: "pass",
+        failure_kind: null,
+        warning_kind: "post-marker-timeout",
+        warnings: [
+          {
+            code: "post-marker-timeout",
+            summary:
+              "Permission readiness marker matched before the external runner timed out; access readiness passed, but runner completion was slow.",
+          },
+        ],
+        marker_file: permissionMarkerFile,
+        marker_status: markerStatus,
+      };
+    } else if (permissionReadiness.status === "pass" && markerContents !== permissionMarkerContents) {
       permissionReadiness = {
         ...permissionReadiness,
         status: "fail",
@@ -2058,6 +2097,245 @@ function normalizeVerdictStatus(value) {
 }
 
 /**
+ * @param {Record<string, unknown>} profile
+ * @returns {"diagnostic" | "blocking"}
+ */
+function resolveBaselineGateMode(profile) {
+  const mode = asNonEmptyString(asRecord(asRecord(profile.verification).baseline_gate).mode).toLowerCase();
+  if (mode === "blocking") return "blocking";
+  if (mode === "diagnostic") return "diagnostic";
+  return asNonEmptyString(profile.journey_mode) === "full-journey" ? "diagnostic" : "blocking";
+}
+
+/**
+ * @param {{ sourcePath: string | null, destinationRoot: string, runId: string, phase: string, index: number }} options
+ * @returns {string | null}
+ */
+function preserveRuntimeFile(options) {
+  const sourcePath = asNonEmptyString(options.sourcePath);
+  if (!sourcePath || !fileExists(sourcePath)) return null;
+  const destination = path.join(
+    options.destinationRoot,
+    `live-e2e-${normalizeId(options.phase)}-${normalizeId(options.runId)}-${String(options.index).padStart(2, "0")}-${path.basename(sourcePath)}`,
+  );
+  fs.copyFileSync(sourcePath, destination);
+  return destination;
+}
+
+/**
+ * @param {{ verifyPayload: Record<string, unknown>, summaryFile: string, reportsRoot: string, runId: string, phase: string }} options
+ */
+function preserveVerifyArtifacts(options) {
+  /** @type {string[]} */
+  const preservedFiles = [];
+  let index = 1;
+  const preserve = (filePath) => {
+    const preserved = preserveRuntimeFile({
+      sourcePath: asNonEmptyString(filePath),
+      destinationRoot: options.reportsRoot,
+      runId: options.runId,
+      phase: options.phase,
+      index,
+    });
+    index += 1;
+    if (preserved) preservedFiles.push(preserved);
+    return preserved;
+  };
+
+  const preservedSummaryFile = preserve(options.summaryFile);
+  /** @type {string[]} */
+  const preservedStepResultFiles = [];
+  for (const stepResultFile of asStringArray(options.verifyPayload.step_result_files)) {
+    const preservedStep = preserve(stepResultFile);
+    if (preservedStep) preservedStepResultFiles.push(preservedStep);
+    if (fileExists(stepResultFile)) {
+      const stepResult = readJson(stepResultFile);
+      for (const evidenceRef of asStringArray(asRecord(stepResult).evidence_refs)) {
+        preserve(evidenceRef);
+      }
+    }
+  }
+
+  return {
+    preserved_summary_file: preservedSummaryFile,
+    preserved_step_result_files: preservedStepResultFiles,
+    preserved_files: preservedFiles,
+  };
+}
+
+/**
+ * @param {{ verifySummary: Record<string, unknown>, verifyPayload: Record<string, unknown>, stepResultFiles: string[], setupCommands: string[], verificationCommands: string[], mode: "diagnostic" | "blocking" }} options
+ */
+function evaluateBaselineVerifyGate(options) {
+  const failedSteps = options.stepResultFiles
+    .filter((filePath) => fileExists(filePath))
+    .map((filePath) => ({ filePath, document: asRecord(readJson(filePath)) }))
+    .filter((entry) => asNonEmptyString(entry.document.status) === "failed");
+  const routedStepResultFile = asNonEmptyString(options.verifyPayload.routed_step_result_file);
+  const routedStepResult = routedStepResultFile && fileExists(routedStepResultFile)
+    ? asRecord(readJson(routedStepResultFile))
+    : {};
+  const setupCommandSet = new Set(options.setupCommands);
+  const verificationCommandSet = new Set(options.verificationCommands);
+  const validationGateStatus = asNonEmptyString(options.verifySummary.validation_gate_status);
+  /** @type {string[]} */
+  const blockingReasons = [];
+  /** @type {string[]} */
+  const findings = [];
+  /** @type {Array<Record<string, unknown>>} */
+  const failedCommands = [];
+
+  if (validationGateStatus && validationGateStatus !== "pass") {
+    blockingReasons.push(`validation-gate-${validationGateStatus}`);
+  }
+  if (!routedStepResultFile || !fileExists(routedStepResultFile)) {
+    blockingReasons.push("routed-dry-run-missing");
+  } else if (asNonEmptyString(routedStepResult.status) !== "passed") {
+    blockingReasons.push("routed-dry-run-failed");
+  }
+
+  for (const failedStep of failedSteps) {
+    const command = asNonEmptyString(failedStep.document.command);
+    const missingPrerequisites = asStringArray(failedStep.document.missing_prerequisites);
+    const summary = asNonEmptyString(failedStep.document.summary) || "Verification step failed.";
+    failedCommands.push({
+      command,
+      summary,
+      missing_prerequisites: missingPrerequisites,
+      step_result_file: failedStep.filePath,
+    });
+    if (missingPrerequisites.length > 0) {
+      blockingReasons.push(`missing-prerequisite:${command || "unknown"}`);
+    } else if (command && setupCommandSet.has(command)) {
+      blockingReasons.push(`readiness-command-failed:${command}`);
+    } else if (!command || !verificationCommandSet.has(command)) {
+      blockingReasons.push(`unknown-verification-failure:${command || "unknown"}`);
+    } else {
+      findings.push(summary);
+    }
+  }
+
+  if (blockingReasons.length > 0) {
+    return {
+      phase: "baseline_diagnostic",
+      mode: options.mode,
+      status: "fail",
+      decision: "block",
+      summary: blockingReasons[0],
+      blocking_reasons: uniqueStrings(blockingReasons),
+      findings,
+      failed_commands: failedCommands,
+      routed_step_result_file: routedStepResultFile || null,
+    };
+  }
+
+  if (asNonEmptyString(options.verifySummary.status) === "failed") {
+    return {
+      phase: "baseline_diagnostic",
+      mode: options.mode,
+      status: options.mode === "blocking" ? "fail" : "warn",
+      decision: options.mode === "blocking" ? "block" : "continue_with_warnings",
+      summary:
+        options.mode === "blocking"
+          ? "Baseline verification failed in blocking mode."
+          : "Baseline target verification failed, but readiness gates passed; continuing to provider execution.",
+      blocking_reasons: options.mode === "blocking" ? ["baseline-verification-failed"] : [],
+      findings,
+      failed_commands: failedCommands,
+      routed_step_result_file: routedStepResultFile || null,
+    };
+  }
+
+  return {
+    phase: "baseline_diagnostic",
+    mode: options.mode,
+    status: "pass",
+    decision: "pass",
+    summary: "Baseline readiness and target verification passed.",
+    blocking_reasons: [],
+    findings,
+    failed_commands: failedCommands,
+    routed_step_result_file: routedStepResultFile || null,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} mission
+ * @param {Record<string, unknown>} catalogVerification
+ * @returns {{ primaryCommands: string[], diagnosticCommands: string[], diagnosticFailureMode: "warn" | "fail" }}
+ */
+function resolvePostRunQualityPolicy(mission, catalogVerification) {
+  const policy = hasObjectFields(asRecord(mission.post_run_quality))
+    ? asRecord(mission.post_run_quality)
+    : asRecord(mission.postRunQuality);
+  const primaryCommands = asStringArray(policy.primary_commands);
+  const diagnosticCommands = asStringArray(policy.diagnostic_commands);
+  const diagnosticFailureMode = asNonEmptyString(policy.diagnostic_failure_mode) === "fail" ? "fail" : "warn";
+  return {
+    primaryCommands: primaryCommands.length > 0 ? primaryCommands : asStringArray(catalogVerification.commands),
+    diagnosticCommands,
+    diagnosticFailureMode,
+  };
+}
+
+/**
+ * @param {{ label: string, commands: string[] }} options
+ * @returns {string[]}
+ */
+function buildVerifyOverrideArgs(options) {
+  const lintCommands = options.commands.filter((command) => /\b(?:xo|eslint|biome|lint)\b/u.test(command));
+  const buildCommands = options.commands.filter((command) => /\b(?:build|tsc)\b/u.test(command));
+  const testCommands = options.commands.filter((command) => !lintCommands.includes(command) && !buildCommands.includes(command));
+  return [
+    "--verification-label",
+    options.label,
+    ...buildCommands.flatMap((entry) => ["--repo-build-command", entry]),
+    ...lintCommands.flatMap((entry) => ["--repo-lint-command", entry]),
+    ...testCommands.flatMap((entry) => ["--repo-test-command", entry]),
+  ];
+}
+
+/**
+ * @param {string | null | undefined} reportFile
+ * @returns {boolean}
+ */
+function runtimeHarnessReportHasMissionScopedChanges(reportFile) {
+  const resolvedReportFile = asNonEmptyString(reportFile);
+  if (!resolvedReportFile || !fileExists(resolvedReportFile)) {
+    return false;
+  }
+  const report = asRecord(readJson(resolvedReportFile));
+  const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
+  return stepDecisions.some((entry) => {
+    const semantics = asRecord(asRecord(entry).mission_semantics);
+    return asStringArray(semantics.mission_scoped_changed_paths).length > 0;
+  });
+}
+
+/**
+ * @param {{ runId: string, reportsRoot: string, liveAdapterPreflightFile: string | null, validationReportFile: string | null, baselineGateDecision: Record<string, unknown>, baselineRoutedStepResultFile: string | null }}
+ */
+function writeExecutionReadinessDecision(options) {
+  const decisionFile = path.join(
+    options.reportsRoot,
+    `live-e2e-execution-readiness-${normalizeId(options.runId)}.json`,
+  );
+  const decision = {
+    run_id: options.runId,
+    phase: "readiness",
+    status: "pass",
+    summary: "Execution readiness passed; baseline target verification is diagnostic evidence for full-journey live E2E.",
+    live_adapter_preflight_file: options.liveAdapterPreflightFile,
+    validation_report_file: options.validationReportFile,
+    baseline_gate_decision: options.baselineGateDecision,
+    baseline_routed_step_result_file: options.baselineRoutedStepResultFile,
+    checked_at: nowIso(),
+  };
+  writeJson(decisionFile, decision);
+  return { decisionFile, decision };
+}
+
+/**
  * @param {{
  *   scenarioPolicy: Record<string, unknown>,
  *   stageResults: Array<{ stage: string, status: string, evidence_refs: string[], summary: string | null }>,
@@ -2349,7 +2627,7 @@ function executeInstalledUserFlow(options) {
 
     const commandBaseArgs = ["--project-ref", ".", "--project-profile", "./project.aor.yaml"];
     let commandIndex = 1;
-    const runCommand = (label, args) => {
+    const runCommand = (label, args, runOptions = {}) => {
       const result = runAorCommand({
         launch: options.aorLaunch,
         cwd: targetCheckout.targetCheckoutRoot,
@@ -2361,7 +2639,7 @@ function executeInstalledUserFlow(options) {
       });
       commandIndex += 1;
       commandResults.push(buildCommandDiagnostic(result));
-      if (!result.ok) {
+      if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
       }
@@ -2517,7 +2795,7 @@ function executeInstalledUserFlow(options) {
     markStage(
       stageMap,
       "execution",
-      "pass",
+      artifacts.execution_degraded === true ? "fail" : "pass",
       uniqueStrings([
         verifyPreflight.transcriptFile,
         verifySummaryPath,
@@ -2793,7 +3071,7 @@ function executeFullJourneyFlow(options) {
     artifacts.target_repo_url = targetCheckout.targetRepoUrl;
 
     let commandIndex = 1;
-    const runCommand = (label, args) => {
+    const runCommand = (label, args, runOptions = {}) => {
       const result = runAorCommand({
         launch: options.aorLaunch,
         cwd: targetCheckout.targetCheckoutRoot,
@@ -2805,7 +3083,7 @@ function executeFullJourneyFlow(options) {
       });
       commandIndex += 1;
       commandResults.push(buildCommandDiagnostic(result));
-      if (!result.ok) {
+      if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
       }
@@ -2950,14 +3228,28 @@ function executeFullJourneyFlow(options) {
       ".aor",
       "--require-validation-pass",
       "true",
+      "--verification-label",
+      "baseline-diagnostic",
       "--routed-dry-run-step",
       "implement",
       ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
     ]);
-    artifacts.verify_summary_file = getStringField(verifyPreflight.payload, "verify_summary_file");
-    artifacts.preflight_step_result_files = getStringArrayField(verifyPreflight.payload, "step_result_files");
-    const verifySummaryPath = /** @type {string | null} */ (artifacts.verify_summary_file);
-    if (!verifySummaryPath || !fileExists(verifySummaryPath)) {
+    const baselineVerifySummaryPath = getStringField(verifyPreflight.payload, "verify_summary_file");
+    artifacts.baseline_verify_summary_file = baselineVerifySummaryPath;
+    artifacts.verify_summary_file = baselineVerifySummaryPath;
+    artifacts.baseline_verify_step_result_files = getStringArrayField(verifyPreflight.payload, "step_result_files");
+    artifacts.preflight_step_result_files = artifacts.baseline_verify_step_result_files;
+    artifacts.baseline_routed_dry_run_step_result_file = getStringField(
+      verifyPreflight.payload,
+      "routed_step_result_file",
+    );
+    if (
+      internalTestHooks.drop_baseline_routed_dry_run_after_preflight === true &&
+      typeof artifacts.baseline_routed_dry_run_step_result_file === "string"
+    ) {
+      fs.rmSync(artifacts.baseline_routed_dry_run_step_result_file, { force: true });
+    }
+    if (!baselineVerifySummaryPath || !fileExists(baselineVerifySummaryPath)) {
       markStage(
         stageMap,
         "execution",
@@ -2967,17 +3259,58 @@ function executeFullJourneyFlow(options) {
       );
       throw new Error("Dry-run verify summary was not materialized.");
     }
-    const verifySummary = readJson(verifySummaryPath);
-    if (verifySummary.status === "failed") {
+    const baselineVerifySummary = readJson(baselineVerifySummaryPath);
+    const preservedBaseline = preserveVerifyArtifacts({
+      verifyPayload: asRecord(verifyPreflight.payload),
+      summaryFile: baselineVerifySummaryPath,
+      reportsRoot: options.layout.reportsRoot,
+      runId: options.runId,
+      phase: "baseline-verify",
+    });
+    artifacts.baseline_verify_preserved_files = preservedBaseline.preserved_files;
+    if (preservedBaseline.preserved_summary_file) {
+      artifacts.baseline_verify_summary_file = preservedBaseline.preserved_summary_file;
+    }
+    if (preservedBaseline.preserved_step_result_files.length > 0) {
+      artifacts.baseline_verify_step_result_files = preservedBaseline.preserved_step_result_files;
+      artifacts.preflight_step_result_files = preservedBaseline.preserved_step_result_files;
+    }
+    const baselineGateMode = resolveBaselineGateMode(options.profile);
+    const baselineGateDecision = evaluateBaselineVerifyGate({
+      verifySummary: asRecord(baselineVerifySummary),
+      verifyPayload: asRecord(verifyPreflight.payload),
+      stepResultFiles: getStringArrayField(verifyPreflight.payload, "step_result_files"),
+      setupCommands: repoLintCommands,
+      verificationCommands: repoVerificationCommands,
+      mode: baselineGateMode,
+    });
+    artifacts.baseline_verify_status = baselineGateDecision.status;
+    artifacts.baseline_verify_gate_decision = baselineGateDecision;
+    if (baselineGateDecision.decision === "block") {
       markStage(
         stageMap,
         "execution",
         "fail",
-        uniqueStrings([verifyPreflight.transcriptFile, verifySummaryPath, ...collectStringRefs(verifyPreflight.payload)]),
-        "Dry-run verify failed before feature-driven discovery planning.",
+        uniqueStrings([
+          verifyPreflight.transcriptFile,
+          baselineVerifySummaryPath,
+          ...asStringArray(artifacts.baseline_verify_preserved_files),
+          ...collectStringRefs(verifyPreflight.payload),
+        ]),
+        asNonEmptyString(baselineGateDecision.summary) || "Baseline readiness failed before provider execution.",
       );
-      throw new Error("Dry-run verify failed before feature-driven discovery planning.");
+      throw new Error(asNonEmptyString(baselineGateDecision.summary) || "Baseline readiness failed before provider execution.");
     }
+    const executionReadiness = writeExecutionReadinessDecision({
+      runId: options.runId,
+      reportsRoot: options.layout.reportsRoot,
+      liveAdapterPreflightFile: asNonEmptyString(artifacts.live_adapter_preflight_file),
+      validationReportFile: asNonEmptyString(artifacts.validation_report_file),
+      baselineGateDecision,
+      baselineRoutedStepResultFile: asNonEmptyString(artifacts.baseline_routed_dry_run_step_result_file),
+    });
+    artifacts.execution_readiness_file = executionReadiness.decisionFile;
+    artifacts.execution_readiness = executionReadiness.decision;
 
     const discovery = runCommand("discovery-run", [
       "discovery",
@@ -3122,8 +3455,10 @@ function executeFullJourneyFlow(options) {
     );
 
     const promotionEvidenceRefs = uniqueStrings([
-      ...(verifySummaryPath ? [verifySummaryPath] : []),
-      ...asStringArray(artifacts.preflight_step_result_files),
+      ...(artifacts.execution_readiness_file ? [/** @type {string} */ (artifacts.execution_readiness_file)] : []),
+      ...(artifacts.baseline_routed_dry_run_step_result_file
+        ? [/** @type {string} */ (artifacts.baseline_routed_dry_run_step_result_file)]
+        : []),
     ]);
 
     const runStart = runCommand("run-start", [
@@ -3153,6 +3488,19 @@ function executeFullJourneyFlow(options) {
     artifacts.routed_step_result_id = getStringField(runStart.payload, "routed_step_result_id");
     artifacts.runtime_harness_report_file = getStringField(runStart.payload, "runtime_harness_report_file");
     artifacts.runtime_harness_overall_decision = getStringField(runStart.payload, "runtime_harness_overall_decision");
+    if (artifacts.runtime_harness_report_file && fileExists(artifacts.runtime_harness_report_file)) {
+      artifacts.runtime_harness_overall_decision =
+        asNonEmptyString(asRecord(readJson(artifacts.runtime_harness_report_file)).overall_decision) ||
+        artifacts.runtime_harness_overall_decision;
+    }
+    artifacts.run_start_runtime_harness_report_file = artifacts.runtime_harness_report_file;
+    artifacts.run_start_runtime_harness_decision = artifacts.runtime_harness_overall_decision;
+    artifacts.execution_degraded =
+      asNonEmptyString(artifacts.run_start_runtime_harness_decision) !== "pass";
+    artifacts.execution_degraded_reason =
+      artifacts.execution_degraded === true
+        ? `Runtime Harness decision '${asNonEmptyString(artifacts.run_start_runtime_harness_decision) || "unknown"}'.`
+        : null;
     if (artifacts.routed_step_result_file && fileExists(artifacts.routed_step_result_file)) {
       const stepResult = readJson(artifacts.routed_step_result_file);
       const routedExecution = asRecord(stepResult.routed_execution);
@@ -3161,22 +3509,51 @@ function executeFullJourneyFlow(options) {
       artifacts.adapter_raw_evidence_ref =
         asNonEmptyString(asRecord(asRecord(asRecord(routedExecution.adapter_response).output).external_runner).raw_evidence_ref) ||
         null;
+      if (internalTestHooks.drop_adapter_raw_evidence_after_run_start === true) {
+        const adapterResponse = asRecord(routedExecution.adapter_response);
+        const adapterOutput = asRecord(adapterResponse.output);
+        const externalRunner = asRecord(adapterOutput.external_runner);
+        if (Object.prototype.hasOwnProperty.call(externalRunner, "raw_evidence_ref")) {
+          delete externalRunner.raw_evidence_ref;
+          adapterOutput.external_runner = externalRunner;
+          adapterResponse.output = adapterOutput;
+          routedExecution.adapter_response = adapterResponse;
+          stepResult.routed_execution = routedExecution;
+        }
+        const topLevelExternalRunner = asRecord(stepResult.external_runner);
+        if (Object.prototype.hasOwnProperty.call(topLevelExternalRunner, "raw_evidence_ref")) {
+          delete topLevelExternalRunner.raw_evidence_ref;
+          stepResult.external_runner = topLevelExternalRunner;
+        }
+        writeJson(artifacts.routed_step_result_file, stepResult);
+        artifacts.adapter_raw_evidence_ref = null;
+      }
       if (asNonEmptyString(stepResult.status) !== "passed") {
+        artifacts.execution_degraded = true;
+        artifacts.execution_degraded_reason = asNonEmptyString(stepResult.summary) || "Run start routed execution failed.";
         markStage(
           stageMap,
           "execution",
           "fail",
           uniqueStrings([
             verifyPreflight.transcriptFile,
-            verifySummaryPath,
+            asNonEmptyString(artifacts.baseline_verify_summary_file),
             runStart.transcriptFile,
             artifacts.routed_step_result_file,
             ...collectStringRefs(stepResult),
           ]),
           asNonEmptyString(stepResult.summary) || "Run start routed execution failed.",
         );
-        throw new Error(asNonEmptyString(stepResult.summary) || "Run start routed execution failed.");
       }
+    } else {
+      markStage(
+        stageMap,
+        "execution",
+        "fail",
+        uniqueStrings([runStart.transcriptFile, ...collectStringRefs(runStart.payload)]),
+        "Run start did not materialize routed execution evidence.",
+      );
+      throw new Error("Run start did not materialize routed execution evidence.");
     }
     const runStatus = runCommand("run-status", [
       "run",
@@ -3189,18 +3566,59 @@ function executeFullJourneyFlow(options) {
       options.runId,
     ]);
     artifacts.run_status_snapshot_file = runStatus.transcriptFile;
+
+    const postRunQualityPolicy = resolvePostRunQualityPolicy(options.mission, catalogVerification);
+    artifacts.post_run_quality_policy = postRunQualityPolicy;
+    const postRunVerify = runCommand("project-verify-post-run-primary", [
+      "project",
+      "verify",
+      "--project-ref",
+      ".",
+      "--project-profile",
+      "./project.aor.yaml",
+      "--runtime-root",
+      ".aor",
+      "--require-validation-pass",
+      "true",
+      ...buildVerifyOverrideArgs({
+        label: "post-run-primary",
+        commands: postRunQualityPolicy.primaryCommands,
+      }),
+    ]);
+    artifacts.post_run_verify_summary_file = getStringField(postRunVerify.payload, "verify_summary_file");
+    artifacts.post_run_verify_step_result_files = getStringArrayField(postRunVerify.payload, "step_result_files");
+    artifacts.post_run_primary_verify_summary_file = artifacts.post_run_verify_summary_file;
+    artifacts.post_run_primary_verify_step_result_files = artifacts.post_run_verify_step_result_files;
+    artifacts.verify_summary_file = artifacts.post_run_verify_summary_file;
+    const postRunVerifySummaryPath = /** @type {string | null} */ (artifacts.post_run_verify_summary_file);
+    if (!postRunVerifySummaryPath || !fileExists(postRunVerifySummaryPath)) {
+      markStage(
+        stageMap,
+        "execution",
+        "fail",
+        uniqueStrings([postRunVerify.transcriptFile, ...collectStringRefs(postRunVerify.payload)]),
+        "Post-run verify summary was not materialized.",
+      );
+      throw new Error("Post-run verify summary was not materialized.");
+    }
+    const postRunVerifySummary = readJson(postRunVerifySummaryPath);
+    artifacts.post_run_verify_status = asNonEmptyString(postRunVerifySummary.status) === "passed" ? "pass" : "fail";
     markStage(
       stageMap,
       "execution",
-      "pass",
+      artifacts.execution_degraded === true ? "fail" : "pass",
       uniqueStrings([
         verifyPreflight.transcriptFile,
-        verifySummaryPath,
+        asNonEmptyString(artifacts.baseline_verify_summary_file),
         runStart.transcriptFile,
         runStatus.transcriptFile,
+        postRunVerify.transcriptFile,
+        postRunVerifySummaryPath,
         ...collectStringRefs(runStart.payload),
       ]),
-      "Dry-run verify, run start, and run status completed through public execution lifecycle.",
+      artifacts.execution_degraded === true
+        ? "Provider execution materialized degraded evidence; post-run verification completed for black-box quality reporting."
+        : "Baseline diagnostics, run start, run status, and post-run verification completed through public execution lifecycle.",
     );
 
     const reviewRun = runCommand("review-run", [
@@ -3214,19 +3632,19 @@ function executeFullJourneyFlow(options) {
       ".aor",
       "--run-id",
       options.runId,
-    ]);
+    ], { allowNonZeroWithPayload: true });
     artifacts.review_report_file = getStringField(reviewRun.payload, "review_report_file");
-    artifacts.runtime_harness_report_file =
+    artifacts.latest_runtime_harness_report_file =
       getStringField(reviewRun.payload, "runtime_harness_report_file") || artifacts.runtime_harness_report_file;
-    artifacts.runtime_harness_overall_decision =
+    artifacts.latest_runtime_harness_decision =
       getStringField(reviewRun.payload, "runtime_harness_overall_decision") ||
+      artifacts.run_start_runtime_harness_decision ||
       artifacts.runtime_harness_overall_decision;
     const reviewReport = artifacts.review_report_file && fileExists(artifacts.review_report_file)
       ? readJson(artifacts.review_report_file)
       : {};
     const reviewOverallStatus = normalizeVerdictStatus(reviewReport.overall_status);
     const featureSizeFitStatus = normalizeVerdictStatus(asRecord(reviewReport.feature_size_fit).status);
-    const providerExecutionStatus = normalizeVerdictStatus(asRecord(reviewReport.provider_traceability).status);
     markStage(
       stageMap,
       "review",
@@ -3246,11 +3664,11 @@ function executeFullJourneyFlow(options) {
         "./project.aor.yaml",
         "--runtime-root",
         ".aor",
-        "--suite-ref",
-        evalSuites[0],
-        "--subject-ref",
-        `run://${options.runId}`,
-      ]);
+      "--suite-ref",
+      evalSuites[0],
+      "--subject-ref",
+      `run://${options.runId}`,
+      ], { allowNonZeroWithPayload: true });
       artifacts.evaluation_report_file = getStringField(evalRun.payload, "evaluation_report_file");
       markStage(
         stageMap,
@@ -3259,11 +3677,58 @@ function executeFullJourneyFlow(options) {
         uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]),
         "Evaluation report materialized.",
       );
-      if (getStringField(evalRun.payload, "evaluation_status") !== "pass") {
-        throw new Error("Evaluation report failed.");
-      }
     } else {
       markStage(stageMap, "qa", "skipped", [], "Profile has no eval suites.");
+    }
+
+    if (postRunQualityPolicy.diagnosticCommands.length > 0) {
+      const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic", [
+        "project",
+        "verify",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        "./project.aor.yaml",
+        "--runtime-root",
+        ".aor",
+        "--require-validation-pass",
+        "true",
+        ...buildVerifyOverrideArgs({
+          label: "post-run-diagnostic",
+          commands: postRunQualityPolicy.diagnosticCommands,
+        }),
+      ]);
+      artifacts.post_run_diagnostic_verify_summary_file = getStringField(
+        postRunDiagnosticVerify.payload,
+        "verify_summary_file",
+      );
+      artifacts.post_run_diagnostic_verify_step_result_files = getStringArrayField(
+        postRunDiagnosticVerify.payload,
+        "step_result_files",
+      );
+      const diagnosticSummaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
+      const diagnosticSummary =
+        diagnosticSummaryFile && fileExists(diagnosticSummaryFile) ? readJson(diagnosticSummaryFile) : {};
+      const diagnosticPassed = asNonEmptyString(diagnosticSummary.status) === "passed";
+      artifacts.post_run_diagnostic_status = diagnosticPassed ? "pass" : postRunQualityPolicy.diagnosticFailureMode;
+      const preservedDiagnostic = diagnosticSummaryFile
+        ? preserveVerifyArtifacts({
+            verifyPayload: asRecord(postRunDiagnosticVerify.payload),
+            summaryFile: diagnosticSummaryFile,
+            reportsRoot: options.layout.reportsRoot,
+            runId: options.runId,
+            phase: "post-run-diagnostic-verify",
+          })
+        : { preserved_summary_file: null, preserved_step_result_files: [], preserved_files: [] };
+      artifacts.post_run_diagnostic_verify_preserved_files = preservedDiagnostic.preserved_files;
+      if (preservedDiagnostic.preserved_summary_file) {
+        artifacts.post_run_diagnostic_verify_summary_file = preservedDiagnostic.preserved_summary_file;
+      }
+      if (preservedDiagnostic.preserved_step_result_files.length > 0) {
+        artifacts.post_run_diagnostic_verify_step_result_files = preservedDiagnostic.preserved_step_result_files;
+      }
+    } else {
+      artifacts.post_run_diagnostic_status = "pass";
     }
 
     const harnessCertification = getHarnessCertification(options.profile);
@@ -3321,32 +3786,52 @@ function executeFullJourneyFlow(options) {
           ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
           : []),
         ...(deliveryEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", deliveryEvidenceRefs.join(",")] : []),
-      ]);
+      ], { allowNonZeroWithPayload: true });
     } catch (error) {
       const summary = error instanceof Error ? error.message : String(error);
-      markStage(stageMap, "delivery", "fail", [], summary);
-      throw error;
+      const lowerSummary = summary.toLowerCase();
+      artifacts.delivery_blocking = true;
+      artifacts.delivery_blocked_by_quality_gate =
+        lowerSummary.includes("runtime harness") || lowerSummary.includes("quality gate");
+      artifacts.delivery_blocking_reasons = [summary];
+      markStage(
+        stageMap,
+        "delivery",
+        "fail",
+        [],
+        artifacts.delivery_blocked_by_quality_gate === true
+          ? "Delivery prepare was blocked by quality/runtime harness gate."
+          : summary,
+      );
     }
-    artifacts.delivery_manifest_file = getStringField(deliverPrepare.payload, "delivery_manifest_file");
-    artifacts.delivery_plan_file = getStringField(deliverPrepare.payload, "delivery_plan_file");
-    artifacts.delivery_transcript_file = getStringField(deliverPrepare.payload, "delivery_transcript_file");
-    if (internalTestHooks.block_delivery_prepare === true) {
-      deliverPrepare.payload.delivery_blocking = true;
-    }
-    markStage(
-      stageMap,
-      "delivery",
-      deliverPrepare.payload?.delivery_blocking === true ? "fail" : "pass",
-      uniqueStrings([deliverPrepare.transcriptFile, ...collectStringRefs(deliverPrepare.payload)]),
-      deliverPrepare.payload?.delivery_blocking === true
-        ? "Delivery prepare was blocked."
-        : "Delivery prepare materialized delivery evidence.",
-    );
-    if (deliverPrepare.payload?.delivery_blocking === true) {
-      throw new Error("Delivery prepare was blocked.");
+    if (deliverPrepare) {
+      artifacts.delivery_manifest_file = getStringField(deliverPrepare.payload, "delivery_manifest_file");
+      artifacts.delivery_plan_file = getStringField(deliverPrepare.payload, "delivery_plan_file");
+      artifacts.delivery_transcript_file = getStringField(deliverPrepare.payload, "delivery_transcript_file");
+      if (internalTestHooks.block_delivery_prepare === true) {
+        deliverPrepare.payload.delivery_blocking = true;
+      }
+      artifacts.delivery_blocking = deliverPrepare.payload?.delivery_blocking === true;
+      artifacts.delivery_blocking_reasons = asStringArray(deliverPrepare.payload?.delivery_blocking_reasons);
+      artifacts.delivery_blocked_by_quality_gate =
+        artifacts.delivery_blocking === true &&
+        artifacts.delivery_blocking_reasons.some((reason) =>
+          /runtime harness|quality gate/iu.test(reason),
+        );
+      markStage(
+        stageMap,
+        "delivery",
+        artifacts.delivery_blocking === true ? "fail" : "pass",
+        uniqueStrings([deliverPrepare.transcriptFile, ...collectStringRefs(deliverPrepare.payload)]),
+        artifacts.delivery_blocking === true
+          ? artifacts.delivery_blocked_by_quality_gate === true
+            ? "Delivery prepare was blocked by quality/runtime harness gate."
+            : "Delivery prepare was blocked."
+          : "Delivery prepare materialized delivery evidence.",
+      );
     }
 
-    if (asRecord(options.profile.output_policy).materialize_release_packet === true) {
+    if (asRecord(options.profile.output_policy).materialize_release_packet === true && artifacts.delivery_blocking !== true) {
       const releasePrepare = runCommand("release-prepare", [
         "release",
         "prepare",
@@ -3385,6 +3870,8 @@ function executeFullJourneyFlow(options) {
         uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
         "Release prepare materialized release packet evidence.",
       );
+    } else if (asRecord(options.profile.output_policy).materialize_release_packet === true) {
+      markStage(stageMap, "release", "fail", [], "Release prepare skipped because delivery prepare was blocked.");
     } else {
       markStage(stageMap, "release", "skipped", [], "Profile does not request release packet materialization.");
     }
@@ -3455,10 +3942,14 @@ function executeFullJourneyFlow(options) {
     }
     artifacts.learning_loop_scorecard_file = getStringField(learningHandoff.payload, "learning_loop_scorecard_file");
     artifacts.learning_loop_handoff_file = getStringField(learningHandoff.payload, "learning_loop_handoff_file");
-    artifacts.runtime_harness_report_file =
-      getStringField(learningHandoff.payload, "runtime_harness_report_file") || artifacts.runtime_harness_report_file;
-    artifacts.runtime_harness_overall_decision =
+    artifacts.latest_runtime_harness_report_file =
+      getStringField(learningHandoff.payload, "runtime_harness_report_file") ||
+      artifacts.latest_runtime_harness_report_file ||
+      artifacts.runtime_harness_report_file;
+    artifacts.latest_runtime_harness_decision =
       getStringField(learningHandoff.payload, "runtime_harness_overall_decision") ||
+      artifacts.latest_runtime_harness_decision ||
+      artifacts.run_start_runtime_harness_decision ||
       artifacts.runtime_harness_overall_decision;
     artifacts.incident_report_file =
       getStringField(learningHandoff.payload, "incident_report_file") ||
@@ -3501,7 +3992,43 @@ function executeFullJourneyFlow(options) {
       }
       artifacts.runtime_harness_report_file = null;
       artifacts.runtime_harness_overall_decision = null;
+      artifacts.run_start_runtime_harness_report_file = null;
+      artifacts.run_start_runtime_harness_decision = null;
     }
+
+    const targetBaselineStatus = asNonEmptyString(artifacts.baseline_verify_status) || "fail";
+    const postRunVerificationStatus = asNonEmptyString(artifacts.post_run_verify_status) || "fail";
+    const postRunDiagnosticStatus = asNonEmptyString(artifacts.post_run_diagnostic_status) || "pass";
+    const runtimeHarnessDecision =
+      asNonEmptyString(artifacts.run_start_runtime_harness_decision) ||
+      asNonEmptyString(artifacts.runtime_harness_overall_decision) ||
+      "unknown";
+    const latestRuntimeHarnessDecision =
+      asNonEmptyString(artifacts.latest_runtime_harness_decision) || runtimeHarnessDecision;
+    const realCodeChangeStatus = runtimeHarnessReportHasMissionScopedChanges(
+      asNonEmptyString(artifacts.run_start_runtime_harness_report_file) ||
+        asNonEmptyString(artifacts.runtime_harness_report_file),
+    )
+      ? "pass"
+      : "fail";
+    const providerExecutionProofStatus = evidenceRefMaterialized(
+      asNonEmptyString(artifacts.adapter_raw_evidence_ref),
+      targetCheckout.targetCheckoutRoot,
+    )
+      ? "pass"
+      : "fail";
+    artifacts.real_code_change_status = realCodeChangeStatus;
+    artifacts.runtime_harness_decision = runtimeHarnessDecision;
+    artifacts.run_start_runtime_harness_decision = runtimeHarnessDecision;
+    artifacts.latest_runtime_harness_decision = latestRuntimeHarnessDecision;
+    artifacts.provider_execution_status = providerExecutionProofStatus;
+    artifacts.quality_gate_decision =
+      postRunVerificationStatus === "pass" &&
+      postRunDiagnosticStatus !== "fail" &&
+      realCodeChangeStatus === "pass" &&
+      reviewOverallStatus !== "fail"
+        ? "pass"
+        : "fail";
 
     const scenarioCoverage = evaluateScenarioCoverage({
       scenarioPolicy: options.scenarioPolicy,
@@ -3526,7 +4053,9 @@ function executeFullJourneyFlow(options) {
     }
     artifacts.scenario_coverage = scenarioCoverage;
     const deliveryReleaseQuality =
-      asRecord(options.profile.output_policy).materialize_release_packet === true
+      artifacts.delivery_blocking === true
+        ? "fail"
+        : asRecord(options.profile.output_policy).materialize_release_packet === true
         ? artifacts.release_packet_file
           ? "pass"
           : "fail"
@@ -3544,15 +4073,21 @@ function executeFullJourneyFlow(options) {
       target_selection: "pass",
       feature_request_quality: artifacts.intake_artifact_packet_file && artifacts.feature_request_file ? "pass" : "fail",
       scenario_coverage_status: scenarioCoverage.status,
-      provider_execution_status: providerExecutionStatus,
+      provider_execution_status: providerExecutionProofStatus,
+      target_baseline_status: targetBaselineStatus,
+      real_code_change_status: realCodeChangeStatus,
+      post_run_verification_status: postRunVerificationStatus,
+      post_run_diagnostic_status: postRunDiagnosticStatus,
       discovery_quality: normalizeVerdictStatus(asRecord(reviewReport.discovery_quality).status),
       runtime_success:
         artifacts.routed_step_result_file &&
         artifacts.runtime_harness_report_file &&
-        artifacts.runtime_harness_overall_decision === "pass"
+        runtimeHarnessDecision === "pass"
           ? "pass"
           : "fail",
-      runtime_harness_decision: artifacts.runtime_harness_overall_decision || "unknown",
+      runtime_harness_decision: runtimeHarnessDecision,
+      run_start_runtime_harness_decision: runtimeHarnessDecision,
+      latest_runtime_harness_decision: latestRuntimeHarnessDecision,
       artifact_quality:
         artifactConsistency.status === "fail"
           ? "fail"
@@ -3561,6 +4096,7 @@ function executeFullJourneyFlow(options) {
       feature_size_fit_status: featureSizeFitStatus,
       delivery_release_quality: deliveryReleaseQuality,
       learning_loop_closure: learningLoopClosure,
+      quality_gate_decision: artifacts.quality_gate_decision,
       overall_verdict: "pass",
     };
     const verdictStatuses = [
@@ -3569,12 +4105,17 @@ function executeFullJourneyFlow(options) {
       verdictMatrix.scenario_coverage_status,
       verdictMatrix.discovery_quality,
       verdictMatrix.runtime_success,
+      verdictMatrix.target_baseline_status,
+      verdictMatrix.real_code_change_status,
+      verdictMatrix.post_run_verification_status,
+      verdictMatrix.post_run_diagnostic_status,
       verdictMatrix.artifact_quality,
       verdictMatrix.code_quality,
       verdictMatrix.provider_execution_status,
       verdictMatrix.feature_size_fit_status,
       verdictMatrix.delivery_release_quality,
       verdictMatrix.learning_loop_closure,
+      verdictMatrix.quality_gate_decision,
     ];
     verdictMatrix.overall_verdict = verdictStatuses.includes("fail")
       ? "fail"
@@ -3639,6 +4180,8 @@ function buildScorecard(options) {
     profile_id: options.profile.profile_id ?? null,
     scenario_id: options.profile.scenario_id ?? null,
     scenario_family: options.profile.scenario_family ?? null,
+    target_catalog_id: options.profile.target_catalog_id ?? null,
+    feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
     flow_kind: options.profile.flow_kind ?? null,
@@ -3657,6 +4200,16 @@ function buildScorecard(options) {
     scenario_coverage_status: verdictMatrix.scenario_coverage_status ?? null,
     provider_execution_status: verdictMatrix.provider_execution_status ?? null,
     feature_size_fit_status: verdictMatrix.feature_size_fit_status ?? null,
+    target_baseline_status: verdictMatrix.target_baseline_status ?? null,
+    real_code_change_status: verdictMatrix.real_code_change_status ?? null,
+    post_run_verification_status: verdictMatrix.post_run_verification_status ?? null,
+    post_run_diagnostic_status: verdictMatrix.post_run_diagnostic_status ?? null,
+    runtime_harness_decision: verdictMatrix.runtime_harness_decision ?? null,
+    run_start_runtime_harness_decision:
+      verdictMatrix.run_start_runtime_harness_decision ?? verdictMatrix.runtime_harness_decision ?? null,
+    latest_runtime_harness_decision:
+      verdictMatrix.latest_runtime_harness_decision ?? verdictMatrix.runtime_harness_decision ?? null,
+    quality_gate_decision: verdictMatrix.quality_gate_decision ?? null,
     summary_ref: options.summaryFile,
     command_count: options.flowResult.commandResults.length,
     generated_at: nowIso(),
@@ -3699,6 +4252,8 @@ function writeProofRunnerArtifacts(options) {
     profile_id: options.profile.profile_id ?? null,
     scenario_id: options.profile.scenario_id ?? null,
     scenario_family: options.profile.scenario_family ?? null,
+    target_catalog_id: options.profile.target_catalog_id ?? null,
+    feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
     flow_kind: options.profile.flow_kind ?? null,
@@ -3723,6 +4278,34 @@ function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.runtime_harness_report_file === "string"
         ? options.flowResult.artifacts.runtime_harness_report_file
         : null,
+    baseline_verify_summary_file:
+      typeof options.flowResult.artifacts.baseline_verify_summary_file === "string"
+        ? options.flowResult.artifacts.baseline_verify_summary_file
+        : null,
+    baseline_verify_status: asNonEmptyString(options.flowResult.artifacts.baseline_verify_status) || null,
+    baseline_verify_gate_decision:
+      typeof options.flowResult.artifacts.baseline_verify_gate_decision === "object" &&
+      options.flowResult.artifacts.baseline_verify_gate_decision
+        ? options.flowResult.artifacts.baseline_verify_gate_decision
+        : null,
+    post_run_verify_summary_file:
+      typeof options.flowResult.artifacts.post_run_verify_summary_file === "string"
+        ? options.flowResult.artifacts.post_run_verify_summary_file
+        : null,
+    post_run_verify_status: asNonEmptyString(options.flowResult.artifacts.post_run_verify_status) || null,
+    post_run_diagnostic_verify_summary_file:
+      typeof options.flowResult.artifacts.post_run_diagnostic_verify_summary_file === "string"
+        ? options.flowResult.artifacts.post_run_diagnostic_verify_summary_file
+        : null,
+    post_run_diagnostic_status: asNonEmptyString(options.flowResult.artifacts.post_run_diagnostic_status) || null,
+    provider_execution_status: asNonEmptyString(options.flowResult.artifacts.provider_execution_status) || null,
+    real_code_change_status: asNonEmptyString(options.flowResult.artifacts.real_code_change_status) || null,
+    runtime_harness_decision: asNonEmptyString(options.flowResult.artifacts.runtime_harness_decision) || null,
+    run_start_runtime_harness_decision:
+      asNonEmptyString(options.flowResult.artifacts.run_start_runtime_harness_decision) || null,
+    latest_runtime_harness_decision:
+      asNonEmptyString(options.flowResult.artifacts.latest_runtime_harness_decision) || null,
+    quality_gate_decision: asNonEmptyString(options.flowResult.artifacts.quality_gate_decision) || null,
     compiled_context_ref:
       typeof options.flowResult.artifacts.compiled_context_ref === "string"
         ? options.flowResult.artifacts.compiled_context_ref

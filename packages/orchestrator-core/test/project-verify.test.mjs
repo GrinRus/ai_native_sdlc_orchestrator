@@ -63,6 +63,42 @@ test("verifyProjectRuntime records passing bounded command execution", () => {
   });
 });
 
+test("verifyProjectRuntime keeps labeled step results distinct across repeated verifies", () => {
+  withTempRepo((repoRoot) => {
+    const primary = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+      repoTestCommands: ['node -e "process.exit(0)"'],
+    });
+
+    const primaryStepRefs = [...primary.verifySummary.step_result_refs];
+    assert.equal(primary.verifySummary.status, "passed");
+    assert.ok(primaryStepRefs.every((filePath) => path.basename(filePath).startsWith("step-result-post-run-primary-")));
+
+    const diagnostic = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-diagnostic",
+      repoTestCommands: ['node -e "process.exit(7)"'],
+    });
+
+    assert.equal(diagnostic.verifySummary.status, "failed");
+    assert.ok(
+      diagnostic.verifySummary.step_result_refs.every((filePath) =>
+        path.basename(filePath).startsWith("step-result-post-run-diagnostic-"),
+      ),
+    );
+
+    for (const filePath of primaryStepRefs) {
+      const stepResult = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      assert.equal(stepResult.verification_label, "post-run-primary");
+      assert.equal(stepResult.status, "passed");
+      assert.equal(stepResult.command_source, "cli-override");
+    }
+  });
+});
+
 test("verifyProjectRuntime runs commands in workspace-clone isolation and records cleanup metadata", () => {
   withTempRepo((repoRoot) => {
     const profilePath = path.join(repoRoot, "examples/project.aor.yaml");

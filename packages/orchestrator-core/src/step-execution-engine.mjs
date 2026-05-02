@@ -182,6 +182,18 @@ function filterNonBootstrapChangedPaths(changedPaths) {
 }
 
 /**
+ * @param {string} candidate
+ * @returns {boolean}
+ */
+function isTransientBackupPath(candidate) {
+  const basename = path.posix.basename(candidate.replace(/\\/g, "/")).toLowerCase();
+  return (
+    basename.startsWith(".#") ||
+    /(?:~|\.bak|\.backup|\.orig|\.rej|\.tmp|\.swp|\.swo|\.old)$/u.test(basename)
+  );
+}
+
+/**
  * @param {string} pattern
  * @param {string} candidate
  * @returns {boolean}
@@ -263,7 +275,9 @@ function loadMissionScope(projectRoot, artifactsRoot) {
  */
 function resolveMissionScopedChanges(changedPaths, missionScope) {
   const ignoredInputFiles = new Set(missionScope.ignoredInputFiles);
-  const scopeCandidates = changedPaths.filter((changedPath) => !ignoredInputFiles.has(changedPath));
+  const scopeCandidates = changedPaths.filter(
+    (changedPath) => !ignoredInputFiles.has(changedPath) && !isTransientBackupPath(changedPath),
+  );
   const forbiddenChangedPaths = scopeCandidates.filter((changedPath) =>
     missionScope.forbiddenPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
   );
