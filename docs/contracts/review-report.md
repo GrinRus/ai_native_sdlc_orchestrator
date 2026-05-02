@@ -65,6 +65,8 @@ Durable report-only quality verdict for one run after execution evidence, delive
 - `forbidden_paths`
 - `findings`
 
+For test files, `code_quality.findings` should flag likely coverage weakening, including lowered `t.plan(...)` counts or removed assertions without an equivalent replacement. Source-tree backup or editor artifacts such as `.bak`, `.orig`, `.rej`, `.tmp`, `.swp`, and `~` files should also be flagged because they are not valid implementation deliverables. These findings are review signals; they do not replace deterministic post-run verification.
+
 `feature_size_fit` should preserve:
 - `status`
 - `feature_size`

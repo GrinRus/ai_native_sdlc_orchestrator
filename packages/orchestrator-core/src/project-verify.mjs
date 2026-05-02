@@ -13,7 +13,54 @@ const NO_WRITE_PREFLIGHT_SEQUENCE = Object.freeze(["clone", "inspect", "analyze"
  * @param {Record<string, unknown>} profile
  * @returns {Array<{ repoId: string, command: string }>}
  */
-function collectVerifyCommands(profile) {
+function asStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
+    : [];
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @returns {string}
+ */
+function resolvePrimaryRepoId(profile) {
+  const repos = Array.isArray(profile.repos) ? profile.repos : [];
+  const firstRepo = repos.length > 0 ? /** @type {Record<string, unknown>} */ (repos[0]) : {};
+  return typeof firstRepo.repo_id === "string" && firstRepo.repo_id.trim().length > 0 ? firstRepo.repo_id.trim() : "main";
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeFilePart(value) {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
+  return normalized.length > 0 ? normalized : "default";
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {{ repoBuildCommands?: string[], repoLintCommands?: string[], repoTestCommands?: string[] }} [overrides]
+ * @returns {Array<{ repoId: string, command: string, commandSource: "project-profile" | "cli-override", commandKind: "lint" | "test" | "build" }>}
+ */
+function collectVerifyCommands(profile, overrides = {}) {
+  const overrideGroups = [
+    { kind: /** @type {"lint"} */ ("lint"), commands: asStringArray(overrides.repoLintCommands) },
+    { kind: /** @type {"test"} */ ("test"), commands: asStringArray(overrides.repoTestCommands) },
+    { kind: /** @type {"build"} */ ("build"), commands: asStringArray(overrides.repoBuildCommands) },
+  ];
+  if (overrideGroups.some((group) => group.commands.length > 0)) {
+    const repoId = resolvePrimaryRepoId(profile);
+    return overrideGroups.flatMap((group) =>
+      group.commands.map((command) => ({
+        repoId,
+        command,
+        commandSource: /** @type {"cli-override"} */ ("cli-override"),
+        commandKind: group.kind,
+      })),
+    );
+  }
+
   /** @type {Array<{ repoId: string, command: string }>} */
   const commands = [];
   const repos = Array.isArray(profile.repos) ? profile.repos : [];
@@ -27,7 +74,17 @@ function collectVerifyCommands(profile) {
       if (!Array.isArray(candidateList)) continue;
       for (const command of candidateList) {
         if (typeof command === "string" && command.trim().length > 0) {
-          commands.push({ repoId, command });
+          commands.push({
+            repoId,
+            command: command.trim(),
+            commandSource: /** @type {"project-profile"} */ ("project-profile"),
+            commandKind:
+              key === "lint_commands"
+                ? /** @type {"lint"} */ ("lint")
+                : key === "test_commands"
+                  ? /** @type {"test"} */ ("test")
+                  : /** @type {"build"} */ ("build"),
+          });
         }
       }
     }
@@ -156,6 +213,9 @@ function inferMissingPrerequisites(command, commandRun) {
  *   repoScope?: string | null,
  *   command?: string | null,
  *   commandOwner?: string,
+ *   commandSource?: string,
+ *   commandKind?: string,
+ *   verificationLabel?: string,
  *   missingPrerequisites?: string[],
  *   executionRoot?: string | null,
  *   isolationMode?: string | null,
@@ -174,6 +234,9 @@ function materializeStepResult(options) {
     repo_scope: options.repoScope ?? null,
     command: options.command ?? null,
     command_owner: options.commandOwner ?? "profile",
+    command_source: options.commandSource ?? "project-profile",
+    command_kind: options.commandKind ?? null,
+    verification_label: options.verificationLabel ?? "default",
     missing_prerequisites: options.missingPrerequisites ?? [],
     blocked_next_step: options.blockedNextStep ?? null,
     execution_root: options.executionRoot ?? null,
@@ -223,6 +286,10 @@ function readValidationGateStatus(runtimeLayout) {
  *  projectProfile?: string,
  *  runtimeRoot?: string,
  *  requireValidationPass?: boolean,
+ *  verificationLabel?: string,
+ *  repoBuildCommands?: string[],
+ *  repoLintCommands?: string[],
+ *  repoTestCommands?: string[],
  * }} options
  */
 export function verifyProjectRuntime(options = {}) {
@@ -242,7 +309,12 @@ export function verifyProjectRuntime(options = {}) {
 
   const validationGateStatus = options.requireValidationPass ? readValidationGateStatus(init.runtimeLayout) : null;
 
-  const runId = `${init.projectId}.verify.v1`;
+  const verificationLabel =
+    typeof options.verificationLabel === "string" && options.verificationLabel.trim().length > 0
+      ? options.verificationLabel.trim()
+      : "default";
+  const verificationLabelFilePart = normalizeFilePart(verificationLabel);
+  const runId = `${init.projectId}.verify.${verificationLabel}.v1`;
   const workspaceIsolation = prepareWorkspaceIsolation({
     projectRoot: init.projectRoot,
     runtimeRoot: init.runtimeRoot,
@@ -250,7 +322,11 @@ export function verifyProjectRuntime(options = {}) {
     runtimeDefaults: preflightSafety.runtimeDefaults,
     runId,
   });
-  const verifyCommands = collectVerifyCommands(profile);
+  const verifyCommands = collectVerifyCommands(profile, {
+    repoBuildCommands: options.repoBuildCommands,
+    repoLintCommands: options.repoLintCommands,
+    repoTestCommands: options.repoTestCommands,
+  });
   const stepResultFiles = [];
   /** @type {Array<Record<string, unknown>>} */
   const stepResults = [];
@@ -266,9 +342,15 @@ export function verifyProjectRuntime(options = {}) {
         status: "failed",
         summary: violation.summary,
         evidenceRefs: [init.projectProfilePath, init.stateFile],
-        stepResultFileName: `step-result-${violation.stepSuffix}.json`,
+        stepResultFileName:
+          verificationLabel === "default"
+            ? `step-result-${violation.stepSuffix}.json`
+            : `step-result-${verificationLabelFilePart}-${violation.stepSuffix}.json`,
         blockedNextStep: violation.blockedNextStep,
         commandOwner: "project-profile",
+        commandSource: "project-profile",
+        commandKind: "preflight",
+        verificationLabel,
         missingPrerequisites: violation.missingPrerequisites,
         executionRoot: workspaceIsolation.executionRoot,
         isolationMode: workspaceIsolation.mode,
@@ -278,8 +360,11 @@ export function verifyProjectRuntime(options = {}) {
     }
   } else {
     verifyCommands.forEach((item, index) => {
-      const stepId = `verify.command.${index + 1}`;
-      const transcriptPath = path.join(init.runtimeLayout.reportsRoot, `verify-command-${index + 1}.log`);
+      const stepId = `verify.${verificationLabel}.command.${index + 1}`;
+      const transcriptPath = path.join(
+        init.runtimeLayout.reportsRoot,
+        `verify-command-${verificationLabelFilePart}-${index + 1}.log`,
+      );
       const commandRun = spawnSync(item.command, {
         cwd: workspaceIsolation.executionRoot,
         shell: true,
@@ -288,6 +373,9 @@ export function verifyProjectRuntime(options = {}) {
 
       const transcript = [
         `command: ${item.command}`,
+        `command_source: ${item.commandSource}`,
+        `command_kind: ${item.commandKind}`,
+        `verification_label: ${verificationLabel}`,
         `repo_scope: ${item.repoId}`,
         `execution_root: ${workspaceIsolation.executionRoot}`,
         `execution_isolation_mode: ${workspaceIsolation.mode}`,
@@ -323,11 +411,17 @@ export function verifyProjectRuntime(options = {}) {
         status,
         summary,
         evidenceRefs: [transcriptPath],
-        stepResultFileName: `step-result-${index + 1}.json`,
+        stepResultFileName:
+          verificationLabel === "default"
+            ? `step-result-${index + 1}.json`
+            : `step-result-${verificationLabelFilePart}-${index + 1}.json`,
         blockedNextStep,
         repoScope: item.repoId,
         command: item.command,
         commandOwner: item.repoId,
+        commandSource: item.commandSource,
+        commandKind: item.commandKind,
+        verificationLabel,
         missingPrerequisites,
         executionRoot: workspaceIsolation.executionRoot,
         isolationMode: workspaceIsolation.mode,
@@ -346,9 +440,15 @@ export function verifyProjectRuntime(options = {}) {
       status: "failed",
       summary: "No bounded verification commands were found in project profile repos[].",
       evidenceRefs: [init.projectProfilePath],
-      stepResultFileName: "step-result-no-commands.json",
+      stepResultFileName:
+        verificationLabel === "default"
+          ? "step-result-no-commands.json"
+          : `step-result-${verificationLabelFilePart}-no-commands.json`,
       blockedNextStep: "Define lint/test/build command lists in project profile repos[] and rerun verify.",
       commandOwner: "project-profile",
+      commandSource: "project-profile",
+      commandKind: "selection",
+      verificationLabel,
       missingPrerequisites: ["At least one bounded command is required in repos[].lint/test/build command lists."],
       executionRoot: workspaceIsolation.executionRoot,
       isolationMode: workspaceIsolation.mode,
@@ -361,8 +461,17 @@ export function verifyProjectRuntime(options = {}) {
   const cleanupResult = workspaceIsolation.finalize(summaryStatus === "passed" ? "success" : "failure");
   const verifySummary = {
     run_id: runId,
+    verification_label: verificationLabel,
     status: summaryStatus,
     validation_gate_status: validationGateStatus,
+    command_source: verifyCommands.some((command) => command.commandSource === "cli-override")
+      ? "cli-override"
+      : "project-profile",
+    command_overrides: {
+      build_commands: asStringArray(options.repoBuildCommands),
+      lint_commands: asStringArray(options.repoLintCommands),
+      test_commands: asStringArray(options.repoTestCommands),
+    },
     preflight_safety: {
       mode: "no-write",
       sequence: NO_WRITE_PREFLIGHT_SEQUENCE,
@@ -408,8 +517,11 @@ export function verifyProjectRuntime(options = {}) {
         : null,
   };
 
-  const verifySummaryPath = path.join(init.runtimeLayout.reportsRoot, "verify-summary.json");
+  const verifySummaryFileName =
+    verificationLabel === "default" ? "verify-summary.json" : `verify-summary-${verificationLabelFilePart}.json`;
+  const verifySummaryPath = path.join(init.runtimeLayout.reportsRoot, verifySummaryFileName);
   fs.writeFileSync(verifySummaryPath, `${JSON.stringify(verifySummary, null, 2)}\n`, "utf8");
+  fs.writeFileSync(path.join(init.runtimeLayout.reportsRoot, "verify-summary.json"), `${JSON.stringify(verifySummary, null, 2)}\n`, "utf8");
 
   return {
     ...init,

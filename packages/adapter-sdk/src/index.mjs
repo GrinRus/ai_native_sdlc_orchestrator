@@ -131,12 +131,12 @@ function hasNonEmptyPermissionDenials(value) {
 }
 
 /**
- * @param {{ stdout?: string, stderr?: string, errorMessage?: string | null, defaultFailureKind: string }} options
+ * @param {{ stdout?: string, stderr?: string, errorMessage?: string | null, defaultFailureKind: string, ignoreAuthFailure?: boolean }} options
  * @returns {string}
  */
 export function classifyExternalRunnerFailure(options) {
   const combined = `${options.stdout ?? ""}\n${options.stderr ?? ""}\n${options.errorMessage ?? ""}`.toLowerCase();
-  if (
+  if (!options.ignoreAuthFailure && (
     /\b401\b/u.test(combined) ||
     combined.includes("unauthorized") ||
     combined.includes("not authenticated") ||
@@ -146,7 +146,7 @@ export function classifyExternalRunnerFailure(options) {
     combined.includes("apikey") ||
     combined.includes("setup-token") ||
     combined.includes("login required")
-  ) {
+  )) {
     return "auth-failed";
   }
   if (
@@ -167,16 +167,21 @@ export function classifyExternalRunnerFailure(options) {
     return "edit-denied";
   }
   if (
-    combined.includes("permission denied") ||
     combined.includes("permission denial") ||
-    combined.includes("permission-mode") ||
-    combined.includes("permissions") ||
-    combined.includes("approval required") ||
-    combined.includes("requesting permission") ||
-    combined.includes("grant permission") ||
+    combined.includes("tool_use_denied") ||
+    combined.includes("tool use denied") ||
+    combined.includes("tool denied") ||
+    combined.includes("approval required for tool") ||
+    combined.includes("approval is required for tool") ||
+    combined.includes("requesting permission to use") ||
+    combined.includes("grant permission to use") ||
+    /\bpermissions?\s+(?:is\s+|are\s+)?required\s+for\s+(?:tool|edit|write|command)\b/u.test(combined) ||
+    /\bpermission[- ]mode\s+(?:blocked|denied|requires|required)\b/u.test(combined) ||
+    /\b(?:blocked|denied)\s+by\s+permission[- ]mode\b/u.test(combined) ||
     combined.includes("workspace trust") ||
     combined.includes("not trusted") ||
-    combined.includes("sandbox")
+    /\brunner\s+sandbox\s+(?:blocked|denied|violation|requires|required)\b/u.test(combined) ||
+    /\btool\s+sandbox\s+(?:blocked|denied|violation|requires|required)\b/u.test(combined)
   ) {
     return "permission-mode-blocked";
   }
@@ -216,13 +221,20 @@ function classifyStructuredRunnerFailure(options) {
     return "edit-denied";
   }
   if (
-    combined.includes("permission denial") ||
-    combined.includes("permission denied") ||
-    combined.includes("approval required") ||
-    combined.includes("requesting permission") ||
-    combined.includes("grant permission") ||
     combined.includes("tool_use_denied") ||
-    combined.includes("tool denied")
+    combined.includes("tool use denied") ||
+    combined.includes("tool denied") ||
+    combined.includes("approval required for tool") ||
+    combined.includes("approval is required for tool") ||
+    combined.includes("requesting permission to use") ||
+    combined.includes("grant permission to use") ||
+    /\bpermissions?\s+(?:is\s+|are\s+)?required\s+for\s+(?:tool|edit|write|command)\b/u.test(combined) ||
+    /\bpermission[- ]mode\s+(?:blocked|denied|requires|required)\b/u.test(combined) ||
+    /\b(?:blocked|denied)\s+by\s+permission[- ]mode\b/u.test(combined) ||
+    combined.includes("workspace trust") ||
+    combined.includes("not trusted") ||
+    /\brunner\s+sandbox\s+(?:blocked|denied|violation|requires|required)\b/u.test(combined) ||
+    /\btool\s+sandbox\s+(?:blocked|denied|violation|requires|required)\b/u.test(combined)
   ) {
     return "permission-mode-blocked";
   }
@@ -1069,6 +1081,7 @@ export function createLiveAdapter(options) {
           stdout,
           stderr,
           defaultFailureKind: "",
+          ignoreAuthFailure: true,
         });
       if (semanticFailureKind) {
         const blocked = [

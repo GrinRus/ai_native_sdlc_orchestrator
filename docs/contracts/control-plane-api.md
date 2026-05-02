@@ -43,6 +43,7 @@ Current enum constraints:
 Project bootstrap baseline:
 - `project init` may materialize a clean target repo through public bootstrap flags only;
 - `project init` accepts optional repo verification overrides via repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs so curated live E2E targets can preserve required setup and verification commands without proof-runner-side profile generation.
+- `project verify` accepts `verification_label` plus repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs. Labels separate baseline diagnostics, primary post-run gates, and diagnostic full-suite evidence while preserving command source in the verify summary.
 
 ## Query families
 - projects
@@ -93,6 +94,7 @@ Full-journey execution baseline (W13):
 - successful execution emits one run-linked `step-result` plus terminal `live-run-event` lineage;
 - `run status` resolves that execution lineage without requiring harness-private execution state.
 - `project verify` and `run start` both accept `route_overrides` and `policy_overrides` so live E2E can apply provider-pinned matrix-cell routing deterministically through the public CLI surface.
+- Full-journey live E2E may continue after a degraded `run start` only when public routed step, Runtime Harness, and adapter raw evidence were materialized. Missing execution evidence remains a hard blocker.
 
 ## Delivery/release baseline (module operations)
 
@@ -144,6 +146,7 @@ Incident recertify baseline (W7-S03):
 Audit runs baseline:
 - emits run-centric snapshots of packet, step-result, quality, incident, and promotion refs;
 - emits `run_audit_records.finance_evidence` with route/wrapper/adapter IDs plus bounded cost/timeout/latency summaries;
+- emits `run_audit_records.provider_execution_status` from materialized adapter raw execution evidence, not from provider route traceability alone;
 - supports optional `run_id` filter and bounded `limit` window;
 - response includes `audit_evidence_refs` for downstream handoff and review workflows.
 

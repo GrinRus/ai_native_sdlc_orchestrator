@@ -224,6 +224,124 @@ function summarizeDiffBudget(projectRoot, changedPaths) {
 }
 
 /**
+ * @param {string} line
+ * @returns {number | null}
+ */
+function parseTapPlan(line) {
+  const match = /\bt\.plan\((\d+)\)/u.exec(line);
+  if (!match) return null;
+  const value = Number.parseInt(match[1], 10);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {string} line
+ * @returns {boolean}
+ */
+function isAssertionLine(line) {
+  return /\bt\.(?:assert|deepEqual|false|is|like|not|notDeepEqual|notRegex|notThrows|regex|snapshot|throws|true)\s*\(/u.test(
+    line,
+  );
+}
+
+/**
+ * @param {string} candidate
+ * @returns {boolean}
+ */
+function isTransientBackupPath(candidate) {
+  const basename = path.posix.basename(candidate.replace(/\\/g, "/")).toLowerCase();
+  return (
+    basename.startsWith(".#") ||
+    /(?:~|\.bak|\.backup|\.orig|\.rej|\.tmp|\.swp|\.swo|\.old)$/u.test(basename)
+  );
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string[]} changedPaths
+ * @returns {Array<{ path: string, type: "plan-lowered" | "assertion-removed", summary: string }>}
+ */
+function detectTestWeakening(projectRoot, changedPaths) {
+  const testPaths = changedPaths.filter((candidate) =>
+    /(?:^|\/)(?:test|tests)\/.*\.(?:[cm]?[jt]s|tsx?)$/u.test(candidate),
+  );
+  if (testPaths.length === 0) return [];
+  const run = spawnSync("git", ["diff", "--unified=0", "--", ...testPaths], {
+    cwd: projectRoot,
+    encoding: "utf8",
+  });
+  if (run.status !== 0) return [];
+
+  /** @type {Array<{ path: string, type: "plan-lowered" | "assertion-removed", summary: string }>} */
+  const findings = [];
+  let currentPath = "";
+  /** @type {Map<string, { removedPlans: number[], addedPlans: number[], removedAssertions: string[], addedAssertions: string[] }>} */
+  const perFile = new Map();
+  const stateFor = (filePath) => {
+    if (!perFile.has(filePath)) {
+      perFile.set(filePath, {
+        removedPlans: [],
+        addedPlans: [],
+        removedAssertions: [],
+        addedAssertions: [],
+      });
+    }
+    return /** @type {{ removedPlans: number[], addedPlans: number[], removedAssertions: string[], addedAssertions: string[] }} */ (
+      perFile.get(filePath)
+    );
+  };
+
+  for (const line of (run.stdout ?? "").split(/\r?\n/u)) {
+    if (line.startsWith("+++ b/")) {
+      currentPath = line.slice("+++ b/".length).trim();
+      continue;
+    }
+    if (!currentPath || line.startsWith("---") || line.startsWith("+++") || line.startsWith("@@")) {
+      continue;
+    }
+    const state = stateFor(currentPath);
+    if (line.startsWith("-")) {
+      const body = line.slice(1);
+      const plan = parseTapPlan(body);
+      if (plan !== null) state.removedPlans.push(plan);
+      if (isAssertionLine(body)) state.removedAssertions.push(body.trim());
+    } else if (line.startsWith("+")) {
+      const body = line.slice(1);
+      const plan = parseTapPlan(body);
+      if (plan !== null) state.addedPlans.push(plan);
+      if (isAssertionLine(body)) state.addedAssertions.push(body.trim());
+    }
+  }
+
+  for (const [filePath, state] of perFile) {
+    if (
+      state.removedPlans.length > 0 &&
+      state.addedPlans.length > 0 &&
+      Math.max(...state.removedPlans) > Math.min(...state.addedPlans)
+    ) {
+      findings.push({
+        path: filePath,
+        type: "plan-lowered",
+        summary: `Test plan count was lowered in '${filePath}', which may weaken regression coverage.`,
+      });
+    }
+    const addedAssertionSet = new Set(state.addedAssertions.map((line) => line.replace(/\s+/gu, " ")));
+    const removedWithoutReplacement = state.removedAssertions.filter(
+      (line) => !addedAssertionSet.has(line.replace(/\s+/gu, " ")),
+    );
+    if (removedWithoutReplacement.length > 0 && state.addedAssertions.length < state.removedAssertions.length) {
+      findings.push({
+        path: filePath,
+        type: "assertion-removed",
+        summary: `Test assertions were removed from '${filePath}' without equivalent replacement.`,
+      });
+    }
+  }
+
+  return findings;
+}
+
+/**
  * @param {string} pattern
  * @param {string} candidate
  * @returns {boolean}
@@ -297,7 +415,10 @@ export function materializeReviewReport(options) {
     "project-analysis-report.json",
     "project-analysis-report",
   );
-  const verifySummaryPath = path.join(init.runtimeLayout.reportsRoot, "verify-summary.json");
+  const preferredVerifySummaryPath = path.join(init.runtimeLayout.reportsRoot, "verify-summary-post-run-primary.json");
+  const verifySummaryPath = fs.existsSync(preferredVerifySummaryPath)
+    ? preferredVerifySummaryPath
+    : path.join(init.runtimeLayout.reportsRoot, "verify-summary.json");
   const verifySummary = fs.existsSync(verifySummaryPath) ? readJson(verifySummaryPath) : null;
 
   const intakePacket =
@@ -552,6 +673,14 @@ export function materializeReviewReport(options) {
     });
   }
   for (const changedPath of codeChangedPaths) {
+    if (isTransientBackupPath(changedPath)) {
+      pushFinding({
+        findings: codeFindings,
+        severity: "warn",
+        category: "code-quality",
+        summary: `Changed path '${changedPath}' appears to be a backup or transient editor artifact.`,
+      });
+    }
     if (forbiddenPaths.some((pattern) => matchesScopePattern(pattern, changedPath))) {
       pushFinding({
         findings: codeFindings,
@@ -580,6 +709,15 @@ export function materializeReviewReport(options) {
         summary: `Changed path '${changedPath}' leaks into control-plane-only content.`,
       });
     }
+  }
+  for (const weakening of detectTestWeakening(init.projectRoot, codeChangedPaths)) {
+    pushFinding({
+      findings: codeFindings,
+      severity: "warn",
+      category: "code-quality",
+      summary: weakening.summary,
+      evidenceRefs: [toEvidenceRef(init.projectRoot, path.join(init.projectRoot, weakening.path))],
+    });
   }
 
   /** @type {Array<Record<string, unknown>>} */

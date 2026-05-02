@@ -239,6 +239,51 @@ test("runtime harness classifies structured permission denials before strict no-
   });
 });
 
+test("runtime harness ignores target Permission denied diagnostics when mission changes exist", () => {
+  const outcome = classifyRuntimeStepOutcome(
+    {
+      step_result_id: "run.target-permission.step.implement",
+      run_id: "run.target-permission",
+      step_id: "run.start.implement",
+      step_class: "runner",
+      status: "passed",
+      summary: "Adapter completed with target diagnostics.",
+      evidence_refs: [],
+      routed_execution: {
+        mode: "execute",
+        adapter_response: {
+          status: "success",
+          output: {
+            runner_output: {
+              jsonl_events: [
+                {
+                  type: "item.completed",
+                  item: {
+                    type: "agent_message",
+                    text: "Full npm test reported Playwright Permission denied (1100) in the browser sandbox, but source/utils/merge.ts and test/headers.ts were changed.",
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+    {
+      gitStatusAvailable: true,
+      strictCodeChangingNoop: true,
+      missionScopedChangedPaths: ["source/utils/merge.ts", "test/headers.ts"],
+      scopeViolationPaths: [],
+    },
+  );
+
+  assert.deepEqual(outcome, {
+    failureClass: "none",
+    decision: "pass",
+    missionOutcome: "satisfied",
+  });
+});
+
 test("materializeRuntimeHarnessReport links eval reports by subject_ref run URI", () => {
   withTempRepo((repoRoot) => {
     const runId = "runtime-harness-eval-fail";
@@ -855,6 +900,73 @@ test("Runtime Harness no-op detection ignores mission input files and enforces a
 
     assert.equal(report.report.overall_decision, "repair");
     assert.deepEqual(report.report.step_decisions[0].mission_semantics.ignored_input_files, ["feature-request.json"]);
+    assert.deepEqual(report.report.step_decisions[0].mission_semantics.mission_scoped_changed_paths, []);
+  });
+});
+
+test("Runtime Harness ignores backup artifacts as real code-changing evidence", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const requestFile = path.join(repoRoot, "feature-request.json");
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify({ allowed_paths: ["src/**"], forbidden_paths: ["docs/**"] }, null, 2)}\n`,
+      "utf8",
+    );
+    materializeIntakeArtifactPacket({
+      projectId: init.projectId,
+      projectRoot: init.projectRoot,
+      projectProfileRef: init.projectProfileRef,
+      runtimeLayout: init.runtimeLayout,
+      command: "aor intake create",
+      missionId: "backup-only",
+      requestFile,
+    });
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const path=require('node:path');",
+          "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+          "const request=input.request||{};",
+          "fs.mkdirSync('src',{recursive:true});",
+          "fs.writeFileSync(path.join('src','index.js.bak'),'backup only\\n');",
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'external runner wrote backup artifact only',",
+          "output:{runner:'node-inline',step_class:request.step_class||null,cwd:process.cwd()},",
+          "evidence_refs:['evidence://external-runner/backup-only'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline-backup-only'}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    const step = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId: "runtime-harness-backup-only",
+      stepId: "run.start.implement",
+      approvedHandoffRef: "evidence://handoff/approved-backup-only",
+      promotionEvidenceRefs: ["evidence://promotion/pass-backup-only"],
+      executionRoot: repoRoot,
+    });
+
+    assert.equal(step.stepResult.failure_class, "no-op");
+    assert.deepEqual(step.stepResult.mission_semantics.mission_scoped_changed_paths, []);
+    assert.ok(step.stepResult.mission_semantics.non_bootstrap_changed_paths.includes("src/index.js.bak"));
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "runtime-harness-backup-only",
+    });
+
+    assert.equal(report.report.overall_decision, "repair");
     assert.deepEqual(report.report.step_decisions[0].mission_semantics.mission_scoped_changed_paths, []);
   });
 });

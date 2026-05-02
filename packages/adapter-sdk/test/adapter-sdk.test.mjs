@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   buildAdapterRegistry,
+  classifyExternalRunnerFailure,
   createAdapterRequestEnvelope,
   createAdapterResponseEnvelope,
   createLiveAdapter,
@@ -251,6 +252,53 @@ test("external runtime permission policy resolves env-selected args before adapt
   assert.equal(invalid.failureKind, "permission-policy-invalid");
 });
 
+test("external runner failure classifier ignores benign permission words on successful output", () => {
+  for (const stdout of [
+    "Confirmed. Bounded non-interactive edits are allowed under the current workspace-write permissions.",
+    "External runner completed under the configured workspace-write sandbox.",
+    JSON.stringify({ status: "success", summary: "workspace-write permissions and sandbox are configured" }),
+  ]) {
+    assert.equal(
+      classifyExternalRunnerFailure({
+        stdout,
+        stderr: "",
+        errorMessage: null,
+        defaultFailureKind: "none",
+      }),
+      "none",
+    );
+  }
+
+  assert.equal(
+    classifyExternalRunnerFailure({
+      stdout: "Approval required for tool Read before editing the handoff packet",
+      stderr: "",
+      errorMessage: null,
+      defaultFailureKind: "none",
+    }),
+    "permission-mode-blocked",
+  );
+});
+
+test("external runner failure classifier ignores nested target Permission denied logs", () => {
+  const targetOutput = [
+    "Running npm test",
+    "browser › chromium - baseUrl option",
+    "MachPortRendezvousServer failed: Permission denied (1100)",
+    "Playwright browser process aborted while running target tests",
+  ].join("\n");
+
+  assert.equal(
+    classifyExternalRunnerFailure({
+      stdout: targetOutput,
+      stderr: "",
+      errorMessage: null,
+      defaultFailureKind: "none",
+    }),
+    "none",
+  );
+});
+
 test("live adapter uses selected permission policy args and records the selected mode", () => {
   const previousMode = process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE;
   process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE = "restricted";
@@ -295,6 +343,49 @@ test("live adapter uses selected permission policy args and records the selected
     } else {
       process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE = previousMode;
     }
+  }
+});
+
+test("live adapter accepts successful runner output that mentions workspace permissions and sandbox", () => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-permission-words-"));
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "codex-cli",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "process.stdout.write(JSON.stringify({",
+            "status:'success',",
+            "summary:'bounded edits allowed under workspace-write permissions and sandbox',",
+            "output:{runner:'node-inline',permission_note:'workspace-write permissions and sandbox configured'},",
+            "evidence_refs:['evidence://external-runner/permission-words-success'],",
+            "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'permission words are benign'}]",
+            "}));",
+          ].join(""),
+        ],
+      }),
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: evidenceRoot,
+      executionRoot: evidenceRoot,
+    });
+
+    const response = adapter.execute({
+      request_id: "req-live-permission-words",
+      run_id: "run-live-permission-words",
+      step_id: "step-live-permission-words",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.runner_output.permission_note, "workspace-write permissions and sandbox configured");
+  } finally {
+    fs.rmSync(evidenceRoot, { recursive: true, force: true });
   }
 });
 
@@ -694,7 +785,7 @@ test("live adapter classifies external runner permission blocks", () => {
     adapterId: "claude-code",
     adapterProfile: buildExternalRunnerProfile({
       command: process.execPath,
-      args: ["-e", "process.stderr.write('Permission denied: approval required');process.exit(1);"],
+      args: ["-e", "process.stderr.write('Approval required for tool Edit');process.exit(1);"],
       handler: null,
     }),
   });
@@ -712,6 +803,101 @@ test("live adapter classifies external runner permission blocks", () => {
 
   assert.equal(response.status, "blocked");
   assert.equal(response.output.failure_kind, "permission-mode-blocked");
+});
+
+test("live adapter accepts successful runner output with target Permission denied logs", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stderr.write('MachPortRendezvousServer failed: Permission denied (1100)\\n');",
+          "process.stdout.write(JSON.stringify({status:'success',summary:'target tests reported browser permission output',output:{changed_files:['source/utils/merge.ts']}}));",
+        ].join(""),
+      ],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-target-permission-output",
+    run_id: "run-target-permission-output",
+    step_id: "step-target-permission-output",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.failure_kind, undefined);
+});
+
+test("live adapter accepts Codex JSONL agent summaries that mention target Permission denied logs", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stdout.write(JSON.stringify({type:'thread.started',thread_id:'t1'})+'\\n');",
+          "process.stdout.write(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'Full target npm test failed because Playwright reported Permission denied (1100) inside a browser sandbox; changed source/utils/merge.ts and test/headers.ts.'}})+'\\n');",
+        ].join(""),
+      ],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-codex-jsonl-target-permission-summary",
+    run_id: "run-codex-jsonl-target-permission-summary",
+    step_id: "step-codex-jsonl-target-permission-summary",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.failure_kind, undefined);
+  assert.equal(response.output.runner_output.jsonl_events.length, 2);
+});
+
+test("live adapter ignores successful Codex plugin warm auth noise", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "codex-cli",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stderr.write('failed to warm featured plugin ids cache error=remote plugin sync request failed with status 403 Forbidden\\n');",
+          "process.stdout.write(JSON.stringify({type:'thread.started',thread_id:'t1'})+'\\n');",
+          "process.stdout.write(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'Implementation completed and target diagnostics were reported.'}})+'\\n');",
+        ].join(""),
+      ],
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-codex-plugin-auth-noise",
+    run_id: "run-codex-plugin-auth-noise",
+    step_id: "step-codex-plugin-auth-noise",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.failure_kind, undefined);
 });
 
 test("live adapter blocks successful Claude JSON results that include permission denials", () => {

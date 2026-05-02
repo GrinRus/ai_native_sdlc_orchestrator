@@ -54,6 +54,15 @@ By default, live E2E also uses `--runtime-agent-permission-mode full-bypass` so 
 
 This is required for Claude Code because `--permission-mode auto` can ask the operator to approve tool reads or writes when the compiled context links handoff/spec artifacts under `.aor/`. AOR invokes Claude through `--print` in non-interactive live E2E, so there is no interactive approval channel to answer those prompts during the run.
 
+Provider permission-mode analogues:
+- Codex full-bypass: `--ask-for-approval never` with the configured workspace sandbox.
+- Codex restricted: configured non-interactive `codex exec` args without the approval bypass.
+- Claude Code full-bypass: `--dangerously-skip-permissions`.
+- Claude Code restricted: `--permission-mode auto`.
+- OpenCode full-bypass candidate: `opencode run --format json --dangerously-skip-permissions`; keep `open-code-primary` extended until the adapter profile declares and proves a live baseline runtime.
+
+Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
+
 Optional override for local catalog experiments:
 ```bash
 node ./scripts/live-e2e/run-profile.mjs \
@@ -88,9 +97,12 @@ Full-journey layer:
 - uses public `aor project init --materialize-project-profile --materialize-bootstrap-assets` plus repo command overrides derived from the curated catalog;
 - preflights the selected provider adapter before execution so missing live runtime metadata, missing commands, auth failures, edit-readiness failures, and permission-mode blocks fail before `run start`;
 - records auth probe attempts and retries one transient auth/runtime probe failure before failing the proof;
+- splits verification into `readiness`, `baseline_diagnostic`, and `post_run_quality` phases;
+- treats full-journey baseline target verification as diagnostic by default: failed target `verification.commands` are preserved as context, but setup failures, missing prerequisites, failed validation, missing or failed routed dry-run, provider readiness failure, and unsafe write-back policy still block before execution;
 - has the runner prepare one structured feature request input;
 - materializes provider-pinned route overrides for the selected provider variant before execution starts;
-- runs the public lifecycle through `intake create`, `project analyze`, `project validate`, `project verify --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, `review run`, `eval run`, `deliver prepare`, optional `release prepare`, `audit runs`, conditional incident handling, and `learning handoff`.
+- writes an execution-readiness decision before `run start` so promotion evidence is based on readiness and routed dry-run proof, not on a failed baseline target check;
+- runs the public lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, `deliver prepare`, optional `release prepare`, `audit runs`, conditional incident handling, and `learning handoff`.
 
 No proof-runner-side `examples/context/project profile` injection is allowed on the full-journey path.
 
@@ -101,9 +113,23 @@ The proof runner is a one-shot command. Inspect `live_e2e_run_summary_file` dire
 - inspect `artifacts.verdict_matrix` for the final operator verdict dimensions.
 
 Full-journey summaries must carry:
+- `target_catalog_id`
+- `feature_mission_id`
 - `feature_request_file`
 - `intake_artifact_packet_file`
+- `baseline_verify_summary_file`
+- `baseline_verify_status`
+- `baseline_verify_gate_decision`
+- `post_run_verify_summary_file`
+- `post_run_verify_status`
+- `post_run_diagnostic_verify_summary_file` when configured
+- `post_run_diagnostic_status`
+- `real_code_change_status`
 - `runtime_harness_report_file`
+- `runtime_harness_decision`
+- `run_start_runtime_harness_decision`
+- `latest_runtime_harness_decision`
+- `quality_gate_decision`
 - `review_report_file`
 - `learning_loop_scorecard_file`
 - `learning_loop_handoff_file`
@@ -125,18 +151,26 @@ Full-journey summaries include one verdict matrix with:
 - `feature_size`
 - `target_selection`
 - `feature_request_quality`
+- `target_baseline_status`
 - `discovery_quality`
+- `provider_execution_status`
+- `real_code_change_status`
+- `post_run_verification_status`
+- `post_run_diagnostic_status`
 - `runtime_success`
+- `runtime_harness_decision`
+- `run_start_runtime_harness_decision`
+- `latest_runtime_harness_decision`
 - `artifact_quality`
 - `code_quality`
-- `provider_execution_status`
 - `feature_size_fit_status`
 - `scenario_coverage_status`
 - `delivery_release_quality`
 - `learning_loop_closure`
+- `quality_gate_decision`
 - `overall_verdict`
 
-`overall_verdict=pass` requires successful runtime, `review-report=pass`, and public learning closure artifacts.
+`overall_verdict=pass` requires real provider execution, mission-scoped code changes, primary post-run verification success, acceptable artifact and code review, and public learning closure artifacts. Baseline target verification and configured diagnostic post-run verification can be `warn` in full-journey mode without blocking execution, but either warning downgrades the overall result to `pass_with_findings`.
 
 ## Operator checks
 - Summary and scorecard files exist under `.aor/projects/<project_id>/reports/`.
@@ -148,6 +182,9 @@ Full-journey summaries include one verdict matrix with:
 - `review_report_file` exists and is contract-valid.
 - `review-report.provider_traceability` matches the requested provider variant and adapter path.
 - `review-report.feature_size_fit` stays inside the declared size budget for the mission.
+- `review-report.artifact_quality.verify_summary_ref` points at the post-run `project verify` summary.
+- `post_run_verify_status=pass` is required for a passing full-journey verdict; diagnostic full-suite failures are reported separately when the mission config marks them as warnings.
+- `provider_execution_status` proves adapter raw evidence materialized; `real_code_change_status` proves meaningful Runtime Harness mission-scoped changed paths exist, excluding backup/editor artifacts; `post_run_verification_status` proves deterministic quality.
 - `learning_loop_scorecard_file` and `learning_loop_handoff_file` exist and are contract-valid.
 - Release-shaped runs keep `delivery_manifest_file` and `release_packet_file` anchored to the target checkout.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.

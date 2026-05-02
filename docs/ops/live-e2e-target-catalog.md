@@ -28,6 +28,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - `small`, `regress`
     - bounded regression mission inside `source/**` and `test/**`
     - expected evidence: `verify-summary`, routed `step-result`, `review-report`
+    - post-run primary gate: `npx xo`, `npm run build`, `npx ava test/headers.ts`; full `npm test` remains diagnostic evidence
   - `ky-fetch-options-regression`
     - `medium`, `regress|repair`
     - bounded multi-file regression across `source/**`, `test/**`, and `index.d.ts`
@@ -121,8 +122,10 @@ Mandatory full-journey live E2E is valid only when:
 3. the profile pins `scenario_family` and `provider_variant_id`;
 4. the runner prepares the feature request during the run;
 5. discovery/spec/handoff trace back to that mission;
-6. public `review run`, `audit runs`, and `learning handoff` artifacts are present;
-7. the resulting artifacts preserve the same matrix cell.
+6. baseline target verification is recorded separately from execution readiness;
+7. provider execution attempts a real code-changing run;
+8. post-run target verification, Runtime Harness, review, audit, and learning artifacts are present;
+9. the resulting artifacts preserve the same matrix cell.
 
 ## W14 matrix expectations
 Required coverage matrix:
@@ -157,5 +160,7 @@ All targets reuse the same baseline before execution-style stages:
 4. validate
 5. verify
 6. continue only when no-write safety gates pass
+
+For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. For bounded profiles, the default is `blocking`. Post-run verification remains mandatory quality evidence for full-journey acceptance.
 
 See `docs/ops/live-e2e-no-write-preflight.md` for the reusable bounded procedure.
