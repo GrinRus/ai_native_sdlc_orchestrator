@@ -517,6 +517,40 @@ test("live adapter reports timeout distinctly from launch failures", () => {
   assert.equal(response.output.external_runner.timed_out, true);
 });
 
+test("live adapter applies resolved route timeout before adapter default timeout", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "setTimeout(() => process.stdout.write(JSON.stringify({status:'success'})), 50);"],
+      timeoutMs: 10,
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-live-route-timeout",
+    run_id: "run-live-route-timeout",
+    step_id: "step-live-route-timeout",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: {
+      policy_id: "policy.step.runner.default",
+      resolved_bounds: {
+        budget: {
+          timeout_sec: 1,
+        },
+      },
+    },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.external_runner.timeout_ms, 1000);
+  assert.equal(response.output.external_runner.timed_out, false);
+});
+
 test("live adapter baseline accepts non-codex adapter ids when an external runner profile is supplied", () => {
   const adapter = createLiveAdapter({
     adapterId: "open-code",

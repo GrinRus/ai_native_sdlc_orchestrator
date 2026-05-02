@@ -2831,6 +2831,8 @@ function executeImplementedCommand(command, flags, cwd) {
           (artifact) => artifact.family === "learning-loop-handoff" && run.quality_refs.includes(artifact.artifact_ref),
         ) ?? null;
       const learningHandoffDocument = asPlainObject(learningHandoffArtifact?.document);
+      const reviewCoverageFollowUp = asPlainObject(reviewFeatureTraceability.coverage_follow_up);
+      const learningCoverageFollowUp = asPlainObject(learningHandoffDocument.coverage_follow_up);
 
       return {
         run_id: run.run_id,
@@ -2860,7 +2862,8 @@ function executeImplementedCommand(command, flags, cwd) {
           Object.keys(asPlainObject(learningHandoffDocument.matrix_cell)).length > 0
             ? asPlainObject(learningHandoffDocument.matrix_cell)
             : asPlainObject(reviewFeatureTraceability.matrix_cell),
-        coverage_follow_up: asPlainObject(learningHandoffDocument.coverage_follow_up),
+        coverage_follow_up:
+          Object.keys(reviewCoverageFollowUp).length > 0 ? reviewCoverageFollowUp : learningCoverageFollowUp,
         provider_execution_status:
           typeof reviewProviderTraceability.status === "string" ? reviewProviderTraceability.status : null,
         feature_size_fit_status:

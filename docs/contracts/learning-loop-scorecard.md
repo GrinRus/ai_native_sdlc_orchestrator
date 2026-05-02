@@ -16,6 +16,7 @@ Durable scorecard that links one completed run to backlog, quality, and incident
 - `linked_harness_capture_refs`
 - `linked_backlog_refs`
 - `matrix_cell`
+- `coverage_follow_up`
 - `generated_at`
 
 ## Status semantics

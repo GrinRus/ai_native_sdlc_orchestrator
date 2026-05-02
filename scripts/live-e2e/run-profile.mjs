@@ -2116,6 +2116,161 @@ function evaluateScenarioCoverage(options) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function sortJsonValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortJsonValue(entry));
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(/** @type {Record<string, unknown>} */ (value))
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, sortJsonValue(entry)]),
+    );
+  }
+  return value;
+}
+
+/**
+ * @param {unknown} left
+ * @param {unknown} right
+ * @returns {boolean}
+ */
+function jsonEquivalent(left, right) {
+  return JSON.stringify(sortJsonValue(left)) === JSON.stringify(sortJsonValue(right));
+}
+
+/**
+ * @param {Record<string, unknown>} value
+ * @returns {boolean}
+ */
+function hasObjectFields(value) {
+  return Object.keys(value).length > 0;
+}
+
+/**
+ * @param {{
+ *   label: string,
+ *   field: string,
+ *   expected: Record<string, unknown>,
+ *   actual: Record<string, unknown>,
+ *   findings: string[],
+ * }} options
+ */
+function compareArtifactObject(options) {
+  if (!hasObjectFields(options.actual)) {
+    options.findings.push(`Artifact consistency mismatch: ${options.label}.${options.field} is missing.`);
+    return;
+  }
+  if (!jsonEquivalent(options.actual, options.expected)) {
+    options.findings.push(`Artifact consistency mismatch: ${options.label}.${options.field} differs from summary.`);
+  }
+}
+
+/**
+ * @param {{
+ *   artifacts: Record<string, unknown>,
+ *   reviewReport: Record<string, unknown>,
+ *   auditPayload: Record<string, unknown>,
+ *   runId: string,
+ * }} options
+ */
+function evaluateArtifactConsistency(options) {
+  /** @type {string[]} */
+  const findings = [];
+  const expectedMatrixCell = asRecord(options.artifacts.matrix_cell);
+  const expectedCoverageFollowUp = asRecord(options.artifacts.coverage_follow_up);
+  const reviewFeatureTraceability = asRecord(options.reviewReport.feature_traceability);
+  const auditRecords = Array.isArray(options.auditPayload.run_audit_records)
+    ? options.auditPayload.run_audit_records.map((record) => asRecord(record))
+    : [];
+  const auditRecord =
+    auditRecords.find((record) => asNonEmptyString(record.run_id) === options.runId) || auditRecords[0] || {};
+  const learningHandoffFile = asNonEmptyString(options.artifacts.learning_loop_handoff_file);
+  const learningScorecardFile = asNonEmptyString(options.artifacts.learning_loop_scorecard_file);
+  const learningHandoff = learningHandoffFile && fileExists(learningHandoffFile) ? readJson(learningHandoffFile) : {};
+  const learningScorecard =
+    learningScorecardFile && fileExists(learningScorecardFile) ? readJson(learningScorecardFile) : {};
+
+  if (!hasObjectFields(expectedMatrixCell)) {
+    findings.push("Artifact consistency mismatch: summary.matrix_cell is missing.");
+  }
+  if (!hasObjectFields(expectedCoverageFollowUp)) {
+    findings.push("Artifact consistency mismatch: summary.coverage_follow_up is missing.");
+  }
+
+  if (hasObjectFields(expectedMatrixCell)) {
+    compareArtifactObject({
+      label: "review-report.feature_traceability",
+      field: "matrix_cell",
+      expected: expectedMatrixCell,
+      actual: asRecord(reviewFeatureTraceability.matrix_cell),
+      findings,
+    });
+    compareArtifactObject({
+      label: "audit-runs.run_audit_records[0]",
+      field: "matrix_cell",
+      expected: expectedMatrixCell,
+      actual: asRecord(auditRecord.matrix_cell),
+      findings,
+    });
+    compareArtifactObject({
+      label: "learning-loop-handoff",
+      field: "matrix_cell",
+      expected: expectedMatrixCell,
+      actual: asRecord(learningHandoff.matrix_cell),
+      findings,
+    });
+    compareArtifactObject({
+      label: "learning-loop-scorecard",
+      field: "matrix_cell",
+      expected: expectedMatrixCell,
+      actual: asRecord(learningScorecard.matrix_cell),
+      findings,
+    });
+  }
+
+  if (hasObjectFields(expectedCoverageFollowUp)) {
+    compareArtifactObject({
+      label: "review-report.feature_traceability",
+      field: "coverage_follow_up",
+      expected: expectedCoverageFollowUp,
+      actual: asRecord(reviewFeatureTraceability.coverage_follow_up),
+      findings,
+    });
+    compareArtifactObject({
+      label: "audit-runs.run_audit_records[0]",
+      field: "coverage_follow_up",
+      expected: expectedCoverageFollowUp,
+      actual: asRecord(auditRecord.coverage_follow_up),
+      findings,
+    });
+    compareArtifactObject({
+      label: "learning-loop-handoff",
+      field: "coverage_follow_up",
+      expected: expectedCoverageFollowUp,
+      actual: asRecord(learningHandoff.coverage_follow_up),
+      findings,
+    });
+    compareArtifactObject({
+      label: "learning-loop-scorecard",
+      field: "coverage_follow_up",
+      expected: expectedCoverageFollowUp,
+      actual: asRecord(learningScorecard.coverage_follow_up),
+      findings,
+    });
+  }
+
+  return {
+    status: findings.length > 0 ? "fail" : "pass",
+    findings,
+    summary: findings[0] ?? "Full-journey artifact lineage is internally consistent.",
+  };
+}
+
+/**
  * @param {{
  *   hostRoot: string,
  *   layout: ReturnType<typeof ensureRuntimeLayout>,
@@ -3246,6 +3401,18 @@ function executeFullJourneyFlow(options) {
     ]);
     artifacts.run_audit_file = auditRuns.transcriptFile;
     const auditPayload = asRecord(auditRuns.payload);
+    if (internalTestHooks.corrupt_audit_coverage_follow_up === true) {
+      const auditRecords = Array.isArray(auditPayload.run_audit_records) ? auditPayload.run_audit_records : [];
+      const auditRecord =
+        auditRecords.map((record) => asRecord(record)).find((record) => asNonEmptyString(record.run_id) === options.runId) ||
+        asRecord(auditRecords[0]);
+      if (hasObjectFields(auditRecord)) {
+        auditRecord.coverage_follow_up = {
+          current_cell_required: false,
+          remaining_required_matrix_cells: [],
+        };
+      }
+    }
 
     let incidentOpen = null;
     if (reviewOverallStatus === "fail") {
@@ -3308,6 +3475,14 @@ function executeFullJourneyFlow(options) {
       );
       throw new Error("Learning handoff did not materialize the required public closure artifacts.");
     }
+    if (internalTestHooks.corrupt_learning_scorecard_coverage_follow_up === true) {
+      const learningScorecard = asRecord(readJson(artifacts.learning_loop_scorecard_file));
+      learningScorecard.coverage_follow_up = {
+        current_cell_required: false,
+        remaining_required_matrix_cells: [],
+      };
+      writeJson(artifacts.learning_loop_scorecard_file, learningScorecard);
+    }
     markStage(
       stageMap,
       "learning",
@@ -3334,6 +3509,21 @@ function executeFullJourneyFlow(options) {
       artifacts,
       auditPayload,
     });
+    const artifactConsistency = evaluateArtifactConsistency({
+      artifacts,
+      reviewReport,
+      auditPayload,
+      runId: options.runId,
+    });
+    artifacts.artifact_consistency = artifactConsistency;
+    if (artifactConsistency.status === "fail") {
+      scenarioCoverage.status = "fail";
+      scenarioCoverage.findings = uniqueStrings([
+        ...asStringArray(scenarioCoverage.findings),
+        ...artifactConsistency.findings,
+      ]);
+      scenarioCoverage.summary = artifactConsistency.summary;
+    }
     artifacts.scenario_coverage = scenarioCoverage;
     const deliveryReleaseQuality =
       asRecord(options.profile.output_policy).materialize_release_packet === true
@@ -3363,7 +3553,10 @@ function executeFullJourneyFlow(options) {
           ? "pass"
           : "fail",
       runtime_harness_decision: artifacts.runtime_harness_overall_decision || "unknown",
-      artifact_quality: normalizeVerdictStatus(asRecord(reviewReport.artifact_quality).status),
+      artifact_quality:
+        artifactConsistency.status === "fail"
+          ? "fail"
+          : normalizeVerdictStatus(asRecord(reviewReport.artifact_quality).status),
       code_quality: normalizeVerdictStatus(asRecord(reviewReport.code_quality).status),
       feature_size_fit_status: featureSizeFitStatus,
       delivery_release_quality: deliveryReleaseQuality,

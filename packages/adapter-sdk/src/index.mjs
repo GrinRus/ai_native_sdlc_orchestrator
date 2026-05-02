@@ -68,6 +68,22 @@ function asPositiveInteger(value, fallback) {
 }
 
 /**
+ * @param {Record<string, unknown>} request
+ * @param {number} fallback
+ * @returns {number}
+ */
+function resolveRequestTimeoutMs(request, fallback) {
+  const policyBundle = asRecord(request.policy_bundle);
+  const resolvedBounds = asRecord(policyBundle.resolved_bounds);
+  const budget = asRecord(resolvedBounds.budget);
+  const timeoutSec = budget.timeout_sec;
+  if (typeof timeoutSec !== "number" || !Number.isFinite(timeoutSec) || timeoutSec <= 0) {
+    return fallback;
+  }
+  return Math.max(1, Math.floor(timeoutSec * 1000));
+}
+
+/**
  * @param {unknown} value
  * @returns {Record<string, string>}
  */
@@ -866,6 +882,7 @@ export function createLiveAdapter(options) {
       }
 
       const runtimeArgs = runtimeInvocation.args;
+      const requestTimeoutMs = resolveRequestTimeoutMs(envelope, timeoutMs);
       const startedAt = new Date().toISOString();
       const runnerInput = {
         request: envelope,
@@ -882,7 +899,7 @@ export function createLiveAdapter(options) {
         env: runnerEnv,
         encoding: "utf8",
         input: requestViaStdin ? `${JSON.stringify(runnerInput)}\n` : undefined,
-        timeout: timeoutMs,
+        timeout: requestTimeoutMs,
         maxBuffer: 10 * 1024 * 1024,
       });
       const finishedAt = new Date().toISOString();
@@ -907,7 +924,7 @@ export function createLiveAdapter(options) {
           mode: runtimeMode,
           command: runtimeCommand,
           args: runtimeArgs,
-          timeout_ms: timeoutMs,
+          timeout_ms: requestTimeoutMs,
           request_via_stdin: requestViaStdin,
           execution_root: executionRoot,
           permission_mode: runtimeInvocation.permissionMode,
@@ -953,6 +970,7 @@ export function createLiveAdapter(options) {
           command: runtimeCommand,
           args: runtimeArgs,
           execution_root: executionRoot,
+          timeout_ms: requestTimeoutMs,
           permission_mode: runtimeInvocation.permissionMode,
           permission_mode_source: runtimeInvocation.source,
           exit_code: invocation.status,
@@ -982,7 +1000,7 @@ export function createLiveAdapter(options) {
           request_id: envelope.request_id,
           adapter_id: adapterId,
           status: "failed",
-          summary: `External runner command '${runtimeCommand}' timed out after ${timeoutMs}ms for adapter '${adapterId}'.`,
+          summary: `External runner command '${runtimeCommand}' timed out after ${requestTimeoutMs}ms for adapter '${adapterId}'.`,
           output: {
             ...baseOutput,
             failure_kind: "external-runner-timeout",

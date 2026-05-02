@@ -1081,8 +1081,19 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     assert.equal(reviewReport.provider_traceability.actual_provider, "openai");
     assert.equal(reviewReport.provider_traceability.actual_adapter, "codex-cli");
     assert.equal(reviewReport.feature_size_fit.feature_size, "small");
+    assert.equal(summary.artifacts.artifact_consistency.status, "pass");
+    assert.deepEqual(reviewReport.feature_traceability.matrix_cell, summary.matrix_cell);
+    assert.deepEqual(reviewReport.feature_traceability.coverage_follow_up, summary.coverage_follow_up);
+    const auditTranscript = JSON.parse(fs.readFileSync(summary.artifacts.run_audit_file, "utf8"));
+    const auditRecord = auditTranscript.parsed_json.run_audit_records[0];
+    assert.deepEqual(auditRecord.matrix_cell, summary.matrix_cell);
+    assert.deepEqual(auditRecord.coverage_follow_up, summary.coverage_follow_up);
+    const learningScorecard = JSON.parse(fs.readFileSync(summary.artifacts.learning_loop_scorecard_file, "utf8"));
     const learningHandoff = JSON.parse(fs.readFileSync(summary.learning_loop_handoff_file, "utf8"));
-    assert.equal(learningHandoff.matrix_cell.provider_variant_id, "openai-primary");
+    assert.deepEqual(learningScorecard.matrix_cell, summary.matrix_cell);
+    assert.deepEqual(learningScorecard.coverage_follow_up, summary.coverage_follow_up);
+    assert.deepEqual(learningHandoff.matrix_cell, summary.matrix_cell);
+    assert.deepEqual(learningHandoff.coverage_follow_up, summary.coverage_follow_up);
   });
 });
 
@@ -2127,6 +2138,100 @@ test("full-journey mode fails when Runtime Harness report evidence is missing", 
     assert.equal(summary.verdict_matrix.runtime_harness_decision, "unknown");
     assert.equal(summary.verdict_matrix.runtime_success, "fail");
     assert.match(String(summary.error), /Required scenario evidence 'runtime-harness-report' was not materialized/u);
+  });
+});
+
+test("full-journey mode fails when artifact coverage lineage mismatches", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.artifact-consistency-gap.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      internalTestHooks: {
+        corrupt_audit_coverage_follow_up: true,
+      },
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-artifact-consistency-gap",
+      catalogRoot,
+    });
+    assert.equal(result.live_e2e_run_status, "fail");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.verdict_matrix.scenario_coverage_status, "fail");
+    assert.equal(summary.verdict_matrix.artifact_quality, "fail");
+    assert.equal(summary.verdict_matrix.overall_verdict, "fail");
+    assert.equal(summary.artifacts.artifact_consistency.status, "fail");
+    assert.match(
+      String(summary.error),
+      /Artifact consistency mismatch: audit-runs\.run_audit_records\[0\]\.coverage_follow_up differs from summary/u,
+    );
+    assert.match(
+      String(summary.artifacts.scenario_coverage.findings.join("\n")),
+      /Artifact consistency mismatch: audit-runs\.run_audit_records\[0\]\.coverage_follow_up differs from summary/u,
+    );
+  });
+});
+
+test("full-journey mode fails when learning scorecard coverage lineage mismatches", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.learning-scorecard-consistency-gap.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      internalTestHooks: {
+        corrupt_learning_scorecard_coverage_follow_up: true,
+      },
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-learning-scorecard-consistency-gap",
+      catalogRoot,
+    });
+    assert.equal(result.live_e2e_run_status, "fail");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "fail");
+    assert.equal(summary.verdict_matrix.scenario_coverage_status, "fail");
+    assert.equal(summary.verdict_matrix.artifact_quality, "fail");
+    assert.equal(summary.verdict_matrix.overall_verdict, "fail");
+    assert.equal(summary.artifacts.artifact_consistency.status, "fail");
+    assert.match(
+      String(summary.error),
+      /Artifact consistency mismatch: learning-loop-scorecard\.coverage_follow_up differs from summary/u,
+    );
   });
 });
 
