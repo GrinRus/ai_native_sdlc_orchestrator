@@ -833,6 +833,7 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       "linked_harness_capture_refs",
       "linked_backlog_refs",
       "matrix_cell",
+      "coverage_follow_up",
       "generated_at",
     ],
     fieldTypes: {
@@ -847,6 +848,7 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
       linked_harness_capture_refs: "array",
       linked_backlog_refs: "array",
       matrix_cell: "object",
+      coverage_follow_up: "object",
       generated_at: "string",
     },
     enumChecks: [{ field: "status", allowedValues: ["pass", "fail", "aborted", "running", "unknown"] }],

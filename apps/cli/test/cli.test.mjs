@@ -2937,6 +2937,11 @@ test("W13 run start, review run, and learning handoff produce durable execution 
       assert.equal(auditPayload.run_audit_records[0].feature_size, "small");
       assert.equal(auditPayload.run_audit_records[0].provider_execution_status, "pass");
       assert.equal(auditPayload.run_audit_records[0].feature_size_fit_status, "pass");
+      assert.deepEqual(auditPayload.run_audit_records[0].matrix_cell, reviewReport.feature_traceability.matrix_cell);
+      assert.deepEqual(
+        auditPayload.run_audit_records[0].coverage_follow_up,
+        reviewReport.feature_traceability.coverage_follow_up,
+      );
 
       const learningRun = invokeCli([
         "learning",
@@ -2971,6 +2976,7 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         true,
       );
       assert.equal(learningScorecard.matrix_cell.provider_variant_id, "openai-primary");
+      assert.deepEqual(learningScorecard.coverage_follow_up, reviewReport.feature_traceability.coverage_follow_up);
       assert.equal(learningHandoff.matrix_cell.feature_size, "small");
       assert.equal(learningHandoff.coverage_follow_up.current_cell_required, true);
     });

@@ -75,7 +75,15 @@ feature_missions:
       max_added_lines: 320
   - mission_id: httpie-cli-repair-exit-codes
     title: Repair one bounded CLI exit-code and formatting seam
-    brief: Fix one multi-file CLI contract issue across command handling and tests while preserving the bounded pytest and codestyle slice.
+    brief: >-
+      Fix the plugin upgrade failure propagation and debug formatting seam in
+      `httpie/manager/tasks/plugins.py`: `PluginInstaller.upgrade()` must return the
+      `_install()` exit status after handling pip stdout so failed installs are not
+      coerced to success, and debug pip stderr must use
+      `textwrap.indent(stderr, '  ')` so every stderr line is indented correctly.
+      Add focused regression coverage in `tests/test_httpie_cli.py` for failed
+      upgrade propagation, successful upgrade return, and debug stderr indentation
+      while preserving the bounded pytest and codestyle slice.
     feature_size: medium
     allowed_paths:
       - httpie/**
@@ -93,6 +101,8 @@ feature_missions:
       - delivery-manifest
     acceptance_checks:
       - keep the fix inside the CLI/runtime surface and its tests
+      - preserve failed plugin upgrade exit status instead of falling through to implicit success
+      - indent every debug pip stderr line with two spaces
       - preserve bounded pytest smoke plus codestyle linkage
       - keep delivery evidence anchored to the target checkout
     supported_scenarios:
