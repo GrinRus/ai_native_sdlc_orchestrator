@@ -33,6 +33,8 @@
       "compiled_context_file": "release-short.compiled-context.json",
       "delivery_transcript_file": "release-short.delivery-transcript.json",
       "delivery_manifest_file": "release-short.delivery-manifest.json",
+      "observation_report_file": "release-short.observation-report.json",
+      "observation_status": "warn",
       "release_packet_file": "release-short.release-packet.json",
       "learning_loop_handoff_file": "release-short.learning-loop-handoff.json",
       "learning_loop_scorecard_file": "release-short.learning-loop-scorecard.json",
@@ -44,6 +46,7 @@
     "routed_live_adapter_evidence": true,
     "public_live_e2e_commands_removed_from_control_surfaces": true,
     "target_root_delivery_lineage": true,
+    "black_box_observation_matrix": true,
     "scorecard_and_learning_loop_from_black_box_evidence": true
   }
 }

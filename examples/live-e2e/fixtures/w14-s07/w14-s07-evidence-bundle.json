@@ -14,8 +14,28 @@
     },
     "examples_root_override": ".aor/w14-s07-proof/examples",
     "external_runner_mode": "deterministic-external-process-mock",
-    "note": "The proof keeps catalog-backed target resolution, pinned scenario/provider matrix-cell validation, public bootstrap, public CLI lifecycle, review, audit, delivery/release, and learning closure black-box semantics while replacing only the adapter external runtime via --examples-root.",
-    "verdict_note": "All committed runs finished with harness status pass. Overall verdicts remain pass_with_findings because the deterministic external runner mock does not materialize mission code changes, so review-report keeps code_quality=warn even when provider traceability, scenario coverage, and feature-size fit pass."
+    "note": "The proof keeps catalog-backed target resolution, pinned scenario/provider matrix-cell validation, public bootstrap, public CLI lifecycle, review, QA, and delivery black-box semantics while replacing only the adapter external runtime via --examples-root.",
+    "verdict_note": "Under the observation model, deterministic external-runner code-quality gaps downgrade overall_status to warn when delivery evidence materializes instead of making the runner verdict fail."
+  },
+  "observation_model": {
+    "contract_family": "live-e2e-observation-report",
+    "status_scale": [
+      "pass",
+      "warn",
+      "not_pass"
+    ],
+    "canonical_flow_range": [
+      "discovery",
+      "spec",
+      "planning",
+      "handoff",
+      "execution",
+      "review",
+      "qa",
+      "delivery"
+    ],
+    "representative_report_file": "full-journey-regress-ky.observation-report.json",
+    "release_and_learning_scope": "excluded-from-v1-observation-matrix"
   },
   "matrix_axes": {
     "mandatory_scenario_families": [

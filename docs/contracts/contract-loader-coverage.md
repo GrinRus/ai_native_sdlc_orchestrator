@@ -18,6 +18,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Execution and quality | `evaluation-report.md` | `evaluation-report` | `examples/eval/report-*.sample.yaml` | implemented | Required fields + top-level type checks, including scorer metadata and summary metrics. |
 | Execution and quality | `review-report.md` | `review-report` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Execution and quality | `runtime-harness-report.md` | `runtime-harness-report` | `examples/reports/runtime-harness-report*.yaml` | implemented | Required fields + closed-set checks for runtime decision and mission type. |
+| Execution and quality | `live-e2e-observation-report.md` | `live-e2e-observation-report` | `examples/reports/live-e2e-observation-report*.yaml` | implemented | Required fields + closed-set `overall_status` checks for black-box observation reports. |
 | Execution and quality | `dataset.md` | `dataset` | `examples/eval/dataset-*.yaml` | implemented | Required fields + top-level type checks. |
 | Execution and quality | `evaluation-suite.md` | `evaluation-suite` | `examples/eval/suite-*.yaml` | implemented | Required fields + top-level type checks. |
 | Execution and quality | `promotion-decision.md` | `promotion-decision` | `examples/packets/promotion-decision-*.yaml` | implemented | Includes closed-set enum checks for promotion channels and certification status (`pass|hold|fail`). |

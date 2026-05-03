@@ -27,6 +27,23 @@ const DEFAULT_STAGES = Object.freeze([
   "delivery",
   "release",
 ]);
+const LIVE_E2E_OBSERVATION_STEPS = Object.freeze([
+  "discovery",
+  "spec",
+  "planning",
+  "handoff",
+  "execution",
+  "review",
+  "qa",
+  "delivery",
+]);
+const LIVE_E2E_OBSERVATION_PRELUDE_STEPS = Object.freeze([
+  "project-init",
+  "intake-create",
+  "project-analyze",
+  "project-validate",
+]);
+const LIVE_E2E_OBSERVATION_EXCLUDED_STEPS = Object.freeze(["release", "learning"]);
 const DEFAULT_BACKLOG_REFS = Object.freeze([
   "docs/backlog/mvp-implementation-backlog.md",
   "docs/backlog/mvp-roadmap.md",
@@ -109,6 +126,26 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function asFindingStrings(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (typeof entry === "string") return entry.trim();
+      const record = asRecord(entry);
+      return (
+        asNonEmptyString(record.summary) ||
+        asNonEmptyString(record.message) ||
+        asNonEmptyString(record.code) ||
+        (Object.keys(record).length > 0 ? JSON.stringify(record) : "")
+      );
+    })
+    .filter((entry) => entry.length > 0);
 }
 
 /**
@@ -910,6 +947,7 @@ function classifyStageFailure(status, summary) {
  */
 function buildStageRecommendation(status, failureClass) {
   if (status === "pass") return "continue";
+  if (status === "warn") return "continue_with_findings";
   if (status === "pending") return "await-stage-execution";
   if (failureClass === "permission-denied") return "inspect adapter permission evidence and runner auth mode";
   if (failureClass === "no-op") return "inspect Runtime Harness report and rerun implementation with meaningful changes";
@@ -969,16 +1007,18 @@ function flattenStageMap(stageMap) {
  */
 function summarizeStageCounts(stageResults) {
   let pass = 0;
+  let warn = 0;
   let fail = 0;
   let pending = 0;
   let skipped = 0;
   for (const stage of stageResults) {
     if (stage.status === "pass") pass += 1;
+    else if (stage.status === "warn") warn += 1;
     else if (stage.status === "fail") fail += 1;
     else if (stage.status === "skipped") skipped += 1;
     else pending += 1;
   }
-  return { pass, fail, pending, skipped };
+  return { pass, warn, fail, pending, skipped };
 }
 
 /**
@@ -2020,6 +2060,103 @@ function getStringArrayField(payload, field) {
 }
 
 /**
+ * @param {string} status
+ * @returns {"pass" | "warn" | "not_pass"}
+ */
+function toObservationStatus(status) {
+  const normalized = asNonEmptyString(status).toLowerCase();
+  if (normalized === "pass" || normalized === "passed" || normalized === "success") return "pass";
+  if (normalized === "warn" || normalized === "warning" || normalized === "skipped") return "warn";
+  return "not_pass";
+}
+
+/**
+ * @param {"pass" | "warn" | "not_pass" | string} left
+ * @param {"pass" | "warn" | "not_pass" | string} right
+ * @returns {"pass" | "warn" | "not_pass"}
+ */
+function worstObservationStatus(left, right) {
+  const statuses = [toObservationStatus(left), toObservationStatus(right)];
+  if (statuses.includes("not_pass")) return "not_pass";
+  if (statuses.includes("warn")) return "warn";
+  return "pass";
+}
+
+/**
+ * @param {string | null} filePath
+ * @returns {Record<string, unknown>}
+ */
+function readJsonIfPresent(filePath) {
+  const resolved = asNonEmptyString(filePath);
+  return resolved && fileExists(resolved) ? asRecord(readJson(resolved)) : {};
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {string[]}
+ */
+function collectDeliveryChangedPaths(artifacts) {
+  const deliveryManifest = readJsonIfPresent(asNonEmptyString(artifacts.delivery_manifest_file));
+  const deliveryPaths = Array.isArray(deliveryManifest.repo_deliveries)
+    ? deliveryManifest.repo_deliveries.flatMap((entry) => asStringArray(asRecord(entry).changed_paths))
+    : [];
+  const reviewReport = readJsonIfPresent(asNonEmptyString(artifacts.review_report_file));
+  const reviewPaths = asStringArray(asRecord(reviewReport.code_quality).changed_paths);
+  return uniqueStrings([...deliveryPaths, ...reviewPaths]);
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {{ status: "pass" | "warn" | "not_pass", delivery_manifest_ref: string | null, review_report_ref: string | null, post_delivery_check_refs: string[], changed_paths: string[], findings: string[] }}
+ */
+function buildCodeQualityObservation(artifacts) {
+  const deliveryManifestRef = asNonEmptyString(artifacts.delivery_manifest_file) || null;
+  const reviewReportRef = asNonEmptyString(artifacts.review_report_file) || null;
+  const deliveryQualityGateStatus = asNonEmptyString(artifacts.delivery_quality_gate_status);
+  const postDeliveryCheckRefs = uniqueStrings([
+    asNonEmptyString(artifacts.post_run_verify_summary_file),
+    asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file),
+  ]);
+  const reviewReport = readJsonIfPresent(reviewReportRef);
+  const reviewCodeQuality = asRecord(reviewReport.code_quality);
+  const findings = uniqueStrings([
+    ...asFindingStrings(reviewCodeQuality.findings),
+    ...(asNonEmptyString(artifacts.provider_execution_status) === "fail"
+      ? ["provider execution evidence was not materialized"]
+      : []),
+    ...(asNonEmptyString(artifacts.real_code_change_status) === "fail" ? ["no mission-scoped code change observed"] : []),
+    ...(asNonEmptyString(artifacts.post_run_verify_status) === "fail" ? ["post-delivery verification failed"] : []),
+    ...(asNonEmptyString(artifacts.quality_gate_decision) === "fail" ? ["legacy quality gate decision failed"] : []),
+    ...(["fail", "not_pass"].includes(deliveryQualityGateStatus)
+      ? ["delivery quality gate produced observed findings"]
+      : []),
+    ...asStringArray(artifacts.delivery_quality_gate_findings),
+  ]);
+  const reviewCodeStatus = normalizeVerdictStatus(reviewCodeQuality.status);
+  const status =
+    !deliveryManifestRef
+      ? "not_pass"
+      : asNonEmptyString(artifacts.provider_execution_status) === "fail" ||
+          asNonEmptyString(artifacts.real_code_change_status) === "fail" ||
+          asNonEmptyString(artifacts.post_run_verify_status) === "fail" ||
+          asNonEmptyString(artifacts.quality_gate_decision) === "fail" ||
+          ["fail", "not_pass"].includes(deliveryQualityGateStatus) ||
+          reviewCodeStatus === "fail"
+        ? "not_pass"
+        : findings.length > 0 || reviewCodeStatus === "warn"
+          ? "warn"
+          : "pass";
+  return {
+    status,
+    delivery_manifest_ref: deliveryManifestRef,
+    review_report_ref: reviewReportRef,
+    post_delivery_check_refs: postDeliveryCheckRefs,
+    changed_paths: collectDeliveryChangedPaths(artifacts),
+    findings,
+  };
+}
+
+/**
  * @param {Record<string, unknown>} profile
  * @returns {string[]}
  */
@@ -2829,20 +2966,20 @@ function executeInstalledUserFlow(options) {
         markStage(
           stageMap,
           "qa",
-          "fail",
+          "warn",
           uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]),
-          "Evaluation report failed.",
+          "Evaluation report produced observed findings.",
         );
-        throw new Error("Evaluation report failed.");
+      } else {
+        markStage(
+          stageMap,
+          "qa",
+          "pass",
+          uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]),
+          "Eval run passed.",
+        );
       }
-      markStage(
-        stageMap,
-        "qa",
-        "pass",
-        uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]),
-        "Eval run passed.",
-      );
-      if (getHarnessCertification(options.profile) === null) {
+      if (evaluationStatus === "pass" && getHarnessCertification(options.profile) === null) {
         markStage(
           stageMap,
           "review",
@@ -2882,85 +3019,78 @@ function executeInstalledUserFlow(options) {
         markStage(
           stageMap,
           "review",
-          "fail",
+          "warn",
           uniqueStrings([certify.transcriptFile, ...collectStringRefs(certify.payload)]),
-          "Harness certification did not pass.",
+          "Harness certification produced observed findings.",
         );
-        throw new Error("Harness certification did not pass.");
+      } else {
+        markStage(
+          stageMap,
+          "review",
+          "pass",
+          uniqueStrings([certify.transcriptFile, ...collectStringRefs(certify.payload)]),
+          "Harness certification passed.",
+        );
       }
-      markStage(
-        stageMap,
-        "review",
-        "pass",
-        uniqueStrings([certify.transcriptFile, ...collectStringRefs(certify.payload)]),
-        "Harness certification passed.",
-      );
     } else if (stageMap.review?.status === "pending") {
       markStage(stageMap, "review", "skipped", [], "Profile has no harness certification step.");
     }
 
-    if (asRecord(options.profile.output_policy).materialize_release_packet === true) {
-      const releaseArgs = [
-        "release",
-        "prepare",
-        ...commandBaseArgs,
-        "--run-id",
-        options.runId,
-        "--step-class",
-        "implement",
-        "--mode",
-        getPreferredDeliveryMode(options.profile),
-      ];
-      if (artifacts.approved_handoff_packet_file) {
-        releaseArgs.push("--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file));
-      }
-      if (promotionEvidenceRefs.length > 0) {
-        releaseArgs.push("--promotion-evidence-refs", uniqueStrings(promotionEvidenceRefs).join(","));
-      }
-      const release = runCommand("release-prepare", releaseArgs);
-      Object.assign(artifacts, {
-        delivery_plan_file: getStringField(release.payload, "delivery_plan_file"),
-        delivery_manifest_file: getStringField(release.payload, "delivery_manifest_file"),
-        release_packet_file: getStringField(release.payload, "release_packet_file"),
-        delivery_transcript_file: getStringField(release.payload, "delivery_transcript_file"),
-        delivery_mode: getStringField(release.payload, "delivery_mode"),
-        release_packet_status: getStringField(release.payload, "release_packet_status"),
-      });
-      if (release.payload?.delivery_blocking === true || !artifacts.release_packet_file) {
-        markStage(
-          stageMap,
-          "delivery",
-          "fail",
-          uniqueStrings([release.transcriptFile, ...collectStringRefs(release.payload)]),
-          "Release prepare was blocked.",
-        );
-        markStage(
-          stageMap,
-          "release",
-          "fail",
-          uniqueStrings([release.transcriptFile, ...collectStringRefs(release.payload)]),
-          "Release packet was not materialized.",
-        );
-        throw new Error("Release prepare was blocked.");
-      }
+    const deliverArgs = [
+      "deliver",
+      "prepare",
+      ...commandBaseArgs,
+      "--run-id",
+      options.runId,
+      "--step-class",
+      "implement",
+      "--mode",
+      getPreferredDeliveryMode(options.profile),
+      "--quality-gate-mode",
+      "observe",
+    ];
+    if (artifacts.approved_handoff_packet_file) {
+      deliverArgs.push("--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file));
+    }
+    if (promotionEvidenceRefs.length > 0) {
+      deliverArgs.push("--promotion-evidence-refs", uniqueStrings(promotionEvidenceRefs).join(","));
+    }
+    const deliver = runCommand("deliver-prepare", deliverArgs, { allowNonZeroWithPayload: true });
+    const deliveryRuntimeHarnessReportFile = getStringField(deliver.payload, "runtime_harness_report_file");
+    Object.assign(artifacts, {
+      delivery_plan_file: getStringField(deliver.payload, "delivery_plan_file"),
+      delivery_manifest_file: getStringField(deliver.payload, "delivery_manifest_file"),
+      delivery_transcript_file: getStringField(deliver.payload, "delivery_transcript_file"),
+      delivery_mode: getStringField(deliver.payload, "delivery_mode"),
+      delivery_quality_gate_mode: getStringField(deliver.payload, "delivery_quality_gate_mode"),
+      delivery_quality_gate_status: getStringField(deliver.payload, "delivery_quality_gate_status"),
+      delivery_quality_gate_findings: asStringArray(deliver.payload?.delivery_quality_gate_findings),
+      delivery_runtime_harness_report_file: deliveryRuntimeHarnessReportFile,
+      runtime_harness_report_file:
+        asNonEmptyString(artifacts.runtime_harness_report_file) || deliveryRuntimeHarnessReportFile,
+      delivery_blocking: deliver.payload?.delivery_blocking === true,
+      delivery_blocking_reasons: asStringArray(deliver.payload?.delivery_blocking_reasons),
+    });
+    if (!artifacts.delivery_manifest_file) {
       markStage(
         stageMap,
         "delivery",
-        "pass",
-        uniqueStrings([release.transcriptFile, ...collectStringRefs(release.payload)]),
-        "Delivery artifacts were materialized through release prepare.",
+        "fail",
+        uniqueStrings([deliver.transcriptFile, ...collectStringRefs(deliver.payload)]),
+        "Delivery prepare did not materialize delivery evidence.",
       );
-      markStage(
-        stageMap,
-        "release",
-        "pass",
-        uniqueStrings([release.transcriptFile, ...collectStringRefs(release.payload)]),
-        "Release packet was materialized.",
-      );
-    } else {
-      markStage(stageMap, "delivery", "skipped", [], "Profile does not request release-packet materialization.");
-      markStage(stageMap, "release", "skipped", [], "Profile does not request release-packet materialization.");
+      throw new Error("Delivery prepare did not materialize delivery evidence.");
     }
+    markStage(
+      stageMap,
+      "delivery",
+      artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass" ? "warn" : "pass",
+      uniqueStrings([deliver.transcriptFile, ...collectStringRefs(deliver.payload)]),
+      artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass"
+        ? "Delivery evidence materialized with observed quality findings."
+        : "Delivery prepare materialized delivery evidence.",
+    );
+    markStage(stageMap, "release", "skipped", [], "Observation v1 ends at delivery.");
 
     return {
       startedAt,
@@ -3534,7 +3664,7 @@ function executeFullJourneyFlow(options) {
         markStage(
           stageMap,
           "execution",
-          "fail",
+          "warn",
           uniqueStrings([
             verifyPreflight.transcriptFile,
             asNonEmptyString(artifacts.baseline_verify_summary_file),
@@ -3603,10 +3733,12 @@ function executeFullJourneyFlow(options) {
     }
     const postRunVerifySummary = readJson(postRunVerifySummaryPath);
     artifacts.post_run_verify_status = asNonEmptyString(postRunVerifySummary.status) === "passed" ? "pass" : "fail";
+    const executionStageStatus =
+      stageMap.execution?.status === "fail" ? "fail" : artifacts.execution_degraded === true ? "warn" : "pass";
     markStage(
       stageMap,
       "execution",
-      artifacts.execution_degraded === true ? "fail" : "pass",
+      executionStageStatus,
       uniqueStrings([
         verifyPreflight.transcriptFile,
         asNonEmptyString(artifacts.baseline_verify_summary_file),
@@ -3616,7 +3748,7 @@ function executeFullJourneyFlow(options) {
         postRunVerifySummaryPath,
         ...collectStringRefs(runStart.payload),
       ]),
-      artifacts.execution_degraded === true
+      executionStageStatus === "warn"
         ? "Provider execution materialized degraded evidence; post-run verification completed for black-box quality reporting."
         : "Baseline diagnostics, run start, run status, and post-run verification completed through public execution lifecycle.",
     );
@@ -3648,9 +3780,9 @@ function executeFullJourneyFlow(options) {
     markStage(
       stageMap,
       "review",
-      reviewOverallStatus === "fail" ? "fail" : "pass",
+      reviewOverallStatus === "fail" ? "warn" : "pass",
       uniqueStrings([reviewRun.transcriptFile, ...collectStringRefs(reviewRun.payload)]),
-      reviewOverallStatus === "fail" ? "Review report failed." : "Review report materialized.",
+      reviewOverallStatus === "fail" ? "Review report materialized observed findings." : "Review report materialized.",
     );
 
     const evalSuites = getEvalSuites(options.profile);
@@ -3664,18 +3796,21 @@ function executeFullJourneyFlow(options) {
         "./project.aor.yaml",
         "--runtime-root",
         ".aor",
-      "--suite-ref",
-      evalSuites[0],
-      "--subject-ref",
-      `run://${options.runId}`,
+        "--suite-ref",
+        evalSuites[0],
+        "--subject-ref",
+        `run://${options.runId}`,
       ], { allowNonZeroWithPayload: true });
       artifacts.evaluation_report_file = getStringField(evalRun.payload, "evaluation_report_file");
+      const evaluationStatus = getStringField(evalRun.payload, "evaluation_status") || "unknown";
       markStage(
         stageMap,
         "qa",
-        getStringField(evalRun.payload, "evaluation_status") === "pass" ? "pass" : "fail",
+        evaluationStatus === "pass" ? "pass" : "warn",
         uniqueStrings([evalRun.transcriptFile, ...collectStringRefs(evalRun.payload)]),
-        "Evaluation report materialized.",
+        evaluationStatus === "pass"
+          ? "Evaluation report materialized."
+          : "Evaluation report materialized observed findings.",
       );
     } else {
       markStage(stageMap, "qa", "skipped", [], "Profile has no eval suites.");
@@ -3757,12 +3892,19 @@ function executeFullJourneyFlow(options) {
         harnessCertification.stepClass,
       ]);
       artifacts.promotion_decision_file = getStringField(certify.payload, "promotion_decision_file");
+      const promotionStatus = getStringField(certify.payload, "promotion_decision_status") || "unknown";
       if (artifacts.promotion_decision_file) {
         deliveryEvidenceRefs.push(artifacts.promotion_decision_file);
       }
-      if (getStringField(certify.payload, "promotion_decision_status") !== "pass") {
-        throw new Error("Harness certification did not pass.");
-      }
+      markStage(
+        stageMap,
+        "review",
+        promotionStatus === "pass" ? "pass" : "warn",
+        uniqueStrings([certify.transcriptFile, ...collectStringRefs(certify.payload)]),
+        promotionStatus === "pass"
+          ? "Harness certification passed."
+          : "Harness certification produced observed findings.",
+      );
     }
 
     let deliverPrepare;
@@ -3782,6 +3924,8 @@ function executeFullJourneyFlow(options) {
         "implement",
         "--mode",
         getPreferredDeliveryMode(options.profile),
+        "--quality-gate-mode",
+        "observe",
         ...(artifacts.approved_handoff_packet_file
           ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
           : []),
@@ -3804,10 +3948,20 @@ function executeFullJourneyFlow(options) {
           : summary,
       );
     }
+    if (!deliverPrepare) {
+      throw new Error("Delivery prepare did not materialize delivery evidence.");
+    }
     if (deliverPrepare) {
+      const deliveryRuntimeHarnessReportFile = getStringField(deliverPrepare.payload, "runtime_harness_report_file");
       artifacts.delivery_manifest_file = getStringField(deliverPrepare.payload, "delivery_manifest_file");
       artifacts.delivery_plan_file = getStringField(deliverPrepare.payload, "delivery_plan_file");
       artifacts.delivery_transcript_file = getStringField(deliverPrepare.payload, "delivery_transcript_file");
+      artifacts.delivery_runtime_harness_report_file = deliveryRuntimeHarnessReportFile;
+      artifacts.runtime_harness_report_file =
+        asNonEmptyString(artifacts.runtime_harness_report_file) || deliveryRuntimeHarnessReportFile;
+      artifacts.delivery_quality_gate_mode = getStringField(deliverPrepare.payload, "delivery_quality_gate_mode");
+      artifacts.delivery_quality_gate_status = getStringField(deliverPrepare.payload, "delivery_quality_gate_status");
+      artifacts.delivery_quality_gate_findings = asStringArray(deliverPrepare.payload?.delivery_quality_gate_findings);
       if (internalTestHooks.block_delivery_prepare === true) {
         deliverPrepare.payload.delivery_blocking = true;
       }
@@ -3821,60 +3975,24 @@ function executeFullJourneyFlow(options) {
       markStage(
         stageMap,
         "delivery",
-        artifacts.delivery_blocking === true ? "fail" : "pass",
+        artifacts.delivery_manifest_file
+          ? artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass"
+            ? "warn"
+            : "pass"
+          : "fail",
         uniqueStrings([deliverPrepare.transcriptFile, ...collectStringRefs(deliverPrepare.payload)]),
-        artifacts.delivery_blocking === true
-          ? artifacts.delivery_blocked_by_quality_gate === true
-            ? "Delivery prepare was blocked by quality/runtime harness gate."
-            : "Delivery prepare was blocked."
-          : "Delivery prepare materialized delivery evidence.",
+        artifacts.delivery_manifest_file
+          ? artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass"
+            ? "Delivery evidence materialized with observed quality findings."
+            : "Delivery prepare materialized delivery evidence."
+          : "Delivery prepare did not materialize delivery evidence.",
       );
+      if (!artifacts.delivery_manifest_file) {
+        throw new Error("Delivery prepare did not materialize delivery evidence.");
+      }
     }
 
-    if (asRecord(options.profile.output_policy).materialize_release_packet === true && artifacts.delivery_blocking !== true) {
-      const releasePrepare = runCommand("release-prepare", [
-        "release",
-        "prepare",
-        "--project-ref",
-        ".",
-        "--project-profile",
-        "./project.aor.yaml",
-        "--runtime-root",
-        ".aor",
-        "--run-id",
-        options.runId,
-        "--step-class",
-        "implement",
-        "--mode",
-        getPreferredDeliveryMode(options.profile),
-        ...(artifacts.approved_handoff_packet_file
-          ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
-          : []),
-        ...(deliveryEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", deliveryEvidenceRefs.join(",")] : []),
-      ]);
-      artifacts.release_packet_file = getStringField(releasePrepare.payload, "release_packet_file");
-      if (!artifacts.release_packet_file) {
-        markStage(
-          stageMap,
-          "release",
-          "fail",
-          uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
-          "Release prepare did not materialize release packet.",
-        );
-        throw new Error("Release prepare did not materialize release packet.");
-      }
-      markStage(
-        stageMap,
-        "release",
-        "pass",
-        uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
-        "Release prepare materialized release packet evidence.",
-      );
-    } else if (asRecord(options.profile.output_policy).materialize_release_packet === true) {
-      markStage(stageMap, "release", "fail", [], "Release prepare skipped because delivery prepare was blocked.");
-    } else {
-      markStage(stageMap, "release", "skipped", [], "Profile does not request release packet materialization.");
-    }
+    markStage(stageMap, "release", "skipped", [], "Observation v1 ends at delivery.");
 
     const auditRuns = runCommand("audit-runs", [
       "audit",
@@ -4196,7 +4314,10 @@ function buildScorecard(options) {
       ref: targetRepo.ref ?? null,
     },
     stage_counts: summarizeStageCounts(options.flowResult.stageResults),
-    status: options.flowResult.status,
+    status: asNonEmptyString(options.flowResult.artifacts.live_e2e_observation_overall_status) || options.flowResult.status,
+    legacy_flow_status: options.flowResult.status,
+    live_e2e_observation_report_file:
+      asNonEmptyString(options.flowResult.artifacts.live_e2e_observation_report_file) || null,
     scenario_coverage_status: verdictMatrix.scenario_coverage_status ?? null,
     provider_execution_status: verdictMatrix.provider_execution_status ?? null,
     feature_size_fit_status: verdictMatrix.feature_size_fit_status ?? null,
@@ -4217,6 +4338,254 @@ function buildScorecard(options) {
 }
 
 /**
+ * @param {string | null} filePath
+ * @returns {Record<string, unknown>}
+ */
+function loadAgentJudgeDocument(filePath) {
+  const resolved = asNonEmptyString(filePath);
+  if (!resolved) return {};
+  if (!fileExists(resolved)) {
+    throw new UsageError(`Agent judge file '${resolved}' was not found.`);
+  }
+  return readJson(resolved);
+}
+
+/**
+ * @param {Record<string, unknown>} judgeDocument
+ * @returns {Map<string, Record<string, unknown>>}
+ */
+function indexAgentJudgeEntries(judgeDocument) {
+  const entries = Array.isArray(judgeDocument.artifact_quality_matrix)
+    ? judgeDocument.artifact_quality_matrix
+    : Array.isArray(judgeDocument.steps)
+      ? judgeDocument.steps
+      : [];
+  const indexed = new Map();
+  for (const entry of entries) {
+    const record = asRecord(entry);
+    const step = asNonEmptyString(record.step);
+    if (step) indexed.set(step, record);
+  }
+  return indexed;
+}
+
+/**
+ * @param {string} step
+ * @returns {string[]}
+ */
+function getObservationCommandLabelPriority(step) {
+  if (step === "discovery") return ["discovery-run", "project-analyze"];
+  if (step === "spec") return ["spec-build", "project-validate"];
+  if (step === "planning") return ["wave-create", "handoff-prepare"];
+  if (step === "handoff") return ["handoff-approve"];
+  if (step === "execution") return ["run-start", "project-verify-routed-live"];
+  if (step === "review") return ["review-run", "harness-certify", "eval-run"];
+  if (step === "qa") return ["eval-run", "project-verify-post-run-primary"];
+  if (step === "delivery") return ["deliver-prepare"];
+  return [];
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} commandResults
+ * @param {string[]} labels
+ * @returns {Record<string, unknown> | undefined}
+ */
+function findCommandByPreferredLabel(commandResults, labels) {
+  for (const label of labels) {
+    const command = commandResults.find((entry) => asNonEmptyString(entry.label) === label);
+    if (command) return command;
+  }
+  return undefined;
+}
+
+/**
+ * @param {{ runId: string, flowResult: { stageResults: Array<Record<string, unknown>>, commandResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown> } }} options
+ */
+function buildObservationStepMatrix(options) {
+  return LIVE_E2E_OBSERVATION_STEPS.map((step) => {
+    const stage = options.flowResult.stageResults.find((entry) => asNonEmptyString(entry.stage) === step) ?? {};
+    const command = findCommandByPreferredLabel(
+      options.flowResult.commandResults,
+      getObservationCommandLabelPriority(step),
+    );
+    const artifactRefs = uniqueStrings([
+      ...asStringArray(stage.evidence_refs),
+      ...asStringArray(command?.artifact_refs),
+    ]);
+    const status = toObservationStatus(asNonEmptyString(stage.status) || asNonEmptyString(command?.status) || "not_pass");
+    return {
+      step,
+      status,
+      command_label: asNonEmptyString(command?.label) || null,
+      command_surface: asNonEmptyString(command?.command_surface) || null,
+      artifact_refs: artifactRefs,
+      findings: uniqueStrings([
+        ...(status === "pass" ? [] : [asNonEmptyString(stage.summary) || `${step} did not complete cleanly`]),
+        ...asStringArray(stage.missing_evidence),
+        ...asStringArray(command?.missing_evidence),
+      ]),
+    };
+  });
+}
+
+/**
+ * @param {{ stepMatrix: Array<Record<string, unknown>>, agentJudgeDocument: Record<string, unknown> }} options
+ */
+function buildArtifactQualityMatrix(options) {
+  const judgeEntries = indexAgentJudgeEntries(options.agentJudgeDocument);
+  const judgeProvided = judgeEntries.size > 0;
+  return options.stepMatrix.map((stepEntry) => {
+    const step = asNonEmptyString(stepEntry.step);
+    const judgeEntry = judgeEntries.get(step);
+    if (judgeEntry) {
+      const status = toObservationStatus(asNonEmptyString(judgeEntry.status) || "warn");
+      return {
+        step,
+        status,
+        judge_source: asNonEmptyString(judgeEntry.judge_source) || "agent",
+        artifact_refs: asStringArray(judgeEntry.artifact_refs).length > 0
+          ? asStringArray(judgeEntry.artifact_refs)
+          : asStringArray(stepEntry.artifact_refs),
+        findings: asStringArray(judgeEntry.findings),
+      };
+    }
+    return {
+      step,
+      status: "warn",
+      judge_source: judgeProvided ? "agent-partial" : "agent-missing",
+      artifact_refs: asStringArray(stepEntry.artifact_refs),
+      findings: [judgeProvided ? "agent-judge-step-missing" : "agent-judge-not-provided"],
+    };
+  });
+}
+
+/**
+ * @param {{ stepMatrix: Array<Record<string, unknown>>, artifactQualityMatrix: Array<Record<string, unknown>>, codeQuality: Record<string, unknown>, artifacts: Record<string, unknown> }}
+ * @returns {"pass" | "warn" | "not_pass"}
+ */
+function resolveObservationOverallStatus(options) {
+  const deliveryStep = options.stepMatrix.find((entry) => asNonEmptyString(entry.step) === "delivery") ?? {};
+  const deliveryStatus = toObservationStatus(asNonEmptyString(deliveryStep.status) || "not_pass");
+  const deliveryManifestFile = asNonEmptyString(options.artifacts.delivery_manifest_file);
+  if (!deliveryManifestFile || deliveryStatus === "not_pass") {
+    return "not_pass";
+  }
+  let overall = "pass";
+  for (const entry of [...options.stepMatrix, ...options.artifactQualityMatrix, options.codeQuality]) {
+    overall = worstObservationStatus(overall, asNonEmptyString(entry.status) || "pass");
+  }
+  return overall === "not_pass" ? "warn" : overall;
+}
+
+/**
+ * @param {{ stepMatrix: Array<Record<string, unknown>> }}
+ */
+function buildContinuationDecisions(options) {
+  return options.stepMatrix
+    .filter((entry) => toObservationStatus(asNonEmptyString(entry.status)) !== "pass")
+    .map((entry, index, entries) => {
+      const step = asNonEmptyString(entry.step);
+      const nextStep =
+        LIVE_E2E_OBSERVATION_STEPS[LIVE_E2E_OBSERVATION_STEPS.indexOf(step) + 1] ||
+        asNonEmptyString(entries[index + 1]?.step) ||
+        null;
+      return {
+        step,
+        decision: nextStep ? "continue_with_findings" : "stop_at_delivery",
+        reason: asStringArray(entry.findings)[0] || `${step} completed with observed findings`,
+        next_step: nextStep,
+      };
+    });
+}
+
+/**
+ * @param {{ runId: string, profilePath: string, profile: Record<string, unknown>, flowResult: { stageResults: Array<Record<string, unknown>>, commandResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }, summaryFile: string, agentJudgeDocument: Record<string, unknown> }}
+ */
+function buildObservationReport(options) {
+  const stepMatrix = buildObservationStepMatrix({
+    runId: options.runId,
+    flowResult: options.flowResult,
+  });
+  const artifactQualityMatrix = buildArtifactQualityMatrix({
+    stepMatrix,
+    agentJudgeDocument: options.agentJudgeDocument,
+  });
+  const codeQuality = buildCodeQualityObservation(options.flowResult.artifacts);
+  const overallStatus = resolveObservationOverallStatus({
+    stepMatrix,
+    artifactQualityMatrix,
+    codeQuality,
+    artifacts: options.flowResult.artifacts,
+  });
+  return {
+    report_id: `${options.runId}.live-e2e-observation.v1`,
+    run_id: options.runId,
+    profile_id: asNonEmptyString(options.profile.profile_id) || "unknown-profile",
+    flow_range: {
+      start_step: "discovery",
+      end_step: "delivery",
+      included_steps: [...LIVE_E2E_OBSERVATION_STEPS],
+      prelude_steps: [...LIVE_E2E_OBSERVATION_PRELUDE_STEPS],
+      excluded_steps: [...LIVE_E2E_OBSERVATION_EXCLUDED_STEPS],
+    },
+    overall_status: overallStatus,
+    step_matrix: stepMatrix,
+    artifact_quality_matrix: artifactQualityMatrix,
+    code_quality_after_delivery: codeQuality,
+    continuation_decisions: buildContinuationDecisions({ stepMatrix }),
+    evidence_refs: uniqueStrings([
+      options.summaryFile,
+      asNonEmptyString(options.flowResult.artifacts.delivery_manifest_file),
+      asNonEmptyString(options.flowResult.artifacts.review_report_file),
+      asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file),
+      asNonEmptyString(options.flowResult.artifacts.evaluation_report_file),
+    ]),
+  };
+}
+
+/**
+ * @param {{ runId: string, reportsRoot: string, stepMatrix: Array<Record<string, unknown>> }}
+ */
+function writeAgentArtifactReviewRequest(options) {
+  const requestFile = path.join(
+    options.reportsRoot,
+    `live-e2e-agent-artifact-review-request-${normalizeId(options.runId)}.json`,
+  );
+  const request = {
+    request_id: `${options.runId}.agent-artifact-review.v1`,
+    run_id: options.runId,
+    rubric: {
+      statuses: ["pass", "warn", "not_pass"],
+      criteria: [
+        "traceability to feature request, mission, and previous step",
+        "completeness for the step",
+        "actionability for the next step",
+        "consistency with neighboring artifacts",
+        "absence of synthetic or no-op explanations that hide failure",
+      ],
+    },
+    expected_response_shape: {
+      artifact_quality_matrix: [
+        {
+          step: "discovery",
+          status: "pass|warn|not_pass",
+          judge_source: "agent",
+          artifact_refs: [],
+          findings: [],
+        },
+      ],
+    },
+    steps: options.stepMatrix.map((entry) => ({
+      step: asNonEmptyString(entry.step),
+      artifact_refs: asStringArray(entry.artifact_refs),
+      observed_status: asNonEmptyString(entry.status),
+    })),
+  };
+  writeJson(requestFile, request);
+  return requestFile;
+}
+
+/**
  * @param {{
  *   hostRoot: string,
  *   hostProjectId: string,
@@ -4234,6 +4603,7 @@ function buildScorecard(options) {
  *   },
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
  *   examplesRoot: string | null,
+ *   agentJudgeFile: string | null,
  * }}
  */
 function writeProofRunnerArtifacts(options) {
@@ -4245,6 +4615,37 @@ function writeProofRunnerArtifacts(options) {
     options.layout.reportsRoot,
     `live-e2e-scorecard-target-${normalizeId(options.runId)}.json`,
   );
+  const agentJudgeDocument = loadAgentJudgeDocument(options.agentJudgeFile);
+  const observationReport = buildObservationReport({
+    runId: options.runId,
+    profilePath: options.profilePath,
+    profile: options.profile,
+    flowResult: options.flowResult,
+    summaryFile,
+    agentJudgeDocument,
+  });
+  const observationValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: observationReport,
+    source: `runtime://live-e2e-observation/${options.runId}`,
+  });
+  if (!observationValidation.ok) {
+    const issues = observationValidation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Live E2E observation report failed contract validation: ${issues}`);
+  }
+  const observationReportFile = path.join(
+    options.layout.reportsRoot,
+    `live-e2e-observation-report-${normalizeId(options.runId)}.json`,
+  );
+  const agentArtifactReviewRequestFile = writeAgentArtifactReviewRequest({
+    runId: options.runId,
+    reportsRoot: options.layout.reportsRoot,
+    stepMatrix: observationReport.step_matrix,
+  });
+  options.flowResult.artifacts.live_e2e_observation_report_file = observationReportFile;
+  options.flowResult.artifacts.agent_artifact_review_request_file = agentArtifactReviewRequestFile;
+  options.flowResult.artifacts.live_e2e_observation_overall_status = observationReport.overall_status;
+
   const summary = {
     run_id: options.runId,
     project_id: options.hostProjectId,
@@ -4260,7 +4661,8 @@ function writeProofRunnerArtifacts(options) {
     duration_class: options.profile.duration_class ?? null,
     started_at: options.flowResult.startedAt,
     finished_at: options.flowResult.finishedAt,
-    status: options.flowResult.status,
+    status: observationReport.overall_status,
+    legacy_flow_status: options.flowResult.status,
     target_repo: asRecord(options.profile.target_repo),
     target_checkout_root:
       typeof options.flowResult.artifacts.target_checkout_root === "string"
@@ -4317,6 +4719,9 @@ function writeProofRunnerArtifacts(options) {
     stage_results: options.flowResult.stageResults,
     command_results: options.flowResult.commandResults,
     artifacts: options.flowResult.artifacts,
+    live_e2e_observation_report_file: observationReportFile,
+    live_e2e_observation_overall_status: observationReport.overall_status,
+    agent_artifact_review_request_file: agentArtifactReviewRequestFile,
     matrix_cell:
       typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
         ? options.flowResult.artifacts.matrix_cell
@@ -4332,7 +4737,7 @@ function writeProofRunnerArtifacts(options) {
     scorecard_files: [scorecardFile],
     control_surfaces: {
       installed_user_proof_runner:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted]",
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>]",
       public_cli_sequence: options.flowResult.commandResults.map((result) => result.command_surface).filter(Boolean),
       aor_bin: options.aorLaunch.binaryRef,
       examples_root: options.examplesRoot,
@@ -4341,7 +4746,7 @@ function writeProofRunnerArtifacts(options) {
     runner_auth_source: asNonEmptyString(options.flowResult.artifacts.runner_auth_source) || null,
     runtime_agent_permission_mode: asNonEmptyString(options.flowResult.artifacts.runtime_agent_permission_mode) || null,
     error:
-      options.flowResult.status === "fail"
+      observationReport.overall_status === "not_pass"
         ? options.flowResult.stageResults.find((stage) => stage.status === "fail")?.summary ||
           asNonEmptyString(asRecord(options.flowResult.artifacts.scenario_coverage).summary) ||
           "Installed-user rehearsal failed without a stage-level failure summary."
@@ -4355,6 +4760,7 @@ function writeProofRunnerArtifacts(options) {
     summaryFile,
   });
 
+  writeJson(observationReportFile, observationReport);
   writeJson(summaryFile, summary);
   writeJson(scorecardFile, scorecard);
 
@@ -4390,7 +4796,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>]",
         "",
         "Installed-user black-box proof runner.",
       ].join("\n"),
@@ -4412,6 +4818,7 @@ function runCli(rawArgs) {
     })();
   const runtimeRoot = resolveOptionalStringFlag(flags["runtime-root"], "runtime-root");
   const aorBin = resolveOptionalStringFlag(flags["aor-bin"], "aor-bin");
+  const agentJudgeFile = resolveOptionalStringFlag(flags["agent-judge-file"], "agent-judge-file");
   const catalogRootOverride = resolveOptionalStringFlag(flags["catalog-root"], "catalog-root");
   const runnerAuthMode = resolveRunnerAuthMode(resolveOptionalStringFlag(flags["runner-auth-mode"], "runner-auth-mode"));
   const runtimeAgentPermissionMode = resolveRuntimeAgentPermissionMode(
@@ -4538,6 +4945,7 @@ function runCli(rawArgs) {
     flowResult,
     aorLaunch,
     examplesRoot,
+    agentJudgeFile,
   });
 
   process.stdout.write(
@@ -4548,6 +4956,8 @@ function runCli(rawArgs) {
         run_id: runId,
         live_e2e_run_status: written.summary.status,
         live_e2e_run_summary_file: written.summaryFile,
+        live_e2e_observation_report_file: written.summary.live_e2e_observation_report_file,
+        agent_artifact_review_request_file: written.summary.agent_artifact_review_request_file,
         live_e2e_scorecard_files: [written.scorecardFile],
         learning_loop_scorecard_file: written.learningLoop?.scorecardFile ?? null,
         learning_loop_handoff_file: written.learningLoop?.handoffFile ?? null,

@@ -13,6 +13,7 @@ export type ContractFamily =
   | "evaluation-report"
   | "review-report"
   | "runtime-harness-report"
+  | "live-e2e-observation-report"
   | "dataset"
   | "evaluation-suite"
   | "promotion-decision"
