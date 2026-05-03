@@ -369,6 +369,50 @@ test("control-plane API contract rejects invalid binding mode", () => {
   assert.ok(enumIssue, "expected enum_value_invalid for binding_mode");
 });
 
+test("live E2E observation report loads and enforces status scale", () => {
+  const source = path.join(workspaceRoot, "examples/reports/live-e2e-observation-report.sample.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "live-e2e-observation-report" });
+  assert.equal(loaded.ok, true, "expected live-e2e-observation-report sample to load");
+
+  const candidate = structuredClone(loaded.document);
+  candidate.overall_status = "fail";
+
+  const validation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: candidate,
+    source: "test://live-e2e-observation-invalid-status",
+  });
+
+  assert.equal(validation.ok, false);
+  const enumIssue = validation.issues.find(
+    (problem) => problem.code === "enum_value_invalid" && problem.field === "overall_status",
+  );
+  assert.ok(enumIssue, "expected enum_value_invalid for overall_status");
+
+  const nestedCandidate = structuredClone(loaded.document);
+  nestedCandidate.step_matrix[0].status = "fail";
+  nestedCandidate.artifact_quality_matrix[0].status = "fail";
+  nestedCandidate.code_quality_after_delivery.status = "fail";
+
+  const nestedValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: nestedCandidate,
+    source: "test://live-e2e-observation-invalid-nested-status",
+  });
+
+  assert.equal(nestedValidation.ok, false);
+  for (const field of [
+    "step_matrix[0].status",
+    "artifact_quality_matrix[0].status",
+    "code_quality_after_delivery.status",
+  ]) {
+    assert.ok(
+      nestedValidation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === field),
+      `expected enum_value_invalid for ${field}`,
+    );
+  }
+});
+
 test("contract index mapping covers every docs/contracts/00-index entry", () => {
   const contractsIndexPath = path.join(workspaceRoot, "docs/contracts/00-index.md");
   const contractsIndexContent = fs.readFileSync(contractsIndexPath, "utf8");

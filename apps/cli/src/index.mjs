@@ -805,28 +805,61 @@ function runtimeHarnessReportHasMeaningfulPatch(report) {
 }
 
 /**
- * @param {{ report: Record<string, unknown>, command: string }} options
+ * @param {string | string[] | true | undefined} value
+ * @returns {"strict" | "observe"}
  */
-function assertRuntimeHarnessAllowsDelivery(options) {
+function resolveQualityGateMode(value) {
+  const mode = resolveOptionalStringFlag("quality-gate-mode", value) ?? "strict";
+  if (mode === "strict" || mode === "observe") {
+    return mode;
+  }
+  throw new CliUsageError("Flag '--quality-gate-mode' must be either 'strict' or 'observe'.");
+}
+
+/**
+ * @param {{ report: Record<string, unknown>, command: string }} options
+ * @returns {{ status: "pass" | "not_pass", findings: string[] }}
+ */
+function evaluateRuntimeHarnessDeliveryGate(options) {
   if (!isStrictRuntimeHarnessReport(options.report)) {
-    return;
+    return { status: "pass", findings: [] };
   }
   const stepDecisions = Array.isArray(options.report.step_decisions) ? options.report.step_decisions : [];
   if (stepDecisions.length === 0) {
-    throw new CliUsageError(
-      `${options.command} blocked because Runtime Harness has no routed step decisions for a strict mission. Run 'aor run start' and close Runtime Harness findings before delivery or release.`,
-    );
+    return {
+      status: "not_pass",
+      findings: [
+        `${options.command} blocked because Runtime Harness has no routed step decisions for a strict mission. Run 'aor run start' and close Runtime Harness findings before delivery or release.`,
+      ],
+    };
   }
   const overallDecision = typeof options.report.overall_decision === "string" ? options.report.overall_decision : "unknown";
   if (overallDecision !== "pass") {
-    throw new CliUsageError(
-      `${options.command} blocked by Runtime Harness decision '${overallDecision}'. Resolve runtime findings before delivery or release.`,
-    );
+    return {
+      status: "not_pass",
+      findings: [
+        `${options.command} blocked by Runtime Harness decision '${overallDecision}'. Resolve runtime findings before delivery or release.`,
+      ],
+    };
   }
   if (!runtimeHarnessReportHasMeaningfulPatch(options.report)) {
-    throw new CliUsageError(
-      `${options.command} blocked because Runtime Harness found no meaningful mission-scoped patch for a strict mission.`,
-    );
+    return {
+      status: "not_pass",
+      findings: [
+        `${options.command} blocked because Runtime Harness found no meaningful mission-scoped patch for a strict mission.`,
+      ],
+    };
+  }
+  return { status: "pass", findings: [] };
+}
+
+/**
+ * @param {{ report: Record<string, unknown>, command: string }} options
+ */
+function assertRuntimeHarnessAllowsDelivery(options) {
+  const gate = evaluateRuntimeHarnessDeliveryGate(options);
+  if (gate.status !== "pass") {
+    throw new CliUsageError(gate.findings[0] ?? `${options.command} blocked by Runtime Harness quality gate.`);
   }
 }
 
@@ -1176,6 +1209,9 @@ function executeImplementedCommand(command, flags, cwd) {
   let deliveryPlanFile = null;
   let deliveryPlanStatus = null;
   let deliveryMode = null;
+  let deliveryQualityGateMode = null;
+  let deliveryQualityGateStatus = null;
+  let deliveryQualityGateFindings = null;
   let deliveryBlocking = null;
   let deliveryBlockingReasons = null;
   let deliveryGovernanceDecision = null;
@@ -2115,6 +2151,10 @@ function executeImplementedCommand(command, flags, cwd) {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
     const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
+    deliveryQualityGateMode = command === "deliver prepare" ? resolveQualityGateMode(flags["quality-gate-mode"]) : "strict";
+    if (command === "release prepare" && flags["quality-gate-mode"] !== undefined) {
+      throw new CliUsageError("Flag '--quality-gate-mode' is only valid for 'aor deliver prepare'.");
+    }
 
     const init = initializeProjectRuntime({
       cwd,
@@ -2142,10 +2182,18 @@ function executeImplementedCommand(command, flags, cwd) {
     runtimeHarnessReportId = runtimeHarness.report.report_id;
     runtimeHarnessReportFile = runtimeHarness.reportPath;
     runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
-    assertRuntimeHarnessAllowsDelivery({
+    const runtimeHarnessDeliveryGate = evaluateRuntimeHarnessDeliveryGate({
       report: runtimeHarness.report,
       command,
     });
+    deliveryQualityGateStatus = runtimeHarnessDeliveryGate.status;
+    deliveryQualityGateFindings = runtimeHarnessDeliveryGate.findings;
+    if (deliveryQualityGateMode === "strict") {
+      assertRuntimeHarnessAllowsDelivery({
+        report: runtimeHarness.report,
+        command,
+      });
+    }
     const resolvedPolicy = resolveStepPolicyForStep({
       projectProfilePath: init.projectProfilePath,
       routesRoot: path.join(init.projectRoot, "examples/routes"),
@@ -2239,6 +2287,9 @@ function executeImplementedCommand(command, flags, cwd) {
           .filter((reason) => typeof reason === "string" && reason.trim().length > 0)
           .map((reason) => reason.trim())
       : [];
+    if (deliveryQualityGateMode === "observe" && deliveryQualityGateFindings.length > 0) {
+      deliveryBlockingReasons = Array.from(new Set([...(deliveryBlockingReasons ?? []), ...deliveryQualityGateFindings]));
+    }
     deliveryGovernanceDecision =
       typeof planResult.deliveryPlan.governance === "object" && planResult.deliveryPlan.governance
         ? planResult.deliveryPlan.governance
@@ -3139,6 +3190,9 @@ function executeImplementedCommand(command, flags, cwd) {
     release_packet_file: releasePacketFile,
     release_packet_status: releasePacketStatus,
     delivery_writeback_result: deliveryWritebackResult,
+    delivery_quality_gate_mode: deliveryQualityGateMode,
+    delivery_quality_gate_status: deliveryQualityGateStatus,
+    delivery_quality_gate_findings: deliveryQualityGateFindings,
     incident_id: incidentId,
     incident_file: incidentFile,
     incident_report_file: incidentFile,

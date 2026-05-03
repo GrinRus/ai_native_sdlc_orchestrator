@@ -20,6 +20,7 @@ const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
 const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "closed"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
+const LIVE_E2E_OBSERVATION_STATUS_VALUES = ["pass", "warn", "not_pass"];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
 const LIVE_RUN_EVENT_TYPE_VALUES = [
@@ -507,6 +508,38 @@ const CONTRACT_FAMILY_INDEX = Object.freeze([
         allowedValues: ["code-changing", "docs-only", "no-write-rehearsal", "release", "asset-certification", "unknown"],
       },
     ],
+  },
+  {
+    family: "live-e2e-observation-report",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/live-e2e-observation-report.md",
+    exampleGlob: "examples/reports/live-e2e-observation-report*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "report_id",
+      "run_id",
+      "profile_id",
+      "flow_range",
+      "overall_status",
+      "step_matrix",
+      "artifact_quality_matrix",
+      "code_quality_after_delivery",
+      "continuation_decisions",
+      "evidence_refs",
+    ],
+    fieldTypes: {
+      report_id: "string",
+      run_id: "string",
+      profile_id: "string",
+      flow_range: "object",
+      overall_status: "string",
+      step_matrix: "array",
+      artifact_quality_matrix: "array",
+      code_quality_after_delivery: "object",
+      continuation_decisions: "array",
+      evidence_refs: "array",
+    },
+    enumChecks: [{ field: "overall_status", allowedValues: LIVE_E2E_OBSERVATION_STATUS_VALUES }],
   },
   {
     family: "dataset",
@@ -1012,6 +1045,7 @@ const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/eval\/dataset-[^/]+\.ya?ml$/, family: "dataset" },
   { regex: /^examples\/eval\/report-[^/]+\.sample\.ya?ml$/, family: "evaluation-report" },
   { regex: /^examples\/eval\/suite-[^/]+\.ya?ml$/, family: "evaluation-suite" },
+  { regex: /^examples\/reports\/live-e2e-observation-report[^/]*\.ya?ml$/, family: "live-e2e-observation-report" },
   { regex: /^examples\/reports\/runtime-harness-report[^/]*\.ya?ml$/, family: "runtime-harness-report" },
   { regex: /^examples\/packets\/wave-ticket-[^/]+\.ya?ml$/, family: "wave-ticket" },
   { regex: /^examples\/packets\/handoff-[^/]+\.ya?ml$/, family: "handoff-packet" },
@@ -1165,12 +1199,95 @@ export function validateContractDocument({ family, document, source = "<in-memor
     }
   }
 
+  if (family === "live-e2e-observation-report") {
+    issues.push(...validateLiveE2EObservationReport(document, source));
+  }
+
   return {
     ok: issues.length === 0,
     family,
     source,
     issues,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateLiveE2EObservationReport(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const codeQuality = isPlainObject(document.code_quality_after_delivery)
+    ? document.code_quality_after_delivery
+    : {};
+  validateObservationStatusField({
+    value: codeQuality.status,
+    source,
+    field: "code_quality_after_delivery.status",
+    issues,
+  });
+  validateObservationMatrixStatuses({
+    entries: document.step_matrix,
+    source,
+    field: "step_matrix",
+    issues,
+  });
+  validateObservationMatrixStatuses({
+    entries: document.artifact_quality_matrix,
+    source,
+    field: "artifact_quality_matrix",
+    issues,
+  });
+  return issues;
+}
+
+/**
+ * @param {{ entries: unknown, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateObservationMatrixStatuses(options) {
+  if (!Array.isArray(options.entries)) return;
+  options.entries.forEach((entry, index) => {
+    const record = isPlainObject(entry) ? entry : {};
+    validateObservationStatusField({
+      value: record.status,
+      source: options.source,
+      field: `${options.field}[${index}].status`,
+      issues: options.issues,
+    });
+  });
+}
+
+/**
+ * @param {{ value: unknown, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateObservationStatusField(options) {
+  if (typeof options.value !== "string") {
+    options.issues.push(
+      issue({
+        code: options.value === undefined ? "required_field_missing" : "field_type_mismatch",
+        source: options.source,
+        field: options.field,
+        expected: options.value === undefined ? "present" : "string",
+        actual: options.value === undefined ? "missing" : describeActualType(options.value),
+        message: `Field '${options.field}' must use live E2E observation status pass|warn|not_pass.`,
+      }),
+    );
+    return;
+  }
+  if (!LIVE_E2E_OBSERVATION_STATUS_VALUES.includes(options.value)) {
+    options.issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source: options.source,
+        field: options.field,
+        expected: LIVE_E2E_OBSERVATION_STATUS_VALUES.join("|"),
+        actual: options.value,
+        message: `Field '${options.field}' has unsupported value '${options.value}'.`,
+      }),
+    );
+  }
 }
 
 /**

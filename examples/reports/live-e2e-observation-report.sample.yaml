@@ -1,0 +1,57 @@
+report_id: live-e2e.sample.observation.v1
+run_id: live-e2e.sample.run
+profile_id: live-e2e.full-journey.regress.ky
+flow_range:
+  start_step: discovery
+  end_step: delivery
+  included_steps:
+    - discovery
+    - spec
+    - planning
+    - handoff
+    - execution
+    - review
+    - qa
+    - delivery
+  prelude_steps:
+    - project-init
+    - intake-create
+    - project-analyze
+    - project-validate
+  excluded_steps:
+    - release
+    - learning
+overall_status: warn
+step_matrix:
+  - step: discovery
+    status: pass
+    command_label: discovery-run
+    command_surface: aor discovery run
+    artifact_refs:
+      - runtime://reports/project-analysis-report.json
+    findings: []
+artifact_quality_matrix:
+  - step: discovery
+    status: warn
+    judge_source: agent-missing
+    artifact_refs:
+      - runtime://reports/project-analysis-report.json
+    findings:
+      - agent-judge-not-provided
+code_quality_after_delivery:
+  status: warn
+  delivery_manifest_ref: runtime://artifacts/delivery-manifest-live-e2e.json
+  review_report_ref: runtime://reports/review-report-live-e2e.json
+  post_delivery_check_refs:
+    - runtime://reports/verify-summary-post-delivery.json
+  changed_paths:
+    - source/index.ts
+  findings:
+    - post-delivery quality checks were observed but not used as hard runner gates
+continuation_decisions:
+  - step: execution
+    decision: continue_with_findings
+    reason: runtime harness reported degraded code quality, but delivery observation remained possible
+    next_step: review
+evidence_refs:
+  - runtime://reports/live-e2e-run-summary.json
