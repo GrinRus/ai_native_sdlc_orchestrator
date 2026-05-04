@@ -27,6 +27,8 @@ Persistent configuration for one target project, including repos, allowed provid
 ## Notes
 Use the project profile as the durable source of truth for runtime default selection.
 
+For bounded multirepo flows, one project profile owns all participating `repos[]` entries and any `repo_graph` dependency edges. This supports separate backend, mobile, frontend, documentation, or shared-library repositories inside one AOR flow; it is not the same as coordinating multiple independent AOR `project_id` profiles.
+
 Deterministic runtime default resolution follows this order:
 1. route from `default_route_profiles.<step>`;
 2. wrapper from `default_wrapper_profiles.<route_class>`;

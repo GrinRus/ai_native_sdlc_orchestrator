@@ -55,6 +55,17 @@ Project bootstrap baseline:
 - delivery manifests and release packets
 - incidents and promotion decisions
 
+## Planned connected lifecycle mutations (W18 target)
+
+W18 tracks the backlog gap between the current bounded mutation baseline and a connected web surface that can drive the approved lifecycle through the control plane. This section is a target contract note, not a claim that every mutation is implemented today.
+
+Lifecycle command mutations should:
+- cover the minimum bootstrap, intake, discovery, spec, planning, handoff, run, review, delivery, and learning actions needed by the web full-flow path;
+- call the same runtime command handlers used by CLI/headless flows instead of adding UI-owned orchestration logic;
+- return existing command response fields and durable artifact refs where available;
+- preserve policy, approval, validation, and blocked-next-step evidence in stable response shapes;
+- support the interactive continuation flow described by `step-result.requested_interaction`.
+
 ## Read surface baseline (module operations)
 
 Read operations must reuse existing contract families and IDs rather than introducing API-only parallel shapes.
@@ -95,6 +106,12 @@ Full-journey execution baseline (W13):
 - `run status` resolves that execution lineage without requiring harness-private execution state.
 - `project verify` and `run start` both accept `route_overrides` and `policy_overrides` so live E2E can apply provider-pinned matrix-cell routing deterministically through the public CLI surface.
 - Full-journey live E2E may continue after a degraded `run start` only when public routed step, Runtime Harness, and adapter raw evidence were materialized. Missing execution evidence remains a hard blocker.
+
+Interactive continuation target (W18-S01):
+- when a routed step requests operator input, the run should preserve a query-safe `requested_interaction` payload in the run-linked step result;
+- operator answers should be submitted through a control-plane command path that records answer audit evidence before any continuation attempt;
+- continuation should either resume the bounded run from the recorded interaction boundary or remain blocked with explicit evidence refs and reason codes;
+- web clients may present and submit the interaction, but the control plane remains responsible for validation, audit, and run-state transitions.
 
 ## Delivery/release baseline (module operations)
 
@@ -236,7 +253,7 @@ Detached authn/authz baseline (W10-S04):
 - auth error payload includes `error.auth.required_permission`, `error.auth.project_id`, and `error.auth.token_id` (when available).
 
 Deferred beyond this baseline:
-- mutation-command HTTP endpoint parity for the full CLI surface outside the supported run-control and UI lifecycle actions;
+- mutation-command HTTP endpoint parity for lifecycle commands outside the supported run-control and UI lifecycle actions; W18-S02 tracks the minimum connected web full-flow subset before any broader CLI-over-HTTP parity claim;
 - production authn/authz and deployment hardening.
 
 ## API/UI alignment notes (W5-S04 + W9-S03 + W10-S03)

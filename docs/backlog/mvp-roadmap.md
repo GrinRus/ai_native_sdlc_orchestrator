@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-17-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-18-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -28,6 +28,7 @@ The authoritative planning model for implementation lives in:
 | W15 | Harden readiness signals after W14 by reopening the queue, aligning package/module evidence, and separating coverage proof from real code-changing proof. | 4 | EPIC-0, EPIC-7 | `docs/backlog/wave-15-implementation-slices.md` |
 | W16 | Reduce implementation complexity through behavior-preserving decomposition, shared helper extraction, and contract-first adapter permission cleanup. | 6 | EPIC-0, EPIC-3, EPIC-6, EPIC-7 | `docs/backlog/wave-16-implementation-slices.md` |
 | W17 | Remove post-W16 legacy public aliases and stale compatibility documentation while keeping W15-S04 externally blocked. | 1 | EPIC-0, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-17-implementation-slices.md` |
+| W18 | Close the connected web full-flow and topology proof gaps with control-plane-owned lifecycle mutations, interactive continuation semantics, and monorepo/bounded multirepo evidence. | 4 | EPIC-5, EPIC-6 | `docs/backlog/wave-18-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -85,6 +86,10 @@ The authoritative planning model for implementation lives in:
 | W16-S05 | implementation complexity reduction: installed-user runner decomposition (no direct story closure) |
 | W16-S06 | implementation complexity reduction: adapter permission legacy cleanup (no direct story closure) |
 | W17-S01 | post-W16 legacy surface cleanup (no direct story closure) |
+| W18-S01 | gap closure: interactive run continuation contract for connected operator surfaces |
+| W18-S02 | gap closure: full lifecycle command mutations for connected web |
+| W18-S03 | gap closure: detachable web full-flow operator console |
+| W18-S04 | gap closure: monorepo and bounded multirepo flow proof |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -310,6 +315,18 @@ The authoritative planning model for implementation lives in:
 - docs, examples, live E2E profiles, and proof fixtures no longer advertise public legacy aliases
 
 **Detailed slices:** `docs/backlog/wave-17-implementation-slices.md`
+
+## W18 — control-plane UI and topology proof gap closure
+**Goal:** Close the post-W17 product gaps around connected web full-flow operation, interactive runner question handling, and evidence-backed monorepo plus bounded multirepo support without making the web UI own orchestration logic.
+
+**Exit criteria:**
+- W18 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
+- `requested_interaction` has a contract-backed continuation target for surfacing runner questions, recording operator answers, and resuming or blocking runs through the control plane
+- connected web can drive the approved lifecycle through bounded lifecycle command mutations while runtime commands remain the orchestration owners
+- the detachable web console has a full-flow backlog path that includes live runner logs/events and interactive answer submission
+- monorepo and bounded multirepo support is proven through examples/tests for one project profile with explicit repo graph, impacted repo scope, validation evidence, coordination evidence, and delivery lineage
+
+**Detailed slices:** `docs/backlog/wave-18-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

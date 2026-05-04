@@ -49,6 +49,8 @@ The runners own:
 6. **Release** — materialize release packets and sign-off evidence.
 7. **Learning** — backfill incidents into datasets, suites, and certification decisions.
 
+Connected web surfaces may drive these lifecycle operations through the control plane, but CLI/API/runtime command handlers remain the owners of orchestration behavior and artifact materialization.
+
 ## Built-in quality model
 AOR uses a layered quality model.
 
@@ -91,6 +93,8 @@ AOR must work for:
 - a monorepo with multiple apps/packages/services;
 - a bounded multirepo graph where impacted repos are explicit and delivery is coordinated.
 
+A bounded multirepo graph belongs to one AOR project profile and may include separate repositories for backend services, mobile apps, frontend apps, documentation, or shared libraries. This is distinct from coordinating multiple independent AOR `project_id` profiles in one portfolio-level flow.
+
 AOR does **not** target unbounded organization-wide orchestration in MVP.
 
 ## Live E2E posture
@@ -111,6 +115,7 @@ The W13 full-journey layer adds:
 
 ## Non-goals for MVP
 - autonomous organization-wide portfolio optimization;
+- orchestration across multiple independent AOR `project_id` profiles in one portfolio flow;
 - fully automatic self-improving prompts without certification and human approval;
 - hidden provider-specific magic inside the orchestrator core;
 - UI-owned orchestration logic.
