@@ -122,6 +122,13 @@ graph TD
   W20S03[W20-S03 OpenCode live-baseline certification]
   W20S04[W20-S04 Compiler revision asset lifecycle]
   W20S05[W20-S05 Finance analytics and production monitoring loop]
+  W21S01[W21-S01 Installed-user onboarding UX contract]
+  W21S02[W21-S02 Installable CLI and first-run entrypoints]
+  W21S03[W21-S03 Clean project onboarding and asset-root resolution]
+  W21S04[W21-S04 Guided mission intake and next-action resolver]
+  W21S05[W21-S05 Guided web app full-flow console]
+  W21S06[W21-S06 Review, delivery, release, and learning closure UX]
+  W21S07[W21-S07 Installed-user guided journey proof]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -316,6 +323,20 @@ graph TD
   W8S09 --> W20S04
   W20S02 --> W20S05
   W7S04 --> W20S05
+  W19S01 --> W21S01
+  W21S01 --> W21S02
+  W21S01 --> W21S03
+  W19S02 --> W21S04
+  W21S03 --> W21S04
+  W18S03 --> W21S05
+  W21S04 --> W21S05
+  W19S05 --> W21S06
+  W21S05 --> W21S06
+  W21S02 --> W21S07
+  W21S03 --> W21S07
+  W21S04 --> W21S07
+  W21S05 --> W21S07
+  W21S06 --> W21S07
 ```
 
 ## W0 hard dependencies
@@ -520,6 +541,17 @@ graph TD
 | W20-S04 | W19-S01, W8-S09 |
 | W20-S05 | W20-S02, W7-S04 |
 
+## W21 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W21-S01 | W19-S01 |
+| W21-S02 | W21-S01 |
+| W21-S03 | W21-S01 |
+| W21-S04 | W19-S02, W21-S03 |
+| W21-S05 | W18-S03, W21-S04 |
+| W21-S06 | W19-S05, W21-S05 |
+| W21-S07 | W21-S02, W21-S03, W21-S04, W21-S05, W21-S06 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -639,6 +671,13 @@ graph TD
 116. W20-S03
 117. W20-S04
 118. W20-S05
+119. W21-S01
+120. W21-S02
+121. W21-S03
+122. W21-S04
+123. W21-S05
+124. W21-S06
+125. W21-S07
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

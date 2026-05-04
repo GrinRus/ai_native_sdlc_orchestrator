@@ -24,6 +24,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W8:** `W8-S02` Later discovery and architecture maturity pack
 - **W13:** `W13-S03` Public bootstrap and feature-intent intake
 - **W19:** `W19-S03` Discovery research and ADR evidence flow
+- **W21:** `W21-S01` Installed-user onboarding UX contract; `W21-S03` Clean project onboarding and asset-root resolution
 
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
@@ -31,6 +32,7 @@ Materialize discovery, planning, handoff, release, and adjacent artifacts as dur
 **Slices by wave:**
 - **W1:** `W1-S06` Runtime store and artifact packet materialization; `W1-S07` Wave ticket and handoff packet foundation
 - **W19:** `W19-S02` Product intake source and KPI/DoD model
+- **W21:** `W21-S04` Guided mission intake and next-action resolver
 
 ## EPIC-3 Routed execution
 Resolve and execute steps through routes, wrappers, prompt bundles, policies, and adapters.
@@ -58,6 +60,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W14:** `W14-S06` Review, audit, and closure alignment
 - **W19:** `W19-S04` Incident-to-dataset backfill workflow; `W19-S05` Review decision and approval workflow
 - **W20:** `W20-S04` Compiler revision asset lifecycle
+- **W21:** `W21-S06` Review, delivery, release, and learning closure UX
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -86,6 +89,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W18:** `W18-S01` Interactive run continuation contract; `W18-S02` Full lifecycle command mutations for connected web; `W18-S03` Web full-flow operator console
 - **W19:** `W19-S06` Planner metrics and scheduler visibility
 - **W20:** `W20-S02` Production security and observability hardening baseline
+- **W21:** `W21-S02` Installable CLI and first-run entrypoints; `W21-S05` Guided web app full-flow console
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -108,3 +112,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W15:** `W15-S03` Proof verdict integrity gates
 - **W16:** `W16-S05` Installed-user live E2E runner decomposition
 - **W20:** `W20-S05` Finance analytics and production monitoring loop
+- **W21:** `W21-S07` Installed-user guided journey proof

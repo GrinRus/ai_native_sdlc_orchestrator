@@ -25,9 +25,9 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ### Local tasks
 1. Add a flat product story coverage matrix for the current 112-story working set.
-2. Link partially covered and uncovered story outcomes to explicit W19/W20 gap slices.
+2. Link partially covered and uncovered story outcomes to explicit W19/W20/W21 gap slices.
 3. Add repository checks for story count, unique IDs, valid tiers, valid coverage statuses, and valid gap slice references.
-4. Update roadmap and README references so the current backlog horizon is W20.
+4. Update roadmap and README references so the current backlog horizon is W21.
 5. Run slice status and root checks after the synchronized backlog update.
 
 ### Acceptance criteria
@@ -38,7 +38,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 5. `pnpm lint`, `pnpm test`, `pnpm build`, and `pnpm check` pass.
 
 ### Done evidence
-- synchronized W19/W20 backlog entries across source-of-truth docs
+- synchronized W19/W20/W21 backlog entries across source-of-truth docs
 - machine-checkable user-story coverage matrix
 - passing repository checks for story registry integrity
 
