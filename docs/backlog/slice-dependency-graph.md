@@ -110,6 +110,10 @@ flowchart TB
   W16S05[W16-S05 Installed-user live E2E runner decomposition]
   W16S06[W16-S06 Adapter permission legacy removal]
   W17S01[W17-S01 Legacy surface cleanup after W16]
+  W18S01[W18-S01 Interactive run continuation contract]
+  W18S02[W18-S02 Full lifecycle command mutations for connected web]
+  W18S03[W18-S03 Web full-flow operator console]
+  W18S04[W18-S04 Monorepo and bounded multirepo flow proof]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -279,6 +283,8 @@ flowchart TB
   W16S04 --> W17S01
   W16S05 --> W17S01
   W16S06 --> W17S01
+  W18S01 --> W18S02
+  W18S02 --> W18S03
 ```
 
 ## W0 hard dependencies
@@ -459,6 +465,14 @@ flowchart TB
 |---|---|
 | W17-S01 | W16-S02, W16-S04, W16-S05, W16-S06 |
 
+## W18 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W18-S01 | none |
+| W18-S02 | W18-S01 |
+| W18-S03 | W18-S02 |
+| W18-S04 | none |
+
 ## Topological order
 1. W0-S01
 2. W0-S04
@@ -564,6 +578,10 @@ flowchart TB
 102. W16-S05
 103. W16-S06
 104. W17-S01
+105. W18-S01
+106. W18-S02
+107. W18-S03
+108. W18-S04
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

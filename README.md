@@ -30,12 +30,13 @@ What exists today:
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
 - a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
 - implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
-- expanded implementation backlog through `W17`, with W17 focused on post-W16 legacy surface cleanup and active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
+- expanded implementation backlog through `W18`, with W18 focused on connected web full-flow, interactive runner continuation, and monorepo/bounded multirepo proof gaps while active queue tracking stays available via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - historical W10/W11 productionization closure for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and target-backed proof evidence.
 - first live routed execution baseline for supported `codex-cli` adapter paths with explicit delivery-guardrail blocking semantics.
 - W15 readiness-hardening work that makes source-of-truth drift, package/module-map drift, and mock-backed proof claims machine-checkable.
 - W16 complexity-reduction work that decomposes monolithic CLI/API/core/live-E2E surfaces and isolates adapter permission legacy cleanup.
 - W17 legacy-surface cleanup that removes public compatibility aliases from CLI incident outputs and delivery mode inputs.
+- W18 backlog coverage for control-plane-owned web lifecycle operation, runner question/answer continuation, and bounded multirepo proof.
 
 What does **not** exist yet:
 
@@ -241,6 +242,7 @@ Detailed wave plans:
 - `docs/backlog/wave-15-implementation-slices.md`
 - `docs/backlog/wave-16-implementation-slices.md`
 - `docs/backlog/wave-17-implementation-slices.md`
+- `docs/backlog/wave-18-implementation-slices.md`
 
 ## Contributing
 

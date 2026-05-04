@@ -153,6 +153,6 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 ## Current planning coverage
 
-The repo carries detailed wave documents for every currently defined `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is `W17`, opened after W16 to remove public legacy aliases and stale compatibility documentation without changing the externally blocked `W15-S04` proof scope.
+The repo carries detailed wave documents for every currently defined `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is `W18`, opened after W17 to close the connected web full-flow, interactive runner-continuation, and monorepo/bounded multirepo proof gaps without changing the externally blocked `W15-S04` proof scope.
 
 The implementation order is still constrained by hard dependencies. A later-wave slice can be described in detail and still remain blocked until earlier-wave slices close.

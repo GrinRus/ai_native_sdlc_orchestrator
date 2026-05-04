@@ -6,6 +6,8 @@ AOR supports:
 - monorepos with multiple apps/packages/services,
 - bounded multirepo topologies with explicit dependency edges.
 
+Bounded multirepo topology is modeled inside one AOR project profile. A flow may coordinate explicit backend, mobile, frontend, documentation, or shared-library repositories, but MVP does not coordinate multiple independent AOR `project_id` profiles as one portfolio transaction.
+
 ## Required capabilities
 - repo graph in the project profile;
 - explicit impacted repo list in handoff and delivery artifacts;

@@ -62,6 +62,7 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W8:** `W8-S07` Later multi-repo, bootstrap, and delivery rerun maturity
 - **W10:** `W10-S02` Networked fork-first delivery execution
 - **W11:** `W11-S04` Target-anchored delivery and release evidence
+- **W18:** `W18-S04` Monorepo and bounded multirepo flow proof
 
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
@@ -75,6 +76,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W10:** `W10-S03` Detached transport mutation command baseline; `W10-S04` Detached transport authn/authz hardening baseline
 - **W12:** `W12-S03` Breaking CLI and contract removal
 - **W16:** `W16-S02` CLI dispatcher decomposition; `W16-S03` API and read-surface decomposition
+- **W18:** `W18-S01` Interactive run continuation contract; `W18-S02` Full lifecycle command mutations for connected web; `W18-S03` Web full-flow operator console
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.

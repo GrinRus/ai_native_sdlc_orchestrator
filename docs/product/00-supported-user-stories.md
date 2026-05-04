@@ -82,6 +82,8 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Select the required matrix cell by scenario family, pinned provider variant, and declared feature size.
 - Track which required matrix cells are still uncovered after each live E2E run.
 
+W18 tracks the remaining operator-surface gap for runner-requested questions: surface the question, submit an approved operator answer, and keep the answer trail auditable without making the web UI own orchestration.
+
 ### Security / compliance
 - Enforce provider and adapter allowlists.
 - Apply secret-safe logging and redaction.
@@ -93,6 +95,8 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Track repo graph, ownership, and cross-repo dependencies.
 - Use scoped locks and cross-repo validation.
 - Produce coordinated delivery manifests for bounded multirepo work.
+
+Bounded multirepo means one AOR project profile can coordinate several explicit repositories, such as backend services, mobile, and frontend repos. It does not mean MVP portfolio orchestration across multiple independent AOR `project_id` profiles.
 
 ### Incident / improvement owner
 - Open incident reports from failed releases or production feedback.

@@ -184,5 +184,13 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W17-S01 | Legacy surface cleanup after W16 | EPIC-0 | done | `docs/backlog/**`, `apps/cli`, `packages/orchestrator-core`, `scripts/live-e2e/**`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**`, `examples/**`, tests | W16-S02, W16-S04, W16-S05, W16-S06 |
 
+## W18 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W18-S01 | Interactive run continuation contract | EPIC-6 | ready | `docs/contracts/**`, `docs/architecture/**`, `docs/product/**`, `docs/backlog/**` | none |
+| W18-S02 | Full lifecycle command mutations for connected web | EPIC-6 | blocked | `apps/api`, `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W18-S01 |
+| W18-S03 | Web full-flow operator console | EPIC-6 | blocked | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S02 |
+| W18-S04 | Monorepo and bounded multirepo flow proof | EPIC-5 | ready | `examples/**`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**`, `docs/ops/**`, tests | none |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.
