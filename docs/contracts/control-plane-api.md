@@ -101,7 +101,7 @@ Full-journey execution baseline (W13):
 Delivery/release payload baseline:
 - `run_id` (optional command-scoped run identity; deterministic fallback when omitted);
 - `step_class` (optional, defaults to `implement`);
-- `mode` (optional override; canonicalized aliases map to `no-write | patch-only | local-branch | fork-first-pr`);
+- `mode` (optional override; must be one of `no-write | patch-only | local-branch | fork-first-pr`);
 - `approved_handoff_ref` (optional evidence ref required by non-`no-write` preconditions);
 - `promotion_evidence_refs` (optional comma/list refs required by non-`no-write` preconditions).
 

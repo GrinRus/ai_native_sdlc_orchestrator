@@ -23,13 +23,6 @@ execution:
   evidence_namespace: evidence://adapter-live/claude-code
   external_runtime:
     command: claude
-    args:
-      - --print
-      - --output-format
-      - json
-      - --no-session-persistence
-      - --permission-mode
-      - auto
     permission_policy:
       default_mode: full-bypass
       modes:

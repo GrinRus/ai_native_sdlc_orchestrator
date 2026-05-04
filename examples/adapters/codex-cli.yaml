@@ -23,12 +23,6 @@ execution:
   evidence_namespace: evidence://adapter-live/codex-cli
   external_runtime:
     command: codex
-    args:
-      - exec
-      - --json
-      - --ephemeral
-      - --sandbox
-      - workspace-write
     permission_policy:
       default_mode: full-bypass
       modes:

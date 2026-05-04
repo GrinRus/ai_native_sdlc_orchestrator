@@ -34,4 +34,4 @@ verification:
 output_policy:
   materialize_release_packet: false
   write_back_to_remote: false
-  preferred_delivery_mode: patch
+  preferred_delivery_mode: patch-only

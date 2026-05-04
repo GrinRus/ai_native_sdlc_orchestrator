@@ -47,15 +47,24 @@ function withTempRepo(callback) {
  * }} options
  */
 function buildExternalRunnerProfile(options) {
+  const permissionArgs = options.args.length > 0 ? options.args : ["--version"];
   const execution = {
     runtime_mode: "external-process",
     evidence_namespace: "evidence://adapter-live/codex-cli",
     external_runtime: {
       command: options.command,
-      args: options.args,
       request_via_stdin: true,
       timeout_ms: options.timeoutMs ?? 30000,
-      ...(options.permissionPolicy ? { permission_policy: options.permissionPolicy } : {}),
+      permission_policy:
+        options.permissionPolicy ??
+        {
+          default_mode: "full-bypass",
+          modes: {
+            "full-bypass": {
+              args: permissionArgs,
+            },
+          },
+        },
     },
   };
   if (options.handler !== null) {
@@ -211,9 +220,8 @@ test("mock adapter executes deterministic dry-run outputs for rehearsal coverage
   assert.ok(first.evidence_refs[0].startsWith("evidence://mock-adapter/"));
 });
 
-test("external runtime permission policy resolves env-selected args before adapter defaults", () => {
+test("external runtime permission policy resolves env-selected mode args before adapter defaults", () => {
   const externalRuntime = {
-    args: ["legacy"],
     permission_policy: {
       default_mode: "full-bypass",
       modes: {
@@ -240,10 +248,12 @@ test("external runtime permission policy resolves env-selected args before adapt
     source: "AOR_RUNTIME_AGENT_PERMISSION_MODE",
   });
   assert.deepEqual(resolveExternalRuntimePermissionPolicy({ externalRuntime: { args: ["legacy"] }, requestedMode: "restricted" }), {
-    ok: true,
-    args: ["legacy"],
-    permissionMode: "legacy",
-    source: "external_runtime.args",
+    ok: false,
+    args: [],
+    permissionMode: "missing",
+    source: "external_runtime.permission_policy",
+    failureKind: "permission-policy-invalid",
+    message: "External runtime permission_policy is required; legacy external_runtime.args is no longer supported.",
   });
 
   const invalid = resolveExternalRuntimePermissionPolicy({ externalRuntime, requestedMode: "missing" });
@@ -630,7 +640,7 @@ test("live adapter applies resolved route timeout before adapter default timeout
       policy_id: "policy.step.runner.default",
       resolved_bounds: {
         budget: {
-          timeout_sec: 1,
+          timeout_sec: 3,
         },
       },
     },
@@ -638,7 +648,7 @@ test("live adapter applies resolved route timeout before adapter default timeout
   });
 
   assert.equal(response.status, "success");
-  assert.equal(response.output.external_runner.timeout_ms, 1000);
+  assert.equal(response.output.external_runner.timeout_ms, 3000);
   assert.equal(response.output.external_runner.timed_out, false);
 });
 

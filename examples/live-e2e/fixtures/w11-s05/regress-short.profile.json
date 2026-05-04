@@ -10,7 +10,7 @@
     "repo_url": "https://github.com/sindresorhus/ky.git",
     "ref": "main",
     "checkout_strategy": "shallow",
-    "write_target": "patch-or-fork"
+    "write_target": "canonical-bounded"
   },
   "preflight": {
     "mode": "no-write",
@@ -31,7 +31,7 @@
     ],
     "failure_safe_defaults": [
       "keep output_policy.write_back_to_remote set to false",
-      "keep preferred delivery mode in patch-or-fork-safe options only"
+      "keep preferred delivery mode in canonical-bounded options only"
     ],
     "abort_conditions": [
       "repository clone fails or ref cannot be resolved",
@@ -41,7 +41,7 @@
     "reusable_assumptions": {
       "bootstrap": "clone and profile loading can run without write-back credentials",
       "quality": "bounded regression verification uses npm test as preflight gate",
-      "delivery": "patch or fork-local artifacts remain sufficient for rehearsal completion"
+      "delivery": "patch-only or fork-first-pr artifacts remain sufficient for rehearsal completion"
     }
   },
   "runtime": {
@@ -54,7 +54,7 @@
     "task_brief": [
       "bootstrap the repository and confirm the local verification path",
       "apply one narrow regression-test-backed change",
-      "produce patch output or a fork-local branch only"
+      "produce patch-only or fork-first-pr evidence only"
     ],
     "success_definition": [
       "source checkout succeeds",

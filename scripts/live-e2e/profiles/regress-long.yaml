@@ -9,7 +9,7 @@ target_repo:
   repo_url: https://github.com/httpie/cli.git
   ref: main
   checkout_strategy: shallow
-  write_target: patch-or-fork
+  write_target: canonical-bounded
 preflight:
   mode: no-write
   sequence:
@@ -34,7 +34,7 @@ preflight:
   reusable_assumptions:
     bootstrap: clone and profile loading can run without write-back credentials
     quality: bounded regression verification uses make targets as preflight gates
-    delivery: patch or fork-local artifacts remain sufficient for rehearsal completion
+    delivery: patch-only or fork-first-pr artifacts remain sufficient for rehearsal completion
 runtime:
   mode: ephemeral
   runtime_root: .aor
@@ -44,7 +44,7 @@ objective:
   task_brief:
     - bootstrap the repository and confirm Python verification path
     - apply one bounded regression fix with tests
-    - produce patch output or a fork-local branch only
+    - produce patch-only or fork-first-pr evidence only
   success_definition:
     - source checkout succeeds
     - handoff packet is materialized

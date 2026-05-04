@@ -20,7 +20,6 @@ aor incident open \
 Expected signals:
 - `incident_id` is returned.
 - `incident_report_file` exists under `.aor/projects/<project_id>/reports/incident-report-*.json`.
-- `incident_file` may still be present as a backward-compatible alias for the same path.
 - `incident_run_ref` matches `run://<RUN_ID>`.
 
 ## Show incidents
@@ -38,7 +37,7 @@ aor incident show \
 
 Expected signals:
 - `incident_records` is returned.
-- each record includes `incident_ref`, `linked_run_refs`, and `linked_asset_refs`.
+- each record includes `incident_ref`, `incident_report_file`, `linked_run_refs`, and `linked_asset_refs`.
 
 ## Recertify and re-enable
 ```bash

@@ -76,7 +76,7 @@ policy_resolution:
             - pnpm test
             - pnpm build
         writeback_mode:
-          mode: pull-request
+          mode: fork-first-pr
 evaluation_registry:
   examples_root: examples
   dataset_refs:

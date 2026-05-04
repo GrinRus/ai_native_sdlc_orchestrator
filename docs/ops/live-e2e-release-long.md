@@ -23,7 +23,7 @@ Confirm that AOR can:
 2. Modify one shared package plus one consuming app or package.
 3. Verify with workspace lint, typecheck, and unit tests.
 4. Materialize release packet and delivery manifest.
-5. Stop at patch, local branch, or fork PR draft.
+5. Stop at `patch-only`, `local-branch`, or `fork-first-pr` evidence.
 
 ## No-write preflight
 Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:

@@ -22,7 +22,7 @@ Confirm that AOR can:
 1. Analyze the repository and verify setup.
 2. Confirm install and verification commands.
 3. Apply one narrow regression-test-backed change.
-4. Produce patch output or a local/fork branch.
+4. Produce `patch-only`, `local-branch`, or `fork-first-pr` delivery evidence.
 5. Run the installed-user proof runner through preflight verify plus routed live execution before any delivery-stage action.
 
 ## No-write preflight

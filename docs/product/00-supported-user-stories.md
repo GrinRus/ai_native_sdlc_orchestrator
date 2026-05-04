@@ -107,7 +107,7 @@ This document groups the AOR user-story surface into role clusters. The current 
 - Block execution if prerequisites are missing.
 
 ### Delivery transaction / Git / PR flow
-- Deliver output as a patch, branch, or pull request according to policy.
+- Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.
 - Produce a delivery manifest that links execution to actual write-back artifacts.
 - Isolate parallel runs with worktree and branch semantics.
 - Rerun from a packet boundary or a failed step.

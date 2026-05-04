@@ -4,7 +4,7 @@ This procedure is the reusable baseline for public-repo rehearsals across bootst
 
 ## Safety invariants
 - Upstream write-back stays disabled (`write_back_to_remote=false`) unless a fork/local mirror policy is explicitly approved.
-- Preferred delivery mode stays in patch/local/fork-safe options.
+- Preferred delivery mode stays in canonical `patch-only`, `local-branch`, or `fork-first-pr` safe options.
 - Rehearsal stops immediately when preflight safety gates fail.
 
 ## Isolation mode guidance (W4-S01)

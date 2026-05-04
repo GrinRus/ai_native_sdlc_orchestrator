@@ -12,6 +12,8 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W13:** `W13-S01` Backlog-first full-journey live E2E realignment
 - **W14:** `W14-S01` Backlog and source-of-truth realignment
 - **W15:** `W15-S01` Source-of-truth and readiness queue repair; `W15-S02` Package/module workspace alignment
+- **W16:** `W16-S01` Complexity baseline and shared helper extraction
+- **W17:** `W17-S01` Legacy surface cleanup after W16
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -37,6 +39,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W10:** `W10-S01` External live adapter execution baseline
 - **W11:** `W11-S03` Profile-driven preflight and routed live execution
 - **W13:** `W13-S04` Feature-driven discovery and execution lifecycle
+- **W16:** `W16-S04` Orchestrator-core execution decomposition; `W16-S06` Adapter permission legacy removal
 
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -71,6 +74,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W9:** `W9-S03` Control-plane API contract/runtime alignment; `W9-S04` Machine-checkable control-plane API contract coverage; `W9-S07` Detached HTTP control-plane transport baseline
 - **W10:** `W10-S03` Detached transport mutation command baseline; `W10-S04` Detached transport authn/authz hardening baseline
 - **W12:** `W12-S03` Breaking CLI and contract removal
+- **W16:** `W16-S02` CLI dispatcher decomposition; `W16-S03` API and read-surface decomposition
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -91,3 +95,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W13:** `W13-S02` Curated target and feature mission catalog; `W13-S06` Full-journey harness and restored runner skill
 - **W14:** `W14-S02` Scenario and provider catalogs; `W14-S03` Feature-size taxonomy and target mission expansion; `W14-S04` Provider-pinned full-journey profiles; `W14-S05` Harness and verdict expansion; `W14-S07` Proof bundle and skill refresh
 - **W15:** `W15-S03` Proof verdict integrity gates; `W15-S04` Real code-changing full-journey proof
+- **W16:** `W16-S05` Installed-user live E2E runner decomposition

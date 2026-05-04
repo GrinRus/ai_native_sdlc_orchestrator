@@ -1,0 +1,151 @@
+const ROUTES = Object.freeze([
+  {
+    id: "project-state",
+    pattern: /^\/api\/projects\/([^/]+)\/state$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "State route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
+    id: "packets",
+    pattern: /^\/api\/projects\/([^/]+)\/packets$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Packet route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
+    id: "step-results",
+    pattern: /^\/api\/projects\/([^/]+)\/step-results$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Step-result route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
+    id: "quality-artifacts",
+    pattern: /^\/api\/projects\/([^/]+)\/quality-artifacts$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Quality route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
+    id: "delivery-manifests",
+    pattern: /^\/api\/projects\/([^/]+)\/delivery-manifests$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Delivery-manifest route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
+    id: "promotion-decisions",
+    pattern: /^\/api\/projects\/([^/]+)\/promotion-decisions$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Promotion-decision route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
+    id: "strategic-snapshot",
+    pattern: /^\/api\/projects\/([^/]+)\/strategic-snapshot$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Strategic-snapshot route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
+    id: "runs",
+    pattern: /^\/api\/projects\/([^/]+)\/runs$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Run route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
+    id: "event-history",
+    pattern: /^\/api\/projects\/([^/]+)\/runs\/([^/]+)\/events\/history$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Event-history route supports only GET.",
+    params: ["projectId", "runId"],
+    kind: "read",
+  },
+  {
+    id: "policy-history",
+    pattern: /^\/api\/projects\/([^/]+)\/runs\/([^/]+)\/policy-history$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Policy-history route supports only GET.",
+    params: ["projectId", "runId"],
+    kind: "read",
+  },
+  {
+    id: "run-events",
+    pattern: /^\/api\/projects\/([^/]+)\/runs\/([^/]+)\/events$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Run-event stream route supports only GET.",
+    params: ["projectId", "runId"],
+    kind: "stream",
+  },
+  {
+    id: "run-control-actions",
+    pattern: /^\/api\/projects\/([^/]+)\/run-control\/actions$/u,
+    method: "POST",
+    allow: "POST",
+    permission: "mutate",
+    methodMessage: "Run-control mutation route supports only POST.",
+    params: ["projectId"],
+    kind: "mutation",
+  },
+  {
+    id: "ui-lifecycle-actions",
+    pattern: /^\/api\/projects\/([^/]+)\/ui-lifecycle\/actions$/u,
+    method: "POST",
+    allow: "POST",
+    permission: "mutate",
+    methodMessage: "UI lifecycle mutation route supports only POST.",
+    params: ["projectId"],
+    kind: "mutation",
+  },
+]);
+
+/**
+ * @param {string} pathname
+ * @returns {{ route: (typeof ROUTES)[number], params: Record<string, string> } | null}
+ */
+export function matchControlPlaneRoute(pathname) {
+  for (const route of ROUTES) {
+    const match = route.pattern.exec(pathname);
+    if (!match) {
+      continue;
+    }
+    const params = {};
+    route.params.forEach((name, index) => {
+      params[name] = decodeURIComponent(match[index + 1]);
+    });
+    return { route, params };
+  }
+  return null;
+}

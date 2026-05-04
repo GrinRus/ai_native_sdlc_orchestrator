@@ -310,7 +310,7 @@
           }
         },
         "writeback_mode": {
-          "mode": "pull-request",
+          "mode": "fork-first-pr",
           "allow_direct_write": false,
           "require_delivery_manifest": true,
           "resolution_source": {
@@ -716,7 +716,7 @@
             }
           },
           "writeback_mode": {
-            "mode": "pull-request",
+            "mode": "fork-first-pr",
             "allow_direct_write": false,
             "require_delivery_manifest": true,
             "resolution_source": {
@@ -899,7 +899,7 @@
             }
           },
           "writeback_mode": {
-            "mode": "pull-request",
+            "mode": "fork-first-pr",
             "allow_direct_write": false,
             "require_delivery_manifest": true,
             "resolution_source": {

@@ -12,7 +12,7 @@ verification:
     - npm test
 safety_defaults:
   write_back_to_remote: false
-  preferred_delivery_mode: patch
+  preferred_delivery_mode: patch-only
 required_matrix_cells:
   - cell_id: ky.regress.small.openai
     scenario_family: regress

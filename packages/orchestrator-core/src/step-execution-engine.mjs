@@ -1,13 +1,9 @@
 import crypto from "node:crypto";
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
 import {
   createAdapterRequestEnvelope,
-  createAdapterResponseEnvelope,
-  createLiveAdapter,
-  createMockAdapter,
   resolveAdapterForRoute,
 } from "../../adapter-sdk/src/index.mjs";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
@@ -19,12 +15,21 @@ import { materializeDeliveryPlan } from "./delivery-plan.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { analyzeProjectRuntime } from "./project-analysis.mjs";
 import {
+  filterNonBootstrapChangedPaths,
+  listChangedPaths,
+  loadMissionScope,
+  resolveMissionScopedChanges,
+} from "./shared/mission-scope.mjs";
+import {
   classifyRuntimeStepOutcome,
   materializeRuntimeHarnessReport,
   resolveRuntimeMissionProfile,
   synthesizeRepairAttempts,
 } from "./runtime-harness-report.mjs";
+import { refreshRuntimeHarnessReportForStep } from "./runtime-harness-refresh.mjs";
+import { invokeStepAdapterForStep } from "./step-adapter-invocation.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
+import { rewriteStepResult, writeStepResult } from "./step-result-writer.mjs";
 
 const STEP_CLASS_TO_RESULT_CLASS = Object.freeze({
   discovery: "artifact",
@@ -49,9 +54,6 @@ const STEP_ARCHITECTURE_CONTRACT_REFS = Object.freeze([
   "docs/contracts/wave-ticket.md",
   "docs/contracts/handoff-packet.md",
 ]);
-const BOOTSTRAP_OWNED_PREFIXES = ["examples/", "context/", ".aor/"];
-const BOOTSTRAP_OWNED_FILES = new Set(["project.aor.yaml"]);
-
 /**
  * @param {unknown} value
  * @returns {string[]}
@@ -141,168 +143,6 @@ function resolveDurationSeconds(startedAt, finishedAt) {
     return null;
   }
   return Math.round(((finishedMs - startedMs) / 1000) * 1000) / 1000;
-}
-
-/**
- * @param {string} root
- * @returns {{ available: boolean, changedPaths: string[] }}
- */
-function listChangedPaths(root) {
-  if (!fs.existsSync(root)) {
-    return { available: false, changedPaths: [] };
-  }
-  const run = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], {
-    cwd: root,
-    encoding: "utf8",
-  });
-  if (run.status !== 0) {
-    return { available: false, changedPaths: [] };
-  }
-  const changedPaths = (run.stdout ?? "")
-    .split(/\r?\n/u)
-    .filter((line) => line.trim().length > 0)
-    .map((line) => line.slice(3).trim())
-    .map((candidate) => {
-      const renameParts = candidate.split(" -> ");
-      return renameParts.length > 1 ? renameParts[renameParts.length - 1] : candidate;
-    })
-    .map((candidate) => candidate.replace(/\\/g, "/"));
-  return { available: true, changedPaths };
-}
-
-/**
- * @param {string[]} changedPaths
- * @returns {string[]}
- */
-function filterNonBootstrapChangedPaths(changedPaths) {
-  return changedPaths.filter((candidate) => {
-    if (BOOTSTRAP_OWNED_FILES.has(candidate)) return false;
-    return !BOOTSTRAP_OWNED_PREFIXES.some((prefix) => candidate === prefix.slice(0, -1) || candidate.startsWith(prefix));
-  });
-}
-
-/**
- * @param {string} candidate
- * @returns {boolean}
- */
-function isTransientBackupPath(candidate) {
-  const basename = path.posix.basename(candidate.replace(/\\/g, "/")).toLowerCase();
-  return (
-    basename.startsWith(".#") ||
-    /(?:~|\.bak|\.backup|\.orig|\.rej|\.tmp|\.swp|\.swo|\.old)$/u.test(basename)
-  );
-}
-
-/**
- * @param {string} pattern
- * @param {string} candidate
- * @returns {boolean}
- */
-function matchesScopePattern(pattern, candidate) {
-  const normalizedPattern = pattern.replace(/\\/g, "/");
-  const normalizedCandidate = candidate.replace(/\\/g, "/");
-  if (normalizedPattern === "**" || normalizedPattern === "**/*") return true;
-  if (normalizedPattern.endsWith("/**")) {
-    const prefix = normalizedPattern.slice(0, -3);
-    return normalizedCandidate === prefix || normalizedCandidate.startsWith(`${prefix}/`);
-  }
-  if (normalizedPattern.endsWith("/*")) {
-    const prefix = normalizedPattern.slice(0, -1);
-    return normalizedCandidate.startsWith(prefix) && !normalizedCandidate.slice(prefix.length).includes("/");
-  }
-  if (!normalizedPattern.includes("*")) {
-    return normalizedCandidate === normalizedPattern;
-  }
-  const wildcardPrefix = normalizedPattern.slice(0, normalizedPattern.indexOf("*"));
-  return normalizedCandidate.startsWith(wildcardPrefix);
-}
-
-/**
- * @param {string} projectRoot
- * @param {string | null} filePath
- * @returns {string | null}
- */
-function resolveProjectRelativeFile(projectRoot, filePath) {
-  if (!filePath) return null;
-  const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(projectRoot, filePath);
-  const relative = path.relative(projectRoot, resolved).replace(/\\/g, "/");
-  return relative.startsWith("../") || relative === "" ? null : relative;
-}
-
-/**
- * @param {string} dirPath
- * @returns {string[]}
- */
-function listJsonFiles(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    return [];
-  }
-  return fs
-    .readdirSync(dirPath)
-    .filter((entry) => entry.endsWith(".json"))
-    .map((entry) => path.join(dirPath, entry))
-    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
-}
-
-/**
- * @param {string} projectRoot
- * @param {string} artifactsRoot
- * @returns {{ ignoredInputFiles: string[], allowedPaths: string[], forbiddenPaths: string[] }}
- */
-function loadMissionScope(projectRoot, artifactsRoot) {
-  const packetFiles = listJsonFiles(artifactsRoot).filter((filePath) => path.basename(filePath).includes(".artifact."));
-  for (const packetFile of packetFiles) {
-    const packet = readJsonFile(packetFile);
-    if (asString(packet?.packet_type) !== "intake-request") continue;
-    const bodyRef = asString(packet?.body_ref);
-    if (!bodyRef || !fs.existsSync(bodyRef)) continue;
-    const body = readJsonFile(bodyRef);
-    const featureRequest = asRecord(body?.feature_request);
-    const requestDocument = asRecord(featureRequest.request_document);
-    const requestFile = resolveProjectRelativeFile(projectRoot, asString(featureRequest.request_file));
-    return {
-      ignoredInputFiles: requestFile ? [requestFile] : [],
-      allowedPaths: asStringArray(requestDocument.allowed_paths),
-      forbiddenPaths: asStringArray(requestDocument.forbidden_paths),
-    };
-  }
-  return { ignoredInputFiles: [], allowedPaths: [], forbiddenPaths: [] };
-}
-
-/**
- * @param {string[]} changedPaths
- * @param {{ ignoredInputFiles: string[], allowedPaths: string[], forbiddenPaths: string[] }} missionScope
- */
-function resolveMissionScopedChanges(changedPaths, missionScope) {
-  const ignoredInputFiles = new Set(missionScope.ignoredInputFiles);
-  const scopeCandidates = changedPaths.filter(
-    (changedPath) => !ignoredInputFiles.has(changedPath) && !isTransientBackupPath(changedPath),
-  );
-  const forbiddenChangedPaths = scopeCandidates.filter((changedPath) =>
-    missionScope.forbiddenPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
-  );
-  const outOfScopeChangedPaths =
-    missionScope.allowedPaths.length > 0
-      ? scopeCandidates.filter(
-          (changedPath) => !missionScope.allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
-        )
-      : [];
-  const missionScopedChangedPaths =
-    missionScope.allowedPaths.length > 0
-      ? scopeCandidates.filter((changedPath) =>
-          missionScope.allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
-        )
-      : scopeCandidates;
-  return {
-    ignoredInputFiles: missionScope.ignoredInputFiles,
-    allowedPaths: missionScope.allowedPaths,
-    forbiddenPaths: missionScope.forbiddenPaths,
-    nonInputChangedPaths: scopeCandidates,
-    missionScopedChangedPaths,
-    forbiddenChangedPaths,
-    outOfScopeChangedPaths,
-    scopeViolationPaths: uniqueStrings([...forbiddenChangedPaths, ...outOfScopeChangedPaths]),
-  };
 }
 
 /**
@@ -453,44 +293,6 @@ function resolveSyntheticPacketRefs(assetResolution) {
 }
 
 /**
- * @param {{
- *   runtimeLayout: { reportsRoot: string },
- *   stepResultFileName: string,
- *   stepResult: Record<string, unknown>,
- * }} options
- */
-function writeStepResult(options) {
-  const validation = validateContractDocument({
-    family: "step-result",
-    document: options.stepResult,
-    source: "runtime://step-result",
-  });
-  if (!validation.ok) {
-    const messages = validation.issues.map((issue) => issue.message).join("; ");
-    throw new Error(`Routed step-result failed contract validation: ${messages}`);
-  }
-
-  const stepResultPath = path.join(options.runtimeLayout.reportsRoot, options.stepResultFileName);
-  fs.writeFileSync(stepResultPath, `${JSON.stringify(options.stepResult, null, 2)}\n`, "utf8");
-  return stepResultPath;
-}
-
-/**
- * @param {{
- *   runtimeLayout: ReturnType<typeof initializeProjectRuntime>["runtimeLayout"],
- *   stepResultPath: string,
- *   stepResult: Record<string, unknown>,
- * }} options
- */
-function rewriteStepResult(options) {
-  return writeStepResult({
-    runtimeLayout: options.runtimeLayout,
-    stepResultFileName: path.basename(options.stepResultPath),
-    stepResult: options.stepResult,
-  });
-}
-
-/**
  * @param {Record<string, unknown>} stepResult
  * @returns {"pass" | "retry" | "repair" | "escalate" | "block" | "fail"}
  */
@@ -577,18 +379,6 @@ function persistExhaustedRuntimeDecision(options) {
     runtimeLayout: options.result.runtimeLayout,
     stepResultPath: options.result.stepResultPath,
     stepResult: options.result.stepResult,
-  });
-}
-
-/**
- * @param {ReturnType<typeof executeRoutedStep>} result
- */
-function refreshRuntimeHarnessReportForStep(result) {
-  materializeRuntimeHarnessReport({
-    projectRef: result.projectRoot,
-    cwd: result.projectRoot,
-    runtimeRoot: result.runtimeRoot,
-    runId: result.runId,
   });
 }
 
@@ -1038,89 +828,20 @@ export function executeRoutedStep(options) {
         },
       });
 
-      const selectedAdapterId =
-        typeof (/** @type {any} */ (adapterResolution))?.adapter?.adapter_id === "string"
-          ? /** @type {any} */ (adapterResolution).adapter.adapter_id
-          : "none";
-
-      if (dryRun) {
-        const mockAdapter = createMockAdapter();
-        adapterResponse = mockAdapter.execute(/** @type {any} */ (adapterRequest));
-        summary = `Routed dry-run for step '${requestedStepClass}' completed with selected adapter '${selectedAdapterId}' and mock execution.`;
-      } else {
-        const plan = asRecord(deliveryPlanResult?.deliveryPlan);
-        const planReady = plan.status === "ready" && plan.writeback_allowed === true;
-        const blockingReasons = asStringArray(plan.blocking_reasons);
-
-        if (!planReady) {
-          status = "failed";
-          summary =
-            blockingReasons.length > 0
-              ? `Routed live execution blocked by delivery guardrails: ${blockingReasons.join(", ")}.`
-              : `Routed live execution blocked for step '${requestedStepClass}': delivery plan is not ready.`;
-          blockedNextStep =
-            "Provide approved handoff and promotion evidence (or use '--routed-dry-run-step') before live execution.";
-          adapterResponse = createAdapterResponseEnvelope({
-            request_id: adapterRequest.request_id,
-            adapter_id: selectedAdapterId,
-            status: "blocked",
-            summary,
-            output: {
-              mode: "execute",
-              blocked: true,
-              blocking_reasons: blockingReasons,
-              delivery_plan_status: asString(plan.status) ?? "unknown",
-            },
-          });
-        } else {
-          try {
-            const liveAdapter = createLiveAdapter({
-              adapterId: selectedAdapterId,
-              adapterProfile: asRecord(asRecord(/** @type {any} */ (adapterResolution).adapter).profile),
-              runtimeEvidenceRoot: init.runtimeLayout.reportsRoot,
-              projectRoot: init.projectRoot,
-              executionRoot,
-            });
-            adapterResponse = liveAdapter.execute(/** @type {any} */ (adapterRequest));
-            if (adapterResponse.status === "success") {
-              summary = `Routed live execution for step '${requestedStepClass}' completed with adapter '${selectedAdapterId}'.`;
-            } else {
-              status = "failed";
-              summary = asString(adapterResponse.summary) ?? summary;
-              const adapterOutput = asRecord(adapterResponse.output);
-              const failureKind = asString(adapterOutput.failure_kind);
-              if (failureKind === "missing-command" || failureKind === "missing-live-runtime") {
-                blockedNextStep =
-                  "Install/configure external runner prerequisites for the selected adapter or use '--routed-dry-run-step'.";
-              } else if (failureKind === "auth-failed") {
-                blockedNextStep =
-                  "Authenticate the selected external runner CLI in the current runner auth mode, then retry live execution.";
-              } else if (failureKind === "permission-mode-blocked") {
-                blockedNextStep =
-                  "Adjust external runner permission mode or live E2E policy, then retry live execution.";
-              } else {
-                blockedNextStep =
-                  "Inspect adapter response evidence/tool traces, fix external runner execution, then retry live execution.";
-              }
-            }
-          } catch (error) {
-            status = "failed";
-            summary = error instanceof Error ? error.message : String(error);
-            blockedNextStep = "Select a supported live adapter or use '--routed-dry-run-step'.";
-            adapterResponse = createAdapterResponseEnvelope({
-              request_id: adapterRequest.request_id,
-              adapter_id: selectedAdapterId,
-              status: "blocked",
-              summary,
-              output: {
-                mode: "execute",
-                blocked: true,
-                failure_kind: "adapter-not-supported",
-              },
-            });
-          }
-        }
-      }
+      const invocation = invokeStepAdapterForStep({
+        dryRun,
+        requestedStepClass,
+        adapterResolution,
+        adapterRequest: /** @type {Record<string, unknown>} */ (adapterRequest),
+        deliveryPlan: deliveryPlanResult?.deliveryPlan ?? null,
+        runtimeEvidenceRoot: init.runtimeLayout.reportsRoot,
+        projectRoot: init.projectRoot,
+        executionRoot,
+      });
+      adapterResponse = invocation.adapterResponse;
+      status = invocation.status;
+      summary = invocation.summary;
+      blockedNextStep = invocation.blockedNextStep;
 
       evidenceRefs = [
         ...new Set([

@@ -208,6 +208,7 @@ function createFakeClaudeBinary(options) {
 function configureAdapterExternalRuntime(options) {
   const adapterPath = path.join(options.examplesRoot, "adapters", options.adapterFileName);
   const source = fs.readFileSync(adapterPath, "utf8");
+  const permissionArgs = options.args.length > 0 ? options.args : ["--version"];
   const executionBlock = [
     "execution:",
     "  live_baseline: true",
@@ -218,17 +219,17 @@ function configureAdapterExternalRuntime(options) {
     `    command: ${JSON.stringify(options.command)}`,
     "    args:",
     ...options.args.map((argument) => `      - ${JSON.stringify(argument)}`),
-    ...(options.includePermissionPolicy !== false && options.args.length > 0
+    ...(options.includePermissionPolicy !== false
       ? [
           "    permission_policy:",
           "      default_mode: full-bypass",
           "      modes:",
           "        full-bypass:",
           "          args:",
-          ...options.args.map((argument) => `            - ${JSON.stringify(argument)}`),
+          ...permissionArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
           "        restricted:",
           "          args:",
-          ...options.args.map((argument) => `            - ${JSON.stringify(argument)}`),
+          ...permissionArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
         ]
       : []),
     "    request_via_stdin: true",
@@ -568,10 +569,10 @@ function configureClaudeExternalRuntimeLegacyPermissionArgs(options) {
         ...permissionProbeSnippet(),
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
-        "summary:'claude legacy permission fixture ok',",
-        "output:{runner:'node-inline-claude-legacy',step_class:request.step_class||null,execution_root:process.cwd()},",
-        "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-claude-legacy'],",
-        "tool_traces:[{phase:'invoke_adapter',kind:'claude-legacy-permission-fixture',detail:'legacy'}]",
+        "summary:'claude unsupported permission args fixture should not run',",
+        "output:{runner:'node-inline-claude-unsupported-permission-args',step_class:request.step_class||null,execution_root:process.cwd()},",
+        "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-claude-unsupported-permission-args'],",
+        "tool_traces:[{phase:'invoke_adapter',kind:'claude-unsupported-permission-args-fixture',detail:'unsupported-permission-args'}]",
         "}));",
       ].join(""),
     ],
@@ -675,7 +676,7 @@ function writeLocalCatalogTarget(options) {
       },
       safety_defaults: {
         write_back_to_remote: false,
-        preferred_delivery_mode: "patch",
+        preferred_delivery_mode: "patch-only",
       },
       required_matrix_cells: [
         {
@@ -773,7 +774,7 @@ function writeLocalFullJourneyProfile(options) {
       output_policy: {
         materialize_release_packet: false,
         write_back_to_remote: false,
-        preferred_delivery_mode: "patch",
+        preferred_delivery_mode: "patch-only",
         ...(options.outputPolicy ?? {}),
       },
       ...(options.liveAdapterPreflight ? { live_adapter_preflight: options.liveAdapterPreflight } : {}),
@@ -1899,7 +1900,7 @@ test("full-journey mode passes permission readiness when marker is written befor
   });
 });
 
-test("full-journey mode fails live adapter preflight when selected permission mode is not reported", () => {
+test("full-journey mode fails live adapter preflight when legacy permission args are used", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
     const examplesRoot = createExamplesRoot({ tempRoot });
@@ -1935,7 +1936,7 @@ test("full-journey mode fails live adapter preflight when selected permission mo
     assert.equal(summary.runtime_agent_permission_mode, "full-bypass");
     assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
     assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "permission-policy-invalid");
-    assert.equal(summary.artifacts.live_adapter_preflight.external_runtime.permission_mode, "legacy");
+    assert.equal(summary.artifacts.live_adapter_preflight.external_runtime.permission_mode, "missing");
     assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
   });
 });

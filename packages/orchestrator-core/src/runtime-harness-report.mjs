@@ -1,15 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
+import {
+  filterMeaningfulCodeChangedPaths,
+  filterNonBootstrapChangedPaths,
+  listChangedPaths,
+  loadMissionScope,
+  resolveMissionScopedChanges,
+} from "./shared/mission-scope.mjs";
 
 const RUNTIME_HARNESS_DECISIONS = new Set(["pass", "retry", "repair", "escalate", "block", "fail"]);
-const BOOTSTRAP_OWNED_PREFIXES = ["examples/", "context/", ".aor/"];
-const BOOTSTRAP_OWNED_FILES = new Set(["project.aor.yaml"]);
-
 /**
  * @param {unknown} value
  * @returns {Record<string, unknown>}
@@ -160,122 +163,6 @@ function normalizeDecision(decision, fallback) {
 }
 
 /**
- * @param {string} projectRoot
- * @returns {{ available: boolean, changedPaths: string[] }}
- */
-function listChangedPaths(projectRoot) {
-  const run = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], {
-    cwd: projectRoot,
-    encoding: "utf8",
-  });
-  if (run.status !== 0) {
-    return { available: false, changedPaths: [] };
-  }
-  const changedPaths = (run.stdout ?? "")
-    .split(/\r?\n/u)
-    .filter((line) => line.trim().length > 0)
-    .map((line) => line.slice(3).trim())
-    .map((candidate) => {
-      const renameParts = candidate.split(" -> ");
-      return renameParts.length > 1 ? renameParts[renameParts.length - 1] : candidate;
-    })
-    .map((candidate) => candidate.replace(/\\/g, "/"));
-  return { available: true, changedPaths };
-}
-
-/**
- * @param {string[]} changedPaths
- * @returns {string[]}
- */
-function filterNonBootstrapChangedPaths(changedPaths) {
-  return changedPaths.filter((candidate) => {
-    if (BOOTSTRAP_OWNED_FILES.has(candidate)) return false;
-    return !BOOTSTRAP_OWNED_PREFIXES.some((prefix) => candidate === prefix.slice(0, -1) || candidate.startsWith(prefix));
-  });
-}
-
-/**
- * @param {string} candidate
- * @returns {boolean}
- */
-function isTransientBackupPath(candidate) {
-  const basename = path.posix.basename(candidate.replace(/\\/g, "/")).toLowerCase();
-  return (
-    basename.startsWith(".#") ||
-    /(?:~|\.bak|\.backup|\.orig|\.rej|\.tmp|\.swp|\.swo|\.old)$/u.test(basename)
-  );
-}
-
-/**
- * @param {string[]} changedPaths
- * @returns {string[]}
- */
-function filterMeaningfulCodeChangedPaths(changedPaths) {
-  return changedPaths.filter((candidate) => !isTransientBackupPath(candidate));
-}
-
-/**
- * @param {string} pattern
- * @param {string} candidate
- * @returns {boolean}
- */
-function matchesScopePattern(pattern, candidate) {
-  const normalizedPattern = pattern.replace(/\\/g, "/");
-  const normalizedCandidate = candidate.replace(/\\/g, "/");
-  if (normalizedPattern === "**" || normalizedPattern === "**/*") return true;
-  if (normalizedPattern.endsWith("/**")) {
-    const prefix = normalizedPattern.slice(0, -3);
-    return normalizedCandidate === prefix || normalizedCandidate.startsWith(`${prefix}/`);
-  }
-  if (normalizedPattern.endsWith("/*")) {
-    const prefix = normalizedPattern.slice(0, -1);
-    return normalizedCandidate.startsWith(prefix) && !normalizedCandidate.slice(prefix.length).includes("/");
-  }
-  if (!normalizedPattern.includes("*")) {
-    return normalizedCandidate === normalizedPattern;
-  }
-  const wildcardPrefix = normalizedPattern.slice(0, normalizedPattern.indexOf("*"));
-  return normalizedCandidate.startsWith(wildcardPrefix);
-}
-
-/**
- * @param {string} projectRoot
- * @param {string | null} filePath
- * @returns {string | null}
- */
-function resolveProjectRelativeFile(projectRoot, filePath) {
-  if (!filePath) return null;
-  const resolved = path.isAbsolute(filePath) ? filePath : path.resolve(projectRoot, filePath);
-  const relative = path.relative(projectRoot, resolved).replace(/\\/g, "/");
-  return relative.startsWith("../") || relative === "" ? null : relative;
-}
-
-/**
- * @param {string} projectRoot
- * @param {string} artifactsRoot
- * @returns {{ ignoredInputFiles: string[], allowedPaths: string[], forbiddenPaths: string[] }}
- */
-function loadMissionScope(projectRoot, artifactsRoot) {
-  const packetFiles = listJsonFiles(artifactsRoot).filter((filePath) => path.basename(filePath).includes(".artifact."));
-  for (const packetFile of packetFiles) {
-    const packet = readJsonFile(packetFile);
-    if (asString(packet?.packet_type) !== "intake-request") continue;
-    const bodyRef = asString(packet?.body_ref);
-    if (!bodyRef || !fs.existsSync(bodyRef)) continue;
-    const body = readJsonFile(bodyRef);
-    const featureRequest = asRecord(body?.feature_request);
-    const requestDocument = asRecord(featureRequest.request_document);
-    const requestFile = resolveProjectRelativeFile(projectRoot, asString(featureRequest.request_file));
-    return {
-      ignoredInputFiles: requestFile ? [requestFile] : [],
-      allowedPaths: asStringArray(requestDocument.allowed_paths),
-      forbiddenPaths: asStringArray(requestDocument.forbidden_paths),
-    };
-  }
-  return { ignoredInputFiles: [], allowedPaths: [], forbiddenPaths: [] };
-}
-
-/**
  * @param {string} missionType
  * @returns {string}
  */
@@ -330,43 +217,6 @@ export function resolveRuntimeMissionProfile(projectRoot, artifactsRoot) {
     missionType: "code-changing",
     strictnessProfile: "strict-code-changing",
     source: "runtime://default-mission-profile",
-  };
-}
-
-/**
- * @param {string[]} changedPaths
- * @param {{ ignoredInputFiles: string[], allowedPaths: string[], forbiddenPaths: string[] }} missionScope
- */
-function resolveMissionScopedChanges(changedPaths, missionScope) {
-  const ignoredInputFiles = new Set(missionScope.ignoredInputFiles);
-  const scopeCandidates = changedPaths.filter(
-    (changedPath) => !ignoredInputFiles.has(changedPath) && !isTransientBackupPath(changedPath),
-  );
-  const forbiddenChangedPaths = scopeCandidates.filter((changedPath) =>
-    missionScope.forbiddenPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
-  );
-  const outOfScopeChangedPaths =
-    missionScope.allowedPaths.length > 0
-      ? scopeCandidates.filter(
-          (changedPath) => !missionScope.allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
-        )
-      : [];
-  const missionScopedChangedPaths =
-    missionScope.allowedPaths.length > 0
-      ? scopeCandidates.filter((changedPath) =>
-          missionScope.allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
-        )
-      : scopeCandidates;
-
-  return {
-    ignoredInputFiles: missionScope.ignoredInputFiles,
-    allowedPaths: missionScope.allowedPaths,
-    forbiddenPaths: missionScope.forbiddenPaths,
-    nonInputChangedPaths: scopeCandidates,
-    missionScopedChangedPaths,
-    forbiddenChangedPaths,
-    outOfScopeChangedPaths,
-    scopeViolationPaths: uniqueStrings([...forbiddenChangedPaths, ...outOfScopeChangedPaths]),
   };
 }
 

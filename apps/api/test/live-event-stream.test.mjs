@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { applyRunControlAction, readRunControlState } from "../src/index.mjs";
 import { appendRunEvent, openRunEventStream, readRunEvents } from "../src/live-event-stream.mjs";
 
@@ -14,34 +13,10 @@ const currentDir = path.dirname(currentFilePath);
 const workspaceRoot = path.resolve(currentDir, "../../..");
 
 /**
- * @param {{ cwd: string, args: string[] }} options
- */
-function runGitChecked(options) {
-  const run = spawnSync("git", options.args, { cwd: options.cwd, encoding: "utf8" });
-  assert.equal(
-    run.status,
-    0,
-    `git ${options.args.join(" ")} failed: ${(run.stderr ?? run.stdout ?? "").trim()}`,
-  );
-}
-
-/**
  * @param {(repoRoot: string) => Promise<void> | void} callback
  */
 async function withTempRepo(callback) {
-  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w5-s02-"));
-  fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
-  runGitChecked({ cwd: repoRoot, args: ["init"] });
-  runGitChecked({ cwd: repoRoot, args: ["config", "user.email", "aor@example.com"] });
-  runGitChecked({ cwd: repoRoot, args: ["config", "user.name", "AOR Test"] });
-  runGitChecked({ cwd: repoRoot, args: ["add", "-A"] });
-  runGitChecked({ cwd: repoRoot, args: ["commit", "-m", "initial"] });
-
-  try {
-    await callback(repoRoot);
-  } finally {
-    fs.rmSync(repoRoot, { recursive: true, force: true });
-  }
+  await withTempRepoHelper({ prefix: "aor-w5-s02-", workspaceRoot }, callback);
 }
 
 test("live event stream supports ordered replay and subscribe flow", async () => {

@@ -14,7 +14,7 @@
     "repo_url": "https://github.com/sindresorhus/ky.git",
     "ref": "main",
     "checkout_strategy": "shallow",
-    "write_target": "patch-or-fork"
+    "write_target": "canonical-bounded"
   },
   "target_checkout_root": ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short",
   "generated_project_profile_file": ".aor/w12-s04-proof/runtime/projects/aor-core/target-checkouts/target-w12-s04.regress-short/project.aor.yaml",

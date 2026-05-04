@@ -50,7 +50,7 @@ test("resolveStepPolicyMatrix resolves deterministic bounds and guardrails for a
       source: "step-policy-profile.retry",
     });
     assert.ok(planning.resolved_bounds.command_constraints.allowed_commands.includes("pnpm lint"));
-    assert.equal(planning.resolved_bounds.writeback_mode.mode, "pull-request");
+    assert.equal(planning.resolved_bounds.writeback_mode.mode, "fork-first-pr");
     assert.equal(planning.guardrails.approval_required, true);
     assert.equal(planning.guardrails.provider_allowlist_enforced, true);
     assert.equal(planning.guardrails.redact_secrets, true);
@@ -83,7 +83,7 @@ test("resolveStepPolicyForStep applies explicit step policy overrides with deter
         "  allowed_commands:",
         "    - pnpm test --filter planner",
         "writeback_policy:",
-        "  mode: patch",
+        "  mode: patch-only",
       ].join("\n"),
       "utf8",
     );
@@ -104,7 +104,7 @@ test("resolveStepPolicyForStep applies explicit step policy overrides with deter
       "pnpm test --filter planner",
     ]);
     assert.equal(resolved.resolved_bounds.command_constraints.resolution_source.kind, "step-override");
-    assert.equal(resolved.resolved_bounds.writeback_mode.mode, "patch");
+    assert.equal(resolved.resolved_bounds.writeback_mode.mode, "patch-only");
     assert.equal(resolved.resolved_bounds.writeback_mode.resolution_source.kind, "step-override");
   });
 });

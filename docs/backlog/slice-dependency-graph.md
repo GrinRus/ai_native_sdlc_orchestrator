@@ -103,6 +103,13 @@ flowchart TB
   W15S02[W15-S02 Package/module workspace alignment]
   W15S03[W15-S03 Proof verdict integrity gates]
   W15S04[W15-S04 Real code-changing full-journey proof]
+  W16S01[W16-S01 Complexity baseline and shared helper extraction]
+  W16S02[W16-S02 CLI dispatcher decomposition]
+  W16S03[W16-S03 API and read-surface decomposition]
+  W16S04[W16-S04 Orchestrator-core execution decomposition]
+  W16S05[W16-S05 Installed-user live E2E runner decomposition]
+  W16S06[W16-S06 Adapter permission legacy removal]
+  W17S01[W17-S01 Legacy surface cleanup after W16]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -263,6 +270,15 @@ flowchart TB
   W15S01 --> W15S02
   W15S01 --> W15S03
   W15S03 --> W15S04
+  W16S01 --> W16S02
+  W16S01 --> W16S03
+  W16S01 --> W16S04
+  W16S01 --> W16S05
+  W16S01 --> W16S06
+  W16S02 --> W17S01
+  W16S04 --> W17S01
+  W16S05 --> W17S01
+  W16S06 --> W17S01
 ```
 
 ## W0 hard dependencies
@@ -428,6 +444,21 @@ flowchart TB
 | W15-S03 | W15-S01 |
 | W15-S04 | W15-S03 |
 
+## W16 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W16-S01 | none |
+| W16-S02 | W16-S01 |
+| W16-S03 | W16-S01 |
+| W16-S04 | W16-S01 |
+| W16-S05 | W16-S01 |
+| W16-S06 | W16-S01 |
+
+## W17 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W17-S01 | W16-S02, W16-S04, W16-S05, W16-S06 |
+
 ## Topological order
 1. W0-S01
 2. W0-S04
@@ -526,6 +557,13 @@ flowchart TB
 95. W15-S02
 96. W15-S03
 97. W15-S04
+98. W16-S01
+99. W16-S02
+100. W16-S03
+101. W16-S04
+102. W16-S05
+103. W16-S06
+104. W17-S01
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

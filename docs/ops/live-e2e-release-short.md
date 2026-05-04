@@ -86,7 +86,7 @@ Guardrail expectation:
 - delivery manifest exists;
 - delivery manifest `repo_deliveries[0].repo_root` matches `target_checkout_root`;
 - delivery manifest `repo_deliveries[0].changed_paths` stays target-relative (no absolute paths, no `..`);
-- write-back target is patch, local branch, or fork.
+- write-back target is `patch-only`, `local-branch`, or `fork-first-pr`.
 
 ## Post-run artifact inspection
 Inspect the latest materialized artifacts:

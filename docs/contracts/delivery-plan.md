@@ -25,7 +25,7 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
 
 ## Policy notes
 - Delivery mode must be explicit and machine-checkable before write-back starts.
-- Non-read-only modes (`patch-only`, `local-branch`, `fork-first-pr`) must require:
+- Non-`no-write` modes (`patch-only`, `local-branch`, `fork-first-pr`) must require:
   - approved handoff evidence;
   - promotion evidence.
 - `status=blocked` means write-back is not allowed for the planned mode yet.
