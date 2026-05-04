@@ -100,7 +100,7 @@ AOR ships with four standard rehearsal classes:
 - release short
 - release long
 
-These profiles are designed to run on real public repositories through read-only, patch, or fork-first delivery defaults.
+These profiles are designed to run on real public repositories through `no-write`, `patch-only`, or `fork-first-pr` delivery defaults.
 
 The W13 full-journey layer adds:
 - curated repository selection instead of arbitrary live targets;

@@ -169,5 +169,20 @@ This is the master index for the implementation slices across all defined waves.
 | W15-S03 | Proof verdict integrity gates | EPIC-7 | done | `scripts/test.mjs`, `examples/live-e2e/**`, `docs/ops/**`, `README.md` | W15-S01 |
 | W15-S04 | Real code-changing full-journey proof | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `.aor/` runtime output | W15-S03 |
 
+## W16 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W16-S01 | Complexity baseline and shared helper extraction | EPIC-0 | done | `docs/backlog/**`, `packages/orchestrator-core`, `packages/adapter-sdk`, `apps/cli`, `apps/api`, test helpers | none |
+| W16-S02 | CLI dispatcher decomposition | EPIC-6 | done | `apps/cli` | W16-S01 |
+| W16-S03 | API and read-surface decomposition | EPIC-6 | done | `apps/api` | W16-S01 |
+| W16-S04 | Orchestrator-core execution decomposition | EPIC-3 | done | `packages/orchestrator-core` | W16-S01 |
+| W16-S05 | Installed-user live E2E runner decomposition | EPIC-7 | done | `scripts/live-e2e/**`, `scripts/test/**` | W16-S01 |
+| W16-S06 | Adapter permission legacy removal | EPIC-3 | done | `docs/contracts/**`, `examples/adapters/**`, `packages/adapter-sdk`, `packages/contracts` | W16-S01 |
+
+## W17 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W17-S01 | Legacy surface cleanup after W16 | EPIC-0 | done | `docs/backlog/**`, `apps/cli`, `packages/orchestrator-core`, `scripts/live-e2e/**`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**`, `examples/**`, tests | W16-S02, W16-S04, W16-S05, W16-S06 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

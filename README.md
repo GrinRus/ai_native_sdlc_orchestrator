@@ -30,10 +30,12 @@ What exists today:
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
 - a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
 - implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
-- expanded implementation backlog through `W14`, with `W15` reopened for readiness hardening and active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
+- expanded implementation backlog through `W17`, with W17 focused on post-W16 legacy surface cleanup and active queue tracking via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - historical W10/W11 productionization closure for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and target-backed proof evidence.
 - first live routed execution baseline for supported `codex-cli` adapter paths with explicit delivery-guardrail blocking semantics.
 - W15 readiness-hardening work that makes source-of-truth drift, package/module-map drift, and mock-backed proof claims machine-checkable.
+- W16 complexity-reduction work that decomposes monolithic CLI/API/core/live-E2E surfaces and isolates adapter permission legacy cleanup.
+- W17 legacy-surface cleanup that removes public compatibility aliases from CLI incident outputs and delivery mode inputs.
 
 What does **not** exist yet:
 
@@ -118,7 +120,7 @@ At a high level, AOR is intended to work like this:
    Run deterministic validation first, then offline evals. Runtime Harness reports diagnose runs; asset certification uses capture/replay and promotion decisions for platform assets.
 
 6. **Deliver through bounded write-back modes**  
-   Start with no-write, patch, and local-branch modes; then expand to fork-first GitHub delivery when the quality bar is met.
+   Start with `no-write`, `patch-only`, and `local-branch` modes; then expand to `fork-first-pr` GitHub delivery when the quality bar is met.
 
 7. **Operate through CLI, API, and detachable UI**  
    Keep the runtime headless-first, with optional live event streams and a detachable web console.
@@ -177,7 +179,7 @@ For exact command inputs/outputs and contract linkage, use `docs/architecture/14
 - `.github/workflows/ci.yml` — pinned, least-privilege CI workflow for repo integrity checks.
 - `.github/ISSUE_TEMPLATE/bug-report.md` — bug-report template.
 - `.github/ISSUE_TEMPLATE/feature-request.md` — feature-request template.
-- `.github/PULL_REQUEST_TEMPLATE.md` — pull-request checklist template.
+- `.github/PULL_REQUEST_TEMPLATE.md` — PR checklist template.
 - `scripts/**` — root repository-integrity checks used by local commands and CI.
 
 ## Live E2E target projects
@@ -235,6 +237,10 @@ Detailed wave plans:
 - `docs/backlog/wave-11-implementation-slices.md`
 - `docs/backlog/wave-12-implementation-slices.md`
 - `docs/backlog/wave-13-implementation-slices.md`
+- `docs/backlog/wave-14-implementation-slices.md`
+- `docs/backlog/wave-15-implementation-slices.md`
+- `docs/backlog/wave-16-implementation-slices.md`
+- `docs/backlog/wave-17-implementation-slices.md`
 
 ## Contributing
 

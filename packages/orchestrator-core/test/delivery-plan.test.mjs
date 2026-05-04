@@ -28,7 +28,7 @@ function withTempRepo(callback) {
   }
 }
 
-test("materializeDeliveryPlan blocks non-read-only mode without approved handoff and promotion evidence", () => {
+test("materializeDeliveryPlan blocks non-no-write mode without approved handoff and promotion evidence", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
     const policyResolution = resolveStepPolicyForStep({
@@ -56,7 +56,7 @@ test("materializeDeliveryPlan blocks non-read-only mode without approved handoff
   });
 });
 
-test("materializeDeliveryPlan allows non-read-only mode only with approved handoff and promotion evidence", () => {
+test("materializeDeliveryPlan allows non-no-write mode only with approved handoff and promotion evidence", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
     const policyResolution = resolveStepPolicyForStep({
@@ -129,6 +129,34 @@ test("materializeDeliveryPlan keeps no-write mode ready without handoff or promo
   });
 });
 
+test("materializeDeliveryPlan rejects delivery mode aliases", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+
+    assert.throws(
+      () =>
+        materializeDeliveryPlan({
+          runtimeLayout: init.runtimeLayout,
+          projectId: init.projectId,
+          runId: "run.delivery.plan.alias.v1",
+          stepClass: "planning",
+          policyResolution: {
+            resolved_bounds: {
+              writeback_mode: {
+                mode: "patch",
+                resolution_source: {
+                  kind: "step-override",
+                  field: "policy_overrides.planning -> writeback_policy.mode",
+                },
+              },
+            },
+          },
+        }),
+      /Unsupported delivery mode 'patch'\. Expected one of: no-write, patch-only, local-branch, fork-first-pr\./u,
+    );
+  });
+});
+
 test("materializeDeliveryPlan blocks delivery when governance decision is deny", () => {
   withTempRepo((repoRoot) => {
     const profilePath = path.join(repoRoot, "examples/project.aor.yaml");
@@ -194,7 +222,7 @@ test("materializeDeliveryPlan blocks delivery when governance decision escalates
   });
 });
 
-test("materializeDeliveryPlan requires coordination evidence for non-read-only multi-repo flows", () => {
+test("materializeDeliveryPlan requires coordination evidence for non-no-write multi-repo flows", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
     const policyResolution = resolveStepPolicyForStep({

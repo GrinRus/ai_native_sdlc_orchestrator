@@ -4,7 +4,7 @@ run_id: RUN-DELIVERY-004
 step_class: implement
 delivery_mode: fork-first-pr
 mode_source:
-  resolved_mode: pull-request
+  resolved_mode: fork-first-pr
   canonical_mode: fork-first-pr
   resolution_kind: project-default
   resolution_field: writeback_policy.default_delivery_mode

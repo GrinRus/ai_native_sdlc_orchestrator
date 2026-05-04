@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -10,6 +8,7 @@ import { validateContractDocument } from "../../../packages/contracts/src/index.
 import { materializeDeliveryPlan } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
 import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
+import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { appendRunEvent, attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../src/index.mjs";
 import {
   listDeliveryManifests,
@@ -29,18 +28,6 @@ const currentDir = path.dirname(currentFilePath);
 const workspaceRoot = path.resolve(currentDir, "../../..");
 
 /**
- * @param {{ cwd: string, args: string[] }} options
- */
-function runGitChecked(options) {
-  const run = spawnSync("git", options.args, { cwd: options.cwd, encoding: "utf8" });
-  assert.equal(
-    run.status,
-    0,
-    `git ${options.args.join(" ")} failed: ${(run.stderr ?? run.stdout ?? "").trim()}`,
-  );
-}
-
-/**
  * @param {{ family: import("../../../packages/contracts/src/index.d.ts").ContractFamily, filePath: string, document: Record<string, unknown> }} options
  */
 function writeContractFile(options) {
@@ -57,19 +44,7 @@ function writeContractFile(options) {
  * @param {(repoRoot: string) => void} callback
  */
 function withTempRepo(callback) {
-  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w5-s01-"));
-  fs.cpSync(path.join(workspaceRoot, "examples"), path.join(repoRoot, "examples"), { recursive: true });
-  runGitChecked({ cwd: repoRoot, args: ["init"] });
-  runGitChecked({ cwd: repoRoot, args: ["config", "user.email", "aor@example.com"] });
-  runGitChecked({ cwd: repoRoot, args: ["config", "user.name", "AOR Test"] });
-  runGitChecked({ cwd: repoRoot, args: ["add", "-A"] });
-  runGitChecked({ cwd: repoRoot, args: ["commit", "-m", "initial"] });
-
-  try {
-    callback(repoRoot);
-  } finally {
-    fs.rmSync(repoRoot, { recursive: true, force: true });
-  }
+  return withTempRepoHelper({ prefix: "aor-w5-s01-", workspaceRoot }, callback);
 }
 
 test("read surface exposes project state, packets, runs, and quality artifacts", () => {
@@ -634,7 +609,7 @@ test("selected-run history surfaces expose policy and event troubleshooting cont
         step_class: "implement",
         delivery_mode: "fork-first-pr",
         mode_source: {
-          resolved_mode: "pull-request",
+          resolved_mode: "fork-first-pr",
           canonical_mode: "fork-first-pr",
           resolution_kind: "project-default",
           resolution_field: "writeback_policy.default_delivery_mode",

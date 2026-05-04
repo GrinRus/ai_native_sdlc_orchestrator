@@ -38,6 +38,7 @@ function withTempRepo(callback) {
 function configureCodexExternalRuntime(repoRoot, runtime) {
   const adapterPath = path.join(repoRoot, "examples/adapters/codex-cli.yaml");
   const source = fs.readFileSync(adapterPath, "utf8");
+  const permissionArgs = runtime.args.length > 0 ? runtime.args : ["--version"];
   const executionBlock = [
     "execution:",
     "  live_baseline: true",
@@ -46,8 +47,12 @@ function configureCodexExternalRuntime(repoRoot, runtime) {
     "  evidence_namespace: evidence://adapter-live/codex-cli",
     "  external_runtime:",
     `    command: ${JSON.stringify(runtime.command)}`,
-    "    args:",
-    ...runtime.args.map((argument) => `      - ${JSON.stringify(argument)}`),
+    "    permission_policy:",
+    "      default_mode: full-bypass",
+    "      modes:",
+    "        full-bypass:",
+    "          args:",
+    ...permissionArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
     "    request_via_stdin: true",
     "    timeout_ms: 30000",
   ].join("\n");
@@ -541,7 +546,7 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
     assert.equal(result.stepResult.routed_execution.adapter_response.output.mode, "execute");
     assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.command, process.execPath);
     assert.equal(result.stepResult.external_runner.command, process.execPath);
-    assert.equal(result.stepResult.external_runner.permission_mode, "legacy");
+    assert.equal(result.stepResult.external_runner.permission_mode, "full-bypass");
     assert.equal(
       fs.realpathSync(result.stepResult.routed_execution.adapter_response.output.external_runner.execution_root),
       fs.realpathSync(executionRoot),

@@ -84,7 +84,7 @@ Delivery-capable runs should execute from an isolated root (`workspace-clone` or
 
 Policy boundary between rehearsal and delivery:
 - rehearsal can proceed in `no-write` mode without handoff/promotion gates;
-- non-read-only delivery modes must be blocked unless approved handoff evidence and promotion evidence are both present;
+- non-`no-write` delivery modes must be blocked unless approved handoff evidence and promotion evidence are both present;
 - strict code-changing and release delivery must be blocked unless the latest Runtime Harness report contains routed step decisions, `overall_decision=pass`, and at least one meaningful mission-scoped changed path;
 - write-back is allowed only when the delivery plan status is `ready`.
 

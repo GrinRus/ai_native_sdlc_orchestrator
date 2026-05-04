@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-15-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-17-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -26,6 +26,8 @@ The authoritative planning model for implementation lives in:
 | W13 | Add a full user-journey live E2E layer on curated public repositories, start each run from a concrete feature mission, and evaluate runtime plus quality verdicts through public surfaces. | 6 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-7 | `docs/backlog/wave-13-implementation-slices.md` |
 | W14 | Expand live E2E into a curated matrix across scenario families, pinned providers, and size-classed feature missions with matrix-aware review, audit, and closure evidence. | 7 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-14-implementation-slices.md` |
 | W15 | Harden readiness signals after W14 by reopening the queue, aligning package/module evidence, and separating coverage proof from real code-changing proof. | 4 | EPIC-0, EPIC-7 | `docs/backlog/wave-15-implementation-slices.md` |
+| W16 | Reduce implementation complexity through behavior-preserving decomposition, shared helper extraction, and contract-first adapter permission cleanup. | 6 | EPIC-0, EPIC-3, EPIC-6, EPIC-7 | `docs/backlog/wave-16-implementation-slices.md` |
+| W17 | Remove post-W16 legacy public aliases and stale compatibility documentation while keeping W15-S04 externally blocked. | 1 | EPIC-0, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-17-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -76,6 +78,13 @@ The authoritative planning model for implementation lives in:
 | W15-S02 | readiness hardening: package/module workspace alignment (no direct story closure) |
 | W15-S03 | readiness hardening: proof verdict integrity gates (no direct story closure) |
 | W15-S04 | readiness hardening: real code-changing proof closure (no direct story closure) |
+| W16-S01 | implementation complexity reduction: shared helper extraction (no direct story closure) |
+| W16-S02 | implementation complexity reduction: CLI dispatcher decomposition (no direct story closure) |
+| W16-S03 | implementation complexity reduction: API/read-surface decomposition (no direct story closure) |
+| W16-S04 | implementation complexity reduction: orchestrator-core execution decomposition (no direct story closure) |
+| W16-S05 | implementation complexity reduction: installed-user runner decomposition (no direct story closure) |
+| W16-S06 | implementation complexity reduction: adapter permission legacy cleanup (no direct story closure) |
+| W17-S01 | post-W16 legacy surface cleanup (no direct story closure) |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -278,6 +287,29 @@ The authoritative planning model for implementation lives in:
 - `W15-S04` remains blocked until a required full-journey matrix cell can run with usable non-interactive edit permissions, meaningful target changes, `runtime_harness_report.overall_decision=pass`, and `overall_verdict=pass`
 
 **Detailed slices:** `docs/backlog/wave-15-implementation-slices.md`
+
+## W16 — implementation complexity reduction
+**Goal:** Reduce accumulated implementation complexity after readiness hardening by splitting monolithic runtime surfaces, extracting repeated helpers, and moving adapter permission cleanup through a contract-first path.
+
+**Exit criteria:**
+- W16 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
+- repeated helper logic has package-local shared implementations where behavior is duplicated across runtime modules
+- CLI, API, core, contracts, and installed-user proof runner decomposition preserves public command, route, contract, and proof output shapes
+- adapter permission legacy fallback fails through explicit permission-policy validation rather than a runtime args fallback
+
+**Detailed slices:** `docs/backlog/wave-16-implementation-slices.md`
+
+## W17 — post-W16 legacy surface cleanup
+**Goal:** Remove public compatibility aliases and stale documentation left after W16 decomposition, while keeping W15-S04 scoped to its external real-proof blocker.
+
+**Exit criteria:**
+- W17-S01 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
+- CLI incident outputs expose only the canonical incident report path field
+- delivery mode inputs accept only canonical `no-write`, `patch-only`, `local-branch`, and `fork-first-pr` values
+- adapter permission legacy wording remains only where documenting or testing unsupported `external_runtime.args`
+- docs, examples, live E2E profiles, and proof fixtures no longer advertise public legacy aliases
+
+**Detailed slices:** `docs/backlog/wave-17-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

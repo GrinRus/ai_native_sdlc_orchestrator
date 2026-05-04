@@ -7,7 +7,7 @@ Human-readable guidance lives here. Machine-readable enforcement lives under `sc
 For canonical setup and verification dependency details per profile, use `docs/ops/live-e2e-dependency-matrix.md`.
 
 ## Safety policy
-- Default to read-only bootstrap and bounded patch output.
+- Default to `no-write` bootstrap and bounded `patch-only` output.
 - Never push to upstream public repositories by default.
 - Mandatory full-journey live E2E is allowed only on curated catalog targets and curated feature missions.
 - Full-journey runs must generate the feature request and discovery/spec/handoff during the run.
@@ -47,7 +47,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`)
 - Failure-safe defaults:
   - `write_back_to_remote=false`
-  - preferred delivery mode: `patch`
+  - preferred delivery mode: `patch-only`
 
 ## Target 2 — `httpie/cli`
 - Catalog id: `httpie-cli`
@@ -76,7 +76,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - use the bounded CLI pytest slice plus `make codestyle`, not the entire repo-wide `make test` matrix
 - Failure-safe defaults:
   - `write_back_to_remote=false`
-  - preferred delivery mode: `patch`
+  - preferred delivery mode: `patch-only`
 
 ## Target 3 — `belgattitude/nextjs-monorepo-example`
 - Catalog id: `nextjs-monorepo-example`

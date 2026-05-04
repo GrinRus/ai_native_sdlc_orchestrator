@@ -10,7 +10,7 @@
     "repo_url": "https://github.com/sindresorhus/ky.git",
     "ref": "main",
     "checkout_strategy": "shallow",
-    "write_target": "patch-or-fork"
+    "write_target": "canonical-bounded"
   },
   "preflight": {
     "mode": "no-write",

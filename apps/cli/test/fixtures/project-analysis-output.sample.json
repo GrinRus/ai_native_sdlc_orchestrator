@@ -41,7 +41,7 @@
           "timeout_sec": 300
         },
         "writeback_mode": {
-          "mode": "pull-request"
+          "mode": "fork-first-pr"
         }
       }
     }

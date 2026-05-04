@@ -10,17 +10,7 @@ export const CANONICAL_DELIVERY_MODES = Object.freeze([
   "fork-first-pr",
 ]);
 
-const DELIVERY_MODE_ALIASES = Object.freeze({
-  "no-write": "no-write",
-  "read-only": "no-write",
-  patch: "patch-only",
-  "patch-only": "patch-only",
-  "local-branch": "local-branch",
-  branch: "local-branch",
-  "fork-first-pr": "fork-first-pr",
-  "fork-pr": "fork-first-pr",
-  "pull-request": "fork-first-pr",
-});
+const DELIVERY_MODE_VALUES = new Set(CANONICAL_DELIVERY_MODES);
 const RERUN_PACKET_BOUNDARIES = new Set(["delivery-manifest", "release-packet"]);
 
 /**
@@ -70,13 +60,12 @@ function normalizeForId(value) {
  * @returns {string}
  */
 export function normalizeDeliveryMode(mode) {
-  const normalized = DELIVERY_MODE_ALIASES[mode];
-  if (!normalized) {
+  if (!DELIVERY_MODE_VALUES.has(mode)) {
     throw new Error(
-      `Unsupported delivery mode '${mode}'. Expected one of: ${Object.keys(DELIVERY_MODE_ALIASES).sort().join(", ")}.`,
+      `Unsupported delivery mode '${mode}'. Expected one of: ${CANONICAL_DELIVERY_MODES.join(", ")}.`,
     );
   }
-  return normalized;
+  return mode;
 }
 
 /**

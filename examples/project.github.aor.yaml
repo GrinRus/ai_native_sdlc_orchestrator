@@ -131,7 +131,7 @@ bootstrap_policy:
   run_project_analysis: true
   require_project_verify: true
 writeback_policy:
-  default_delivery_mode: pull-request
+  default_delivery_mode: fork-first-pr
   allow_direct_write: false
   require_delivery_manifest: true
 tooling_policy:

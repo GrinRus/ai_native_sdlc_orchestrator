@@ -19,7 +19,8 @@ Live adapter baselines can add optional execution metadata without changing requ
 - `execution.handler`
 - `execution.evidence_namespace`
 - `execution.external_runtime.command`
-- `execution.external_runtime.args`
+- `execution.external_runtime.permission_policy.default_mode`
+- `execution.external_runtime.permission_policy.modes.<mode>.args`
 - `execution.external_runtime.request_via_stdin`
 - `execution.external_runtime.timeout_ms`
 
@@ -27,11 +28,11 @@ Live adapter baselines can add optional execution metadata without changing requ
 
 `execution.external_runtime.preflight_timeout_ms` is optional and controls live adapter preflight probes separately from full step execution. When omitted, live E2E derives a conservative probe timeout from `timeout_ms`. Preflight reports must record both the full `timeout_ms` and selected `preflight_timeout_ms` so slow readiness probes can be distinguished from full runtime execution limits.
 
-`execution.external_runtime.permission_policy` is optional for backwards compatibility. When present, it declares named non-interactive permission modes:
+`execution.external_runtime.permission_policy` is required for live E2E external-process adapters. It declares named non-interactive permission modes:
 - `default_mode` selects the adapter default when `AOR_RUNTIME_AGENT_PERMISSION_MODE` is not set.
-- `modes.<mode>.args` replaces `execution.external_runtime.args` for that selected mode.
+- `modes.<mode>.args` is the selected runtime invocation argument list.
 
-Live E2E defaults to `full-bypass` so installed-user acceptance runs do not hang on runtime-agent approval prompts inside isolated target checkouts. `restricted` should preserve the safer adapter-native prompting mode for local diagnostics. Codex uses `--ask-for-approval never` for the full-bypass mode and omits that approval bypass in restricted mode. Claude Code uses `--dangerously-skip-permissions` for full-bypass and `--permission-mode auto` for restricted mode. OpenCode's candidate full-bypass analogue is `opencode run --format json --dangerously-skip-permissions`, but it should stay extended until the adapter is wired and certified as a live baseline. If `AOR_RUNTIME_AGENT_PERMISSION_MODE` requests a mode that the profile does not declare, adapter execution must return blocked semantics with `failure_kind=permission-policy-invalid`. Profiles without `permission_policy` keep using legacy `execution.external_runtime.args`.
+Live E2E defaults to `full-bypass` so installed-user acceptance runs do not hang on runtime-agent approval prompts inside isolated target checkouts. `restricted` should preserve the safer adapter-native prompting mode for local diagnostics. Codex uses `--ask-for-approval never` for the full-bypass mode and omits that approval bypass in restricted mode. Claude Code uses `--dangerously-skip-permissions` for full-bypass and `--permission-mode auto` for restricted mode. OpenCode's candidate full-bypass analogue is `opencode run --format json --dangerously-skip-permissions`, but it should stay extended until the adapter is wired and certified as a live baseline. If `AOR_RUNTIME_AGENT_PERMISSION_MODE` requests a mode that the profile does not declare, or if an external-process adapter profile omits `permission_policy`, adapter execution must return blocked semantics with `failure_kind=permission-policy-invalid`. Legacy `execution.external_runtime.args` is intentionally unsupported for permission selection.
 In-process adapters without `execution.external_runtime`, such as `mock-runner`, may declare profile-level `permission_policy: not_applicable` as informational evidence that runtime-agent approval prompts do not apply.
 
 When live runtime prerequisites are missing (for example command not found on PATH), adapter execution should return explicit blocked semantics instead of synthetic success.

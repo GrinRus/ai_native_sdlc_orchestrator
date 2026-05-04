@@ -11,7 +11,7 @@
     "repo_url": "https://github.com/sindresorhus/ky.git",
     "ref": "main",
     "checkout_strategy": "shallow",
-    "write_target": "patch-or-fork"
+    "write_target": "canonical-bounded"
   },
   "started_at": "2026-04-23T12:26:17.520Z",
   "finished_at": "2026-04-23T12:28:25.999Z",

@@ -58,13 +58,13 @@ Add safe write-back modes, manifests, and release artifacts so AOR can move from
 
 ### Local tasks
 1. Model delivery write-back modes such as no-write, patch-only, local-branch, and fork-first PR.
-2. Require explicit approved handoff and promotion evidence before non-read-only modes are allowed.
+2. Require explicit approved handoff and promotion evidence before non-`no-write` modes are allowed.
 3. Persist the selected delivery plan as durable metadata before file changes are written.
 4. Document the policy boundary between rehearsal and delivery.
 
 ### Acceptance criteria
 1. Delivery mode is explicit and machine-checkable before a delivery run starts.
-2. Non-read-only modes require approved handoff and promotion evidence.
+2. Non-`no-write` modes require approved handoff and promotion evidence.
 3. The selected delivery plan is persisted and linked to the run before write-back begins.
 4. Docs explain how rehearsal and delivery policies differ.
 

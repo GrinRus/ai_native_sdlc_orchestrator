@@ -5,6 +5,11 @@ import { spawnSync } from "node:child_process";
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 
 import { initializeProjectRuntime } from "./project-init.mjs";
+import {
+  isTransientBackupPath,
+  listChangedPaths,
+  matchesScopePattern,
+} from "./shared/mission-scope.mjs";
 
 /**
  * @param {unknown} value
@@ -152,29 +157,6 @@ function loadOptionalQualityArtifact(projectRoot, reportsRoot, fileName, family)
 
 /**
  * @param {string} projectRoot
- * @returns {string[]}
- */
-function listChangedPaths(projectRoot) {
-  const run = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], {
-    cwd: projectRoot,
-    encoding: "utf8",
-  });
-  if (run.status !== 0) {
-    return [];
-  }
-  return (run.stdout ?? "")
-    .split(/\r?\n/u)
-    .filter((line) => line.trim().length > 0)
-    .map((line) => line.slice(3).trim())
-    .map((candidate) => {
-      const renameParts = candidate.split(" -> ");
-      return renameParts.length > 1 ? renameParts[renameParts.length - 1] : candidate;
-    })
-    .map((candidate) => candidate.replace(/\\/g, "/"));
-}
-
-/**
- * @param {string} projectRoot
  * @param {string[]} changedPaths
  * @returns {{ addedLines: number, deletedLines: number, touchedLines: number }}
  */
@@ -241,18 +223,6 @@ function parseTapPlan(line) {
 function isAssertionLine(line) {
   return /\bt\.(?:assert|deepEqual|false|is|like|not|notDeepEqual|notRegex|notThrows|regex|snapshot|throws|true)\s*\(/u.test(
     line,
-  );
-}
-
-/**
- * @param {string} candidate
- * @returns {boolean}
- */
-function isTransientBackupPath(candidate) {
-  const basename = path.posix.basename(candidate.replace(/\\/g, "/")).toLowerCase();
-  return (
-    basename.startsWith(".#") ||
-    /(?:~|\.bak|\.backup|\.orig|\.rej|\.tmp|\.swp|\.swo|\.old)$/u.test(basename)
   );
 }
 
@@ -339,28 +309,6 @@ function detectTestWeakening(projectRoot, changedPaths) {
   }
 
   return findings;
-}
-
-/**
- * @param {string} pattern
- * @param {string} candidate
- * @returns {boolean}
- */
-function matchesScopePattern(pattern, candidate) {
-  const normalizedPattern = pattern.replace(/\\/g, "/").replace(/^\.\//u, "");
-  const normalizedCandidate = candidate.replace(/\\/g, "/").replace(/^\.\//u, "");
-  if (normalizedPattern === "**") {
-    return true;
-  }
-  if (normalizedPattern.endsWith("/**")) {
-    const prefix = normalizedPattern.slice(0, -3);
-    return normalizedCandidate === prefix || normalizedCandidate.startsWith(`${prefix}/`);
-  }
-  if (!normalizedPattern.includes("*")) {
-    return normalizedCandidate === normalizedPattern;
-  }
-  const wildcardPrefix = normalizedPattern.slice(0, normalizedPattern.indexOf("*"));
-  return normalizedCandidate.startsWith(wildcardPrefix);
 }
 
 /**
@@ -655,7 +603,7 @@ export function materializeReviewReport(options) {
       ignoredInputFiles.add(relativeRequestFile);
     }
   }
-  const rawChangedPaths = listChangedPaths(init.projectRoot);
+  const rawChangedPaths = listChangedPaths(init.projectRoot).changedPaths;
   const codeChangedPaths = rawChangedPaths.filter((candidate) => {
     if (ignoredInputFiles.has(candidate)) return false;
     if (bootstrapOwnedFiles.has(candidate)) return false;

@@ -43,7 +43,7 @@
     "owner": "project-profile",
     "allow_unlisted_commands": false
   },
-  "writeback_mode": "pull-request",
+  "writeback_mode": "fork-first-pr",
   "approval_state": {
     "required": true,
     "state": "approved",

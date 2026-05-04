@@ -83,6 +83,7 @@ function writeContractFixture(options) {
 function configureCodexExternalRuntime(options) {
   const adapterPath = path.join(options.projectRoot, "examples/adapters/codex-cli.yaml");
   const source = fs.readFileSync(adapterPath, "utf8");
+  const permissionArgs = options.args.length > 0 ? options.args : ["--version"];
   const executionBlock = [
     "execution:",
     "  live_baseline: true",
@@ -91,10 +92,14 @@ function configureCodexExternalRuntime(options) {
     "  evidence_namespace: evidence://adapter-live/codex-cli",
     "  external_runtime:",
     `    command: ${JSON.stringify(options.command)}`,
-    "    args:",
-    ...options.args.map((argument) => `      - ${JSON.stringify(argument)}`),
     "    request_via_stdin: true",
     "    timeout_ms: 30000",
+    "    permission_policy:",
+    "      default_mode: full-bypass",
+    "      modes:",
+    "        full-bypass:",
+    "          args:",
+    ...permissionArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
   ].join("\n");
   const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
   fs.writeFileSync(adapterPath, updated, "utf8");
@@ -1369,10 +1374,11 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     assert.equal(typeof incidentOpenPayload.incident_id, "string");
     assert.equal(incidentOpenPayload.incident_status, "open");
     assert.equal(incidentOpenPayload.incident_run_ref, `run://${runId}`);
-    assert.equal(fs.existsSync(incidentOpenPayload.incident_file), true);
-    assert.equal(incidentOpenPayload.incident_report_file, incidentOpenPayload.incident_file);
+    const legacyIncidentAlias = ["incident", "file"].join("_");
+    assert.equal(Object.prototype.hasOwnProperty.call(incidentOpenPayload, legacyIncidentAlias), false);
+    assert.equal(fs.existsSync(incidentOpenPayload.incident_report_file), true);
     assert.ok(incidentOpenPayload.incident_linked_asset_refs.includes("evidence://external/manual-note"));
-    const incidentDocument = JSON.parse(fs.readFileSync(incidentOpenPayload.incident_file, "utf8"));
+    const incidentDocument = JSON.parse(fs.readFileSync(incidentOpenPayload.incident_report_file, "utf8"));
     const incidentFixture = JSON.parse(
       fs.readFileSync(path.join(fixturesDir, "incident-report.fixture.json"), "utf8"),
     );
@@ -1474,7 +1480,8 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     assert.equal(rollbackRecertifyResult.exitCode, 0, rollbackRecertifyResult.stderr);
     const rollbackRecertifyPayload = JSON.parse(rollbackRecertifyResult.stdout);
     assert.equal(rollbackRecertifyPayload.incident_status, recertificationFixture.rollback.incident_status);
-    assert.equal(rollbackRecertifyPayload.incident_report_file, rollbackRecertifyPayload.incident_file);
+    assert.equal(Object.prototype.hasOwnProperty.call(rollbackRecertifyPayload, legacyIncidentAlias), false);
+    assert.equal(fs.existsSync(rollbackRecertifyPayload.incident_report_file), true);
     assert.equal(rollbackRecertifyPayload.incident_recertification_decision, "re-enable");
     assert.equal(rollbackRecertifyPayload.incident_recertification_gate, recertificationFixture.rollback.gate);
     assert.equal(
@@ -1498,7 +1505,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     assert.ok(rollbackRecertifyPayload.incident_recertification_finance_evidence_refs.length >= 1);
     assert.ok(rollbackRecertifyPayload.incident_recertification_quality_evidence_refs.length >= 1);
 
-    const rollbackIncidentDocument = JSON.parse(fs.readFileSync(rollbackRecertifyPayload.incident_file, "utf8"));
+    const rollbackIncidentDocument = JSON.parse(fs.readFileSync(rollbackRecertifyPayload.incident_report_file, "utf8"));
     assert.equal(rollbackIncidentDocument.status, "hold");
     assert.equal(rollbackIncidentDocument.recertification.platform_recertification.rollout_action, "demote");
     assert.equal(rollbackIncidentDocument.recertification.platform_recertification.linkage_status, "rollback");
@@ -1519,6 +1526,8 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     assert.equal(Array.isArray(incidentShowPayload.incident_records), true);
     assert.equal(incidentShowPayload.incident_records.length, 1);
     assert.equal(incidentShowPayload.incident_records[0].incident_id, incidentOpenPayload.incident_id);
+    assert.equal(Object.prototype.hasOwnProperty.call(incidentShowPayload.incident_records[0], legacyIncidentAlias), false);
+    assert.equal(incidentShowPayload.incident_records[0].incident_report_file, incidentOpenPayload.incident_report_file);
     assert.ok(incidentShowPayload.incident_records[0].linked_run_refs.includes(`run://${runId}`));
 
     const auditResult = invokeCli([
@@ -3303,7 +3312,7 @@ test("project analyze writes durable analysis report under runtime root", () => 
     assert.ok(planningPolicy);
     assert.equal(planningPolicy.policy.policy_id, "policy.step.planner.default");
     assert.equal(planningPolicy.policy.resolution_source.kind, "step-override");
-    assert.equal(planningPolicy.resolved_bounds.writeback_mode.mode, "pull-request");
+    assert.equal(planningPolicy.resolved_bounds.writeback_mode.mode, "fork-first-pr");
 
     const report = JSON.parse(fs.readFileSync(parsed.analysis_report_file, "utf8"));
     assert.equal(report.project_id, "aor-core");

@@ -268,7 +268,7 @@ export function prepareHandoffArtifacts(options = {}) {
   const writebackMode =
     typeof writebackPolicy.default_delivery_mode === "string" && writebackPolicy.default_delivery_mode.length > 0
       ? writebackPolicy.default_delivery_mode
-      : "pull-request";
+      : "fork-first-pr";
   const handoffPacketId = `${init.projectId}.handoff.bootstrap.v1`;
   const handoffPacketFile = path.join(init.runtimeLayout.artifactsRoot, `${handoffPacketId}.json`);
   const handoffPacket = {

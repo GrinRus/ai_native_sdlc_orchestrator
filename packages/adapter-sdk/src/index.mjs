@@ -4,6 +4,9 @@ import { spawnSync } from "node:child_process";
 
 import { loadContractFile } from "../../contracts/src/index.mjs";
 import { SUPPORTED_STEP_CLASSES } from "../../provider-routing/src/route-resolution.mjs";
+import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
+
+export { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 
 const ADAPTER_RESPONSE_STATUSES = Object.freeze(["success", "failed", "blocked"]);
 
@@ -239,58 +242,6 @@ function classifyStructuredRunnerFailure(options) {
     return "permission-mode-blocked";
   }
   return "";
-}
-
-/**
- * @param {{ externalRuntime: Record<string, unknown>, requestedMode?: string | null }} options
- * @returns {{ ok: true, args: string[], permissionMode: string, source: string } | { ok: false, args: string[], permissionMode: string, source: string, failureKind: string, message: string }}
- */
-export function resolveExternalRuntimePermissionPolicy(options) {
-  const externalRuntime = asRecord(options.externalRuntime);
-  const legacyArgs = asStringArray(externalRuntime.args);
-  const policy = asRecord(externalRuntime.permission_policy);
-  const hasPolicy = Object.keys(policy).length > 0;
-  if (!hasPolicy) {
-    return {
-      ok: true,
-      args: legacyArgs,
-      permissionMode: "legacy",
-      source: "external_runtime.args",
-    };
-  }
-
-  const requestedMode = asOptionalString(options.requestedMode);
-  const defaultMode = asOptionalString(policy.default_mode);
-  const selectedMode = requestedMode ?? defaultMode;
-  if (!selectedMode) {
-    return {
-      ok: true,
-      args: legacyArgs,
-      permissionMode: "legacy",
-      source: "external_runtime.args",
-    };
-  }
-
-  const modes = asRecord(policy.modes);
-  const modeProfile = asRecord(modes[selectedMode]);
-  const modeArgs = asStringArray(modeProfile.args);
-  if (modeArgs.length === 0) {
-    return {
-      ok: false,
-      args: [],
-      permissionMode: selectedMode,
-      source: requestedMode ? "AOR_RUNTIME_AGENT_PERMISSION_MODE" : "permission_policy.default_mode",
-      failureKind: "permission-policy-invalid",
-      message: `External runtime permission policy mode '${selectedMode}' is not declared with non-empty args.`,
-    };
-  }
-
-  return {
-    ok: true,
-    args: modeArgs,
-    permissionMode: selectedMode,
-    source: requestedMode ? "AOR_RUNTIME_AGENT_PERMISSION_MODE" : "permission_policy.default_mode",
-  };
 }
 
 /**
@@ -740,7 +691,6 @@ export function createLiveAdapter(options) {
     asOptionalString(executionProfile.evidence_namespace) ?? `evidence://adapter-live/${adapterId}`;
   const externalRuntime = asRecord(executionProfile.external_runtime);
   const runtimeCommand = asOptionalString(externalRuntime.command);
-  const legacyRuntimeArgs = asStringArray(externalRuntime.args);
   const requestViaStdin = externalRuntime.request_via_stdin !== false;
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
   const envOverrides = asStringMap(externalRuntime.env);
@@ -810,7 +760,7 @@ export function createLiveAdapter(options) {
             external_runner: {
               runtime_mode: runtimeMode,
               command: runtimeCommand,
-              args: legacyRuntimeArgs,
+              args: runtimeInvocation.args,
               permission_mode: runtimeInvocation.permissionMode,
               permission_mode_source: runtimeInvocation.source,
               execution_root: executionRoot,
@@ -843,7 +793,7 @@ export function createLiveAdapter(options) {
             external_runner: {
               runtime_mode: runtimeMode,
               command: runtimeCommand,
-              args: legacyRuntimeArgs,
+              args: runtimeInvocation.args,
               permission_mode: runtimeInvocation.permissionMode,
               permission_mode_source: runtimeInvocation.source,
               execution_root: executionRoot,

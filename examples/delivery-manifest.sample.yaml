@@ -4,7 +4,7 @@ ticket_id: WAVE-004
 run_refs:
   - RUN-101
 step_ref: RUN-101:delivery.apply
-delivery_mode: pull-request
+delivery_mode: fork-first-pr
 execution_isolation:
   mode: workspace-clone
   source_root: /workspace/aor-core

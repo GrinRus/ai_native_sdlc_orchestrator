@@ -7,4 +7,4 @@
 - Examples are illustrative but must remain internally consistent.
 - When a contract changes, update the relevant examples immediately.
 - Prefer realistic examples over toy placeholders.
-- Keep public-repo proof fixtures and target-facing examples safe by default: patch, local branch, or fork only.
+- Keep public-repo proof fixtures and target-facing examples safe by default: `patch-only`, `local-branch`, or `fork-first-pr`.

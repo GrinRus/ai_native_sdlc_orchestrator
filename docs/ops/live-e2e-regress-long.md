@@ -23,7 +23,7 @@ Confirm that AOR can:
 2. Use the documented `make`-based workflow.
 3. Implement one bounded fix or improvement in a CLI surface.
 4. Verify with `make test` and `make codestyle`.
-5. Stop at patch or fork branch unless explicitly configured otherwise.
+5. Stop at `patch-only` or `fork-first-pr` evidence unless explicitly configured otherwise.
 
 ## No-write preflight
 Use `docs/ops/live-e2e-no-write-preflight.md` and keep the sequence explicit:
