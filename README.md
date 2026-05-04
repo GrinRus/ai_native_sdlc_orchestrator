@@ -19,7 +19,7 @@ Teams need more than code generation. They need a system that can:
 
 ## Current repository status
 
-This repository is currently a **docs-first and scaffold-first project package**.
+This repository is currently a **docs-first project package with implemented CLI/API/web/runtime baselines**. It is not yet a production-ready orchestrator runtime.
 
 What exists today:
 
@@ -30,21 +30,22 @@ What exists today:
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
 - a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
 - implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
-- expanded implementation backlog through `W18`, with W18 focused on connected web full-flow, interactive runner continuation, and monorepo/bounded multirepo proof gaps while active queue tracking stays available via `pnpm slice:status` and `pnpm slice:next -- --json`.
+- expanded implementation backlog through `W20`, with W18 focused on connected web full-flow and topology proof gaps, and W19/W20 focused on user-story gap traceability, product-quality closure, and production/platform maturity gaps while active queue tracking stays available via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - historical W10/W11 productionization closure for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and target-backed proof evidence.
-- first live routed execution baseline for supported `codex-cli` adapter paths with explicit delivery-guardrail blocking semantics.
+- stable live routed execution baseline for supported `codex-cli` adapter paths, plus live-runnable candidate `claude-code` matrix coverage and extended non-baseline `open-code` coverage with explicit delivery-guardrail blocking semantics.
 - W15 readiness-hardening work that makes source-of-truth drift, package/module-map drift, and mock-backed proof claims machine-checkable.
 - W16 complexity-reduction work that decomposes monolithic CLI/API/core/live-E2E surfaces and isolates adapter permission legacy cleanup.
 - W17 legacy-surface cleanup that removes public compatibility aliases from CLI incident outputs and delivery mode inputs.
 - W18 backlog coverage for control-plane-owned web lifecycle operation, runner question/answer continuation, and bounded multirepo proof.
+- W19/W20 backlog gap intake that maps all 112 supported user stories to current evidence, coverage status, and explicit follow-up slices for remaining gaps.
 
 What does **not** exist yet:
 
 - a production-ready orchestrator runtime;
-- broad multi-provider production-grade adapter coverage (beyond the first `codex-cli` live baseline);
+- broad multi-provider production-grade adapter coverage beyond the stable `codex-cli` live baseline and candidate `claude-code` rehearsal coverage;
 - delivery write-back automation to upstream repositories;
-- full planned command surface and production hardening for all operator/delivery controls.
-- a real code-changing full-journey proof with `overall_verdict=pass`; the current W14 matrix proof is coverage evidence with findings.
+- production hardening and operator parity for every CLI/API/web control surface;
+- a real code-changing full-journey proof with `overall_verdict=pass`; the current W14 matrix proof is coverage evidence with findings, and this target is not assigned to the current W18-W20 backlog horizon.
 
 Use the backlog docs for the implementation roadmap.
 
@@ -169,8 +170,8 @@ For exact command inputs/outputs and contract linkage, use `docs/architecture/14
 
 ### Code scaffold
 - `apps/api/` — implemented control-plane read/event baseline with detached HTTP/SSE transport for connected-mode read/follow surfaces.
-- `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, delivery, incident, and UI-lifecycle command baseline with planned extensions.
-- `apps/web/` — implemented detachable operator console baseline with planned production-hardening extensions.
+- `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, delivery, incident, and UI-lifecycle command baseline with production-hardening extensions still outstanding.
+- `apps/web/` — implemented detachable operator console baseline with production-hardening extensions still outstanding.
 - `packages/**` — implemented shared runtime modules (contracts, orchestrator core, routing, adapter SDK, harness, observability) with roadmap extensions.
 - `packages/harness/` — asset certification capture/replay primitives used by certification and promotion decisions.
 - `scripts/live-e2e/**` — installed-user black-box proof runner and private scenario profiles.
@@ -208,7 +209,7 @@ The W14 full-journey layer resolves these repositories through an internal machi
 
 Target catalogs carry one curated `small`, `medium`, and `large` mission per repo plus required matrix cells. `openai-primary` and `anthropic-primary` are the mandatory provider variants for W14 matrix coverage; `open-code-primary` starts as extended coverage only. Bounded `regress/release short/long` profiles remain, but they no longer claim to prove the entire installed-user journey.
 
-The current committed matrix proof bundle lives at `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json` and proves all W14 required matrix cells plus all repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs as coverage evidence. It is intentionally marked `proof_scope=coverage_with_findings` because deterministic external-runner mocks do not materialize mission code changes; W15 keeps real code-changing proof as a separate blocked slice until a non-mock external runner can produce `overall_verdict=pass`.
+The current committed matrix proof bundle lives at `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json` and proves all W14 required matrix cells plus all repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs as coverage evidence. It is intentionally marked `proof_scope=coverage_with_findings` because deterministic external-runner mocks do not materialize mission code changes.
 
 ## Roadmap
 
@@ -243,6 +244,8 @@ Detailed wave plans:
 - `docs/backlog/wave-16-implementation-slices.md`
 - `docs/backlog/wave-17-implementation-slices.md`
 - `docs/backlog/wave-18-implementation-slices.md`
+- `docs/backlog/wave-19-implementation-slices.md`
+- `docs/backlog/wave-20-implementation-slices.md`
 
 ## Contributing
 

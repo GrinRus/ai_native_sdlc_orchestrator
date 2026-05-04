@@ -119,8 +119,13 @@ Delivery/release payload baseline:
 - `run_id` (optional command-scoped run identity; deterministic fallback when omitted);
 - `step_class` (optional, defaults to `implement`);
 - `mode` (optional override; must be one of `no-write | patch-only | local-branch | fork-first-pr`);
+- `quality_gate_mode` (optional for `deliver prepare`, defaults to `strict`; `release prepare` always uses strict semantics);
 - `approved_handoff_ref` (optional evidence ref required by non-`no-write` preconditions);
 - `promotion_evidence_refs` (optional comma/list refs required by non-`no-write` preconditions).
+- `coordination_evidence_refs`, `rerun_of_run_id`, `rerun_failed_step`, and `rerun_packet_boundary` preserve multi-repo and rerun recovery evidence.
+- `route_overrides` and `policy_overrides` apply provider-pinned delivery/release routing deterministically through the public CLI surface.
+- `ticket_id`, `branch_name`, `commit_message`, `fork_owner`, `fork_remote_url`, `base_ref`, `pr_title`, and `pr_body` describe planned write-back metadata.
+- `network_write` is explicit and defaults to false; fork-first remote writes remain blocked unless policy and operator inputs allow them.
 
 Delivery/release guardrail baseline:
 - resolve policy bounds before materializing delivery/release artifacts;
@@ -130,10 +135,12 @@ Delivery/release guardrail baseline:
 
 Delivery/release response baseline:
 - `delivery_plan_file` and `delivery_plan_status` for policy traceability;
+- `delivery_quality_gate_mode`, `delivery_quality_gate_status`, and `delivery_quality_gate_findings` for strict/observe gate evidence when the command exposes observe mode;
 - `delivery_governance_decision` for explicit deny/escalate reasoning;
 - `delivery_coordination` for multi-repo coordination requirement and evidence status;
 - `delivery_rerun_recovery` for explicit rerun run-ref, failed-step, and packet-boundary scope;
 - `delivery_manifest_file` and `release_packet_file` as durable evidence outputs;
+- `runtime_harness_report_file` and `runtime_harness_overall_decision` for the latest Runtime Harness gate used by strict delivery/release checks;
 - `delivery_writeback_result` to distinguish `no-write-confirmed`, `patch-materialized`, `local-branch-committed`, `fork-pr-planned`, and `fork-pr-draft-created`.
 
 ## Incident/audit baseline (module operations)

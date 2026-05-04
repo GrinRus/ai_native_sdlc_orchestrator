@@ -22,14 +22,23 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Execution and quality | `dataset.md` | `dataset` | `examples/eval/dataset-*.yaml` | implemented | Required fields + top-level type checks. |
 | Execution and quality | `evaluation-suite.md` | `evaluation-suite` | `examples/eval/suite-*.yaml` | implemented | Required fields + top-level type checks. |
 | Execution and quality | `promotion-decision.md` | `promotion-decision` | `examples/packets/promotion-decision-*.yaml` | implemented | Includes closed-set enum checks for promotion channels and certification status (`pass|hold|fail`). |
+| Execution and quality | `compiled-context-artifact.md` | `compiled-context-artifact` | `examples/context/compiled/*.yaml` | implemented | Required fields + top-level type checks for compiled prompt, context, packet, hash, and provenance lineage. |
 | Platform assets | `provider-route-profile.md` | `provider-route-profile` | `examples/routes/*.yaml` | implemented | Required fields + top-level type checks. |
 | Platform assets | `wrapper-profile.md` | `wrapper-profile` | `examples/wrappers/*.yaml` | implemented | Includes closed-set enum check for `step_class`. |
 | Platform assets | `prompt-bundle.md` | `prompt-bundle` | `examples/prompts/*.yaml` | implemented | Includes closed-set enum check for `step_class`. |
+| Platform assets | `context-doc.md` | `context-doc` | `examples/context/docs/*.yaml` | implemented | Required fields + top-level type checks for metadata, source, and applicability. |
+| Platform assets | `context-rule.md` | `context-rule` | `examples/context/rules/*.yaml` | implemented | Required fields + top-level type checks for instruction, source refs, and applicability. |
+| Platform assets | `context-skill.md` | `context-skill` | `examples/context/skills/*.yaml` | implemented | Required fields + top-level type checks for workflow, source refs, and applicability. |
+| Platform assets | `context-bundle.md` | `context-bundle` | `examples/context/bundles/*.yaml` | implemented | Required fields + top-level type checks for context refs, source refs, and selection policy. |
 | Platform assets | `step-policy-profile.md` | `step-policy-profile` | `examples/policies/*.yaml` | implemented | Includes closed-set enum check for `step_class`. |
 | Platform assets | `adapter-capability-profile.md` | `adapter-capability-profile` | `examples/adapters/*.yaml` | implemented | Required fields + top-level type checks, including deterministic `mock-runner` baseline profile. |
+| Platform assets | `skill-profile.md` | `skill-profile` | `examples/skills/*.yaml` | implemented | Includes closed-set enum check for `step_class` and required workflow shape. |
 | Operations | `live-run-event.md` | `live-run-event` | none | implemented | Contract is loader-covered with closed-set `event_type` validation; no YAML example in this repo yet. |
 | Operations | `learning-loop-scorecard.md` | `learning-loop-scorecard` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Operations | `learning-loop-handoff.md` | `learning-loop-handoff` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
+| Operations | `live-e2e-provider-variant.md` | `live-e2e-provider-variant` | `scripts/live-e2e/catalog/providers/*.yaml` | implemented | Required fields + closed-set `provider_variant_id` checks for W14 matrix variants. |
+| Operations | `live-e2e-scenario-policy.md` | `live-e2e-scenario-policy` | `scripts/live-e2e/catalog/scenarios/*.yaml` | implemented | Required fields + closed-set `scenario_family` checks for live E2E scenario policy. |
+| Operations | `live-e2e-target-catalog.md` | `live-e2e-target-catalog` | `scripts/live-e2e/catalog/targets/*.yaml` | implemented | Required fields + top-level type checks for target safety, matrix, provider pairs, and missions. |
 | Operations | `control-plane-api.md` | `control-plane-api` | `examples/control-plane-api/*.yaml` | implemented | Loader validates the hybrid module + detached HTTP/SSE baseline for read/follow plus bounded run-control/ui-lifecycle mutation families. |
 
 ## Reference integrity and compatibility checks (W3-S01)

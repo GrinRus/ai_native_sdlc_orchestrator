@@ -15,7 +15,7 @@ Close the connected web full-flow and topology proof gaps while preserving the h
 - `W18-S02` depends on `W18-S01` so connected lifecycle mutations can carry interaction-continuation semantics from the start.
 - `W18-S03` depends on `W18-S02` because web should call the control-plane mutation surface rather than owning orchestration logic.
 - `W18-S04` is ready independently because existing multirepo foundations are done; the remaining gap is proof coverage and source-of-truth clarity.
-- `W15-S04` remains externally blocked and is not part of W18 scope.
+- Real code-changing full-journey proof remains outside W18 scope.
 
 ---
 

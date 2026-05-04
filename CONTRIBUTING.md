@@ -2,7 +2,7 @@
 
 Thanks for contributing to AOR.
 
-AOR is a docs-first and scaffold-first repository today. The highest-value contributions are the ones that keep the roadmap, contracts, examples, and implementation scaffold aligned while the runtime is being built.
+AOR is a docs-first repository with implemented CLI/API/web/runtime baselines today. The highest-value contributions are the ones that keep the roadmap, contracts, examples, command surfaces, and implementation baselines aligned while the runtime is hardened toward production readiness.
 
 ## Ways to contribute
 

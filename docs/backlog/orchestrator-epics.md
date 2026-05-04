@@ -14,6 +14,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W15:** `W15-S01` Source-of-truth and readiness queue repair; `W15-S02` Package/module workspace alignment
 - **W16:** `W16-S01` Complexity baseline and shared helper extraction
 - **W17:** `W17-S01` Legacy surface cleanup after W16
+- **W19:** `W19-S01` User-story registry and coverage evidence matrix
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -22,12 +23,14 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W1:** `W1-S02` Project init and profile loading runtime; `W1-S03` Project analysis engine and durable analysis report; `W1-S05` Project verify flow and bounded preflight execution
 - **W8:** `W8-S02` Later discovery and architecture maturity pack
 - **W13:** `W13-S03` Public bootstrap and feature-intent intake
+- **W19:** `W19-S03` Discovery research and ADR evidence flow
 
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
 
 **Slices by wave:**
 - **W1:** `W1-S06` Runtime store and artifact packet materialization; `W1-S07` Wave ticket and handoff packet foundation
+- **W19:** `W19-S02` Product intake source and KPI/DoD model
 
 ## EPIC-3 Routed execution
 Resolve and execute steps through routes, wrappers, prompt bundles, policies, and adapters.
@@ -40,6 +43,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W11:** `W11-S03` Profile-driven preflight and routed live execution
 - **W13:** `W13-S04` Feature-driven discovery and execution lifecycle
 - **W16:** `W16-S04` Orchestrator-core execution decomposition; `W16-S06` Adapter permission legacy removal
+- **W20:** `W20-S03` OpenCode live-baseline certification
 
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -52,6 +56,8 @@ Implement validation, eval, harness, certification, and promotion.
 - **W9:** `W9-S05` Public harness replay command surface; `W9-S06` Asset promote/freeze command surface completion
 - **W13:** `W13-S05` Public review and learning-loop closure surfaces
 - **W14:** `W14-S06` Review, audit, and closure alignment
+- **W19:** `W19-S04` Incident-to-dataset backfill workflow; `W19-S05` Review decision and approval workflow
+- **W20:** `W20-S04` Compiler revision asset lifecycle
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -63,6 +69,7 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W10:** `W10-S02` Networked fork-first delivery execution
 - **W11:** `W11-S04` Target-anchored delivery and release evidence
 - **W18:** `W18-S04` Monorepo and bounded multirepo flow proof
+- **W20:** `W20-S01` Multirepo scoped locks and cross-repo validation
 
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
@@ -77,6 +84,8 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W12:** `W12-S03` Breaking CLI and contract removal
 - **W16:** `W16-S02` CLI dispatcher decomposition; `W16-S03` API and read-surface decomposition
 - **W18:** `W18-S01` Interactive run continuation contract; `W18-S02` Full lifecycle command mutations for connected web; `W18-S03` Web full-flow operator console
+- **W19:** `W19-S06` Planner metrics and scheduler visibility
+- **W20:** `W20-S02` Production security and observability hardening baseline
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -94,7 +103,8 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W10:** `W10-S05` Externally verified live E2E target-catalog proof
 - **W11:** `W11-S02` Target workspace materialization for live E2E; `W11-S05` Fresh external proof bundle for catalog targets
 - **W12:** `W12-S02` Live E2E Installed-User Proof Runner; `W12-S04` Proof refresh after surface cleanup
-- **W13:** `W13-S02` Curated target and feature mission catalog; `W13-S06` Full-journey harness and restored runner skill
-- **W14:** `W14-S02` Scenario and provider catalogs; `W14-S03` Feature-size taxonomy and target mission expansion; `W14-S04` Provider-pinned full-journey profiles; `W14-S05` Harness and verdict expansion; `W14-S07` Proof bundle and skill refresh
-- **W15:** `W15-S03` Proof verdict integrity gates; `W15-S04` Real code-changing full-journey proof
+- **W13:** `W13-S02` Curated target and feature mission catalog; `W13-S06` Full-journey proof runner and restored runner skill
+- **W14:** `W14-S02` Scenario and provider catalogs; `W14-S03` Feature-size taxonomy and target mission expansion; `W14-S04` Provider-pinned full-journey profiles; `W14-S05` Proof runner and verdict expansion; `W14-S07` Proof bundle and skill refresh
+- **W15:** `W15-S03` Proof verdict integrity gates
 - **W16:** `W16-S05` Installed-user live E2E runner decomposition
+- **W20:** `W20-S05` Finance analytics and production monitoring loop

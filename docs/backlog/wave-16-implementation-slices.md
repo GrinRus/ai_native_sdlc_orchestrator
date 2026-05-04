@@ -163,7 +163,7 @@ Reduce implementation complexity after W15 readiness hardening by decomposing mo
 - passing proof-runner tests
 
 ### Out of scope
-- producing the blocked real code-changing W15-S04 proof
+- producing a real code-changing full-journey proof
 - enabling upstream public-repo writes
 
 ---

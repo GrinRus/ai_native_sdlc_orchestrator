@@ -12,7 +12,6 @@ Close the post-W16 legacy cleanup by removing public compatibility aliases and s
 
 ## Sequencing notes
 - `W17-S01` depends on the W16 decomposition and adapter cleanup slices so the cleanup can touch the split CLI, core, live E2E runner, and permission-policy modules directly.
-- `W15-S04` remains externally blocked and is not part of W17 cleanup scope.
 
 ---
 
@@ -25,14 +24,14 @@ Close the post-W16 legacy cleanup by removing public compatibility aliases and s
 - **Primary user-story surfaces:** operator / SRE, delivery transaction / Git / PR flow, incident / improvement owner, security / compliance
 
 ### Local tasks
-1. Add W17-S01 across backlog source-of-truth docs without reopening W16 or W15-S04.
+1. Add W17-S01 across backlog source-of-truth docs without reopening W16.
 2. Remove the legacy incident path alias from public CLI outputs, command catalog docs, live E2E readers, tests, and proof fixtures.
 3. Remove delivery mode alias support and update examples/profiles to canonical mode values.
 4. Clean adapter permission legacy fixture wording while preserving explicit negative coverage for unsupported `external_runtime.args`.
 5. Run targeted regressions and root gates, then mark W17-S01 done.
 
 ### Acceptance criteria
-1. `pnpm slice:status` reports W17-S01 consistently while active and returns to only the external W15-S04 blocker after completion.
+1. `pnpm slice:status` reports W17-S01 consistently while active and returns to the next ready backlog slice after completion.
 2. The legacy incident path alias is absent from tracked source, docs, tests, and examples.
 3. Legacy delivery aliases are absent from active mode fields and are rejected instead of normalized.
 4. `external_runtime.args` appears only in unsupported contract or negative-test contexts.
@@ -45,6 +44,5 @@ Close the post-W16 legacy cleanup by removing public compatibility aliases and s
 - passing targeted and root gates
 
 ### Out of scope
-- producing the externally blocked W15-S04 real code-changing proof
 - changing `mock-runner` dry-run semantics
 - adding new delivery modes or adapter providers
