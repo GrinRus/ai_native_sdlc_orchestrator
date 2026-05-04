@@ -121,15 +121,15 @@ test("computeStateSyncChanges promotes/degrades ready and blocked states from de
 test("computeStateSyncChanges preserves blocked slices with explicit external blockers", () => {
   const model = buildSyntheticModel(
     [
-      { sliceId: "W15-S03", state: "done" },
+      { sliceId: "W20-S02", state: "done" },
       {
-        sliceId: "W15-S04",
+        sliceId: "W20-S03",
         state: "blocked",
-        hardDependencies: ["W15-S03"],
+        hardDependencies: ["W20-S02"],
         externalBlocker: "External runner credentials are unavailable.",
       },
     ],
-    ["W15-S03", "W15-S04"],
+    ["W20-S02", "W20-S03"],
   );
 
   assert.deepEqual(computeStateSyncChanges(model), []);
@@ -138,15 +138,15 @@ test("computeStateSyncChanges preserves blocked slices with explicit external bl
 test("computeStateSyncChanges degrades ready slices with explicit external blockers", () => {
   const model = buildSyntheticModel(
     [
-      { sliceId: "W15-S03", state: "done" },
+      { sliceId: "W20-S02", state: "done" },
       {
-        sliceId: "W15-S04",
+        sliceId: "W20-S03",
         state: "ready",
-        hardDependencies: ["W15-S03"],
+        hardDependencies: ["W20-S02"],
         externalBlocker: "External runner credentials are unavailable.",
       },
     ],
-    ["W15-S03", "W15-S04"],
+    ["W20-S02", "W20-S03"],
   );
 
   assert.deepEqual(
@@ -155,15 +155,15 @@ test("computeStateSyncChanges degrades ready slices with explicit external block
       currentState: change.currentState,
       nextState: change.nextState,
     })),
-    [{ sliceId: "W15-S04", currentState: "ready", nextState: "blocked" }],
+    [{ sliceId: "W20-S03", currentState: "ready", nextState: "blocked" }],
   );
 });
 
 test("applySliceStateTransition requires force to bypass an explicit external blocker", () => {
   const model = loadBacklogModel(process.cwd());
   assert.throws(
-    () => applySliceStateTransition(model, "W15-S04", "done"),
-    /Cannot set W15-S04 to done: external blocker remains:/,
+    () => applySliceStateTransition(model, "W20-S03", "done"),
+    /Cannot set W20-S03 to done: external blocker remains:/,
   );
 });
 

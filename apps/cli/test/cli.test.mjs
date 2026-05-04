@@ -221,6 +221,44 @@ test("implemented command help documents inputs outputs and contracts", () => {
   assert.match(result.stdout, /Contract families: project-profile/);
 });
 
+test("operator command help documents routed delivery and audit metadata", () => {
+  const verifyHelp = invokeCli(["project", "verify", "--help"]);
+  const runStartHelp = invokeCli(["run", "start", "--help"]);
+  const deliverHelp = invokeCli(["deliver", "prepare", "--help"]);
+  const releaseHelp = invokeCli(["release", "prepare", "--help"]);
+  const auditHelp = invokeCli(["audit", "runs", "--help"]);
+  const reviewHelp = invokeCli(["review", "run", "--help"]);
+
+  assert.equal(verifyHelp.exitCode, 0);
+  assert.match(verifyHelp.stdout, /--verification-label <label>/);
+  assert.match(verifyHelp.stdout, /--repo-build-command <cmd>/);
+  assert.match(verifyHelp.stdout, /--route-overrides <step=route_id,\.\.\.>/);
+  assert.match(verifyHelp.stdout, /verification_label/);
+
+  assert.equal(runStartHelp.exitCode, 0);
+  assert.match(runStartHelp.stdout, /--route-overrides <step=route_id,\.\.\.>/);
+  assert.match(runStartHelp.stdout, /runtime_harness_report_id/);
+
+  assert.equal(deliverHelp.exitCode, 0);
+  assert.match(deliverHelp.stdout, /--fork-remote-url <url>/);
+  assert.match(deliverHelp.stdout, /--network-write <true\|false>/);
+  assert.match(deliverHelp.stdout, /runtime_harness_report_id/);
+  assert.match(deliverHelp.stdout, /runtime-harness-report/);
+
+  assert.equal(releaseHelp.exitCode, 0);
+  assert.match(releaseHelp.stdout, /--fork-remote-url <url>/);
+  assert.match(releaseHelp.stdout, /--network-write <true\|false>/);
+  assert.match(releaseHelp.stdout, /runtime_harness_report_id/);
+
+  assert.equal(auditHelp.exitCode, 0);
+  assert.match(auditHelp.stdout, /run_audit_records\.provider_variant_id/);
+  assert.match(auditHelp.stdout, /run_audit_records\.feature_size_fit_status/);
+
+  assert.equal(reviewHelp.exitCode, 0);
+  assert.match(reviewHelp.stdout, /review_feature_size_fit_status/);
+  assert.match(reviewHelp.stdout, /review_provider_traceability_status/);
+});
+
 test("W13 review and learning command help documents verdict and closure semantics", () => {
   const reviewHelp = invokeCli(["review", "run", "--help"]);
   const learningHelp = invokeCli(["learning", "handoff", "--help"]);

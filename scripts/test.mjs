@@ -284,6 +284,454 @@ function assertProofBundleIntegrity() {
   console.log(`proof integrity ok: W14 bundle is ${proof.proof_scope}`);
 }
 
+function splitMarkdownTableRow(line) {
+  const trimmed = line.trim();
+  const inner = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+  const cells = [];
+  let current = "";
+  let escaped = false;
+  let inCodeSpan = false;
+
+  for (const char of inner) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === "`") {
+      inCodeSpan = !inCodeSpan;
+      current += char;
+      continue;
+    }
+
+    if (char === "|" && !inCodeSpan) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  cells.push(current.trim());
+  return cells;
+}
+
+function normalizeMarkdownInline(value) {
+  return value
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseDelimitedMarkdownList(cell, delimiter) {
+  const normalized = normalizeMarkdownInline(cell);
+  if (!normalized || normalized.toLowerCase() === "none") {
+    return [];
+  }
+
+  return normalized
+    .split(delimiter)
+    .map((item) => normalizeMarkdownInline(item))
+    .filter(Boolean);
+}
+
+function assertArrayExact(label, command, documented, expected) {
+  if (JSON.stringify(documented) === JSON.stringify(expected)) {
+    return;
+  }
+
+  const missing = expected.filter((item) => !documented.includes(item));
+  const extra = documented.filter((item) => !expected.includes(item));
+  const firstMismatchIndex = documented.findIndex((item, index) => item !== expected[index]);
+  const orderDetail =
+    missing.length === 0 && extra.length === 0 && firstMismatchIndex >= 0
+      ? ` First order mismatch at index ${firstMismatchIndex}: documented '${documented[firstMismatchIndex]}', actual '${expected[firstMismatchIndex]}'.`
+      : "";
+  console.error(
+    `${label} mismatch for '${command}': missing [${missing.join(", ")}], extra [${extra.join(", ")}].${orderDetail}`,
+  );
+  process.exit(1);
+}
+
+function parseCliCommandCatalogDocumentation() {
+  const catalog = read("docs/architecture/14-cli-command-catalog.md");
+  const rows = new Map();
+
+  for (const line of catalog.split("\n")) {
+    if (!/^\| `aor /.test(line)) {
+      continue;
+    }
+
+    const cells = splitMarkdownTableRow(line);
+    const commandMatch = /^`aor (.+)`$/.exec(cells[0] ?? "");
+    if (!commandMatch || cells.length !== 5) {
+      console.error(`Malformed CLI command catalog row: ${line}`);
+      process.exit(1);
+    }
+
+    rows.set(commandMatch[1], {
+      status: normalizeMarkdownInline(cells[1]),
+      inputs: parseDelimitedMarkdownList(cells[2], ";"),
+      outputs: parseDelimitedMarkdownList(cells[3], ","),
+      contractFamilies: parseDelimitedMarkdownList(cells[4], ","),
+    });
+  }
+
+  return rows;
+}
+
+function assertCliCommandCatalogDocumentation(commandCatalogModule) {
+  const documentedRows = parseCliCommandCatalogDocumentation();
+  const implementedCommands = commandCatalogModule.getImplementedCommands();
+  const implementedCommandNames = implementedCommands.map((definition) => definition.command);
+
+  assertArrayExact(
+    "CLI command catalog row order",
+    "docs/architecture/14-cli-command-catalog.md",
+    [...documentedRows.keys()],
+    implementedCommandNames,
+  );
+
+  for (const definition of implementedCommands) {
+    const documented = documentedRows.get(definition.command);
+    if (!documented) {
+      console.error(`docs/architecture/14-cli-command-catalog.md is missing '${definition.command}'.`);
+      process.exit(1);
+    }
+
+    if (documented.status !== definition.status) {
+      console.error(
+        `Status mismatch for '${definition.command}': documented '${documented.status}', actual '${definition.status}'.`,
+      );
+      process.exit(1);
+    }
+
+    assertArrayExact(
+      "CLI command inputs",
+      definition.command,
+      documented.inputs,
+      definition.inputs.filter((input) => input !== "--help").map(normalizeMarkdownInline),
+    );
+    assertArrayExact(
+      "CLI command outputs",
+      definition.command,
+      documented.outputs,
+      definition.outputs.map(normalizeMarkdownInline),
+    );
+    assertArrayExact(
+      "CLI command contract families",
+      definition.command,
+      documented.contractFamilies,
+      definition.contractFamilies.map(normalizeMarkdownInline),
+    );
+  }
+
+  console.log(`CLI command catalog docs ok: ${implementedCommands.length} implemented command rows aligned.`);
+}
+
+function parseContractLoaderCoverageDocumentation() {
+  const coverage = read("docs/contracts/contract-loader-coverage.md");
+  const rows = new Map();
+
+  for (const line of coverage.split("\n")) {
+    if (!/^\|[^|]+\| `[^`]+\.md` \| `[^`]+` \|/.test(line)) {
+      continue;
+    }
+
+    const cells = splitMarkdownTableRow(line);
+    if (cells.length !== 6) {
+      console.error(`Malformed contract loader coverage row: ${line}`);
+      process.exit(1);
+    }
+
+    const family = normalizeMarkdownInline(cells[2]);
+    rows.set(family, {
+      familyGroup: normalizeMarkdownInline(cells[0]),
+      sourceContract: normalizeMarkdownInline(cells[1]),
+      exampleGlob: normalizeMarkdownInline(cells[3]),
+      status: normalizeMarkdownInline(cells[4]),
+    });
+  }
+
+  return rows;
+}
+
+function assertContractLoaderCoverageDocumentation(familyIndex) {
+  const groupLabels = {
+    "core-packets-and-profiles": "Core packets and profiles",
+    "execution-and-quality": "Execution and quality",
+    "platform-assets": "Platform assets",
+    operations: "Operations",
+  };
+  const documentedRows = parseContractLoaderCoverageDocumentation();
+  const familyNames = familyIndex.map((entry) => entry.family);
+
+  assertArrayExact(
+    "contract loader coverage row order",
+    "docs/contracts/contract-loader-coverage.md",
+    [...documentedRows.keys()],
+    familyNames,
+  );
+
+  for (const entry of familyIndex) {
+    const documented = documentedRows.get(entry.family);
+    if (!documented) {
+      console.error(`docs/contracts/contract-loader-coverage.md is missing '${entry.family}'.`);
+      process.exit(1);
+    }
+
+    const expected = {
+      familyGroup: groupLabels[entry.familyGroup] ?? entry.familyGroup,
+      sourceContract: path.basename(entry.sourceContract),
+      exampleGlob: entry.exampleGlob,
+      status: entry.status,
+    };
+
+    for (const [field, expectedValue] of Object.entries(expected)) {
+      if (documented[field] !== expectedValue) {
+        console.error(
+          `Contract loader coverage mismatch for '${entry.family}' field '${field}': documented '${documented[field]}', actual '${expectedValue}'.`,
+        );
+        process.exit(1);
+      }
+    }
+  }
+
+  console.log(`contract loader coverage docs ok: ${familyIndex.length} contract families aligned.`);
+}
+
+const userStoryFamilies = [
+  {
+    prefix: "PSO",
+    roleCluster: "Product sponsor / owner",
+    total: 8,
+    tierCounts: { MVP: 6, "MVP+": 1, Later: 1 },
+  },
+  {
+    prefix: "DIS",
+    roleCluster: "Discovery / research",
+    total: 8,
+    tierCounts: { MVP: 6, "MVP+": 1, Later: 1 },
+  },
+  {
+    prefix: "ARC",
+    roleCluster: "Architect / tech lead",
+    total: 8,
+    tierCounts: { MVP: 5, "MVP+": 2, Later: 1 },
+  },
+  {
+    prefix: "EMP",
+    roleCluster: "Engineering manager / planner",
+    total: 8,
+    tierCounts: { MVP: 6, "MVP+": 1, Later: 1 },
+  },
+  {
+    prefix: "DEV",
+    roleCluster: "Delivery engineer",
+    total: 10,
+    tierCounts: { MVP: 7, "MVP+": 2, Later: 1 },
+  },
+  {
+    prefix: "RQA",
+    roleCluster: "Reviewer / QA",
+    total: 6,
+    tierCounts: { MVP: 4, "MVP+": 1, Later: 1 },
+  },
+  {
+    prefix: "AIP",
+    roleCluster: "AI platform owner",
+    total: 12,
+    tierCounts: { MVP: 6, "MVP+": 4, Later: 2 },
+  },
+  {
+    prefix: "OPS",
+    roleCluster: "Operator / SRE",
+    total: 10,
+    tierCounts: { MVP: 8, "MVP+": 1, Later: 1 },
+  },
+  {
+    prefix: "SEC",
+    roleCluster: "Security / compliance",
+    total: 6,
+    tierCounts: { MVP: 4, "MVP+": 1, Later: 1 },
+  },
+  {
+    prefix: "RMO",
+    roleCluster: "Repository / multirepo owner",
+    total: 6,
+    tierCounts: { MVP: 4, "MVP+": 1, Later: 1 },
+  },
+  {
+    prefix: "INC",
+    roleCluster: "Incident / improvement owner",
+    total: 6,
+    tierCounts: { MVP: 3, "MVP+": 2, Later: 1 },
+  },
+  {
+    prefix: "PBO",
+    roleCluster: "Project bootstrap / onboarding",
+    total: 8,
+    tierCounts: { MVP: 5, "MVP+": 2, Later: 1 },
+  },
+  {
+    prefix: "DTX",
+    roleCluster: "Delivery transaction / Git / PR",
+    total: 8,
+    tierCounts: { MVP: 5, "MVP+": 2, Later: 1 },
+  },
+  {
+    prefix: "FIN",
+    roleCluster: "Finance / audit / hygiene",
+    total: 8,
+    tierCounts: { MVP: 4, "MVP+": 3, Later: 1 },
+  },
+];
+
+const validStoryTiers = new Set(["MVP", "MVP+", "Later"]);
+const validCoverageStatuses = new Set(["covered", "partial", "gap", "blocked"]);
+
+function parseUserStoryCoverageMatrixDocumentation() {
+  const matrix = read("docs/product/user-story-coverage-matrix.md");
+  const rows = new Map();
+
+  for (const line of matrix.split("\n")) {
+    if (!/^\| [A-Z]{3}-\d{2} \|/.test(line)) {
+      continue;
+    }
+
+    const cells = splitMarkdownTableRow(line);
+    if (cells.length !== 7) {
+      console.error(`Malformed user-story coverage row: ${line}`);
+      process.exit(1);
+    }
+
+    const [storyId, roleCluster, tier, outcome, coverageStatus, evidence, gapSliceCell] = cells.map(
+      normalizeMarkdownInline,
+    );
+
+    if (rows.has(storyId)) {
+      console.error(`Duplicate user-story id found in coverage matrix: ${storyId}`);
+      process.exit(1);
+    }
+
+    rows.set(storyId, {
+      storyId,
+      roleCluster,
+      tier,
+      outcome,
+      coverageStatus,
+      evidence,
+      gapSlices: parseDelimitedMarkdownList(gapSliceCell, ","),
+    });
+  }
+
+  return rows;
+}
+
+function assertUserStoryCoverageMatrixDocumentation() {
+  const supportedStories = read("docs/product/00-supported-user-stories.md");
+  if (!supportedStories.includes("docs/product/user-story-coverage-matrix.md")) {
+    console.error("docs/product/00-supported-user-stories.md must reference the user story coverage matrix.");
+    process.exit(1);
+  }
+
+  const rows = parseUserStoryCoverageMatrixDocumentation();
+  const expectedTotal = userStoryFamilies.reduce((sum, family) => sum + family.total, 0);
+  if (rows.size !== expectedTotal) {
+    console.error(
+      `User-story coverage matrix row count mismatch: documented ${rows.size}, expected ${expectedTotal}.`,
+    );
+    process.exit(1);
+  }
+
+  const familyByPrefix = new Map(userStoryFamilies.map((family) => [family.prefix, family]));
+  const tierCountsByPrefix = new Map(
+    userStoryFamilies.map((family) => [family.prefix, { MVP: 0, "MVP+": 0, Later: 0 }]),
+  );
+
+  for (const family of userStoryFamilies) {
+    for (let index = 1; index <= family.total; index += 1) {
+      const storyId = `${family.prefix}-${String(index).padStart(2, "0")}`;
+      if (!rows.has(storyId)) {
+        console.error(`User-story coverage matrix is missing ${storyId}.`);
+        process.exit(1);
+      }
+    }
+  }
+
+  for (const row of rows.values()) {
+    const idMatch = /^([A-Z]{3})-\d{2}$/.exec(row.storyId);
+    const prefix = idMatch?.[1];
+    const family = prefix ? familyByPrefix.get(prefix) : null;
+    if (!family) {
+      console.error(`User-story coverage matrix contains unknown story id '${row.storyId}'.`);
+      process.exit(1);
+    }
+
+    if (row.roleCluster !== family.roleCluster) {
+      console.error(
+        `User-story ${row.storyId} role cluster mismatch: documented '${row.roleCluster}', expected '${family.roleCluster}'.`,
+      );
+      process.exit(1);
+    }
+
+    if (!validStoryTiers.has(row.tier)) {
+      console.error(`User-story ${row.storyId} has invalid tier '${row.tier}'.`);
+      process.exit(1);
+    }
+
+    if (!validCoverageStatuses.has(row.coverageStatus)) {
+      console.error(`User-story ${row.storyId} has invalid coverage status '${row.coverageStatus}'.`);
+      process.exit(1);
+    }
+
+    if (!row.outcome || !row.evidence) {
+      console.error(`User-story ${row.storyId} must include a non-empty outcome and evidence cell.`);
+      process.exit(1);
+    }
+
+    if (row.coverageStatus === "covered" && row.gapSlices.length > 0) {
+      console.error(`Covered user-story ${row.storyId} must not reference gap slices.`);
+      process.exit(1);
+    }
+
+    if (row.coverageStatus !== "covered" && row.gapSlices.length === 0) {
+      console.error(`Non-covered user-story ${row.storyId} must reference at least one gap slice.`);
+      process.exit(1);
+    }
+
+    for (const gapSlice of row.gapSlices) {
+      if (!waveSectionMap.has(gapSlice)) {
+        console.error(`User-story ${row.storyId} references unknown gap slice '${gapSlice}'.`);
+        process.exit(1);
+      }
+    }
+
+    tierCountsByPrefix.get(prefix)[row.tier] += 1;
+  }
+
+  for (const family of userStoryFamilies) {
+    const actualTierCounts = tierCountsByPrefix.get(family.prefix);
+    for (const tier of Object.keys(family.tierCounts)) {
+      if (actualTierCounts[tier] !== family.tierCounts[tier]) {
+        console.error(
+          `User-story tier count mismatch for ${family.prefix} ${tier}: documented ${actualTierCounts[tier]}, expected ${family.tierCounts[tier]}.`,
+        );
+        process.exit(1);
+      }
+    }
+  }
+
+  console.log(`user-story coverage matrix ok: ${rows.size} stories across ${userStoryFamilies.length} role clusters.`);
+}
+
 if (!sameSet(waveSliceIds, uniqueMasterSliceIds)) {
   console.error("Wave docs and master backlog disagree about slice ids.");
   process.exit(1);
@@ -366,6 +814,7 @@ for (const file of waveFiles) {
 console.log(`backlog consistency ok: ${waveSliceIds.length} slices across ${waveFiles.length} waves`);
 assertLatestWaveSourceOfTruth();
 assertProofBundleIntegrity();
+assertUserStoryCoverageMatrixDocumentation();
 
 const readme = read("README.md");
 const readmeCommandSurfaceMatch = readme.match(
@@ -392,6 +841,10 @@ if (documentedImplementedCount !== implementedCommandsCount || documentedPlanned
 console.log(
   `README command surface counts ok: ${implementedCommandsCount} implemented and ${plannedCommandsCount} planned commands.`,
 );
+assertCliCommandCatalogDocumentation(commandCatalogModule);
+
+const contractsModule = await import(pathToFileURL(path.join(root, "packages/contracts/src/index.mjs")).href);
+assertContractLoaderCoverageDocumentation(contractsModule.getContractFamilyIndex());
 
 const contractsTestDir = path.join(root, "packages/contracts/test");
 const contractsTestFiles = fs

@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-18-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-20-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -25,10 +25,12 @@ The authoritative planning model for implementation lives in:
 | W12 | Remove public live-E2E product surfaces, move rehearsal to an internal installed-user black-box proof runner, and refresh proof through installed-user style execution. | 4 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-12-implementation-slices.md` |
 | W13 | Add a full user-journey live E2E layer on curated public repositories, start each run from a concrete feature mission, and evaluate runtime plus quality verdicts through public surfaces. | 6 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-7 | `docs/backlog/wave-13-implementation-slices.md` |
 | W14 | Expand live E2E into a curated matrix across scenario families, pinned providers, and size-classed feature missions with matrix-aware review, audit, and closure evidence. | 7 | EPIC-0, EPIC-4, EPIC-7 | `docs/backlog/wave-14-implementation-slices.md` |
-| W15 | Harden readiness signals after W14 by reopening the queue, aligning package/module evidence, and separating coverage proof from real code-changing proof. | 4 | EPIC-0, EPIC-7 | `docs/backlog/wave-15-implementation-slices.md` |
+| W15 | Harden readiness signals after W14 by reopening the queue, aligning package/module evidence, and making coverage proof claims machine-checkable. | 3 | EPIC-0, EPIC-7 | `docs/backlog/wave-15-implementation-slices.md` |
 | W16 | Reduce implementation complexity through behavior-preserving decomposition, shared helper extraction, and contract-first adapter permission cleanup. | 6 | EPIC-0, EPIC-3, EPIC-6, EPIC-7 | `docs/backlog/wave-16-implementation-slices.md` |
-| W17 | Remove post-W16 legacy public aliases and stale compatibility documentation while keeping W15-S04 externally blocked. | 1 | EPIC-0, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-17-implementation-slices.md` |
+| W17 | Remove post-W16 legacy public aliases and stale compatibility documentation. | 1 | EPIC-0, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-17-implementation-slices.md` |
 | W18 | Close the connected web full-flow and topology proof gaps with control-plane-owned lifecycle mutations, interactive continuation semantics, and monorepo/bounded multirepo evidence. | 4 | EPIC-5, EPIC-6 | `docs/backlog/wave-18-implementation-slices.md` |
+| W19 | Convert the user-story gap audit into traceable product, discovery, quality, learning, and planner backlog slices. | 6 | EPIC-0, EPIC-1, EPIC-2, EPIC-4, EPIC-6 | `docs/backlog/wave-19-implementation-slices.md` |
+| W20 | Capture production and platform maturity gaps for multirepo locks, hardening, OpenCode certification, compiler revisions, and finance monitoring. | 5 | EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-20-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -78,7 +80,6 @@ The authoritative planning model for implementation lives in:
 | W15-S01 | readiness hardening: source-of-truth queue repair (no direct story closure) |
 | W15-S02 | readiness hardening: package/module workspace alignment (no direct story closure) |
 | W15-S03 | readiness hardening: proof verdict integrity gates (no direct story closure) |
-| W15-S04 | readiness hardening: real code-changing proof closure (no direct story closure) |
 | W16-S01 | implementation complexity reduction: shared helper extraction (no direct story closure) |
 | W16-S02 | implementation complexity reduction: CLI dispatcher decomposition (no direct story closure) |
 | W16-S03 | implementation complexity reduction: API/read-surface decomposition (no direct story closure) |
@@ -90,6 +91,17 @@ The authoritative planning model for implementation lives in:
 | W18-S02 | gap closure: full lifecycle command mutations for connected web |
 | W18-S03 | gap closure: detachable web full-flow operator console |
 | W18-S04 | gap closure: monorepo and bounded multirepo flow proof |
+| W19-S01 | gap traceability target: all 112 story IDs |
+| W19-S02 | gap closure target: PSO-01, PSO-02, PSO-07, PBO-07 |
+| W19-S03 | gap closure target: DIS-03, DIS-07, DIS-08, ARC-08, PBO-08 |
+| W19-S04 | gap closure target: RQA-05, INC-03, INC-05 |
+| W19-S05 | gap closure target: PSO-03, PSO-05, DEV-05, RQA-02, RQA-06, OPS-04 |
+| W19-S06 | gap closure target: PSO-08, EMP-02, EMP-03, EMP-07, EMP-08, OPS-10 |
+| W20-S01 | gap closure target: RMO-02, RMO-03, RMO-04, RMO-05, RMO-06, DTX-08, PBO-08 |
+| W20-S02 | gap closure target: DEV-10, OPS-10, SEC-02, SEC-06 |
+| W20-S03 | gap closure target: DEV-04, AIP-12 |
+| W20-S04 | gap closure target: AIP-05, INC-03 |
+| W20-S05 | gap closure target: INC-06, FIN-01, FIN-02, FIN-07, FIN-08 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -282,14 +294,13 @@ The authoritative planning model for implementation lives in:
 
 **Current status note:** `W14-S07` is now closed with matrix-aware coverage proof under `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`. The refreshed bundle proves all `9/9` required matrix cells, all `3/3` repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs, and all mandatory scenario families (`regress`, `release`, `repair`, `governance`), but it is explicitly `coverage_with_findings` because deterministic external-runner mocks do not materialize mission code changes.
 
-## W15 — readiness hardening and real-proof queue
-**Goal:** Remove false readiness signals after W14 by making source-of-truth drift, package/module map drift, and live E2E proof scope machine-checkable while keeping real code-changing proof blocked until it can be produced honestly.
+## W15 — readiness hardening and proof integrity
+**Goal:** Remove false readiness signals after W14 by making source-of-truth drift, package/module map drift, and live E2E proof scope machine-checkable.
 
 **Exit criteria:**
 - W15 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
 - the module map and workspace manifests agree on all package-managed apps/packages
 - root checks fail when stale wave-coverage claims or dishonest proof-bundle claims appear
-- `W15-S04` remains blocked until a required full-journey matrix cell can run with usable non-interactive edit permissions, meaningful target changes, `runtime_harness_report.overall_decision=pass`, and `overall_verdict=pass`
 
 **Detailed slices:** `docs/backlog/wave-15-implementation-slices.md`
 
@@ -305,7 +316,7 @@ The authoritative planning model for implementation lives in:
 **Detailed slices:** `docs/backlog/wave-16-implementation-slices.md`
 
 ## W17 — post-W16 legacy surface cleanup
-**Goal:** Remove public compatibility aliases and stale documentation left after W16 decomposition, while keeping W15-S04 scoped to its external real-proof blocker.
+**Goal:** Remove public compatibility aliases and stale documentation left after W16 decomposition.
 
 **Exit criteria:**
 - W17-S01 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
@@ -327,6 +338,30 @@ The authoritative planning model for implementation lives in:
 - monorepo and bounded multirepo support is proven through examples/tests for one project profile with explicit repo graph, impacted repo scope, validation evidence, coordination evidence, and delivery lineage
 
 **Detailed slices:** `docs/backlog/wave-18-implementation-slices.md`
+
+## W19 — story gap traceability and product-quality closure
+**Goal:** Convert the user-story gap audit into actionable backlog slices, with traceable coverage evidence before deeper product, discovery, review, learning, and planner work begins.
+
+**Exit criteria:**
+- W19 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
+- the 112-story working set has stable IDs, tiers, coverage statuses, implementation evidence, and gap slice references
+- product intake, discovery research, review decisions, incident backfill, and planner metric gaps have explicit acceptance evidence paths
+
+**Detailed slices:** `docs/backlog/wave-19-implementation-slices.md`
+
+
+## W20 — production and platform maturity gap closure
+**Goal:** Capture remaining production and platform maturity gaps after W19, including multirepo locks, security hardening, OpenCode certification, compiler revision lifecycle, and finance monitoring.
+
+**Exit criteria:**
+- W20 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
+- multirepo scoped locks and cross-repo validation have a bounded backlog path
+- production auth, redaction, logging, and observability hardening are separated from local trusted baselines
+- OpenCode live-baseline certification remains blocked unless live runtime evidence exists
+- compiler revisions and finance monitoring loops have first-class backlog slices
+
+**Detailed slices:** `docs/backlog/wave-20-implementation-slices.md`
+
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

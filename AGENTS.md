@@ -13,7 +13,7 @@ AOR is an AI-native orchestrator for the full SDLC: bootstrap, discovery, specif
 
 ## Current repo state
 
-- This repository is still a docs-first and scaffold-first package.
+- This repository is docs-first with implemented CLI/API/web/runtime baselines, but it is not yet a production-ready orchestrator runtime.
 - Root commands are repository-integrity checks, not a full product runtime:
   - `pnpm install`
   - `pnpm lint`

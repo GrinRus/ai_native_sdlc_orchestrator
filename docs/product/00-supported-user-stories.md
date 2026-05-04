@@ -2,6 +2,8 @@
 
 This document groups the AOR user-story surface into role clusters. The current working set still maps to **112 stories** across the lifecycle, but this document is intentionally easier to navigate than a flat list.
 
+The flat, machine-checkable registry lives in `docs/product/user-story-coverage-matrix.md`. It assigns stable story IDs, tiers, implementation evidence, coverage status, and backlog gap references for every story in this working set.
+
 ## Coverage summary
 - Total stories: **112**
 - MVP: **73**

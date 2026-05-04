@@ -1,11 +1,9 @@
 # Slice dependency graph
 
-## Purpose
-This document shows the hard-dependency structure for all defined implementation slices.
+This graph mirrors the hard dependencies from the wave documents and master backlog.
 
-## Mermaid graph
 ```mermaid
-flowchart TB
+graph TD
   W0S01[W0-S01 Workspace and package build baseline]
   W0S02[W0-S02 Contracts package and schema loader baseline]
   W0S03[W0-S03 Example and reference integrity checks]
@@ -91,18 +89,17 @@ flowchart TB
   W13S03[W13-S03 Public bootstrap and feature-intent intake]
   W13S04[W13-S04 Feature-driven discovery and execution lifecycle]
   W13S05[W13-S05 Public review and learning-loop closure surfaces]
-  W13S06[W13-S06 Full-journey harness and restored runner skill]
+  W13S06[W13-S06 Full-journey proof runner and restored runner skill]
   W14S01[W14-S01 Backlog and source-of-truth realignment]
   W14S02[W14-S02 Scenario and provider catalogs]
   W14S03[W14-S03 Feature-size taxonomy and target mission expansion]
   W14S04[W14-S04 Provider-pinned full-journey profiles]
-  W14S05[W14-S05 Harness and verdict expansion]
+  W14S05[W14-S05 Proof runner and verdict expansion]
   W14S06[W14-S06 Review, audit, and closure alignment]
   W14S07[W14-S07 Proof bundle and skill refresh]
   W15S01[W15-S01 Source-of-truth and readiness queue repair]
   W15S02[W15-S02 Package/module workspace alignment]
   W15S03[W15-S03 Proof verdict integrity gates]
-  W15S04[W15-S04 Real code-changing full-journey proof]
   W16S01[W16-S01 Complexity baseline and shared helper extraction]
   W16S02[W16-S02 CLI dispatcher decomposition]
   W16S03[W16-S03 API and read-surface decomposition]
@@ -114,6 +111,17 @@ flowchart TB
   W18S02[W18-S02 Full lifecycle command mutations for connected web]
   W18S03[W18-S03 Web full-flow operator console]
   W18S04[W18-S04 Monorepo and bounded multirepo flow proof]
+  W19S01[W19-S01 User-story registry and coverage evidence matrix]
+  W19S02[W19-S02 Product intake source and KPI/DoD model]
+  W19S03[W19-S03 Discovery research and ADR evidence flow]
+  W19S04[W19-S04 Incident-to-dataset backfill workflow]
+  W19S05[W19-S05 Review decision and approval workflow]
+  W19S06[W19-S06 Planner metrics and scheduler visibility]
+  W20S01[W20-S01 Multirepo scoped locks and cross-repo validation]
+  W20S02[W20-S02 Production security and observability hardening baseline]
+  W20S03[W20-S03 OpenCode live-baseline certification]
+  W20S04[W20-S04 Compiler revision asset lifecycle]
+  W20S05[W20-S05 Finance analytics and production monitoring loop]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -250,13 +258,13 @@ flowchart TB
   W6S03 --> W10S03
   W6S04 --> W10S03
   W10S03 --> W10S04
+  W10S01 --> W10S05
+  W10S02 --> W10S05
+  W11S05 --> W10S05
   W11S01 --> W11S02
   W11S02 --> W11S03
   W11S03 --> W11S04
   W11S04 --> W11S05
-  W10S01 --> W10S05
-  W10S02 --> W10S05
-  W11S05 --> W10S05
   W12S01 --> W12S02
   W12S02 --> W12S03
   W12S03 --> W12S04
@@ -273,7 +281,6 @@ flowchart TB
   W14S06 --> W14S07
   W15S01 --> W15S02
   W15S01 --> W15S03
-  W15S03 --> W15S04
   W16S01 --> W16S02
   W16S01 --> W16S03
   W16S01 --> W16S04
@@ -285,6 +292,30 @@ flowchart TB
   W16S06 --> W17S01
   W18S01 --> W18S02
   W18S02 --> W18S03
+  W17S01 --> W19S01
+  W19S01 --> W19S02
+  W13S03 --> W19S02
+  W19S02 --> W19S03
+  W8S02 --> W19S03
+  W19S01 --> W19S04
+  W7S03 --> W19S04
+  W13S05 --> W19S04
+  W19S01 --> W19S05
+  W13S05 --> W19S05
+  W14S06 --> W19S05
+  W19S01 --> W19S06
+  W6S03 --> W19S06
+  W8S01 --> W19S06
+  W19S01 --> W20S01
+  W8S07 --> W20S01
+  W19S01 --> W20S02
+  W10S04 --> W20S02
+  W16S06 --> W20S03
+  W20S02 --> W20S03
+  W19S01 --> W20S04
+  W8S09 --> W20S04
+  W20S02 --> W20S05
+  W7S04 --> W20S05
 ```
 
 ## W0 hard dependencies
@@ -402,8 +433,6 @@ flowchart TB
 | W10-S04 | W10-S03 |
 | W10-S05 | W10-S01, W10-S02, W11-S05 |
 
-`W10-S05 -> W11-S05` is a historical closure dependency retained to explain why the final W10 proof closed after W11 target-backed evidence; it is not normal forward implementation order.
-
 ## W11 hard dependencies
 | Slice ID | Depends on |
 |---|---|
@@ -448,7 +477,6 @@ flowchart TB
 | W15-S01 | none |
 | W15-S02 | W15-S01 |
 | W15-S03 | W15-S01 |
-| W15-S04 | W15-S03 |
 
 ## W16 hard dependencies
 | Slice ID | Depends on |
@@ -473,19 +501,38 @@ flowchart TB
 | W18-S03 | W18-S02 |
 | W18-S04 | none |
 
+## W19 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W19-S01 | W17-S01 |
+| W19-S02 | W19-S01, W13-S03 |
+| W19-S03 | W19-S02, W8-S02 |
+| W19-S04 | W19-S01, W7-S03, W13-S05 |
+| W19-S05 | W19-S01, W13-S05, W14-S06 |
+| W19-S06 | W19-S01, W6-S03, W8-S01 |
+
+## W20 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W20-S01 | W19-S01, W8-S07 |
+| W20-S02 | W19-S01, W10-S04 |
+| W20-S03 | W16-S06, W20-S02 |
+| W20-S04 | W19-S01, W8-S09 |
+| W20-S05 | W20-S02, W7-S04 |
+
 ## Topological order
 1. W0-S01
-2. W0-S04
-3. W0-S02
-4. W0-S03
-5. W1-S01
-6. W0-S05
-7. W1-S02
-8. W0-S06
+2. W0-S02
+3. W0-S03
+4. W0-S04
+5. W0-S05
+6. W0-S06
+7. W1-S01
+8. W1-S02
 9. W1-S03
 10. W1-S04
-11. W1-S06
-12. W1-S05
+11. W1-S05
+12. W1-S06
 13. W1-S07
 14. W1-S08
 15. W2-S01
@@ -495,12 +542,12 @@ flowchart TB
 19. W2-S05
 20. W2-S06
 21. W3-S01
-22. W4-S01
-23. W3-S02
-24. W3-S03
-25. W3-S04
-26. W3-S05
-27. W3-S06
+22. W3-S02
+23. W3-S03
+24. W3-S04
+25. W3-S05
+26. W3-S06
+27. W4-S01
 28. W4-S02
 29. W4-S03
 30. W4-S04
@@ -520,36 +567,36 @@ flowchart TB
 44. W6-S06
 45. W7-S01
 46. W7-S02
-47. W7-S04
-48. W7-S03
-49. W8-S05
-50. W7-S05
-51. W8-S01
-52. W8-S02
-53. W8-S08
-54. W8-S03
-55. W8-S04
-56. W8-S06
-57. W8-S09
-58. W8-S07
+47. W7-S03
+48. W7-S04
+49. W7-S05
+50. W8-S01
+51. W8-S02
+52. W8-S03
+53. W8-S04
+54. W8-S05
+55. W8-S06
+56. W8-S07
+57. W8-S08
+58. W8-S09
 59. W9-S01
 60. W9-S02
 61. W9-S03
-62. W9-S05
-63. W9-S06
-64. W9-S04
+62. W9-S04
+63. W9-S05
+64. W9-S06
 65. W9-S07
 66. W9-S08
 67. W10-S01
 68. W10-S02
 69. W10-S03
 70. W10-S04
-71. W11-S01
-72. W11-S02
-73. W11-S03
-74. W11-S04
-75. W11-S05
-76. W10-S05
+71. W10-S05
+72. W11-S01
+73. W11-S02
+74. W11-S03
+75. W11-S04
+76. W11-S05
 77. W12-S01
 78. W12-S02
 79. W12-S03
@@ -570,18 +617,28 @@ flowchart TB
 94. W15-S01
 95. W15-S02
 96. W15-S03
-97. W15-S04
-98. W16-S01
-99. W16-S02
-100. W16-S03
-101. W16-S04
-102. W16-S05
-103. W16-S06
-104. W17-S01
-105. W18-S01
-106. W18-S02
-107. W18-S03
-108. W18-S04
+97. W16-S01
+98. W16-S02
+99. W16-S03
+100. W16-S04
+101. W16-S05
+102. W16-S06
+103. W17-S01
+104. W18-S01
+105. W18-S02
+106. W18-S03
+107. W18-S04
+108. W19-S01
+109. W19-S02
+110. W19-S03
+111. W19-S04
+112. W19-S05
+113. W19-S06
+114. W20-S01
+115. W20-S02
+116. W20-S03
+117. W20-S04
+118. W20-S05
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.
