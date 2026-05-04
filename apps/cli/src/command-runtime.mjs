@@ -393,28 +393,61 @@ export function runtimeHarnessReportHasMeaningfulPatch(report) {
 }
 
 /**
- * @param {{ report: Record<string, unknown>, command: string }} options
+ * @param {string | string[] | true | undefined} value
+ * @returns {"strict" | "observe"}
  */
-export function assertRuntimeHarnessAllowsDelivery(options) {
+export function resolveQualityGateMode(value) {
+  const mode = resolveOptionalStringFlag("quality-gate-mode", value) ?? "strict";
+  if (mode === "strict" || mode === "observe") {
+    return mode;
+  }
+  throw new CliUsageError("Flag '--quality-gate-mode' must be either 'strict' or 'observe'.");
+}
+
+/**
+ * @param {{ report: Record<string, unknown>, command: string }} options
+ * @returns {{ status: "pass" | "not_pass", findings: string[] }}
+ */
+export function evaluateRuntimeHarnessDeliveryGate(options) {
   if (!isStrictRuntimeHarnessReport(options.report)) {
-    return;
+    return { status: "pass", findings: [] };
   }
   const stepDecisions = Array.isArray(options.report.step_decisions) ? options.report.step_decisions : [];
   if (stepDecisions.length === 0) {
-    throw new CliUsageError(
-      `${options.command} blocked because Runtime Harness has no routed step decisions for a strict mission. Run 'aor run start' and close Runtime Harness findings before delivery or release.`,
-    );
+    return {
+      status: "not_pass",
+      findings: [
+        `${options.command} blocked because Runtime Harness has no routed step decisions for a strict mission. Run 'aor run start' and close Runtime Harness findings before delivery or release.`,
+      ],
+    };
   }
   const overallDecision = typeof options.report.overall_decision === "string" ? options.report.overall_decision : "unknown";
   if (overallDecision !== "pass") {
-    throw new CliUsageError(
-      `${options.command} blocked by Runtime Harness decision '${overallDecision}'. Resolve runtime findings before delivery or release.`,
-    );
+    return {
+      status: "not_pass",
+      findings: [
+        `${options.command} blocked by Runtime Harness decision '${overallDecision}'. Resolve runtime findings before delivery or release.`,
+      ],
+    };
   }
   if (!runtimeHarnessReportHasMeaningfulPatch(options.report)) {
-    throw new CliUsageError(
-      `${options.command} blocked because Runtime Harness found no meaningful mission-scoped patch for a strict mission.`,
-    );
+    return {
+      status: "not_pass",
+      findings: [
+        `${options.command} blocked because Runtime Harness found no meaningful mission-scoped patch for a strict mission.`,
+      ],
+    };
+  }
+  return { status: "pass", findings: [] };
+}
+
+/**
+ * @param {{ report: Record<string, unknown>, command: string }} options
+ */
+export function assertRuntimeHarnessAllowsDelivery(options) {
+  const gate = evaluateRuntimeHarnessDeliveryGate(options);
+  if (gate.status !== "pass") {
+    throw new CliUsageError(gate.findings[0] ?? `${options.command} blocked by Runtime Harness quality gate.`);
   }
 }
 

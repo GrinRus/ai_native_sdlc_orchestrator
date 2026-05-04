@@ -1098,68 +1098,61 @@ export function executeInstalledUserFlow(options) {
       markStage(stageMap, "review", "skipped", [], "Profile has no harness certification step.");
     }
 
-    if (asRecord(options.profile.output_policy).materialize_release_packet === true) {
-      const releaseArgs = [
-        "release",
-        "prepare",
-        ...commandBaseArgs,
-        "--run-id",
-        options.runId,
-        "--step-class",
-        "implement",
-        "--mode",
-        getPreferredDeliveryMode(options.profile),
-      ];
-      if (artifacts.approved_handoff_packet_file) {
-        releaseArgs.push("--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file));
-      }
-      if (promotionEvidenceRefs.length > 0) {
-        releaseArgs.push("--promotion-evidence-refs", uniqueStrings(promotionEvidenceRefs).join(","));
-      }
-      const release = runCommand("release-prepare", releaseArgs);
-      Object.assign(artifacts, {
-        delivery_plan_file: getStringField(release.payload, "delivery_plan_file"),
-        delivery_manifest_file: getStringField(release.payload, "delivery_manifest_file"),
-        release_packet_file: getStringField(release.payload, "release_packet_file"),
-        delivery_transcript_file: getStringField(release.payload, "delivery_transcript_file"),
-        delivery_mode: getStringField(release.payload, "delivery_mode"),
-        release_packet_status: getStringField(release.payload, "release_packet_status"),
-      });
-      if (release.payload?.delivery_blocking === true || !artifacts.release_packet_file) {
-        markStage(
-          stageMap,
-          "delivery",
-          "fail",
-          uniqueStrings([release.transcriptFile, ...collectStringRefs(release.payload)]),
-          "Release prepare was blocked.",
-        );
-        markStage(
-          stageMap,
-          "release",
-          "fail",
-          uniqueStrings([release.transcriptFile, ...collectStringRefs(release.payload)]),
-          "Release packet was not materialized.",
-        );
-        throw new Error("Release prepare was blocked.");
-      }
+    const deliverArgs = [
+      "deliver",
+      "prepare",
+      ...commandBaseArgs,
+      "--run-id",
+      options.runId,
+      "--step-class",
+      "implement",
+      "--mode",
+      getPreferredDeliveryMode(options.profile),
+      "--quality-gate-mode",
+      "observe",
+    ];
+    if (artifacts.approved_handoff_packet_file) {
+      deliverArgs.push("--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file));
+    }
+    if (promotionEvidenceRefs.length > 0) {
+      deliverArgs.push("--promotion-evidence-refs", uniqueStrings(promotionEvidenceRefs).join(","));
+    }
+    const deliver = runCommand("deliver-prepare", deliverArgs, { allowNonZeroWithPayload: true });
+    const deliveryRuntimeHarnessReportFile = getStringField(deliver.payload, "runtime_harness_report_file");
+    Object.assign(artifacts, {
+      delivery_plan_file: getStringField(deliver.payload, "delivery_plan_file"),
+      delivery_manifest_file: getStringField(deliver.payload, "delivery_manifest_file"),
+      delivery_transcript_file: getStringField(deliver.payload, "delivery_transcript_file"),
+      delivery_mode: getStringField(deliver.payload, "delivery_mode"),
+      delivery_quality_gate_mode: getStringField(deliver.payload, "delivery_quality_gate_mode"),
+      delivery_quality_gate_status: getStringField(deliver.payload, "delivery_quality_gate_status"),
+      delivery_quality_gate_findings: asStringArray(deliver.payload?.delivery_quality_gate_findings),
+      delivery_runtime_harness_report_file: deliveryRuntimeHarnessReportFile,
+      runtime_harness_report_file:
+        asNonEmptyString(artifacts.runtime_harness_report_file) || deliveryRuntimeHarnessReportFile,
+      delivery_blocking: deliver.payload?.delivery_blocking === true,
+      delivery_blocking_reasons: asStringArray(deliver.payload?.delivery_blocking_reasons),
+    });
+    if (!artifacts.delivery_manifest_file) {
       markStage(
         stageMap,
         "delivery",
-        "pass",
-        uniqueStrings([release.transcriptFile, ...collectStringRefs(release.payload)]),
-        "Delivery artifacts were materialized through release prepare.",
+        "fail",
+        uniqueStrings([deliver.transcriptFile, ...collectStringRefs(deliver.payload)]),
+        "Delivery prepare did not materialize delivery evidence.",
       );
-      markStage(
-        stageMap,
-        "release",
-        "pass",
-        uniqueStrings([release.transcriptFile, ...collectStringRefs(release.payload)]),
-        "Release packet was materialized.",
-      );
-    } else {
-      markStage(stageMap, "delivery", "skipped", [], "Profile does not request release-packet materialization.");
-      markStage(stageMap, "release", "skipped", [], "Profile does not request release-packet materialization.");
+      throw new Error("Delivery prepare did not materialize delivery evidence.");
     }
+    markStage(
+      stageMap,
+      "delivery",
+      artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass" ? "warn" : "pass",
+      uniqueStrings([deliver.transcriptFile, ...collectStringRefs(deliver.payload)]),
+      artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass"
+        ? "Delivery evidence materialized with observed quality findings."
+        : "Delivery prepare materialized delivery evidence.",
+    );
+    markStage(stageMap, "release", "skipped", [], "Observation v1 ends at delivery.");
 
     return {
       startedAt,
@@ -1733,7 +1726,7 @@ export function executeFullJourneyFlow(options) {
         markStage(
           stageMap,
           "execution",
-          "fail",
+          "warn",
           uniqueStrings([
             verifyPreflight.transcriptFile,
             asNonEmptyString(artifacts.baseline_verify_summary_file),
@@ -1802,10 +1795,12 @@ export function executeFullJourneyFlow(options) {
     }
     const postRunVerifySummary = readJson(postRunVerifySummaryPath);
     artifacts.post_run_verify_status = asNonEmptyString(postRunVerifySummary.status) === "passed" ? "pass" : "fail";
+    const executionStageStatus =
+      stageMap.execution?.status === "fail" ? "fail" : artifacts.execution_degraded === true ? "warn" : "pass";
     markStage(
       stageMap,
       "execution",
-      artifacts.execution_degraded === true ? "fail" : "pass",
+      executionStageStatus,
       uniqueStrings([
         verifyPreflight.transcriptFile,
         asNonEmptyString(artifacts.baseline_verify_summary_file),
@@ -1815,7 +1810,7 @@ export function executeFullJourneyFlow(options) {
         postRunVerifySummaryPath,
         ...collectStringRefs(runStart.payload),
       ]),
-      artifacts.execution_degraded === true
+      executionStageStatus === "warn"
         ? "Provider execution materialized degraded evidence; post-run verification completed for black-box quality reporting."
         : "Baseline diagnostics, run start, run status, and post-run verification completed through public execution lifecycle.",
     );
@@ -1981,6 +1976,8 @@ export function executeFullJourneyFlow(options) {
         "implement",
         "--mode",
         getPreferredDeliveryMode(options.profile),
+        "--quality-gate-mode",
+        "observe",
         ...(artifacts.approved_handoff_packet_file
           ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
           : []),
@@ -2003,10 +2000,20 @@ export function executeFullJourneyFlow(options) {
           : summary,
       );
     }
+    if (!deliverPrepare) {
+      throw new Error("Delivery prepare did not materialize delivery evidence.");
+    }
     if (deliverPrepare) {
+      const deliveryRuntimeHarnessReportFile = getStringField(deliverPrepare.payload, "runtime_harness_report_file");
       artifacts.delivery_manifest_file = getStringField(deliverPrepare.payload, "delivery_manifest_file");
       artifacts.delivery_plan_file = getStringField(deliverPrepare.payload, "delivery_plan_file");
       artifacts.delivery_transcript_file = getStringField(deliverPrepare.payload, "delivery_transcript_file");
+      artifacts.delivery_runtime_harness_report_file = deliveryRuntimeHarnessReportFile;
+      artifacts.runtime_harness_report_file =
+        asNonEmptyString(artifacts.runtime_harness_report_file) || deliveryRuntimeHarnessReportFile;
+      artifacts.delivery_quality_gate_mode = getStringField(deliverPrepare.payload, "delivery_quality_gate_mode");
+      artifacts.delivery_quality_gate_status = getStringField(deliverPrepare.payload, "delivery_quality_gate_status");
+      artifacts.delivery_quality_gate_findings = asStringArray(deliverPrepare.payload?.delivery_quality_gate_findings);
       if (internalTestHooks.block_delivery_prepare === true) {
         deliverPrepare.payload.delivery_blocking = true;
       }
@@ -2020,60 +2027,24 @@ export function executeFullJourneyFlow(options) {
       markStage(
         stageMap,
         "delivery",
-        artifacts.delivery_blocking === true ? "fail" : "pass",
+        artifacts.delivery_manifest_file
+          ? artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass"
+            ? "warn"
+            : "pass"
+          : "fail",
         uniqueStrings([deliverPrepare.transcriptFile, ...collectStringRefs(deliverPrepare.payload)]),
-        artifacts.delivery_blocking === true
-          ? artifacts.delivery_blocked_by_quality_gate === true
-            ? "Delivery prepare was blocked by quality/runtime harness gate."
-            : "Delivery prepare was blocked."
-          : "Delivery prepare materialized delivery evidence.",
+        artifacts.delivery_manifest_file
+          ? artifacts.delivery_blocking === true || artifacts.delivery_quality_gate_status === "not_pass"
+            ? "Delivery evidence materialized with observed quality findings."
+            : "Delivery prepare materialized delivery evidence."
+          : "Delivery prepare did not materialize delivery evidence.",
       );
+      if (!artifacts.delivery_manifest_file) {
+        throw new Error("Delivery prepare did not materialize delivery evidence.");
+      }
     }
 
-    if (asRecord(options.profile.output_policy).materialize_release_packet === true && artifacts.delivery_blocking !== true) {
-      const releasePrepare = runCommand("release-prepare", [
-        "release",
-        "prepare",
-        "--project-ref",
-        ".",
-        "--project-profile",
-        "./project.aor.yaml",
-        "--runtime-root",
-        ".aor",
-        "--run-id",
-        options.runId,
-        "--step-class",
-        "implement",
-        "--mode",
-        getPreferredDeliveryMode(options.profile),
-        ...(artifacts.approved_handoff_packet_file
-          ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
-          : []),
-        ...(deliveryEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", deliveryEvidenceRefs.join(",")] : []),
-      ]);
-      artifacts.release_packet_file = getStringField(releasePrepare.payload, "release_packet_file");
-      if (!artifacts.release_packet_file) {
-        markStage(
-          stageMap,
-          "release",
-          "fail",
-          uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
-          "Release prepare did not materialize release packet.",
-        );
-        throw new Error("Release prepare did not materialize release packet.");
-      }
-      markStage(
-        stageMap,
-        "release",
-        "pass",
-        uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
-        "Release prepare materialized release packet evidence.",
-      );
-    } else if (asRecord(options.profile.output_policy).materialize_release_packet === true) {
-      markStage(stageMap, "release", "fail", [], "Release prepare skipped because delivery prepare was blocked.");
-    } else {
-      markStage(stageMap, "release", "skipped", [], "Profile does not request release packet materialization.");
-    }
+    markStage(stageMap, "release", "skipped", [], "Observation v1 ends at delivery.");
 
     const auditRuns = runCommand("audit-runs", [
       "audit",

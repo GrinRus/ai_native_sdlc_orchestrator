@@ -1013,6 +1013,42 @@ test("strict delivery prepare blocks without Runtime Harness routed step decisio
   });
 });
 
+test("delivery prepare observe mode materializes evidence with Runtime Harness findings", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+
+    const result = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "observe-delivery-without-runtime-harness",
+      "--mode",
+      "patch-only",
+      "--quality-gate-mode",
+      "observe",
+      "--approved-handoff-ref",
+      "evidence://handoff/strict-empty-report",
+      "--promotion-evidence-refs",
+      "evidence://promotion/strict-empty-report",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.delivery_quality_gate_mode, "observe");
+    assert.equal(payload.delivery_quality_gate_status, "not_pass");
+    assert.match(payload.delivery_quality_gate_findings.join("\n"), /Runtime Harness has no routed step decisions/u);
+    assert.equal(fs.existsSync(payload.delivery_manifest_file), true);
+    assert.equal(fs.existsSync(payload.runtime_harness_report_file), true);
+  });
+});
+
 test("delivery and release outputs enforce multi-repo coordination evidence and preserve rerun scope", () => {
   withTempProject((projectRoot) => {
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });

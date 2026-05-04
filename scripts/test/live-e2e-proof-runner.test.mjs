@@ -795,6 +795,8 @@ function writeLocalFullJourneyProfile(options) {
  *   extraEnv?: NodeJS.ProcessEnv,
  *   runnerAuthMode?: string,
  *   runtimeAgentPermissionMode?: string,
+ *   agentJudgeFile?: string | null,
+ *   skipAgentJudge?: boolean,
  * }} options
  */
 function runProofRunner(options) {
@@ -821,6 +823,38 @@ function runProofRunner(options) {
   }
   if (options.runtimeAgentPermissionMode) {
     args.push("--runtime-agent-permission-mode", options.runtimeAgentPermissionMode);
+  }
+  if (options.agentJudgeFile) {
+    args.push("--agent-judge-file", options.agentJudgeFile);
+  } else if (options.skipAgentJudge !== true) {
+    const judgeFile = path.join(path.dirname(options.profilePath), `${options.runId}.agent-judge.json`);
+    fs.writeFileSync(
+      judgeFile,
+      `${JSON.stringify(
+        {
+          artifact_quality_matrix: [
+            "discovery",
+            "spec",
+            "planning",
+            "handoff",
+            "execution",
+            "review",
+            "qa",
+            "delivery",
+          ].map((step) => ({
+            step,
+            status: "pass",
+            judge_source: "agent",
+            artifact_refs: [],
+            findings: [],
+          })),
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    args.push("--agent-judge-file", judgeFile);
   }
   const run = spawnSync(process.execPath, args, {
     cwd: workspaceRoot,
@@ -855,7 +889,7 @@ test("installed-user proof runner runs a valid short profile through public CLI 
     });
     assert.equal(
       result.live_e2e_run_status,
-      "pass",
+      "warn",
       fs.existsSync(result.live_e2e_run_summary_file)
         ? fs.readFileSync(result.live_e2e_run_summary_file, "utf8")
         : result.live_e2e_run_summary_file,
@@ -863,12 +897,15 @@ test("installed-user proof runner runs a valid short profile through public CLI 
     assert.equal(fs.existsSync(result.live_e2e_run_summary_file), true);
 
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "pass");
+    assert.equal(summary.status, "warn");
     assert.equal(fs.existsSync(summary.target_checkout_root), true);
     assert.equal(fs.existsSync(summary.generated_project_profile_file), true);
     assert.equal(fs.existsSync(summary.routed_step_result_file), true);
     assert.equal(summary.learning_loop_scorecard_file ?? null, null);
     assert.equal(summary.learning_loop_handoff_file ?? null, null);
+    assert.equal(fs.existsSync(summary.live_e2e_observation_report_file), true);
+    const observation = JSON.parse(fs.readFileSync(summary.live_e2e_observation_report_file, "utf8"));
+    assert.equal(observation.artifact_quality_matrix.every((entry) => entry.judge_source === "agent"), true);
     assert.equal(Array.isArray(summary.scorecard_files), true);
     assert.equal(fs.existsSync(summary.scorecard_files[0]), true);
     assert.equal(summary.control_surfaces.installed_user_proof_runner.includes("scripts/live-e2e/run-profile.mjs"), true);
@@ -878,6 +915,42 @@ test("installed-user proof runner runs a valid short profile through public CLI 
     const routedStepResult = JSON.parse(fs.readFileSync(summary.routed_step_result_file, "utf8"));
     assert.equal(routedStepResult.status, "passed");
     assert.equal(routedStepResult.routed_execution.adapter_response.status, "success");
+  });
+});
+
+test("installed-user proof runner records controlled artifact warnings without agent judge file", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const profilePath = path.join(tempRoot, "regress-short.no-agent-judge.yaml");
+    writeLocalProofRunnerProfile({
+      templateProfilePath: path.join(workspaceRoot, "scripts/live-e2e/profiles/regress-short.yaml"),
+      outputProfilePath: profilePath,
+      targetRepoRoot: targetRepo.targetRepoRoot,
+      targetRef: targetRepo.targetRef,
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "installed-user-no-agent-judge",
+      skipAgentJudge: true,
+    });
+
+    assert.equal(result.live_e2e_run_status, "warn");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    const observation = JSON.parse(fs.readFileSync(summary.live_e2e_observation_report_file, "utf8"));
+    assert.equal(summary.status, "warn");
+    assert.equal(observation.overall_status, "warn");
+    assert.equal(
+      observation.artifact_quality_matrix.every((entry) =>
+        entry.status === "warn" && entry.findings.includes("agent-judge-not-provided"),
+      ),
+      true,
+    );
+    assert.equal(fs.existsSync(summary.agent_artifact_review_request_file), true);
   });
 });
 
@@ -966,9 +1039,9 @@ test("installed-user proof runner records a failed run when target ref cannot be
       profilePath,
       runId: "installed-user-invalid-ref",
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "not_pass");
     assert.match(String(summary.error), /target checkout clone failed|Remote branch missing-ref not found/u);
   });
 });
@@ -997,9 +1070,9 @@ test("installed-user proof runner surfaces missing external runner prerequisites
       profilePath,
       runId: "installed-user-missing-runner",
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "not_pass");
     assert.equal(fs.existsSync(summary.artifacts.routed_step_result_file), true);
 
     const routedStepResult = JSON.parse(fs.readFileSync(summary.artifacts.routed_step_result_file, "utf8"));
@@ -1032,9 +1105,9 @@ test("installed-user proof runner records a policy-blocked live execution when a
       profilePath,
       runId: "installed-user-policy-blocked",
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "not_pass");
     assert.equal(fs.existsSync(summary.artifacts.routed_step_result_file), true);
 
     const routedStepResult = JSON.parse(fs.readFileSync(summary.artifacts.routed_step_result_file, "utf8"));
@@ -1086,6 +1159,15 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     );
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
     assert.equal(summary.status, "pass");
+    const observation = JSON.parse(fs.readFileSync(summary.live_e2e_observation_report_file, "utf8"));
+    const observationCommandLabels = new Map(
+      observation.step_matrix.map((entry) => [entry.step, entry.command_label]),
+    );
+    assert.equal(observationCommandLabels.get("discovery"), "discovery-run");
+    assert.equal(observationCommandLabels.get("spec"), "spec-build");
+    assert.equal(observationCommandLabels.get("qa"), "eval-run");
+    assert.equal(observationCommandLabels.get("delivery"), "deliver-prepare");
+    assert.equal(observation.flow_range.excluded_steps.includes("release"), true);
     assert.equal(summary.target_catalog_id, "local-target");
     assert.equal(summary.feature_mission_id, "local-mission");
     assert.equal(summary.runtime_agent_permission_mode, "full-bypass");
@@ -1382,8 +1464,8 @@ test("full-journey mode blocks before provider execution when readiness setup co
     });
 
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(result.live_e2e_run_status, "fail");
-    assert.equal(summary.status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    assert.equal(summary.status, "not_pass");
     assert.equal(summary.artifacts.baseline_verify_status, "fail");
     assert.equal(summary.artifacts.baseline_verify_gate_decision.decision, "block");
     assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
@@ -1423,8 +1505,8 @@ test("full-journey mode blocks before provider execution when baseline routed dr
     });
 
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(result.live_e2e_run_status, "fail");
-    assert.equal(summary.status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    assert.equal(summary.status, "not_pass");
     assert.equal(summary.artifacts.baseline_verify_status, "fail");
     assert.equal(summary.artifacts.baseline_verify_gate_decision.decision, "block");
     assert.ok(summary.artifacts.baseline_verify_gate_decision.blocking_reasons.includes("routed-dry-run-missing"));
@@ -1463,8 +1545,8 @@ test("full-journey mode fails final verdict when post-run verification fails aft
     });
 
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(result.live_e2e_run_status, "fail");
-    assert.equal(summary.status, "fail");
+    assert.equal(result.live_e2e_run_status, "warn");
+    assert.equal(summary.status, "warn");
     assert.equal(summary.artifacts.baseline_verify_status, "warn");
     assert.equal(summary.artifacts.post_run_verify_status, "fail");
     assert.ok(
@@ -1664,8 +1746,8 @@ test("full-journey mode fails live adapter preflight before run start when requi
     });
 
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(result.live_e2e_run_status, "fail");
-    assert.equal(summary.status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    assert.equal(summary.status, "not_pass");
     assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
     assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "missing-live-runtime");
     assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
@@ -1704,8 +1786,8 @@ test("full-journey mode fails live adapter preflight before run start when edit 
     });
 
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(result.live_e2e_run_status, "fail");
-    assert.equal(summary.status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    assert.equal(summary.status, "not_pass");
     assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
     assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.status, "pass");
     assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.attempts.length, 1);
@@ -1747,8 +1829,8 @@ test("full-journey mode fails live adapter preflight when restricted mode asks f
     });
 
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(result.live_e2e_run_status, "fail");
-    assert.equal(summary.status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    assert.equal(summary.status, "not_pass");
     assert.equal(summary.runtime_agent_permission_mode, "restricted");
     assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
     assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "permission-mode-blocked");
@@ -1797,8 +1879,8 @@ test("full-journey mode still runs permission readiness when auth probe is skipp
     });
 
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(result.live_e2e_run_status, "fail");
-    assert.equal(summary.status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    assert.equal(summary.status, "not_pass");
     assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
     assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.status, "skipped");
     assert.equal(summary.artifacts.live_adapter_preflight.permission_readiness.status, "fail");
@@ -1838,8 +1920,8 @@ test("full-journey mode fails permission readiness on structured denials even wh
     });
 
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(result.live_e2e_run_status, "fail");
-    assert.equal(summary.status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    assert.equal(summary.status, "not_pass");
     assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
     assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "permission-mode-blocked");
     assert.equal(summary.artifacts.live_adapter_preflight.permission_readiness.status, "fail");
@@ -1931,8 +2013,8 @@ test("full-journey mode fails live adapter preflight when legacy permission args
     });
 
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(result.live_e2e_run_status, "fail");
-    assert.equal(summary.status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    assert.equal(summary.status, "not_pass");
     assert.equal(summary.runtime_agent_permission_mode, "full-bypass");
     assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
     assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "permission-policy-invalid");
@@ -2286,9 +2368,9 @@ test("full-journey mode fails when discovery artifacts are not mission-traceable
       runId: "full-journey-discovery-gap",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "not_pass");
     assert.equal(summary.command_results.some((entry) => entry.label === "spec-build"), true);
     assert.match(String(summary.error), /Spec build did not materialize a routed step-result artifact/u);
   });
@@ -2325,9 +2407,9 @@ test("full-journey mode fails when approved handoff validation is blocked", () =
       runId: "full-journey-handoff-block",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "not_pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "not_pass");
     assert.match(String(summary.error), /Approved handoff validation was blocked by internal test hook/u);
   });
 });
@@ -2360,10 +2442,10 @@ test("full-journey mode fails when review detects control-plane leakage", () => 
       runId: "full-journey-review-fail",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "warn");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
-    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "fail");
+    assert.equal(summary.status, "warn");
+    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "warn");
     assert.equal(fs.existsSync(summary.runtime_harness_report_file), true);
     const runtimeHarnessReport = JSON.parse(fs.readFileSync(summary.runtime_harness_report_file, "utf8"));
     assert.equal(runtimeHarnessReport.overall_decision, "fail");
@@ -2402,10 +2484,10 @@ test("full-journey mode fails when runtime harness detects code-changing no-op",
       runId: "full-journey-runtime-noop",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "warn");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
-    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "fail");
+    assert.equal(summary.status, "warn");
+    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "warn");
     assert.equal(fs.existsSync(summary.runtime_harness_report_file), true);
     const runtimeHarnessReport = JSON.parse(fs.readFileSync(summary.runtime_harness_report_file, "utf8"));
     assert.equal(runtimeHarnessReport.overall_decision, "fail");
@@ -2416,6 +2498,9 @@ test("full-journey mode fails when runtime harness detects code-changing no-op",
     assert.equal(summary.verdict_matrix.provider_execution_status, "pass");
     assert.equal(summary.verdict_matrix.real_code_change_status, "fail");
     assert.equal(summary.verdict_matrix.post_run_verification_status, "pass");
+    const observation = JSON.parse(fs.readFileSync(summary.live_e2e_observation_report_file, "utf8"));
+    assert.equal(observation.overall_status, "warn");
+    assert.equal(observation.code_quality_after_delivery.status, "not_pass");
     assert.equal(summary.learning_loop_scorecard_file && fs.existsSync(summary.learning_loop_scorecard_file), true);
     assert.equal(summary.learning_loop_handoff_file && fs.existsSync(summary.learning_loop_handoff_file), true);
     assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), true);
@@ -2456,9 +2541,9 @@ test("full-journey mode fails provider execution when adapter raw evidence is mi
       runId: "full-journey-raw-evidence-gap",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "warn");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "warn");
     assert.equal(summary.provider_execution_status, "fail");
     assert.equal(summary.verdict_matrix.provider_execution_status, "fail");
     assert.equal(summary.verdict_matrix.real_code_change_status, "pass");
@@ -2516,7 +2601,7 @@ test("full-journey review flags lowered test plans as code-quality findings", ()
       runId: "full-journey-review-test-weakening",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "pass");
+    assert.equal(result.live_e2e_run_status, "warn");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
     assert.equal(summary.verdict_matrix.code_quality, "warn");
     assert.equal(summary.verdict_matrix.overall_verdict, "pass_with_findings");
@@ -2567,11 +2652,12 @@ test("full-journey mode fails when delivery prepare is blocked", () => {
       runId: "full-journey-delivery-block",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "warn");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "warn");
     assert.equal(summary.command_results.some((entry) => entry.label === "deliver-prepare"), true);
-    assert.match(String(summary.error), /Delivery prepare was blocked/u);
+    assert.equal(summary.legacy_flow_status, "fail");
+    assert.equal(summary.error, null);
   });
 });
 
@@ -2606,11 +2692,12 @@ test("full-journey mode fails when public learning closure outputs are missing",
       runId: "full-journey-learning-gap",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "pass");
     assert.equal(summary.command_results.some((entry) => entry.label === "learning-handoff"), true);
-    assert.match(String(summary.error), /Learning handoff did not materialize the required public closure artifacts/u);
+    assert.equal(summary.legacy_flow_status, "fail");
+    assert.equal(summary.error, null);
   });
 });
 
@@ -2645,17 +2732,18 @@ test("full-journey mode fails when Runtime Harness report evidence is missing", 
       runId: "full-journey-runtime-harness-gap",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "warn");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "warn");
     assert.equal(summary.runtime_harness_report_file, null);
     assert.equal(summary.verdict_matrix.runtime_harness_decision, "unknown");
     assert.equal(summary.verdict_matrix.runtime_success, "fail");
-    assert.match(String(summary.error), /Required scenario evidence 'runtime-harness-report' was not materialized/u);
+    assert.equal(summary.legacy_flow_status, "fail");
+    assert.equal(summary.error, null);
   });
 });
 
-test("full-journey mode fails when artifact coverage lineage mismatches", () => {
+test("full-journey mode records legacy artifact coverage mismatch without failing observation", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
     const examplesRoot = createExamplesRoot({ tempRoot });
@@ -2686,17 +2774,15 @@ test("full-journey mode fails when artifact coverage lineage mismatches", () => 
       runId: "full-journey-artifact-consistency-gap",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "pass");
     assert.equal(summary.verdict_matrix.scenario_coverage_status, "fail");
     assert.equal(summary.verdict_matrix.artifact_quality, "fail");
     assert.equal(summary.verdict_matrix.overall_verdict, "fail");
     assert.equal(summary.artifacts.artifact_consistency.status, "fail");
-    assert.match(
-      String(summary.error),
-      /Artifact consistency mismatch: audit-runs\.run_audit_records\[0\]\.coverage_follow_up differs from summary/u,
-    );
+    assert.equal(summary.legacy_flow_status, "fail");
+    assert.equal(summary.error, null);
     assert.match(
       String(summary.artifacts.scenario_coverage.findings.join("\n")),
       /Artifact consistency mismatch: audit-runs\.run_audit_records\[0\]\.coverage_follow_up differs from summary/u,
@@ -2704,7 +2790,7 @@ test("full-journey mode fails when artifact coverage lineage mismatches", () => 
   });
 });
 
-test("full-journey mode fails when learning scorecard coverage lineage mismatches", () => {
+test("full-journey mode records legacy learning coverage mismatch outside observation range", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
     const examplesRoot = createExamplesRoot({ tempRoot });
@@ -2735,21 +2821,19 @@ test("full-journey mode fails when learning scorecard coverage lineage mismatche
       runId: "full-journey-learning-scorecard-consistency-gap",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "pass");
     assert.equal(summary.verdict_matrix.scenario_coverage_status, "fail");
     assert.equal(summary.verdict_matrix.artifact_quality, "fail");
     assert.equal(summary.verdict_matrix.overall_verdict, "fail");
     assert.equal(summary.artifacts.artifact_consistency.status, "fail");
-    assert.match(
-      String(summary.error),
-      /Artifact consistency mismatch: learning-loop-scorecard\.coverage_follow_up differs from summary/u,
-    );
+    assert.equal(summary.legacy_flow_status, "fail");
+    assert.equal(summary.error, null);
   });
 });
 
-test("full-journey mode fails when scenario policy required evidence is missing", () => {
+test("full-journey mode records release evidence gaps outside observation range", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
     const examplesRoot = createExamplesRoot({ tempRoot });
@@ -2782,12 +2866,13 @@ test("full-journey mode fails when scenario policy required evidence is missing"
       runId: "full-journey-scenario-coverage-gap",
       catalogRoot,
     });
-    assert.equal(result.live_e2e_run_status, "fail");
+    assert.equal(result.live_e2e_run_status, "pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
-    assert.equal(summary.status, "fail");
+    assert.equal(summary.status, "pass");
     assert.equal(summary.verdict_matrix.scenario_coverage_status, "fail");
     assert.equal(summary.verdict_matrix.overall_verdict, "fail");
-    assert.match(String(summary.error), /Required scenario evidence 'release-packet' was not materialized/u);
+    assert.equal(summary.legacy_flow_status, "fail");
+    assert.equal(summary.error, null);
     assert.match(
       String(summary.artifacts.scenario_coverage.findings.join("\n")),
       /Required scenario evidence 'release-packet' was not materialized/u,

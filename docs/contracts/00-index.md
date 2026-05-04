@@ -17,6 +17,7 @@
 - `evaluation-report.md`
 - `review-report.md`
 - `runtime-harness-report.md`
+- `live-e2e-observation-report.md`
 - `dataset.md`
 - `evaluation-suite.md`
 - `promotion-decision.md`

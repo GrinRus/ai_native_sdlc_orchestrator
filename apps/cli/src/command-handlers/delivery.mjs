@@ -63,6 +63,8 @@ import {
   normalizeLearningRunStatus,
   isStrictRuntimeHarnessReport,
   runtimeHarnessReportHasMeaningfulPatch,
+  evaluateRuntimeHarnessDeliveryGate,
+  resolveQualityGateMode,
   assertRuntimeHarnessAllowsDelivery,
   finalizeRunControlState,
   normalizeRunRef,
@@ -93,6 +95,11 @@ export function handleDeliveryCommand(context) {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
     const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
+    const deliveryQualityGateMode =
+      command === "deliver prepare" ? resolveQualityGateMode(flags["quality-gate-mode"]) : "strict";
+    if (command === "release prepare" && flags["quality-gate-mode"] !== undefined) {
+      throw new CliUsageError("Flag '--quality-gate-mode' is only valid for 'aor deliver prepare'.");
+    }
 
     const init = initializeProjectRuntime({
       cwd,
@@ -120,10 +127,19 @@ export function handleDeliveryCommand(context) {
     outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;
     outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
     outputState.runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
-    assertRuntimeHarnessAllowsDelivery({
+    const runtimeHarnessDeliveryGate = evaluateRuntimeHarnessDeliveryGate({
       report: runtimeHarness.report,
       command,
     });
+    outputState.deliveryQualityGateMode = deliveryQualityGateMode;
+    outputState.deliveryQualityGateStatus = runtimeHarnessDeliveryGate.status;
+    outputState.deliveryQualityGateFindings = runtimeHarnessDeliveryGate.findings;
+    if (deliveryQualityGateMode === "strict") {
+      assertRuntimeHarnessAllowsDelivery({
+        report: runtimeHarness.report,
+        command,
+      });
+    }
     const resolvedPolicy = resolveStepPolicyForStep({
       projectProfilePath: init.projectProfilePath,
       routesRoot: path.join(init.projectRoot, "examples/routes"),
@@ -217,6 +233,11 @@ export function handleDeliveryCommand(context) {
           .filter((reason) => typeof reason === "string" && reason.trim().length > 0)
           .map((reason) => reason.trim())
       : [];
+    if (deliveryQualityGateMode === "observe" && runtimeHarnessDeliveryGate.findings.length > 0) {
+      outputState.deliveryBlockingReasons = Array.from(
+        new Set([...outputState.deliveryBlockingReasons, ...runtimeHarnessDeliveryGate.findings]),
+      );
+    }
     outputState.deliveryGovernanceDecision =
       typeof planResult.deliveryPlan.governance === "object" && planResult.deliveryPlan.governance
         ? planResult.deliveryPlan.governance

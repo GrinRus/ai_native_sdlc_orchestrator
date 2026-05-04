@@ -5,7 +5,7 @@ Provide one installed-user black-box proof runner for both live E2E layers:
 - bounded rehearsal profiles for fast regression and release smoke;
 - catalog-backed full-journey profiles for mandatory installed-user acceptance on curated repositories and curated feature missions.
 
-Live E2E simulates a user who has installed AOR, initializes or attaches a target repository, walks the public SDLC flow through CLI/API surfaces, and then emits a per-step diagnostic summary. It must not call private runtime internals to repair the run. It proves whether AOR works as a product from the public surface and whether produced artifacts explain each pass, failure, block, and missing-evidence gap.
+Live E2E simulates a user who has installed AOR, initializes or attaches a target repository, walks the public SDLC flow through CLI/API surfaces, and then emits a per-step black-box observation summary. It must not call private runtime internals to repair the run. It proves whether AOR works as a product from the public surface and whether produced artifacts explain each `pass`, `warn`, `not_pass`, block, and missing-evidence gap.
 
 W14 extends the full-journey layer into a curated matrix across:
 - `scenario_family`
@@ -102,15 +102,18 @@ Full-journey layer:
 - has the runner prepare one structured feature request input;
 - materializes provider-pinned route overrides for the selected provider variant before execution starts;
 - writes an execution-readiness decision before `run start` so promotion evidence is based on readiness and routed dry-run proof, not on a failed baseline target check;
-- runs the public lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, `deliver prepare`, optional `release prepare`, `audit runs`, conditional incident handling, and `learning handoff`.
+- runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
+- may still run legacy audit or learning diagnostics after delivery for compatibility, but `release` and `learning` are excluded from the v1 observation matrix.
 
 No proof-runner-side `examples/context/project profile` injection is allowed on the full-journey path.
 
 ## Inspect
 The proof runner is a one-shot command. Inspect `live_e2e_run_summary_file` directly:
 - read `status`, `stage_results`, and `command_results`;
-- inspect `artifacts.routed_step_result_file`, `artifacts.review_report_file`, delivery/release artifacts, and public closure artifacts when present;
-- inspect `artifacts.verdict_matrix` for the final operator verdict dimensions.
+- inspect `live_e2e_observation_report_file` first; it is the durable product-flow verdict for `discovery -> delivery`;
+- inspect `agent_artifact_review_request_file` when no `--agent-judge-file` was supplied;
+- inspect `artifacts.routed_step_result_file`, `artifacts.review_report_file`, delivery artifacts, and public closure artifacts when present;
+- inspect `artifacts.verdict_matrix` only as a legacy diagnostic matrix.
 
 Full-journey summaries must carry:
 - `target_catalog_id`
@@ -131,11 +134,12 @@ Full-journey summaries must carry:
 - `latest_runtime_harness_decision`
 - `quality_gate_decision`
 - `review_report_file`
-- `learning_loop_scorecard_file`
-- `learning_loop_handoff_file`
-- `verdict_matrix`
+- `live_e2e_observation_report_file`
+- `live_e2e_observation_overall_status`
+- `agent_artifact_review_request_file`
+- `verdict_matrix` when legacy diagnostics ran
 
-Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for proof success when produced artifacts show no-op implementation, permission denial, blocked semantics, or missing Runtime Harness evidence.
+Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for product observation success when required step evidence is missing.
 
 Bounded summaries continue to carry:
 - `target_checkout_root`
@@ -144,8 +148,34 @@ Bounded summaries continue to carry:
 - `compiled_context_ref`
 - `adapter_raw_evidence_ref`
 
-## Verdict matrix
-Full-journey summaries include one verdict matrix with:
+## Observation Report
+The runner writes `live-e2e-observation-report` for every profile. The canonical v1 range is:
+
+`discovery -> spec -> planning -> handoff -> execution -> review -> qa -> delivery`
+
+`project init`, `intake create`, `project analyze`, and readiness validation are prelude/readiness evidence. `release` and `learning` are not part of the v1 matrix.
+
+`overall_status` uses:
+- `pass`: the public flow reached delivery and all observed step, artifact, and post-delivery code dimensions passed.
+- `warn`: delivery evidence materialized, but code quality, no-op, Runtime Harness, review, post-delivery checks, legacy diagnostics, or artifact judge findings degraded the run.
+- `not_pass`: the black-box flow could not reach delivery or delivery evidence did not materialize.
+
+`deliver prepare` must be invoked with `--quality-gate-mode observe` by the live E2E runner. In observe mode Runtime Harness failures, no meaningful patch, and quality findings are copied into delivery output instead of preventing delivery evidence materialization.
+
+## Artifact Judge
+The runner does not call an in-product LLM route for artifact judging. The agent running live E2E reviews `agent_artifact_review_request_file` and may pass `--agent-judge-file <json>` on a subsequent run. The file should provide `artifact_quality_matrix[]` entries with `step`, `status`, `judge_source`, `artifact_refs`, and `findings`.
+
+Judge criteria:
+- traceability to feature request, mission, and previous step;
+- completeness for the step;
+- actionability for the next step;
+- consistency with neighboring artifacts;
+- absence of synthetic or no-op explanations that hide failure.
+
+If no judge file is provided, the runner still writes the objective step/code matrix and sets each artifact-quality entry to `warn` with `agent-judge-not-provided`.
+
+## Legacy Verdict Matrix
+Full-journey summaries may include one legacy verdict matrix with:
 - `scenario_family`
 - `provider_variant_id`
 - `feature_size`
@@ -170,7 +200,7 @@ Full-journey summaries include one verdict matrix with:
 - `quality_gate_decision`
 - `overall_verdict`
 
-`overall_verdict=pass` requires real provider execution, mission-scoped code changes, primary post-run verification success, acceptable artifact and code review, and public learning closure artifacts. Baseline target verification and configured diagnostic post-run verification can be `warn` in full-journey mode without blocking execution, but either warning downgrades the overall result to `pass_with_findings`.
+Legacy `overall_verdict=fail` no longer forces the live E2E observation status to fail when delivery evidence materialized. Those findings downgrade the observation to `warn` unless they prevented the public flow from reaching delivery.
 
 ## Operator checks
 - Summary and scorecard files exist under `.aor/projects/<project_id>/reports/`.
@@ -183,10 +213,8 @@ Full-journey summaries include one verdict matrix with:
 - `review-report.provider_traceability` matches the requested provider variant and adapter path.
 - `review-report.feature_size_fit` stays inside the declared size budget for the mission.
 - `review-report.artifact_quality.verify_summary_ref` points at the post-run `project verify` summary.
-- `post_run_verify_status=pass` is required for a passing full-journey verdict; diagnostic full-suite failures are reported separately when the mission config marks them as warnings.
-- `provider_execution_status` proves adapter raw evidence materialized; `real_code_change_status` proves meaningful Runtime Harness mission-scoped changed paths exist, excluding backup/editor artifacts; `post_run_verification_status` proves deterministic quality.
-- `learning_loop_scorecard_file` and `learning_loop_handoff_file` exist and are contract-valid.
-- Release-shaped runs keep `delivery_manifest_file` and `release_packet_file` anchored to the target checkout.
+- `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and `runtime_harness_decision` are observed post-delivery dimensions. Failures downgrade observation to `warn` when delivery evidence exists.
+- `delivery_manifest_file` exists and is anchored to the target checkout.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.
 
 ## W14-S07 matrix proof bundle (2026-04-24)

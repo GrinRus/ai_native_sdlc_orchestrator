@@ -1,0 +1,134 @@
+{
+  "report_id": "w14-s07.full-journey-regress-ky.live-e2e-observation.v1",
+  "run_id": "w14-s07.full-journey-regress-ky",
+  "profile_id": "live-e2e.full-journey.regress.ky",
+  "flow_range": {
+    "start_step": "discovery",
+    "end_step": "delivery",
+    "included_steps": [
+      "discovery",
+      "spec",
+      "planning",
+      "handoff",
+      "execution",
+      "review",
+      "qa",
+      "delivery"
+    ],
+    "prelude_steps": [
+      "project-init",
+      "intake-create",
+      "project-analyze",
+      "project-validate"
+    ],
+    "excluded_steps": [
+      "release",
+      "learning"
+    ]
+  },
+  "overall_status": "warn",
+  "step_matrix": [
+    {
+      "step": "discovery",
+      "status": "pass",
+      "command_label": "discovery-run",
+      "artifact_refs": [
+        "full-journey-regress-ky.analysis-report.json"
+      ],
+      "findings": []
+    },
+    {
+      "step": "spec",
+      "status": "pass",
+      "command_label": "spec-build",
+      "artifact_refs": [
+        "full-journey-regress-ky.spec-step-result.json"
+      ],
+      "findings": []
+    },
+    {
+      "step": "planning",
+      "status": "pass",
+      "command_label": "wave-create",
+      "artifact_refs": [
+        "full-journey-regress-ky.handoff-packet.json"
+      ],
+      "findings": []
+    },
+    {
+      "step": "handoff",
+      "status": "pass",
+      "command_label": "handoff-approve",
+      "artifact_refs": [
+        "full-journey-regress-ky.handoff-packet.json"
+      ],
+      "findings": []
+    },
+    {
+      "step": "execution",
+      "status": "pass",
+      "command_label": "run-start",
+      "artifact_refs": [
+        "full-journey-regress-ky.routed-step-result.json"
+      ],
+      "findings": []
+    },
+    {
+      "step": "review",
+      "status": "pass",
+      "command_label": "review-run",
+      "artifact_refs": [
+        "full-journey-regress-ky.review-report.json"
+      ],
+      "findings": []
+    },
+    {
+      "step": "qa",
+      "status": "pass",
+      "command_label": "eval-run",
+      "artifact_refs": [
+        "full-journey-regress-ky.run-summary.json"
+      ],
+      "findings": []
+    },
+    {
+      "step": "delivery",
+      "status": "pass",
+      "command_label": "deliver-prepare",
+      "artifact_refs": [
+        "full-journey-regress-ky.delivery-manifest.json",
+        "full-journey-regress-ky.delivery-transcript.json"
+      ],
+      "findings": []
+    }
+  ],
+  "artifact_quality_matrix": [
+    {
+      "step": "discovery",
+      "status": "warn",
+      "judge_source": "agent-missing",
+      "artifact_refs": [
+        "full-journey-regress-ky.analysis-report.json"
+      ],
+      "findings": [
+        "agent-judge-not-provided"
+      ]
+    }
+  ],
+  "code_quality_after_delivery": {
+    "status": "not_pass",
+    "delivery_manifest_ref": "full-journey-regress-ky.delivery-manifest.json",
+    "review_report_ref": "full-journey-regress-ky.review-report.json",
+    "post_delivery_check_refs": [],
+    "changed_paths": [],
+    "findings": [
+      "deterministic W14 external runner mock did not prove mission-scoped code changes"
+    ]
+  },
+  "continuation_decisions": [],
+  "evidence_refs": [
+    "full-journey-regress-ky.run-summary.json",
+    "full-journey-regress-ky.delivery-manifest.json",
+    "full-journey-regress-ky.review-report.json"
+  ]
+}
