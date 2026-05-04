@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-20-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-21-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -31,6 +31,7 @@ The authoritative planning model for implementation lives in:
 | W18 | Close the connected web full-flow and topology proof gaps with control-plane-owned lifecycle mutations, interactive continuation semantics, and monorepo/bounded multirepo evidence. | 4 | EPIC-5, EPIC-6 | `docs/backlog/wave-18-implementation-slices.md` |
 | W19 | Convert the user-story gap audit into traceable product, discovery, quality, learning, and planner backlog slices. | 6 | EPIC-0, EPIC-1, EPIC-2, EPIC-4, EPIC-6 | `docs/backlog/wave-19-implementation-slices.md` |
 | W20 | Capture production and platform maturity gaps for multirepo locks, hardening, OpenCode certification, compiler revisions, and finance monitoring. | 5 | EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-20-implementation-slices.md` |
+| W21 | Close installed-user onboarding and guided UX gaps from first launch through review, delivery, release, and learning closure. | 7 | EPIC-1, EPIC-2, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-21-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -102,6 +103,13 @@ The authoritative planning model for implementation lives in:
 | W20-S03 | gap closure target: DEV-04, AIP-12 |
 | W20-S04 | gap closure target: AIP-05, INC-03 |
 | W20-S05 | gap closure target: INC-06, FIN-01, FIN-02, FIN-07, FIN-08 |
+| W21-S01 | installed-user guided UX target: PSO-01, PSO-02, PSO-03, PBO-07, OPS-04 |
+| W21-S02 | installed-user guided UX target: PBO-01, PBO-02, PBO-03, OPS-01 |
+| W21-S03 | installed-user guided UX target: PBO-06, PBO-07, PBO-08, PSO-01 |
+| W21-S04 | installed-user guided UX target: PSO-01, PSO-02, PSO-07, PBO-07, EMP-02 |
+| W21-S05 | installed-user guided UX target: PSO-03, PSO-08, OPS-01, OPS-02, OPS-04, OPS-10 |
+| W21-S06 | installed-user guided UX target: PSO-05, DEV-05, RQA-02, RQA-06, OPS-04, DTX-07 |
+| W21-S07 | installed-user guided UX target: OPS-06, OPS-07, PBO-01, PBO-02, PBO-03, DTX-07 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -361,6 +369,19 @@ The authoritative planning model for implementation lives in:
 - compiler revisions and finance monitoring loops have first-class backlog slices
 
 **Detailed slices:** `docs/backlog/wave-20-implementation-slices.md`
+
+## W21 — installed-user onboarding and guided UX closure
+**Goal:** Close the gap between implemented command/API/web baselines and a polished installed-user journey that guides an external user from first launch through onboarding, mission intake, next action, optional web operation, review, delivery, release, and learning closure.
+
+**Exit criteria:**
+- W21 is represented across the roadmap, master backlog, epic map, dependency graph, story coverage matrix, and owning wave doc
+- guided CLI entrypoints make first-run, doctor, onboarding, mission intake, next-action, and app-launch paths discoverable without replacing low-level commands
+- clean onboarding supports bundled and explicitly materialized asset modes with project-profile-driven registry roots and durable onboarding reports
+- optional web UI mirrors the guided lifecycle while control-plane/runtime commands remain the orchestration source of truth
+- final review, delivery, release, and learning stages expose durable evidence, approvals, blockers, and next actions
+- an installed-user guided rehearsal proves the journey on a clean repository with no surprise upstream writes
+
+**Detailed slices:** `docs/backlog/wave-21-implementation-slices.md`
 
 
 ## Planning rule
