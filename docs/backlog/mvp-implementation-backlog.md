@@ -195,7 +195,7 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W19-S01 | User-story registry and coverage evidence matrix | EPIC-0 | done | `docs/product/**`, `docs/backlog/**`, `scripts/test.mjs` | W17-S01 |
-| W19-S02 | Product intake source and KPI/DoD model | EPIC-2 | blocked | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli` | W19-S01, W13-S03 |
+| W19-S02 | Product intake source and KPI/DoD model | EPIC-2 | done | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli` | W19-S01, W13-S03 |
 | W19-S03 | Discovery research and ADR evidence flow | EPIC-1 | blocked | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli` | W19-S02, W8-S02 |
 | W19-S04 | Incident-to-dataset backfill workflow | EPIC-4 | blocked | `docs/contracts/**`, `packages/harness`, `packages/observability`, `packages/orchestrator-core`, `apps/cli` | W19-S01, W7-S03, W13-S05 |
 | W19-S05 | Review decision and approval workflow | EPIC-4 | blocked | `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api` | W19-S01, W13-S05, W14-S06 |

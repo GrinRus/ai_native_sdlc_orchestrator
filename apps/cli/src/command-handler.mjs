@@ -235,6 +235,8 @@ export function formatCommandHelp(definition) {
               "- --project-ref must point to an existing directory.",
               "- Intake create writes an intake-request artifact-packet with feature request and optional mission traceability.",
               "- --request-file can carry structured JSON input that discovery and review can trace later.",
+              "- --source-kind and --source-ref preserve local issue, PRD, RFC, note, or mail-like source references.",
+              "- Product-intake completeness is explicit: goals, constraints, KPIs, Definition of Done, and source refs are reported as present or missing.",
               "- --request-constraints accepts comma-separated values and can be repeated.",
               `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
             ]

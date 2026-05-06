@@ -1,0 +1,40 @@
+generated_from:
+  command: aor intake create
+  project_root: /workspace/aor-core
+  project_profile_ref: examples/project.aor.yaml
+project_identity:
+  project_id: aor-core
+mission_traceability:
+  mission_id: null
+  source_kind: manual-request
+  scenario_family: null
+  provider_variant_id: null
+  feature_size: null
+  matrix_cell: null
+  coverage_follow_up: null
+product_intake:
+  goals:
+    - Prepare one bounded feature mission request.
+  constraints: []
+  kpis: []
+  definition_of_done: []
+  source_refs:
+    - source_id: manual-request
+      source_kind: local-note
+      title: Catalog-backed feature mission request
+      ref: runtime://manual-request
+product_intake_completeness:
+  status: incomplete
+  missing_fields:
+    - constraints
+    - kpis
+    - definition_of_done
+feature_request:
+  title: Catalog-backed feature mission request
+  brief: Prepare one bounded feature mission request for full-journey live E2E.
+  constraints: []
+  request_file: null
+  request_document: null
+evidence_roots:
+  reports_root: .aor/projects/aor-core/reports
+  state_root: .aor/projects/aor-core/state

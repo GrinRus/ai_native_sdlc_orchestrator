@@ -4,6 +4,7 @@
 - `project-profile.md`
 - `project-analysis-report.md`
 - `artifact-packet.md`
+- `intake-request-body.md`
 - `wave-ticket.md`
 - `handoff-packet.md`
 - `release-packet.md`

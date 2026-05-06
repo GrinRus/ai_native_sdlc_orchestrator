@@ -164,10 +164,15 @@ export function handleBootstrapCommand(context) {
       requestBrief: resolveOptionalStringFlag("request-brief", flags["request-brief"]) ?? null,
       requestConstraints: resolveOptionalCsvFlag("request-constraints", flags["request-constraints"]),
       requestFile: requestFile ?? null,
+      sourceKind: resolveOptionalStringFlag("source-kind", flags["source-kind"]) ?? null,
+      sourceRef: resolveOptionalStringFlag("source-ref", flags["source-ref"]) ?? null,
     });
     outputState.artifactPacketId = intakePacket.packet.packet_id;
     outputState.artifactPacketFile = intakePacket.packetFile;
     outputState.artifactPacketBodyFile = intakePacket.packetBodyFile;
+    outputState.productIntake = intakePacket.packetBody.product_intake;
+    outputState.productIntakeCompleteness = intakePacket.packetBody.product_intake_completeness;
+    outputState.productIntakeSourceRefs = intakePacket.packetBody.product_intake.source_refs;
   } else if (command === "project analyze") {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);

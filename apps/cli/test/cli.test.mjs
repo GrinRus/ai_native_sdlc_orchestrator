@@ -442,6 +442,20 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     const intakePayload = JSON.parse(intakeResult.stdout);
     assert.equal(intakePayload.command, "intake create");
     assert.equal(fs.existsSync(intakePayload.artifact_packet_file), true);
+    assert.equal(intakePayload.product_intake_completeness.status, "incomplete");
+    assert.deepEqual(intakePayload.product_intake_completeness.missing_fields, [
+      "constraints",
+      "kpis",
+      "definition_of_done",
+    ]);
+    assert.deepEqual(intakePayload.product_intake_source_refs, [
+      {
+        source_id: "manual-request",
+        source_kind: "local-note",
+        title: "Catalog-backed feature mission request",
+        ref: "runtime://manual-request",
+      },
+    ]);
 
     const discoveryResult = invokeCli(["discovery", "run", "--project-ref", projectRoot]);
     assert.equal(discoveryResult.exitCode, 0, discoveryResult.stderr);
@@ -2656,6 +2670,27 @@ test("intake create preserves mission traceability and discovery run consumes ex
       requestFile,
       `${JSON.stringify(
         {
+          goals: ["Reduce fixture mission regression risk before delivery."],
+          kpis: [
+            {
+              kpi_id: "fixture-regression-risk",
+              name: "Fixture regression risk",
+              target: "No fixture regression after bounded implementation.",
+              measurement: "All targeted fixture checks pass.",
+            },
+          ],
+          definition_of_done: [
+            "Implementation changes stay inside source and test paths.",
+            "Review evidence links back to the fixture mission request.",
+          ],
+          source_refs: [
+            {
+              source_id: "fixture-prd",
+              source_kind: "local-prd",
+              title: "Fixture PRD",
+              ref: "docs/product/fixture-prd.md",
+            },
+          ],
           allowed_paths: ["source/**", "test/**"],
           forbidden_paths: ["docs/**", "examples/**", "context/**"],
           expected_evidence: ["verify-summary", "review-report"],
@@ -2684,14 +2719,32 @@ test("intake create preserves mission traceability and discovery run consumes ex
       "avoid docs and control-plane content",
       "--request-file",
       requestFile,
+      "--source-kind",
+      "local-prd",
+      "--source-ref",
+      "docs/product/fixture-prd.md",
     ]);
     assert.equal(intakeResult.exitCode, 0, intakeResult.stderr);
     const intakePayload = JSON.parse(intakeResult.stdout);
     assert.equal(fs.existsSync(intakePayload.artifact_packet_file), true);
     assert.equal(fs.existsSync(intakePayload.artifact_packet_body_file), true);
+    assert.equal(intakePayload.product_intake_completeness.status, "complete");
+    assert.deepEqual(intakePayload.product_intake.goals, ["Reduce fixture mission regression risk before delivery."]);
+    assert.equal(intakePayload.product_intake.kpis[0].kpi_id, "fixture-regression-risk");
+    assert.deepEqual(intakePayload.product_intake.definition_of_done, [
+      "Implementation changes stay inside source and test paths.",
+      "Review evidence links back to the fixture mission request.",
+    ]);
+    assert.ok(
+      intakePayload.product_intake_source_refs.some(
+        (entry) => entry.source_kind === "local-prd" && entry.ref === "docs/product/fixture-prd.md",
+      ),
+      "expected CLI output to expose local PRD source refs",
+    );
     const intakeBody = JSON.parse(fs.readFileSync(intakePayload.artifact_packet_body_file, "utf8"));
     assert.equal(intakeBody.mission_traceability.mission_id, "fixture-mission");
     assert.equal(intakeBody.feature_request.request_file, requestFile);
+    assert.equal(intakeBody.product_intake_completeness.status, "complete");
     assert.deepEqual(intakeBody.feature_request.request_document.allowed_paths, ["source/**", "test/**"]);
     const newerTimestamp = new Date(Date.now() + 5_000);
     fs.utimesSync(intakePayload.artifact_packet_body_file, newerTimestamp, newerTimestamp);
@@ -2718,6 +2771,27 @@ test("intake create preserves mission traceability and discovery run consumes ex
     const autoAnalysisReport = JSON.parse(fs.readFileSync(autoDiscoveryPayload.analysis_report_file, "utf8"));
     assert.equal(autoAnalysisReport.feature_traceability.mission_id, "fixture-mission");
     assert.equal(autoAnalysisReport.feature_traceability.input_packet_ref, intakePacketRef);
+  });
+});
+
+test("intake create rejects unsupported external SaaS source kinds", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const intakeResult = invokeCli([
+      "intake",
+      "create",
+      "--project-ref",
+      projectRoot,
+      "--source-kind",
+      "github-issue",
+      "--source-ref",
+      "https://github.com/example/repo/issues/1",
+    ]);
+
+    assert.equal(intakeResult.exitCode, 1);
+    assert.match(intakeResult.stderr, /External SaaS connectors are out of scope/);
   });
 });
 

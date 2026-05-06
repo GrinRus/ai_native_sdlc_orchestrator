@@ -50,7 +50,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S02 — Product intake source and KPI/DoD model
 - **Epic:** EPIC-2 Packet lifecycle
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add a bounded product-intake follow-up slice for project goals, constraints, KPIs, Definition of Done, and local source-material references.
 - **Primary modules:** `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`
 - **Hard dependencies:** W19-S01, W13-S03

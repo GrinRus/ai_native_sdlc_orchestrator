@@ -2,6 +2,7 @@ export type ContractFamily =
   | "project-profile"
   | "project-analysis-report"
   | "artifact-packet"
+  | "intake-request-body"
   | "wave-ticket"
   | "handoff-packet"
   | "release-packet"

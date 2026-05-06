@@ -101,6 +101,20 @@ AOR does **not** target unbounded organization-wide orchestration in MVP.
 
 The MVP proof path for bounded multirepo support is intentionally narrow: one profile, explicit `repos[]`, explicit `repo_graph[]`, deterministic per-repo and integration validation refs, coordination evidence before non-`no-write` delivery, and repo-level changed-path lineage in the delivery manifest and release packet.
 
+## Product intake source model
+AOR intake preserves product acceptance evidence as a durable `intake-request-body` attached to the `intake-request` artifact packet.
+
+The supported local source model covers:
+- local issue exports;
+- local PRDs;
+- local RFCs;
+- local notes;
+- local mail-like exports.
+
+Each intake body records product goals, constraints, KPIs, Definition of Done, source refs, and an explicit completeness status. Complete intake evidence requires all five groups to be present. Incomplete intake can still be materialized for early discovery, but downstream review and guided onboarding can inspect the missing groups instead of treating absent KPI or Definition of Done input as implicit acceptance.
+
+Live SaaS ingestion from Jira, GitHub Issues, Gmail, Outlook, or similar systems is out of scope for the MVP intake contract. Such sources must be exported or mirrored into local structured source refs before AOR treats them as product-intake evidence.
+
 ## Live E2E posture
 AOR ships with four standard rehearsal classes:
 - regress short

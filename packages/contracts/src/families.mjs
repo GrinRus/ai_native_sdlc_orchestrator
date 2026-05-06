@@ -19,6 +19,7 @@ const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
 export const LIVE_E2E_OBSERVATION_STATUS_VALUES = ["pass", "warn", "not_pass"];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
+export const INTAKE_SOURCE_KIND_VALUES = ["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"];
 const LIVE_RUN_EVENT_TYPE_VALUES = [
   "run.started",
   "step.updated",
@@ -143,6 +144,32 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       status: "string",
       summary: "string",
       body_ref: "string",
+    },
+    enumChecks: [],
+  },
+  {
+    family: "intake-request-body",
+    familyGroup: "core-packets-and-profiles",
+    sourceContract: "docs/contracts/intake-request-body.md",
+    exampleGlob: "examples/packets/intake-request-body*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "generated_from",
+      "project_identity",
+      "mission_traceability",
+      "product_intake",
+      "product_intake_completeness",
+      "feature_request",
+      "evidence_roots",
+    ],
+    fieldTypes: {
+      generated_from: "object",
+      project_identity: "object",
+      mission_traceability: "object",
+      product_intake: "object",
+      product_intake_completeness: "object",
+      feature_request: "object",
+      evidence_roots: "object",
     },
     enumChecks: [],
   },
@@ -1038,6 +1065,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/control-plane-api\/[^/]+\.ya?ml$/, family: "control-plane-api" },
   { regex: /^examples\/delivery-manifest[^/]*\.ya?ml$/, family: "delivery-manifest" },
   { regex: /^examples\/packets\/delivery-plan-[^/]+\.ya?ml$/, family: "delivery-plan" },
+  { regex: /^examples\/packets\/intake-request-body[^/]*\.ya?ml$/, family: "intake-request-body" },
   { regex: /^examples\/eval\/dataset-[^/]+\.ya?ml$/, family: "dataset" },
   { regex: /^examples\/eval\/report-[^/]+\.sample\.ya?ml$/, family: "evaluation-report" },
   { regex: /^examples\/eval\/suite-[^/]+\.ya?ml$/, family: "evaluation-suite" },

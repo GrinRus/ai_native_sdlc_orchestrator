@@ -36,6 +36,8 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 - Review discovery outputs, open questions, and approval gates before execution.
 - Track wave status, quality gates, and delivery risk.
 
+`W19-S02` adds the first machine-checkable intake source model: local issue, PRD, RFC, note, and mail-like source refs are preserved with goals, constraints, KPIs, Definition of Done, and completeness evidence in the intake-request body. Live SaaS connectors remain out of scope until a later integration slice exports or mirrors those sources into local structured refs.
+
 ### Discovery / research
 - Build discovery packets from repository content, project analysis, AOR-owned runtime context assets, and external research.
 - Separate discovery from delivery.

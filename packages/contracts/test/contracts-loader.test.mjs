@@ -326,6 +326,60 @@ test("runtime harness report example loads through the shared contract path", ()
   assert.equal(loaded.ok, true, "expected runtime-harness-report example to load");
 });
 
+test("intake request body validates local source refs and rejects malformed product evidence", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/packets/intake-request-body.complete.yaml"),
+    family: "intake-request-body",
+  });
+  assert.equal(loaded.ok, true, "expected complete intake-request-body example to load");
+
+  const invalidSource = structuredClone(loaded.document);
+  invalidSource.product_intake.source_refs[0].source_kind = "github-issue";
+  const invalidSourceValidation = validateContractDocument({
+    family: "intake-request-body",
+    document: invalidSource,
+    source: "test://intake-request-body-external-source",
+  });
+  assert.equal(invalidSourceValidation.ok, false);
+  assert.ok(
+    invalidSourceValidation.issues.some(
+      (problem) =>
+        problem.code === "enum_value_invalid" && problem.field === "product_intake.source_refs[0].source_kind",
+    ),
+    "expected external SaaS source kind to be rejected",
+  );
+
+  const missingKpis = structuredClone(loaded.document);
+  delete missingKpis.product_intake.kpis;
+  const missingKpisValidation = validateContractDocument({
+    family: "intake-request-body",
+    document: missingKpis,
+    source: "test://intake-request-body-missing-kpis",
+  });
+  assert.equal(missingKpisValidation.ok, false);
+  assert.ok(
+    missingKpisValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "product_intake.kpis",
+    ),
+    "expected missing product_intake.kpis to be rejected",
+  );
+
+  const malformedKpi = structuredClone(loaded.document);
+  delete malformedKpi.product_intake.kpis[0].target;
+  const malformedKpiValidation = validateContractDocument({
+    family: "intake-request-body",
+    document: malformedKpi,
+    source: "test://intake-request-body-malformed-kpi",
+  });
+  assert.equal(malformedKpiValidation.ok, false);
+  assert.ok(
+    malformedKpiValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "product_intake.kpis[0].target",
+    ),
+    "expected malformed KPI target to be rejected",
+  );
+});
+
 test("context assets require metadata and source reference fields in the supported shape", () => {
   const source = path.join(workspaceRoot, "examples/context/skills/runner-verification-default.yaml");
   const loaded = loadContractFile({ filePath: source, family: "context-skill" });

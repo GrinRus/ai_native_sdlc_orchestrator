@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import { CONTRACT_FAMILY_INDEX, LIVE_E2E_OBSERVATION_STATUS_VALUES } from "./families.mjs";
+import { CONTRACT_FAMILY_INDEX, INTAKE_SOURCE_KIND_VALUES, LIVE_E2E_OBSERVATION_STATUS_VALUES } from "./families.mjs";
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 
@@ -149,12 +149,260 @@ export function validateContractDocument({ family, document, source = "<in-memor
     issues.push(...validateLiveE2EObservationReport(document, source));
   }
 
+  if (family === "intake-request-body") {
+    issues.push(...validateIntakeRequestBody(document, source));
+  }
+
   return {
     ok: issues.length === 0,
     family,
     source,
     issues,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateIntakeRequestBody(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+  const productIntake = isPlainObject(document.product_intake) ? document.product_intake : {};
+  const completeness = isPlainObject(document.product_intake_completeness) ? document.product_intake_completeness : {};
+
+  for (const field of ["goals", "constraints", "kpis", "definition_of_done", "source_refs"]) {
+    validateNestedArrayField({
+      record: productIntake,
+      source,
+      field: `product_intake.${field}`,
+      issues,
+    });
+  }
+
+  validateNestedStringField({
+    record: completeness,
+    source,
+    field: "product_intake_completeness.status",
+    issues,
+    required: true,
+  });
+  validateNestedArrayField({
+    record: completeness,
+    source,
+    field: "product_intake_completeness.missing_fields",
+    issues,
+  });
+
+  validateStringArrayItems({
+    values: productIntake.goals,
+    source,
+    field: "product_intake.goals",
+    issues,
+  });
+  validateStringArrayItems({
+    values: productIntake.constraints,
+    source,
+    field: "product_intake.constraints",
+    issues,
+  });
+  validateStringArrayItems({
+    values: productIntake.definition_of_done,
+    source,
+    field: "product_intake.definition_of_done",
+    issues,
+  });
+  validateStringArrayItems({
+    values: completeness.missing_fields,
+    source,
+    field: "product_intake_completeness.missing_fields",
+    issues,
+  });
+
+  if (typeof completeness.status === "string" && !["complete", "incomplete"].includes(completeness.status)) {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "product_intake_completeness.status",
+        expected: "complete|incomplete",
+        actual: completeness.status,
+        message: "Field 'product_intake_completeness.status' has unsupported value.",
+      }),
+    );
+  }
+
+  if (Array.isArray(productIntake.kpis)) {
+    productIntake.kpis.forEach((entry, index) => {
+      const record = isPlainObject(entry) ? entry : {};
+      if (!isPlainObject(entry)) {
+        issues.push(
+          issue({
+            code: "field_type_mismatch",
+            source,
+            field: `product_intake.kpis[${index}]`,
+            expected: "object",
+            actual: describeActualType(entry),
+            message: `Field 'product_intake.kpis[${index}]' must be 'object'.`,
+          }),
+        );
+        return;
+      }
+
+      for (const field of ["kpi_id", "name", "target"]) {
+        validateNestedStringField({
+          record,
+          source,
+          field: `product_intake.kpis[${index}].${field}`,
+          issues,
+          required: true,
+        });
+      }
+      validateNestedStringField({
+        record,
+        source,
+        field: `product_intake.kpis[${index}].measurement`,
+        issues,
+        required: false,
+      });
+    });
+  }
+
+  if (Array.isArray(productIntake.source_refs)) {
+    productIntake.source_refs.forEach((entry, index) => {
+      const record = isPlainObject(entry) ? entry : {};
+      if (!isPlainObject(entry)) {
+        issues.push(
+          issue({
+            code: "field_type_mismatch",
+            source,
+            field: `product_intake.source_refs[${index}]`,
+            expected: "object",
+            actual: describeActualType(entry),
+            message: `Field 'product_intake.source_refs[${index}]' must be 'object'.`,
+          }),
+        );
+        return;
+      }
+
+      for (const field of ["source_id", "source_kind", "title", "ref"]) {
+        validateNestedStringField({
+          record,
+          source,
+          field: `product_intake.source_refs[${index}].${field}`,
+          issues,
+          required: true,
+        });
+      }
+
+      const sourceKind = record.source_kind;
+      if (typeof sourceKind === "string" && !INTAKE_SOURCE_KIND_VALUES.includes(sourceKind)) {
+        issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source,
+            field: `product_intake.source_refs[${index}].source_kind`,
+            expected: INTAKE_SOURCE_KIND_VALUES.join("|"),
+            actual: sourceKind,
+            message: `Field 'product_intake.source_refs[${index}].source_kind' must use a local intake source kind; external SaaS connectors are out of scope.`,
+          }),
+        );
+      }
+    });
+  }
+
+  return issues;
+}
+
+/**
+ * @param {{ record: Record<string, unknown>, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateNestedArrayField(options) {
+  const fieldName = options.field.split(".").at(-1) ?? options.field;
+  if (!(fieldName in options.record)) {
+    options.issues.push(
+      issue({
+        code: "required_field_missing",
+        source: options.source,
+        field: options.field,
+        expected: "present",
+        actual: "missing",
+        message: `Missing required field '${options.field}'.`,
+      }),
+    );
+    return;
+  }
+
+  const value = options.record[fieldName];
+  if (!Array.isArray(value)) {
+    options.issues.push(
+      issue({
+        code: "field_type_mismatch",
+        source: options.source,
+        field: options.field,
+        expected: "array",
+        actual: describeActualType(value),
+        message: `Field '${options.field}' must be 'array'.`,
+      }),
+    );
+  }
+}
+
+/**
+ * @param {{ record: Record<string, unknown>, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[], required: boolean }} options
+ */
+function validateNestedStringField(options) {
+  const fieldName = options.field.split(".").at(-1) ?? options.field;
+  if (!(fieldName in options.record)) {
+    if (options.required) {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: options.field,
+          expected: "present",
+          actual: "missing",
+          message: `Missing required field '${options.field}'.`,
+        }),
+      );
+    }
+    return;
+  }
+
+  const value = options.record[fieldName];
+  if (typeof value !== "string") {
+    options.issues.push(
+      issue({
+        code: "field_type_mismatch",
+        source: options.source,
+        field: options.field,
+        expected: "string",
+        actual: describeActualType(value),
+        message: `Field '${options.field}' must be 'string'.`,
+      }),
+    );
+  }
+}
+
+/**
+ * @param {{ values: unknown, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateStringArrayItems(options) {
+  if (!Array.isArray(options.values)) return;
+  options.values.forEach((value, index) => {
+    if (typeof value === "string") return;
+    options.issues.push(
+      issue({
+        code: "field_type_mismatch",
+        source: options.source,
+        field: `${options.field}[${index}]`,
+        expected: "string",
+        actual: describeActualType(value),
+        message: `Field '${options.field}[${index}]' must be 'string'.`,
+      }),
+    );
+  });
 }
 
 /**
