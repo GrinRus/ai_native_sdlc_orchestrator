@@ -12,6 +12,23 @@ generated_from:
     - .github/workflows/ci.yaml
 repo_facts:
   topology: monorepo
+  declared_topology: bounded-multirepo
+  declared_repo_count: 3
+  declared_repo_ids:
+    - backend
+    - mobile
+    - frontend
+  repo_graph:
+    - from_repo_id: backend
+      to_repo_id: frontend
+      relationship: api-contract
+      validation_refs:
+        - validation://integration/backend-frontend/api-contract
+    - from_repo_id: backend
+      to_repo_id: mobile
+      relationship: api-contract
+      validation_refs:
+        - validation://integration/backend-mobile/api-contract
   package_manager: pnpm
   languages:
     - typescript
@@ -150,6 +167,78 @@ architecture_traceability:
       - suite.release.core@v1
     dataset_refs:
       - dataset://run-regression@2026-04-20T08:00:00Z
+repo_scope_proof:
+  topology: bounded-multirepo
+  repo_count: 3
+  repos:
+    - repo_id: backend
+      name: backend-services
+      role: backend
+      default_branch: main
+      source_kind: git
+      source_root: repos/backend
+    - repo_id: mobile
+      name: mobile-app
+      role: mobile
+      default_branch: main
+      source_kind: git
+      source_root: repos/mobile
+    - repo_id: frontend
+      name: frontend-app
+      role: frontend
+      default_branch: main
+      source_kind: git
+      source_root: repos/frontend
+  repo_graph:
+    - from_repo_id: backend
+      to_repo_id: frontend
+      relationship: api-contract
+      validation_refs:
+        - validation://integration/backend-frontend/api-contract
+    - from_repo_id: backend
+      to_repo_id: mobile
+      relationship: api-contract
+      validation_refs:
+        - validation://integration/backend-mobile/api-contract
+  impacted_repo_scope:
+    - repo_id: backend
+      role: backend
+      source_kind: git
+      source_root: repos/backend
+      default_branch: main
+    - repo_id: mobile
+      role: mobile
+      source_kind: git
+      source_root: repos/mobile
+      default_branch: main
+    - repo_id: frontend
+      role: frontend
+      source_kind: git
+      source_root: repos/frontend
+      default_branch: main
+  per_repo_validation_evidence:
+    - repo_id: backend
+      validation_refs:
+        - validation://repos/github-sandbox/backend/profile-entry
+        - validation://repos/github-sandbox/backend/scope
+      command_refs:
+        - validation://repos/github-sandbox/backend/test/1
+    - repo_id: mobile
+      validation_refs:
+        - validation://repos/github-sandbox/mobile/profile-entry
+        - validation://repos/github-sandbox/mobile/scope
+      command_refs:
+        - validation://repos/github-sandbox/mobile/test/1
+    - repo_id: frontend
+      validation_refs:
+        - validation://repos/github-sandbox/frontend/profile-entry
+        - validation://repos/github-sandbox/frontend/scope
+      command_refs:
+        - validation://repos/github-sandbox/frontend/test/1
+  integration_validation_refs:
+    - validation://integration/backend-frontend/api-contract
+    - validation://integration/backend-mobile/api-contract
+  coordination_required: true
 service_boundaries:
   - service_id: api
     paths:

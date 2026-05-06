@@ -105,6 +105,36 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
   });
 });
 
+test("analyzeProjectRuntime records bounded multirepo repo graph and validation proof", () => {
+  withTempRepo((repoRoot) => {
+    const result = analyzeProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: path.join(repoRoot, "examples/project.bounded-multirepo.aor.yaml"),
+    });
+
+    assert.equal(result.report.project_id, "aor-bounded-multirepo-sample");
+    assert.equal(result.report.repo_facts.declared_topology, "bounded-multirepo");
+    assert.deepEqual(result.report.repo_facts.declared_repo_ids, ["backend", "mobile", "frontend"]);
+    assert.equal(result.report.repo_scope_proof.coordination_required, true);
+    assert.equal(result.report.repo_scope_proof.repo_graph.length, 2);
+    assert.deepEqual(
+      result.report.repo_scope_proof.impacted_repo_scope.map((entry) => entry.repo_id),
+      ["backend", "mobile", "frontend"],
+    );
+    assert.equal(result.report.repo_scope_proof.per_repo_validation_evidence.length, 3);
+    assert.ok(
+      result.report.repo_scope_proof.integration_validation_refs.includes(
+        "validation://integration/backend-frontend/api-contract",
+      ),
+    );
+
+    const reloaded = JSON.parse(fs.readFileSync(result.reportPath, "utf8"));
+    assert.equal(reloaded.repo_scope_proof.topology, "bounded-multirepo");
+    assert.equal(reloaded.repo_scope_proof.per_repo_validation_evidence.length, 3);
+  });
+});
+
 test("analyzeProjectRuntime reports blocking discovery completeness when evaluation registry coverage is missing", () => {
   withTempRepo((repoRoot) => {
     fs.rmSync(path.join(repoRoot, "examples", "eval"), { recursive: true, force: true });

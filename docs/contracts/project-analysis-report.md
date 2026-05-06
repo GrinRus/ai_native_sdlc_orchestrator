@@ -25,6 +25,7 @@ The analysis report should be repeatable and durable. It feeds validate/verify, 
 `evaluation_registry` should expose discoverable suite and dataset refs so eval/certification flows can resolve assets by ID without ad hoc file lookups.
 `discovery_completeness` should expose explicit pass/fail checks for later-stage readiness (route/asset/policy coverage and evaluation-registry availability).
 `architecture_traceability` should link step coverage back to architecture docs and contract refs used by discovery/spec planning workflows.
+`repo_scope_proof` should expose the declared profile topology, repo list, repo graph, impacted repo scope, per-repo validation evidence refs, integration validation refs, and whether coordination is required. For bounded multirepo profiles this is the machine-readable proof that backend, mobile, frontend, or other repo entries are handled through the same project-profile contract path as single-repo and monorepo projects.
 
 ## Example
 See `examples/project-analysis-report.sample.yaml`.

@@ -189,10 +189,16 @@ export function handleDeliveryCommand(context) {
           .filter((repo) => typeof repo === "object" && repo !== null)
           .map((repo) => {
             const repoRecord = /** @type {Record<string, unknown>} */ (repo);
+            const sourceRecord =
+              typeof repoRecord.source === "object" && repoRecord.source
+                ? /** @type {Record<string, unknown>} */ (repoRecord.source)
+                : {};
             return {
               repo_id: typeof repoRecord.repo_id === "string" ? repoRecord.repo_id : null,
               role: typeof repoRecord.role === "string" ? repoRecord.role : null,
               default_branch: typeof repoRecord.default_branch === "string" ? repoRecord.default_branch : null,
+              source_root: typeof sourceRecord.root === "string" ? sourceRecord.root : null,
+              source_kind: typeof sourceRecord.kind === "string" ? sourceRecord.kind : null,
             };
           })
           .filter((repo) => typeof repo.repo_id === "string")

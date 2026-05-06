@@ -6,7 +6,9 @@ run_refs:
 change_summary: >
   Added bounded multirepo governance documents, contracts and examples.
 impacted_repos:
-  - main
+  - backend
+  - mobile
+  - frontend
 verification_refs:
   - evidence://reports/RUN-101/tests.xml
   - evidence://evaluation/RUN-101/release-suite.json
@@ -19,8 +21,19 @@ evidence_lineage:
   execution_refs:
     - evidence://reports/step-result-routed-implement.json
     - evidence://reports/delivery-transcript-fork-first-pr-run-101.json
+  coordination_refs:
+    - evidence://coordination/WAVE-004/backend-mobile-frontend
   delivery_output_refs:
     - evidence://release/REL-004/delivery-manifest.yaml
+coordination:
+  required: true
+  status: present
+  repo_ids:
+    - backend
+    - mobile
+    - frontend
+  evidence_refs:
+    - evidence://coordination/WAVE-004/backend-mobile-frontend
 residual_risks:
   - Runtime implementation is still scaffold-only.
 rollback_notes: >

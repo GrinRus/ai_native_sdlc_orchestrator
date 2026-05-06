@@ -63,6 +63,45 @@ test("validateProjectRuntime emits pass status when safety checks and analysis r
   });
 });
 
+test("validateProjectRuntime emits bounded multirepo per-repo and integration evidence", () => {
+  withTempRepo((repoRoot) => {
+    analyzeProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: path.join(repoRoot, "examples/project.bounded-multirepo.aor.yaml"),
+    });
+    const result = validateProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: path.join(repoRoot, "examples/project.bounded-multirepo.aor.yaml"),
+    });
+
+    assert.equal(result.report.status, "pass");
+    const repoScopeValidator = result.report.validators.find(
+      (validator) => validator.validator_id === "repo-scope-proof",
+    );
+    assert.ok(repoScopeValidator, "expected repo-scope-proof validator");
+    assert.equal(repoScopeValidator.status, "pass");
+    assert.equal(repoScopeValidator.details?.coordination_required, true);
+    assert.deepEqual(
+      /** @type {{ repo_id: string }[]} */ (repoScopeValidator.details?.impacted_repo_scope).map(
+        (entry) => entry.repo_id,
+      ),
+      ["backend", "mobile", "frontend"],
+    );
+    assert.ok(
+      result.report.evidence_refs.includes("validation://integration/backend-frontend/api-contract"),
+      "expected integration validation ref in validation report evidence",
+    );
+    assert.ok(
+      result.report.evidence_refs.includes(
+        "validation://repos/aor-bounded-multirepo-sample/backend/profile-entry",
+      ),
+      "expected backend per-repo validation evidence ref",
+    );
+  });
+});
+
 test("validateProjectRuntime emits fail status for unsafe writeback policy", () => {
   withTempRepo((repoRoot) => {
     const profilePath = path.join(repoRoot, "examples/project.aor.yaml");

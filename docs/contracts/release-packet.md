@@ -17,6 +17,7 @@ Release-ready summary of a completed wave, linking runs, verification evidence, 
 
 ## Notes
 The release packet must point to the delivery manifest for the run and preserve lineage back to handoff, promotion, and execution evidence.
+For bounded multirepo delivery, release lineage must preserve the delivery manifest ref plus coordination refs so auditors can trace repo-level changed paths back to the approved cross-repo evidence.
 Later-maturity release packets should also preserve:
 - coordination lineage (`evidence_lineage.coordination_refs`) when cross-repo approval artifacts are required;
 - rerun lineage (`evidence_lineage.rerun_refs`) and bounded retry context (`rerun_recovery`).

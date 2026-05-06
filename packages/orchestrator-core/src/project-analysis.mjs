@@ -9,6 +9,7 @@ import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
 import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
 import { resolveStepPolicyMatrix } from "./policy-resolution.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { resolveProjectRepoScope } from "./repo-scope.mjs";
 
 const LANGUAGE_BY_EXTENSION = Object.freeze({
   ".ts": "typescript",
@@ -698,6 +699,12 @@ export function analyzeProjectRuntime(options = {}) {
         ? options.inputPacketPath
         : undefined,
   });
+  const loadedProjectProfile = loadContractFile({
+    filePath: init.projectProfilePath,
+    family: "project-profile",
+  });
+  const projectProfile = asRecord(loadedProjectProfile.document);
+  const repoScopeProof = resolveProjectRepoScope({ profile: projectProfile });
 
   const report = {
     report_id: `${init.projectId}.analysis.v1`,
@@ -710,6 +717,10 @@ export function analyzeProjectRuntime(options = {}) {
     },
     repo_facts: {
       topology: repoFacts.topology,
+      declared_topology: repoScopeProof.topology,
+      declared_repo_count: repoScopeProof.repo_count,
+      declared_repo_ids: repoScopeProof.repo_ids,
+      repo_graph: repoScopeProof.repo_graph,
       package_manager: repoFacts.package_manager,
       languages: repoFacts.languages,
       ci_systems: repoFacts.ci_systems,
@@ -758,6 +769,16 @@ export function analyzeProjectRuntime(options = {}) {
           source_kind: featureTraceability.sourceKind,
         }
       : null,
+    repo_scope_proof: {
+      topology: repoScopeProof.topology,
+      repo_count: repoScopeProof.repo_count,
+      repos: repoScopeProof.repos,
+      repo_graph: repoScopeProof.repo_graph,
+      impacted_repo_scope: repoScopeProof.impacted_repo_scope,
+      per_repo_validation_evidence: repoScopeProof.per_repo_validation_evidence,
+      integration_validation_refs: repoScopeProof.integration_validation_refs,
+      coordination_required: repoScopeProof.coordination_required,
+    },
     discovery_completeness: discoveryCompleteness,
     architecture_traceability: architectureTraceability,
     verification_plan: verificationPlan,

@@ -18,15 +18,46 @@ preconditions:
     status: present
     refs:
       - .aor/projects/aor-core/reports/promotion-decision-wrapper-wrapper.runner.default-v3-1776793902247.json
+  coordination_evidence:
+    required: true
+    status: present
+    refs:
+      - evidence://coordination/WAVE-004/backend-mobile-frontend
 governance:
   decision: allow
   route_risk_tier: medium
   high_risk_delivery: false
   reasons: []
+coordination:
+  required: true
+  status: present
+  repo_ids:
+    - backend
+    - mobile
+    - frontend
+  repos:
+    - repo_id: backend
+      role: backend
+      default_branch: main
+      source_root: repos/backend
+      source_kind: git
+    - repo_id: mobile
+      role: mobile
+      default_branch: main
+      source_root: repos/mobile
+      source_kind: git
+    - repo_id: frontend
+      role: frontend
+      default_branch: main
+      source_root: repos/frontend
+      source_kind: git
+  evidence_refs:
+    - evidence://coordination/WAVE-004/backend-mobile-frontend
 writeback_allowed: true
 blocking_reasons: []
 status: ready
 evidence_refs:
   - .aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json
   - .aor/projects/aor-core/reports/promotion-decision-wrapper-wrapper.runner.default-v3-1776793902247.json
+  - evidence://coordination/WAVE-004/backend-mobile-frontend
 created_at: 2026-04-21T00:00:00.000Z

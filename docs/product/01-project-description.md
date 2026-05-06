@@ -99,6 +99,8 @@ A bounded multirepo graph belongs to one AOR project profile and may include sep
 
 AOR does **not** target unbounded organization-wide orchestration in MVP.
 
+The MVP proof path for bounded multirepo support is intentionally narrow: one profile, explicit `repos[]`, explicit `repo_graph[]`, deterministic per-repo and integration validation refs, coordination evidence before non-`no-write` delivery, and repo-level changed-path lineage in the delivery manifest and release packet.
+
 ## Live E2E posture
 AOR ships with four standard rehearsal classes:
 - regress short

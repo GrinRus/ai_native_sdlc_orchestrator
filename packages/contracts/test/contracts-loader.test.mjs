@@ -71,6 +71,16 @@ test("loads all examples through the shared contracts path", () => {
   assert.equal(loaded.ok, true, "batch example loading should pass");
 });
 
+test("loads monorepo and bounded multirepo profiles through the same project-profile contract path", () => {
+  for (const profileName of ["project.aor.yaml", "project.bounded-multirepo.aor.yaml"]) {
+    const loaded = loadContractFile({
+      filePath: path.join(workspaceRoot, "examples", profileName),
+      family: "project-profile",
+    });
+    assert.equal(loaded.ok, true, `${profileName} should load as project-profile`);
+  }
+});
+
 test("returns actionable error when required field is missing", () => {
   const source = path.join(workspaceRoot, "examples/project.aor.yaml");
   const loaded = loadContractFile({ filePath: source, family: "project-profile" });

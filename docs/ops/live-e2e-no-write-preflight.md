@@ -158,6 +158,21 @@ Expected no-write command signals:
 - `delivery_rerun_recovery` preserves explicit failed-step and packet-boundary retry scope;
 - `delivery_manifest_file` and `release_packet_file` are both materialized.
 
+## Bounded multirepo proof smoke
+Use the bounded multirepo sample profile when validating repo graph and coordination behavior without upstream writes:
+
+```bash
+aor project analyze --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.bounded-multirepo.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w18-s04-multirepo
+aor project validate --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.bounded-multirepo.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w18-s04-multirepo
+aor deliver prepare --project-ref <AOR_WORKSPACE> --project-profile <AOR_WORKSPACE>/examples/project.bounded-multirepo.aor.yaml --runtime-root <AOR_WORKSPACE>/.aor/w18-s04-multirepo --mode no-write --coordination-evidence-refs evidence://coordination/w18-s04
+```
+
+Expected bounded multirepo signals:
+- analysis report includes `repo_scope_proof.repo_graph`, `impacted_repo_scope`, per-repo validation evidence, and integration validation refs;
+- validation report includes a passing `repo-scope-proof` validator;
+- `patch-only`, `local-branch`, and `fork-first-pr` delivery plans block without coordination evidence when more than one repo is in scope;
+- delivery manifest and release packet preserve repo ids and coordination refs for audit replay.
+
 ## Required target annotations
 Each profile and runbook must provide:
 - prerequisites;

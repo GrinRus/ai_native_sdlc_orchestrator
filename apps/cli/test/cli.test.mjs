@@ -1096,24 +1096,9 @@ test("delivery and release outputs enforce multi-repo coordination evidence and 
     runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
     runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
 
-    const profilePath = path.join(projectRoot, "examples/project.aor.yaml");
-    const profileContent = fs.readFileSync(profilePath, "utf8");
-    fs.writeFileSync(
-      profilePath,
-      profileContent.replace(
-        "repo_graph: []",
-        [
-          "  - repo_id: docs",
-          "    name: docs",
-          "    source:",
-          "      kind: local",
-          "      root: docs",
-          "    default_branch: main",
-          "    role: documentation",
-          "repo_graph: []",
-        ].join("\n"),
-      ),
-      "utf8",
+    fs.copyFileSync(
+      path.join(projectRoot, "examples/project.bounded-multirepo.aor.yaml"),
+      path.join(projectRoot, "examples/project.aor.yaml"),
     );
     materializeSoftNoWriteIntake({ projectRoot, missionId: "w8-delivery-coordination-soft-rehearsal" });
 
@@ -1157,7 +1142,7 @@ test("delivery and release outputs enforce multi-repo coordination evidence and 
     const deliverPayload = JSON.parse(deliverResult.stdout);
     assert.equal(deliverPayload.delivery_mode, "no-write");
     assert.equal(deliverPayload.delivery_coordination.required, true);
-    assert.deepEqual(deliverPayload.delivery_coordination.repo_ids, ["main", "docs"]);
+    assert.deepEqual(deliverPayload.delivery_coordination.repo_ids, ["backend", "mobile", "frontend"]);
     assert.equal(deliverPayload.delivery_coordination.status, "present");
     assert.equal(deliverPayload.delivery_rerun_recovery.requested, true);
     assert.equal(deliverPayload.delivery_rerun_recovery.status, "ready");

@@ -123,7 +123,7 @@ Close the connected web full-flow and topology proof gaps while preserving the h
 
 ## W18-S04 — Monorepo and bounded multirepo flow proof
 - **Epic:** EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Add examples and tests proving one AOR project profile can cover both a monorepo and a bounded multirepo setup such as backend services repo, mobile repo, and frontend repo.
 - **Primary modules:** `examples/**`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**`, `docs/ops/**`, tests
 - **Hard dependencies:** none
