@@ -118,11 +118,21 @@ node apps/web/scripts/operator-console-smoke.mjs \
 ```
 
 Expected full-flow console evidence:
-- rendered HTML includes lifecycle command and runner interaction sections;
+- rendered HTML includes guided lifecycle, lifecycle command, and runner interaction sections;
+- `guided_lifecycle.stages` covers readiness, mission, discovery/spec/plan, execution, review/QA, delivery/release, and learning;
+- `guided_lifecycle` shows each stage status, evidence count/refs, blocker codes, policy-history count, event-history count, and the exact current next action from `next-action-report`;
+- connected stage mutations use `POST /api/projects/:projectId/lifecycle-command/actions`; `mission create` creates guided intake evidence and `next` refreshes the durable next-action report;
 - `contract_alignment.mutation_model` includes `POST /api/projects/:projectId/lifecycle-command/actions` and `POST /api/projects/:projectId/interactions/answers`;
+- `contract_alignment.read_model` includes `GET /api/projects/:projectId/next-action-report`;
 - pending runner questions are derived from `step-result.requested_interaction`;
 - submitted answers return `interaction_answer.answer_audit_ref` and live/event-history payloads reference that audit ref without raw answer text;
 - detaching the session stops web follow capture only; run state and evidence remain queryable through CLI/API.
+
+Read-only checks:
+- open a snapshot with read-only mode when mutation transport is unavailable or intentionally disabled;
+- verify `guided_lifecycle.state=read_only`;
+- stage evidence, blockers, policy history, live/event history, and next-action report refs remain visible;
+- mutation descriptors report `available=false` without removing the exact CLI command the operator can run headlessly.
 
 ## Auth-enabled detached mode
 If detached transport auth is enabled, pass bearer token on every read/follow/mutation request:

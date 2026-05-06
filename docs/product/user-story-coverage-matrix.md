@@ -12,12 +12,12 @@ Coverage status values:
 |---|---|---|---|---|---|---|
 | PSO-01 | Product sponsor / owner | MVP | Define project goals and constraints for a target repository. | covered | `project init`, project profiles, W13-S03 feature-intent intake, W19-S02 intake-request body goals and constraints, `mission create`, W21-S04 guided mission evidence | none |
 | PSO-02 | Product sponsor / owner | MVP | Start intake from issues, PRDs, RFCs, notes, or mail-like source material. | covered | `intake create`, `mission create`, W13-S03 public feature-intent intake, W19-S02 local issue/PRD/RFC/note/mail source refs, W21-S04 guided source-ref preservation | none |
-| PSO-03 | Product sponsor / owner | MVP | Review discovery outputs and open questions before execution. | partial | `discovery run`, `spec build`, W13-S04 lifecycle evidence, W19-S03 discovery research open questions, W21-S01 guided stage model | W21-S05 |
+| PSO-03 | Product sponsor / owner | MVP | Review discovery outputs and open questions before execution. | covered | `discovery run`, `spec build`, W13-S04 lifecycle evidence, W19-S03 discovery research open questions, W21-S05 guided web discovery/spec/plan stage with evidence, blockers, and next action | none |
 | PSO-04 | Product sponsor / owner | MVP | Track wave status and implementation progress. | covered | `wave create`, `run status`, W8-S01 sponsor visibility | none |
 | PSO-05 | Product sponsor / owner | MVP | Inspect quality gates before approving delivery. | partial | review reports, Runtime Harness reports, `review-decision`, `review decide`, delivery/release review-decision gate, W14-S06 review alignment, W19-S05, W21-S01 closure stage model | W21-S06 |
 | PSO-06 | Product sponsor / owner | MVP | See delivery risk and release readiness. | covered | delivery manifests, `release prepare`, W6-S05 delivery/release command pack | none |
 | PSO-07 | Product sponsor / owner | MVP+ | Track KPIs and Definition of Done as product acceptance evidence. | covered | product docs, W19-S02 intake-request body KPI/Definition of Done evidence and completeness status, `mission create`, `next-action-report` blockers for missing KPI/DoD | none |
-| PSO-08 | Product sponsor / owner | Later | Use strategic product visibility across waves and outcomes. | partial | W8-S01 sponsor/planner visibility, W19-S06 planner metrics in strategic snapshot | W21-S05 |
+| PSO-08 | Product sponsor / owner | Later | Use strategic product visibility across waves and outcomes. | covered | W8-S01 sponsor/planner visibility, W19-S06 planner metrics in strategic snapshot, W21-S05 guided web lifecycle and strategic/finance panels | none |
 | DIS-01 | Discovery / research | MVP | Build discovery packets from repository content. | covered | `project analyze`, `discovery run`, W1-S03 project analysis | none |
 | DIS-02 | Discovery / research | MVP | Include AOR-owned runtime context assets in discovery. | covered | context compiler and asset lifecycle, W8-S08, W8-S09 | none |
 | DIS-03 | Discovery / research | MVP | Preserve local research inputs alongside discovery facts. | covered | `discovery-research-report`, local intake source refs, W19-S03 | none |
@@ -41,7 +41,7 @@ Coverage status values:
 | EMP-05 | Engineering manager / planner | MVP | Pause, resume, and cancel active runs. | covered | `run pause`, `run resume`, `run cancel`, W6-S03 | none |
 | EMP-06 | Engineering manager / planner | MVP | Steer bounded execution with policy and audit traceability. | covered | `run steer`, audit records, W6-S03 | none |
 | EMP-07 | Engineering manager / planner | MVP+ | Track retry, repair, clean-close, and blocker rates. | covered | `planner-metrics-snapshot`, `run status`, API `planner-metrics`, web Strategic Snapshot panel, W19-S06 | none |
-| EMP-08 | Engineering manager / planner | Later | Use strategic planner dashboards for portfolio visibility. | partial | W8-S01 sponsor/planner visibility, W19-S06 planner metrics projection | W21-S05 |
+| EMP-08 | Engineering manager / planner | Later | Use strategic planner dashboards for portfolio visibility. | covered | W8-S01 sponsor/planner visibility, W19-S06 planner metrics projection, web Strategic Snapshot panel and W21-S05 guided lifecycle stage state | none |
 | DEV-01 | Delivery engineer | MVP | Execute approved work through runner-agnostic routes. | covered | route registry, adapter SDK, W2-S05, W13-S04 | none |
 | DEV-02 | Delivery engineer | MVP | Run live work through the stable Codex CLI adapter baseline. | covered | W10-S01, W14 provider-pinned matrix evidence | none |
 | DEV-03 | Delivery engineer | MVP | Run Claude Code as a live-runnable candidate with matrix coverage. | covered | W14 anthropic-primary matrix coverage | none |
@@ -79,7 +79,7 @@ Coverage status values:
 | OPS-07 | Operator / SRE | MVP | Run curated full-journey live acceptance on real repositories. | covered | W14 coverage_with_findings proof on curated matrix repositories | none |
 | OPS-08 | Operator / SRE | MVP | Select required matrix cells by scenario, provider, and feature size. | covered | W14 scenario/provider/feature-size matrix | none |
 | OPS-09 | Operator / SRE | MVP+ | Inspect policy and audit guardrails for run controls. | covered | W6-S03 run-control audit guardrails | none |
-| OPS-10 | Operator / SRE | Later | Use richer event, policy, and production observability views. | partial | W8-S04 operator visibility, W19-S06 planner metrics projection, W20-S02 redacted production transport/event baseline, W20-S05 finance monitoring projection, W21-S01 guided web state model | W21-S05 |
+| OPS-10 | Operator / SRE | Later | Use richer event, policy, and production observability views. | covered | W8-S04 operator visibility, W19-S06 planner metrics projection, W20-S02 redacted production transport/event baseline, W20-S05 finance monitoring projection, W21-S05 guided stage policy/event counts and finance monitoring panel | none |
 | SEC-01 | Security / compliance | MVP | Enforce provider and adapter allowlists. | covered | route policies, adapter capability validation, W2-S03, W8-S03 | none |
 | SEC-02 | Security / compliance | MVP | Apply secret-safe logging and redaction. | covered | W10-S04 auth hardening baseline, W20-S02 shared redaction across HTTP/SSE/CLI/live logs/run-control audit | none |
 | SEC-03 | Security / compliance | MVP | Preserve audit trails for approvals, overrides, and route changes. | covered | audit records, W6-S03, W7-S04 | none |

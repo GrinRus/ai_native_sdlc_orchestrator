@@ -11,6 +11,7 @@ export {
   readRunPolicyHistory,
   listRuns,
   readPlannerMetrics,
+  readNextActionReport,
   listStepResults,
   readStrategicSnapshot,
   readProjectState,

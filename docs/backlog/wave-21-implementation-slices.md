@@ -157,7 +157,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S05 — Guided web app full-flow console
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Make the optional web UI mirror the guided CLI journey from readiness through mission, discovery/spec/plan, execution, review/QA, delivery/release, and learning.
 - **Primary modules:** `apps/web`, `apps/api`, `docs/ops/**`, tests
 - **Hard dependencies:** W18-S03, W21-S04
@@ -191,7 +191,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S06 — Review, delivery, release, and learning closure UX
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Make the final guided steps understandable and evidence-backed for review decisions, delivery readiness, release packets, and learning-loop handoff.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`, `apps/web`, `docs/ops/**`, tests
 - **Hard dependencies:** W19-S05, W21-S05

@@ -255,6 +255,12 @@ test("detached control-plane transport serves read baseline endpoints", async ()
       const compilerRevisionStatuses = await compilerRevisionResponse.json();
       assert.equal(Array.isArray(compilerRevisionStatuses), true);
       assert.ok(compilerRevisionStatuses.some((entry) => entry.family === "compiler-revision-status"));
+
+      const nextActionResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/next-action-report`,
+      );
+      assert.equal(nextActionResponse.status, 200);
+      assert.equal(await nextActionResponse.json(), null);
     } finally {
       await transport.close();
     }
@@ -439,6 +445,43 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(successPayload.lifecycle_command.command_output.command, "intake create");
       assert.equal(fs.existsSync(successPayload.lifecycle_command.command_output.artifact_packet_file), true);
       assert.ok(successPayload.lifecycle_command.artifact_refs.includes(successPayload.lifecycle_command.command_output.artifact_packet_file));
+
+      const missionResponse = await postJson(commandUrl, {
+        command: "mission create",
+        flags: {
+          mission_id: "web-guided-flow",
+          goal: "Expose guided lifecycle in the web console.",
+          constraint: "Keep orchestration owned by the runtime.",
+          kpi: "guided-web:Guided web:Operator reaches next action:Console smoke",
+          dod: "Console shows blockers, evidence, and next action.",
+          allowed_path: "apps/web/**",
+          forbidden_path: "secrets/**",
+          delivery_mode: "patch-only",
+          source_kind: "local-note",
+          source_ref: "docs/ops/ui-attach-detach.md",
+        },
+      });
+      assert.equal(missionResponse.status, 200);
+      const missionPayload = await missionResponse.json();
+      assert.equal(missionPayload.lifecycle_command.command, "mission create");
+      assert.equal(missionPayload.lifecycle_command.blocked, false);
+      assert.equal(missionPayload.lifecycle_command.command_output.product_intake_completeness.status, "complete");
+
+      const nextResponse = await postJson(commandUrl, {
+        command: "next",
+        flags: {},
+      });
+      assert.equal(nextResponse.status, 200);
+      const nextPayload = await nextResponse.json();
+      assert.equal(nextPayload.lifecycle_command.command, "next");
+      assert.equal(nextPayload.lifecycle_command.command_output.next_action_primary.action_id, "discovery-run");
+      assert.equal(fs.existsSync(nextPayload.lifecycle_command.command_output.next_action_report_file), true);
+
+      const nextReportResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/next-action-report`);
+      assert.equal(nextReportResponse.status, 200);
+      const nextReportPayload = await nextReportResponse.json();
+      assert.equal(nextReportPayload.family, "next-action-report");
+      assert.equal(nextReportPayload.document.primary_action.action_id, "discovery-run");
 
       const invalidFlagResponse = await postJson(commandUrl, {
         command: "review run",

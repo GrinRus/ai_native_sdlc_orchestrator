@@ -11,7 +11,7 @@ Current code is **hybrid module + detached transport**:
 - Contract and artifact semantics stay aligned across both bindings.
 
 Implemented operation families:
-- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring;
+- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
 - live events: append/read/open stream using the `live-run-event` contract family.
@@ -73,6 +73,7 @@ The control plane remains the orchestration owner:
 - `doctor`, `onboard`, `mission create`, `next`, and `app` are guided vocabulary over existing command/query families;
 - web stages read the same project, packet, run, quality, finance, and lifecycle state exposed by the control plane;
 - guided mutations must call runtime command handlers or existing control-plane mutation families;
+- guided web can invoke the bounded `mission create` and `next` lifecycle-command mutations to create mission evidence and refresh the durable `next-action-report`;
 - read-only, disconnected, connected, detached, blocked, and ready UI states must be derived from durable runtime state;
 - guided flows must preserve no-upstream-write defaults until delivery mode, policy, review, approval, and writeback evidence are explicit.
 
@@ -93,6 +94,7 @@ Project bootstrap baseline:
 - compiler revision status reports
 - planner metric snapshots
 - finance monitoring snapshots
+- next-action reports
 
 ## Connected lifecycle mutations (W18 baseline)
 
@@ -114,6 +116,7 @@ HTTP lifecycle command mutation baseline:
 - `project_ref`, `project-ref`, `runtime_root`, `runtime-root`, and `help` are server-owned and cannot be supplied by clients;
 - the transport injects the scoped project ref and runtime root before invoking the existing CLI/runtime path;
 - successful responses return `{ lifecycle_command }` with `command_output` preserving the CLI JSON fields, `artifact_refs`, `evidence_refs`, `exit_code`, `stdout`, `stderr`, and `interactive_continuation`;
+- `mission create` and `next` are included in the bounded mutation subset for guided web progress; `next` is treated as a mutation because it materializes a durable `next-action-report`;
 - unsupported commands or invalid/missing required flags return HTTP `400` with `error.code` in `invalid_lifecycle_command | invalid_lifecycle_flags`;
 - command outputs that report policy, validation, guardrail, or interaction blocking return HTTP `409` with `{ error, lifecycle_command }` while preserving any durable output refs the runtime produced.
 
@@ -137,6 +140,7 @@ Run-level read baseline:
 - `strategic_snapshot.planner_metrics` and `GET /api/projects/:projectId/planner-metrics` expose one `planner-metrics-snapshot` read model with `clean_close_rate`, `retry_rate`, `repair_rate`, and `blocker_rate`.
 - `strategic_snapshot.finance_monitoring` and `GET /api/projects/:projectId/finance-monitoring` expose one `finance-monitoring-snapshot` read model with cost/latency grouping by project, route, bundle, compiler revision, and adapter.
 - `GET /api/projects/:projectId/compiler-revisions` returns contract-backed `compiler-revision-status` reports so compiler lifecycle, compatibility, decision history, incidents, and evaluation lineage are queryable without opening raw files.
+- `GET /api/projects/:projectId/next-action-report` returns the latest durable `next-action-report` if one exists, or `null` when `aor next` has not materialized one yet. The read route does not generate or refresh the report.
 - Empty projects must return `status=no-data`, `no_data=true`, and `value=null` per metric rather than claiming a zero success or failure rate.
 - Planner metrics derive only from durable run, review, Runtime Harness, incident, and run-control audit artifacts; they do not mutate scheduler state.
 - Finance monitoring separates `production_monitoring`, `offline_certification`, and `rehearsal` evidence classes. Production monitoring requires explicit event scope and must not be inferred from certification or rehearsal artifacts.
@@ -308,6 +312,8 @@ Connected-mode transport mapping is implemented for read, follow, and bounded mu
 - `GET /api/projects/:projectId/state`
 - `GET /api/projects/:projectId/strategic-snapshot`
 - `GET /api/projects/:projectId/planner-metrics`
+- `GET /api/projects/:projectId/finance-monitoring`
+- `GET /api/projects/:projectId/next-action-report`
 - `GET /api/projects/:projectId/packets`
 - `GET /api/projects/:projectId/step-results`
 - `GET /api/projects/:projectId/quality-artifacts`

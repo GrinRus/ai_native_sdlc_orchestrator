@@ -213,6 +213,11 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.ok(
       snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/finance-monitoring"),
     );
+    assert.ok(
+      snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/next-action-report"),
+    );
+    assert.equal(snapshot.guided_lifecycle.stages.length, 7);
+    assert.equal(snapshot.guided_lifecycle.mutation_transport.available, true);
 
     const html = renderOperatorConsoleHtml(snapshot, {
       title: "AOR Web Console Smoke",
@@ -229,6 +234,7 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.match(html, /Clean-close rate/);
     assert.match(html, /Finance Monitoring/);
     assert.match(html, /Telemetry state/);
+    assert.match(html, /Guided lifecycle/);
     assert.match(html, /Lifecycle commands/);
     assert.match(html, /Runner interactions/);
   });
@@ -408,6 +414,9 @@ test("operator console smoke script renders html and emits transcript summary", 
         detached: summary.detached,
         lifecycle_command_count: summary.lifecycle_command_count,
         interaction_count: summary.interaction_count,
+        guided_lifecycle_state: summary.guided_lifecycle_state,
+        guided_current_stage_id: summary.guided_current_stage_id,
+        guided_stage_count: summary.guided_stage_count,
         lifecycle_mutation_path_present: Array.isArray(summary.contract_alignment.mutation_model)
           ? summary.contract_alignment.mutation_model.includes("POST /api/projects/:projectId/lifecycle-command/actions")
           : false,
@@ -490,10 +499,39 @@ test("web connected mode consumes detached HTTP/SSE transport while preserving d
 
       const received = /** @type {Record<string, unknown>} */ (await streamedEvent);
       assert.equal(received.event_type, "warning.raised");
+      const reconnectAfterEventId = session.replay_events.at(-1)?.event_id;
 
       const detached = session.detach();
       assert.equal(detached.detached, true);
       assert.ok(detached.captured_event_count >= 1);
+
+      const reconnectSession = await attachOperatorConsoleSession({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+        follow: true,
+        afterEventId: typeof reconnectAfterEventId === "string" ? reconnectAfterEventId : undefined,
+      });
+      const reconnectedEvent = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("timed out waiting for reconnected follow event")), 3000);
+        const unsubscribe = reconnectSession.onEvent((event) => {
+          clearTimeout(timeout);
+          unsubscribe();
+          resolve(event);
+        });
+      });
+
+      appendRunEvent({
+        projectRef: projectRoot,
+        cwd: projectRoot,
+        runId,
+        eventType: "step.updated",
+        payload: { step_id: "runner.review", status: "pass" },
+      });
+
+      const reconnected = /** @type {Record<string, unknown>} */ (await reconnectedEvent);
+      assert.equal(reconnected.event_type, "step.updated");
+      reconnectSession.detach();
     } finally {
       await transport.close();
     }
@@ -609,6 +647,178 @@ test("web connected mode drives lifecycle commands through detached control-plan
         ),
       );
       assert.ok(snapshot.api_ui_contract_alignment.lifecycle_commands.includes("intake create"));
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("guided web lifecycle progresses mission and next action through connected control-plane mutations", async () => {
+  await withTempProject(async (projectRoot) => {
+    fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "guided-web-success" }, null, 2), "utf8");
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    const onboard = invokeCli(["onboard", projectRoot, "--json"]);
+    assert.equal(onboard.exitCode, 0, onboard.stderr);
+
+    const runId = "run.guided.web.success.v1";
+    const transport = await createControlPlaneHttpServer({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const attachResult = invokeCli([
+        "ui",
+        "attach",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+        "--control-plane",
+        transport.baseUrl,
+      ]);
+      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
+
+      const mission = await applyOperatorLifecycleCommand({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        command: "mission create",
+        flags: {
+          mission_id: "guided-web-success",
+          goal: "Make the web console show the guided lifecycle.",
+          constraint: "Use control-plane lifecycle mutations.",
+          kpi: "guided-web:Guided web:Operator sees next action:Console smoke",
+          dod: "Console shows status, evidence, blockers, and next action.",
+          allowed_path: "apps/web/**",
+          forbidden_path: "secrets/**",
+          delivery_mode: "patch-only",
+          source_kind: "local-note",
+          source_ref: "docs/ops/ui-attach-detach.md",
+        },
+      });
+      assert.equal(mission.binding_mode, "detached-http-mutation");
+      assert.equal(mission.lifecycle_command.command, "mission create");
+      assert.equal(mission.lifecycle_command.command_output.product_intake_completeness.status, "complete");
+
+      const next = await applyOperatorLifecycleCommand({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        command: "next",
+      });
+      assert.equal(next.binding_mode, "detached-http-mutation");
+      assert.equal(next.lifecycle_command.command_output.next_action_primary.action_id, "discovery-run");
+
+      const snapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+      });
+      assert.equal(snapshot.api_ui_contract_alignment.binding_mode, "detached-http-sse");
+      assert.ok(
+        snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/next-action-report"),
+      );
+      assert.ok(snapshot.api_ui_contract_alignment.lifecycle_commands.includes("mission create"));
+      assert.ok(snapshot.api_ui_contract_alignment.lifecycle_commands.includes("next"));
+      assert.equal(snapshot.guided_lifecycle.current_stage_id, "discovery-spec-plan");
+      assert.equal(snapshot.guided_lifecycle.stages.length, 7);
+      const missionStage = snapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "mission");
+      const discoveryStage = snapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "discovery-spec-plan");
+      assert.equal(missionStage?.status, "done");
+      assert.equal(discoveryStage?.status, "ready");
+      assert.equal(discoveryStage?.next_action.mutation.transport, "control-plane");
+      assert.equal(discoveryStage?.next_action.mutation.command, "discovery run");
+      assert.equal(discoveryStage?.next_action.command.includes("aor discovery run"), true);
+      assert.ok((discoveryStage?.evidence_refs.length ?? 0) > 0);
+
+      const html = renderOperatorConsoleHtml(snapshot);
+      assert.match(html, /Guided lifecycle/);
+      assert.match(html, /Discovery, Spec, Plan/);
+      assert.match(html, /aor discovery run/);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("guided web lifecycle renders blocked and read-only states without losing evidence", async () => {
+  await withTempProject(async (projectRoot) => {
+    fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "guided-web-blocked" }, null, 2), "utf8");
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    const onboard = invokeCli(["onboard", projectRoot, "--json"]);
+    assert.equal(onboard.exitCode, 0, onboard.stderr);
+
+    const runId = "run.guided.web.blocked.v1";
+    const transport = await createControlPlaneHttpServer({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const attachResult = invokeCli([
+        "ui",
+        "attach",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+        "--control-plane",
+        transport.baseUrl,
+      ]);
+      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
+
+      const incompleteMission = await applyOperatorLifecycleCommand({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        command: "mission create",
+        flags: {
+          mission_id: "guided-web-blocked",
+          goal: "Expose a blocked guided web stage.",
+          constraint: "Keep blocked reasons explicit.",
+          source_kind: "local-note",
+          source_ref: "docs/ops/ui-attach-detach.md",
+        },
+      });
+      assert.equal(incompleteMission.binding_mode, "detached-http-mutation");
+      assert.equal(incompleteMission.lifecycle_command.command_output.product_intake_completeness.status, "incomplete");
+
+      const next = await applyOperatorLifecycleCommand({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        command: "next",
+      });
+      assert.equal(next.lifecycle_command.command_output.next_action_status, "blocked");
+
+      const snapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+      });
+      assert.equal(snapshot.guided_lifecycle.state, "blocked");
+      assert.equal(snapshot.guided_lifecycle.current_stage_id, "mission");
+      const missionStage = snapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "mission");
+      assert.equal(missionStage?.status, "blocked");
+      assert.ok(missionStage?.blockers.some((blocker) => blocker.code === "mission-kpis-missing"));
+      assert.ok(missionStage?.blockers.some((blocker) => blocker.code === "mission-definition_of_done-missing"));
+      assert.equal(missionStage?.next_action.mutation.command, "mission create");
+
+      const readOnlySnapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+        readOnly: true,
+      });
+      const readOnlyMissionStage = readOnlySnapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "mission");
+      assert.equal(readOnlySnapshot.guided_lifecycle.state, "read_only");
+      assert.equal(readOnlyMissionStage?.next_action.mutation.available, false);
+      assert.ok((readOnlyMissionStage?.evidence_refs.length ?? 0) > 0);
+
+      const html = renderOperatorConsoleHtml(readOnlySnapshot);
+      assert.match(html, /mission-kpis-missing/);
+      assert.match(html, /read-only/);
     } finally {
       await transport.close();
     }

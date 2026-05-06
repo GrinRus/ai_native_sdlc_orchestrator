@@ -12,6 +12,8 @@ const AOR_BIN = path.resolve(currentDir, "../../cli/bin/aor.mjs");
 const LIFECYCLE_COMMANDS = new Set([
   "project init",
   "intake create",
+  "mission create",
+  "next",
   "discovery run",
   "spec build",
   "wave create",
@@ -373,13 +375,13 @@ export function runLifecycleCommand(options) {
     return { ok: false, statusCode: 400, error: { code: requiredResult.code, message: requiredResult.message } };
   }
 
-  const [group, verb] = command.split(" ");
+  const commandParts = command.split(" ");
   const args = [
-    group,
-    verb,
+    ...commandParts,
     "--project-ref",
     options.projectRef,
     ...(options.runtimeRoot ? ["--runtime-root", options.runtimeRoot] : []),
+    ...(command === "next" && flagResult.cliFlags.json === undefined ? ["--json"] : []),
     ...flagResult.args,
   ];
   const run = spawnSync(process.execPath, [AOR_BIN, ...args], {

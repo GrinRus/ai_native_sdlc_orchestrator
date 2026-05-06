@@ -137,6 +137,11 @@ async function main() {
     interaction_count: Array.isArray(session.snapshot.run_detail.interactions)
       ? session.snapshot.run_detail.interactions.length
       : 0,
+    guided_lifecycle_state: session.snapshot.guided_lifecycle?.state ?? "unknown",
+    guided_current_stage_id: session.snapshot.guided_lifecycle?.current_stage_id ?? "unknown",
+    guided_stage_count: Array.isArray(session.snapshot.guided_lifecycle?.stages)
+      ? session.snapshot.guided_lifecycle.stages.length
+      : 0,
     rendered_html_file: outputHtml,
     contract_alignment: session.snapshot.api_ui_contract_alignment,
   };

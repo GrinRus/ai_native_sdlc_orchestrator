@@ -568,6 +568,18 @@ test("control-plane API baseline documents interactive continuation target metad
     "expected lifecycle command subset to include intake create",
   );
   assert.ok(
+    loaded.document.lifecycle_command_operations?.commands?.some(
+      (entry) => entry.command === "mission create",
+    ),
+    "expected lifecycle command subset to include guided mission create",
+  );
+  assert.ok(
+    loaded.document.deferred_transport?.implemented_mappings?.includes(
+      "GET /api/projects/:projectId/next-action-report",
+    ),
+    "expected next-action report read mapping for guided web",
+  );
+  assert.ok(
     loaded.document.interactive_continuation?.audit_behavior?.query_safe_refs?.includes("answer_audit_ref"),
     "expected answer audit refs to be query-safe",
   );

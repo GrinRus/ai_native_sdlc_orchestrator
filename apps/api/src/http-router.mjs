@@ -90,6 +90,16 @@ const ROUTES = Object.freeze([
     kind: "read",
   },
   {
+    id: "next-action-report",
+    pattern: /^\/api\/projects\/([^/]+)\/next-action-report$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Next-action report route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
     id: "multirepo-coordination",
     pattern: /^\/api\/projects\/([^/]+)\/multirepo-coordination$/u,
     method: "GET",

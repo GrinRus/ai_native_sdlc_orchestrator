@@ -47,6 +47,17 @@ The optional web console mirrors the same stages with these states:
 
 The web app must not invent separate lifecycle state. It reads control-plane state and invokes runtime-owned mutations.
 
+W21-S05 maps the optional web console to seven guided stage views:
+- readiness;
+- mission;
+- discovery/spec/plan;
+- execution;
+- review/QA;
+- delivery/release;
+- learning.
+
+Each stage exposes durable evidence refs, blocker codes, selected-run policy history counts, event/log counts, and the exact current next action from the latest `next-action-report`. Connected mode invokes `mission create`, `next`, and other bounded lifecycle commands through `POST /api/projects/:projectId/lifecycle-command/actions`; read-only mode keeps the same evidence visible while disabling mutation descriptors.
+
 ## Safety defaults
 Installed-user onboarding defaults to public-repo safety:
 - no upstream writes by default;

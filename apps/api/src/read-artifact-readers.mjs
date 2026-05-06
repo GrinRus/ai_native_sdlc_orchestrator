@@ -24,6 +24,7 @@ const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/
 const LEARNING_LOOP_SCORECARD_REGEX = /^learning-loop-scorecard-.*\.json$/;
 const LEARNING_LOOP_HANDOFF_REGEX = /^learning-loop-handoff-.*\.json$/;
 const RUN_CONTROL_AUDIT_REGEX = /^run-control-event-.*\.json$/;
+const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/;
 
 /**
  * @param {string} value
@@ -328,4 +329,26 @@ export function listRunControlAudits(options = {}) {
   const init = initializeProjectRuntime(options);
   const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
   return loadJsonDocuments({ init, files: reportFiles, matcher: RUN_CONTROL_AUDIT_REGEX });
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ * @returns {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> } | null}
+ */
+export function readNextActionReport(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  return (
+    loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "next-action-report",
+      matcher: NEXT_ACTION_REPORT_REGEX,
+    })[0] ?? null
+  );
 }

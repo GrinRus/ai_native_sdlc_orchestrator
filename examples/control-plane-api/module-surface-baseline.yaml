@@ -32,6 +32,10 @@ read_operations:
     operation_family: read
     output_contract_families:
       - finance-monitoring-snapshot
+  - operation_id: read.next-action-report
+    operation_family: read
+    output_contract_families:
+      - next-action-report
 
 run_control_operations:
   - operation_id: run.start
@@ -77,6 +81,10 @@ lifecycle_command_operations:
       command: project init
     - operation_id: intake.create
       command: intake create
+    - operation_id: mission.create
+      command: mission create
+    - operation_id: next.resolve
+      command: next
     - operation_id: discovery.run
       command: discovery run
     - operation_id: spec.build
@@ -157,6 +165,7 @@ deferred_transport:
     - GET /api/projects/:projectId/strategic-snapshot
     - GET /api/projects/:projectId/planner-metrics
     - GET /api/projects/:projectId/finance-monitoring
+    - GET /api/projects/:projectId/next-action-report
     - GET /api/projects/:projectId/packets
     - GET /api/projects/:projectId/step-results
     - GET /api/projects/:projectId/quality-artifacts
