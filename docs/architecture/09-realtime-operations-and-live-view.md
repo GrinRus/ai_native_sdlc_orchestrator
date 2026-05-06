@@ -23,3 +23,12 @@ Operators need live state without making the UI part of the critical path.
 - CLI for direct operational control
 - optional web UI for dashboards and drill-down views
 - API queries for automation and integrations
+
+## Interactive continuation
+When a runner asks a question, AOR treats it as a run continuation boundary:
+- the routed step persists `step-result.requested_interaction` with a query-safe summary and evidence refs;
+- live events announce the requested, answered, resumed, or blocked state without raw answer text;
+- operator answers flow through a control-plane command path that writes answer audit evidence first;
+- the runtime resumes from the recorded boundary or stays blocked with explicit evidence refs and reason codes.
+
+The web UI may render the question and submit the answer, but it must not decide how to resume the run or store unaudited answer state.

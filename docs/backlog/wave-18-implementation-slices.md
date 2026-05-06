@@ -21,7 +21,7 @@ Close the connected web full-flow and topology proof gaps while preserving the h
 
 ## W18-S01 — Interactive run continuation contract
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Define contract and API behavior for surfacing runner questions, submitting operator answers, auditing the answer, and continuing or blocking the run without UI-owned orchestration.
 - **Primary modules:** `docs/contracts/**`, `docs/architecture/**`, `docs/product/**`, `docs/backlog/**`
 - **Hard dependencies:** none
@@ -55,7 +55,7 @@ Close the connected web full-flow and topology proof gaps while preserving the h
 
 ## W18-S02 — Full lifecycle command mutations for connected web
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Expose the minimum control-plane mutation surface needed for connected web to drive bootstrap, intake, discovery, spec, planning, handoff, run, review, delivery, and learning paths using existing runtime ownership.
 - **Primary modules:** `apps/api`, `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**`
 - **Hard dependencies:** W18-S01

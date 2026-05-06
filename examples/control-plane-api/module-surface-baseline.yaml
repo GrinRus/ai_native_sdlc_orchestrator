@@ -49,6 +49,37 @@ live_event_operations:
     replay_supported: true
     backpressure: bounded-replay-window
 
+interactive_continuation:
+  owning_slice: W18-S01
+  status: target-contract
+  request_contract_family: step-result
+  event_contract_family: live-run-event
+  request_field: requested_interaction
+  answer_submission:
+    operation_id: run.interaction.answer
+    implementation_status: planned-w18-s02
+    required_payload_fields:
+      - run_id
+      - interaction_id
+      - answer
+    optional_payload_fields:
+      - reason
+      - approval_ref
+      - answer_evidence_ref
+    response_fields:
+      - interaction_id
+      - interaction_status
+      - answer_audit_ref
+      - step_result_ref
+      - run_control_transition
+      - blocked_reason
+  audit_behavior:
+    raw_answer_storage: durable-audit-evidence-only
+    live_event_answer_text: forbidden
+    query_safe_refs:
+      - requested_interaction
+      - answer_audit_ref
+
 deferred_transport:
   owning_slice: W9-S07
   status: implemented

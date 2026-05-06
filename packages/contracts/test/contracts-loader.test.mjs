@@ -348,6 +348,24 @@ test("control-plane API baseline example loads through the shared contract path"
   assert.equal(loaded.ok, true, "expected control-plane-api baseline example to load");
 });
 
+test("control-plane API baseline documents interactive continuation target metadata", () => {
+  const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
+  assert.equal(loaded.ok, true, "fixture should load before assertions");
+
+  assert.equal(loaded.document.interactive_continuation?.owning_slice, "W18-S01");
+  assert.equal(loaded.document.interactive_continuation?.request_contract_family, "step-result");
+  assert.equal(loaded.document.interactive_continuation?.event_contract_family, "live-run-event");
+  assert.equal(
+    loaded.document.interactive_continuation?.answer_submission?.implementation_status,
+    "planned-w18-s02",
+  );
+  assert.ok(
+    loaded.document.interactive_continuation?.audit_behavior?.query_safe_refs?.includes("answer_audit_ref"),
+    "expected answer audit refs to be query-safe",
+  );
+});
+
 test("control-plane API contract rejects invalid binding mode", () => {
   const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
   const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });

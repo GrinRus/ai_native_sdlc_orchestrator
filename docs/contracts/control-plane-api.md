@@ -64,7 +64,8 @@ Lifecycle command mutations should:
 - call the same runtime command handlers used by CLI/headless flows instead of adding UI-owned orchestration logic;
 - return existing command response fields and durable artifact refs where available;
 - preserve policy, approval, validation, and blocked-next-step evidence in stable response shapes;
-- support the interactive continuation flow described by `step-result.requested_interaction`.
+- support the interactive continuation flow described by `step-result.requested_interaction`;
+- include an answer-submission command mutation for unresolved runner-requested interactions before web full-flow claims answer support.
 
 ## Read surface baseline (module operations)
 
@@ -110,8 +111,17 @@ Full-journey execution baseline (W13):
 Interactive continuation target (W18-S01):
 - when a routed step requests operator input, the run should preserve a query-safe `requested_interaction` payload in the run-linked step result;
 - operator answers should be submitted through a control-plane command path that records answer audit evidence before any continuation attempt;
+- answer submission payloads should include `run_id`, `interaction_id`, `answer`, and optional `reason`, `approval_ref`, or `answer_evidence_ref`;
+- answer submission responses should include `interaction_id`, `interaction_status`, `answer_audit_ref`, `step_result_ref`, `run_control_transition`, and `blocked_reason` when continuation cannot proceed;
 - continuation should either resume the bounded run from the recorded interaction boundary or remain blocked with explicit evidence refs and reason codes;
+- live event payloads should reference `requested_interaction` and `answer_audit_ref` without exposing raw answer text;
 - web clients may present and submit the interaction, but the control plane remains responsible for validation, audit, and run-state transitions.
+
+Answer validation baseline for W18:
+- the referenced `interaction_id` must match the latest unresolved run-linked `requested_interaction`;
+- empty answers are invalid unless an `answer_evidence_ref` points to a durable operator-provided artifact;
+- accepted answers must write one durable audit artifact before the run attempts to continue;
+- rejected answers must return a stable blocked/error shape and preserve the prior interaction evidence.
 
 ## Delivery/release baseline (module operations)
 

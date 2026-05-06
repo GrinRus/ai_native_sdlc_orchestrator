@@ -13,7 +13,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Core packets and profiles | `delivery-plan.md` | `delivery-plan` | `examples/packets/delivery-plan-*.yaml` | implemented | Includes closed-set enum checks for `delivery_mode` (`no-write|patch-only|local-branch|fork-first-pr`) and `status` (`ready|blocked`); governance decision metadata is optional. |
 | Core packets and profiles | `delivery-manifest.md` | `delivery-manifest` | `examples/delivery-manifest*.yaml` | implemented | Required fields + top-level type checks, including `step_ref`, `approval_context`, `evidence_root`, `source_refs`, and `created_at`. |
 | Core packets and profiles | `incident-report.md` | `incident-report` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
-| Execution and quality | `step-result.md` | `step-result` | none | implemented | Includes closed-set enum check for `step_class`; routed replay metadata (including completeness gate and architecture traceability) is optional. |
+| Execution and quality | `step-result.md` | `step-result` | none | implemented | Includes closed-set enum check for `step_class`; routed replay metadata and optional `requested_interaction` continuation metadata are optional. |
 | Execution and quality | `validation-report.md` | `validation-report` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Execution and quality | `evaluation-report.md` | `evaluation-report` | `examples/eval/report-*.sample.yaml` | implemented | Required fields + top-level type checks, including scorer metadata and summary metrics. |
 | Execution and quality | `review-report.md` | `review-report` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
@@ -39,7 +39,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Operations | `live-e2e-provider-variant.md` | `live-e2e-provider-variant` | `scripts/live-e2e/catalog/providers/*.yaml` | implemented | Required fields + closed-set `provider_variant_id` checks for W14 matrix variants. |
 | Operations | `live-e2e-scenario-policy.md` | `live-e2e-scenario-policy` | `scripts/live-e2e/catalog/scenarios/*.yaml` | implemented | Required fields + closed-set `scenario_family` checks for live E2E scenario policy. |
 | Operations | `live-e2e-target-catalog.md` | `live-e2e-target-catalog` | `scripts/live-e2e/catalog/targets/*.yaml` | implemented | Required fields + top-level type checks for target safety, matrix, provider pairs, and missions. |
-| Operations | `control-plane-api.md` | `control-plane-api` | `examples/control-plane-api/*.yaml` | implemented | Loader validates the hybrid module + detached HTTP/SSE baseline for read/follow plus bounded run-control/ui-lifecycle mutation families. |
+| Operations | `control-plane-api.md` | `control-plane-api` | `examples/control-plane-api/*.yaml` | implemented | Loader validates the hybrid module + detached HTTP/SSE baseline for read/follow plus bounded run-control/ui-lifecycle mutation families; the example also carries W18 interactive-continuation target metadata. |
 
 ## Reference integrity and compatibility checks (W3-S01)
 

@@ -84,7 +84,7 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 - Select the required matrix cell by scenario family, pinned provider variant, and declared feature size.
 - Track which required matrix cells are still uncovered after each live E2E run.
 
-W18 tracks the remaining operator-surface gap for runner-requested questions: surface the question, submit an approved operator answer, and keep the answer trail auditable without making the web UI own orchestration.
+W18 tracks the remaining operator-surface gap for runner-requested questions: surface the question from `step-result.requested_interaction`, submit an approved operator answer through the control plane, emit query-safe live events, and keep the answer trail auditable without making the web UI own orchestration.
 
 ### Security / compliance
 - Enforce provider and adapter allowlists.

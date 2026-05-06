@@ -23,3 +23,6 @@ The CLI is the primary operator surface for AOR. It must remain usable when the 
 `aor project verify --routed-dry-run-step <step_class>` remains the baseline smoke path for routed no-write execution and durable step-result emission. The full-journey live path additionally uses public `review run` and `learning handoff` surfaces after real execution.
 
 Installed-user proof for AOR itself runs through the internal `scripts/live-e2e/*` proof runner and is not part of the public CLI command surface.
+
+## Interactive continuation rule
+Runner-requested questions are operator interventions, not a separate UI workflow. CLI, API, and web surfaces should all read the same `step-result.requested_interaction` evidence and submit answers through the control plane so answer audit refs and run-state transitions stay durable. Until the W18 connected mutation slice implements the command path, subscribers should report these interactions as blocked continuation states rather than inventing local resume behavior.

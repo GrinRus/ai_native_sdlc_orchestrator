@@ -51,6 +51,8 @@ The runners own:
 
 Connected web surfaces may drive these lifecycle operations through the control plane, but CLI/API/runtime command handlers remain the owners of orchestration behavior and artifact materialization.
 
+Runner-requested questions are treated as resumable operator interactions, not as a web-only exception. AOR records the question as query-safe step evidence, accepts answers only through a control-plane-owned command path, writes answer audit evidence, and then either resumes from the recorded boundary or remains blocked with explicit reasons.
+
 ## Built-in quality model
 AOR uses a layered quality model.
 
@@ -119,6 +121,7 @@ The W13 full-journey layer adds:
 - fully automatic self-improving prompts without certification and human approval;
 - hidden provider-specific magic inside the orchestrator core;
 - UI-owned orchestration logic.
+- UI-local handling of runner questions without control-plane audit evidence.
 
 ## Success criteria for the first implementation
 AOR v1 is successful when the repo can demonstrate that:
