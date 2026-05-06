@@ -1,7 +1,7 @@
 # Runbook: incident and audit command operations
 
 ## Scope
-Use this runbook when a run needs a durable incident record or when operators need run-centric audit snapshots.
+Use this runbook when a run needs a durable incident record, a reviewed dataset backfill proposal, or run-centric audit snapshots.
 
 ## Preconditions
 - Runtime artifacts exist for the target run (`aor run status --run-id <RUN_ID>` returns at least one summary).
@@ -37,7 +37,27 @@ aor incident show \
 
 Expected signals:
 - `incident_records` is returned.
-- each record includes `incident_ref`, `incident_report_file`, `linked_run_refs`, and `linked_asset_refs`.
+- each record includes `incident_ref`, `incident_report_file`, `linked_run_refs`, `linked_asset_refs`, and any `backfill_proposal_refs`.
+
+## Propose dataset backfill
+```bash
+aor incident backfill \
+  --project-ref <PROJECT_ROOT> \
+  --incident-id <INCIDENT_ID> \
+  --suite-ref suite.regress.short@v1
+```
+
+Expected signals:
+- `incident_backfill_proposal_file` exists under `.aor/projects/<project_id>/reports/incident-backfill-proposal-*.json`.
+- `incident_backfill_proposal_state` is `proposed` unless an explicit reviewed state was supplied.
+- `incident_backfill_suite_ref` and `incident_backfill_dataset_ref` identify the intended quality assets.
+- `incident_backfill_review_required` is `true`.
+- stable dataset files are not changed by this command; reviewers must approve the proposal before a separate dataset update is authored.
+
+Blocked proposal creation:
+- missing `incident_id` fails with an explicit not-found error;
+- missing linked incident asset refs fails because the proposal would not be traceable;
+- missing `suite_ref` or its target `dataset_ref` fails before any proposal is written.
 
 ## Recertify and re-enable
 ```bash
@@ -103,4 +123,5 @@ Expected signals:
 
 ## Invalid lookup behavior
 - `incident show --incident-id <missing>` must fail with an explicit not-found error.
+- `incident backfill --incident-id <missing>` must fail with an explicit not-found error.
 - `audit runs --run-id <missing>` must fail with an explicit not-found error.

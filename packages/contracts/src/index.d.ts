@@ -33,6 +33,7 @@ export type ContractFamily =
   | "live-run-event"
   | "learning-loop-scorecard"
   | "learning-loop-handoff"
+  | "incident-backfill-proposal"
   | "control-plane-api"
   | "live-e2e-provider-variant"
   | "live-e2e-scenario-policy"

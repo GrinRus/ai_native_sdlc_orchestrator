@@ -64,7 +64,7 @@ AOR needs suites for:
 - release readiness,
 - wrapper certification,
 - adapter certification,
-- incident backfill,
+- reviewed incident backfill proposals,
 - live E2E rehearshal.
 
 ## Asset certification workflows

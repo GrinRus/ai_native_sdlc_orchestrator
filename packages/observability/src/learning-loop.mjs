@@ -4,6 +4,7 @@ import path from "node:path";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
+const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/;
 const DEFAULT_BACKLOG_REFS = Object.freeze([
   "docs/backlog/mvp-implementation-backlog.md",
   "docs/backlog/mvp-roadmap.md",
@@ -81,6 +82,15 @@ function collectHarnessCaptureRefs(refs) {
     const normalized = ref.toLowerCase();
     return normalized.includes("harness-capture") || normalized.includes("harness-replay");
   });
+}
+
+/**
+ * @param {string[]} refs
+ * @param {RegExp} pattern
+ * @returns {string[]}
+ */
+function filterRefs(refs, pattern) {
+  return uniqueStrings(refs.filter((ref) => pattern.test(ref)));
 }
 
 /**
@@ -370,6 +380,180 @@ export function listIncidentReports(options) {
   }
 
   return reports;
+}
+
+/**
+ * @param {{
+ *   projectId: string,
+ *   projectRoot: string,
+ *   runtimeLayout: { reportsRoot: string },
+ *   incidentRef: string,
+ *   incident: Record<string, unknown>,
+ *   suiteRef: string,
+ *   datasetRef: string,
+ *   subjectType?: string | null,
+ *   learningHandoffRef?: string | null,
+ *   scorecardRefs?: string[],
+ *   evidenceRefs?: string[],
+ *   proposedCaseId?: string,
+ *   proposalState?: "proposed" | "approved" | "rejected",
+ *   timestamp?: string,
+ * }} options
+ */
+export function materializeIncidentBackfillProposal(options) {
+  const createdAt = options.timestamp ?? nowIso();
+  const incidentId = typeof options.incident.incident_id === "string" ? options.incident.incident_id : "";
+  const incidentRef = typeof options.incidentRef === "string" ? options.incidentRef.trim() : "";
+  const suiteRef = typeof options.suiteRef === "string" ? options.suiteRef.trim() : "";
+  const datasetRef = typeof options.datasetRef === "string" ? options.datasetRef.trim() : "";
+  const proposalState = options.proposalState ?? "proposed";
+  const allowedProposalStates = new Set(["proposed", "approved", "rejected"]);
+
+  if (incidentId.length === 0 || incidentRef.length === 0) {
+    throw new Error("Incident backfill proposal requires a source incident reference.");
+  }
+  if (suiteRef.length === 0) {
+    throw new Error("Incident backfill proposal requires a target suite reference.");
+  }
+  if (datasetRef.length === 0) {
+    throw new Error("Incident backfill proposal requires a target dataset reference.");
+  }
+  if (!allowedProposalStates.has(proposalState)) {
+    throw new Error("Incident backfill proposal state must be proposed, approved, or rejected.");
+  }
+
+  const linkedAssetRefs = normalizeEvidenceRefs(
+    options.projectRoot,
+    uniqueStrings([...asStringArray(options.incident.linked_asset_refs), ...asStringArray(options.evidenceRefs)]),
+  );
+  if (linkedAssetRefs.length === 0) {
+    throw new Error("Incident backfill proposal requires at least one linked asset reference.");
+  }
+
+  const scorecardRefs = normalizeEvidenceRefs(options.projectRoot, asStringArray(options.scorecardRefs));
+  const learningHandoffRef =
+    typeof options.learningHandoffRef === "string" && options.learningHandoffRef.trim().length > 0
+      ? toEvidenceRef(options.projectRoot, options.learningHandoffRef.trim())
+      : null;
+  const runRefs = asStringArray(options.incident.linked_run_refs);
+  const runId = runRefs.length > 0 ? normalizeRunRef(runRefs[0]) : null;
+  const sourceStatus = typeof options.incident.status === "string" ? options.incident.status : "unknown";
+  const subjectType = typeof options.subjectType === "string" && options.subjectType.trim().length > 0
+    ? options.subjectType.trim()
+    : "run";
+  const evidenceRefs = uniqueStrings([
+    incidentRef,
+    ...(learningHandoffRef ? [learningHandoffRef] : []),
+    ...scorecardRefs,
+    ...linkedAssetRefs,
+  ]);
+  const caseId = options.proposedCaseId ?? `case-${normalizeId(incidentId)}`;
+  const proposalId = `${incidentId}.backfill.${normalizeId(suiteRef)}.${createdAt.replace(/[^0-9]/g, "").slice(-12)}`;
+  const proposedCase = {
+    case_id: caseId,
+    source_incident_ref: incidentRef,
+    input_ref: `${incidentRef}#input`,
+    expected_ref: `${incidentRef}#expected`,
+    linked_asset_refs: linkedAssetRefs,
+    route_refs: filterRefs(linkedAssetRefs, /(^route:\/\/|\/routes\/|route[._-])/i),
+    context_asset_refs: filterRefs(linkedAssetRefs, /(^context-|^context:\/\/|context-bundle:\/\/|\/context\/|compiled-context)/i),
+    wrapper_refs: filterRefs(linkedAssetRefs, /(^wrapper:\/\/|\/wrappers\/|wrapper[._-])/i),
+    adapter_refs: filterRefs(linkedAssetRefs, /(^adapter:\/\/|\/adapters\/|adapter[._-]|codex-cli|claude|opencode)/i),
+    compiler_revision_refs: filterRefs(linkedAssetRefs, /(^compiler-revision:\/\/|compiler|compiled-context)/i),
+    scorecard_refs: scorecardRefs,
+    harness_capture_refs: collectHarnessCaptureRefs(linkedAssetRefs),
+  };
+
+  const proposal = {
+    proposal_id: proposalId,
+    project_id: options.projectId,
+    run_id: runId,
+    proposal_state: proposalState,
+    source_artifacts: {
+      incident_ref: incidentRef,
+      incident_id: incidentId,
+      learning_handoff_ref: learningHandoffRef,
+      scorecard_refs: scorecardRefs,
+      run_refs: runRefs,
+      source_status: sourceStatus,
+    },
+    target: {
+      suite_ref: suiteRef,
+      dataset_ref: datasetRef,
+      subject_type: subjectType,
+      dataset_mutation_mode: "proposal-only",
+    },
+    proposed_cases: [proposedCase],
+    mutation_policy: {
+      stable_dataset_mutation: "blocked",
+      requires_review: true,
+      allowed_review_states: ["approved"],
+      applied_by_runtime: false,
+    },
+    evidence_refs: evidenceRefs,
+    created_at: createdAt,
+  };
+
+  const validation = validateContractDocument({
+    family: "incident-backfill-proposal",
+    document: proposal,
+    source: "runtime://incident-backfill-proposal",
+  });
+  if (!validation.ok) {
+    const issues = validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Generated incident-backfill-proposal failed contract validation: ${issues}`);
+  }
+
+  const proposalFile = path.join(
+    options.runtimeLayout.reportsRoot,
+    `incident-backfill-proposal-${normalizeId(proposalId)}.json`,
+  );
+  writeJson(proposalFile, proposal);
+
+  return {
+    proposal,
+    proposalFile,
+    proposalRef: toEvidenceRef(options.projectRoot, proposalFile),
+  };
+}
+
+/**
+ * @param {{ projectRoot: string, runtimeLayout: { reportsRoot?: string, reports_root?: string } }} options
+ */
+export function listIncidentBackfillProposals(options) {
+  const reportsRoot = resolveReportsRoot(options.runtimeLayout);
+  if (!reportsRoot || !fs.existsSync(reportsRoot)) {
+    return [];
+  }
+
+  const files = fs
+    .readdirSync(reportsRoot)
+    .filter((entry) => INCIDENT_BACKFILL_PROPOSAL_REGEX.test(entry))
+    .map((entry) => path.join(reportsRoot, entry))
+    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
+
+  /** @type {Array<{ file: string, artifact_ref: string, document: Record<string, unknown> }>} */
+  const proposals = [];
+  for (const filePath of files) {
+    try {
+      const document = /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(filePath, "utf8")));
+      const validation = validateContractDocument({
+        family: "incident-backfill-proposal",
+        document,
+        source: `runtime://${path.basename(filePath)}`,
+      });
+      if (!validation.ok) continue;
+      proposals.push({
+        file: filePath,
+        artifact_ref: toEvidenceRef(options.projectRoot, filePath),
+        document,
+      });
+    } catch {
+      // Ignore malformed or partially written proposal files.
+    }
+  }
+
+  return proposals;
 }
 
 /**

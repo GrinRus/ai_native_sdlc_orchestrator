@@ -355,6 +355,47 @@ test("discovery research report examples distinguish ADR-ready and incomplete ev
   );
 });
 
+test("incident backfill proposal example preserves proposal-only review state", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/incident-backfill-proposal.proposed.yaml"),
+    family: "incident-backfill-proposal",
+  });
+  assert.equal(loaded.ok, true, "expected incident-backfill-proposal example to load");
+  assert.equal(loaded.document.proposal_state, "proposed");
+  assert.equal(loaded.document.target.dataset_mutation_mode, "proposal-only");
+  assert.equal(loaded.document.mutation_policy.stable_dataset_mutation, "blocked");
+
+  const invalidState = structuredClone(loaded.document);
+  invalidState.proposal_state = "applied";
+  const invalidStateValidation = validateContractDocument({
+    family: "incident-backfill-proposal",
+    document: invalidState,
+    source: "test://incident-backfill-invalid-state",
+  });
+  assert.equal(invalidStateValidation.ok, false);
+  assert.ok(
+    invalidStateValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "proposal_state",
+    ),
+    "expected applied proposal state to be rejected",
+  );
+
+  const missingTarget = structuredClone(loaded.document);
+  delete missingTarget.target;
+  const missingTargetValidation = validateContractDocument({
+    family: "incident-backfill-proposal",
+    document: missingTarget,
+    source: "test://incident-backfill-missing-target",
+  });
+  assert.equal(missingTargetValidation.ok, false);
+  assert.ok(
+    missingTargetValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "target",
+    ),
+    "expected missing target to be rejected",
+  );
+});
+
 test("intake request body validates local source refs and rejects malformed product evidence", () => {
   const loaded = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/packets/intake-request-body.complete.yaml"),

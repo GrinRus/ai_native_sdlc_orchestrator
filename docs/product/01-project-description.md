@@ -49,6 +49,10 @@ The runners own:
 6. **Release** — materialize release packets and sign-off evidence.
 7. **Learning** — backfill incidents into datasets, suites, and certification decisions.
 
+### Incident backfill proposals
+
+Incident learning uses proposal-only artifacts before any stable dataset or suite changes. `incident-backfill-proposal` links the source incident, learning-loop handoff, scorecards, target suite/dataset refs, and impacted route/context/wrapper/adapter/compiler asset refs so reviewers can accept or reject a backfill before a separate dataset revision is authored.
+
 Connected web surfaces may drive these lifecycle operations through the control plane, but CLI/API/runtime command handlers remain the owners of orchestration behavior and artifact materialization.
 
 Runner-requested questions are treated as resumable operator interactions, not as a web-only exception. AOR records the question as query-safe step evidence, accepts answers only through a control-plane-owned command path, writes answer audit evidence, and then either resumes from the recorded boundary or remains blocked with explicit reasons.

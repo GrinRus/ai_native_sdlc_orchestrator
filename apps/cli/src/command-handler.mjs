@@ -130,6 +130,8 @@ export function formatCommandHelp(definition) {
           ? "Status: implemented in delivery/release shell (W6-S05)"
         : definition.command === "incident recertify"
           ? "Status: implemented in incident recertification shell (W8-S06)"
+        : definition.command === "incident backfill"
+          ? "Status: implemented in incident backfill shell (W19-S04)"
         : definition.command === "incident open" ||
             definition.command === "incident show" ||
             definition.command === "audit runs"
@@ -346,12 +348,19 @@ export function formatCommandHelp(definition) {
                       "- Freeze/demote rollout actions trigger rollback-safe hold instead of direct re-enable.",
                       "- Recertification updates preserve run-linked, finance, and quality evidence refs with explicit roots.",
                     ]
-                : definition.command === "incident show"
-                  ? [
-                      "- Incident show is read-only and supports lookup by --incident-id or --run-id.",
-                      "- --limit bounds output size for operator review sessions.",
-                      "- Empty result sets are valid when no incident record matches the filter.",
-                    ]
+                  : definition.command === "incident backfill"
+                    ? [
+                        "- Incident backfill writes one incident-backfill-proposal report and never mutates stable datasets directly.",
+                        "- The proposal links incident, learning-loop, suite, dataset, and linked asset evidence for reviewer assessment.",
+                        "- Missing incident, suite, dataset, or linked asset evidence blocks proposal creation.",
+                      ]
+                    : definition.command === "incident show"
+                      ? [
+                          "- Incident show is read-only and supports lookup by --incident-id or --run-id.",
+                          "- --limit bounds output size for operator review sessions.",
+                          "- Incident records include backfill proposal refs when proposals exist.",
+                          "- Empty result sets are valid when no incident record matches the filter.",
+                        ]
                   : definition.command === "audit runs"
                     ? [
                         "- Audit runs is read-only and emits run-centric snapshots for packet, step, quality, and finance evidence refs.",

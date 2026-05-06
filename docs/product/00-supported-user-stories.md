@@ -106,7 +106,7 @@ Bounded multirepo means one AOR project profile can coordinate several explicit 
 
 ### Incident / improvement owner
 - Open incident reports from failed releases or production feedback.
-- Backfill incidents into datasets and suites.
+- Backfill incidents into datasets and suites through reviewed proposal artifacts.
 - See which routes, prompt/context assets, wrappers, adapters, or compiler revisions correlate with incidents.
 - Force recertification before re-enabling a problematic route.
 

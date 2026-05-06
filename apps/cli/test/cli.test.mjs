@@ -372,6 +372,7 @@ test("delivery and release command help documents bounded policy semantics", () 
 
 test("incident and audit command help documents run-linked operational semantics", () => {
   const incidentHelp = invokeCli(["incident", "open", "--help"]);
+  const backfillHelp = invokeCli(["incident", "backfill", "--help"]);
   const recertifyHelp = invokeCli(["incident", "recertify", "--help"]);
   const auditHelp = invokeCli(["audit", "runs", "--help"]);
 
@@ -380,6 +381,12 @@ test("incident and audit command help documents run-linked operational semantics
   assert.match(incidentHelp.stdout, /Status: implemented in incident\/audit shell \(W6-S06\)/);
   assert.match(incidentHelp.stdout, /--run-id <id>/);
   assert.match(incidentHelp.stdout, /writes one contract-valid incident-report/);
+
+  assert.equal(backfillHelp.exitCode, 0);
+  assert.equal(backfillHelp.stderr, "");
+  assert.match(backfillHelp.stdout, /Status: implemented in incident backfill shell \(W19-S04\)/);
+  assert.match(backfillHelp.stdout, /--incident-id <id>/);
+  assert.match(backfillHelp.stdout, /incident-backfill-proposal report and never mutates stable datasets directly/);
 
   assert.equal(recertifyHelp.exitCode, 0);
   assert.equal(recertifyHelp.stderr, "");
@@ -1445,6 +1452,97 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     };
     assert.deepEqual(incidentSubset, incidentFixture);
 
+    const learningHandoffResult = invokeCli([
+      "learning",
+      "handoff",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+    ]);
+    assert.equal(learningHandoffResult.exitCode, 0, learningHandoffResult.stderr);
+    const learningHandoffPayload = JSON.parse(learningHandoffResult.stdout);
+    assert.equal(fs.existsSync(learningHandoffPayload.learning_loop_handoff_file), true);
+
+    const stableDatasetPath = path.join(projectRoot, "examples/eval/dataset-run-regression.yaml");
+    const stableDatasetBeforeBackfill = fs.readFileSync(stableDatasetPath, "utf8");
+    const backfillResult = invokeCli([
+      "incident",
+      "backfill",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      incidentOpenPayload.incident_id,
+      "--suite-ref",
+      "suite.regress.short@v1",
+      "--case-id",
+      "case-release-regression-follow-up",
+    ]);
+    assert.equal(backfillResult.exitCode, 0, backfillResult.stderr);
+    const backfillPayload = JSON.parse(backfillResult.stdout);
+    assert.equal(backfillPayload.incident_backfill_proposal_state, "proposed");
+    assert.equal(backfillPayload.incident_backfill_suite_ref, "suite.regress.short@v1");
+    assert.equal(backfillPayload.incident_backfill_dataset_ref, "dataset://run-regression@2026-04-20T08:00:00Z");
+    assert.deepEqual(backfillPayload.incident_backfill_case_ids, ["case-release-regression-follow-up"]);
+    assert.equal(backfillPayload.incident_backfill_review_required, true);
+    assert.equal(fs.existsSync(backfillPayload.incident_backfill_proposal_file), true);
+    assert.equal(fs.readFileSync(stableDatasetPath, "utf8"), stableDatasetBeforeBackfill);
+    const backfillProposal = JSON.parse(fs.readFileSync(backfillPayload.incident_backfill_proposal_file, "utf8"));
+    assert.equal(
+      validateContractDocument({
+        family: "incident-backfill-proposal",
+        document: backfillProposal,
+        source: "fixture://incident-backfill-proposal",
+      }).ok,
+      true,
+    );
+    assert.equal(backfillProposal.run_id, runId);
+    assert.equal(backfillProposal.target.dataset_mutation_mode, "proposal-only");
+    assert.equal(backfillProposal.mutation_policy.stable_dataset_mutation, "blocked");
+    assert.equal(backfillProposal.source_artifacts.incident_id, incidentOpenPayload.incident_id);
+    assert.match(backfillProposal.source_artifacts.learning_handoff_ref, /learning-loop-handoff/);
+    assert.ok(backfillProposal.proposed_cases[0].linked_asset_refs.includes("evidence://external/manual-note"));
+
+    const missingSuiteBackfill = invokeCli([
+      "incident",
+      "backfill",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      incidentOpenPayload.incident_id,
+      "--suite-ref",
+      "suite.missing@v1",
+    ]);
+    assert.equal(missingSuiteBackfill.exitCode, 1);
+    assert.match(missingSuiteBackfill.stderr, /Evaluation suite 'suite\.missing@v1' was not found/);
+
+    const emptyAssetIncidentFile = path.join(reportsRoot, "incident-report-empty-linked-assets.json");
+    writeContractFixture({
+      family: "incident-report",
+      filePath: emptyAssetIncidentFile,
+      document: {
+        incident_id: "empty-linked-assets",
+        project_id: "aor",
+        severity: "high",
+        summary: "Incident with no linked assets should not produce a dataset proposal.",
+        linked_run_refs: [`run://${runId}`],
+        linked_asset_refs: [],
+        status: "open",
+      },
+    });
+    const emptyAssetBackfill = invokeCli([
+      "incident",
+      "backfill",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      "empty-linked-assets",
+      "--suite-ref",
+      "suite.regress.short@v1",
+    ]);
+    assert.equal(emptyAssetBackfill.exitCode, 1);
+    assert.match(emptyAssetBackfill.stderr, /has no linked asset refs for dataset backfill/);
+
     const blockedRecertifyResult = invokeCli([
       "incident",
       "recertify",
@@ -1577,6 +1675,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     assert.equal(Object.prototype.hasOwnProperty.call(incidentShowPayload.incident_records[0], legacyIncidentAlias), false);
     assert.equal(incidentShowPayload.incident_records[0].incident_report_file, incidentOpenPayload.incident_report_file);
     assert.ok(incidentShowPayload.incident_records[0].linked_run_refs.includes(`run://${runId}`));
+    assert.ok(incidentShowPayload.incident_records[0].backfill_proposal_refs.length >= 1);
 
     const auditResult = invokeCli([
       "audit",

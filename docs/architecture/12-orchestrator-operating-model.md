@@ -100,8 +100,8 @@ Promotion must be based on certification evidence, not intuition.
 When a run fails or a release causes trouble:
 1. create an incident report;
 2. link the incident to run, route, wrapper, prompt/context assets, adapter, compiler revision, and packets;
-3. backfill a dataset case;
-4. update or create suites;
+3. create a reviewed incident-backfill proposal for the target dataset or suite;
+4. update or create suites only after proposal review accepts the change;
 5. recertify the impacted platform asset before restoring it to stable use.
 
 For full-journey live E2E, the same loop must also leave behind:

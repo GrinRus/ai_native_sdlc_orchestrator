@@ -14,6 +14,7 @@ const ROUTE_STEP_VALUES = [
 const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "demoted"];
 const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
 const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "closed"];
+const INCIDENT_BACKFILL_PROPOSAL_STATE_VALUES = ["proposed", "approved", "rejected"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
 export const LIVE_E2E_OBSERVATION_STATUS_VALUES = ["pass", "warn", "not_pass"];
@@ -410,6 +411,36 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       { field: "severity", allowedValues: INCIDENT_SEVERITY_VALUES },
       { field: "status", allowedValues: INCIDENT_STATUS_VALUES },
     ],
+  },
+  {
+    family: "incident-backfill-proposal",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/incident-backfill-proposal.md",
+    exampleGlob: "examples/reports/incident-backfill-proposal*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "proposal_id",
+      "project_id",
+      "proposal_state",
+      "source_artifacts",
+      "target",
+      "proposed_cases",
+      "mutation_policy",
+      "evidence_refs",
+      "created_at",
+    ],
+    fieldTypes: {
+      proposal_id: "string",
+      project_id: "string",
+      proposal_state: "string",
+      source_artifacts: "object",
+      target: "object",
+      proposed_cases: "array",
+      mutation_policy: "object",
+      evidence_refs: "array",
+      created_at: "string",
+    },
+    enumChecks: [{ field: "proposal_state", allowedValues: INCIDENT_BACKFILL_PROPOSAL_STATE_VALUES }],
   },
   {
     family: "step-result",
@@ -1101,6 +1132,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/control-plane-api\/[^/]+\.ya?ml$/, family: "control-plane-api" },
   { regex: /^examples\/delivery-manifest[^/]*\.ya?ml$/, family: "delivery-manifest" },
   { regex: /^examples\/reports\/discovery-research-report[^/]*\.ya?ml$/, family: "discovery-research-report" },
+  { regex: /^examples\/reports\/incident-backfill-proposal[^/]*\.ya?ml$/, family: "incident-backfill-proposal" },
   { regex: /^examples\/packets\/delivery-plan-[^/]+\.ya?ml$/, family: "delivery-plan" },
   { regex: /^examples\/packets\/intake-request-body[^/]*\.ya?ml$/, family: "intake-request-body" },
   { regex: /^examples\/eval\/dataset-[^/]+\.ya?ml$/, family: "dataset" },

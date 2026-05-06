@@ -582,6 +582,7 @@ function loadRunQualityArtifacts(options) {
     /** @type {const} */ ("learning-loop-scorecard"),
     /** @type {const} */ ("learning-loop-handoff"),
     /** @type {const} */ ("incident-report"),
+    /** @type {const} */ ("incident-backfill-proposal"),
   ];
   const files = listJsonFiles(options.init.runtimeLayout.reportsRoot);
   /** @type {Array<{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> }>} */

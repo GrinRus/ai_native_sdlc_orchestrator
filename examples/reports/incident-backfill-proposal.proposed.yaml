@@ -1,0 +1,53 @@
+proposal_id: aor.incident.release-regression.backfill.suite.regress.short-v1.20260506T010000Z
+project_id: aor
+run_id: release-regression
+proposal_state: proposed
+source_artifacts:
+  incident_ref: evidence://.aor/projects/aor/reports/incident-report-aor-incident-release-regression.json
+  incident_id: aor.incident.release-regression
+  learning_handoff_ref: evidence://.aor/projects/aor/reports/learning-loop-handoff-release-regression.json
+  scorecard_refs:
+    - evidence://.aor/projects/aor/reports/learning-loop-scorecard-cli-learning-handoff-release-regression.json
+  run_refs:
+    - run://release-regression
+target:
+  suite_ref: suite.regress.short@v1
+  dataset_ref: dataset://run-regression@2026-04-20T08:00:00Z
+  subject_type: run
+  dataset_mutation_mode: proposal-only
+proposed_cases:
+  - case_id: case-aor-incident-release-regression
+    source_incident_ref: evidence://.aor/projects/aor/reports/incident-report-aor-incident-release-regression.json
+    input_ref: evidence://.aor/projects/aor/reports/incident-report-aor-incident-release-regression.json#input
+    expected_ref: evidence://.aor/projects/aor/reports/incident-report-aor-incident-release-regression.json#expected
+    linked_asset_refs:
+      - evidence://.aor/projects/aor/reports/step-result-release-regression-implement.json
+      - route://route.implement.default
+      - wrapper://wrapper.implement.default@v1
+      - adapter://codex-cli
+      - context-bundle://aor-harness-foundation@v1
+      - compiler-revision://compiled-context-v1
+    route_refs:
+      - route://route.implement.default
+    context_asset_refs:
+      - context-bundle://aor-harness-foundation@v1
+    wrapper_refs:
+      - wrapper://wrapper.implement.default@v1
+    adapter_refs:
+      - adapter://codex-cli
+    compiler_revision_refs:
+      - compiler-revision://compiled-context-v1
+    scorecard_refs:
+      - evidence://.aor/projects/aor/reports/learning-loop-scorecard-cli-learning-handoff-release-regression.json
+    harness_capture_refs:
+      - evidence://.aor/projects/aor/reports/harness-capture-release-regression.json
+mutation_policy:
+  stable_dataset_mutation: blocked
+  requires_review: true
+  allowed_review_states:
+    - approved
+  applied_by_runtime: false
+evidence_refs:
+  - evidence://.aor/projects/aor/reports/incident-report-aor-incident-release-regression.json
+  - evidence://.aor/projects/aor/reports/learning-loop-handoff-release-regression.json
+created_at: "2026-05-06T01:00:00.000Z"

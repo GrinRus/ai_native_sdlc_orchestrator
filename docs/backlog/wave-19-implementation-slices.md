@@ -116,7 +116,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S04 — Incident-to-dataset backfill workflow
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add a controlled workflow that turns incidents and learning-loop handoffs into reviewed dataset or suite backfill proposals.
 - **Primary modules:** `docs/contracts/**`, `packages/harness`, `packages/observability`, `packages/orchestrator-core`, `apps/cli`
 - **Hard dependencies:** W19-S01, W7-S03, W13-S05

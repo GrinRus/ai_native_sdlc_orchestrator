@@ -17,6 +17,7 @@ const EVALUATION_REPORT_REGEX = /^evaluation-report.*\.json$/;
 const REVIEW_REPORT_REGEX = /^review-report.*\.json$/;
 const RUNTIME_HARNESS_REPORT_REGEX = /^runtime-harness-report.*\.json$/;
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
+const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/;
 const LEARNING_LOOP_SCORECARD_REGEX = /^learning-loop-scorecard-.*\.json$/;
 const LEARNING_LOOP_HANDOFF_REGEX = /^learning-loop-handoff-.*\.json$/;
 
@@ -205,6 +206,12 @@ export function listQualityArtifacts(options = {}) {
       matcher: RUNTIME_HARNESS_REPORT_REGEX,
     }),
     ...loadContractDocuments({ init, files: reportFiles, family: "incident-report", matcher: INCIDENT_REPORT_REGEX }),
+    ...loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "incident-backfill-proposal",
+      matcher: INCIDENT_BACKFILL_PROPOSAL_REGEX,
+    }),
     ...loadContractDocuments({
       init,
       files: reportFiles,
