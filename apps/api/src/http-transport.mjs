@@ -10,7 +10,7 @@ import {
 import { handleReadRoute } from "./http-read-handlers.mjs";
 import { matchControlPlaneRoute } from "./http-router.mjs";
 import { handleRunEventStream } from "./http-stream-handlers.mjs";
-import { asPositiveInteger, asString, sendError } from "./http-utils.mjs";
+import { asPositiveInteger, asString, attachResponseRedactionPolicy, sendError } from "./http-utils.mjs";
 import { readProjectState } from "./read-surface.mjs";
 
 /**
@@ -21,6 +21,7 @@ import { readProjectState } from "./read-surface.mjs";
  *   host?: string,
  *   port?: number,
  *   auth?: {
+ *     mode?: "local-trusted" | "production-hardened",
  *     enabled?: boolean,
  *     tokens?: Array<{
  *       token: string,
@@ -28,6 +29,7 @@ import { readProjectState } from "./read-surface.mjs";
  *       permissions?: Array<"read" | "mutate">,
  *       project_refs?: string[],
  *     }>,
+ *     secret_values?: string[],
  *   },
  * }} options
  */
@@ -43,9 +45,14 @@ export function createControlPlaneHttpServer(options) {
   const state = readProjectState(runtimeOptions);
   const projectId = state.project_id;
   const authPolicy = normalizeAuthPolicy(options.auth, projectId);
+  const runtimeOptionsWithSecurity = {
+    ...runtimeOptions,
+    redactionPolicy: authPolicy.redactionPolicy,
+  };
 
   const server = http.createServer(async (request, response) => {
     try {
+      attachResponseRedactionPolicy(response, authPolicy.redactionPolicy);
       const baseOrigin = `http://${request.headers.host ?? `${host}:${port}`}`;
       const requestUrl = new URL(request.url ?? "/", baseOrigin);
       const method = request.method ?? "GET";
@@ -91,7 +98,7 @@ export function createControlPlaneHttpServer(options) {
           params,
           requestUrl,
           response,
-          runtimeOptions,
+          runtimeOptions: runtimeOptionsWithSecurity,
         });
         return;
       }
@@ -102,28 +109,28 @@ export function createControlPlaneHttpServer(options) {
           request,
           requestUrl,
           response,
-          runtimeOptions,
+          runtimeOptions: runtimeOptionsWithSecurity,
         });
         return;
       }
 
       if (route.id === "run-control-actions") {
-        await handleRunControlAction({ request, response, runtimeOptions });
+        await handleRunControlAction({ request, response, runtimeOptions: runtimeOptionsWithSecurity });
         return;
       }
 
       if (route.id === "ui-lifecycle-actions") {
-        await handleUiLifecycleAction({ request, response, runtimeOptions });
+        await handleUiLifecycleAction({ request, response, runtimeOptions: runtimeOptionsWithSecurity });
         return;
       }
 
       if (route.id === "lifecycle-command-actions") {
-        await handleLifecycleCommandAction({ request, response, runtimeOptions });
+        await handleLifecycleCommandAction({ request, response, runtimeOptions: runtimeOptionsWithSecurity });
         return;
       }
 
       if (route.id === "interaction-answers") {
-        await handleInteractionAnswer({ request, response, runtimeOptions });
+        await handleInteractionAnswer({ request, response, runtimeOptions: runtimeOptionsWithSecurity });
         return;
       }
 

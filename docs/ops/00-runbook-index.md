@@ -19,6 +19,7 @@
 - `operator-strategic-visibility.md` — sponsor/planner wave progress and run-risk snapshots from operator surfaces.
 - `operator-policy-troubleshooting.md` — selected-run event and policy history inspection sequence for later-stage operator triage.
 - `security-route-governance.md` — allow/deny/escalate checks for delivery/release route governance decisions.
+- `control-plane-production-hardening.md` — local-trusted versus production-hardened transport mode, bearer scopes, denied-action audit behavior, and redaction surfaces.
 
 ## UI lifecycle
 - `ui-attach-detach.md` — how to attach or detach the optional web UI from a running AOR system.

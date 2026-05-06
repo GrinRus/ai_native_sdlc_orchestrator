@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { redactSensitiveValue } from "./redaction.mjs";
 
 const LIVE_RUN_EVENT_TYPES = new Set([
   "run.started",
@@ -93,6 +94,7 @@ function readEventLog(logFile) {
  *   eventType: string,
  *   payload: Record<string, unknown>,
  *   timestamp?: string,
+ *   redactionPolicy?: unknown,
  * }} options
  */
 export function appendLiveRunEvent(options) {
@@ -105,6 +107,9 @@ export function appendLiveRunEvent(options) {
   ensureLogDir(options.logFile);
   const existing = readEventLog(options.logFile).filter((event) => event.run_id === options.runId);
   const nextSequence = existing.length === 0 ? 1 : getEventSequence(existing[existing.length - 1]) + 1;
+  const redactedPayload = /** @type {Record<string, unknown>} */ (
+    redactSensitiveValue(options.payload, options.redactionPolicy)
+  );
 
   const event = {
     event_id: buildEventId(options.runId, nextSequence),
@@ -113,7 +118,7 @@ export function appendLiveRunEvent(options) {
     event_type: options.eventType,
     payload: {
       sequence: nextSequence,
-      ...options.payload,
+      ...redactedPayload,
     },
   };
 
@@ -179,6 +184,7 @@ function resolveReplayWindow(events, afterEventId, maxReplay) {
  *   runId: string,
  *   afterEventId?: string,
  *   maxReplay?: number,
+ *   redactionPolicy?: unknown,
  * }} options
  */
 export function openLiveRunEventStream(options) {
@@ -202,7 +208,9 @@ export function openLiveRunEventStream(options) {
       policy: "bounded-replay-window",
       max_replay_events: maxReplay,
     },
-    replay_events: replayWindow.replayEvents,
+    replay_events: replayWindow.replayEvents.map((event) =>
+      /** @type {Record<string, unknown>} */ (redactSensitiveValue(event, options.redactionPolicy)),
+    ),
     /**
      * @param {(event: Record<string, unknown>) => void} handler
      * @returns {() => void}
@@ -216,7 +224,7 @@ export function openLiveRunEventStream(options) {
         const sequence = getEventSequence(event);
         if (sequence <= lastSequence) return;
         lastSequence = sequence;
-        handler(event);
+        handler(/** @type {Record<string, unknown>} */ (redactSensitiveValue(event, options.redactionPolicy)));
       }
 
       emitter.on("event", onEvent);

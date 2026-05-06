@@ -49,7 +49,7 @@ Close the production and platform maturity gaps that remain after the W19 story-
 
 ## W20-S02 — Production security and observability hardening baseline
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add a production-hardening follow-up slice for transport auth, authorization, redaction, logging, and operator observability boundaries.
 - **Primary modules:** `docs/contracts/**`, `docs/architecture/**`, `apps/api`, `apps/web`, `apps/cli`, `packages/observability`
 - **Hard dependencies:** W19-S01, W10-S04

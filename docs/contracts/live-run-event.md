@@ -23,6 +23,7 @@ Normalized event emitted during workflow execution for CLI, API, and web subscri
 - `payload` should include only query-safe fields needed by CLI/web subscribers (ids, refs, status, summaries).
 - For later operator troubleshooting, payloads may include `policy_context` (for example action risk tier and approval requirement flags) when the emitter has policy guardrail context.
 - W18 interactive continuation events should use existing query-safe event types such as `step.updated`, `warning.raised`, and `evidence.linked` unless the contract family is intentionally expanded. Payloads should point to `requested_interaction` and answer audit evidence refs rather than embedding sensitive answer text.
+- W20 production hardening requires event emitters and stream presenters to apply the configured redaction policy before JSONL append or SSE replay. Configured bearer tokens and explicit redaction values must not appear in live-event logs or stream payloads.
 
 ## Interactive continuation payload convention
 Runner-requested questions are represented as run events about a persisted `step-result.requested_interaction`, not as UI-local state.

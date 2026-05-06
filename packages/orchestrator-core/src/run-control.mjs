@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { redactSensitiveValue } from "../../observability/src/index.mjs";
 import { initializeProjectRuntime, loadProjectProfileForRuntime } from "./project-init.mjs";
 
 const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
@@ -393,6 +394,7 @@ function resolveNextActions(action, state) {
  *   targetStep?: string,
  *   reason?: string,
  *   approvalRef?: string,
+ *   redactionPolicy?: unknown,
  * }} options
  */
 export function applyRunControlAction(options) {
@@ -442,7 +444,7 @@ export function applyRunControlAction(options) {
   const auditId = `${runId}.run-control.${String(actionSequence).padStart(4, "0")}`;
   const eventTimestamp = nowIso();
 
-  const auditRecord = {
+  const auditRecord = /** @type {Record<string, unknown>} */ (redactSensitiveValue({
     audit_id: auditId,
     run_id: runId,
     action,
@@ -463,7 +465,7 @@ export function applyRunControlAction(options) {
     evidence_root: init.runtimeLayout.reportsRoot,
     state_file: stateFile,
     timestamp: eventTimestamp,
-  };
+  }, options.redactionPolicy));
   writeJson(auditFile, auditRecord);
 
   let stateAfter = stateBefore;

@@ -1,3 +1,5 @@
+import { parseRedactionSecretList, redactSensitiveValue } from "../../../packages/observability/src/index.mjs";
+
 const CLI_OUTPUT_DEFAULTS = Object.freeze({
   resolvedProjectRef: null,
   resolvedRuntimeRoot: null,
@@ -397,5 +399,10 @@ export function buildCliOutput({ command, resolvedFamilies, state }) {
 
   output.contract_families = resolvedFamilies;
   output.command_catalog_alignment = "docs/architecture/14-cli-command-catalog.md";
-  return output;
+  return /** @type {Record<string, unknown>} */ (
+    redactSensitiveValue(output, {
+      enabled: true,
+      secretValues: parseRedactionSecretList(process.env.AOR_REDACTION_SECRETS),
+    })
+  );
 }

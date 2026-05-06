@@ -9,7 +9,7 @@ import { openRunEventStream } from "./live-event-stream.mjs";
  *   request: import("node:http").IncomingMessage,
  *   requestUrl: URL,
  *   response: import("node:http").ServerResponse,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string },
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
  * }} options
  */
 export function handleRunEventStream({ params, request, requestUrl, response, runtimeOptions }) {
@@ -24,6 +24,7 @@ export function handleRunEventStream({ params, request, requestUrl, response, ru
     runId,
     afterEventId,
     maxReplay,
+    redactionPolicy: runtimeOptions.redactionPolicy,
   });
 
   response.writeHead(200, {

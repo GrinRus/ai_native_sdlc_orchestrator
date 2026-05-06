@@ -38,7 +38,7 @@ async function readMutationPayload(request, response) {
  * @param {{
  *   request: import("node:http").IncomingMessage,
  *   response: import("node:http").ServerResponse,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string },
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
  * }} options
  */
 export async function handleRunControlAction({ request, response, runtimeOptions }) {
@@ -83,7 +83,7 @@ export async function handleRunControlAction({ request, response, runtimeOptions
  * @param {{
  *   request: import("node:http").IncomingMessage,
  *   response: import("node:http").ServerResponse,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string },
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
  * }} options
  */
 export async function handleUiLifecycleAction({ request, response, runtimeOptions }) {
@@ -119,7 +119,7 @@ export async function handleUiLifecycleAction({ request, response, runtimeOption
  * @param {{
  *   request: import("node:http").IncomingMessage,
  *   response: import("node:http").ServerResponse,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string },
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
  * }} options
  */
 export async function handleLifecycleCommandAction({ request, response, runtimeOptions }) {
@@ -160,7 +160,7 @@ export async function handleLifecycleCommandAction({ request, response, runtimeO
  * @param {{
  *   request: import("node:http").IncomingMessage,
  *   response: import("node:http").ServerResponse,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string },
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
  * }} options
  */
 export async function handleInteractionAnswer({ request, response, runtimeOptions }) {

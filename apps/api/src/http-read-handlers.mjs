@@ -20,7 +20,7 @@ import {
  *   params: Record<string, string>,
  *   requestUrl: URL,
  *   response: import("node:http").ServerResponse,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string },
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
  * }} options
  */
 export function handleReadRoute({ routeId, params, requestUrl, response, runtimeOptions }) {

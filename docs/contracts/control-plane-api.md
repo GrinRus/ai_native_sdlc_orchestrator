@@ -30,6 +30,32 @@ Current enum constraints:
 - `binding_mode=hybrid-module-and-detached-http-sse`;
 - `deferred_transport_status=implemented`.
 
+## Production hardening boundary (W20-S02)
+
+The detached HTTP/SSE transport now has two explicit security modes:
+- `local-trusted` is the default for loopback development and local harness use. It may run without bearer credentials, but it still uses the same route permission metadata and redaction helpers.
+- `production-hardened` requires bearer authentication for every read, stream, and mutation route. This mode is a transport hardening baseline, not an enterprise identity-provider integration or hosted SaaS claim.
+
+Auth and authorization behavior:
+- bearer principals are configured out-of-band when the detached transport starts;
+- each principal carries `read` and/or `mutate` permission scopes plus allowed `project_refs`;
+- all route definitions declare one required permission before handlers run;
+- missing, invalid, wrong-project, and insufficient-scope decisions return stable `auth.*` error codes with `required_permission`, `project_id`, `token_id`, and `security_mode`;
+- denied transport actions do not invoke mutation handlers.
+
+Secret-safe payload behavior:
+- configured bearer token values and additional configured redaction values are redacted from JSON responses and SSE events;
+- live-run event writes redact sensitive fields before appending JSONL logs;
+- run-control audit records redact configured secret values while preserving denial reasons and policy context;
+- CLI JSON output applies the same redaction primitive to configured local secret values from `AOR_REDACTION_SECRETS`;
+- durable audit evidence may retain non-secret operator intent, approval refs, state refs, and evidence refs for reviewability.
+
+Out of scope for this baseline:
+- external identity-provider federation;
+- hosted tenant isolation;
+- broad SaaS audit retention policy;
+- replacing repository/provider permissions with AOR transport auth.
+
 ## Command families
 - project bootstrap commands
 - intake and planning commands

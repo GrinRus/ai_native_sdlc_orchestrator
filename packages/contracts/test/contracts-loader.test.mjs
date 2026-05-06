@@ -558,6 +558,25 @@ test("control-plane API baseline documents interactive continuation target metad
   );
 });
 
+test("control-plane API baseline documents production hardening metadata", () => {
+  const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
+  assert.equal(loaded.ok, true, "fixture should load before assertions");
+
+  assert.equal(loaded.document.production_hardening?.owning_slice, "W20-S02");
+  assert.equal(loaded.document.production_hardening?.status, "implemented-baseline");
+  assert.ok(
+    loaded.document.production_hardening?.transport_modes?.some(
+      (entry) => entry.mode === "production-hardened" && entry.auth_required === true,
+    ),
+    "expected production-hardened mode to require auth",
+  );
+  assert.ok(
+    loaded.document.production_hardening?.redaction?.response_surfaces?.includes("SSE data payloads"),
+    "expected SSE response redaction metadata",
+  );
+});
+
 test("control-plane API contract rejects invalid binding mode", () => {
   const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
   const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });

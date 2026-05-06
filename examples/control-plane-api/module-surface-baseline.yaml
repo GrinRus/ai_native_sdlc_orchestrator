@@ -165,9 +165,9 @@ deferred_transport:
     - production authn/authz policy envelope
 
 authn_authz:
-  mode: optional-bearer-token
+  mode: local-trusted | production-hardened
   defaults:
-    enabled: false
+    mode: local-trusted
   when_enabled:
     required_header: "Authorization: Bearer <token>"
     permission_scopes:
@@ -178,3 +178,35 @@ authn_authz:
       - auth.invalid_token
       - auth.forbidden_project
       - auth.insufficient_permission
+
+production_hardening:
+  owning_slice: W20-S02
+  status: implemented-baseline
+  transport_modes:
+    - mode: local-trusted
+      auth_required: false
+      intended_scope: loopback development and local harness operation
+    - mode: production-hardened
+      auth_required: true
+      intended_scope: connected operator transport with explicit bearer principals
+  authorization:
+    route_permission_metadata: required
+    scopes:
+      - read
+      - mutate
+    denied_action_behavior:
+      invokes_mutation_handler: false
+      audit_reason_shape: auth error with security_mode and required_permission
+  redaction:
+    configured_secret_sources:
+      - bearer token values
+      - explicit redaction secret values
+      - AOR_REDACTION_SECRETS for CLI JSON output
+    response_surfaces:
+      - HTTP JSON responses
+      - SSE data payloads
+      - CLI JSON output
+    durable_log_surfaces:
+      - live-run-event JSONL payloads
+      - run-control audit records
+    replacement: "[REDACTED]"

@@ -629,3 +629,98 @@ test("detached control-plane authn/authz enforces bearer auth with project-scope
     }
   });
 });
+
+test("production-hardened transport enforces authz and redacts configured secrets from denials and logs", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.transport.production-hardening.v1";
+    const secretToken = "prod-secret-token";
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+      auth: {
+        mode: "production-hardened",
+        tokens: [
+          {
+            token: "reader-prod-token",
+            token_id: "reader",
+            permissions: ["read"],
+          },
+          {
+            token: secretToken,
+            token_id: "operator",
+            permissions: ["read", "mutate"],
+          },
+        ],
+      },
+    });
+
+    try {
+      const stateUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/state`;
+      const runControlUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`;
+
+      const missingAuthResponse = await getJson(stateUrl);
+      assert.equal(missingAuthResponse.status, 401);
+      const missingAuthPayload = await missingAuthResponse.json();
+      assert.equal(missingAuthPayload.error.code, "auth.missing_credentials");
+      assert.equal(missingAuthPayload.error.auth.security_mode, "production-hardened");
+
+      const deniedMutateResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "start",
+          run_id: runId,
+        },
+        "reader-prod-token",
+      );
+      assert.equal(deniedMutateResponse.status, 403);
+      const deniedMutatePayload = await deniedMutateResponse.json();
+      assert.equal(deniedMutatePayload.error.code, "auth.insufficient_permission");
+      assert.equal(JSON.stringify(deniedMutatePayload).includes(secretToken), false);
+
+      const startResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "start",
+          run_id: runId,
+          reason: "production hardening baseline",
+        },
+        secretToken,
+      );
+      assert.equal(startResponse.status, 200);
+
+      const blockedResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "cancel",
+          run_id: runId,
+          reason: `operator pasted ${secretToken} while requesting cancel`,
+        },
+        secretToken,
+      );
+      assert.equal(blockedResponse.status, 409);
+      const blockedPayload = await blockedResponse.json();
+      assert.equal(blockedPayload.error.code, "approval.required");
+      assert.equal(blockedPayload.run_control.blocked, true);
+      assert.equal(JSON.stringify(blockedPayload).includes(secretToken), false);
+
+      const auditRaw = fs.readFileSync(blockedPayload.run_control.audit_file, "utf8");
+      assert.equal(auditRaw.includes(secretToken), false);
+      assert.equal(auditRaw.includes("[REDACTED]"), true);
+
+      const eventLogRaw = fs.readFileSync(blockedPayload.run_control.stream_log_file, "utf8");
+      assert.equal(eventLogRaw.includes(secretToken), false);
+
+      const historyResponse = await getJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events/history?limit=25`,
+        secretToken,
+      );
+      assert.equal(historyResponse.status, 200);
+      const historyPayload = await historyResponse.json();
+      assert.equal(JSON.stringify(historyPayload).includes(secretToken), false);
+    } finally {
+      await transport.close();
+    }
+  });
+});

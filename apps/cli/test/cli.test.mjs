@@ -10,6 +10,7 @@ import { parse as parseYaml } from "../../../packages/contracts/node_modules/yam
 
 import { appendRunEvent, applyRunControlAction } from "../../api/src/index.mjs";
 import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
+import { buildCliOutput } from "../src/cli-output.mjs";
 import { invokeCli } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -76,6 +77,42 @@ function writeContractFixture(options) {
   assert.equal(validation.ok, true, `${options.family} fixture must pass contract validation`);
   fs.writeFileSync(options.filePath, `${JSON.stringify(options.document, null, 2)}\n`, "utf8");
 }
+
+test("CLI output redacts configured secret values while preserving non-secret policy flags", () => {
+  const previous = process.env.AOR_REDACTION_SECRETS;
+  process.env.AOR_REDACTION_SECRETS = "cli-secret-token";
+  try {
+    const output = buildCliOutput({
+      command: "run status",
+      resolvedFamilies: [],
+      state: {
+        runEventHistory: {
+          events: [
+            {
+              event_id: "event.secret",
+              payload: {
+                summary: "operator pasted cli-secret-token",
+                security_policy: {
+                  redact_secrets: true,
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(JSON.stringify(output).includes("cli-secret-token"), false);
+    assert.equal(JSON.stringify(output).includes("[REDACTED]"), true);
+    assert.equal(output.run_event_history.events[0].payload.security_policy.redact_secrets, true);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.AOR_REDACTION_SECRETS;
+    } else {
+      process.env.AOR_REDACTION_SECRETS = previous;
+    }
+  }
+});
 
 /**
  * @param {{ projectRoot: string, command: string, args: string[] }} options

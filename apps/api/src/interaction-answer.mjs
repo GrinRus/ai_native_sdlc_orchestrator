@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { redactSensitiveValue } from "../../../packages/observability/src/index.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 
 import { appendRunEvent } from "./live-event-stream.mjs";
@@ -129,6 +130,7 @@ function uniqueStrings(values) {
  *   reason?: string,
  *   approvalRef?: string,
  *   answerEvidenceRef?: string,
+ *   redactionPolicy?: unknown,
  * }}
  */
 export function submitInteractionAnswer(options) {
@@ -151,7 +153,7 @@ export function submitInteractionAnswer(options) {
   const auditFile = path.join(init.runtimeLayout.reportsRoot, `${auditId}.json`);
   const answerAuditRef = toEvidenceRef(init, auditFile);
   const answerEvidenceRefs = uniqueStrings([options.answerEvidenceRef ?? ""]);
-  const answerAudit = {
+  const answerAudit = /** @type {Record<string, unknown>} */ (redactSensitiveValue({
     audit_id: auditId,
     created_at: timestamp,
     run_id: options.runId,
@@ -163,7 +165,7 @@ export function submitInteractionAnswer(options) {
     reason: options.reason ?? null,
     approval_ref: options.approvalRef ?? null,
     evidence_refs: uniqueStrings([match.artifactRef, ...answerEvidenceRefs]),
-  };
+  }, options.redactionPolicy));
   fs.writeFileSync(auditFile, `${JSON.stringify(answerAudit, null, 2)}\n`, "utf8");
 
   const previousAnswerRefs = asStringArray(match.requestedInteraction.answer_audit_refs);
@@ -194,6 +196,7 @@ export function submitInteractionAnswer(options) {
     cwd: options.cwd,
     projectRef: options.projectRef,
     runtimeRoot: options.runtimeRoot,
+    redactionPolicy: options.redactionPolicy,
     runId: options.runId,
     eventType: "evidence.linked",
     payload: {
@@ -208,6 +211,7 @@ export function submitInteractionAnswer(options) {
     cwd: options.cwd,
     projectRef: options.projectRef,
     runtimeRoot: options.runtimeRoot,
+    redactionPolicy: options.redactionPolicy,
     runId: options.runId,
     eventType: "step.updated",
     payload: {
@@ -226,6 +230,7 @@ export function submitInteractionAnswer(options) {
     cwd: options.cwd,
     projectRef: options.projectRef,
     runtimeRoot: options.runtimeRoot,
+    redactionPolicy: options.redactionPolicy,
     runId: options.runId,
     eventType: "warning.raised",
     payload: {

@@ -51,7 +51,7 @@ Coverage status values:
 | DEV-07 | Delivery engineer | MVP | Inspect compiled prompt and context lineage. | covered | compiled-context artifacts, W8-S08 | none |
 | DEV-08 | Delivery engineer | MVP+ | Use operator UI lifecycle commands during delivery support. | covered | `ui attach`, `ui detach`, W6-S04 | none |
 | DEV-09 | Delivery engineer | MVP+ | Execute with policy and audit guardrails. | covered | W6-S03 run-control guardrails, W10-S04 auth hardening | none |
-| DEV-10 | Delivery engineer | Later | Use later delivery and security governance maturity. | partial | W8-S03 route-governance maturity | W20-S02 |
+| DEV-10 | Delivery engineer | Later | Use later delivery and security governance maturity. | covered | W8-S03 route-governance maturity, W20-S02 production-hardened transport/redaction baseline | none |
 | RQA-01 | Reviewer / QA | MVP | Review structured review packets with risk notes and evidence. | covered | `review run`, review reports, W13-S05 | none |
 | RQA-02 | Reviewer / QA | MVP | Inspect machine-readable review verdicts before proceeding. | covered | review reports, Runtime Harness verdicts, `review-decision`, `review decide`, delivery/release `--require-review-decision`, W19-S05 | none |
 | RQA-03 | Reviewer / QA | MVP | Compare deterministic validation with judge-based eval outcomes. | covered | validation reports, eval runner, W3, W7-S01 | none |
@@ -79,13 +79,13 @@ Coverage status values:
 | OPS-07 | Operator / SRE | MVP | Run curated full-journey live acceptance on real repositories. | covered | W14 coverage_with_findings proof on curated matrix repositories | none |
 | OPS-08 | Operator / SRE | MVP | Select required matrix cells by scenario, provider, and feature size. | covered | W14 scenario/provider/feature-size matrix | none |
 | OPS-09 | Operator / SRE | MVP+ | Inspect policy and audit guardrails for run controls. | covered | W6-S03 run-control audit guardrails | none |
-| OPS-10 | Operator / SRE | Later | Use richer event, policy, and production observability views. | partial | W8-S04 operator visibility, W19-S06 planner metrics projection | W20-S02, W21-S05 |
+| OPS-10 | Operator / SRE | Later | Use richer event, policy, and production observability views. | partial | W8-S04 operator visibility, W19-S06 planner metrics projection, W20-S02 redacted production transport/event baseline | W21-S05 |
 | SEC-01 | Security / compliance | MVP | Enforce provider and adapter allowlists. | covered | route policies, adapter capability validation, W2-S03, W8-S03 | none |
-| SEC-02 | Security / compliance | MVP | Apply secret-safe logging and redaction. | partial | W10-S04 auth hardening baseline | W20-S02 |
+| SEC-02 | Security / compliance | MVP | Apply secret-safe logging and redaction. | covered | W10-S04 auth hardening baseline, W20-S02 shared redaction across HTTP/SSE/CLI/live logs/run-control audit | none |
 | SEC-03 | Security / compliance | MVP | Preserve audit trails for approvals, overrides, and route changes. | covered | audit records, W6-S03, W7-S04 | none |
 | SEC-04 | Security / compliance | MVP | Use stricter gates for higher-risk flows. | covered | step policies, delivery guards, W8-S03 | none |
 | SEC-05 | Security / compliance | MVP+ | Govern route and policy overrides. | covered | W6-S03 run-control policy guardrails | none |
-| SEC-06 | Security / compliance | Later | Harden production transport, logging, and redaction. | partial | detached transport auth baseline | W20-S02 |
+| SEC-06 | Security / compliance | Later | Harden production transport, logging, and redaction. | covered | detached transport auth baseline, W20-S02 production-hardened bearer mode and denied-action redaction evidence | none |
 | RMO-01 | Repository / multirepo owner | MVP | Describe monolith or bounded multirepo topology. | covered | project profile topology, bounded multirepo sample, W18-S04 | none |
 | RMO-02 | Repository / multirepo owner | MVP | Track repo graph and ownership. | covered | project analysis `repo_scope_proof`, bounded multirepo docs, W18-S04, W20-S01 scoped coordination evidence | none |
 | RMO-03 | Repository / multirepo owner | MVP | Use scoped locks for coordinated work. | covered | `aor multirepo lock`, `multirepo-coordination-status.lock_state`, W20-S01 | none |

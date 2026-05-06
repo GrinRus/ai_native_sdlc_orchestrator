@@ -38,13 +38,14 @@ What exists today:
 - W17 legacy-surface cleanup that removes public compatibility aliases from CLI incident outputs and delivery mode inputs.
 - W18 backlog coverage for control-plane-owned web lifecycle operation, runner question/answer continuation, and bounded multirepo proof.
 - W19/W20/W21 backlog gap intake that maps all 112 supported user stories to current evidence, coverage status, and explicit follow-up slices for remaining gaps.
+- W20 production-hardening baseline for detached control-plane transport mode, bearer auth/authz scopes, redaction of configured secrets across JSON/SSE/CLI surfaces, and denied-action audit evidence.
 
 What does **not** exist yet:
 
 - a production-ready orchestrator runtime;
 - broad multi-provider production-grade adapter coverage beyond the stable `codex-cli` live baseline and candidate `claude-code` rehearsal coverage;
 - delivery write-back automation to upstream repositories;
-- production hardening and operator parity for every CLI/API/web control surface;
+- enterprise identity-provider integration, hosted SaaS deployment hardening, and operator parity for every CLI/API/web control surface;
 - a real code-changing full-journey proof with `overall_verdict=pass`; the current W14 matrix proof is coverage evidence with findings, and this target is not assigned to the current W18-W21 backlog horizon.
 
 Use the backlog docs for the implementation roadmap.
@@ -169,9 +170,9 @@ For exact command inputs/outputs and contract linkage, use `docs/architecture/14
 - `examples/**` — project profiles, routes, wrappers, prompt bundles, policies, adapters, packets, eval assets, and proof fixtures.
 
 ### Code scaffold
-- `apps/api/` — implemented control-plane read/event baseline with detached HTTP/SSE transport for connected-mode read/follow surfaces.
-- `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, delivery, incident, and UI-lifecycle command baseline with production-hardening extensions still outstanding.
-- `apps/web/` — implemented detachable operator console baseline with production-hardening extensions still outstanding.
+- `apps/api/` — implemented control-plane read/event baseline with detached HTTP/SSE transport, production-hardened bearer auth/authz mode, and redacted response/event surfaces.
+- `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, delivery, incident, and UI-lifecycle command baseline with secret-safe JSON output support.
+- `apps/web/` — implemented detachable operator console baseline over shared control-plane auth and mutation semantics.
 - `packages/**` — implemented shared runtime modules (contracts, orchestrator core, routing, adapter SDK, harness, observability) with roadmap extensions.
 - `packages/harness/` — asset certification capture/replay primitives used by certification and promotion decisions.
 - `scripts/live-e2e/**` — installed-user black-box proof runner and private scenario profiles.

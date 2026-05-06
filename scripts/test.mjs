@@ -911,6 +911,7 @@ console.log("cli tests ok: bootstrap command contracts, parsing, and help output
 const apiTests = [
   path.join(root, "apps/api/test/read-surface.test.mjs"),
   path.join(root, "apps/api/test/live-event-stream.test.mjs"),
+  path.join(root, "apps/api/test/http-transport.test.mjs"),
 ];
 const apiTestRun = spawnSync(process.execPath, ["--test", ...apiTests], {
   cwd: root,
@@ -922,6 +923,20 @@ if (apiTestRun.status !== 0) {
 }
 
 console.log("api tests ok: control-plane read surface smoke endpoints");
+
+const observabilityTests = [
+  path.join(root, "packages/observability/test/redaction.test.mjs"),
+];
+const observabilityTestRun = spawnSync(process.execPath, ["--test", ...observabilityTests], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (observabilityTestRun.status !== 0) {
+  process.exit(observabilityTestRun.status ?? 1);
+}
+
+console.log("observability tests ok: redaction and secret-safe payload helpers");
 
 const webTests = [
   path.join(root, "apps/web/test/operator-console.test.mjs"),
