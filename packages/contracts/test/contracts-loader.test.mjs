@@ -349,6 +349,34 @@ test("review decision example preserves explicit approval vocabulary", () => {
   );
 });
 
+test("planner metrics snapshot example preserves no-data capable metric vocabulary", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/planner-metrics-snapshot.sample.yaml"),
+    family: "planner-metrics-snapshot",
+  });
+  assert.equal(loaded.ok, true, "expected planner-metrics-snapshot example to load");
+  assert.deepEqual(loaded.document.metric_names, [
+    "clean_close_rate",
+    "retry_rate",
+    "repair_rate",
+    "blocker_rate",
+  ]);
+  assert.equal(loaded.document.metrics.clean_close_rate.value, 0.25);
+
+  const invalid = structuredClone(loaded.document);
+  invalid.status = "green";
+  const validation = validateContractDocument({
+    family: "planner-metrics-snapshot",
+    document: invalid,
+    source: "test://planner-metrics-invalid-status",
+  });
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === "status"),
+    "expected invalid planner metrics status to be rejected",
+  );
+});
+
 test("discovery research report examples distinguish ADR-ready and incomplete evidence", () => {
   const ready = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/discovery-research-report.adr-ready.yaml"),

@@ -11,7 +11,7 @@ Current code is **hybrid module + detached transport**:
 - Contract and artifact semantics stay aligned across both bindings.
 
 Implemented operation families:
-- read: project state, packets, step results, manifests, promotion decisions, quality artifacts, runs, run event history, run policy history, strategic snapshot;
+- read: project state, packets, step results, manifests, promotion decisions, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
 - live events: append/read/open stream using the `live-run-event` contract family.
@@ -54,6 +54,7 @@ Project bootstrap baseline:
 - review reports, review decisions, and learning-loop closure artifacts
 - delivery manifests and release packets
 - incidents and promotion decisions
+- planner metric snapshots
 
 ## Connected lifecycle mutations (W18 baseline)
 
@@ -95,6 +96,9 @@ Run-level read baseline:
 - run summaries include `context_lifecycle` when run-linked promotion decisions reference context assets, with context version refs, immutable provenance refs, and decision-trail history;
 - run event history remains bounded and replay-safe;
 - run policy history remains evidence-derived from `step-result` and `delivery-plan` outputs.
+- `strategic_snapshot.planner_metrics` and `GET /api/projects/:projectId/planner-metrics` expose one `planner-metrics-snapshot` read model with `clean_close_rate`, `retry_rate`, `repair_rate`, and `blocker_rate`.
+- Empty projects must return `status=no-data`, `no_data=true`, and `value=null` per metric rather than claiming a zero success or failure rate.
+- Planner metrics derive only from durable run, review, Runtime Harness, incident, and run-control audit artifacts; they do not mutate scheduler state.
 
 ## Run-control baseline (module operations)
 
@@ -198,7 +202,7 @@ Incident recertify baseline (W7-S03):
 - recertification output includes explicit platform linkage (`platform_action`, `platform_linkage`, `rollback_required`) plus finance/quality evidence refs and roots.
 
 Audit runs baseline:
-- emits run-centric snapshots of packet, step-result, quality, incident, and promotion refs;
+  - emits run-centric snapshots of packet, step-result, quality, incident, and promotion refs;
 - emits `run_audit_records.finance_evidence` with route/wrapper/adapter IDs plus bounded cost/timeout/latency summaries;
 - emits `run_audit_records.provider_execution_status` from materialized adapter raw execution evidence, not from provider route traceability alone;
 - supports optional `run_id` filter and bounded `limit` window;
@@ -261,6 +265,7 @@ Reconnect and backpressure baseline:
 Connected-mode transport mapping is implemented for read, follow, and bounded mutation baseline:
 - `GET /api/projects/:projectId/state`
 - `GET /api/projects/:projectId/strategic-snapshot`
+- `GET /api/projects/:projectId/planner-metrics`
 - `GET /api/projects/:projectId/packets`
 - `GET /api/projects/:projectId/step-results`
 - `GET /api/projects/:projectId/quality-artifacts`

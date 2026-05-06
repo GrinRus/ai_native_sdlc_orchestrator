@@ -18,6 +18,7 @@ import {
   readRunEventHistory,
   readRunPolicyHistory,
   listRuns,
+  readPlannerMetrics,
   readStrategicSnapshot,
   listStepResults,
   readProjectState,
@@ -750,6 +751,12 @@ test("readStrategicSnapshot reports wave progress from backlog state", () => {
   assert.ok(Array.isArray(snapshot.wave_snapshot.waves));
   assert.ok(snapshot.wave_snapshot.waves.some((wave) => wave.wave_id === "W8"));
   assert.equal(typeof snapshot.risk_snapshot.level_totals.high, "number");
+  assert.deepEqual(snapshot.planner_metrics.metric_names, [
+    "clean_close_rate",
+    "retry_rate",
+    "repair_rate",
+    "blocker_rate",
+  ]);
 });
 
 test("readStrategicSnapshot keeps risk reporting available when backlog file is missing", () => {
@@ -804,6 +811,177 @@ test("readStrategicSnapshot keeps risk reporting available when backlog file is 
     assert.equal(snapshot.risk_snapshot.signal_totals.incident_linked_runs, 1);
     assert.equal(snapshot.risk_snapshot.signal_totals.regression_runs, 1);
     assert.deepEqual(snapshot.risk_snapshot.high_risk_run_ids, [runId]);
+  });
+});
+
+test("planner metrics expose empty, partial, and populated run histories", () => {
+  withTempRepo((emptyRoot) => {
+    const emptyMetrics = readPlannerMetrics({ projectRef: emptyRoot, cwd: emptyRoot });
+    assert.equal(emptyMetrics.status, "no-data");
+    assert.equal(emptyMetrics.no_data, true);
+    assert.equal(emptyMetrics.metrics.clean_close_rate.value, null);
+    assert.equal(emptyMetrics.metrics.clean_close_rate.no_data, true);
+  });
+
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const reportsRoot = init.runtimeLayout.reportsRoot;
+
+    const writeReviewReport = (runId, status = "pass", recommendation = "proceed") => {
+      writeContractFile({
+        family: "review-report",
+        filePath: path.join(reportsRoot, `review-report-${runId}.json`),
+        document: {
+          review_report_id: `${runId}.review-report.v1`,
+          project_id: init.projectId,
+          run_id: runId,
+          generated_at: new Date().toISOString(),
+          overall_status: status,
+          review_recommendation: recommendation,
+          feature_traceability: {},
+          discovery_quality: {},
+          artifact_quality: {},
+          code_quality: {},
+          feature_size_fit: {},
+          provider_traceability: {},
+          findings: [],
+          evidence_refs: [init.stateFile],
+        },
+      });
+    };
+
+    const writeRuntimeHarnessReport = (runId, decision, attemptAction = null) => {
+      writeContractFile({
+        family: "runtime-harness-report",
+        filePath: path.join(reportsRoot, `runtime-harness-report-${runId}.json`),
+        document: {
+          report_id: `${runId}.runtime-harness-report.v1`,
+          project_id: init.projectId,
+          run_id: runId,
+          generated_at: new Date().toISOString(),
+          mission_type: "code-changing",
+          strictness_profile: "strict-code-changing",
+          overall_decision: decision,
+          step_decisions: [
+            {
+              step_id: `${runId}.implement`,
+              step_class: "runner",
+              runtime_harness_decision: decision,
+              repair_attempts: attemptAction
+                ? [
+                    {
+                      attempt: 1,
+                      policy_action: attemptAction,
+                      runtime_harness_decision: attemptAction,
+                      result: `succeeded_after_${attemptAction}`,
+                    },
+                  ]
+                : [],
+            },
+          ],
+          run_findings: [],
+          recommendations: [],
+          impacted_asset_refs: [],
+          promotion_recommendations: [],
+          unresolved_gaps: [],
+          evidence_refs: [init.stateFile],
+        },
+      });
+    };
+
+    const writeReviewDecision = (runId, decision, gateStatus) => {
+      writeContractFile({
+        family: "review-decision",
+        filePath: path.join(reportsRoot, `review-decision-${runId}.json`),
+        document: {
+          decision_id: `${runId}.review-decision.${decision}.v1`,
+          project_id: init.projectId,
+          run_id: runId,
+          decision,
+          decider_ref: "operator://planner-metrics-test",
+          reason: `Fixture ${decision} decision.`,
+          review_report_ref: `evidence://reports/review-report-${runId}.json`,
+          runtime_harness_report_ref: `evidence://reports/runtime-harness-report-${runId}.json`,
+          delivery_manifest_refs: [],
+          learning_handoff_refs: [],
+          decision_basis: {},
+          delivery_gate: {
+            status: gateStatus,
+            blocks_downstream: gateStatus !== "pass",
+            required_downstream_decision: "approve",
+            findings: [],
+          },
+          evidence_refs: [init.stateFile],
+          decided_at: new Date().toISOString(),
+        },
+      });
+    };
+
+    writeReviewReport("run.clean.v1");
+    writeRuntimeHarnessReport("run.clean.v1", "pass");
+    writeReviewDecision("run.clean.v1", "approve", "pass");
+
+    writeReviewReport("run.retry.v1", "warn", "repair");
+    writeRuntimeHarnessReport("run.retry.v1", "retry", "retry");
+
+    writeReviewReport("run.repair.v1", "fail", "repair");
+    writeRuntimeHarnessReport("run.repair.v1", "repair", "repair");
+    writeReviewDecision("run.repair.v1", "request-repair", "blocked");
+
+    writeRuntimeHarnessReport("run.blocker.v1", "block");
+    writeContractFile({
+      family: "incident-report",
+      filePath: path.join(reportsRoot, "incident-report-run-blocker-v1.json"),
+      document: {
+        incident_id: `${init.projectId}.incident.blocker.v1`,
+        project_id: init.projectId,
+        severity: "high",
+        summary: "Blocked run fixture.",
+        linked_run_refs: ["run://run.blocker.v1"],
+        linked_asset_refs: [init.stateFile],
+        status: "open",
+      },
+    });
+    fs.writeFileSync(
+      path.join(reportsRoot, "run-control-event-run-blocker-v1-0002.json"),
+      `${JSON.stringify(
+        {
+          audit_id: "run.blocker.v1.run-control.0002",
+          run_id: "run.blocker.v1",
+          action: "steer",
+          blocked: true,
+          blocked_reason: { code: "approval.required" },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.stateRoot, "run-control-state-run-partial-v1.json"),
+      `${JSON.stringify({ schema_version: 1, run_id: "run.partial.v1", status: "running" }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const metrics = readPlannerMetrics({ projectRef: repoRoot, cwd: repoRoot });
+    assert.equal(metrics.status, "partial");
+    assert.equal(metrics.aggregation.denominator, 5);
+    assert.deepEqual(metrics.metric_names, ["clean_close_rate", "retry_rate", "repair_rate", "blocker_rate"]);
+    assert.equal(metrics.metrics.clean_close_rate.numerator, 1);
+    assert.equal(metrics.metrics.retry_rate.numerator, 1);
+    assert.equal(metrics.metrics.repair_rate.numerator, 1);
+    assert.equal(metrics.metrics.blocker_rate.numerator, 2);
+    assert.deepEqual(metrics.metrics.clean_close_rate.evidence_run_ids, ["run.clean.v1"]);
+    assert.deepEqual(metrics.metrics.retry_rate.evidence_run_ids, ["run.retry.v1"]);
+    assert.deepEqual(metrics.metrics.repair_rate.evidence_run_ids, ["run.repair.v1"]);
+    assert.deepEqual(metrics.metrics.blocker_rate.evidence_run_ids, ["run.blocker.v1", "run.repair.v1"]);
+    assert.deepEqual(metrics.aggregation.partial_run_ids, ["run.blocker.v1", "run.partial.v1"]);
+    assert.ok(metrics.source_artifacts.audit_refs.some((ref) => ref.includes("run-control-event-run-blocker-v1")));
+
+    const snapshot = readStrategicSnapshot({ projectRef: repoRoot, cwd: repoRoot });
+    assert.deepEqual(snapshot.planner_metrics.metric_names, metrics.metric_names);
+    assert.equal(snapshot.planner_metrics.metrics.blocker_rate.numerator, 2);
   });
 });
 

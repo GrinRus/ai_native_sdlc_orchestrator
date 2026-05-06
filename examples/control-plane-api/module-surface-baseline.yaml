@@ -12,6 +12,7 @@ read_operations:
       - step-result
       - review-decision
       - promotion-decision
+      - planner-metrics-snapshot
   - operation_id: read.run-history
     operation_family: read
     output_contract_families:
@@ -141,6 +142,7 @@ deferred_transport:
   implemented_mappings:
     - GET /api/projects/:projectId/state
     - GET /api/projects/:projectId/strategic-snapshot
+    - GET /api/projects/:projectId/planner-metrics
     - GET /api/projects/:projectId/packets
     - GET /api/projects/:projectId/step-results
     - GET /api/projects/:projectId/quality-artifacts

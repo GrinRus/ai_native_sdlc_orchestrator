@@ -38,6 +38,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Platform assets | `adapter-capability-profile.md` | `adapter-capability-profile` | `examples/adapters/*.yaml` | implemented | Required fields + top-level type checks, including deterministic `mock-runner` baseline profile. |
 | Platform assets | `skill-profile.md` | `skill-profile` | `examples/skills/*.yaml` | implemented | Includes closed-set enum check for `step_class` and required workflow shape. |
 | Operations | `live-run-event.md` | `live-run-event` | none | implemented | Contract is loader-covered with closed-set `event_type` validation; no YAML example in this repo yet. |
+| Operations | `planner-metrics-snapshot.md` | `planner-metrics-snapshot` | `examples/reports/planner-metrics-snapshot*.yaml` | implemented | Required fields + closed `status` values for no-data, partial, and ready planner metric histories. |
 | Operations | `learning-loop-scorecard.md` | `learning-loop-scorecard` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Operations | `learning-loop-handoff.md` | `learning-loop-handoff` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Operations | `live-e2e-provider-variant.md` | `live-e2e-provider-variant` | `scripts/live-e2e/catalog/providers/*.yaml` | implemented | Required fields + closed-set `provider_variant_id` checks for W14 matrix variants. |

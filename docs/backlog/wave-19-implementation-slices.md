@@ -182,7 +182,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S06 — Planner metrics and scheduler visibility
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add planner/operator visibility for decomposition quality, clean-close rate, retry rate, repair rate, and blocker rate.
 - **Primary modules:** `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli`
 - **Hard dependencies:** W19-S01, W6-S03, W8-S01

@@ -199,7 +199,7 @@ This is the master index for the implementation slices across all defined waves.
 | W19-S03 | Discovery research and ADR evidence flow | EPIC-1 | done | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli` | W19-S02, W8-S02 |
 | W19-S04 | Incident-to-dataset backfill workflow | EPIC-4 | done | `docs/contracts/**`, `packages/harness`, `packages/observability`, `packages/orchestrator-core`, `apps/cli` | W19-S01, W7-S03, W13-S05 |
 | W19-S05 | Review decision and approval workflow | EPIC-4 | done | `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api` | W19-S01, W13-S05, W14-S06 |
-| W19-S06 | Planner metrics and scheduler visibility | EPIC-6 | blocked | `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli` | W19-S01, W6-S03, W8-S01 |
+| W19-S06 | Planner metrics and scheduler visibility | EPIC-6 | done | `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli` | W19-S01, W6-S03, W8-S01 |
 
 ## W20 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

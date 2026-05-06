@@ -16,6 +16,7 @@ const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
 const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "closed"];
 const INCIDENT_BACKFILL_PROPOSAL_STATE_VALUES = ["proposed", "approved", "rejected"];
 const REVIEW_DECISION_VALUES = ["approve", "hold", "request-repair"];
+const PLANNER_METRICS_STATUS_VALUES = ["no-data", "partial", "ready"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
 export const LIVE_E2E_OBSERVATION_STATUS_VALUES = ["pass", "warn", "not_pass"];
@@ -979,6 +980,40 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     enumChecks: [{ field: "event_type", allowedValues: LIVE_RUN_EVENT_TYPE_VALUES }],
   },
   {
+    family: "planner-metrics-snapshot",
+    familyGroup: "operations",
+    sourceContract: "docs/contracts/planner-metrics-snapshot.md",
+    exampleGlob: "examples/reports/planner-metrics-snapshot*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "schema_version",
+      "snapshot_id",
+      "project_id",
+      "generated_at",
+      "status",
+      "no_data",
+      "metric_names",
+      "aggregation",
+      "source_artifacts",
+      "metrics",
+      "run_breakdown",
+    ],
+    fieldTypes: {
+      schema_version: "number",
+      snapshot_id: "string",
+      project_id: "string",
+      generated_at: "string",
+      status: "string",
+      no_data: "boolean",
+      metric_names: "array",
+      aggregation: "object",
+      source_artifacts: "object",
+      metrics: "object",
+      run_breakdown: "array",
+    },
+    enumChecks: [{ field: "status", allowedValues: PLANNER_METRICS_STATUS_VALUES }],
+  },
+  {
     family: "learning-loop-scorecard",
     familyGroup: "operations",
     sourceContract: "docs/contracts/learning-loop-scorecard.md",
@@ -1174,6 +1209,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/delivery-manifest[^/]*\.ya?ml$/, family: "delivery-manifest" },
   { regex: /^examples\/reports\/discovery-research-report[^/]*\.ya?ml$/, family: "discovery-research-report" },
   { regex: /^examples\/reports\/incident-backfill-proposal[^/]*\.ya?ml$/, family: "incident-backfill-proposal" },
+  { regex: /^examples\/reports\/planner-metrics-snapshot[^/]*\.ya?ml$/, family: "planner-metrics-snapshot" },
   { regex: /^examples\/packets\/delivery-plan-[^/]+\.ya?ml$/, family: "delivery-plan" },
   { regex: /^examples\/packets\/intake-request-body[^/]*\.ya?ml$/, family: "intake-request-body" },
   { regex: /^examples\/eval\/dataset-[^/]+\.ya?ml$/, family: "dataset" },

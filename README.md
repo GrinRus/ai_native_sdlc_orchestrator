@@ -29,7 +29,7 @@ What exists today:
 - root repository-integrity commands and CI for roadmap, guidance, and community-file consistency;
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
 - a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
-- implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
+- implemented operator baseline surfaces: control-plane read APIs, planner metrics snapshots, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
 - expanded implementation backlog through `W21`, with W18 focused on connected web full-flow and topology proof gaps, W19/W20 focused on user-story gap traceability, product-quality closure, and production/platform maturity gaps, and W21 focused on installed-user onboarding plus guided UX closure while active queue tracking stays available via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - historical W10/W11 productionization closure for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and target-backed proof evidence.
 - stable live routed execution baseline for supported `codex-cli` adapter paths, plus live-runnable candidate `claude-code` matrix coverage and extended non-baseline `open-code` coverage with explicit delivery-guardrail blocking semantics.

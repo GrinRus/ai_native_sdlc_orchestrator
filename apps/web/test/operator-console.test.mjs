@@ -179,6 +179,12 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.equal(typeof snapshot.strategic_snapshot, "object");
     assert.ok(Array.isArray(snapshot.strategic_snapshot.wave_snapshot.waves));
     assert.equal(typeof snapshot.strategic_snapshot.risk_snapshot.level_totals.high, "number");
+    assert.deepEqual(snapshot.strategic_snapshot.planner_metrics.metric_names, [
+      "clean_close_rate",
+      "retry_rate",
+      "repair_rate",
+      "blocker_rate",
+    ]);
     assert.equal(
       snapshot.api_ui_contract_alignment.live_stream,
       "GET /api/projects/:projectId/runs/:runId/events",
@@ -193,6 +199,9 @@ test("web console snapshot builds run list and run detail from shared API contra
         "GET /api/projects/:projectId/runs/:runId/policy-history",
       ),
     );
+    assert.ok(
+      snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/planner-metrics"),
+    );
 
     const html = renderOperatorConsoleHtml(snapshot, {
       title: "AOR Web Console Smoke",
@@ -206,6 +215,7 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.match(html, /Event history entries/);
     assert.match(html, /Strategic Snapshot/);
     assert.match(html, /High-risk runs/);
+    assert.match(html, /Clean-close rate/);
     assert.match(html, /Lifecycle commands/);
     assert.match(html, /Runner interactions/);
   });

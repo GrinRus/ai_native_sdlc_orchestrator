@@ -6,6 +6,7 @@ import {
   listQualityArtifacts,
   listRuns,
   listStepResults,
+  readPlannerMetrics,
   readProjectState,
   readRunEventHistory,
   readRunPolicyHistory,
@@ -43,6 +44,9 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
       return;
     case "strategic-snapshot":
       sendJson(response, 200, readStrategicSnapshot(runtimeOptions));
+      return;
+    case "planner-metrics":
+      sendJson(response, 200, readPlannerMetrics(runtimeOptions));
       return;
     case "runs":
       sendJson(response, 200, listRuns(runtimeOptions));

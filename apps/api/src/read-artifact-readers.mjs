@@ -21,6 +21,7 @@ const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
 const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/;
 const LEARNING_LOOP_SCORECARD_REGEX = /^learning-loop-scorecard-.*\.json$/;
 const LEARNING_LOOP_HANDOFF_REGEX = /^learning-loop-handoff-.*\.json$/;
+const RUN_CONTROL_AUDIT_REGEX = /^run-control-event-.*\.json$/;
 
 /**
  * @param {string} value
@@ -96,6 +97,39 @@ function loadContractDocuments(options) {
       artifact_ref: toEvidenceRef(options.init, filePath),
       document: /** @type {Record<string, unknown>} */ (contract.document),
     });
+  }
+
+  return loaded;
+}
+
+/**
+ * @param {{ init: ReturnType<typeof initializeProjectRuntime>, files: string[], matcher: RegExp }}
+ * @returns {Array<{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> }>}
+ */
+function loadJsonDocuments(options) {
+  /** @type {Array<{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> }>} */
+  const loaded = [];
+
+  for (const filePath of options.files) {
+    const name = path.basename(filePath);
+    if (!options.matcher.test(name)) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        continue;
+      }
+      loaded.push({
+        family: "run-control-audit",
+        file: filePath,
+        artifact_ref: toEvidenceRef(options.init, filePath),
+        document: /** @type {Record<string, unknown>} */ (parsed),
+      });
+    } catch {
+      // Ignore malformed audit sidecars; contract-backed artifacts still load through validators.
+    }
   }
 
   return loaded;
@@ -228,4 +262,18 @@ export function listQualityArtifacts(options = {}) {
     }),
     ...listPromotionDecisions(options),
   ];
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ */
+export function listRunControlAudits(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  return loadJsonDocuments({ init, files: reportFiles, matcher: RUN_CONTROL_AUDIT_REGEX });
 }

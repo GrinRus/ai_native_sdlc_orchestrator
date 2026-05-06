@@ -1,12 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { buildPlannerMetricsSnapshot } from "../../../packages/observability/src/index.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
 import {
   listJsonFiles,
   listPacketArtifacts,
   listQualityArtifacts,
+  listRunControlAudits,
   listStepResults,
 } from "./read-artifact-readers.mjs";
 
@@ -989,8 +991,27 @@ export function readRunPolicyHistory(options) {
  *   runtimeRoot?: string,
  * }} options
  */
+export function readPlannerMetrics(options = {}) {
+  const init = initializeProjectRuntime(options);
+  return buildPlannerMetricsSnapshot({
+    projectId: init.projectId,
+    runSummaries: listRuns(options),
+    qualityArtifacts: listQualityArtifacts(options),
+    runControlAudits: listRunControlAudits(options),
+  });
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ */
 export function readStrategicSnapshot(options = {}) {
   const init = initializeProjectRuntime(options);
+  const generatedAt = new Date().toISOString();
   const backlogPath = path.join(init.projectRoot, MASTER_BACKLOG_FILE);
   const backlogRows =
     fs.existsSync(backlogPath) && fs.statSync(backlogPath).isFile()
@@ -998,6 +1019,13 @@ export function readStrategicSnapshot(options = {}) {
       : [];
   const waveProgress = summarizeWaveProgress(backlogRows);
   const runs = listRuns(options);
+  const plannerMetrics = buildPlannerMetricsSnapshot({
+    projectId: init.projectId,
+    generatedAt,
+    runSummaries: runs,
+    qualityArtifacts: listQualityArtifacts(options),
+    runControlAudits: listRunControlAudits(options),
+  });
 
   const highRiskRunIds = [];
   const mediumRiskRunIds = [];
@@ -1023,7 +1051,7 @@ export function readStrategicSnapshot(options = {}) {
   }
 
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: generatedAt,
     wave_snapshot: {
       source_backlog_ref: MASTER_BACKLOG_FILE,
       total_slices: backlogRows.length,
@@ -1050,5 +1078,6 @@ export function readStrategicSnapshot(options = {}) {
         regression_runs: regressionRuns,
       },
     },
+    planner_metrics: plannerMetrics,
   };
 }

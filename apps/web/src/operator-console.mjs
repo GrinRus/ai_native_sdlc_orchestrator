@@ -748,6 +748,7 @@ export async function buildOperatorConsoleSnapshot(options) {
           "GET /api/projects/:projectId/delivery-manifests",
           "GET /api/projects/:projectId/promotion-decisions",
           "GET /api/projects/:projectId/strategic-snapshot",
+          "GET /api/projects/:projectId/planner-metrics",
           "GET /api/projects/:projectId/runs/:runId/events/history",
           "GET /api/projects/:projectId/runs/:runId/policy-history",
         ],
@@ -876,6 +877,7 @@ export async function buildOperatorConsoleSnapshot(options) {
         "GET /api/projects/:projectId/delivery-manifests",
         "GET /api/projects/:projectId/promotion-decisions",
         "GET /api/projects/:projectId/strategic-snapshot",
+        "GET /api/projects/:projectId/planner-metrics",
         "GET /api/projects/:projectId/runs/:runId/events/history",
         "GET /api/projects/:projectId/runs/:runId/policy-history",
       ],
@@ -908,6 +910,21 @@ export async function buildOperatorConsoleSnapshot(options) {
  */
 function asRecord(value) {
   return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {unknown} metric
+ * @returns {string}
+ */
+function formatPlannerMetric(metric) {
+  const record = asRecord(metric);
+  const value = typeof record.value === "number" ? record.value : null;
+  const numerator = typeof record.numerator === "number" ? record.numerator : null;
+  const denominator = typeof record.denominator === "number" ? record.denominator : null;
+  if (value === null || denominator === null || denominator === 0) {
+    return "no-data";
+  }
+  return `${Math.round(value * 100)}% (${numerator ?? 0}/${denominator})`;
 }
 
 /**
@@ -970,6 +987,8 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
   const lifecycleItems = (snapshot.api_ui_contract_alignment.lifecycle_commands ?? [])
     .map((command) => `<li><code>${escapeHtml(String(command))}</code></li>`)
     .join("\n");
+  const plannerMetrics = asRecord(snapshot.strategic_snapshot?.planner_metrics);
+  const plannerMetricValues = asRecord(plannerMetrics.metrics);
 
   return `<!doctype html>
 <html lang="en">
@@ -1026,6 +1045,11 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
       <p>Blocked slices: <code>${String(snapshot.strategic_snapshot.wave_snapshot.state_totals.blocked)}</code></p>
       <p>High-risk runs: <code>${String(snapshot.strategic_snapshot.risk_snapshot.level_totals.high)}</code></p>
       <p>Medium-risk runs: <code>${String(snapshot.strategic_snapshot.risk_snapshot.level_totals.medium)}</code></p>
+      <p>Planner metrics: <code>${escapeHtml(String(plannerMetrics.status ?? "no-data"))}</code></p>
+      <p>Clean-close rate: <code>${escapeHtml(formatPlannerMetric(plannerMetricValues.clean_close_rate))}</code></p>
+      <p>Retry rate: <code>${escapeHtml(formatPlannerMetric(plannerMetricValues.retry_rate))}</code></p>
+      <p>Repair rate: <code>${escapeHtml(formatPlannerMetric(plannerMetricValues.repair_rate))}</code></p>
+      <p>Blocker rate: <code>${escapeHtml(formatPlannerMetric(plannerMetricValues.blocker_rate))}</code></p>
     </section>
     <section class="panel">
       <h2>Run list</h2>

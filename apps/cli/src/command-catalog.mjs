@@ -731,6 +731,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "delivery-manifest",
       "release-packet",
       "promotion-decision",
+      "planner-metrics-snapshot",
     ],
   },
   {

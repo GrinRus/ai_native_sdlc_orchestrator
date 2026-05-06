@@ -200,6 +200,14 @@ test("detached control-plane transport serves read baseline endpoints", async ()
       assert.equal(strategicResponse.status, 200);
       const strategicSnapshot = await strategicResponse.json();
       assert.equal(typeof strategicSnapshot.wave_snapshot.total_slices, "number");
+      assert.equal(strategicSnapshot.planner_metrics.metric_names.includes("clean_close_rate"), true);
+
+      const plannerMetricsResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/planner-metrics`,
+      );
+      assert.equal(plannerMetricsResponse.status, 200);
+      const plannerMetrics = await plannerMetricsResponse.json();
+      assert.deepEqual(plannerMetrics.metric_names, strategicSnapshot.planner_metrics.metric_names);
     } finally {
       await transport.close();
     }

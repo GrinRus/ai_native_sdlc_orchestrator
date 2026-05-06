@@ -70,6 +70,16 @@ const ROUTES = Object.freeze([
     kind: "read",
   },
   {
+    id: "planner-metrics",
+    pattern: /^\/api\/projects\/([^/]+)\/planner-metrics$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Planner-metrics route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
     id: "runs",
     pattern: /^\/api\/projects\/([^/]+)\/runs$/u,
     method: "GET",

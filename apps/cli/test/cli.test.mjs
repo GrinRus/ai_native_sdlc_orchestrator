@@ -1857,6 +1857,12 @@ test("operator commands inspect runs, packets, and evidence through shared contr
     assert.equal(typeof runStatusPayload.strategic_snapshot, "object");
     assert.ok(Array.isArray(runStatusPayload.strategic_snapshot.wave_snapshot.waves));
     assert.equal(typeof runStatusPayload.strategic_snapshot.risk_snapshot.level_totals.high, "number");
+    assert.deepEqual(runStatusPayload.strategic_snapshot.planner_metrics.metric_names, [
+      "clean_close_rate",
+      "retry_rate",
+      "repair_rate",
+      "blocker_rate",
+    ]);
     assert.equal(runStatusPayload.read_only, true);
     assert.ok(runStatusPayload.future_control_hooks.includes("run pause"));
 
