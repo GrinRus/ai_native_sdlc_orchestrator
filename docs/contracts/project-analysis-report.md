@@ -28,6 +28,7 @@ The analysis report should be repeatable and durable. It feeds validate/verify, 
 `architecture_traceability` should link step coverage back to architecture docs and contract refs used by discovery/spec planning workflows.
 `repo_scope_proof` should expose the declared profile topology, repo list, repo graph, impacted repo scope, per-repo validation evidence refs, integration validation refs, and whether coordination is required. For bounded multirepo profiles this is the machine-readable proof that backend, mobile, frontend, or other repo entries are handled through the same project-profile contract path as single-repo and monorepo projects.
 `discovery_research` should summarize the ADR-ready discovery research report that links repository facts, runtime context assets, local research inputs, open questions, and ADR candidate recommendations before spec handoff.
+Guided onboarding should reference project-analysis evidence instead of duplicating repository facts. W21-S03 owns the additive onboarding-report shape for asset mode, readiness, blockers, next action, and no-surprise-write evidence.
 
 ## Example
 See `examples/project-analysis-report.sample.yaml`.

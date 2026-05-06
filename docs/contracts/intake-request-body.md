@@ -34,3 +34,5 @@ External SaaS ingestion such as live Jira, GitHub Issues, Gmail, or Outlook conn
 
 ## Notes
 The artifact packet owns packet identity and lifecycle status. This body owns product acceptance evidence and source-material traceability.
+
+Guided mission intake in W21 must populate these same product-intake fields instead of creating a parallel mission schema. Missing goals, constraints, KPIs, Definition of Done, or source refs should remain explicit through `product_intake_completeness` so `aor next` and guided web stages can report blockers deterministically.

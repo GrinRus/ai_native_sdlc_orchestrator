@@ -66,6 +66,16 @@ Out of scope for this baseline:
 - delivery and release commands
 - incident and promotion commands
 
+## Guided installed-user boundary (W21-S01)
+Guided UX surfaces use the installed-user journey defined in `docs/product/02-installed-user-onboarding-journey.md`.
+
+The control plane remains the orchestration owner:
+- `doctor`, `onboard`, `mission create`, `next`, and `app` are guided vocabulary over existing command/query families;
+- web stages read the same project, packet, run, quality, finance, and lifecycle state exposed by the control plane;
+- guided mutations must call runtime command handlers or existing control-plane mutation families;
+- read-only, disconnected, connected, detached, blocked, and ready UI states must be derived from durable runtime state;
+- guided flows must preserve no-upstream-write defaults until delivery mode, policy, review, approval, and writeback evidence are explicit.
+
 Project bootstrap baseline:
 - `project init` may materialize a clean target repo through public bootstrap flags only;
 - `project init` accepts optional repo verification overrides via repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs so curated live E2E targets can preserve required setup and verification commands without proof-runner-side profile generation.

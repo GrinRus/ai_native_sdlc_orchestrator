@@ -56,12 +56,13 @@ Start here if you want to understand the project before implementing anything:
 
 1. `AGENTS.md`
 2. `docs/product/01-project-description.md`
-3. `docs/architecture/12-orchestrator-operating-model.md`
-4. `docs/contracts/00-index.md`
-5. `docs/backlog/backlog-operating-model.md`
-6. `docs/backlog/mvp-roadmap.md`
-7. `docs/ops/live-e2e-target-catalog.md`
-8. `docs/ops/live-e2e-dependency-matrix.md`
+3. `docs/product/02-installed-user-onboarding-journey.md`
+4. `docs/architecture/12-orchestrator-operating-model.md`
+5. `docs/contracts/00-index.md`
+6. `docs/backlog/backlog-operating-model.md`
+7. `docs/backlog/mvp-roadmap.md`
+8. `docs/ops/live-e2e-target-catalog.md`
+9. `docs/ops/live-e2e-dependency-matrix.md`
 
 ## Contributor quickstart
 

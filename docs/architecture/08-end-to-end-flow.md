@@ -18,6 +18,19 @@
 15. incident or close
 16. learning handoff, dataset / suite backfill, and recertification when needed
 
+## Guided installed-user overlay
+The installed-user journey source of truth is `docs/product/02-installed-user-onboarding-journey.md`.
+
+Guided commands and web stages are an overlay on the canonical flow:
+- first-run and doctor guidance explain readiness before mutation;
+- onboarding wraps bootstrap, analysis, validation, registry-root resolution, and onboarding reports;
+- mission intake wraps product-intake packets and source refs;
+- next-action resolution reads durable packets, reports, policy state, review decisions, and run-control state;
+- optional web stages mirror control-plane read models and lifecycle mutations;
+- review, delivery, release, and learning closure remain contract-backed artifacts.
+
+The overlay must not change the orchestration owner. CLI, API, and web surfaces should all point back to the same runtime-owned commands, control-plane mutations, and durable evidence refs.
+
 ## Why bootstrap is a first-class stage
 AOR cannot safely run against a repository until it knows:
 - its topology,
@@ -35,3 +48,6 @@ The full loop closes only when:
 - incidents can feed back into quality memory,
 - learning-loop handoff exists for follow-up,
 - platform assets can be recertified if needed.
+
+## Installed-user safety rule
+For clean or public repositories, guided flows default to no upstream writes. Any path that can produce patches, branches, fork PRs, release packets, or network writes must first expose delivery mode, writeback policy, handoff approval, review decision, promotion evidence, route governance, and bounded command scope.

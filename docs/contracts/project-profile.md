@@ -45,6 +45,11 @@ Deterministic runtime default resolution follows this order:
 `registry_roots` declares the committed AOR asset roots for routes, wrappers, prompt bundles, and runtime context assets. Runtime context assets are AOR-owned committed artifacts, not contributor guidance files from the target repository.
 Committed registry roots are source assets and static samples only. Runtime-generated outputs still belong under `.aor/`.
 
+W21 guided onboarding will make asset-mode behavior explicit without changing the existing required project-profile fields:
+- `bundled` mode resolves AOR-provided registry roots without copying examples into the target repository;
+- `materialized` mode records intentional asset ejection/materialization when a user wants local committed AOR assets;
+- runtime outputs still belong under `.aor/` in both modes.
+
 `default_prompt_bundles` is keyed by workflow step and resolves one prompt bundle ref per step.
 `default_context_bundles` is keyed by workflow step and resolves one or more context bundle refs per step.
 These fields declare deterministic defaults only. Actual context selection, expansion, and prompt/context assembly begin in `W8-S08`.

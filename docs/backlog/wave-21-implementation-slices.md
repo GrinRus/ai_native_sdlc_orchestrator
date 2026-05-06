@@ -22,7 +22,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S01 — Installed-user onboarding UX contract
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** blocked
+- **State:** done
 - **Outcome:** Define the installed-user journey contract and backlog narrative for install, doctor, onboard, mission intake, next action, web attach, review, delivery, release, and learning closure.
 - **Primary modules:** `docs/product/**`, `docs/contracts/**`, `docs/architecture/**`, `docs/backlog/**`
 - **Hard dependencies:** W19-S01
@@ -56,7 +56,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S02 — Installable CLI and first-run entrypoints
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Make AOR understandable from first launch by adding guided public entrypoints for doctor, onboarding, app launch, and next-action discovery.
 - **Primary modules:** `package.json`, `apps/cli`, `docs/architecture/**`, `docs/ops/**`, tests
 - **Hard dependencies:** W21-S01
@@ -90,7 +90,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S03 — Clean project onboarding and asset-root resolution
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Allow `aor onboard <repo>` to prepare a clean target repository without mandatory example-copy materialization, while still supporting explicit asset ejection when requested.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, `examples/**`, tests
 - **Hard dependencies:** W21-S01

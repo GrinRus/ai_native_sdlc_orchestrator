@@ -38,6 +38,8 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 
 `W19-S02` adds the first machine-checkable intake source model: local issue, PRD, RFC, note, and mail-like source refs are preserved with goals, constraints, KPIs, Definition of Done, and completeness evidence in the intake-request body. Live SaaS connectors remain out of scope until a later integration slice exports or mirrors those sources into local structured refs.
 
+`W21-S01` defines the installed-user journey from first launch through learning closure. Product-facing guided intake remains additive: it should populate the existing product-intake contract and surface blockers through `aor next` or guided web stages rather than replacing low-level command evidence.
+
 ### Discovery / research
 - Build discovery packets from repository content, project analysis, AOR-owned runtime context assets, and external research.
 - Separate discovery from delivery.
@@ -115,6 +117,8 @@ Bounded multirepo means one AOR project profile can coordinate several explicit 
 - Materialize project-analysis reports with commands, service boundaries, risk zones, and runtime-context readiness.
 - Recommend missing AOR-native runtime context assets and project-profile coverage.
 - Block execution if prerequisites are missing.
+
+`W21-S01` makes onboarding a first-class installed-user journey rather than a list of independent bootstrap commands. Later W21 slices implement the guided CLI shortcuts, asset-mode onboarding report, next-action resolver, guided web stages, closure UX, and proof rehearsal.
 
 ### Delivery transaction / Git / PR flow
 - Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.
