@@ -23,6 +23,33 @@ mission_state:
     - packages/payments/**
   forbidden_paths:
     - packages/settlement/**
+closure_state:
+  run_id: null
+  review:
+    status: not-started
+    review_report_ref: null
+    runtime_harness_report_ref: null
+    decision_ref: null
+    decision: null
+    delivery_gate_status: null
+    blocks_downstream: true
+    required_evidence_refs: []
+  delivery:
+    status: waiting-for-review
+    delivery_plan_ref: null
+    delivery_manifest_ref: null
+    release_packet_ref: null
+    release_packet_status: null
+    writeback_result: null
+    blocked_reasons:
+      - run-evidence-required
+    requires_review_decision: true
+  learning:
+    status: waiting-for-release
+    scorecard_ref: null
+    handoff_ref: null
+    linked_evidence_refs: []
+  evidence_chain: []
 primary_action:
   action_id: discovery-run
   command: aor discovery run --project-ref /workspace/aor-core --input-packet /workspace/aor-core/.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json

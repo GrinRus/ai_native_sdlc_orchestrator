@@ -31,7 +31,7 @@ These public commands are the target vocabulary for W21. W21-S02 implements the 
 | `aor doctor` | Read environment and repo readiness before mutation. | `project init`, project profile resolution, runtime-root checks. |
 | `aor onboard <repo>` | Prepare or inspect a repository using explicit asset-mode behavior. | Project bootstrap, analysis, validation, project-profile registry roots. |
 | `aor mission create` | Capture product mission evidence in one guided intake flow. | `intake-request-body` packet evidence with goals, constraints, KPI/DoD, source refs, allowed paths, and delivery mode. |
-| `aor next` | Recommend one deterministic next action and explain blockers. | `next-action-report` over onboarding reports, intake packets, run-control state, and bounded write-back policy. |
+| `aor next` | Recommend one deterministic next action and explain blockers. | `next-action-report` over onboarding reports, intake packets, run-control state, bounded write-back policy, and closure evidence. |
 | `aor app` | Point to the optional web surface and connection state. | `ui attach`, `ui detach`, detached control-plane transport, web read models. |
 
 Low-level commands remain stable, scriptable, and machine-readable. Guided commands may default to human-readable output, but they must preserve machine-readable evidence refs whenever the underlying command already exposes them.
@@ -58,6 +58,13 @@ W21-S05 maps the optional web console to seven guided stage views:
 
 Each stage exposes durable evidence refs, blocker codes, selected-run policy history counts, event/log counts, and the exact current next action from the latest `next-action-report`. Connected mode invokes `mission create`, `next`, and other bounded lifecycle commands through `POST /api/projects/:projectId/lifecycle-command/actions`; read-only mode keeps the same evidence visible while disabling mutation descriptors.
 
+For the final three stages, the web console reads `next-action-report.closure_state` directly:
+- review/QA shows review report, Runtime Harness report, current `review-decision`, downstream delivery gate status, and whether downstream delivery is blocked;
+- delivery/release shows delivery-plan, delivery-manifest, release-packet, write-back result, release readiness, and blocked reasons;
+- learning shows scorecard and handoff refs plus the evidence chain that links back to review, quality, delivery, and release artifacts.
+
+The web surface does not store approval, hold, repair, release, or learning state locally. It only renders durable artifacts and invokes the same lifecycle mutations that CLI/API expose.
+
 ## Safety defaults
 Installed-user onboarding defaults to public-repo safety:
 - no upstream writes by default;
@@ -77,9 +84,9 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 | Project identity and registry roots | `project-profile` | W21-S03 adds explicit `asset_mode` semantics and bundled/materialized registry-root resolution. |
 | Bootstrap readiness | `project-analysis-report`, `validation-report` | W21-S03 adds an onboarding report that records readiness, blockers, asset mode, next action, and no-surprise-write evidence. |
 | Product mission | `intake-request-body` | W21-S04 preserves goals, constraints, KPI, Definition of Done, source refs, allowed paths, and delivery mode. |
-| Next action | `next-action-report` | W21-S04 resolves one primary action with blockers, evidence refs, mission state, active run state, and explicit write-back policy. |
+| Next action | `next-action-report` | W21-S04 resolves one primary action with blockers, evidence refs, mission state, active run state, and explicit write-back policy; W21-S06 adds `closure_state` for review, delivery, release, and learning. |
 | Web lifecycle | `control-plane-api`, `live-run-event` | W21-S05 maps guided stages to read models and lifecycle mutations without UI-owned orchestration. |
-| Closure | `review-decision`, `delivery-plan`, `delivery-manifest`, `release-packet`, `learning-loop-handoff` | W21-S06 exposes final-stage decisions, blockers, and evidence refs consistently across CLI/API/web. |
+| Closure | `next-action-report`, `review-decision`, `delivery-plan`, `delivery-manifest`, `release-packet`, `learning-loop-handoff` | W21-S06 exposes final-stage decisions, blockers, evidence refs, and exact next actions consistently across CLI/API/web. |
 | Proof | Live E2E profiles and observation reports | W21-S07 proves the clean installed-user journey with no-upstream-write assertions. |
 
 ## Out of scope for W21-S01

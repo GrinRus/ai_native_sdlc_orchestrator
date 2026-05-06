@@ -78,6 +78,15 @@ function writeContractFixture(options) {
   fs.writeFileSync(options.filePath, `${JSON.stringify(options.document, null, 2)}\n`, "utf8");
 }
 
+/**
+ * @param {string} filePath
+ * @param {Record<string, unknown>} document
+ */
+function writeRuntimeJson(filePath, document) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+}
+
 test("CLI output redacts configured secret values while preserving non-secret policy flags", () => {
   const previous = process.env.AOR_REDACTION_SECRETS;
   process.env.AOR_REDACTION_SECRETS = "cli-secret-token";
@@ -439,6 +448,75 @@ test("guided mission create writes intake evidence and next resolves mission sta
     assert.equal(nextPayload.next_action_primary.action_id, "discovery-run");
     assert.equal(nextPayload.next_action_bounded_execution.requested_delivery_mode, "patch-only");
     assert.equal(nextPayload.next_action_bounded_execution.requires_review_before_writeback, true);
+    assert.equal(nextPayload.next_action_closure_state.run_id, null);
+
+    const runtimeLayout = missionPayload.runtime_layout;
+    const closureRunId = "run.cli.closure.v1";
+    const closureProjectId = missionBody.project_identity.project_id;
+    writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `step-result-${closureRunId}.json`), {
+      step_result_id: `${closureRunId}.implement.pass`,
+      project_id: closureProjectId,
+      run_id: closureRunId,
+      step_id: "run.start.implement",
+      step_class: "runner",
+      status: "pass",
+      evidence_refs: [`evidence://reports/step-result-${closureRunId}.json`],
+    });
+    writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-report-${closureRunId}.json`), {
+      review_report_id: `${closureRunId}.review-report.v1`,
+      project_id: closureProjectId,
+      run_id: closureRunId,
+      overall_status: "pass",
+      review_recommendation: "proceed",
+      findings: [],
+      evidence_refs: [`evidence://reports/step-result-${closureRunId}.json`],
+    });
+    writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `runtime-harness-report-${closureRunId}.json`), {
+      report_id: `${closureRunId}.runtime-harness-report.v1`,
+      project_id: closureProjectId,
+      run_id: closureRunId,
+      overall_decision: "pass",
+      run_findings: [],
+      evidence_refs: [`evidence://reports/step-result-${closureRunId}.json`],
+    });
+    writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-decision-${closureRunId}-approve.json`), {
+      decision_id: `${closureRunId}.review-decision.approve.v1`,
+      project_id: closureProjectId,
+      run_id: closureRunId,
+      decision: "approve",
+      decider_ref: "operator://cli-test",
+      reason: "Approved CLI closure fixture.",
+      review_report_ref: `evidence://reports/review-report-${closureRunId}.json`,
+      runtime_harness_report_ref: `evidence://reports/runtime-harness-report-${closureRunId}.json`,
+      delivery_manifest_refs: [],
+      learning_handoff_refs: [],
+      decision_basis: {
+        review_overall_status: "pass",
+        review_recommendation: "proceed",
+        runtime_harness_overall_decision: "pass",
+        blocking_findings: [],
+      },
+      delivery_gate: {
+        status: "pass",
+        blocks_downstream: false,
+        required_downstream_decision: "approve",
+        findings: [],
+      },
+      evidence_refs: [
+        `evidence://reports/review-report-${closureRunId}.json`,
+        `evidence://reports/runtime-harness-report-${closureRunId}.json`,
+      ],
+      decided_at: "2026-05-06T00:00:00.000Z",
+    });
+
+    const closureNextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
+    assert.equal(closureNextJson.exitCode, 0, closureNextJson.stderr);
+    const closureNextPayload = JSON.parse(closureNextJson.stdout);
+    assert.equal(closureNextPayload.guided_stage, "delivery");
+    assert.equal(closureNextPayload.next_action_primary.action_id, "delivery-prepare");
+    assert.equal(closureNextPayload.next_action_closure_state.run_id, closureRunId);
+    assert.equal(closureNextPayload.next_action_closure_state.review.status, "approved");
+    assert.ok(closureNextPayload.next_action_evidence_refs.some((ref) => ref.includes(`review-decision-${closureRunId}-approve`)));
   });
 
   withTempProject((projectRoot) => {

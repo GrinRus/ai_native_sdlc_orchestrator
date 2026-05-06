@@ -436,6 +436,42 @@ function resolveNextActionStageId(report) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} report
+ * @param {string} stageId
+ * @returns {Record<string, unknown>}
+ */
+function resolveClosureStageState(report, stageId) {
+  const closureState = asRecord(asRecord(report).closure_state);
+  if (stageId === "review-qa") return asRecord(closureState.review);
+  if (stageId === "delivery-release") return asRecord(closureState.delivery);
+  if (stageId === "learning") return asRecord(closureState.learning);
+  return {};
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} report
+ * @returns {Record<string, unknown>}
+ */
+function buildClosureSafetyGates(report) {
+  const closureState = asRecord(asRecord(report).closure_state);
+  const review = asRecord(closureState.review);
+  const delivery = asRecord(closureState.delivery);
+  const learning = asRecord(closureState.learning);
+  return {
+    run_id: asString(closureState.run_id),
+    review_decision: asString(review.decision),
+    review_status: asString(review.status),
+    delivery_gate_status: asString(review.delivery_gate_status),
+    blocks_downstream: review.blocks_downstream === true,
+    required_review_evidence_refs: asStringArray(review.required_evidence_refs),
+    delivery_status: asString(delivery.status),
+    delivery_blocked_reasons: asStringArray(delivery.blocked_reasons),
+    release_packet_status: asString(delivery.release_packet_status),
+    learning_status: asString(learning.status),
+  };
+}
+
+/**
  * @param {Record<string, unknown>} primaryAction
  * @returns {string | null}
  */
@@ -535,6 +571,11 @@ function collectGuidedStageEvidence(options) {
   );
   const nextActionEvidence = asStringArray(asRecord(options.nextActionReport).evidence_refs);
   const missionState = asRecord(asRecord(options.nextActionReport).mission_state);
+  const closureState = asRecord(asRecord(options.nextActionReport).closure_state);
+  const reviewClosure = asRecord(closureState.review);
+  const deliveryClosure = asRecord(closureState.delivery);
+  const learningClosure = asRecord(closureState.learning);
+  const closureEvidence = asStringArray(closureState.evidence_chain);
 
   if (options.stageId === "readiness") {
     return uniqueStrings([
@@ -572,33 +613,46 @@ function collectGuidedStageEvidence(options) {
 
   if (options.stageId === "review-qa") {
     return uniqueStrings([
+      asString(reviewClosure.review_report_ref),
+      asString(reviewClosure.runtime_harness_report_ref),
+      asString(reviewClosure.decision_ref),
+      ...asStringArray(reviewClosure.required_evidence_refs),
       ...evidenceRefsFor(qualityArtifacts, (entry) =>
         ["review-report", "review-decision", "runtime-harness-report", "evaluation-report", "validation-report"].includes(
           asString(entry.family) ?? "",
         ),
       ),
+      ...closureEvidence,
       ...nextActionEvidence,
     ]);
   }
 
   if (options.stageId === "delivery-release") {
     return uniqueStrings([
+      asString(deliveryClosure.delivery_plan_ref),
+      asString(deliveryClosure.delivery_manifest_ref),
+      asString(deliveryClosure.release_packet_ref),
       ...evidenceRefsFor(packets, (entry) =>
         ["delivery-plan", "delivery-manifest", "release-packet"].includes(asString(entry.family) ?? ""),
       ),
       ...evidenceRefsFor(deliveryManifests, () => true),
+      ...closureEvidence,
       ...nextActionEvidence,
     ]);
   }
 
   if (options.stageId === "learning") {
     return uniqueStrings([
+      asString(learningClosure.scorecard_ref),
+      asString(learningClosure.handoff_ref),
+      ...asStringArray(learningClosure.linked_evidence_refs),
       ...evidenceRefsFor(qualityArtifacts, (entry) =>
         ["learning-loop-scorecard", "learning-loop-handoff", "incident-report", "incident-backfill-proposal"].includes(
           asString(entry.family) ?? "",
         ),
       ),
       ...evidenceRefsFor(promotionDecisions, () => true),
+      ...closureEvidence,
       ...nextActionEvidence,
     ]);
   }
@@ -623,6 +677,10 @@ function isGuidedStageDone(options) {
     asArray(snapshot.delivery_manifests)
   );
   const nextReport = asRecord(options.nextActionReport);
+  const closureState = asRecord(nextReport.closure_state);
+  const reviewClosure = asRecord(closureState.review);
+  const deliveryClosure = asRecord(closureState.delivery);
+  const learningClosure = asRecord(closureState.learning);
 
   if (options.stageId === "readiness") {
     return asString(asRecord(nextReport.project_state).onboarding_report_ref) !== null || asString(asRecord(snapshot.project).state_file) !== null;
@@ -643,19 +701,28 @@ function isGuidedStageDone(options) {
     return stepResults.some((entry) => asString(entry.document.run_id) === asString(snapshot.selected_run_id));
   }
   if (options.stageId === "review-qa") {
-    return qualityArtifacts.some((entry) =>
-      ["review-report", "review-decision", "runtime-harness-report", "evaluation-report"].includes(asString(entry.family) ?? ""),
+    return (
+      asString(reviewClosure.status) === "approved" ||
+      asString(reviewClosure.status) === "held" ||
+      asString(reviewClosure.status) === "repair-requested" ||
+      qualityArtifacts.some((entry) =>
+        ["review-report", "review-decision", "runtime-harness-report", "evaluation-report"].includes(asString(entry.family) ?? ""),
+      )
     );
   }
   if (options.stageId === "delivery-release") {
     return (
+      ["delivery-plan-ready", "delivery-prepared", "release-ready"].includes(asString(deliveryClosure.status) ?? "") ||
       deliveryManifests.length > 0 ||
       packets.some((entry) => ["delivery-plan", "delivery-manifest", "release-packet"].includes(asString(entry.family) ?? ""))
     );
   }
   if (options.stageId === "learning") {
-    return qualityArtifacts.some((entry) =>
-      ["learning-loop-scorecard", "learning-loop-handoff"].includes(asString(entry.family) ?? ""),
+    return (
+      asString(learningClosure.status) === "handoff-complete" ||
+      qualityArtifacts.some((entry) =>
+        ["learning-loop-scorecard", "learning-loop-handoff"].includes(asString(entry.family) ?? ""),
+      )
     );
   }
   return false;
@@ -749,6 +816,8 @@ function buildGuidedLifecycle(options) {
       stage_id: stageDefinition.stage_id,
       label: stageDefinition.label,
       status,
+      closure_state: resolveClosureStageState(nextActionReport, stageDefinition.stage_id),
+      safety_gates: buildClosureSafetyGates(nextActionReport),
       evidence_refs: collectGuidedStageEvidence({
         stageId: stageDefinition.stage_id,
         snapshot,
@@ -786,6 +855,7 @@ function buildGuidedLifecycle(options) {
       headless_safe: asRecord(snapshot.ui_lifecycle).headless_safe === true,
     },
     next_action_report_ref: asString(nextActionEntry.artifact_ref) ?? asString(nextActionEntry.file),
+    closure_state: asRecord(asRecord(nextActionReport).closure_state),
     stages,
   };
 }
@@ -1467,6 +1537,8 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
     .map((stage) => {
       const evidenceCount = Array.isArray(stage.evidence_refs) ? stage.evidence_refs.length : 0;
       const blockers = Array.isArray(stage.blockers) ? stage.blockers : [];
+      const safetyGates = asRecord(stage.safety_gates);
+      const closureState = asRecord(stage.closure_state);
       const blockerItems = blockers
         .map((blocker) => {
           const code = escapeHtml(String(blocker.code ?? "blocked"));
@@ -1481,6 +1553,9 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
         evidence=<code>${String(evidenceCount)}</code>
         policy=<code>${String(stage.policy_state?.policy_history_entries ?? 0)}</code>
         events=<code>${String(stage.logs_events?.event_history_entries ?? 0)}</code>
+        closure=<code>${escapeHtml(String(closureState.status ?? "n/a"))}</code>
+        gate=<code>${escapeHtml(String(safetyGates.delivery_gate_status ?? "n/a"))}</code>
+        release=<code>${escapeHtml(String(safetyGates.release_packet_status ?? "n/a"))}</code>
         <br />
         next=<code>${escapeHtml(String(stage.next_action?.command ?? "none"))}</code>
         <br />

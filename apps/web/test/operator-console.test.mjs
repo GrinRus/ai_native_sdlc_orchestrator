@@ -158,6 +158,105 @@ function seedRequestedInteraction(projectRoot, runId, interactionId) {
   return stepResultFile;
 }
 
+/**
+ * @param {string} filePath
+ * @param {Record<string, unknown>} document
+ */
+function writeRuntimeJson(filePath, document) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+}
+
+/**
+ * @param {{ artifactsRoot: string, reportsRoot: string }} runtimeLayout
+ * @param {string} projectId
+ * @param {string} runId
+ */
+function seedGuidedClosureArtifacts(runtimeLayout, projectId, runId) {
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `step-result-${runId}.json`), {
+    step_result_id: `${runId}.implement.pass`,
+    project_id: projectId,
+    run_id: runId,
+    step_id: "run.start.implement",
+    step_class: "runner",
+    status: "pass",
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-report-${runId}.json`), {
+    review_report_id: `${runId}.review-report.v1`,
+    project_id: projectId,
+    run_id: runId,
+    overall_status: "pass",
+    review_recommendation: "proceed",
+    findings: [],
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `runtime-harness-report-${runId}.json`), {
+    report_id: `${runId}.runtime-harness-report.v1`,
+    project_id: projectId,
+    run_id: runId,
+    overall_decision: "pass",
+    run_findings: [],
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-decision-${runId}-approve.json`), {
+    decision_id: `${runId}.review-decision.approve.v1`,
+    project_id: projectId,
+    run_id: runId,
+    decision: "approve",
+    decider_ref: "operator://web-test",
+    reason: "Approved guided web closure fixture.",
+    review_report_ref: `evidence://reports/review-report-${runId}.json`,
+    runtime_harness_report_ref: `evidence://reports/runtime-harness-report-${runId}.json`,
+    delivery_manifest_refs: [],
+    learning_handoff_refs: [],
+    decision_basis: {
+      review_overall_status: "pass",
+      review_recommendation: "proceed",
+      runtime_harness_overall_decision: "pass",
+      blocking_findings: [],
+    },
+    delivery_gate: {
+      status: "pass",
+      blocks_downstream: false,
+      required_downstream_decision: "approve",
+      findings: [],
+    },
+    evidence_refs: [`evidence://reports/review-report-${runId}.json`, `evidence://reports/runtime-harness-report-${runId}.json`],
+    decided_at: "2026-05-06T00:00:00.000Z",
+  });
+  writeRuntimeJson(path.join(runtimeLayout.artifactsRoot, `delivery-plan-${runId}.json`), {
+    plan_id: `${runId}.delivery-plan.implement.v1`,
+    project_id: projectId,
+    run_id: runId,
+    step_class: "implement",
+    delivery_mode: "patch-only",
+    status: "ready",
+    blocking_reasons: [],
+    evidence_refs: [`evidence://reports/review-decision-${runId}-approve.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.artifactsRoot, `delivery-manifest-${runId}.json`), {
+    manifest_id: `${runId}.delivery-manifest.v1`,
+    project_id: projectId,
+    run_refs: [runId],
+    status: "submitted",
+    repo_deliveries: [{ repo_id: "target", writeback_result: "patch-created" }],
+    evidence_refs: [`evidence://artifacts/delivery-plan-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.artifactsRoot, `release-packet-${runId}.json`), {
+    packet_id: `${runId}.release-packet.v1`,
+    project_id: projectId,
+    run_refs: [runId],
+    status: "ready-for-close",
+    delivery_manifest_ref: `evidence://artifacts/delivery-manifest-${runId}.json`,
+    evidence_lineage: {
+      execution_refs: [`evidence://artifacts/delivery-plan-${runId}.json`],
+      delivery_output_refs: [`evidence://artifacts/delivery-manifest-${runId}.json`],
+    },
+    evidence_refs: [`evidence://artifacts/delivery-manifest-${runId}.json`],
+  });
+}
+
 test("web console snapshot builds run list and run detail from shared API contracts", async () => {
   await withTempProject(async (projectRoot) => {
     const runId = seedOperatorArtifacts(projectRoot);
@@ -736,6 +835,43 @@ test("guided web lifecycle progresses mission and next action through connected 
       assert.match(html, /Guided lifecycle/);
       assert.match(html, /Discovery, Spec, Plan/);
       assert.match(html, /aor discovery run/);
+
+      seedGuidedClosureArtifacts(
+        mission.lifecycle_command.command_output.runtime_layout,
+        transport.projectId,
+        "run.guided.web.closure.v1",
+      );
+      const closureNext = await applyOperatorLifecycleCommand({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        command: "next",
+      });
+      assert.equal(closureNext.lifecycle_command.command_output.next_action_primary.action_id, "learning-handoff");
+      assert.equal(
+        closureNext.lifecycle_command.command_output.next_action_closure_state.delivery.status,
+        "release-ready",
+      );
+
+      const closureSnapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId: "run.guided.web.closure.v1",
+      });
+      assert.equal(closureSnapshot.guided_lifecycle.current_stage_id, "learning");
+      assert.equal(closureSnapshot.guided_lifecycle.closure_state.run_id, "run.guided.web.closure.v1");
+      const reviewStage = closureSnapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "review-qa");
+      const deliveryStage = closureSnapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "delivery-release");
+      const learningStage = closureSnapshot.guided_lifecycle.stages.find((stage) => stage.stage_id === "learning");
+      assert.equal(reviewStage?.closure_state.status, "approved");
+      assert.equal(reviewStage?.safety_gates.delivery_gate_status, "pass");
+      assert.equal(deliveryStage?.closure_state.status, "release-ready");
+      assert.equal(learningStage?.status, "ready");
+      assert.equal(learningStage?.next_action.mutation.command, "learning handoff");
+      assert.ok((learningStage?.evidence_refs.length ?? 0) > 0);
+
+      const closureHtml = renderOperatorConsoleHtml(closureSnapshot);
+      assert.match(closureHtml, /learning handoff/);
+      assert.match(closureHtml, /ready-for-close/);
     } finally {
       await transport.close();
     }

@@ -401,6 +401,7 @@ export function handleGuidedCommand(context) {
     outputState.nextActionBlockers = report.blockers;
     outputState.nextActionEvidenceRefs = report.evidence_refs;
     outputState.nextActionMissionState = report.mission_state;
+    outputState.nextActionClosureState = report.closure_state;
     outputState.nextActionBoundedExecution = report.bounded_execution;
     outputState.guidedCommand = "aor next";
     outputState.guidedStage = report.project_state.stage;
@@ -415,7 +416,17 @@ export function handleGuidedCommand(context) {
     outputState.guidedActionableBlockers = report.blockers;
     outputState.guidedRecommendedCommands = [primary.command];
     outputState.readOnly = false;
-    outputState.futureControlHooks = ["mission create", "discovery run", "spec build", "run status"];
+    outputState.futureControlHooks = [
+      "mission create",
+      "discovery run",
+      "spec build",
+      "review run",
+      "review decide",
+      "deliver prepare",
+      "release prepare",
+      "learning handoff",
+      "run status",
+    ];
     return true;
   }
 

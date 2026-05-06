@@ -121,12 +121,21 @@ Expected full-flow console evidence:
 - rendered HTML includes guided lifecycle, lifecycle command, and runner interaction sections;
 - `guided_lifecycle.stages` covers readiness, mission, discovery/spec/plan, execution, review/QA, delivery/release, and learning;
 - `guided_lifecycle` shows each stage status, evidence count/refs, blocker codes, policy-history count, event-history count, and the exact current next action from `next-action-report`;
+- final stages include `closure_state` and `safety_gates`: review decision, delivery gate status, downstream block flag, delivery blocked reasons, release-packet status, learning status, and the same evidence chain returned by CLI/API;
 - connected stage mutations use `POST /api/projects/:projectId/lifecycle-command/actions`; `mission create` creates guided intake evidence and `next` refreshes the durable next-action report;
 - `contract_alignment.mutation_model` includes `POST /api/projects/:projectId/lifecycle-command/actions` and `POST /api/projects/:projectId/interactions/answers`;
 - `contract_alignment.read_model` includes `GET /api/projects/:projectId/next-action-report`;
 - pending runner questions are derived from `step-result.requested_interaction`;
 - submitted answers return `interaction_answer.answer_audit_ref` and live/event-history payloads reference that audit ref without raw answer text;
 - detaching the session stops web follow capture only; run state and evidence remain queryable through CLI/API.
+
+Closure branch checks:
+- missing review evidence selects `aor review run --run-id <RUN_ID>`;
+- review evidence without a decision selects `aor review decide --decision approve`, while the UI still shows that `hold` and `request-repair` are durable decision choices;
+- `hold` and `request-repair` decisions set `guided_lifecycle.state=blocked` and preserve the review-decision ref in stage evidence;
+- delivery and release recommendations include `--require-review-decision`;
+- release-ready evidence selects `aor learning handoff --run-id <RUN_ID>`;
+- completed learning handoff changes the primary action to evidence inspection rather than another mutation.
 
 Read-only checks:
 - open a snapshot with read-only mode when mutation transport is unavailable or intentionally disabled;

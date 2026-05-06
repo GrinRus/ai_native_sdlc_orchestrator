@@ -1,0 +1,97 @@
+report_id: aor-core.next-action.v1
+project_id: aor-core
+version: 1
+generated_from:
+  command: aor next
+  project_root: /workspace/aor-core
+  project_profile_ref: .aor/projects/aor-core/state/project.aor.yaml
+project_state:
+  stage: learning
+  runtime_root: /workspace/aor-core/.aor
+  runtime_state_file: /workspace/aor-core/.aor/projects/aor-core/state/project-init-state.json
+  onboarding_report_ref: evidence://.aor/projects/aor-core/reports/onboarding-report.json
+  active_run_ref: null
+mission_state:
+  intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+  intake_body_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.body.json
+  completeness_status: complete
+  missing_fields: []
+  mission_id: checkout-risk
+  delivery_mode: patch-only
+  allowed_paths:
+    - apps/web/**
+  forbidden_paths:
+    - packages/settlement/**
+closure_state:
+  run_id: run.closure.checkout-risk
+  review:
+    status: approved
+    review_report_ref: evidence://.aor/projects/aor-core/reports/review-report-run.closure.checkout-risk.json
+    runtime_harness_report_ref: evidence://.aor/projects/aor-core/reports/runtime-harness-report-run.closure.checkout-risk.json
+    decision_ref: evidence://.aor/projects/aor-core/reports/review-decision-run.closure.checkout-risk-approve.json
+    decision: approve
+    delivery_gate_status: pass
+    blocks_downstream: false
+    required_evidence_refs:
+      - evidence://.aor/projects/aor-core/reports/review-report-run.closure.checkout-risk.json
+      - evidence://.aor/projects/aor-core/reports/runtime-harness-report-run.closure.checkout-risk.json
+      - evidence://.aor/projects/aor-core/reports/review-decision-run.closure.checkout-risk-approve.json
+  delivery:
+    status: release-ready
+    delivery_plan_ref: evidence://.aor/projects/aor-core/artifacts/delivery-plan-run.closure.checkout-risk.json
+    delivery_manifest_ref: evidence://.aor/projects/aor-core/artifacts/delivery-manifest-run.closure.checkout-risk.json
+    release_packet_ref: evidence://.aor/projects/aor-core/artifacts/release-packet-run.closure.checkout-risk.json
+    release_packet_status: ready-for-close
+    writeback_result: patch-created
+    blocked_reasons: []
+    requires_review_decision: true
+  learning:
+    status: ready-for-handoff
+    scorecard_ref: null
+    handoff_ref: null
+    linked_evidence_refs: []
+  evidence_chain:
+    - evidence://.aor/projects/aor-core/reports/step-result-run.closure.checkout-risk.json
+    - evidence://.aor/projects/aor-core/reports/review-report-run.closure.checkout-risk.json
+    - evidence://.aor/projects/aor-core/reports/runtime-harness-report-run.closure.checkout-risk.json
+    - evidence://.aor/projects/aor-core/reports/review-decision-run.closure.checkout-risk-approve.json
+    - evidence://.aor/projects/aor-core/artifacts/delivery-plan-run.closure.checkout-risk.json
+    - evidence://.aor/projects/aor-core/artifacts/delivery-manifest-run.closure.checkout-risk.json
+    - evidence://.aor/projects/aor-core/artifacts/release-packet-run.closure.checkout-risk.json
+primary_action:
+  action_id: learning-handoff
+  command: aor learning handoff --project-ref /workspace/aor-core --run-id run.closure.checkout-risk
+  reason: Release-ready evidence exists; close the run with a learning scorecard and handoff chain.
+  low_level_command: learning handoff
+  evidence_refs:
+    - evidence://.aor/projects/aor-core/reports/step-result-run.closure.checkout-risk.json
+    - evidence://.aor/projects/aor-core/reports/review-report-run.closure.checkout-risk.json
+    - evidence://.aor/projects/aor-core/reports/runtime-harness-report-run.closure.checkout-risk.json
+    - evidence://.aor/projects/aor-core/reports/review-decision-run.closure.checkout-risk-approve.json
+    - evidence://.aor/projects/aor-core/artifacts/delivery-plan-run.closure.checkout-risk.json
+    - evidence://.aor/projects/aor-core/artifacts/delivery-manifest-run.closure.checkout-risk.json
+    - evidence://.aor/projects/aor-core/artifacts/release-packet-run.closure.checkout-risk.json
+blockers: []
+bounded_execution:
+  requested_delivery_mode: patch-only
+  upstream_writes_default: false
+  delivery_capable_mode: true
+  allowed_paths:
+    - apps/web/**
+  forbidden_paths:
+    - packages/settlement/**
+  requires_review_before_writeback: true
+evidence_refs:
+  - evidence://.aor/projects/aor-core/state/project-init-state.json
+  - evidence://.aor/projects/aor-core/reports/onboarding-report.json
+  - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+  - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.body.json
+  - evidence://.aor/projects/aor-core/reports/step-result-run.closure.checkout-risk.json
+  - evidence://.aor/projects/aor-core/reports/review-report-run.closure.checkout-risk.json
+  - evidence://.aor/projects/aor-core/reports/runtime-harness-report-run.closure.checkout-risk.json
+  - evidence://.aor/projects/aor-core/reports/review-decision-run.closure.checkout-risk-approve.json
+  - evidence://.aor/projects/aor-core/artifacts/delivery-plan-run.closure.checkout-risk.json
+  - evidence://.aor/projects/aor-core/artifacts/delivery-manifest-run.closure.checkout-risk.json
+  - evidence://.aor/projects/aor-core/artifacts/release-packet-run.closure.checkout-risk.json
+status: ready
+created_at: "2026-05-06T00:00:00.000Z"

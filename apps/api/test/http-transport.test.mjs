@@ -93,6 +93,85 @@ async function postJson(url, payload) {
 }
 
 /**
+ * @param {string} filePath
+ * @param {Record<string, unknown>} document
+ */
+function writeRuntimeJson(filePath, document) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+}
+
+/**
+ * @param {{ artifactsRoot: string, reportsRoot: string }} runtimeLayout
+ * @param {string} projectId
+ * @param {string} runId
+ */
+function writeApprovedClosureArtifacts(runtimeLayout, projectId, runId) {
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `step-result-${runId}.json`), {
+    step_result_id: `${runId}.implement.pass`,
+    project_id: projectId,
+    run_id: runId,
+    step_id: "run.start.implement",
+    step_class: "runner",
+    status: "pass",
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-report-${runId}.json`), {
+    review_report_id: `${runId}.review-report.v1`,
+    project_id: projectId,
+    run_id: runId,
+    overall_status: "pass",
+    review_recommendation: "proceed",
+    findings: [],
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `runtime-harness-report-${runId}.json`), {
+    report_id: `${runId}.runtime-harness-report.v1`,
+    project_id: projectId,
+    run_id: runId,
+    overall_decision: "pass",
+    run_findings: [],
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-decision-${runId}-approve.json`), {
+    decision_id: `${runId}.review-decision.approve.v1`,
+    project_id: projectId,
+    run_id: runId,
+    decision: "approve",
+    decider_ref: "operator://api-test",
+    reason: "Approved closure API fixture.",
+    review_report_ref: `evidence://reports/review-report-${runId}.json`,
+    runtime_harness_report_ref: `evidence://reports/runtime-harness-report-${runId}.json`,
+    delivery_manifest_refs: [],
+    learning_handoff_refs: [],
+    decision_basis: {
+      review_overall_status: "pass",
+      review_recommendation: "proceed",
+      runtime_harness_overall_decision: "pass",
+      blocking_findings: [],
+    },
+    delivery_gate: {
+      status: "pass",
+      blocks_downstream: false,
+      required_downstream_decision: "approve",
+      findings: [],
+    },
+    evidence_refs: [`evidence://reports/review-report-${runId}.json`, `evidence://reports/runtime-harness-report-${runId}.json`],
+    decided_at: "2026-05-06T00:00:00.000Z",
+  });
+  writeRuntimeJson(path.join(runtimeLayout.artifactsRoot, `delivery-plan-${runId}.json`), {
+    plan_id: `${runId}.delivery-plan.implement.v1`,
+    project_id: projectId,
+    run_id: runId,
+    step_class: "implement",
+    delivery_mode: "patch-only",
+    status: "ready",
+    blocking_reasons: [],
+    evidence_refs: [`evidence://reports/review-decision-${runId}-approve.json`],
+  });
+}
+
+/**
  * @param {string} url
  * @param {string | null} token
  */
@@ -482,6 +561,34 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       const nextReportPayload = await nextReportResponse.json();
       assert.equal(nextReportPayload.family, "next-action-report");
       assert.equal(nextReportPayload.document.primary_action.action_id, "discovery-run");
+      assert.equal(nextReportPayload.document.closure_state.run_id, null);
+
+      const runtimeLayout = missionPayload.lifecycle_command.command_output.runtime_layout;
+      assert.equal(typeof runtimeLayout.reportsRoot, "string");
+      assert.equal(typeof runtimeLayout.artifactsRoot, "string");
+      writeApprovedClosureArtifacts(runtimeLayout, transport.projectId, "run.api.closure.v1");
+
+      const closureNextResponse = await postJson(commandUrl, {
+        command: "next",
+        flags: {},
+      });
+      assert.equal(closureNextResponse.status, 200);
+      const closureNextPayload = await closureNextResponse.json();
+      const closureOutput = closureNextPayload.lifecycle_command.command_output;
+      assert.equal(closureOutput.next_action_primary.action_id, "release-prepare");
+      assert.equal(closureOutput.next_action_closure_state.run_id, "run.api.closure.v1");
+      assert.equal(closureOutput.next_action_closure_state.review.status, "approved");
+      assert.equal(closureOutput.next_action_closure_state.delivery.status, "delivery-plan-ready");
+
+      const closureReportResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/next-action-report`);
+      assert.equal(closureReportResponse.status, 200);
+      const closureReportPayload = await closureReportResponse.json();
+      assert.equal(closureReportPayload.family, "next-action-report");
+      assert.equal(closureReportPayload.document.closure_state.run_id, "run.api.closure.v1");
+      assert.equal(
+        closureReportPayload.document.closure_state.evidence_chain.join("\n").includes("review-decision-run.api.closure.v1-approve"),
+        true,
+      );
 
       const invalidFlagResponse = await postJson(commandUrl, {
         command: "review run",

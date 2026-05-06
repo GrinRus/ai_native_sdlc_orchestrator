@@ -5,6 +5,7 @@ import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]);
+const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
 
 /**
  * @param {unknown} value
@@ -32,6 +33,16 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {unknown[]} values
+ * @returns {string[]}
+ */
+function uniqueStrings(values) {
+  return Array.from(
+    new Set(values.filter((value) => typeof value === "string" && value.trim().length > 0).map((value) => value.trim())),
+  );
 }
 
 /**
@@ -74,6 +85,560 @@ function listJsonFiles(dirPath) {
     .filter((entry) => entry.endsWith(".json"))
     .map((entry) => path.join(dirPath, entry))
     .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} filePath
+ * @param {string} family
+ * @returns {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> } | null}
+ */
+function loadRuntimeDocument(init, filePath, family) {
+  const document = readJsonFile(filePath);
+  if (!document) return null;
+  return {
+    family,
+    file: filePath,
+    artifact_ref: toEvidenceRef(init.projectRoot, filePath),
+    document,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} runId
+ * @returns {boolean}
+ */
+function documentReferencesRun(document, runId) {
+  if (asString(document.run_id) === runId) return true;
+  const normalizedRunRef = `run://${runId}`;
+  return asStringArray(document.run_refs).some((ref) => ref === runId || ref === normalizedRunRef);
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {string} runId
+ * @param {string} family
+ * @param {RegExp} matcher
+ * @param {"reports" | "artifacts"} root
+ * @returns {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> } | null}
+ */
+function findLatestRunDocument(init, runId, family, matcher, root) {
+  const rootPath = root === "reports" ? init.runtimeLayout.reportsRoot : init.runtimeLayout.artifactsRoot;
+  for (const filePath of listJsonFiles(rootPath)) {
+    if (!matcher.test(path.basename(filePath))) continue;
+    const entry = loadRuntimeDocument(init, filePath, family);
+    if (entry && documentReferencesRun(entry.document, runId)) {
+      return entry;
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @returns {{ runId: string, evidenceRef: string } | null}
+ */
+function findLatestRunEvidence(init) {
+  /** @type {Array<{ runId: string, evidenceRef: string, file: string }>} */
+  const candidates = [];
+  const addCandidate = (filePath, document) => {
+    const runId = asString(document.run_id);
+    if (runId) {
+      candidates.push({ runId, evidenceRef: toEvidenceRef(init.projectRoot, filePath), file: filePath });
+      return;
+    }
+    const runRef = asStringArray(document.run_refs)[0];
+    if (runRef) {
+      candidates.push({
+        runId: runRef.startsWith("run://") ? runRef.slice("run://".length) : runRef,
+        evidenceRef: toEvidenceRef(init.projectRoot, filePath),
+        file: filePath,
+      });
+    }
+  };
+
+  for (const filePath of listJsonFiles(init.runtimeLayout.stateRoot)) {
+    if (!path.basename(filePath).startsWith("run-control-state-")) continue;
+    const state = readJsonFile(filePath);
+    if (state) addCandidate(filePath, state);
+  }
+
+  for (const filePath of listJsonFiles(init.runtimeLayout.reportsRoot)) {
+    if (
+      !/^step-result-.*\.json$/u.test(path.basename(filePath)) &&
+      !/^review-report.*\.json$/u.test(path.basename(filePath)) &&
+      !/^review-decision-.*\.json$/u.test(path.basename(filePath)) &&
+      !/^runtime-harness-report.*\.json$/u.test(path.basename(filePath)) &&
+      !/^learning-loop-(?:scorecard|handoff)-.*\.json$/u.test(path.basename(filePath))
+    ) {
+      continue;
+    }
+    const document = readJsonFile(filePath);
+    if (document) addCandidate(filePath, document);
+  }
+
+  for (const filePath of listJsonFiles(init.runtimeLayout.artifactsRoot)) {
+    if (
+      !/^delivery-plan-.*\.json$/u.test(path.basename(filePath)) &&
+      !/^delivery-manifest-.*\.json$/u.test(path.basename(filePath)) &&
+      !/^release-packet-.*\.json$/u.test(path.basename(filePath))
+    ) {
+      continue;
+    }
+    const document = readJsonFile(filePath);
+    if (document) addCandidate(filePath, document);
+  }
+
+  candidates.sort((left, right) => fs.statSync(right.file).mtimeMs - fs.statSync(left.file).mtimeMs);
+  const latest = candidates[0] ?? null;
+  return latest ? { runId: latest.runId, evidenceRef: latest.evidenceRef } : null;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @returns {string[]}
+ */
+function collectDocumentEvidenceRefs(document) {
+  const sourceRefs = asRecord(document.source_refs);
+  const evidenceLineage = asRecord(document.evidence_lineage);
+  return uniqueStrings([
+    ...asStringArray(document.evidence_refs),
+    ...asStringArray(document.verification_refs),
+    ...asStringArray(document.source_refs),
+    ...asStringArray(sourceRefs.delivery_plan_ref ? [sourceRefs.delivery_plan_ref] : []),
+    ...asStringArray(sourceRefs.delivery_transcript_ref ? [sourceRefs.delivery_transcript_ref] : []),
+    ...asStringArray(document.delivery_manifest_ref ? [document.delivery_manifest_ref] : []),
+    ...asStringArray(evidenceLineage.handoff_refs),
+    ...asStringArray(evidenceLineage.promotion_refs),
+    ...asStringArray(evidenceLineage.execution_refs),
+    ...asStringArray(evidenceLineage.delivery_output_refs),
+    ...asStringArray(evidenceLineage.coordination_refs),
+    ...asStringArray(evidenceLineage.rerun_refs),
+  ]);
+}
+
+/**
+ * @param {string | null} status
+ * @returns {boolean}
+ */
+function isDeliveryReadyStatus(status) {
+  return status !== null && DELIVERY_READY_STATUSES.has(status);
+}
+
+/**
+ * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   runId: string | null,
+ *   runEvidenceRef?: string | null,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function buildClosureState(options) {
+  const runId = options.runId;
+  const emptyEvidence = uniqueStrings([options.runEvidenceRef ?? null]);
+  if (!runId) {
+    return {
+      run_id: null,
+      review: {
+        status: "not-started",
+        review_report_ref: null,
+        runtime_harness_report_ref: null,
+        decision_ref: null,
+        decision: null,
+        delivery_gate_status: null,
+        blocks_downstream: true,
+        required_evidence_refs: [],
+      },
+      delivery: {
+        status: "waiting-for-review",
+        delivery_plan_ref: null,
+        delivery_manifest_ref: null,
+        release_packet_ref: null,
+        release_packet_status: null,
+        writeback_result: null,
+        blocked_reasons: ["run-evidence-required"],
+        requires_review_decision: true,
+      },
+      learning: {
+        status: "waiting-for-release",
+        scorecard_ref: null,
+        handoff_ref: null,
+        linked_evidence_refs: [],
+      },
+      evidence_chain: emptyEvidence,
+    };
+  }
+
+  const reviewReport = findLatestRunDocument(
+    options.init,
+    runId,
+    "review-report",
+    /^review-report.*\.json$/u,
+    "reports",
+  );
+  const runtimeHarnessReport = findLatestRunDocument(
+    options.init,
+    runId,
+    "runtime-harness-report",
+    /^runtime-harness-report.*\.json$/u,
+    "reports",
+  );
+  const reviewDecision = findLatestRunDocument(
+    options.init,
+    runId,
+    "review-decision",
+    /^review-decision-.*\.json$/u,
+    "reports",
+  );
+  const deliveryPlan = findLatestRunDocument(
+    options.init,
+    runId,
+    "delivery-plan",
+    /^delivery-plan-.*\.json$/u,
+    "artifacts",
+  );
+  const deliveryManifest = findLatestRunDocument(
+    options.init,
+    runId,
+    "delivery-manifest",
+    /^delivery-manifest-.*\.json$/u,
+    "artifacts",
+  );
+  const releasePacket = findLatestRunDocument(
+    options.init,
+    runId,
+    "release-packet",
+    /^release-packet-.*\.json$/u,
+    "artifacts",
+  );
+  const learningScorecard = findLatestRunDocument(
+    options.init,
+    runId,
+    "learning-loop-scorecard",
+    /^learning-loop-scorecard-.*\.json$/u,
+    "reports",
+  );
+  const learningHandoff = findLatestRunDocument(
+    options.init,
+    runId,
+    "learning-loop-handoff",
+    /^learning-loop-handoff-.*\.json$/u,
+    "reports",
+  );
+
+  const decision = asString(reviewDecision?.document.decision);
+  const deliveryGate = asRecord(reviewDecision?.document.delivery_gate);
+  const deliveryGateStatus = asString(deliveryGate.status);
+  const blocksDownstream = deliveryGate.blocks_downstream === true;
+  const approved =
+    decision === "approve" &&
+    deliveryGateStatus === "pass" &&
+    blocksDownstream !== true;
+  const reviewStatus = !reviewReport && !runtimeHarnessReport
+    ? "missing"
+    : !reviewDecision
+      ? "decision-required"
+      : approved
+        ? "approved"
+        : decision === "hold"
+          ? "held"
+          : decision === "request-repair"
+            ? "repair-requested"
+            : "blocked";
+  const deliveryPlanStatus = asString(deliveryPlan?.document.status);
+  const releasePacketStatus = asString(releasePacket?.document.status);
+  const deliveryPlanBlockers = asStringArray(deliveryPlan?.document.blocking_reasons);
+  const releaseRisks = asStringArray(releasePacket?.document.residual_risks);
+  const reviewRequiredReason = approved ? [] : ["approved-review-decision-required"];
+  const deliveryBlockedReasons = uniqueStrings([...reviewRequiredReason, ...deliveryPlanBlockers, ...releaseRisks]);
+  const deliveryStatus = !approved
+    ? "blocked-review-required"
+    : deliveryPlanStatus === "blocked" || releasePacketStatus === "blocked" || deliveryPlanBlockers.length > 0 || releaseRisks.length > 0
+      ? "blocked"
+      : releasePacket && isDeliveryReadyStatus(releasePacketStatus)
+        ? "release-ready"
+        : deliveryManifest
+          ? "delivery-prepared"
+          : deliveryPlan
+            ? isDeliveryReadyStatus(deliveryPlanStatus)
+              ? "delivery-plan-ready"
+              : "delivery-plan-pending"
+            : "ready-to-prepare";
+  const repoDeliveries = Array.isArray(deliveryManifest?.document.repo_deliveries)
+    ? deliveryManifest.document.repo_deliveries
+    : [];
+  const writebackResult = repoDeliveries
+    .map((entry) => asString(asRecord(entry).writeback_result))
+    .find((entry) => entry !== null) ?? null;
+  const learningStatus = learningHandoff
+    ? "handoff-complete"
+    : releasePacket && isDeliveryReadyStatus(releasePacketStatus)
+      ? "ready-for-handoff"
+      : "waiting-for-release";
+  const evidenceChain = uniqueStrings([
+    options.runEvidenceRef ?? null,
+    reviewReport?.artifact_ref,
+    runtimeHarnessReport?.artifact_ref,
+    reviewDecision?.artifact_ref,
+    deliveryPlan?.artifact_ref,
+    deliveryManifest?.artifact_ref,
+    releasePacket?.artifact_ref,
+    learningScorecard?.artifact_ref,
+    learningHandoff?.artifact_ref,
+    ...collectDocumentEvidenceRefs(reviewReport?.document ?? {}),
+    ...collectDocumentEvidenceRefs(runtimeHarnessReport?.document ?? {}),
+    ...collectDocumentEvidenceRefs(reviewDecision?.document ?? {}),
+    ...collectDocumentEvidenceRefs(deliveryPlan?.document ?? {}),
+    ...collectDocumentEvidenceRefs(deliveryManifest?.document ?? {}),
+    ...collectDocumentEvidenceRefs(releasePacket?.document ?? {}),
+    ...collectDocumentEvidenceRefs(learningScorecard?.document ?? {}),
+    ...collectDocumentEvidenceRefs(learningHandoff?.document ?? {}),
+  ]);
+
+  return {
+    run_id: runId,
+    review: {
+      status: reviewStatus,
+      review_report_ref: reviewReport?.artifact_ref ?? null,
+      runtime_harness_report_ref: runtimeHarnessReport?.artifact_ref ?? null,
+      decision_ref: reviewDecision?.artifact_ref ?? null,
+      decision: decision ?? null,
+      delivery_gate_status: deliveryGateStatus,
+      blocks_downstream: blocksDownstream || !approved,
+      required_evidence_refs: uniqueStrings([
+        reviewReport?.artifact_ref,
+        runtimeHarnessReport?.artifact_ref,
+        reviewDecision?.artifact_ref,
+      ]),
+    },
+    delivery: {
+      status: deliveryStatus,
+      delivery_plan_ref: deliveryPlan?.artifact_ref ?? null,
+      delivery_manifest_ref: deliveryManifest?.artifact_ref ?? null,
+      release_packet_ref: releasePacket?.artifact_ref ?? null,
+      release_packet_status: releasePacketStatus,
+      writeback_result: writebackResult,
+      blocked_reasons: deliveryBlockedReasons,
+      requires_review_decision: true,
+    },
+    learning: {
+      status: learningStatus,
+      scorecard_ref: learningScorecard?.artifact_ref ?? null,
+      handoff_ref: learningHandoff?.artifact_ref ?? null,
+      linked_evidence_refs: uniqueStrings([
+        learningScorecard?.artifact_ref,
+        learningHandoff?.artifact_ref,
+        ...asStringArray(learningScorecard?.document.evidence_refs),
+        ...asStringArray(learningHandoff?.document.evidence_refs),
+      ]),
+    },
+    evidence_chain: evidenceChain,
+  };
+}
+
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   runId: string,
+ *   closureState: Record<string, unknown>,
+ *   evidenceRefs: string[],
+ *   missionState: Record<string, unknown>,
+ * }} options
+ * @returns {{ status: string, stage: string, primaryAction: Record<string, unknown>, blockers: Array<Record<string, unknown>> }}
+ */
+function resolveClosureAction(options) {
+  const review = asRecord(options.closureState.review);
+  const delivery = asRecord(options.closureState.delivery);
+  const learning = asRecord(options.closureState.learning);
+  const reviewStatus = asString(review.status);
+  const deliveryStatus = asString(delivery.status);
+  const learningStatus = asString(learning.status);
+  const evidenceRefs = uniqueStrings([...options.evidenceRefs, ...asStringArray(options.closureState.evidence_chain)]);
+
+  if (reviewStatus === "missing") {
+    return {
+      status: "ready",
+      stage: "review",
+      blockers: [],
+      primaryAction: {
+        action_id: "review-run",
+        command: `${projectCommand("review run", options.projectRoot)} --run-id ${shellQuote(options.runId)}`,
+        reason: "Execution evidence exists; run review and Runtime Harness checks before any delivery-capable action.",
+        low_level_command: "review run",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (reviewStatus === "decision-required") {
+    return {
+      status: "ready",
+      stage: "review",
+      blockers: [],
+      primaryAction: {
+        action_id: "review-decide",
+        command: `${projectCommand("review decide", options.projectRoot)} --run-id ${shellQuote(options.runId)} --decision approve`,
+        reason: "Review and Runtime Harness evidence exist; the operator must approve, hold, or request repair before delivery.",
+        low_level_command: "review decide",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (reviewStatus === "held") {
+    const nextCommand = `${projectCommand("review decide", options.projectRoot)} --run-id ${shellQuote(options.runId)} --decision approve`;
+    return {
+      status: "blocked",
+      stage: "review",
+      blockers: [
+        createBlocker({
+          projectRoot: options.projectRoot,
+          code: "review-held",
+          summary: "Latest review decision is hold; delivery and release stay blocked until the operator records an approved decision.",
+          evidenceRefs: asStringArray(review.required_evidence_refs),
+          nextCommand,
+        }),
+      ],
+      primaryAction: {
+        action_id: "resolve-review-hold",
+        command: nextCommand,
+        reason: "A hold decision intentionally blocks downstream delivery and release preparation.",
+        low_level_command: "review decide",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (reviewStatus === "repair-requested") {
+    const nextCommand = `${projectCommand("run start", options.projectRoot)} --run-id ${shellQuote(`${options.runId}.repair`)} --target-step implement`;
+    return {
+      status: "blocked",
+      stage: "review",
+      blockers: [
+        createBlocker({
+          projectRoot: options.projectRoot,
+          code: "review-repair-requested",
+          summary: "Latest review decision requests repair; delivery and release must wait for repaired execution evidence.",
+          evidenceRefs: asStringArray(review.required_evidence_refs),
+          nextCommand,
+        }),
+      ],
+      primaryAction: {
+        action_id: "run-review-repair",
+        command: nextCommand,
+        reason: "Repair was requested before delivery can proceed.",
+        low_level_command: "run start",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (reviewStatus !== "approved") {
+    const nextCommand = `${projectCommand("review decide", options.projectRoot)} --run-id ${shellQuote(options.runId)} --decision request-repair`;
+    return {
+      status: "blocked",
+      stage: "review",
+      blockers: [
+        createBlocker({
+          projectRoot: options.projectRoot,
+          code: "review-approval-blocked",
+          summary: "Review decision evidence is present but does not pass the downstream delivery gate.",
+          evidenceRefs: asStringArray(review.required_evidence_refs),
+          nextCommand,
+        }),
+      ],
+      primaryAction: {
+        action_id: "repair-review-gate",
+        command: nextCommand,
+        reason: "Downstream delivery is blocked until the review decision gate passes.",
+        low_level_command: "review decide",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (deliveryStatus === "blocked") {
+    const nextCommand = `${projectCommand("deliver prepare", options.projectRoot)} --run-id ${shellQuote(options.runId)} --require-review-decision`;
+    return {
+      status: "blocked",
+      stage: "delivery",
+      blockers: asStringArray(delivery.blocked_reasons).map((reason) =>
+        createBlocker({
+          projectRoot: options.projectRoot,
+          code: reason,
+          summary: `Delivery or release preparation is blocked: ${reason}.`,
+          evidenceRefs,
+          nextCommand,
+        }),
+      ),
+      primaryAction: {
+        action_id: "fix-delivery-blockers",
+        command: nextCommand,
+        reason: "Delivery evidence exists but its safety gates are not ready.",
+        low_level_command: "deliver prepare",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (deliveryStatus === "ready-to-prepare" || deliveryStatus === "delivery-plan-pending") {
+    return {
+      status: "ready",
+      stage: "delivery",
+      blockers: [],
+      primaryAction: {
+        action_id: "delivery-prepare",
+        command: `${projectCommand("deliver prepare", options.projectRoot)} --run-id ${shellQuote(options.runId)} --require-review-decision`,
+        reason: "Approved review evidence exists; prepare delivery while enforcing the review decision gate.",
+        low_level_command: "deliver prepare",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (deliveryStatus === "delivery-plan-ready" || deliveryStatus === "delivery-prepared") {
+    return {
+      status: "ready",
+      stage: "release",
+      blockers: [],
+      primaryAction: {
+        action_id: "release-prepare",
+        command: `${projectCommand("release prepare", options.projectRoot)} --run-id ${shellQuote(options.runId)} --require-review-decision`,
+        reason: "Delivery evidence is prepared; generate release readiness evidence with the same approval gate.",
+        low_level_command: "release prepare",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (learningStatus !== "handoff-complete") {
+    return {
+      status: "ready",
+      stage: "learning",
+      blockers: [],
+      primaryAction: {
+        action_id: "learning-handoff",
+        command: `${projectCommand("learning handoff", options.projectRoot)} --run-id ${shellQuote(options.runId)}`,
+        reason: "Release-ready evidence exists; close the run with a learning scorecard and handoff chain.",
+        low_level_command: "learning handoff",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  return {
+    status: "ready",
+    stage: "learning",
+    blockers: [],
+    primaryAction: {
+      action_id: "closure-complete",
+      command: `${projectCommand("evidence show", options.projectRoot)} --run-id ${shellQuote(options.runId)}`,
+      reason: "Review, delivery, release, and learning evidence are linked; inspect the closure evidence chain.",
+      low_level_command: "evidence show",
+      evidence_refs: evidenceRefs,
+    },
+  };
 }
 
 /**
@@ -223,11 +788,13 @@ export function resolveNextAction(options = {}) {
     allowed_paths: [],
     forbidden_paths: [],
   };
+  let closureState = buildClosureState({ init, runId: null });
 
   const activeRun = findActiveRun(init);
   if (activeRun) {
     const runId = asString(activeRun.state.run_id) ?? "current";
     const activeRunRef = toEvidenceRef(projectRoot, activeRun.stateFile);
+    closureState = buildClosureState({ init, runId, runEvidenceRef: activeRunRef });
     status = "ready";
     stage = "run-active";
     primaryAction = {
@@ -318,7 +885,25 @@ export function resolveNextAction(options = {}) {
           };
         } else {
           const discoveryReport = findDiscoveryReport(init);
-          if (discoveryReport) {
+          const runEvidence = findLatestRunEvidence(init);
+          if (runEvidence) {
+            closureState = buildClosureState({
+              init,
+              runId: runEvidence.runId,
+              runEvidenceRef: runEvidence.evidenceRef,
+            });
+            const closureAction = resolveClosureAction({
+              projectRoot,
+              runId: runEvidence.runId,
+              closureState,
+              evidenceRefs,
+              missionState,
+            });
+            status = closureAction.status;
+            stage = closureAction.stage;
+            primaryAction = closureAction.primaryAction;
+            blockers = closureAction.blockers;
+          } else if (discoveryReport) {
             const discoveryRef = toEvidenceRef(projectRoot, discoveryReport);
             stage = "spec-build";
             primaryAction = {
@@ -360,6 +945,7 @@ export function resolveNextAction(options = {}) {
       active_run_ref: activeRun ? toEvidenceRef(projectRoot, activeRun.stateFile) : null,
     },
     mission_state: missionState,
+    closure_state: closureState,
     primary_action: primaryAction,
     blockers,
     bounded_execution: {
