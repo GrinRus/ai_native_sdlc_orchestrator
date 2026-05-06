@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
+import { materializeCompilerRevisionStatus } from "../../../packages/orchestrator-core/src/compiler-revision.mjs";
 import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 import { applyRunControlAction, appendRunEvent, createControlPlaneHttpServer } from "../src/index.mjs";
 
@@ -157,6 +158,16 @@ test("detached control-plane transport serves read baseline endpoints", async ()
         "frontend=validation://repos/frontend/profile-entry",
       ],
     });
+    materializeCompilerRevisionStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      compilerRevisionRef: "compiler-revision://runtime-context-compiler@v1",
+      action: "promote",
+      promotionDecisionRef: "evidence://.aor/projects/http/artifacts/promotion-decision-compiler-v1.json",
+      compiledContextRefs: ["compiled-context://compiled-context.http.implement.runtime-context-compiler"],
+      evaluationRefs: ["evidence://.aor/projects/http/reports/evaluation-report-runtime-context-compiler.json"],
+      compatibilityStatus: "compatible",
+    });
 
     const transport = await createControlPlaneHttpServer({
       projectRef: repoRoot,
@@ -228,6 +239,14 @@ test("detached control-plane transport serves read baseline endpoints", async ()
       const multirepoStatuses = await multirepoResponse.json();
       assert.equal(Array.isArray(multirepoStatuses), true);
       assert.ok(multirepoStatuses.some((entry) => entry.family === "multirepo-coordination-status"));
+
+      const compilerRevisionResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/compiler-revisions`,
+      );
+      assert.equal(compilerRevisionResponse.status, 200);
+      const compilerRevisionStatuses = await compilerRevisionResponse.json();
+      assert.equal(Array.isArray(compilerRevisionStatuses), true);
+      assert.ok(compilerRevisionStatuses.some((entry) => entry.family === "compiler-revision-status"));
     } finally {
       await transport.close();
     }

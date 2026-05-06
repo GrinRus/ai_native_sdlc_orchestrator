@@ -19,6 +19,7 @@ export type ContractFamily =
   | "live-e2e-observation-report"
   | "multirepo-coordination-status"
   | "planner-metrics-snapshot"
+  | "compiler-revision-status"
   | "dataset"
   | "evaluation-suite"
   | "promotion-decision"

@@ -18,6 +18,7 @@ const REVIEW_REPORT_REGEX = /^review-report.*\.json$/;
 const REVIEW_DECISION_REGEX = /^review-decision-.*\.json$/;
 const RUNTIME_HARNESS_REPORT_REGEX = /^runtime-harness-report.*\.json$/;
 const MULTIREPO_COORDINATION_STATUS_REGEX = /^multirepo-coordination-status-.*\.json$/;
+const COMPILER_REVISION_STATUS_REGEX = /^compiler-revision-status-.*\.json$/;
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
 const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/;
 const LEARNING_LOOP_SCORECARD_REGEX = /^learning-loop-scorecard-.*\.json$/;
@@ -248,6 +249,12 @@ export function listQualityArtifacts(options = {}) {
       family: "multirepo-coordination-status",
       matcher: MULTIREPO_COORDINATION_STATUS_REGEX,
     }),
+    ...loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "compiler-revision-status",
+      matcher: COMPILER_REVISION_STATUS_REGEX,
+    }),
     ...loadContractDocuments({ init, files: reportFiles, family: "incident-report", matcher: INCIDENT_REPORT_REGEX }),
     ...loadContractDocuments({
       init,
@@ -287,6 +294,25 @@ export function listMultirepoCoordinationStatuses(options = {}) {
     files: reportFiles,
     family: "multirepo-coordination-status",
     matcher: MULTIREPO_COORDINATION_STATUS_REGEX,
+  });
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ */
+export function listCompilerRevisionStatuses(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  return loadContractDocuments({
+    init,
+    files: reportFiles,
+    family: "compiler-revision-status",
+    matcher: COMPILER_REVISION_STATUS_REGEX,
   });
 }
 

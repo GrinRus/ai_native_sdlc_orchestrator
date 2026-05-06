@@ -90,6 +90,16 @@ const ROUTES = Object.freeze([
     kind: "read",
   },
   {
+    id: "compiler-revisions",
+    pattern: /^\/api\/projects\/([^/]+)\/compiler-revisions$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Compiler-revision route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
     id: "runs",
     pattern: /^\/api\/projects\/([^/]+)\/runs$/u,
     method: "GET",

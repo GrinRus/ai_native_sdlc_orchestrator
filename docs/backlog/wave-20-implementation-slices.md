@@ -115,7 +115,7 @@ Close the production and platform maturity gaps that remain after the W19 story-
 
 ## W20-S04 — Compiler revision asset lifecycle
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add compiler revisions as a first-class platform asset with certification, promotion, freeze, and audit evidence.
 - **Primary modules:** `docs/contracts/**`, `packages/harness`, `packages/orchestrator-core`, `apps/cli`, `apps/api`
 - **Hard dependencies:** W19-S01, W8-S09

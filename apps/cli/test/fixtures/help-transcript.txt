@@ -10,6 +10,7 @@ Implemented commands:
   - aor harness certify
   - aor asset promote
   - aor asset freeze
+  - aor compiler revision
   - aor handoff prepare
   - aor handoff approve
   - aor intake create

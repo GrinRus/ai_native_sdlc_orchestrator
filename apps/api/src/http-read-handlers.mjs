@@ -1,5 +1,6 @@
 import { readQueryInteger, sendJson } from "./http-utils.mjs";
 import {
+  listCompilerRevisionStatuses,
   listDeliveryManifests,
   listMultirepoCoordinationStatuses,
   listPacketArtifacts,
@@ -51,6 +52,9 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
       return;
     case "multirepo-coordination":
       sendJson(response, 200, listMultirepoCoordinationStatuses(runtimeOptions));
+      return;
+    case "compiler-revisions":
+      sendJson(response, 200, listCompilerRevisionStatuses(runtimeOptions));
       return;
     case "runs":
       sendJson(response, 200, listRuns(runtimeOptions));

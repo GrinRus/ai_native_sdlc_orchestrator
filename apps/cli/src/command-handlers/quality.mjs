@@ -4,6 +4,7 @@ import {
   appendRunEvent,
   attachUiLifecycle,
   detachUiLifecycle,
+  listCompilerRevisionStatuses,
   listDeliveryManifests,
   listReviewDecisions,
   listPacketArtifacts,
@@ -23,6 +24,7 @@ import {
   approveHandoffArtifacts,
   prepareHandoffArtifacts,
   certifyAssetPromotion,
+  materializeCompilerRevisionStatus,
   runDeliveryDriver,
   materializeDeliveryPlan,
   normalizeDeliveryMode,
@@ -78,6 +80,7 @@ export const QUALITY_COMMANDS = Object.freeze([
   "harness replay",
   "asset promote",
   "asset freeze",
+  "compiler revision",
   "harness certify",
   "review run",
   "review decide",
@@ -88,6 +91,37 @@ export const QUALITY_COMMAND_GROUP = Object.freeze({
   group_id: "quality",
   commands: QUALITY_COMMANDS,
 });
+
+/**
+ * @param {Record<string, unknown>} outputState
+ * @param {unknown} compilerRevisionStatus
+ */
+function assignCompilerRevisionOutput(outputState, compilerRevisionStatus) {
+  if (
+    typeof compilerRevisionStatus !== "object" ||
+    compilerRevisionStatus === null ||
+    !("report" in compilerRevisionStatus)
+  ) {
+    return;
+  }
+  const result = /** @type {{ report?: Record<string, unknown>, statusPath?: string, statusRef?: string, blocking?: boolean }} */ (
+    compilerRevisionStatus
+  );
+  const report = result.report;
+  if (!report) {
+    return;
+  }
+  outputState.compilerRevisionStatusId = report.status_id;
+  outputState.compilerRevisionStatusFile = result.statusPath ?? null;
+  outputState.compilerRevisionStatusRef = result.statusRef ?? null;
+  outputState.compilerRevisionRef = report.compiler_revision_ref;
+  outputState.compilerRevisionLifecycleState = report.lifecycle_state;
+  outputState.compilerRevisionStatus = report.status;
+  outputState.compilerRevisionBlocking = result.blocking ?? false;
+  outputState.compilerRevisionBlockingReasons = report.blocking_reasons;
+  outputState.compilerRevisionCompatibility = report.compatibility;
+  outputState.compilerRevisionDecisionHistory = report.decision_history;
+}
 
 /**
  * @param {{ command: string, flags: Record<string, string | string[] | true>, cwd: string, outputState: Record<string, unknown> }} context
@@ -177,6 +211,7 @@ export function handleQualityCommand(context) {
     outputState.certificationEvaluationReportFile = promoteResult.evaluationReportPath;
     outputState.certificationHarnessCaptureFile = promoteResult.harnessCapturePath;
     outputState.certificationHarnessReplayFile = promoteResult.harnessReplayPath;
+    assignCompilerRevisionOutput(outputState, promoteResult.compilerRevisionStatus);
   } else if (command === "asset freeze") {
     ensureRequiredFlags(command, flags);
 
@@ -210,6 +245,62 @@ export function handleQualityCommand(context) {
     outputState.certificationEvaluationReportFile = freezeResult.evaluationReportPath;
     outputState.certificationHarnessCaptureFile = freezeResult.harnessCapturePath;
     outputState.certificationHarnessReplayFile = freezeResult.harnessReplayPath;
+    assignCompilerRevisionOutput(outputState, freezeResult.compilerRevisionStatus);
+  } else if (command === "compiler revision") {
+    ensureRequiredFlags(command, flags);
+    const action = /** @type {"inspect" | "promote" | "freeze" | "demote" | undefined} */ (
+      resolveOptionalStringFlag("action", flags.action)
+    );
+
+    const statusResult = materializeCompilerRevisionStatus({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      compilerRevisionRef: /** @type {string} */ (
+        resolveOptionalStringFlag("compiler-revision-ref", flags["compiler-revision-ref"])
+      ),
+      action,
+      promotionDecisionRef: resolveOptionalStringFlag("promotion-decision-ref", flags["promotion-decision-ref"]),
+      compiledContextRefs: resolveOptionalCsvFlag("compiled-context-refs", flags["compiled-context-refs"]),
+      evaluationRefs: resolveOptionalCsvFlag("evaluation-refs", flags["evaluation-refs"]),
+      incidentRefs: resolveOptionalCsvFlag("incident-refs", flags["incident-refs"]),
+      certificationEvidenceRefs: resolveOptionalCsvFlag(
+        "certification-evidence-refs",
+        flags["certification-evidence-refs"],
+      ),
+      compatibilityStatus: /** @type {"compatible" | "incompatible" | "unknown" | undefined} */ (
+        resolveOptionalStringFlag("compatibility-status", flags["compatibility-status"])
+      ),
+    });
+
+    outputState.resolvedProjectRef = statusResult.projectRoot;
+    outputState.resolvedRuntimeRoot = statusResult.runtimeRoot;
+    outputState.runtimeLayout = statusResult.runtimeLayout;
+    outputState.runtimeStateFile = statusResult.stateFile;
+    outputState.projectProfileRef = statusResult.projectProfileRef;
+    outputState.compilerRevisionStatusId = statusResult.report.status_id;
+    outputState.compilerRevisionStatusFile = statusResult.statusPath;
+    outputState.compilerRevisionStatusRef = statusResult.statusRef;
+    outputState.compilerRevisionRef = statusResult.report.compiler_revision_ref;
+    outputState.compilerRevisionLifecycleState = statusResult.report.lifecycle_state;
+    outputState.compilerRevisionStatus = statusResult.report.status;
+    outputState.compilerRevisionBlocking = statusResult.blocking;
+    outputState.compilerRevisionBlockingReasons = statusResult.report.blocking_reasons;
+    outputState.compilerRevisionCompatibility = statusResult.report.compatibility;
+    outputState.compilerRevisionDecisionHistory = statusResult.report.decision_history;
+    outputState.compilerRevisionRecords = listCompilerRevisionStatuses({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    outputState.readOnly = (action ?? "inspect") === "inspect";
+    outputState.futureControlHooks = [
+      `asset promote --asset-ref ${statusResult.report.compiler_revision_ref} --subject-ref ${statusResult.report.compiler_revision_ref}`,
+      `compiler revision --compiler-revision-ref ${statusResult.report.compiler_revision_ref} --action freeze --promotion-decision-ref <evidence://...>`,
+      `evidence show --project-ref ${statusResult.projectRoot}`,
+    ];
   } else if (command === "harness certify") {
     ensureRequiredFlags(command, flags);
 
@@ -237,6 +328,7 @@ export function handleQualityCommand(context) {
     outputState.certificationEvaluationReportFile = certifyResult.evaluationReportPath;
     outputState.certificationHarnessCaptureFile = certifyResult.harnessCapturePath;
     outputState.certificationHarnessReplayFile = certifyResult.harnessReplayPath;
+    assignCompilerRevisionOutput(outputState, certifyResult.compilerRevisionStatus);
 
   } else if (command === "review run") {
     ensureRequiredFlags(command, flags);

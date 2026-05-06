@@ -18,6 +18,8 @@ const INCIDENT_BACKFILL_PROPOSAL_STATE_VALUES = ["proposed", "approved", "reject
 const REVIEW_DECISION_VALUES = ["approve", "hold", "request-repair"];
 const PLANNER_METRICS_STATUS_VALUES = ["no-data", "partial", "ready"];
 const MULTIREPO_COORDINATION_STATUS_VALUES = ["ready", "blocked", "released"];
+const COMPILER_REVISION_LIFECYCLE_VALUES = ["draft", "candidate", "stable", "frozen", "demoted", "blocked"];
+const COMPILER_REVISION_STATUS_VALUES = ["ready", "blocked"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
 export const LIVE_E2E_OBSERVATION_STATUS_VALUES = ["pass", "warn", "not_pass"];
@@ -1053,6 +1055,43 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     enumChecks: [{ field: "status", allowedValues: PLANNER_METRICS_STATUS_VALUES }],
   },
   {
+    family: "compiler-revision-status",
+    familyGroup: "operations",
+    sourceContract: "docs/contracts/compiler-revision-status.md",
+    exampleGlob: "examples/reports/compiler-revision-status*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "status_id",
+      "project_id",
+      "compiler_revision_ref",
+      "compiler_revision",
+      "lifecycle_state",
+      "compatibility",
+      "decision_history",
+      "evidence_links",
+      "status",
+      "blocking_reasons",
+      "created_at",
+    ],
+    fieldTypes: {
+      status_id: "string",
+      project_id: "string",
+      compiler_revision_ref: "string",
+      compiler_revision: "object",
+      lifecycle_state: "string",
+      compatibility: "object",
+      decision_history: "array",
+      evidence_links: "object",
+      status: "string",
+      blocking_reasons: "array",
+      created_at: "string",
+    },
+    enumChecks: [
+      { field: "lifecycle_state", allowedValues: COMPILER_REVISION_LIFECYCLE_VALUES },
+      { field: "status", allowedValues: COMPILER_REVISION_STATUS_VALUES },
+    ],
+  },
+  {
     family: "learning-loop-scorecard",
     familyGroup: "operations",
     sourceContract: "docs/contracts/learning-loop-scorecard.md",
@@ -1249,6 +1288,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/reports\/discovery-research-report[^/]*\.ya?ml$/, family: "discovery-research-report" },
   { regex: /^examples\/reports\/incident-backfill-proposal[^/]*\.ya?ml$/, family: "incident-backfill-proposal" },
   { regex: /^examples\/reports\/planner-metrics-snapshot[^/]*\.ya?ml$/, family: "planner-metrics-snapshot" },
+  { regex: /^examples\/reports\/compiler-revision-status[^/]*\.ya?ml$/, family: "compiler-revision-status" },
   { regex: /^examples\/packets\/delivery-plan-[^/]+\.ya?ml$/, family: "delivery-plan" },
   { regex: /^examples\/packets\/intake-request-body[^/]*\.ya?ml$/, family: "intake-request-body" },
   { regex: /^examples\/eval\/dataset-[^/]+\.ya?ml$/, family: "dataset" },

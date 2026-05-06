@@ -105,6 +105,8 @@ export function formatCommandHelp(definition) {
         ? "Status: implemented in quality shell (W9-S05)"
       : definition.command === "asset promote" || definition.command === "asset freeze"
         ? "Status: implemented in quality shell (W9-S06)"
+      : definition.command === "compiler revision"
+        ? "Status: implemented in compiler revision shell (W20-S04)"
       : definition.command === "harness certify"
         ? "Status: implemented in quality shell (W3-S05)"
       : definition.command === "intake create" ||
@@ -222,6 +224,15 @@ export function formatCommandHelp(definition) {
             "- Freeze uses the same certification evidence bar (validation, eval, harness capture/replay).",
             "- Without regression evidence, freeze remains hold with explicit guardrail rationale.",
             "- With regression evidence, rollout_decision.action can become freeze even when final decision status is fail.",
+            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+          ]
+      : definition.command === "compiler revision"
+        ? [
+            "- Inspect writes a read-only status snapshot for one compiler revision and includes prior decision history.",
+            "- Promote, freeze, and demote require --promotion-decision-ref to report ready; otherwise the status is blocked with promotion-decision-required.",
+            "- --compiled-context-refs, --evaluation-refs, --incident-refs, and --certification-evidence-refs preserve lifecycle lineage for audit and API reads.",
+            "- --compatibility-status=incompatible blocks the revision and keeps the lifecycle state blocked.",
+            "- Use asset promote/freeze with a compiler-revision:// asset ref to produce certification evidence plus this status report in one flow.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
           ]
       : definition.command === "handoff prepare"

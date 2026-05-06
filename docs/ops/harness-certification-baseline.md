@@ -32,6 +32,16 @@ aor asset freeze \
   --suite-ref suite.cert.core@v4
 ```
 
+Compiler revision lifecycle surface:
+```bash
+aor compiler revision \
+  --project-ref <PROJECT_ROOT> \
+  --compiler-revision-ref compiler-revision://runtime-context-compiler@v1 \
+  --action inspect
+```
+
+`aor asset promote` and `aor asset freeze` can use a `compiler-revision://...` asset ref to produce both a `promotion-decision` and a linked `compiler-revision-status` report. Direct `aor compiler revision --action promote|freeze|demote` requires an existing `--promotion-decision-ref`; without that evidence it writes a blocked status rather than claiming lifecycle readiness.
+
 ## Expected output fields
 - `promotion_decision_id`
 - `promotion_decision_file`
@@ -44,6 +54,7 @@ aor asset freeze \
 - `certification_evaluation_report_file`
 - `certification_harness_capture_file`
 - `certification_harness_replay_file`
+- `compiler_revision_status_file` and `compiler_revision_decision_history` when the certified asset is a compiler revision
 - `baseline_comparison.*` for stable/frozen/demoted transitions
 
 ## Certification transcripts (examples)

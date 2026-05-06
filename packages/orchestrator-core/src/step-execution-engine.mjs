@@ -799,7 +799,7 @@ export function executeRoutedStep(options) {
           context_hash: `sha256:${String(compiled.context_compilation.compiled_context_fingerprint ?? "")}`,
         },
         provenance: {
-          compiler_revision_ref: "compiler://runtime-context-compiler@v1",
+          compiler_revision_ref: "compiler-revision://runtime-context-compiler@v1",
           project_profile_ref: init.projectProfilePath,
           route_profile_ref: asRecord(routeResolution).resolved_route_id ?? null,
           wrapper_profile_ref: asRecord(asRecord(assetResolution).wrapper).wrapper_ref ?? null,

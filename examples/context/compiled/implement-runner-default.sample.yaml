@@ -17,5 +17,5 @@ hashes:
   prompt_hash: sha256:prompt-runner-default-sample
   context_hash: sha256:context-runner-default-sample
 provenance:
-  compiler_revision_ref: compiler://runtime-context-foundation@draft
+  compiler_revision_ref: compiler-revision://runtime-context-foundation@v1
   project_profile_ref: examples/project.aor.yaml

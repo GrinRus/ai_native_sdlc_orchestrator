@@ -9,6 +9,7 @@ export {
   attachUiLifecycle,
   detachUiLifecycle,
   listDeliveryManifests,
+  listCompilerRevisionStatuses,
   listMultirepoCoordinationStatuses,
   listPacketArtifacts,
   listPromotionDecisions,
@@ -34,6 +35,10 @@ export {
   prepareHandoffArtifacts,
 } from "../../../packages/orchestrator-core/src/handoff-packets.mjs";
 export { certifyAssetPromotion } from "../../../packages/orchestrator-core/src/certification-decision.mjs";
+export {
+  materializeCompilerRevisionStatus,
+  parseCompilerRevisionRef,
+} from "../../../packages/orchestrator-core/src/compiler-revision.mjs";
 export { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
 export {
   materializeDeliveryPlan,

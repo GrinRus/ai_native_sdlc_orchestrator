@@ -11,7 +11,7 @@ Current code is **hybrid module + detached transport**:
 - Contract and artifact semantics stay aligned across both bindings.
 
 Implemented operation families:
-- read: project state, packets, step results, manifests, promotion decisions, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics;
+- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
 - live events: append/read/open stream using the `live-run-event` contract family.
@@ -80,6 +80,7 @@ Project bootstrap baseline:
 - review reports, review decisions, and learning-loop closure artifacts
 - delivery manifests and release packets
 - incidents and promotion decisions
+- compiler revision status reports
 - planner metric snapshots
 
 ## Connected lifecycle mutations (W18 baseline)
@@ -123,6 +124,7 @@ Run-level read baseline:
 - run event history remains bounded and replay-safe;
 - run policy history remains evidence-derived from `step-result` and `delivery-plan` outputs.
 - `strategic_snapshot.planner_metrics` and `GET /api/projects/:projectId/planner-metrics` expose one `planner-metrics-snapshot` read model with `clean_close_rate`, `retry_rate`, `repair_rate`, and `blocker_rate`.
+- `GET /api/projects/:projectId/compiler-revisions` returns contract-backed `compiler-revision-status` reports so compiler lifecycle, compatibility, decision history, incidents, and evaluation lineage are queryable without opening raw files.
 - Empty projects must return `status=no-data`, `no_data=true`, and `value=null` per metric rather than claiming a zero success or failure rate.
 - Planner metrics derive only from durable run, review, Runtime Harness, incident, and run-control audit artifacts; they do not mutate scheduler state.
 
@@ -298,6 +300,7 @@ Connected-mode transport mapping is implemented for read, follow, and bounded mu
 - `GET /api/projects/:projectId/quality-artifacts`
 - `GET /api/projects/:projectId/delivery-manifests`
 - `GET /api/projects/:projectId/promotion-decisions`
+- `GET /api/projects/:projectId/compiler-revisions`
 - `GET /api/projects/:projectId/runs`
 - `GET /api/projects/:projectId/runs/:runId/events/history`
 - `GET /api/projects/:projectId/runs/:runId/policy-history`

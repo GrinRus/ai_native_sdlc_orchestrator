@@ -23,6 +23,10 @@ read_operations:
     operation_family: read
     output_contract_families:
       - multirepo-coordination-status
+  - operation_id: read.compiler-revisions
+    operation_family: read
+    output_contract_families:
+      - compiler-revision-status
 
 run_control_operations:
   - operation_id: run.start
@@ -152,6 +156,7 @@ deferred_transport:
     - GET /api/projects/:projectId/quality-artifacts
     - GET /api/projects/:projectId/delivery-manifests
     - GET /api/projects/:projectId/promotion-decisions
+    - GET /api/projects/:projectId/compiler-revisions
     - GET /api/projects/:projectId/runs
     - GET /api/projects/:projectId/runs/:runId/events/history
     - GET /api/projects/:projectId/runs/:runId/policy-history

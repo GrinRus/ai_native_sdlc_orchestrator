@@ -62,7 +62,7 @@ Coverage status values:
 | AIP-02 | AI platform owner | MVP | Manage context docs, rules, skills, and bundles. | covered | context assets, compiled context, W8-S08, W8-S09 | none |
 | AIP-03 | AI platform owner | MVP | Manage wrappers, routes, and policies. | covered | route, wrapper, and policy registries, W2 | none |
 | AIP-04 | AI platform owner | MVP | Manage adapters and capability metadata. | covered | adapter SDK, adapter contracts, W16-S06 | none |
-| AIP-05 | AI platform owner | MVP | Manage compiler revisions as platform assets. | partial | compiled-context runtime foundation | W20-S04 |
+| AIP-05 | AI platform owner | MVP | Manage compiler revisions as platform assets. | covered | `compiler-revision-status`, `aor compiler revision`, certification-linked compiler lifecycle status, API `compiler-revisions`, W20-S04 | none |
 | AIP-06 | AI platform owner | MVP | Run certification before promotion. | covered | `harness certify`, promotion decisions, W3-S05 | none |
 | AIP-07 | AI platform owner | MVP+ | Compare new candidates against stable baselines. | covered | W7-S02 promotion/freeze maturity | none |
 | AIP-08 | AI platform owner | MVP+ | Freeze problematic platform assets. | covered | `asset freeze`, W7-S02 | none |
@@ -94,7 +94,7 @@ Coverage status values:
 | RMO-06 | Repository / multirepo owner | Later | Mature multirepo delivery orchestration and reruns. | covered | W8-S07 rerun maturity plus W20-S01 lock and validation lineage | none |
 | INC-01 | Incident / improvement owner | MVP | Open incident reports from failed runs or releases. | covered | `incident open`, W6-S06 | none |
 | INC-02 | Incident / improvement owner | MVP | Force recertification before re-enabling problematic routes. | covered | `incident recertify`, W7-S03 | none |
-| INC-03 | Incident / improvement owner | MVP | Correlate incidents with routes, assets, wrappers, adapters, or compiler revisions. | partial | incident reports, learning-loop handoffs, and `incident-backfill-proposal` linked asset correlation | W20-S04 |
+| INC-03 | Incident / improvement owner | MVP | Correlate incidents with routes, assets, wrappers, adapters, or compiler revisions. | covered | incident reports, learning-loop handoffs, `incident-backfill-proposal` linked asset correlation, and `compiler-revision-status.evidence_links.incident_refs`, W20-S04 | none |
 | INC-04 | Incident / improvement owner | MVP+ | Use controlled re-enable after recertification. | covered | W7-S03 controlled re-enable flow | none |
 | INC-05 | Incident / improvement owner | MVP+ | Backfill incidents into datasets and suites. | covered | `incident backfill`, `incident-backfill-proposal`, proposal-only mutation policy, W19-S04 | none |
 | INC-06 | Incident / improvement owner | Later | Close the production feedback loop into monitoring and learning. | partial | W8-S06 incident maturity | W20-S05 |

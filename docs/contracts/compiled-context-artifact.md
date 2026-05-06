@@ -25,5 +25,9 @@ Runtime outputs are run/step scoped: `compiled_context_id` and the persisted rep
 
 Compiled context is the prepare-phase artifact for routed adapter-backed steps. Runtime execution must be able to trace adapter invocation back to the prompt bundle, context docs, context rules, context skills, wrapper, policy, packet refs, guardrails, and provenance used to build the request.
 
+`provenance` may include `compiler_revision_ref` when the compiled context was produced by a tracked compiler revision. New artifacts should use `compiler-revision://<revision_id>@vN`; existing `compiler://<revision_id>@vN` refs remain readable and normalize into the compiler revision lifecycle surfaces.
+
+When compiler revision lifecycle evidence exists, `compiler-revision-status` links the revision back to compiled-context refs, certification evidence, evaluation refs, incident refs, and decision history. The compiled-context artifact remains step-scoped; the compiler revision status is the platform-asset lifecycle record.
+
 ## Example
 See `examples/context/compiled/*.yaml`.

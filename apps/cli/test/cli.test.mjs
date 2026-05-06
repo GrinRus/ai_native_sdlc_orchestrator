@@ -1310,6 +1310,67 @@ test("multirepo lock command materializes scoped lock and validation status evid
   });
 });
 
+test("compiler revision command materializes lifecycle status and history reads", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+
+    const promoteResult = invokeCli([
+      "compiler",
+      "revision",
+      "--project-ref",
+      projectRoot,
+      "--compiler-revision-ref",
+      "compiler-revision://runtime-context-compiler@v1",
+      "--action",
+      "promote",
+      "--promotion-decision-ref",
+      "evidence://.aor/projects/cli/artifacts/promotion-decision-compiler-v1.json",
+      "--compiled-context-refs",
+      "compiled-context://compiled-context.cli.implement.runtime-context-compiler",
+      "--evaluation-refs",
+      "evidence://.aor/projects/cli/reports/evaluation-report-runtime-context-compiler.json",
+      "--incident-refs",
+      "incident://INC-COMPILER-CLI-001",
+      "--compatibility-status",
+      "compatible",
+    ]);
+
+    assert.equal(promoteResult.exitCode, 0, promoteResult.stderr);
+    const promotePayload = JSON.parse(promoteResult.stdout);
+    assert.equal(promotePayload.command, "compiler revision");
+    assert.equal(promotePayload.compiler_revision_ref, "compiler-revision://runtime-context-compiler@v1");
+    assert.equal(promotePayload.compiler_revision_lifecycle_state, "stable");
+    assert.equal(promotePayload.compiler_revision_status, "ready");
+    assert.equal(promotePayload.compiler_revision_blocking, false);
+    assert.equal(promotePayload.compiler_revision_compatibility.status, "compatible");
+    assert.equal(fs.existsSync(promotePayload.compiler_revision_status_file), true);
+
+    const inspectResult = invokeCli([
+      "compiler",
+      "revision",
+      "--project-ref",
+      projectRoot,
+      "--compiler-revision-ref",
+      "compiler://runtime-context-compiler@v1",
+    ]);
+    assert.equal(inspectResult.exitCode, 0, inspectResult.stderr);
+    const inspectPayload = JSON.parse(inspectResult.stdout);
+    assert.equal(inspectPayload.read_only, true);
+    assert.equal(inspectPayload.compiler_revision_lifecycle_state, "stable");
+    assert.ok(
+      inspectPayload.compiler_revision_decision_history.some(
+        (entry) => entry.history_kind === "compiler-revision-status",
+      ),
+    );
+    assert.ok(
+      inspectPayload.compiler_revision_records.some(
+        (entry) => entry.family === "compiler-revision-status",
+      ),
+    );
+  });
+});
+
 test("delivery and release surfaces explicit governance deny/escalation reasons for high-risk policy paths", () => {
   withTempProject((projectRoot) => {
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });

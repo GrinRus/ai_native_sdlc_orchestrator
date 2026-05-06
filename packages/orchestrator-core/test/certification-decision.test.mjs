@@ -322,6 +322,40 @@ test("certifyAssetPromotion records context lifecycle comparison and provenance 
   });
 });
 
+test("certifyAssetPromotion materializes compiler revision lifecycle status", () => {
+  withTempRepo((repoRoot) => {
+    const result = certifyAssetPromotion({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      assetRef: "compiler-revision://runtime-context-compiler@v1",
+      subjectRef: "wrapper://wrapper.eval.default@v1",
+      suiteRef: "suite.cert.core@v4",
+      stepClass: "implement",
+      fromChannel: "candidate",
+      toChannel: "stable",
+    });
+
+    assert.equal(result.decision.status, "pass");
+    assert.equal(
+      result.decision.evidence_summary.compiler_revision_lifecycle.compiler_revision_ref,
+      "compiler-revision://runtime-context-compiler@v1",
+    );
+    assert.equal(result.decision.evidence_summary.compiler_revision_lifecycle.lifecycle_state, "stable");
+    assert.equal(result.decision.evidence_summary.compiler_revision_lifecycle.compatibility_status, "compatible");
+    assert.ok(Array.isArray(result.decision.evidence_summary.compiler_revision_lifecycle.compiled_context_refs));
+    assert.ok(result.decision.evidence_summary.compiler_revision_lifecycle.compiled_context_refs.length > 0);
+    assert.ok(result.compilerRevisionStatus);
+    assert.equal(fs.existsSync(result.compilerRevisionStatus.statusPath), true);
+    assert.equal(result.compilerRevisionStatus.report.lifecycle_state, "stable");
+    assert.equal(result.compilerRevisionStatus.report.status, "ready");
+    assert.ok(
+      result.compilerRevisionStatus.report.decision_history.some(
+        (entry) => entry.history_kind === "promotion-decision",
+      ),
+    );
+  });
+});
+
 test("certifyAssetPromotion holds context promotion when target context version is outdated", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });

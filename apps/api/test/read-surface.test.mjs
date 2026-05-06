@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
+import { materializeCompilerRevisionStatus } from "../../../packages/orchestrator-core/src/compiler-revision.mjs";
 import { materializeDeliveryPlan } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
 import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
@@ -13,6 +14,7 @@ import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helper
 import { appendRunEvent, attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../src/index.mjs";
 import {
   listDeliveryManifests,
+  listCompilerRevisionStatuses,
   listMultirepoCoordinationStatuses,
   listPacketArtifacts,
   listPromotionDecisions,
@@ -175,6 +177,17 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
       ],
       integrationValidationRefs: ["validation://integration/backend-frontend/api-contract"],
     });
+    const compilerRevision = materializeCompilerRevisionStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      compilerRevisionRef: "compiler-revision://runtime-context-compiler@v1",
+      action: "promote",
+      promotionDecisionRef: "evidence://.aor/projects/aor-core/artifacts/promotion-decision-compiler-v1.json",
+      compiledContextRefs: ["compiled-context://compiled-context.aor-core.implement.runtime-context-compiler"],
+      evaluationRefs: ["evidence://.aor/projects/aor-core/reports/evaluation-report-runtime-context-compiler.json"],
+      incidentRefs: ["incident://INC-COMPILER-001"],
+      compatibilityStatus: "compatible",
+    });
 
     writeContractFile({
       family: "review-decision",
@@ -233,10 +246,16 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "incident-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "promotion-decision"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "multirepo-coordination-status"));
+    assert.ok(qualityArtifacts.some((artifact) => artifact.family === "compiler-revision-status"));
 
     const multirepoStatuses = listMultirepoCoordinationStatuses({ projectRef: repoRoot, cwd: repoRoot });
     assert.ok(multirepoStatuses.some((entry) => entry.file === multirepoCoordination.statusPath));
     assert.equal(multirepoStatuses[0].document.cross_repo_validation.status, "pass");
+
+    const compilerRevisionStatuses = listCompilerRevisionStatuses({ projectRef: repoRoot, cwd: repoRoot });
+    assert.ok(compilerRevisionStatuses.some((entry) => entry.file === compilerRevision.statusPath));
+    assert.equal(compilerRevisionStatuses[0].document.lifecycle_state, "stable");
+    assert.equal(compilerRevisionStatuses[0].document.compatibility.status, "compatible");
 
     const runs = listRuns({ projectRef: repoRoot, cwd: repoRoot });
     const runSummary = runs.find((run) => run.run_id === runId);

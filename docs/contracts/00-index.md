@@ -43,6 +43,7 @@
 ## Operations
 - `live-run-event.md`
 - `planner-metrics-snapshot.md`
+- `compiler-revision-status.md`
 - `learning-loop-scorecard.md`
 - `learning-loop-handoff.md`
 - `live-e2e-provider-variant.md`

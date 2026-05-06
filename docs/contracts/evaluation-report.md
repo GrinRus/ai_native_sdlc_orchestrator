@@ -23,5 +23,7 @@ Evaluation reports should preserve thresholds, regressions, and baseline compari
 `summary_metrics` should include at least total cases, pass/fail counts, and aggregated pass rate so
 comparisons across asset versions are deterministic.
 
+When a suite evaluates a compiler revision, `subject_ref` may use `compiler-revision://...` and `subject_type` should identify the compiler/revision family. `compiler-revision-status.compatibility.evaluation_refs` is the queryable lifecycle link back to those reports.
+
 ## Example
 See `examples/eval/report-release-core.sample.yaml`.
