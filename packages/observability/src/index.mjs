@@ -1,4 +1,5 @@
 export { appendLiveRunEvent, listLiveRunEvents, openLiveRunEventStream } from "./live-run-events.mjs";
+export { buildFinanceMonitoringSnapshot, FINANCE_MONITORING_DIMENSION_NAMES } from "./finance-monitoring.mjs";
 export {
   applyIncidentRecertification,
   listIncidentBackfillProposals,

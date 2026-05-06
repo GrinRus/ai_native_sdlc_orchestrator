@@ -148,7 +148,7 @@ Close the production and platform maturity gaps that remain after the W19 story-
 
 ## W20-S05 — Finance analytics and production monitoring loop
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add a follow-up slice for finance analytics, tenant-like reporting boundaries, and the distinction between offline certification and production monitoring.
 - **Primary modules:** `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**`
 - **Hard dependencies:** W20-S02, W7-S04

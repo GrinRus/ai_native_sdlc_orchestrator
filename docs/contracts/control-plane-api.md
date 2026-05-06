@@ -11,7 +11,7 @@ Current code is **hybrid module + detached transport**:
 - Contract and artifact semantics stay aligned across both bindings.
 
 Implemented operation families:
-- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics;
+- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
 - live events: append/read/open stream using the `live-run-event` contract family.
@@ -82,6 +82,7 @@ Project bootstrap baseline:
 - incidents and promotion decisions
 - compiler revision status reports
 - planner metric snapshots
+- finance monitoring snapshots
 
 ## Connected lifecycle mutations (W18 baseline)
 
@@ -124,9 +125,11 @@ Run-level read baseline:
 - run event history remains bounded and replay-safe;
 - run policy history remains evidence-derived from `step-result` and `delivery-plan` outputs.
 - `strategic_snapshot.planner_metrics` and `GET /api/projects/:projectId/planner-metrics` expose one `planner-metrics-snapshot` read model with `clean_close_rate`, `retry_rate`, `repair_rate`, and `blocker_rate`.
+- `strategic_snapshot.finance_monitoring` and `GET /api/projects/:projectId/finance-monitoring` expose one `finance-monitoring-snapshot` read model with cost/latency grouping by project, route, bundle, compiler revision, and adapter.
 - `GET /api/projects/:projectId/compiler-revisions` returns contract-backed `compiler-revision-status` reports so compiler lifecycle, compatibility, decision history, incidents, and evaluation lineage are queryable without opening raw files.
 - Empty projects must return `status=no-data`, `no_data=true`, and `value=null` per metric rather than claiming a zero success or failure rate.
 - Planner metrics derive only from durable run, review, Runtime Harness, incident, and run-control audit artifacts; they do not mutate scheduler state.
+- Finance monitoring separates `production_monitoring`, `offline_certification`, and `rehearsal` evidence classes. Production monitoring requires explicit event scope and must not be inferred from certification or rehearsal artifacts.
 
 ## Run-control baseline (module operations)
 

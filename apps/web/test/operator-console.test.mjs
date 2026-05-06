@@ -185,6 +185,14 @@ test("web console snapshot builds run list and run detail from shared API contra
       "repair_rate",
       "blocker_rate",
     ]);
+    assert.equal(typeof snapshot.finance_monitoring, "object");
+    assert.deepEqual(snapshot.finance_monitoring.dimension_names, [
+      "project",
+      "route",
+      "bundle",
+      "compiler_revision",
+      "adapter",
+    ]);
     assert.equal(
       snapshot.api_ui_contract_alignment.live_stream,
       "GET /api/projects/:projectId/runs/:runId/events",
@@ -202,6 +210,9 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.ok(
       snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/planner-metrics"),
     );
+    assert.ok(
+      snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/finance-monitoring"),
+    );
 
     const html = renderOperatorConsoleHtml(snapshot, {
       title: "AOR Web Console Smoke",
@@ -216,6 +227,8 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.match(html, /Strategic Snapshot/);
     assert.match(html, /High-risk runs/);
     assert.match(html, /Clean-close rate/);
+    assert.match(html, /Finance Monitoring/);
+    assert.match(html, /Telemetry state/);
     assert.match(html, /Lifecycle commands/);
     assert.match(html, /Runner interactions/);
   });
@@ -444,6 +457,10 @@ test("web connected mode consumes detached HTTP/SSE transport while preserving d
       assert.equal(snapshot.ui_lifecycle.connection_state, "connected");
       assert.equal(snapshot.api_ui_contract_alignment.binding_mode, "detached-http-sse");
       assert.equal(snapshot.api_ui_contract_alignment.control_plane, transport.baseUrl);
+      assert.ok(
+        snapshot.api_ui_contract_alignment.read_model.includes("GET /api/projects/:projectId/finance-monitoring"),
+      );
+      assert.equal(typeof snapshot.finance_monitoring.monitoring_loop.evidence_classes.production_monitoring.status, "string");
 
       const session = await attachOperatorConsoleSession({
         cwd: projectRoot,

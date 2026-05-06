@@ -22,6 +22,7 @@ import {
   readRunEventHistory,
   readRunPolicyHistory,
   listRuns,
+  readFinanceMonitoringSnapshot,
   readPlannerMetrics,
   readStrategicSnapshot,
   listStepResults,
@@ -532,6 +533,169 @@ test("listRuns aggregates finance evidence across multiple run profiles", () => 
     });
     assert.equal(beta.finance_evidence.baseline_pass_rate, 0.95);
     assert.equal(beta.finance_evidence.candidate_pass_rate, 0.95);
+  });
+});
+
+test("finance monitoring read model exposes no-data, partial, and ready telemetry states", () => {
+  withTempRepo((emptyRoot) => {
+    const empty = readFinanceMonitoringSnapshot({ projectRef: emptyRoot, cwd: emptyRoot });
+    assert.equal(empty.status, "no-data");
+    assert.equal(empty.no_data, true);
+    assert.equal(empty.telemetry_state, "no-data");
+    assert.deepEqual(empty.aggregation.partial_run_ids, []);
+  });
+
+  withTempRepo((partialRoot) => {
+    const init = initializeProjectRuntime({ projectRef: partialRoot, cwd: partialRoot });
+    const runId = "run.finance.partial.v1";
+    writeContractFile({
+      family: "step-result",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "step-result-finance-partial.json"),
+      document: {
+        step_result_id: `${runId}.step.finance.partial`,
+        run_id: runId,
+        step_id: "runner.finance.partial",
+        step_class: "runner",
+        status: "passed",
+        summary: "Partial finance telemetry fixture.",
+        evidence_refs: [init.stateFile],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:00.000Z",
+          finished_at: "2026-01-01T00:00:04.000Z",
+          route_resolution: {
+            resolved_route_id: "route.finance.partial",
+          },
+          asset_resolution: {
+            prompt_bundle: {
+              prompt_bundle_ref: "prompt-bundle://finance-partial@v1",
+            },
+            context_bundles: {
+              bundle_refs: ["context-bundle://finance.partial@v1"],
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.finance.partial",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {},
+          },
+        },
+      },
+    });
+
+    const partial = readFinanceMonitoringSnapshot({ projectRef: partialRoot, cwd: partialRoot });
+    assert.equal(partial.status, "partial");
+    assert.equal(partial.telemetry_state, "partial-data");
+    assert.deepEqual(partial.aggregation.partial_run_ids, [runId]);
+    assert.ok(partial.run_breakdown[0].missing_signals.includes("cost"));
+    assert.ok(partial.run_breakdown[0].missing_signals.includes("certification_latency"));
+    assert.ok(partial.run_breakdown[0].missing_signals.includes("production_monitoring"));
+    assert.equal(partial.finance.dimensions.route[0].key, "route.finance.partial");
+    assert.equal(partial.monitoring_loop.evidence_classes.production_monitoring.status, "no-data");
+  });
+
+  withTempRepo((readyRoot) => {
+    const init = initializeProjectRuntime({ projectRef: readyRoot, cwd: readyRoot });
+    const runId = "run.finance.ready.v1";
+    writeContractFile({
+      family: "step-result",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "step-result-finance-ready.json"),
+      document: {
+        step_result_id: `${runId}.step.finance.ready`,
+        run_id: runId,
+        step_id: "runner.finance.ready",
+        step_class: "runner",
+        status: "passed",
+        summary: "Ready finance telemetry fixture.",
+        evidence_refs: [init.stateFile],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:00.000Z",
+          finished_at: "2026-01-01T00:00:06.000Z",
+          route_resolution: {
+            resolved_route_id: "route.finance.ready",
+          },
+          asset_resolution: {
+            prompt_bundle: {
+              prompt_bundle_ref: "prompt-bundle://finance-ready@v1",
+            },
+            context_bundles: {
+              bundle_refs: ["context-bundle://finance.ready@v1"],
+            },
+          },
+          context_compilation: {
+            compiled_context_artifact: {
+              provenance: {
+                compiler_revision_ref: "compiler-revision://finance-compiler@v2",
+              },
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.finance.ready",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {
+              budget: {
+                max_cost_usd: 18,
+                timeout_sec: 60,
+              },
+            },
+          },
+        },
+      },
+    });
+    writeContractFile({
+      family: "promotion-decision",
+      filePath: path.join(init.runtimeLayout.artifactsRoot, "promotion-decision-finance-ready.json"),
+      document: {
+        decision_id: `${init.projectId}.promotion.finance.ready`,
+        run_id: runId,
+        subject_ref: "compiler-revision://finance-compiler@v2",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [init.stateFile],
+        evidence_summary: {
+          finance_signals: {
+            total_latency_sec: 0.8,
+          },
+          compiler_revision_lifecycle: {
+            compiler_revision_ref: "compiler-revision://finance-compiler@v2",
+          },
+        },
+        status: "pass",
+      },
+    });
+    appendRunEvent({
+      projectRef: readyRoot,
+      cwd: readyRoot,
+      runId,
+      eventType: "step.updated",
+      payload: {
+        monitoring_scope: "production",
+        status: "healthy",
+      },
+    });
+
+    const ready = readFinanceMonitoringSnapshot({ projectRef: readyRoot, cwd: readyRoot });
+    assert.equal(ready.status, "ready");
+    assert.equal(ready.telemetry_state, "ready");
+    assert.deepEqual(ready.aggregation.partial_run_ids, []);
+    assert.equal(ready.finance.dimensions.project[0].cost_limit_usd.max, 18);
+    assert.equal(ready.finance.dimensions.route[0].key, "route.finance.ready");
+    assert.equal(ready.finance.dimensions.bundle.length, 2);
+    assert.equal(ready.finance.dimensions.compiler_revision[0].key, "compiler-revision://finance-compiler@v2");
+    assert.equal(ready.finance.dimensions.adapter[0].key, "adapter.finance.ready");
+    assert.equal(ready.monitoring_loop.evidence_classes.production_monitoring.event_count, 1);
+    assert.equal(ready.monitoring_loop.evidence_classes.offline_certification.status, "ready");
+    assert.deepEqual(ready.run_breakdown[0].production_monitoring_evidence_refs, [
+      `live-run-event://${runId}.event.000001`,
+    ]);
+
+    const strategic = readStrategicSnapshot({ projectRef: readyRoot, cwd: readyRoot });
+    assert.equal(strategic.finance_monitoring.status, "ready");
   });
 });
 

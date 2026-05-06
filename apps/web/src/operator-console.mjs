@@ -6,6 +6,7 @@ import {
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
+  readFinanceMonitoringSnapshot,
   readRunEventHistory,
   readRunPolicyHistory,
   listRuns,
@@ -689,6 +690,7 @@ export async function buildOperatorConsoleSnapshot(options) {
     uiLifecycleState: uiLifecycle.state,
   });
   const strategicSnapshot = readStrategicSnapshot(options);
+  const financeMonitoring = readFinanceMonitoringSnapshot(options);
 
   if (!connectedControlPlane) {
     const state = readProjectState(options);
@@ -726,6 +728,7 @@ export async function buildOperatorConsoleSnapshot(options) {
       delivery_manifests: deliveryManifests,
       promotion_decisions: promotionDecisions,
       strategic_snapshot: strategicSnapshot,
+      finance_monitoring: financeMonitoring,
       run_detail: {
         packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
         step_results: filterArtifactsByRunId(stepResults, selectedRunId),
@@ -749,6 +752,7 @@ export async function buildOperatorConsoleSnapshot(options) {
           "GET /api/projects/:projectId/promotion-decisions",
           "GET /api/projects/:projectId/strategic-snapshot",
           "GET /api/projects/:projectId/planner-metrics",
+          "GET /api/projects/:projectId/finance-monitoring",
           "GET /api/projects/:projectId/runs/:runId/events/history",
           "GET /api/projects/:projectId/runs/:runId/policy-history",
         ],
@@ -770,7 +774,7 @@ export async function buildOperatorConsoleSnapshot(options) {
   const projectState = readProjectState(options);
   const projectId = projectState.project_id;
 
-  const [state, runsRaw, packetsRaw, stepResultsRaw, qualityRaw, deliveryRaw, promotionRaw, strategicRaw] =
+  const [state, runsRaw, packetsRaw, stepResultsRaw, qualityRaw, deliveryRaw, promotionRaw, strategicRaw, financeRaw] =
     await Promise.all([
       readControlPlaneJson({
         controlPlane: connectedControlPlane,
@@ -812,6 +816,11 @@ export async function buildOperatorConsoleSnapshot(options) {
         pathname: `/api/projects/${encodeURIComponent(projectId)}/strategic-snapshot`,
         authToken: controlPlaneAuthToken,
       }).catch(() => strategicSnapshot),
+      readControlPlaneJson({
+        controlPlane: connectedControlPlane,
+        pathname: `/api/projects/${encodeURIComponent(projectId)}/finance-monitoring`,
+        authToken: controlPlaneAuthToken,
+      }).catch(() => readFinanceMonitoringSnapshot(options)),
     ]);
 
   const runs = asArray(runsRaw).sort((left, right) => {
@@ -855,6 +864,7 @@ export async function buildOperatorConsoleSnapshot(options) {
     delivery_manifests: deliveryManifests,
     promotion_decisions: promotionDecisions,
     strategic_snapshot: strategicRaw,
+    finance_monitoring: financeRaw,
     run_detail: {
       packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
       step_results: filterArtifactsByRunId(stepResults, selectedRunId),
@@ -878,6 +888,7 @@ export async function buildOperatorConsoleSnapshot(options) {
         "GET /api/projects/:projectId/promotion-decisions",
         "GET /api/projects/:projectId/strategic-snapshot",
         "GET /api/projects/:projectId/planner-metrics",
+        "GET /api/projects/:projectId/finance-monitoring",
         "GET /api/projects/:projectId/runs/:runId/events/history",
         "GET /api/projects/:projectId/runs/:runId/policy-history",
       ],
@@ -989,6 +1000,13 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
     .join("\n");
   const plannerMetrics = asRecord(snapshot.strategic_snapshot?.planner_metrics);
   const plannerMetricValues = asRecord(plannerMetrics.metrics);
+  const financeMonitoring = asRecord(snapshot.finance_monitoring ?? snapshot.strategic_snapshot?.finance_monitoring);
+  const monitoringLoop = asRecord(financeMonitoring.monitoring_loop);
+  const evidenceClasses = asRecord(monitoringLoop.evidence_classes);
+  const productionMonitoring = asRecord(evidenceClasses.production_monitoring);
+  const finance = asRecord(financeMonitoring.finance);
+  const dimensions = asRecord(finance.dimensions);
+  const routeGroups = Array.isArray(dimensions.route) ? dimensions.route : [];
 
   return `<!doctype html>
 <html lang="en">
@@ -1050,6 +1068,13 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
       <p>Retry rate: <code>${escapeHtml(formatPlannerMetric(plannerMetricValues.retry_rate))}</code></p>
       <p>Repair rate: <code>${escapeHtml(formatPlannerMetric(plannerMetricValues.repair_rate))}</code></p>
       <p>Blocker rate: <code>${escapeHtml(formatPlannerMetric(plannerMetricValues.blocker_rate))}</code></p>
+    </section>
+    <section class="panel">
+      <h2>Finance Monitoring</h2>
+      <p>Telemetry state: <code>${escapeHtml(String(financeMonitoring.telemetry_state ?? "no-data"))}</code></p>
+      <p>Route groups: <code>${String(routeGroups.length)}</code></p>
+      <p>Production monitoring: <code>${escapeHtml(String(productionMonitoring.status ?? "no-data"))}</code></p>
+      <p>Production events: <code>${String(productionMonitoring.event_count ?? 0)}</code></p>
     </section>
     <section class="panel">
       <h2>Run list</h2>

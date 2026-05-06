@@ -40,6 +40,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Platform assets | `skill-profile.md` | `skill-profile` | `examples/skills/*.yaml` | implemented | Includes closed-set enum check for `step_class` and required workflow shape. |
 | Operations | `live-run-event.md` | `live-run-event` | none | implemented | Contract is loader-covered with closed-set `event_type` validation; no YAML example in this repo yet. |
 | Operations | `planner-metrics-snapshot.md` | `planner-metrics-snapshot` | `examples/reports/planner-metrics-snapshot*.yaml` | implemented | Required fields + closed `status` values for no-data, partial, and ready planner metric histories. |
+| Operations | `finance-monitoring-snapshot.md` | `finance-monitoring-snapshot` | `examples/reports/finance-monitoring-snapshot*.yaml` | implemented | Required fields + closed `status` values for no-data, partial, and ready finance/production monitoring snapshots. |
 | Operations | `compiler-revision-status.md` | `compiler-revision-status` | `examples/reports/compiler-revision-status*.yaml` | implemented | Required fields + closed lifecycle/status values for compiler revision status and decision-history snapshots. |
 | Operations | `learning-loop-scorecard.md` | `learning-loop-scorecard` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Operations | `learning-loop-handoff.md` | `learning-loop-handoff` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |

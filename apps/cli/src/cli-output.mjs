@@ -197,6 +197,9 @@ const CLI_OUTPUT_DEFAULTS = Object.freeze({
   incidentRecords: null,
   runAuditRecords: null,
   auditEvidenceRefs: null,
+  financeMonitoringSnapshot: null,
+  financeAnalytics: null,
+  productionMonitoring: null,
 });
 
 const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
@@ -379,6 +382,9 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["incident_records", "incidentRecords"],
   ["run_audit_records", "runAuditRecords"],
   ["audit_evidence_refs", "auditEvidenceRefs"],
+  ["finance_monitoring_snapshot", "financeMonitoringSnapshot"],
+  ["finance_analytics", "financeAnalytics"],
+  ["production_monitoring", "productionMonitoring"],
   ["run_summaries", "runSummaries"],
   ["run_event_history", "runEventHistory"],
   ["run_policy_history", "runPolicyHistory"],

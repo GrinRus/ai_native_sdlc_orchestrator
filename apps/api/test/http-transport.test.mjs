@@ -232,6 +232,14 @@ test("detached control-plane transport serves read baseline endpoints", async ()
       const plannerMetrics = await plannerMetricsResponse.json();
       assert.deepEqual(plannerMetrics.metric_names, strategicSnapshot.planner_metrics.metric_names);
 
+      const financeMonitoringResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/finance-monitoring`,
+      );
+      assert.equal(financeMonitoringResponse.status, 200);
+      const financeMonitoring = await financeMonitoringResponse.json();
+      assert.deepEqual(financeMonitoring.dimension_names, strategicSnapshot.finance_monitoring.dimension_names);
+      assert.equal(typeof financeMonitoring.monitoring_loop.evidence_classes.production_monitoring.status, "string");
+
       const multirepoResponse = await fetch(
         `${transport.baseUrl}/api/projects/${transport.projectId}/multirepo-coordination`,
       );

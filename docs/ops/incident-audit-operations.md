@@ -1,7 +1,7 @@
 # Runbook: incident and audit command operations
 
 ## Scope
-Use this runbook when a run needs a durable incident record, a reviewed dataset backfill proposal, or run-centric audit snapshots.
+Use this runbook when a run needs a durable incident record, a reviewed dataset backfill proposal, run-centric audit snapshots, or finance/production monitoring reads.
 
 ## Preconditions
 - Runtime artifacts exist for the target run (`aor run status --run-id <RUN_ID>` returns at least one summary).
@@ -120,6 +120,24 @@ Expected signals:
 - `finance_evidence` carries route/wrapper/adapter IDs plus cost, timeout, and latency rollups.
 - `incident_refs` and `promotion_refs` highlight escalation and promotion lineage.
 - `audit_evidence_refs` provides the aggregate evidence set for handoff.
+
+## Finance monitoring
+```bash
+aor finance monitor \
+  --project-ref <PROJECT_ROOT>
+```
+
+Expected signals:
+- `finance_monitoring_snapshot.status` is `no-data`, `partial`, or `ready`.
+- `finance_monitoring_snapshot.telemetry_state` is `no-data`, `partial-data`, or `ready`.
+- `finance_analytics.dimensions` groups cost and latency by project, route, prompt/context bundle, compiler revision, and adapter.
+- `production_monitoring` is populated only from explicitly scoped production monitoring live events.
+- offline certification and rehearsal evidence remain separate under `monitoring_loop.evidence_classes`.
+
+Boundary rules:
+- missing cost, latency, dimension, or production monitoring evidence must remain visible as partial data;
+- offline `promotion-decision`, `evaluation-report`, and `runtime-harness-report` artifacts do not prove production monitoring on their own;
+- project-level grouping is a tenant-like reporting boundary for installed users, not hosted SaaS tenancy.
 
 ## Invalid lookup behavior
 - `incident show --incident-id <missing>` must fail with an explicit not-found error.

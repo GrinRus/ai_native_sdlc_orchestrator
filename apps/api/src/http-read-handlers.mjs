@@ -7,6 +7,7 @@ import {
   listPromotionDecisions,
   listQualityArtifacts,
   listRuns,
+  readFinanceMonitoringSnapshot,
   listStepResults,
   readPlannerMetrics,
   readProjectState,
@@ -49,6 +50,9 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
       return;
     case "planner-metrics":
       sendJson(response, 200, readPlannerMetrics(runtimeOptions));
+      return;
+    case "finance-monitoring":
+      sendJson(response, 200, readFinanceMonitoringSnapshot(runtimeOptions));
       return;
     case "multirepo-coordination":
       sendJson(response, 200, listMultirepoCoordinationStatuses(runtimeOptions));

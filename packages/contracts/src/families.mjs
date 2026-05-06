@@ -17,6 +17,7 @@ const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "clos
 const INCIDENT_BACKFILL_PROPOSAL_STATE_VALUES = ["proposed", "approved", "rejected"];
 const REVIEW_DECISION_VALUES = ["approve", "hold", "request-repair"];
 const PLANNER_METRICS_STATUS_VALUES = ["no-data", "partial", "ready"];
+const FINANCE_MONITORING_STATUS_VALUES = ["no-data", "partial", "ready"];
 const MULTIREPO_COORDINATION_STATUS_VALUES = ["ready", "blocked", "released"];
 const COMPILER_REVISION_LIFECYCLE_VALUES = ["draft", "candidate", "stable", "frozen", "demoted", "blocked"];
 const COMPILER_REVISION_STATUS_VALUES = ["ready", "blocked"];
@@ -1055,6 +1056,46 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     enumChecks: [{ field: "status", allowedValues: PLANNER_METRICS_STATUS_VALUES }],
   },
   {
+    family: "finance-monitoring-snapshot",
+    familyGroup: "operations",
+    sourceContract: "docs/contracts/finance-monitoring-snapshot.md",
+    exampleGlob: "examples/reports/finance-monitoring-snapshot*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "schema_version",
+      "snapshot_id",
+      "project_id",
+      "generated_at",
+      "status",
+      "no_data",
+      "telemetry_state",
+      "dimension_names",
+      "tenant_like_grouping",
+      "aggregation",
+      "finance",
+      "monitoring_loop",
+      "source_artifacts",
+      "run_breakdown",
+    ],
+    fieldTypes: {
+      schema_version: "number",
+      snapshot_id: "string",
+      project_id: "string",
+      generated_at: "string",
+      status: "string",
+      no_data: "boolean",
+      telemetry_state: "string",
+      dimension_names: "array",
+      tenant_like_grouping: "object",
+      aggregation: "object",
+      finance: "object",
+      monitoring_loop: "object",
+      source_artifacts: "object",
+      run_breakdown: "array",
+    },
+    enumChecks: [{ field: "status", allowedValues: FINANCE_MONITORING_STATUS_VALUES }],
+  },
+  {
     family: "compiler-revision-status",
     familyGroup: "operations",
     sourceContract: "docs/contracts/compiler-revision-status.md",
@@ -1288,6 +1329,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/reports\/discovery-research-report[^/]*\.ya?ml$/, family: "discovery-research-report" },
   { regex: /^examples\/reports\/incident-backfill-proposal[^/]*\.ya?ml$/, family: "incident-backfill-proposal" },
   { regex: /^examples\/reports\/planner-metrics-snapshot[^/]*\.ya?ml$/, family: "planner-metrics-snapshot" },
+  { regex: /^examples\/reports\/finance-monitoring-snapshot[^/]*\.ya?ml$/, family: "finance-monitoring-snapshot" },
   { regex: /^examples\/reports\/compiler-revision-status[^/]*\.ya?ml$/, family: "compiler-revision-status" },
   { regex: /^examples\/packets\/delivery-plan-[^/]+\.ya?ml$/, family: "delivery-plan" },
   { regex: /^examples\/packets\/intake-request-body[^/]*\.ya?ml$/, family: "intake-request-body" },

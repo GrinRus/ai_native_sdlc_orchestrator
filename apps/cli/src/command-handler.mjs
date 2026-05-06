@@ -142,6 +142,8 @@ export function formatCommandHelp(definition) {
             definition.command === "incident show" ||
             definition.command === "audit runs"
           ? "Status: implemented in incident/audit shell (W6-S06)"
+        : definition.command === "finance monitor"
+          ? "Status: implemented in finance monitoring shell (W20-S05)"
         : definition.command === "ui attach" || definition.command === "ui detach"
           ? "Status: implemented in UI lifecycle shell (W6-S04)"
           : "Status: implemented in bootstrap shell (W1-S01)";
@@ -392,6 +394,13 @@ export function formatCommandHelp(definition) {
                         "- Use --run-id to scope one run or --limit for bounded list output.",
                         "- Audit output highlights incident/promotion lineage plus cost/latency signals for traceable governance follow-up.",
                       ]
+                    : definition.command === "finance monitor"
+                      ? [
+                          "- Finance monitor is read-only and exposes the finance-monitoring-snapshot read model.",
+                          "- Cost and latency are grouped by project, route, prompt/context bundle, compiler revision, and adapter.",
+                          "- Production monitoring evidence requires explicit live-event scope and is not inferred from certification or rehearsal artifacts.",
+                          "- Empty and incomplete telemetry remain visible as no-data or partial-data states.",
+                        ]
                   : definition.command === "review run"
                     ? [
                         "- Review run is report-only at the command level and writes one durable review-report artifact.",

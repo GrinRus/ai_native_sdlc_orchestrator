@@ -412,6 +412,7 @@ test("incident and audit command help documents run-linked operational semantics
   const backfillHelp = invokeCli(["incident", "backfill", "--help"]);
   const recertifyHelp = invokeCli(["incident", "recertify", "--help"]);
   const auditHelp = invokeCli(["audit", "runs", "--help"]);
+  const financeHelp = invokeCli(["finance", "monitor", "--help"]);
 
   assert.equal(incidentHelp.exitCode, 0);
   assert.equal(incidentHelp.stderr, "");
@@ -436,6 +437,12 @@ test("incident and audit command help documents run-linked operational semantics
   assert.equal(auditHelp.exitCode, 0);
   assert.equal(auditHelp.stderr, "");
   assert.match(auditHelp.stdout, /run-centric snapshots for packet, step, quality, and finance evidence refs/);
+
+  assert.equal(financeHelp.exitCode, 0);
+  assert.equal(financeHelp.stderr, "");
+  assert.match(financeHelp.stdout, /Status: implemented in finance monitoring shell \(W20-S05\)/);
+  assert.match(financeHelp.stdout, /finance_monitoring_snapshot/);
+  assert.match(financeHelp.stdout, /Production monitoring evidence requires explicit live-event scope/);
 });
 
 test("review decision command help documents durable approval semantics", () => {
@@ -1955,6 +1962,182 @@ test("W6 incident and audit command pack links run evidence to durable incident 
       },
     };
     assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("finance monitor command reports no-data, partial-data, and ready states", () => {
+  withTempProject((emptyRoot) => {
+    fs.mkdirSync(path.join(emptyRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(emptyRoot, "examples"), { recursive: true });
+
+    const result = invokeCli(["finance", "monitor", "--project-ref", emptyRoot]);
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.finance_monitoring_snapshot.status, "no-data");
+    assert.equal(payload.finance_monitoring_snapshot.telemetry_state, "no-data");
+    assert.equal(payload.production_monitoring.status, "no-data");
+    assert.equal(payload.read_only, true);
+  });
+
+  withTempProject((partialRoot) => {
+    fs.mkdirSync(path.join(partialRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(partialRoot, "examples"), { recursive: true });
+
+    const initResult = invokeCli(["project", "init", "--project-ref", partialRoot]);
+    assert.equal(initResult.exitCode, 0, initResult.stderr);
+    const initPayload = JSON.parse(initResult.stdout);
+    const reportsRoot = initPayload.runtime_layout.reportsRoot;
+    const runId = "run.cli.finance.partial.v1";
+    writeContractFixture({
+      family: "step-result",
+      filePath: path.join(reportsRoot, "step-result-cli-finance-partial.json"),
+      document: {
+        step_result_id: `${runId}.step.finance.partial`,
+        run_id: runId,
+        step_id: "runner.finance.partial",
+        step_class: "runner",
+        status: "passed",
+        summary: "Partial CLI finance fixture.",
+        evidence_refs: [initPayload.runtime_state_file],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:00.000Z",
+          finished_at: "2026-01-01T00:00:02.000Z",
+          route_resolution: {
+            resolved_route_id: "route.cli.finance.partial",
+          },
+          asset_resolution: {
+            prompt_bundle: {
+              prompt_bundle_ref: "prompt-bundle://cli-finance-partial@v1",
+            },
+            context_bundles: {
+              bundle_refs: ["context-bundle://cli.finance.partial@v1"],
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.cli.finance.partial",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {},
+          },
+        },
+      },
+    });
+
+    const result = invokeCli(["finance", "monitor", "--project-ref", partialRoot]);
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.finance_monitoring_snapshot.status, "partial");
+    assert.equal(payload.finance_monitoring_snapshot.telemetry_state, "partial-data");
+    assert.ok(payload.finance_monitoring_snapshot.aggregation.partial_run_ids.includes(runId));
+    assert.ok(payload.finance_monitoring_snapshot.run_breakdown[0].missing_signals.includes("certification_latency"));
+    assert.equal(payload.finance_analytics.dimensions.route[0].key, "route.cli.finance.partial");
+  });
+
+  withTempProject((readyRoot) => {
+    fs.mkdirSync(path.join(readyRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(readyRoot, "examples"), { recursive: true });
+
+    const initResult = invokeCli(["project", "init", "--project-ref", readyRoot]);
+    assert.equal(initResult.exitCode, 0, initResult.stderr);
+    const initPayload = JSON.parse(initResult.stdout);
+    const reportsRoot = initPayload.runtime_layout.reportsRoot;
+    const artifactsRoot = initPayload.runtime_layout.artifactsRoot;
+    const runId = "run.cli.finance.ready.v1";
+    writeContractFixture({
+      family: "step-result",
+      filePath: path.join(reportsRoot, "step-result-cli-finance-ready.json"),
+      document: {
+        step_result_id: `${runId}.step.finance.ready`,
+        run_id: runId,
+        step_id: "runner.finance.ready",
+        step_class: "runner",
+        status: "passed",
+        summary: "Ready CLI finance fixture.",
+        evidence_refs: [initPayload.runtime_state_file],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:00.000Z",
+          finished_at: "2026-01-01T00:00:05.000Z",
+          route_resolution: {
+            resolved_route_id: "route.cli.finance.ready",
+          },
+          asset_resolution: {
+            prompt_bundle: {
+              prompt_bundle_ref: "prompt-bundle://cli-finance-ready@v1",
+            },
+            context_bundles: {
+              bundle_refs: ["context-bundle://cli.finance.ready@v1"],
+            },
+          },
+          context_compilation: {
+            compiled_context_artifact: {
+              provenance: {
+                compiler_revision_ref: "compiler-revision://cli-finance-compiler@v1",
+              },
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.cli.finance.ready",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {
+              budget: {
+                max_cost_usd: 23,
+              },
+            },
+          },
+        },
+      },
+    });
+    writeContractFixture({
+      family: "promotion-decision",
+      filePath: path.join(artifactsRoot, "promotion-decision-cli-finance-ready.json"),
+      document: {
+        decision_id: "cli.finance.ready.promotion",
+        run_id: runId,
+        subject_ref: "compiler-revision://cli-finance-compiler@v1",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [initPayload.runtime_state_file],
+        evidence_summary: {
+          finance_signals: {
+            total_latency_sec: 0.7,
+          },
+          compiler_revision_lifecycle: {
+            compiler_revision_ref: "compiler-revision://cli-finance-compiler@v1",
+          },
+        },
+        status: "pass",
+      },
+    });
+    appendRunEvent({
+      projectRef: readyRoot,
+      cwd: readyRoot,
+      runId,
+      eventType: "step.updated",
+      payload: {
+        evidence_scope: "production-monitoring",
+        status: "healthy",
+      },
+    });
+
+    const result = invokeCli(["finance", "monitor", "--project-ref", readyRoot]);
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.finance_monitoring_snapshot.status, "ready");
+    assert.equal(payload.finance_monitoring_snapshot.telemetry_state, "ready");
+    assert.equal(payload.finance_analytics.dimensions.project[0].cost_limit_usd.max, 23);
+    assert.equal(
+      payload.finance_analytics.dimensions.compiler_revision[0].key,
+      "compiler-revision://cli-finance-compiler@v1",
+    );
+    assert.deepEqual(payload.finance_monitoring_snapshot.run_breakdown[0].production_monitoring_evidence_refs, [
+      `live-run-event://${runId}.event.000001`,
+    ]);
+    assert.equal(payload.production_monitoring.event_count, 1);
   });
 });
 

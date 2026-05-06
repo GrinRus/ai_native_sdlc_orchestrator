@@ -13,6 +13,7 @@ read_operations:
       - review-decision
       - promotion-decision
       - planner-metrics-snapshot
+      - finance-monitoring-snapshot
   - operation_id: read.run-history
     operation_family: read
     output_contract_families:
@@ -27,6 +28,10 @@ read_operations:
     operation_family: read
     output_contract_families:
       - compiler-revision-status
+  - operation_id: read.finance-monitoring
+    operation_family: read
+    output_contract_families:
+      - finance-monitoring-snapshot
 
 run_control_operations:
   - operation_id: run.start
@@ -151,6 +156,7 @@ deferred_transport:
     - GET /api/projects/:projectId/state
     - GET /api/projects/:projectId/strategic-snapshot
     - GET /api/projects/:projectId/planner-metrics
+    - GET /api/projects/:projectId/finance-monitoring
     - GET /api/projects/:projectId/packets
     - GET /api/projects/:projectId/step-results
     - GET /api/projects/:projectId/quality-artifacts

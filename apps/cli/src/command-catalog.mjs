@@ -775,6 +775,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "release-packet",
       "promotion-decision",
       "planner-metrics-snapshot",
+      "finance-monitoring-snapshot",
     ],
   },
   {
@@ -1208,6 +1209,31 @@ const COMMAND_DEFINITIONS = Object.freeze([
     ],
     requiredFlags: ["project-ref"],
     contractFamilies: ["incident-report", "promotion-decision", "delivery-manifest", "release-packet", "step-result"],
+  },
+  {
+    command: "finance monitor",
+    category: "incidents-and-audit",
+    status: "implemented",
+    summary:
+      "Read finance analytics and production monitoring signals without mixing certification, rehearsal, and production evidence.",
+    inputs: [
+      "--project-ref <path>",
+      "--runtime-root <path> (optional)",
+      "--help",
+    ],
+    outputs: [
+      "resolved_project_ref",
+      "resolved_runtime_root",
+      "finance_monitoring_snapshot",
+      "finance_analytics",
+      "production_monitoring",
+      "read_only",
+      "future_control_hooks",
+      "contract_families",
+      "command_catalog_alignment",
+    ],
+    requiredFlags: ["project-ref"],
+    contractFamilies: ["finance-monitoring-snapshot", "step-result", "promotion-decision", "live-run-event"],
   },
   {
     command: "ui attach",

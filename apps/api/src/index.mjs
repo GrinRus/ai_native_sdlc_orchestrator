@@ -6,6 +6,7 @@ export {
   listPromotionDecisions,
   listQualityArtifacts,
   listRunControlAudits,
+  readFinanceMonitoringSnapshot,
   readRunEventHistory,
   readRunPolicyHistory,
   listRuns,

@@ -79,7 +79,7 @@ Coverage status values:
 | OPS-07 | Operator / SRE | MVP | Run curated full-journey live acceptance on real repositories. | covered | W14 coverage_with_findings proof on curated matrix repositories | none |
 | OPS-08 | Operator / SRE | MVP | Select required matrix cells by scenario, provider, and feature size. | covered | W14 scenario/provider/feature-size matrix | none |
 | OPS-09 | Operator / SRE | MVP+ | Inspect policy and audit guardrails for run controls. | covered | W6-S03 run-control audit guardrails | none |
-| OPS-10 | Operator / SRE | Later | Use richer event, policy, and production observability views. | partial | W8-S04 operator visibility, W19-S06 planner metrics projection, W20-S02 redacted production transport/event baseline | W21-S05 |
+| OPS-10 | Operator / SRE | Later | Use richer event, policy, and production observability views. | partial | W8-S04 operator visibility, W19-S06 planner metrics projection, W20-S02 redacted production transport/event baseline, W20-S05 finance monitoring projection | W21-S05 |
 | SEC-01 | Security / compliance | MVP | Enforce provider and adapter allowlists. | covered | route policies, adapter capability validation, W2-S03, W8-S03 | none |
 | SEC-02 | Security / compliance | MVP | Apply secret-safe logging and redaction. | covered | W10-S04 auth hardening baseline, W20-S02 shared redaction across HTTP/SSE/CLI/live logs/run-control audit | none |
 | SEC-03 | Security / compliance | MVP | Preserve audit trails for approvals, overrides, and route changes. | covered | audit records, W6-S03, W7-S04 | none |
@@ -97,7 +97,7 @@ Coverage status values:
 | INC-03 | Incident / improvement owner | MVP | Correlate incidents with routes, assets, wrappers, adapters, or compiler revisions. | covered | incident reports, learning-loop handoffs, `incident-backfill-proposal` linked asset correlation, and `compiler-revision-status.evidence_links.incident_refs`, W20-S04 | none |
 | INC-04 | Incident / improvement owner | MVP+ | Use controlled re-enable after recertification. | covered | W7-S03 controlled re-enable flow | none |
 | INC-05 | Incident / improvement owner | MVP+ | Backfill incidents into datasets and suites. | covered | `incident backfill`, `incident-backfill-proposal`, proposal-only mutation policy, W19-S04 | none |
-| INC-06 | Incident / improvement owner | Later | Close the production feedback loop into monitoring and learning. | partial | W8-S06 incident maturity | W20-S05 |
+| INC-06 | Incident / improvement owner | Later | Close the production feedback loop into monitoring and learning. | covered | W8-S06 incident maturity, `finance-monitoring-snapshot.monitoring_loop.evidence_classes`, `aor finance monitor`, W20-S05 | none |
 | PBO-01 | Project bootstrap / onboarding | MVP | Run project analysis. | covered | `project analyze`, W1-S03 | none |
 | PBO-02 | Project bootstrap / onboarding | MVP | Run deterministic project validation. | covered | `project validate`, W1-S04 | none |
 | PBO-03 | Project bootstrap / onboarding | MVP | Run bounded project verification. | covered | `project verify`, W1-S05 | none |
@@ -114,11 +114,11 @@ Coverage status values:
 | DTX-06 | Delivery transaction / Git / PR | MVP+ | Rerun from a packet boundary or failed step. | covered | W8-S07 delivery rerun maturity | none |
 | DTX-07 | Delivery transaction / Git / PR | MVP+ | Prepare release evidence from delivery artifacts. | covered | `release prepare`, W6-S05 | none |
 | DTX-08 | Delivery transaction / Git / PR | Later | Coordinate bounded multirepo delivery manifests. | covered | W8-S07 multirepo delivery maturity, W18-S04 repo-level delivery manifest lineage, W20-S01 scoped lock and validation refs | none |
-| FIN-01 | Finance / audit / hygiene | MVP | Track cost by route, bundle, compiler revision, adapter, and project. | partial | finance evidence and audit records | W20-S05 |
-| FIN-02 | Finance / audit / hygiene | MVP | Track latency by route, bundle, compiler revision, adapter, and project. | partial | run/audit timing evidence | W20-S05 |
+| FIN-01 | Finance / audit / hygiene | MVP | Track cost by route, bundle, compiler revision, adapter, and project. | covered | `finance-monitoring-snapshot.finance.dimensions`, `aor finance monitor`, API `finance-monitoring`, web finance monitoring panel, W20-S05 | none |
+| FIN-02 | Finance / audit / hygiene | MVP | Track latency by route, bundle, compiler revision, adapter, and project. | covered | `finance-monitoring-snapshot` step and certification latency summaries, CLI/API/web finance monitoring reads, W20-S05 | none |
 | FIN-03 | Finance / audit / hygiene | MVP | Preserve durable evidence for reviews and audits. | covered | audit records, evidence show, W7-S04 | none |
 | FIN-04 | Finance / audit / hygiene | MVP | Keep audit evidence queryable from command and API surfaces. | covered | `audit runs`, API read surface, W7-S04 | none |
 | FIN-05 | Finance / audit / hygiene | MVP+ | Link promotion and freeze decisions to finance evidence. | covered | W7-S02, W7-S04 | none |
 | FIN-06 | Finance / audit / hygiene | MVP+ | Expand finance evidence durability. | covered | W7-S04 finance evidence expansion | none |
-| FIN-07 | Finance / audit / hygiene | MVP+ | Make platform hygiene visible through regression signals. | partial | W7-S01, W7-S04, W8-S09 | W20-S05 |
-| FIN-08 | Finance / audit / hygiene | Later | Distinguish production monitoring from offline certification. | gap | audit and proof evidence exist, production monitoring loop does not | W20-S05 |
+| FIN-07 | Finance / audit / hygiene | MVP+ | Make platform hygiene visible through regression signals. | covered | W7-S01, W7-S04, W8-S09, W20-S05 monitoring-loop evidence classes | none |
+| FIN-08 | Finance / audit / hygiene | Later | Distinguish production monitoring from offline certification. | covered | `finance-monitoring-snapshot.monitoring_loop.evidence_classes.production_monitoring`, offline certification/rehearsal separation rules, W20-S05 | none |

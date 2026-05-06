@@ -15,6 +15,7 @@ export {
   listPromotionDecisions,
   listQualityArtifacts,
   listRunControlAudits,
+  readFinanceMonitoringSnapshot,
   readRunControlState,
   readRunEventHistory,
   readRunPolicyHistory,

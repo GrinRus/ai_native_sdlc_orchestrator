@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { buildPlannerMetricsSnapshot } from "../../../packages/observability/src/index.mjs";
+import { buildFinanceMonitoringSnapshot, buildPlannerMetricsSnapshot } from "../../../packages/observability/src/index.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
 import {
@@ -471,9 +471,12 @@ export function listRuns(options = {}) {
    *   step_result_refs: string[],
    *   quality_refs: string[],
    *   finance_evidence: {
-   *     route_ids: string[],
-   *     wrapper_refs: string[],
-   *     adapter_ids: string[],
+ *     route_ids: string[],
+ *     wrapper_refs: string[],
+ *     prompt_bundle_refs: string[],
+ *     context_bundle_refs: string[],
+ *     compiler_revision_refs: string[],
+ *     adapter_ids: string[],
    *     max_cost_usd: number | null,
    *     timeout_sec: number | null,
    *     max_cost_sources: string[],
@@ -535,6 +538,9 @@ export function listRuns(options = {}) {
         finance_evidence: {
           route_ids: [],
           wrapper_refs: [],
+          prompt_bundle_refs: [],
+          context_bundle_refs: [],
+          compiler_revision_refs: [],
           adapter_ids: [],
           max_cost_usd: null,
           timeout_sec: null,
@@ -606,6 +612,8 @@ export function listRuns(options = {}) {
     const routeResolution = asRecord(routedExecution.route_resolution);
     const assetResolution = asRecord(routedExecution.asset_resolution);
     const wrapperResolution = asRecord(assetResolution.wrapper);
+    const promptBundleResolution = asRecord(assetResolution.prompt_bundle);
+    const contextBundleResolution = asRecord(assetResolution.context_bundles);
     const adapterResolution = asRecord(routedExecution.adapter_resolution);
     const adapter = asRecord(adapterResolution.adapter);
     const policyResolution = asRecord(routedExecution.policy_resolution);
@@ -619,6 +627,14 @@ export function listRuns(options = {}) {
     }
     const wrapperRef = asString(wrapperResolution.wrapper_ref);
     if (wrapperRef) run.finance_evidence.wrapper_refs.push(wrapperRef);
+    const promptBundleRef = asString(promptBundleResolution.prompt_bundle_ref);
+    if (promptBundleRef) run.finance_evidence.prompt_bundle_refs.push(promptBundleRef);
+    run.finance_evidence.context_bundle_refs.push(...asStringArray(contextBundleResolution.bundle_refs));
+    const compilerRevisionRef = asString(
+      asRecord(asRecord(asRecord(routedExecution.context_compilation).compiled_context_artifact).provenance)
+        .compiler_revision_ref,
+    );
+    if (compilerRevisionRef) run.finance_evidence.compiler_revision_refs.push(compilerRevisionRef);
     const adapterId = asString(adapter.adapter_id);
     if (adapterId) run.finance_evidence.adapter_ids.push(adapterId);
     const policyId = asString(asRecord(policyResolution.policy).policy_id);
@@ -674,6 +690,9 @@ export function listRuns(options = {}) {
       const evidenceSummary = asRecord(artifact.document.evidence_summary);
       const financeSignals = asRecord(evidenceSummary.finance_signals);
       const baselineComparison = asRecord(evidenceSummary.baseline_comparison);
+      const compilerLifecycle = asRecord(evidenceSummary.compiler_revision_lifecycle);
+      const compilerRevisionRef = asString(compilerLifecycle.compiler_revision_ref);
+      if (compilerRevisionRef) run.finance_evidence.compiler_revision_refs.push(compilerRevisionRef);
 
       const captureLatency = asNumber(financeSignals.capture_latency_sec);
       if (captureLatency !== null) run.finance_evidence.certification_latency_samples_sec.push(captureLatency);
@@ -776,6 +795,9 @@ export function listRuns(options = {}) {
       finance_evidence: {
         route_ids: Array.from(new Set(entry.finance_evidence.route_ids)),
         wrapper_refs: Array.from(new Set(entry.finance_evidence.wrapper_refs)),
+        prompt_bundle_refs: Array.from(new Set(entry.finance_evidence.prompt_bundle_refs)),
+        context_bundle_refs: Array.from(new Set(entry.finance_evidence.context_bundle_refs)),
+        compiler_revision_refs: Array.from(new Set(entry.finance_evidence.compiler_revision_refs)),
         adapter_ids: Array.from(new Set(entry.finance_evidence.adapter_ids)),
         max_cost_usd: entry.finance_evidence.max_cost_usd,
         timeout_sec: entry.finance_evidence.timeout_sec,
@@ -1008,6 +1030,47 @@ export function readPlannerMetrics(options = {}) {
  *   projectProfile?: string,
  *   runtimeRoot?: string,
  * }} options
+ * @param {Array<Record<string, unknown>>} runs
+ */
+function listRunEventsForSummaries(options, runs) {
+  return runs.flatMap((run) => {
+    const runId = asString(run.run_id);
+    if (!runId) return [];
+    return readRunEvents({
+      cwd: options.cwd,
+      projectRef: options.projectRef,
+      projectProfile: options.projectProfile,
+      runtimeRoot: options.runtimeRoot,
+      runId,
+    });
+  });
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ */
+export function readFinanceMonitoringSnapshot(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const runs = listRuns(options);
+  return buildFinanceMonitoringSnapshot({
+    projectId: init.projectId,
+    runSummaries: runs,
+    liveRunEvents: listRunEventsForSummaries(options, runs),
+  });
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
  */
 export function readStrategicSnapshot(options = {}) {
   const init = initializeProjectRuntime(options);
@@ -1019,12 +1082,19 @@ export function readStrategicSnapshot(options = {}) {
       : [];
   const waveProgress = summarizeWaveProgress(backlogRows);
   const runs = listRuns(options);
+  const liveRunEvents = listRunEventsForSummaries(options, runs);
   const plannerMetrics = buildPlannerMetricsSnapshot({
     projectId: init.projectId,
     generatedAt,
     runSummaries: runs,
     qualityArtifacts: listQualityArtifacts(options),
     runControlAudits: listRunControlAudits(options),
+  });
+  const financeMonitoring = buildFinanceMonitoringSnapshot({
+    projectId: init.projectId,
+    generatedAt,
+    runSummaries: runs,
+    liveRunEvents,
   });
 
   const highRiskRunIds = [];
@@ -1079,5 +1149,6 @@ export function readStrategicSnapshot(options = {}) {
       },
     },
     planner_metrics: plannerMetrics,
+    finance_monitoring: financeMonitoring,
   };
 }

@@ -94,6 +94,7 @@ Freeze escalation flow (regression-backed):
 - harness replay reports compatibility mismatches;
 - deterministic validation status is `warn` or `fail`;
 - finance signals are incomplete in promotion decision evidence summary;
+- production monitoring evidence is missing from `finance-monitoring-snapshot` when a production monitoring claim is being reviewed;
 - baseline comparison evidence is missing for `stable|frozen|demoted` transitions;
 - freeze transition is requested without explicit regression evidence;
 - required evidence files were not generated.

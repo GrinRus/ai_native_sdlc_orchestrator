@@ -16,6 +16,7 @@ import {
   readRunPolicyHistory,
   listRuns,
   listStepResults,
+  readFinanceMonitoringSnapshot,
   readStrategicSnapshot,
   openRunEventStream,
   readUiLifecycleState,
@@ -82,7 +83,8 @@ export const OPERATIONS_COMMANDS = Object.freeze([
   "incident backfill",
   "incident recertify",
   "incident show",
-  "audit runs"
+  "audit runs",
+  "finance monitor"
 ]);
 
 export const OPERATIONS_COMMAND_GROUP = Object.freeze({
@@ -864,7 +866,34 @@ export function handleOperationsCommand(context) {
           "incident open --run-id <id> --summary <text>",
           "incident show --run-id <id>",
           "incident recertify --incident-id <id> --decision recertify",
-        ];
+      ];
+  } else if (command === "finance monitor") {
+    ensureRequiredFlags(command, flags);
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    outputState.resolvedProjectRef = projectState.project_root;
+    outputState.resolvedRuntimeRoot = projectState.runtime_root;
+    outputState.runtimeLayout = projectState.runtime_layout;
+    outputState.runtimeStateFile = projectState.state_file;
+    outputState.projectProfileRef = projectState.project_profile_ref;
+
+    const snapshot = readFinanceMonitoringSnapshot({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    outputState.financeMonitoringSnapshot = snapshot;
+    outputState.financeAnalytics = snapshot.finance;
+    outputState.productionMonitoring = snapshot.monitoring_loop.evidence_classes.production_monitoring;
+    outputState.readOnly = true;
+    outputState.futureControlHooks = [
+      "audit runs",
+      "run status --follow=true --run-id <id>",
+      "incident open --run-id <id> --summary <text>",
+    ];
   } else {
     return false;
   }

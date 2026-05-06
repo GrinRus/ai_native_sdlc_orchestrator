@@ -208,7 +208,7 @@ This is the master index for the implementation slices across all defined waves.
 | W20-S02 | Production security and observability hardening baseline | EPIC-6 | done | `docs/contracts/**`, `docs/architecture/**`, `apps/api`, `apps/web`, `apps/cli`, `packages/observability` | W19-S01, W10-S04 |
 | W20-S03 | OpenCode live-baseline certification | EPIC-3 | blocked | `examples/adapters/**`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W16-S06, W20-S02 |
 | W20-S04 | Compiler revision asset lifecycle | EPIC-4 | done | `docs/contracts/**`, `packages/harness`, `packages/orchestrator-core`, `apps/cli`, `apps/api` | W19-S01, W8-S09 |
-| W20-S05 | Finance analytics and production monitoring loop | EPIC-7 | blocked | `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W20-S02, W7-S04 |
+| W20-S05 | Finance analytics and production monitoring loop | EPIC-7 | done | `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W20-S02, W7-S04 |
 
 ## W21 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

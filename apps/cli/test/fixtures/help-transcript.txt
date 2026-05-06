@@ -33,6 +33,7 @@ Implemented commands:
   - aor incident recertify
   - aor incident show
   - aor audit runs
+  - aor finance monitor
   - aor ui attach
   - aor review run
   - aor review decide
