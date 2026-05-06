@@ -124,7 +124,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S04 — Guided mission intake and next-action resolver
 - **Epic:** EPIC-2 Packet lifecycle
-- **State:** ready
+- **State:** done
 - **Outcome:** Let users define a mission with goals, KPI/DoD, constraints, allowed paths, and delivery mode, then receive the next safe action for the current project state.
 - **Primary modules:** `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, tests
 - **Hard dependencies:** W19-S02, W21-S03
@@ -157,7 +157,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S05 — Guided web app full-flow console
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Make the optional web UI mirror the guided CLI journey from readiness through mission, discovery/spec/plan, execution, review/QA, delivery/release, and learning.
 - **Primary modules:** `apps/web`, `apps/api`, `docs/ops/**`, tests
 - **Hard dependencies:** W18-S03, W21-S04

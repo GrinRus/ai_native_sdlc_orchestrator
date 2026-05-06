@@ -218,6 +218,8 @@ export function formatCommandHelp(definition) {
   const statusLine =
     GUIDED_SHORTCUT_COMMANDS.has(definition.command)
       ? "Status: implemented in guided first-run shell (W21-S02)"
+      : definition.command === "mission create"
+        ? "Status: implemented in guided mission shell (W21-S04)"
       : definition.command === "eval run"
       ? "Status: implemented in quality shell (W3-S03)"
       : definition.command === "harness replay"
@@ -293,11 +295,20 @@ export function formatCommandHelp(definition) {
             ]
           : definition.command === "next"
             ? [
-                "- Next is a first-run discovery shortcut in W21-S02.",
-                "- It points to the safe low-level command for current first-run state without claiming the W21-S04 deterministic resolver.",
-                "- Runtime-initialized projects are directed toward intake or status inspection.",
+                "- Next writes a deterministic next-action-report under the project runtime root.",
+                "- It chooses one primary action from onboarding, mission intake, active run, and discovery evidence.",
+                "- Incomplete mission intake is blocked with missing product evidence fields and exact repair command.",
+                "- Delivery-capable modes keep write-back policy explicit and upstream writes disabled by default.",
                 "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
               ]
+            : definition.command === "mission create"
+              ? [
+                  "- Mission create is a guided wrapper over 'aor intake create'.",
+                  "- It writes the existing intake-request artifact packet and intake-request-body contract.",
+                  "- Goals, constraints, KPIs, Definition of Done, source refs, allowed paths, and delivery mode remain durable evidence.",
+                  "- Missing KPI or Definition of Done evidence is saved but blocks the next lifecycle action.",
+                  "- Delivery mode defaults to no-write; delivery-capable modes still require review before write-back.",
+                ]
     : definition.command === "project init"
       ? [
           "- --project-ref is optional. When omitted, the command discovers repo root from cwd.",

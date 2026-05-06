@@ -339,6 +339,8 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(nextJson.exitCode, 0, nextJson.stderr);
     const nextPayload = JSON.parse(nextJson.stdout);
     assert.equal(nextPayload.guided_low_level_command, "intake create");
+    assert.equal(nextPayload.next_action_primary.action_id, "mission-create");
+    assert.equal(fs.existsSync(nextPayload.next_action_report_file), true);
 
     const transcriptFixture = JSON.parse(
       fs.readFileSync(path.join(fixturesDir, "installed-user-first-run-transcript.json"), "utf8"),
@@ -375,10 +377,117 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
           guided_stage: nextPayload.guided_stage,
           guided_low_level_command: nextPayload.guided_low_level_command,
           guided_status: nextPayload.guided_status,
+          has_next_action_report_file: fs.existsSync(nextPayload.next_action_report_file),
         },
       },
       transcriptFixture,
     );
+  });
+});
+
+test("guided mission create writes intake evidence and next resolves mission states", () => {
+  withTempProject((projectRoot) => {
+    fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "mission-fixture" }, null, 2), "utf8");
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+
+    const completeMission = invokeCli([
+      "mission",
+      "create",
+      "--project-ref",
+      projectRoot,
+      "--mission-id",
+      "checkout-risk",
+      "--goal",
+      "Reduce checkout support tickets.",
+      "--constraint",
+      "Keep changes in web checkout.",
+      "--kpi",
+      "checkout-risk:Checkout risk:Reduce weekly tickets by 20%:Support tickets tagged checkout",
+      "--dod",
+      "Checkout errors show an actionable reason.",
+      "--allowed-path",
+      "apps/web/**",
+      "--forbidden-path",
+      "packages/settlement/**",
+      "--delivery-mode",
+      "patch-only",
+      "--source-kind",
+      "local-prd",
+      "--source-ref",
+      "docs/product/checkout-risk.md",
+      "--json",
+    ]);
+    assert.equal(completeMission.exitCode, 0, completeMission.stderr);
+    const missionPayload = JSON.parse(completeMission.stdout);
+    assert.equal(missionPayload.command, "mission create");
+    assert.equal(missionPayload.guided_status, "ready");
+    assert.equal(missionPayload.delivery_mode, "patch-only");
+    assert.equal(missionPayload.product_intake_completeness.status, "complete");
+    assert.equal(fs.existsSync(missionPayload.artifact_packet_body_file), true);
+
+    const missionBody = JSON.parse(fs.readFileSync(missionPayload.artifact_packet_body_file, "utf8"));
+    assert.equal(missionBody.generated_from.command, "aor mission create");
+    assert.deepEqual(missionBody.mission_scope.allowed_paths, ["apps/web/**"]);
+    assert.equal(missionBody.mission_scope.delivery_mode, "patch-only");
+    assert.equal(missionBody.mission_scope.writeback_policy.upstream_writes_default, false);
+
+    const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
+    assert.equal(nextJson.exitCode, 0, nextJson.stderr);
+    const nextPayload = JSON.parse(nextJson.stdout);
+    assert.equal(nextPayload.guided_stage, "discovery");
+    assert.equal(nextPayload.next_action_status, "ready");
+    assert.equal(nextPayload.next_action_primary.action_id, "discovery-run");
+    assert.equal(nextPayload.next_action_bounded_execution.requested_delivery_mode, "patch-only");
+    assert.equal(nextPayload.next_action_bounded_execution.requires_review_before_writeback, true);
+  });
+
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    const incompleteMission = invokeCli([
+      "mission",
+      "create",
+      "--project-ref",
+      projectRoot,
+      "--mission-id",
+      "missing-acceptance",
+      "--goal",
+      "Define a bounded mission.",
+      "--constraint",
+      "Stay in docs.",
+      "--source-kind",
+      "local-note",
+      "--source-ref",
+      "docs/product/missing-acceptance.md",
+    ]);
+    assert.equal(incompleteMission.exitCode, 0, incompleteMission.stderr);
+    const incompletePayload = JSON.parse(incompleteMission.stdout);
+    assert.equal(incompletePayload.guided_status, "blocked");
+    assert.deepEqual(incompletePayload.product_intake_completeness.missing_fields, [
+      "kpis",
+      "definition_of_done",
+    ]);
+
+    const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
+    assert.equal(nextJson.exitCode, 0, nextJson.stderr);
+    const nextPayload = JSON.parse(nextJson.stdout);
+    const blockerCodes = nextPayload.next_action_blockers.map((blocker) => blocker.code);
+    assert.equal(nextPayload.next_action_status, "blocked");
+    assert.ok(blockerCodes.includes("mission-kpis-missing"));
+    assert.ok(blockerCodes.includes("mission-definition_of_done-missing"));
+  });
+
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    const invalidMission = invokeCli([
+      "mission",
+      "create",
+      "--project-ref",
+      projectRoot,
+      "--kpi",
+      "not-enough-parts",
+    ]);
+    assert.equal(invalidMission.exitCode, 1);
+    assert.match(invalidMission.stderr, /must use 'kpi_id:name:target\[:measurement\]'/);
   });
 });
 

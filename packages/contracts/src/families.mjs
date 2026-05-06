@@ -25,6 +25,7 @@ const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-fi
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
 const ASSET_MODE_VALUES = ["bundled", "materialized"];
 const ONBOARDING_STATUS_VALUES = ["ready", "blocked"];
+const NEXT_ACTION_STATUS_VALUES = ["ready", "blocked"];
 export const LIVE_E2E_OBSERVATION_STATUS_VALUES = ["pass", "warn", "not_pass"];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
@@ -141,6 +142,42 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     ],
   },
   {
+    family: "next-action-report",
+    familyGroup: "core-packets-and-profiles",
+    sourceContract: "docs/contracts/next-action-report.md",
+    exampleGlob: "examples/reports/next-action-report*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "report_id",
+      "project_id",
+      "version",
+      "generated_from",
+      "project_state",
+      "mission_state",
+      "primary_action",
+      "blockers",
+      "bounded_execution",
+      "evidence_refs",
+      "status",
+      "created_at",
+    ],
+    fieldTypes: {
+      report_id: "string",
+      project_id: "string",
+      version: "number",
+      generated_from: "object",
+      project_state: "object",
+      mission_state: "object",
+      primary_action: "object",
+      blockers: "array",
+      bounded_execution: "object",
+      evidence_refs: "array",
+      status: "string",
+      created_at: "string",
+    },
+    enumChecks: [{ field: "status", allowedValues: NEXT_ACTION_STATUS_VALUES }],
+  },
+  {
     family: "project-analysis-report",
     familyGroup: "core-packets-and-profiles",
     sourceContract: "docs/contracts/project-analysis-report.md",
@@ -244,6 +281,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       "mission_traceability",
       "product_intake",
       "product_intake_completeness",
+      "mission_scope",
       "feature_request",
       "evidence_roots",
     ],
@@ -253,6 +291,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       mission_traceability: "object",
       product_intake: "object",
       product_intake_completeness: "object",
+      mission_scope: "object",
       feature_request: "object",
       evidence_roots: "object",
     },
@@ -1369,6 +1408,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/control-plane-api\/[^/]+\.ya?ml$/, family: "control-plane-api" },
   { regex: /^examples\/delivery-manifest[^/]*\.ya?ml$/, family: "delivery-manifest" },
   { regex: /^examples\/reports\/onboarding-report[^/]*\.ya?ml$/, family: "onboarding-report" },
+  { regex: /^examples\/reports\/next-action-report[^/]*\.ya?ml$/, family: "next-action-report" },
   { regex: /^examples\/reports\/discovery-research-report[^/]*\.ya?ml$/, family: "discovery-research-report" },
   { regex: /^examples\/reports\/incident-backfill-proposal[^/]*\.ya?ml$/, family: "incident-backfill-proposal" },
   { regex: /^examples\/reports\/planner-metrics-snapshot[^/]*\.ya?ml$/, family: "planner-metrics-snapshot" },

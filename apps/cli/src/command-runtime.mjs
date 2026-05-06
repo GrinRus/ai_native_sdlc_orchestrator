@@ -58,6 +58,7 @@ export {
 export { resolveStepPolicyForStep } from "../../../packages/orchestrator-core/src/policy-resolution.mjs";
 export { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 export { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
+export { resolveNextAction } from "../../../packages/orchestrator-core/src/next-action.mjs";
 export { validateProjectRuntime } from "../../../packages/orchestrator-core/src/project-validate.mjs";
 export { verifyProjectRuntime } from "../../../packages/orchestrator-core/src/project-verify.mjs";
 export { materializeIntakeArtifactPacket } from "../../../packages/orchestrator-core/src/artifact-store.mjs";

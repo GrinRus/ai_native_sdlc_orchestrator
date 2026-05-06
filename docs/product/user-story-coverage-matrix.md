@@ -10,13 +10,13 @@ Coverage status values:
 
 | Story ID | Role cluster | Tier | Outcome | Coverage status | Evidence | Gap slice |
 |---|---|---|---|---|---|---|
-| PSO-01 | Product sponsor / owner | MVP | Define project goals and constraints for a target repository. | partial | `project init`, project profiles, W13-S03 feature-intent intake, W19-S02 intake-request body goals and constraints, W21-S01 installed-user journey contract | W21-S04 |
-| PSO-02 | Product sponsor / owner | MVP | Start intake from issues, PRDs, RFCs, notes, or mail-like source material. | partial | `intake create`, W13-S03 public feature-intent intake, W19-S02 local issue/PRD/RFC/note/mail source refs, W21-S01 guided mission-intake boundary | W21-S04 |
+| PSO-01 | Product sponsor / owner | MVP | Define project goals and constraints for a target repository. | covered | `project init`, project profiles, W13-S03 feature-intent intake, W19-S02 intake-request body goals and constraints, `mission create`, W21-S04 guided mission evidence | none |
+| PSO-02 | Product sponsor / owner | MVP | Start intake from issues, PRDs, RFCs, notes, or mail-like source material. | covered | `intake create`, `mission create`, W13-S03 public feature-intent intake, W19-S02 local issue/PRD/RFC/note/mail source refs, W21-S04 guided source-ref preservation | none |
 | PSO-03 | Product sponsor / owner | MVP | Review discovery outputs and open questions before execution. | partial | `discovery run`, `spec build`, W13-S04 lifecycle evidence, W19-S03 discovery research open questions, W21-S01 guided stage model | W21-S05 |
 | PSO-04 | Product sponsor / owner | MVP | Track wave status and implementation progress. | covered | `wave create`, `run status`, W8-S01 sponsor visibility | none |
 | PSO-05 | Product sponsor / owner | MVP | Inspect quality gates before approving delivery. | partial | review reports, Runtime Harness reports, `review-decision`, `review decide`, delivery/release review-decision gate, W14-S06 review alignment, W19-S05, W21-S01 closure stage model | W21-S06 |
 | PSO-06 | Product sponsor / owner | MVP | See delivery risk and release readiness. | covered | delivery manifests, `release prepare`, W6-S05 delivery/release command pack | none |
-| PSO-07 | Product sponsor / owner | MVP+ | Track KPIs and Definition of Done as product acceptance evidence. | partial | product docs, W19-S02 intake-request body KPI/Definition of Done evidence and completeness status | W21-S04 |
+| PSO-07 | Product sponsor / owner | MVP+ | Track KPIs and Definition of Done as product acceptance evidence. | covered | product docs, W19-S02 intake-request body KPI/Definition of Done evidence and completeness status, `mission create`, `next-action-report` blockers for missing KPI/DoD | none |
 | PSO-08 | Product sponsor / owner | Later | Use strategic product visibility across waves and outcomes. | partial | W8-S01 sponsor/planner visibility, W19-S06 planner metrics in strategic snapshot | W21-S05 |
 | DIS-01 | Discovery / research | MVP | Build discovery packets from repository content. | covered | `project analyze`, `discovery run`, W1-S03 project analysis | none |
 | DIS-02 | Discovery / research | MVP | Include AOR-owned runtime context assets in discovery. | covered | context compiler and asset lifecycle, W8-S08, W8-S09 | none |
@@ -35,8 +35,8 @@ Coverage status values:
 | ARC-07 | Architect / tech lead | MVP+ | Inspect governance guardrails and quality evidence parity. | covered | W7-S01 governance quality guardrails | none |
 | ARC-08 | Architect / tech lead | Later | Maintain later architecture maturity and ADR traceability. | covered | W8-S02 architecture maturity pack, W19-S03 discovery research ADR-ready recommendations | none |
 | EMP-01 | Engineering manager / planner | MVP | Convert approved scope into wave tickets and handoff packets. | covered | `wave create`, `handoff prepare`, W1-S07 handoff foundation | none |
-| EMP-02 | Engineering manager / planner | MVP | Split work into bounded implementation steps. | partial | wave tickets, run-control command pack, W19-S06 decomposition-quality visibility metrics, W21-S01 next-action stage contract | W21-S04 |
-| EMP-03 | Engineering manager / planner | MVP | Coordinate sequential or parallel execution steps. | partial | route policies, run-control command pack, W19-S06 scheduler visibility metrics, W21-S01 next-action stage contract | W21-S04 |
+| EMP-02 | Engineering manager / planner | MVP | Split work into bounded implementation steps. | covered | wave tickets, run-control command pack, W19-S06 decomposition-quality visibility metrics, W21-S04 deterministic next-action stages | none |
+| EMP-03 | Engineering manager / planner | MVP | Coordinate sequential or parallel execution steps. | covered | route policies, run-control command pack, W19-S06 scheduler visibility metrics, W21-S04 active-run and next-stage resolver | none |
 | EMP-04 | Engineering manager / planner | MVP | Manage budgets during execution. | covered | step policies, budgets, W2-S03, W6-S03 | none |
 | EMP-05 | Engineering manager / planner | MVP | Pause, resume, and cancel active runs. | covered | `run pause`, `run resume`, `run cancel`, W6-S03 | none |
 | EMP-06 | Engineering manager / planner | MVP | Steer bounded execution with policy and audit traceability. | covered | `run steer`, audit records, W6-S03 | none |
@@ -104,8 +104,8 @@ Coverage status values:
 | PBO-04 | Project bootstrap / onboarding | MVP | Materialize project-analysis reports with boundaries and risk zones. | covered | project-analysis reports, W1-S03 | none |
 | PBO-05 | Project bootstrap / onboarding | MVP | Block execution when prerequisites are missing. | covered | verify/preflight reports, W1-S05 | none |
 | PBO-06 | Project bootstrap / onboarding | MVP+ | Recommend missing AOR-native runtime context assets. | covered | W6-S02, W8-S08, W8-S09 | none |
-| PBO-07 | Project bootstrap / onboarding | MVP+ | Track project-profile coverage and missing source material. | partial | project profile validation, story coverage matrix, W19-S02 intake source refs and completeness evidence, W21-S01 installed-user onboarding source-of-truth | W21-S03, W21-S04 |
-| PBO-08 | Project bootstrap / onboarding | Later | Support later bootstrap maturity for reruns and multirepo work. | partial | W8-S07 bootstrap and delivery rerun maturity, W19-S03 research gate evidence, W20-S01 multirepo coordination evidence, W21-S01 onboarding stage model | W21-S03 |
+| PBO-07 | Project bootstrap / onboarding | MVP+ | Track project-profile coverage and missing source material. | covered | project profile validation, story coverage matrix, W19-S02 intake source refs and completeness evidence, W21-S03 onboarding report, W21-S04 next-action blockers for missing source/product evidence | none |
+| PBO-08 | Project bootstrap / onboarding | Later | Support later bootstrap maturity for reruns and multirepo work. | covered | W8-S07 bootstrap and delivery rerun maturity, W19-S03 research gate evidence, W20-S01 multirepo coordination evidence, W21-S01 onboarding stage model, W21-S03 clean asset-root onboarding evidence | none |
 | DTX-01 | Delivery transaction / Git / PR | MVP | Deliver output through patch-only mode. | covered | delivery driver, `deliver prepare`, W4-S03, W6-S05 | none |
 | DTX-02 | Delivery transaction / Git / PR | MVP | Deliver output through local-branch mode. | covered | local branch delivery driver, W4-S03 | none |
 | DTX-03 | Delivery transaction / Git / PR | MVP | Prepare fork-first-pr delivery under bounded policy. | covered | fork-first driver, W4-S04, W10-S02 | none |

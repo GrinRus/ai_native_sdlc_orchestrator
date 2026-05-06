@@ -4,6 +4,7 @@ import path from "node:path";
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 
 const INTAKE_SOURCE_KIND_VALUES = Object.freeze(["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"]);
+const DELIVERY_MODE_VALUES = Object.freeze(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
 
 /**
  * @param {string} value
@@ -51,6 +52,16 @@ function readOptionalStringArray(record, field) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function normalizeStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean)
+    : [];
+}
+
+/**
  * @param {Record<string, unknown>} record
  * @returns {Array<{ kpi_id: string, name: string, target: string, measurement?: string }>}
  */
@@ -79,6 +90,51 @@ function readOptionalKpis(record) {
       ...(measurement ? { measurement } : {}),
     };
   });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Array<{ kpi_id: string, name: string, target: string, measurement?: string }>}
+ */
+function normalizeKpis(value) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) {
+    throw new Error("Guided mission KPIs must be an array when provided.");
+  }
+  return value.map((entry, index) => {
+    if (!isPlainObject(entry)) {
+      throw new Error(`Guided mission KPI '${index}' must be an object.`);
+    }
+    const kpiId = typeof entry.kpi_id === "string" ? entry.kpi_id.trim() : "";
+    const name = typeof entry.name === "string" ? entry.name.trim() : "";
+    const target = typeof entry.target === "string" ? entry.target.trim() : "";
+    const measurement = typeof entry.measurement === "string" ? entry.measurement.trim() : "";
+    if (!kpiId || !name || !target) {
+      throw new Error(`Guided mission KPI '${index}' must include kpi_id, name, and target.`);
+    }
+    return {
+      kpi_id: kpiId,
+      name,
+      target,
+      ...(measurement ? { measurement } : {}),
+    };
+  });
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function normalizeDeliveryMode(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") {
+    throw new Error("Delivery mode must be a string.");
+  }
+  const deliveryMode = value.trim();
+  if (!DELIVERY_MODE_VALUES.includes(deliveryMode)) {
+    throw new Error(`Unsupported delivery mode '${deliveryMode}'. Expected one of: ${DELIVERY_MODE_VALUES.join(", ")}.`);
+  }
+  return deliveryMode;
 }
 
 /**
@@ -152,22 +208,36 @@ function dedupeSourceRefs(sourceRefs) {
  *   requestTitle: string,
  *   requestBrief: string,
  *   requestConstraints: string[],
+ *   goals?: string[],
+ *   kpis?: Array<{ kpi_id: string, name: string, target: string, measurement?: string }>,
+ *   definitionOfDone?: string[],
  *   requestFile: string | null,
  *   sourceKind?: string | null,
  *   sourceRef?: string | null,
  * }} options
  */
 function buildProductIntake(options) {
-  const goals = readOptionalStringArray(options.requestDocument, "goals");
+  const goals = [
+    ...normalizeStringArray(options.goals),
+    ...readOptionalStringArray(options.requestDocument, "goals"),
+  ].filter((entry, index, entries) => entries.indexOf(entry) === index);
   const constraints = [
     ...options.requestConstraints,
     ...readOptionalStringArray(options.requestDocument, "constraints"),
   ].filter((entry, index, entries) => entries.indexOf(entry) === index);
-  const kpis = readOptionalKpis(options.requestDocument);
+  const kpis = [
+    ...normalizeKpis(options.kpis),
+    ...readOptionalKpis(options.requestDocument),
+  ].filter((entry, index, entries) =>
+    entries.findIndex((candidate) => candidate.kpi_id === entry.kpi_id) === index,
+  );
+  const guidedDefinitionOfDone = normalizeStringArray(options.definitionOfDone);
   const definitionOfDone =
-    options.requestDocument.definition_of_done !== undefined
-      ? readOptionalStringArray(options.requestDocument, "definition_of_done")
-      : readOptionalStringArray(options.requestDocument, "dod");
+    guidedDefinitionOfDone.length > 0
+      ? guidedDefinitionOfDone
+      : options.requestDocument.definition_of_done !== undefined
+        ? readOptionalStringArray(options.requestDocument, "definition_of_done")
+        : readOptionalStringArray(options.requestDocument, "dod");
   const requestedSourceKind = normalizeSourceKind(options.sourceKind) ?? "local-note";
   const sourceRefs = readOptionalSourceRefs(options.requestDocument);
   const sourceRef = typeof options.sourceRef === "string" && options.sourceRef.trim().length > 0
@@ -301,6 +371,12 @@ export function materializeBootstrapArtifactPacket(options) {
  *  requestTitle?: string | null,
  *  requestBrief?: string | null,
  *  requestConstraints?: string[],
+ *  goals?: string[],
+ *  kpis?: Array<{ kpi_id: string, name: string, target: string, measurement?: string }>,
+ *  definitionOfDone?: string[],
+ *  allowedPaths?: string[],
+ *  forbiddenPaths?: string[],
+ *  deliveryMode?: string | null,
  *  requestFile?: string | null,
  *  sourceKind?: string | null,
  *  sourceRef?: string | null,
@@ -335,10 +411,26 @@ export function materializeIntakeArtifactPacket(options) {
     requestTitle,
     requestBrief,
     requestConstraints,
+    goals: options.goals,
+    kpis: options.kpis,
+    definitionOfDone: options.definitionOfDone,
     requestFile,
     sourceKind: options.sourceKind ?? null,
     sourceRef: options.sourceRef ?? null,
   });
+  const allowedPaths = [
+    ...normalizeStringArray(options.allowedPaths),
+    ...readOptionalStringArray(requestDocument, "allowed_paths"),
+  ].filter((entry, index, entries) => entries.indexOf(entry) === index);
+  const forbiddenPaths = [
+    ...normalizeStringArray(options.forbiddenPaths),
+    ...readOptionalStringArray(requestDocument, "forbidden_paths"),
+  ].filter((entry, index, entries) => entries.indexOf(entry) === index);
+  const deliveryMode =
+    normalizeDeliveryMode(options.deliveryMode) ??
+    normalizeDeliveryMode(requestDocument.delivery_mode) ??
+    normalizeDeliveryMode(requestDocument.write_mode) ??
+    "no-write";
 
   const packetBody = {
     generated_from: {
@@ -357,6 +449,8 @@ export function materializeIntakeArtifactPacket(options) {
       provider_variant_id:
         typeof requestDocument.provider_variant_id === "string" ? requestDocument.provider_variant_id : null,
       feature_size: typeof requestDocument.feature_size === "string" ? requestDocument.feature_size : null,
+      mission_type: typeof requestDocument.mission_type === "string" ? requestDocument.mission_type : null,
+      delivery_mode: deliveryMode,
       matrix_cell:
         typeof requestDocument.matrix_cell === "object" &&
         requestDocument.matrix_cell !== null &&
@@ -372,10 +466,23 @@ export function materializeIntakeArtifactPacket(options) {
     },
     product_intake: productIntake,
     product_intake_completeness: completeness,
+    mission_scope: {
+      allowed_paths: allowedPaths,
+      forbidden_paths: forbiddenPaths,
+      delivery_mode: deliveryMode,
+      writeback_policy: {
+        mode: deliveryMode,
+        upstream_writes_default: false,
+        requires_explicit_review: deliveryMode !== "no-write",
+      },
+    },
     feature_request: {
       title: requestTitle,
       brief: requestBrief,
       constraints: requestConstraints,
+      allowed_paths: allowedPaths,
+      forbidden_paths: forbiddenPaths,
+      delivery_mode: deliveryMode,
       request_file: requestFile,
       request_document: requestDocumentBody,
     },

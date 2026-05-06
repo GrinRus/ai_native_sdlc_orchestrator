@@ -5,6 +5,7 @@ Implemented commands:
   - aor onboard
   - aor app
   - aor next
+  - aor mission create
   - aor project init
   - aor project analyze
   - aor project validate

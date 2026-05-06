@@ -3,6 +3,7 @@
 ## Core packets and profiles
 - `project-profile.md`
 - `onboarding-report.md`
+- `next-action-report.md`
 - `project-analysis-report.md`
 - `discovery-research-report.md`
 - `artifact-packet.md`

@@ -6,6 +6,8 @@ import { CONTRACT_FAMILY_INDEX, INTAKE_SOURCE_KIND_VALUES, LIVE_E2E_OBSERVATION_
 import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 
+const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
+
 /**
  * @returns {import("./index.d.ts").ContractFamilyIndexEntry[]}
  */
@@ -171,6 +173,7 @@ function validateIntakeRequestBody(document, source) {
   const issues = [];
   const productIntake = isPlainObject(document.product_intake) ? document.product_intake : {};
   const completeness = isPlainObject(document.product_intake_completeness) ? document.product_intake_completeness : {};
+  const missionScope = isPlainObject(document.mission_scope) ? document.mission_scope : {};
 
   for (const field of ["goals", "constraints", "kpis", "definition_of_done", "source_refs"]) {
     validateNestedArrayField({
@@ -193,6 +196,25 @@ function validateIntakeRequestBody(document, source) {
     source,
     field: "product_intake_completeness.missing_fields",
     issues,
+  });
+  validateNestedArrayField({
+    record: missionScope,
+    source,
+    field: "mission_scope.allowed_paths",
+    issues,
+  });
+  validateNestedArrayField({
+    record: missionScope,
+    source,
+    field: "mission_scope.forbidden_paths",
+    issues,
+  });
+  validateNestedStringField({
+    record: missionScope,
+    source,
+    field: "mission_scope.delivery_mode",
+    issues,
+    required: true,
   });
 
   validateStringArrayItems({
@@ -229,6 +251,19 @@ function validateIntakeRequestBody(document, source) {
         expected: "complete|incomplete",
         actual: completeness.status,
         message: "Field 'product_intake_completeness.status' has unsupported value.",
+      }),
+    );
+  }
+
+  if (typeof missionScope.delivery_mode === "string" && !DELIVERY_MODE_VALUES.includes(missionScope.delivery_mode)) {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "mission_scope.delivery_mode",
+        expected: DELIVERY_MODE_VALUES.join("|"),
+        actual: missionScope.delivery_mode,
+        message: "Field 'mission_scope.delivery_mode' has unsupported value.",
       }),
     );
   }

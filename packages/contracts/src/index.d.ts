@@ -1,6 +1,7 @@
 export type ContractFamily =
   | "project-profile"
   | "onboarding-report"
+  | "next-action-report"
   | "project-analysis-report"
   | "discovery-research-report"
   | "artifact-packet"

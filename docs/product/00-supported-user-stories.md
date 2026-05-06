@@ -40,6 +40,8 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 
 `W21-S01` defines the installed-user journey from first launch through learning closure. Product-facing guided intake remains additive: it should populate the existing product-intake contract and surface blockers through `aor next` or guided web stages rather than replacing low-level command evidence.
 
+`W21-S04` implements that product-facing boundary for the CLI: `aor mission create` writes the existing intake-request packet/body with goals, constraints, KPIs, Definition of Done, local source refs, allowed paths, and delivery mode, while `aor next` writes a deterministic next-action report that blocks on missing product evidence.
+
 ### Discovery / research
 - Build discovery packets from repository content, project analysis, AOR-owned runtime context assets, and external research.
 - Separate discovery from delivery.
@@ -119,6 +121,8 @@ Bounded multirepo means one AOR project profile can coordinate several explicit 
 - Block execution if prerequisites are missing.
 
 `W21-S01` makes onboarding a first-class installed-user journey rather than a list of independent bootstrap commands. Later W21 slices implement the guided CLI shortcuts, asset-mode onboarding report, next-action resolver, guided web stages, closure UX, and proof rehearsal.
+
+`W21-S04` closes the guided mission and next-action resolver portion: installed users get one primary next command, evidence refs, blockers, active-run handling, and explicit write-back policy before delivery-capable work is recommended.
 
 ### Delivery transaction / Git / PR flow
 - Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.

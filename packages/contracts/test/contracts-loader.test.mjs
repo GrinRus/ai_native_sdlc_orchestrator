@@ -499,6 +499,21 @@ test("intake request body validates local source refs and rejects malformed prod
     ),
     "expected malformed KPI target to be rejected",
   );
+
+  const invalidDeliveryMode = structuredClone(loaded.document);
+  invalidDeliveryMode.mission_scope.delivery_mode = "upstream-main";
+  const invalidDeliveryModeValidation = validateContractDocument({
+    family: "intake-request-body",
+    document: invalidDeliveryMode,
+    source: "test://intake-request-body-invalid-delivery-mode",
+  });
+  assert.equal(invalidDeliveryModeValidation.ok, false);
+  assert.ok(
+    invalidDeliveryModeValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "mission_scope.delivery_mode",
+    ),
+    "expected unsupported mission delivery mode to be rejected",
+  );
 });
 
 test("context assets require metadata and source reference fields in the supported shape", () => {

@@ -3,8 +3,13 @@ import path from "node:path";
 
 import {
   initializeProjectRuntime,
+  materializeIntakeArtifactPacket,
+  normalizeDeliveryMode,
+  resolveNextAction,
   resolveOptionalAssetModeFlag,
   resolveOptionalBooleanFlag,
+  resolveOptionalCsvFlag,
+  resolveOptionalRefOrPathFlag,
   resolveOptionalStringFlag,
   resolveOptionalStringListFlag,
   resolveRuntimeRoot,
@@ -13,6 +18,7 @@ import {
 export const GUIDED_COMMANDS = Object.freeze([
   "doctor",
   "onboard",
+  "mission create",
   "app",
   "next",
 ]);
@@ -37,6 +43,33 @@ function shellQuote(value) {
  */
 function projectCommand(command, projectRoot) {
   return `aor ${command} --project-ref ${shellQuote(projectRoot)}`;
+}
+
+/**
+ * @param {string | string[] | true | undefined} value
+ * @returns {Array<{ kpi_id: string, name: string, target: string, measurement?: string }>}
+ */
+function resolveKpiFlags(value) {
+  if (value === undefined) return [];
+  if (value === true) {
+    throw new Error("Flag '--kpi' requires a value.");
+  }
+  const values = Array.isArray(value) ? value : [value];
+  return values.map((entry, index) => {
+    const [kpiId, name, target, ...measurementParts] = entry.split(":").map((part) => part.trim());
+    const measurement = measurementParts.join(":").trim();
+    if (!kpiId || !name || !target) {
+      throw new Error(
+        `Flag '--kpi' value ${index + 1} must use 'kpi_id:name:target[:measurement]' format.`,
+      );
+    }
+    return {
+      kpi_id: kpiId,
+      name,
+      target,
+      ...(measurement ? { measurement } : {}),
+    };
+  });
 }
 
 /**
@@ -216,6 +249,93 @@ export function handleGuidedCommand(context) {
     return true;
   }
 
+  if (command === "mission create") {
+    const missionInit = initializeProjectRuntime({
+      cwd,
+      projectRef: resolveOptionalStringFlag("project-ref", flags["project-ref"]) ?? ".",
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      command: "aor mission create",
+    });
+    const requestFileInput = resolveOptionalStringFlag("request-file", flags["request-file"]);
+    const requestFile = resolveOptionalRefOrPathFlag({
+      cwd,
+      projectRoot: missionInit.projectRoot,
+      flagValue: requestFileInput,
+      flagName: "request-file",
+    });
+    if (requestFile && !fs.existsSync(requestFile)) {
+      throw new Error(`Request file '${requestFileInput}' was not found.`);
+    }
+    const deliveryMode = normalizeDeliveryMode(
+      resolveOptionalStringFlag("delivery-mode", flags["delivery-mode"]) ?? "no-write",
+    );
+    const missionId = resolveOptionalStringFlag("mission-id", flags["mission-id"]) ?? null;
+    const goals = resolveOptionalStringListFlag("goal", flags.goal);
+    const constraints = resolveOptionalStringListFlag("constraint", flags.constraint);
+    const definitionOfDone = resolveOptionalStringListFlag("dod", flags.dod);
+    const kpis = resolveKpiFlags(flags.kpi);
+    const intakePacket = materializeIntakeArtifactPacket({
+      projectId: missionInit.projectId,
+      projectRoot: missionInit.projectRoot,
+      projectProfileRef: missionInit.projectProfileRef,
+      runtimeLayout: missionInit.runtimeLayout,
+      command: "aor mission create",
+      missionId,
+      requestTitle:
+        resolveOptionalStringFlag("title", flags.title) ??
+        (missionId ? `Guided mission ${missionId}` : "Guided mission request"),
+      requestBrief:
+        resolveOptionalStringFlag("brief", flags.brief) ??
+        goals[0] ??
+        "Prepare one bounded guided mission request.",
+      requestConstraints: constraints,
+      goals,
+      kpis,
+      definitionOfDone,
+      allowedPaths: resolveOptionalCsvFlag("allowed-path", flags["allowed-path"]),
+      forbiddenPaths: resolveOptionalCsvFlag("forbidden-path", flags["forbidden-path"]),
+      deliveryMode,
+      requestFile: requestFile ?? null,
+      sourceKind: resolveOptionalStringFlag("source-kind", flags["source-kind"]) ?? null,
+      sourceRef: resolveOptionalStringFlag("source-ref", flags["source-ref"]) ?? null,
+    });
+    const completeness = intakePacket.packetBody.product_intake_completeness;
+    const complete = completeness.status === "complete";
+
+    outputState.resolvedProjectRef = missionInit.projectRoot;
+    outputState.resolvedRuntimeRoot = missionInit.runtimeRoot;
+    outputState.runtimeLayout = missionInit.runtimeLayout;
+    outputState.runtimeStateFile = missionInit.stateFile;
+    outputState.projectProfileRef = missionInit.projectProfileRef;
+    outputState.artifactPacketId = intakePacket.packet.packet_id;
+    outputState.artifactPacketFile = intakePacket.packetFile;
+    outputState.artifactPacketBodyFile = intakePacket.packetBodyFile;
+    outputState.productIntake = intakePacket.packetBody.product_intake;
+    outputState.productIntakeCompleteness = completeness;
+    outputState.productIntakeSourceRefs = intakePacket.packetBody.product_intake.source_refs;
+    outputState.deliveryMode = deliveryMode;
+    outputState.guidedCommand = "aor mission create";
+    outputState.guidedStage = "mission-intake";
+    outputState.guidedStatus = complete ? "ready" : "blocked";
+    outputState.guidedSummary = complete
+      ? "Guided mission intake is complete and preserved as an intake-request artifact packet."
+      : "Guided mission intake was saved, but missing product evidence blocks the next lifecycle stage.";
+    outputState.guidedLowLevelCommand = "intake create";
+    outputState.guidedActionableBlockers = complete
+      ? []
+      : completeness.missing_fields.map((field) => ({
+          code: `mission-${field}-missing`,
+          summary: `Mission intake is missing ${field}.`,
+          next_command: projectCommand("mission create", missionInit.projectRoot),
+        }));
+    outputState.guidedRecommendedCommands = complete
+      ? [projectCommand("next", missionInit.projectRoot)]
+      : [projectCommand("mission create", missionInit.projectRoot)];
+    outputState.futureControlHooks = ["next", "discovery run", "spec build"];
+    return true;
+  }
+
   if (command === "app") {
     const { projectRoot, runtimeRoot } = resolveGuidedProject({ flags, cwd });
     const readiness = inspectReadiness(projectRoot, runtimeRoot);
@@ -256,37 +376,46 @@ export function handleGuidedCommand(context) {
   }
 
   if (command === "next") {
-    const { projectRoot, runtimeRoot } = resolveGuidedProject({ flags, cwd });
-    const readiness = inspectReadiness(projectRoot, runtimeRoot);
-    const runtimeInitialized = fs.existsSync(runtimeRoot);
-    const lowLevelCommand = runtimeInitialized ? "intake create" : "project init";
+    const next = resolveNextAction({
+      cwd,
+      projectRef: resolveOptionalStringFlag("project-ref", flags["project-ref"]) ?? ".",
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const report = next.nextActionReport;
+    const primary = report.primary_action;
 
-    outputState.resolvedProjectRef = projectRoot;
-    outputState.resolvedRuntimeRoot = runtimeRoot;
+    outputState.resolvedProjectRef = next.projectRoot;
+    outputState.resolvedRuntimeRoot = next.runtimeRoot;
+    outputState.runtimeLayout = next.runtimeLayout;
+    outputState.runtimeStateFile = next.stateFile;
+    outputState.projectProfileRef = next.projectProfileRef;
+    outputState.onboardingReportId = next.onboardingReportId;
+    outputState.onboardingReportFile = next.onboardingReportFile;
+    outputState.assetMode = next.assetMode;
+    outputState.registryRoots = next.registryRoots;
+    outputState.nextActionReportId = next.nextActionReportId;
+    outputState.nextActionReportFile = next.nextActionReportFile;
+    outputState.nextActionStatus = report.status;
+    outputState.nextActionPrimary = primary;
+    outputState.nextActionBlockers = report.blockers;
+    outputState.nextActionEvidenceRefs = report.evidence_refs;
+    outputState.nextActionMissionState = report.mission_state;
+    outputState.nextActionBoundedExecution = report.bounded_execution;
     outputState.guidedCommand = "aor next";
-    outputState.guidedStage = "next-action-preview";
-    outputState.guidedStatus = readiness.status;
-    outputState.guidedSummary =
-      readiness.status === "ready" && runtimeInitialized
-        ? "Runtime root exists. This first-run preview points to the current safe low-level command until the deterministic next-action resolver lands."
-        : readiness.status === "ready"
-          ? "Project is ready for onboarding. Run the guided onboard wrapper before creating mission evidence."
-          : "Next action is blocked by project readiness issues.";
-    outputState.guidedLowLevelCommand = lowLevelCommand;
+    outputState.guidedStage = report.project_state.stage;
+    outputState.guidedStatus = report.status;
+    outputState.guidedSummary = primary.reason;
+    outputState.guidedLowLevelCommand = primary.low_level_command;
     outputState.guidedReadiness = {
-      status: readiness.status,
-      runtime_initialized: runtimeInitialized,
-      checks: readiness.checks,
+      status: report.status,
+      stage: report.project_state.stage,
+      report_file: next.nextActionReportFile,
     };
-    outputState.guidedActionableBlockers = readiness.blockers;
-    outputState.guidedRecommendedCommands =
-      readiness.status !== "ready"
-        ? readiness.blockers.map((blocker) => blocker.next_command)
-        : runtimeInitialized
-          ? [projectCommand("intake create", projectRoot), projectCommand("run status", projectRoot)]
-          : [projectCommand("onboard", projectRoot), projectCommand("doctor", projectRoot)];
-    outputState.readOnly = true;
-    outputState.futureControlHooks = ["onboard", "intake create", "run status"];
+    outputState.guidedActionableBlockers = report.blockers;
+    outputState.guidedRecommendedCommands = [primary.command];
+    outputState.readOnly = false;
+    outputState.futureControlHooks = ["mission create", "discovery run", "spec build", "run status"];
     return true;
   }
 

@@ -995,6 +995,7 @@ console.log("harness tests ok: scorer interface plus capture-format compatibilit
 
 const orchestratorCoreTests = [
   path.join(root, "packages/orchestrator-core/test/project-init.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/next-action.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/handoff-packets.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/evaluation-registry.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/eval-runner.test.mjs"),

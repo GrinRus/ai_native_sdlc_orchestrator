@@ -216,8 +216,8 @@ This is the master index for the implementation slices across all defined waves.
 | W21-S01 | Installed-user onboarding UX contract | EPIC-1 | done | `docs/product/**`, `docs/contracts/**`, `docs/architecture/**`, `docs/backlog/**` | W19-S01 |
 | W21-S02 | Installable CLI and first-run entrypoints | EPIC-6 | done | `package.json`, `apps/cli`, `docs/architecture/**`, `docs/ops/**`, tests | W21-S01 |
 | W21-S03 | Clean project onboarding and asset-root resolution | EPIC-1 | done | `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, `examples/**`, tests | W21-S01 |
-| W21-S04 | Guided mission intake and next-action resolver | EPIC-2 | ready | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, tests | W19-S02, W21-S03 |
-| W21-S05 | Guided web app full-flow console | EPIC-6 | blocked | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S03, W21-S04 |
+| W21-S04 | Guided mission intake and next-action resolver | EPIC-2 | done | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, tests | W19-S02, W21-S03 |
+| W21-S05 | Guided web app full-flow console | EPIC-6 | ready | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S03, W21-S04 |
 | W21-S06 | Review, delivery, release, and learning closure UX | EPIC-4 | blocked | `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`, `apps/web`, `docs/ops/**`, tests | W19-S05, W21-S05 |
 | W21-S07 | Installed-user guided journey proof | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/cli`, `apps/web`, tests | W21-S02, W21-S03, W21-S04, W21-S05, W21-S06 |
 

@@ -24,14 +24,14 @@ An installed user can connect a repository, understand readiness, define a missi
 | Guided proof | Rehearse the installed-user journey on a clean repo with no upstream-write defaults. | Live E2E proof profile, CLI transcript, web smoke evidence, no-write assertions. | W21-S07 |
 
 ## Guided command vocabulary
-These public commands are the target vocabulary for W21. W21-S02 implements the first-run guided shell for `doctor`, `onboard`, `app`, and `next`; later W21 slices deepen onboarding internals, mission intake, deterministic next-action reports, web stages, and closure.
+These public commands are the target vocabulary for W21. W21-S02 implements the first-run guided shell for `doctor`, `onboard`, `app`, and the initial `next` shell. W21-S03 adds clean bundled onboarding evidence, and W21-S04 adds guided mission intake plus deterministic next-action reports. Later W21 slices deepen web stages and closure.
 
 | Guided command | Intent | Low-level ownership |
 |---|---|---|
 | `aor doctor` | Read environment and repo readiness before mutation. | `project init`, project profile resolution, runtime-root checks. |
 | `aor onboard <repo>` | Prepare or inspect a repository using explicit asset-mode behavior. | Project bootstrap, analysis, validation, project-profile registry roots. |
-| `aor mission create` | Capture product mission evidence in one guided intake flow. | `intake create`, `discovery run`, `spec build` prerequisites. |
-| `aor next` | Recommend one deterministic next action and explain blockers. | Existing packets, reports, run-control state, review decisions, delivery/release gates. |
+| `aor mission create` | Capture product mission evidence in one guided intake flow. | `intake-request-body` packet evidence with goals, constraints, KPI/DoD, source refs, allowed paths, and delivery mode. |
+| `aor next` | Recommend one deterministic next action and explain blockers. | `next-action-report` over onboarding reports, intake packets, run-control state, and bounded write-back policy. |
 | `aor app` | Point to the optional web surface and connection state. | `ui attach`, `ui detach`, detached control-plane transport, web read models. |
 
 Low-level commands remain stable, scriptable, and machine-readable. Guided commands may default to human-readable output, but they must preserve machine-readable evidence refs whenever the underlying command already exposes them.
@@ -66,7 +66,7 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 | Project identity and registry roots | `project-profile` | W21-S03 adds explicit `asset_mode` semantics and bundled/materialized registry-root resolution. |
 | Bootstrap readiness | `project-analysis-report`, `validation-report` | W21-S03 adds an onboarding report that records readiness, blockers, asset mode, next action, and no-surprise-write evidence. |
 | Product mission | `intake-request-body` | W21-S04 preserves goals, constraints, KPI, Definition of Done, source refs, allowed paths, and delivery mode. |
-| Next action | Packets, reports, run-control state, policy evidence | W21-S04 adds deterministic next-action output over existing durable evidence. |
+| Next action | `next-action-report` | W21-S04 resolves one primary action with blockers, evidence refs, mission state, active run state, and explicit write-back policy. |
 | Web lifecycle | `control-plane-api`, `live-run-event` | W21-S05 maps guided stages to read models and lifecycle mutations without UI-owned orchestration. |
 | Closure | `review-decision`, `delivery-plan`, `delivery-manifest`, `release-packet`, `learning-loop-handoff` | W21-S06 exposes final-stage decisions, blockers, and evidence refs consistently across CLI/API/web. |
 | Proof | Live E2E profiles and observation reports | W21-S07 proves the clean installed-user journey with no-upstream-write assertions. |

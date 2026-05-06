@@ -34,14 +34,37 @@ product_intake:
 product_intake_completeness:
   status: complete
   missing_fields: []
+mission_scope:
+  allowed_paths:
+    - apps/web/**
+    - packages/payments/**
+  forbidden_paths:
+    - packages/settlement/**
+  delivery_mode: patch-only
+  writeback_policy:
+    mode: patch-only
+    upstream_writes_default: false
+    requires_explicit_review: true
 feature_request:
   title: Checkout error clarity
   brief: Improve checkout error messaging without changing settlement behavior.
   constraints:
     - Keep changes inside apps/web and packages/payments.
+  allowed_paths:
+    - apps/web/**
+    - packages/payments/**
+  forbidden_paths:
+    - packages/settlement/**
+  delivery_mode: patch-only
   request_file: docs/product/checkout-risk-prd.json
   request_document:
     feature_size: small
+    allowed_paths:
+      - apps/web/**
+      - packages/payments/**
+    forbidden_paths:
+      - packages/settlement/**
+    delivery_mode: patch-only
 evidence_roots:
   reports_root: .aor/projects/aor-core/reports
   state_root: .aor/projects/aor-core/state

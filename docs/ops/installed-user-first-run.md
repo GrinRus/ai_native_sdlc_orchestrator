@@ -19,7 +19,7 @@ Guided shortcuts default to human-readable output. Pass `--json` when automation
 | --- | --- | --- |
 | `aor doctor` | environment and project readiness probe | Read-only. Reports actionable blockers without mutating `.aor/`. |
 | `aor onboard <repo>` | `aor project init --project-ref <repo>` | Initializes the runtime-root layout, emits an onboarding report, and defaults clean repos to bundled asset mode without copying `examples/`. |
-| `aor next` | current first-run state | Points to onboarding or intake/status commands. W21-S04 owns durable deterministic next-action reports. |
+| `aor next` | current first-run state | Writes a durable deterministic next-action report with one primary action, blockers, evidence refs, and write-back policy. |
 | `aor app` | `aor ui attach` / `aor ui detach` | Web is optional; headless CLI/API operation remains valid. |
 
 ## Smoke transcript shape

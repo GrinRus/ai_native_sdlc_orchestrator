@@ -29,10 +29,21 @@ product_intake_completeness:
     - constraints
     - kpis
     - definition_of_done
+mission_scope:
+  allowed_paths: []
+  forbidden_paths: []
+  delivery_mode: no-write
+  writeback_policy:
+    mode: no-write
+    upstream_writes_default: false
+    requires_explicit_review: false
 feature_request:
   title: Catalog-backed feature mission request
   brief: Prepare one bounded feature mission request for full-journey live E2E.
   constraints: []
+  allowed_paths: []
+  forbidden_paths: []
+  delivery_mode: no-write
   request_file: null
   request_document: null
 evidence_roots:
