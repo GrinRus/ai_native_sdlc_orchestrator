@@ -80,6 +80,16 @@ const ROUTES = Object.freeze([
     kind: "read",
   },
   {
+    id: "multirepo-coordination",
+    pattern: /^\/api\/projects\/([^/]+)\/multirepo-coordination$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Multirepo coordination route supports only GET.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
     id: "runs",
     pattern: /^\/api\/projects\/([^/]+)\/runs$/u,
     method: "GET",

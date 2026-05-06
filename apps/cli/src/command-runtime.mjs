@@ -9,6 +9,7 @@ export {
   attachUiLifecycle,
   detachUiLifecycle,
   listDeliveryManifests,
+  listMultirepoCoordinationStatuses,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
@@ -38,6 +39,7 @@ export {
   materializeDeliveryPlan,
   normalizeDeliveryMode,
 } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
+export { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 export { runEvaluationSuite } from "../../../packages/orchestrator-core/src/eval-runner.mjs";
 export { replayHarnessCapture } from "../../../packages/orchestrator-core/src/harness-capture-replay.mjs";
 export {

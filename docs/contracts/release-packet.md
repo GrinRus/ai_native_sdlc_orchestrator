@@ -20,6 +20,7 @@ The release packet must point to the delivery manifest for the run and preserve 
 For bounded multirepo delivery, release lineage must preserve the delivery manifest ref plus coordination refs so auditors can trace repo-level changed paths back to the approved cross-repo evidence.
 Later-maturity release packets should also preserve:
 - coordination lineage (`evidence_lineage.coordination_refs`) when cross-repo approval artifacts are required;
+- scoped lock lineage (`evidence_lineage.coordination_lock_refs`) and validation lineage (`evidence_lineage.cross_repo_validation_refs`) when multirepo coordination status evidence is available;
 - rerun lineage (`evidence_lineage.rerun_refs`) and bounded retry context (`rerun_recovery`).
 
 ## Example

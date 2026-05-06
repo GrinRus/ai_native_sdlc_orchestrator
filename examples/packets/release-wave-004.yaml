@@ -23,6 +23,10 @@ evidence_lineage:
     - evidence://reports/delivery-transcript-fork-first-pr-run-101.json
   coordination_refs:
     - evidence://coordination/WAVE-004/backend-mobile-frontend
+  coordination_lock_refs:
+    - evidence://reports/multirepo-coordination-status.sample.yaml
+  cross_repo_validation_refs:
+    - validation://integration/backend-frontend/api-contract
   delivery_output_refs:
     - evidence://release/REL-004/delivery-manifest.yaml
 coordination:
@@ -34,6 +38,10 @@ coordination:
     - frontend
   evidence_refs:
     - evidence://coordination/WAVE-004/backend-mobile-frontend
+  lock_evidence_refs:
+    - evidence://reports/multirepo-coordination-status.sample.yaml
+  cross_repo_validation_refs:
+    - validation://integration/backend-frontend/api-contract
 residual_risks:
   - Runtime implementation is still scaffold-only.
 rollback_notes: >

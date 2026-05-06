@@ -19,6 +19,10 @@ read_operations:
       - live-run-event
       - step-result
       - delivery-plan
+  - operation_id: read.multirepo-coordination
+    operation_family: read
+    output_contract_families:
+      - multirepo-coordination-status
 
 run_control_operations:
   - operation_id: run.start

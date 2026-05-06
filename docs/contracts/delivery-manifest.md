@@ -28,7 +28,7 @@ For bounded multirepo delivery, `repo_deliveries[]` should contain one entry per
 For strict code-changing missions, an empty patch or empty non-bootstrap changed-path set is a machine-readable quality failure even when the manifest is structurally valid for audit lineage.
 Strict delivery/release preparation must also fail before manifest materialization when the run has no Runtime Harness routed step decisions or the latest Runtime Harness report is not `pass`.
 `approval_context` should preserve handoff and promotion evidence references that justified write-back eligibility.
-`coordination` should capture multi-repo coordination requirement/status and evidence refs used to unblock write-back.
+`coordination` should capture multi-repo coordination requirement/status and evidence refs used to unblock write-back. When `multirepo-coordination-status` evidence exists, the manifest should also preserve `lock_evidence_refs[]` and `cross_repo_validation_refs[]` both at top-level coordination and each repo delivery coordination record.
 `rerun_recovery` should keep retry scope bounded by one failed step and explicit packet boundary.
 When fork-first network write is executed, `repo_deliveries[].pr_draft` and `writeback_policy.network_mode` should preserve draft PR and network provenance for audit replay.
 

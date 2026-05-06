@@ -1173,6 +1173,10 @@ test("delivery and release outputs enforce multi-repo coordination evidence and 
       "no-write",
       "--coordination-evidence-refs",
       "evidence://coordination/w8-deliver-rerun-coordination",
+      "--coordination-lock-evidence-refs",
+      "evidence://reports/multirepo-coordination-status-w8-deliver-rerun-coordination.json",
+      "--cross-repo-validation-refs",
+      "validation://integration/backend-frontend/api-contract",
       "--rerun-of-run-id",
       "w8-deliver-previous-failed",
       "--rerun-failed-step",
@@ -1186,11 +1190,86 @@ test("delivery and release outputs enforce multi-repo coordination evidence and 
     assert.equal(deliverPayload.delivery_coordination.required, true);
     assert.deepEqual(deliverPayload.delivery_coordination.repo_ids, ["backend", "mobile", "frontend"]);
     assert.equal(deliverPayload.delivery_coordination.status, "present");
+    assert.deepEqual(deliverPayload.delivery_coordination.lock_evidence_refs, [
+      "evidence://reports/multirepo-coordination-status-w8-deliver-rerun-coordination.json",
+    ]);
+    assert.deepEqual(deliverPayload.delivery_coordination.cross_repo_validation_refs, [
+      "validation://integration/backend-frontend/api-contract",
+    ]);
     assert.equal(deliverPayload.delivery_rerun_recovery.requested, true);
     assert.equal(deliverPayload.delivery_rerun_recovery.status, "ready");
     assert.equal(deliverPayload.delivery_rerun_recovery.failed_step_ref, "deliver.prepare");
     assert.equal(deliverPayload.delivery_rerun_recovery.packet_boundary, "delivery-manifest");
     assert.ok(deliverPayload.delivery_rerun_recovery.rerun_of_run_ref.includes("w8-deliver-previous-failed"));
+  });
+});
+
+test("multirepo lock command materializes scoped lock and validation status evidence", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+
+    const result = invokeCli([
+      "multirepo",
+      "lock",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      "examples/project.bounded-multirepo.aor.yaml",
+      "--action",
+      "acquire",
+      "--run-id",
+      "w20-cli-multirepo-lock",
+      "--owner-ref",
+      "operator://cli-test",
+      "--repo-ids",
+      "backend,mobile,frontend",
+      "--path-globs",
+      "apps/api/**,packages/contracts/**",
+      "--duration-minutes",
+      "30",
+      "--repo-validation-refs",
+      "backend=validation://repos/backend/profile-entry,mobile=validation://repos/mobile/profile-entry,frontend=validation://repos/frontend/profile-entry",
+      "--integration-validation-refs",
+      "validation://integration/backend-frontend/api-contract",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.multirepo_coordination_status, "ready");
+    assert.equal(payload.multirepo_lock_state.status, "active");
+    assert.equal(payload.multirepo_cross_repo_validation.status, "pass");
+    assert.equal(fs.existsSync(payload.multirepo_coordination_file), true);
+    assert.ok(payload.multirepo_coordination_ref.includes("multirepo-coordination-status"));
+
+    const conflict = invokeCli([
+      "multirepo",
+      "lock",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      "examples/project.bounded-multirepo.aor.yaml",
+      "--action",
+      "acquire",
+      "--run-id",
+      "w20-cli-multirepo-conflict",
+      "--owner-ref",
+      "operator://cli-test-other",
+      "--repo-ids",
+      "backend",
+      "--path-globs",
+      "apps/api/routes/**",
+      "--repo-validation-refs",
+      "backend=validation://repos/backend/profile-entry",
+    ]);
+    assert.equal(conflict.exitCode, 0, conflict.stderr);
+    const conflictPayload = JSON.parse(conflict.stdout);
+    assert.equal(conflictPayload.multirepo_coordination_status, "blocked");
+    assert.deepEqual(conflictPayload.multirepo_coordination_blocking_reasons, ["lock-conflict"]);
   });
 });
 

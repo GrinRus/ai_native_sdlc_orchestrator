@@ -16,7 +16,7 @@ Close the production and platform maturity gaps that remain after the W19 story-
 
 ## W20-S01 — Multirepo scoped locks and cross-repo validation
 - **Epic:** EPIC-5 Delivery and release
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add a follow-up slice for scoped multirepo locks, cross-repo validation, and coordinated delivery safety.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/ops/**`
 - **Hard dependencies:** W19-S01, W8-S07

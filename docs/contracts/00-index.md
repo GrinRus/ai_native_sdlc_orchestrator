@@ -21,6 +21,7 @@
 - `review-decision.md`
 - `runtime-harness-report.md`
 - `live-e2e-observation-report.md`
+- `multirepo-coordination-status.md`
 - `incident-backfill-proposal.md`
 - `dataset.md`
 - `evaluation-suite.md`

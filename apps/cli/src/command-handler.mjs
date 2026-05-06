@@ -130,6 +130,8 @@ export function formatCommandHelp(definition) {
           ? "Status: implemented in operator shell (W5-S03)"
         : definition.command === "deliver prepare" || definition.command === "release prepare"
           ? "Status: implemented in delivery/release shell (W6-S05)"
+        : definition.command === "multirepo lock"
+          ? "Status: implemented in multirepo coordination shell (W20-S01)"
         : definition.command === "incident recertify"
           ? "Status: implemented in incident recertification shell (W8-S06)"
         : definition.command === "incident backfill"
@@ -319,7 +321,7 @@ export function formatCommandHelp(definition) {
                   "- Non-no-write modes require approved handoff and promotion evidence refs to pass guardrails.",
                   "- fork-first-pr stays in planning-only mode unless --network-write is explicitly enabled.",
                   "- --network-write requires GitHub credentials (GITHUB_TOKEN) and bounded fork permissions.",
-                  "- Multi-repo plans require --coordination-evidence-refs in non-no-write modes.",
+                  "- Multi-repo plans require --coordination-evidence-refs in non-no-write modes; lock and cross-repo refs can also be supplied separately.",
                   "- Optional rerun flags persist packet-boundary and failed-step recovery scope for auditable retries.",
                   "- --require-review-decision requires the latest run-linked review-decision to be approve.",
                   "- Output includes delivery_governance_decision with explicit allow/deny/escalate reasons.",
@@ -332,6 +334,14 @@ export function formatCommandHelp(definition) {
                     "- Optional rerun flags keep failed-step recovery bounded by explicit packet boundary metadata.",
                     "- Governance deny/escalate reasons are surfaced as machine-readable blocking codes.",
                     "- Successful execution links delivery-manifest and release-packet outputs for audit lineage.",
+                  ]
+              : definition.command === "multirepo lock"
+                ? [
+                    "- The command writes one multirepo-coordination-status report for acquire, release, or inspect.",
+                    "- Acquire requires --owner-ref plus bounded --repo-ids; overlapping active locks block with lock-conflict.",
+                    "- Expired overlapping locks block with lock-stale until explicitly released or replaced.",
+                    "- --repo-validation-refs uses repo=ref pairs and reports missing or failed repo checks deterministically.",
+                    "- Pass multirepo_coordination_ref to delivery via --coordination-evidence-refs and lock/validation-specific evidence flags.",
                   ]
             : definition.command === "evidence show"
               ? [

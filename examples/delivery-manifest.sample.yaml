@@ -45,6 +45,10 @@ repo_deliveries:
         - frontend
       evidence_refs:
         - evidence://coordination/WAVE-004/backend-mobile-frontend
+      lock_evidence_refs:
+        - evidence://reports/multirepo-coordination-status.sample.yaml
+      cross_repo_validation_refs:
+        - validation://integration/backend-frontend/api-contract
     rollback_refs:
       - revert://9f3c2ab
   - repo_id: mobile
@@ -68,6 +72,10 @@ repo_deliveries:
         - frontend
       evidence_refs:
         - evidence://coordination/WAVE-004/backend-mobile-frontend
+      lock_evidence_refs:
+        - evidence://reports/multirepo-coordination-status.sample.yaml
+      cross_repo_validation_refs:
+        - validation://integration/backend-frontend/api-contract
   - repo_id: frontend
     role: frontend
     source_kind: git
@@ -89,6 +97,10 @@ repo_deliveries:
         - frontend
       evidence_refs:
         - evidence://coordination/WAVE-004/backend-mobile-frontend
+      lock_evidence_refs:
+        - evidence://reports/multirepo-coordination-status.sample.yaml
+      cross_repo_validation_refs:
+        - validation://integration/backend-frontend/api-contract
 verification_refs:
   - evidence://reports/RUN-101/tests.xml
   - evidence://evaluation/RUN-101/release-suite.json
@@ -104,6 +116,10 @@ approval_context:
     status: present
     refs:
       - evidence://coordination/WAVE-004/backend-mobile-frontend
+    lock_refs:
+      - evidence://reports/multirepo-coordination-status.sample.yaml
+    cross_repo_validation_refs:
+      - validation://integration/backend-frontend/api-contract
 coordination:
   required: true
   status: present
@@ -113,6 +129,10 @@ coordination:
     - frontend
   evidence_refs:
     - evidence://coordination/WAVE-004/backend-mobile-frontend
+  lock_evidence_refs:
+    - evidence://reports/multirepo-coordination-status.sample.yaml
+  cross_repo_validation_refs:
+    - validation://integration/backend-frontend/api-contract
 evidence_root: /workspace/aor-core/.aor/projects/aor-core/reports
 source_refs:
   delivery_plan_ref: evidence://packets/delivery-plan-implement-fork-first-pr.yaml

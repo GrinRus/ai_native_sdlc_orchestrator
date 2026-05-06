@@ -1,0 +1,66 @@
+status_id: aor-core.multirepo-coordination.w20-s01.ready
+project_id: aor-core
+run_id: w20-s01.multirepo-ready
+version: 1
+generated_from:
+  command: aor multirepo lock
+  action: acquire
+  requested_by: operator://delivery-lead
+lock_scope:
+  repo_ids:
+    - backend
+    - mobile
+    - frontend
+  path_globs:
+    - packages/contracts/**
+    - apps/api/**
+    - apps/cli/**
+  owner_ref: operator://delivery-lead
+  duration_minutes: 45
+lock_state:
+  status: active
+  lock_id: lock.w20-s01.multirepo-ready.backend-mobile-frontend
+  owner_ref: operator://delivery-lead
+  run_id: w20-s01.multirepo-ready
+  acquired_at: "2026-05-06T08:00:00.000Z"
+  expires_at: "2026-05-06T08:45:00.000Z"
+  released_at: null
+  conflicts: []
+  release_evidence_refs: []
+cross_repo_validation:
+  status: pass
+  repos:
+    - repo_id: backend
+      status: pass
+      validation_refs:
+        - validation://repos/aor-bounded-multirepo-sample/backend/profile-entry
+    - repo_id: mobile
+      status: pass
+      validation_refs:
+        - validation://repos/aor-bounded-multirepo-sample/mobile/profile-entry
+    - repo_id: frontend
+      status: pass
+      validation_refs:
+        - validation://repos/aor-bounded-multirepo-sample/frontend/profile-entry
+  missing_repo_ids: []
+  failed_repo_ids: []
+  integration_validation_refs:
+    - validation://integration/backend-frontend/api-contract
+delivery_evidence:
+  coordination_evidence_refs:
+    - evidence://reports/multirepo-coordination-status-w20-s01.multirepo-ready.json
+  lock_evidence_refs:
+    - evidence://reports/multirepo-coordination-status-w20-s01.multirepo-ready.json
+  cross_repo_validation_refs:
+    - validation://repos/aor-bounded-multirepo-sample/backend/profile-entry
+    - validation://repos/aor-bounded-multirepo-sample/mobile/profile-entry
+    - validation://repos/aor-bounded-multirepo-sample/frontend/profile-entry
+    - validation://integration/backend-frontend/api-contract
+status: ready
+blocking_reasons: []
+evidence_refs:
+  - validation://repos/aor-bounded-multirepo-sample/backend/profile-entry
+  - validation://repos/aor-bounded-multirepo-sample/mobile/profile-entry
+  - validation://repos/aor-bounded-multirepo-sample/frontend/profile-entry
+  - validation://integration/backend-frontend/api-contract
+created_at: "2026-05-06T08:00:00.000Z"

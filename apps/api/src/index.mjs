@@ -1,5 +1,6 @@
 export {
   listDeliveryManifests,
+  listMultirepoCoordinationStatuses,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,

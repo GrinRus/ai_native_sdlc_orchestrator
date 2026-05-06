@@ -132,6 +132,8 @@ function resolveGovernanceSource(policyResolution) {
  *   promotionEvidenceRefs?: string[],
  *   coordinationRepos?: Array<{ repo_id?: string, role?: string, default_branch?: string, source_root?: string, source_kind?: string, source?: Record<string, unknown> }>,
  *   coordinationEvidenceRefs?: string[],
+ *   coordinationLockEvidenceRefs?: string[],
+ *   crossRepoValidationRefs?: string[],
  *   rerunOfRunRef?: string,
  *   rerunFailedStepRef?: string,
  *   rerunPacketBoundary?: string,
@@ -172,7 +174,13 @@ export function materializeDeliveryPlan(options) {
   const coordinationRepoIds = uniqueStrings(
     coordinationRepos.map((repo) => /** @type {string} */ (repo.repo_id)),
   );
-  const coordinationEvidenceRefs = uniqueStrings(asStringArray(options.coordinationEvidenceRefs ?? []));
+  const coordinationLockEvidenceRefs = uniqueStrings(asStringArray(options.coordinationLockEvidenceRefs ?? []));
+  const crossRepoValidationRefs = uniqueStrings(asStringArray(options.crossRepoValidationRefs ?? []));
+  const coordinationEvidenceRefs = uniqueStrings([
+    ...asStringArray(options.coordinationEvidenceRefs ?? []),
+    ...coordinationLockEvidenceRefs,
+    ...crossRepoValidationRefs,
+  ]);
   const multiRepoRequired = coordinationRepoIds.length > 1;
   const coordinationStatus = multiRepoRequired
     ? coordinationEvidenceRefs.length > 0
@@ -270,6 +278,8 @@ export function materializeDeliveryPlan(options) {
         required: nonReadOnlyMode && multiRepoRequired,
         status: nonReadOnlyMode && multiRepoRequired ? coordinationStatus : "not-required",
         refs: coordinationEvidenceRefs,
+        lock_refs: coordinationLockEvidenceRefs,
+        cross_repo_validation_refs: crossRepoValidationRefs,
       },
     },
     governance,
@@ -279,6 +289,8 @@ export function materializeDeliveryPlan(options) {
       repo_ids: coordinationRepoIds,
       repos: coordinationRepos,
       evidence_refs: coordinationEvidenceRefs,
+      lock_evidence_refs: coordinationLockEvidenceRefs,
+      cross_repo_validation_refs: crossRepoValidationRefs,
     },
     rerun_recovery: {
       requested: rerunRequested,

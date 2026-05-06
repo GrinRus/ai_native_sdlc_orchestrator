@@ -6,12 +6,14 @@ import { fileURLToPath } from "node:url";
 
 import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import { materializeDeliveryPlan } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
+import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { appendRunEvent, attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../src/index.mjs";
 import {
   listDeliveryManifests,
+  listMultirepoCoordinationStatuses,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
@@ -161,6 +163,19 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
         status: "open",
       },
     });
+    const multirepoCoordination = materializeMultirepoCoordinationStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      action: "inspect",
+      runId: "run.api.read.multirepo",
+      repoIds: ["backend", "frontend"],
+      repoValidationRefs: [
+        "backend=validation://repos/backend/profile-entry",
+        "frontend=validation://repos/frontend/profile-entry",
+      ],
+      integrationValidationRefs: ["validation://integration/backend-frontend/api-contract"],
+    });
+
     writeContractFile({
       family: "review-decision",
       filePath: path.join(init.runtimeLayout.reportsRoot, "review-decision-runtime.json"),
@@ -217,6 +232,11 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "review-decision"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "incident-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "promotion-decision"));
+    assert.ok(qualityArtifacts.some((artifact) => artifact.family === "multirepo-coordination-status"));
+
+    const multirepoStatuses = listMultirepoCoordinationStatuses({ projectRef: repoRoot, cwd: repoRoot });
+    assert.ok(multirepoStatuses.some((entry) => entry.file === multirepoCoordination.statusPath));
+    assert.equal(multirepoStatuses[0].document.cross_repo_validation.status, "pass");
 
     const runs = listRuns({ projectRef: repoRoot, cwd: repoRoot });
     const runSummary = runs.find((run) => run.run_id === runId);

@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
+import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 import { applyRunControlAction, appendRunEvent, createControlPlaneHttpServer } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -145,6 +146,17 @@ test("detached control-plane transport serves read baseline endpoints", async ()
         status: "pass",
       },
     });
+    materializeMultirepoCoordinationStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      action: "inspect",
+      runId: "run.http.transport.multirepo",
+      repoIds: ["backend", "frontend"],
+      repoValidationRefs: [
+        "backend=validation://repos/backend/profile-entry",
+        "frontend=validation://repos/frontend/profile-entry",
+      ],
+    });
 
     const transport = await createControlPlaneHttpServer({
       projectRef: repoRoot,
@@ -208,6 +220,14 @@ test("detached control-plane transport serves read baseline endpoints", async ()
       assert.equal(plannerMetricsResponse.status, 200);
       const plannerMetrics = await plannerMetricsResponse.json();
       assert.deepEqual(plannerMetrics.metric_names, strategicSnapshot.planner_metrics.metric_names);
+
+      const multirepoResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/multirepo-coordination`,
+      );
+      assert.equal(multirepoResponse.status, 200);
+      const multirepoStatuses = await multirepoResponse.json();
+      assert.equal(Array.isArray(multirepoStatuses), true);
+      assert.ok(multirepoStatuses.some((entry) => entry.family === "multirepo-coordination-status"));
     } finally {
       await transport.close();
     }

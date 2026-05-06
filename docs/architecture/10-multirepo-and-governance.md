@@ -26,10 +26,11 @@ Single-repo, monorepo, and bounded multirepo targets all enter through the `proj
 - integration validation refs for graph edges;
 - whether delivery coordination is required.
 
-`project validate` repeats the same proof as the `repo-scope-proof` validator. Non-`no-write` delivery plans with more than one coordinated repo stay blocked until coordination evidence refs are present. Delivery manifests then preserve one `repo_deliveries[]` entry per coordinated repo, and release packets keep `evidence_lineage.coordination_refs` for audit replay.
+`project validate` repeats the same proof as the `repo-scope-proof` validator. Before coordinated delivery, `aor multirepo lock` writes `multirepo-coordination-status` evidence for scoped lock acquisition, release, stale/conflict blockers, and cross-repo validation completeness. Non-`no-write` delivery plans with more than one coordinated repo stay blocked until coordination evidence refs are present. Delivery manifests then preserve one `repo_deliveries[]` entry per coordinated repo, and release packets keep `evidence_lineage.coordination_refs`, `coordination_lock_refs`, and `cross_repo_validation_refs` for audit replay.
 
 ## Governance rules
 - keep multirepo scope explicit;
 - avoid unbounded organization-wide orchestration in MVP;
 - record ownership and dependency edges;
 - require stronger approvals for higher-risk cross-repo work.
+- treat AOR locks as local coordination evidence only; repository permissions and public-repo no-write defaults still control write-back.

@@ -17,6 +17,7 @@ const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "clos
 const INCIDENT_BACKFILL_PROPOSAL_STATE_VALUES = ["proposed", "approved", "rejected"];
 const REVIEW_DECISION_VALUES = ["approve", "hold", "request-repair"];
 const PLANNER_METRICS_STATUS_VALUES = ["no-data", "partial", "ready"];
+const MULTIREPO_COORDINATION_STATUS_VALUES = ["ready", "blocked", "released"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
 export const LIVE_E2E_OBSERVATION_STATUS_VALUES = ["pass", "warn", "not_pass"];
@@ -674,6 +675,44 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     enumChecks: [{ field: "overall_status", allowedValues: LIVE_E2E_OBSERVATION_STATUS_VALUES }],
   },
   {
+    family: "multirepo-coordination-status",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/multirepo-coordination-status.md",
+    exampleGlob: "examples/reports/multirepo-coordination-status*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "status_id",
+      "project_id",
+      "run_id",
+      "version",
+      "generated_from",
+      "lock_scope",
+      "lock_state",
+      "cross_repo_validation",
+      "delivery_evidence",
+      "status",
+      "blocking_reasons",
+      "evidence_refs",
+      "created_at",
+    ],
+    fieldTypes: {
+      status_id: "string",
+      project_id: "string",
+      run_id: "string",
+      version: "number",
+      generated_from: "object",
+      lock_scope: "object",
+      lock_state: "object",
+      cross_repo_validation: "object",
+      delivery_evidence: "object",
+      status: "string",
+      blocking_reasons: "array",
+      evidence_refs: "array",
+      created_at: "string",
+    },
+    enumChecks: [{ field: "status", allowedValues: MULTIREPO_COORDINATION_STATUS_VALUES }],
+  },
+  {
     family: "dataset",
     familyGroup: "execution-and-quality",
     sourceContract: "docs/contracts/dataset.md",
@@ -1216,6 +1255,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/eval\/report-[^/]+\.sample\.ya?ml$/, family: "evaluation-report" },
   { regex: /^examples\/eval\/suite-[^/]+\.ya?ml$/, family: "evaluation-suite" },
   { regex: /^examples\/reports\/live-e2e-observation-report[^/]*\.ya?ml$/, family: "live-e2e-observation-report" },
+  { regex: /^examples\/reports\/multirepo-coordination-status[^/]*\.ya?ml$/, family: "multirepo-coordination-status" },
   { regex: /^examples\/reports\/review-decision[^/]*\.ya?ml$/, family: "review-decision" },
   { regex: /^examples\/reports\/runtime-harness-report[^/]*\.ya?ml$/, family: "runtime-harness-report" },
   { regex: /^examples\/packets\/wave-ticket-[^/]+\.ya?ml$/, family: "wave-ticket" },

@@ -54,6 +54,8 @@ function withTempRepo(callback) {
  *   mode: "patch-only" | "local-branch" | "fork-first-pr",
  *   coordinationRepos?: Array<{ repo_id: string, role?: string, default_branch?: string, source_root?: string, source_kind?: string }>,
  *   coordinationEvidenceRefs?: string[],
+ *   coordinationLockEvidenceRefs?: string[],
+ *   crossRepoValidationRefs?: string[],
  *   rerunOfRunRef?: string,
  *   rerunFailedStepRef?: string,
  *   rerunPacketBoundary?: string,
@@ -86,6 +88,8 @@ function createReadyPlan(options) {
     ],
     coordinationRepos: options.coordinationRepos,
     coordinationEvidenceRefs: options.coordinationEvidenceRefs,
+    coordinationLockEvidenceRefs: options.coordinationLockEvidenceRefs,
+    crossRepoValidationRefs: options.crossRepoValidationRefs,
     rerunOfRunRef: options.rerunOfRunRef,
     rerunFailedStepRef: options.rerunFailedStepRef,
     rerunPacketBoundary: options.rerunPacketBoundary,
@@ -451,6 +455,8 @@ test("runDeliveryDriver persists multi-repo coordination and bounded rerun metad
         { repo_id: "docs", role: "documentation", default_branch: "main" },
       ],
       coordinationEvidenceRefs: ["evidence://coordination/w8-s07"],
+      coordinationLockEvidenceRefs: ["evidence://reports/multirepo-coordination-status-w8-s07.json"],
+      crossRepoValidationRefs: ["validation://integration/main-docs"],
       rerunOfRunRef: fixture.rerun.rerun_of_run_ref,
       rerunFailedStepRef: fixture.rerun.failed_step_ref,
       rerunPacketBoundary: fixture.rerun.packet_boundary,
@@ -473,6 +479,12 @@ test("runDeliveryDriver persists multi-repo coordination and bounded rerun metad
     assert.equal(result.deliveryManifest.rerun_recovery.packet_boundary, fixture.rerun.packet_boundary);
     assert.equal(result.deliveryManifest.rerun_recovery.failed_step_ref, fixture.rerun.failed_step_ref);
     assert.ok(result.releasePacket.evidence_lineage.coordination_refs.includes("evidence://coordination/w8-s07"));
+    assert.ok(
+      result.releasePacket.evidence_lineage.coordination_lock_refs.includes(
+        "evidence://reports/multirepo-coordination-status-w8-s07.json",
+      ),
+    );
+    assert.ok(result.releasePacket.evidence_lineage.cross_repo_validation_refs.includes("validation://integration/main-docs"));
     assert.ok(result.releasePacket.evidence_lineage.rerun_refs.includes(fixture.rerun.rerun_of_run_ref));
 
     const transcript = JSON.parse(fs.readFileSync(result.transcriptFile, "utf8"));
@@ -525,6 +537,8 @@ test("runDeliveryDriver preserves repo-level changed paths for bounded multirepo
         },
       ],
       coordinationEvidenceRefs: ["evidence://coordination/w18-s04"],
+      coordinationLockEvidenceRefs: ["evidence://reports/multirepo-coordination-status-w18-s04.json"],
+      crossRepoValidationRefs: ["validation://integration/backend-frontend/api-contract"],
     });
 
     const result = runDeliveryDriver({
@@ -547,6 +561,14 @@ test("runDeliveryDriver preserves repo-level changed paths for bounded multirepo
     assert.deepEqual(deliveriesByRepo.get("mobile")?.changed_paths, []);
     assert.deepEqual(deliveriesByRepo.get("backend")?.coordination.evidence_refs, [
       "evidence://coordination/w18-s04",
+      "evidence://reports/multirepo-coordination-status-w18-s04.json",
+      "validation://integration/backend-frontend/api-contract",
+    ]);
+    assert.deepEqual(deliveriesByRepo.get("backend")?.coordination.lock_evidence_refs, [
+      "evidence://reports/multirepo-coordination-status-w18-s04.json",
+    ]);
+    assert.deepEqual(deliveriesByRepo.get("backend")?.coordination.cross_repo_validation_refs, [
+      "validation://integration/backend-frontend/api-contract",
     ]);
   });
 });

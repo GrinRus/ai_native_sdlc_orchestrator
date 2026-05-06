@@ -24,6 +24,7 @@ Implemented commands:
   - aor run status
   - aor deliver prepare
   - aor release prepare
+  - aor multirepo lock
   - aor packet show
   - aor evidence show
   - aor incident open

@@ -17,6 +17,7 @@ const EVALUATION_REPORT_REGEX = /^evaluation-report.*\.json$/;
 const REVIEW_REPORT_REGEX = /^review-report.*\.json$/;
 const REVIEW_DECISION_REGEX = /^review-decision-.*\.json$/;
 const RUNTIME_HARNESS_REPORT_REGEX = /^runtime-harness-report.*\.json$/;
+const MULTIREPO_COORDINATION_STATUS_REGEX = /^multirepo-coordination-status-.*\.json$/;
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
 const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/;
 const LEARNING_LOOP_SCORECARD_REGEX = /^learning-loop-scorecard-.*\.json$/;
@@ -241,6 +242,12 @@ export function listQualityArtifacts(options = {}) {
       family: "runtime-harness-report",
       matcher: RUNTIME_HARNESS_REPORT_REGEX,
     }),
+    ...loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "multirepo-coordination-status",
+      matcher: MULTIREPO_COORDINATION_STATUS_REGEX,
+    }),
     ...loadContractDocuments({ init, files: reportFiles, family: "incident-report", matcher: INCIDENT_REPORT_REGEX }),
     ...loadContractDocuments({
       init,
@@ -262,6 +269,25 @@ export function listQualityArtifacts(options = {}) {
     }),
     ...listPromotionDecisions(options),
   ];
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ */
+export function listMultirepoCoordinationStatuses(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  return loadContractDocuments({
+    init,
+    files: reportFiles,
+    family: "multirepo-coordination-status",
+    matcher: MULTIREPO_COORDINATION_STATUS_REGEX,
+  });
 }
 
 /**

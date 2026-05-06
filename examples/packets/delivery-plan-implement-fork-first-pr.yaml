@@ -23,6 +23,10 @@ preconditions:
     status: present
     refs:
       - evidence://coordination/WAVE-004/backend-mobile-frontend
+    lock_refs:
+      - evidence://reports/multirepo-coordination-status.sample.yaml
+    cross_repo_validation_refs:
+      - validation://integration/backend-frontend/api-contract
 governance:
   decision: allow
   route_risk_tier: medium
@@ -53,6 +57,10 @@ coordination:
       source_kind: git
   evidence_refs:
     - evidence://coordination/WAVE-004/backend-mobile-frontend
+  lock_evidence_refs:
+    - evidence://reports/multirepo-coordination-status.sample.yaml
+  cross_repo_validation_refs:
+    - validation://integration/backend-frontend/api-contract
 writeback_allowed: true
 blocking_reasons: []
 status: ready
@@ -60,4 +68,6 @@ evidence_refs:
   - .aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json
   - .aor/projects/aor-core/reports/promotion-decision-wrapper-wrapper.runner.default-v3-1776793902247.json
   - evidence://coordination/WAVE-004/backend-mobile-frontend
+  - evidence://reports/multirepo-coordination-status.sample.yaml
+  - validation://integration/backend-frontend/api-contract
 created_at: 2026-04-21T00:00:00.000Z

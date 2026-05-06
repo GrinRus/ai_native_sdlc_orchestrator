@@ -328,6 +328,8 @@ export function runDeliveryDriver(options = {}) {
   const coordination = asRecord(deliveryPlan.coordination);
   const coordinationRepoIds = asStringArray(coordination.repo_ids);
   const coordinationEvidenceRefs = asStringArray(coordination.evidence_refs);
+  const coordinationLockEvidenceRefs = asStringArray(coordination.lock_evidence_refs);
+  const crossRepoValidationRefs = asStringArray(coordination.cross_repo_validation_refs);
   const coordinationRepos = resolveCoordinationRepos(coordination, coordinationRepoIds);
   const coordinationMetadata = {
     required: coordination.required === true,
@@ -335,6 +337,8 @@ export function runDeliveryDriver(options = {}) {
     repo_ids: coordinationRepoIds,
     repos: coordinationRepos,
     evidence_refs: coordinationEvidenceRefs,
+    lock_evidence_refs: coordinationLockEvidenceRefs,
+    cross_repo_validation_refs: crossRepoValidationRefs,
   };
   const rerunRecovery = asRecord(deliveryPlan.rerun_recovery);
   const rerunMetadata = {
@@ -547,6 +551,8 @@ export function runDeliveryDriver(options = {}) {
         status: coordinationMetadata.status,
         repo_ids: coordinationMetadata.repo_ids,
         evidence_refs: coordinationMetadata.evidence_refs,
+        lock_evidence_refs: coordinationMetadata.lock_evidence_refs,
+        cross_repo_validation_refs: coordinationMetadata.cross_repo_validation_refs,
       },
     };
 
@@ -636,6 +642,8 @@ export function runDeliveryDriver(options = {}) {
       promotion_refs: evidenceGroups.promotionRefs,
       execution_refs: executionRefs,
       coordination_refs: coordinationMetadata.evidence_refs,
+      coordination_lock_refs: coordinationMetadata.lock_evidence_refs,
+      cross_repo_validation_refs: coordinationMetadata.cross_repo_validation_refs,
       rerun_refs: rerunMetadata.rerun_of_run_ref ? [rerunMetadata.rerun_of_run_ref] : [],
       delivery_output_refs: uniqueStrings([deliveryManifestRef, ...deliveryOutputRefs]),
     },

@@ -33,7 +33,10 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
 - `coordination` should preserve repo-level coordination requirements:
   - `required` and `status` for multi-repo gating;
   - `repo_ids[]` and `repos[]` to keep repo scope explicit;
-  - `evidence_refs[]` for approved cross-repo coordination artifacts.
+  - `evidence_refs[]` for approved cross-repo coordination artifacts;
+  - `lock_evidence_refs[]` for scoped multirepo lock status evidence;
+  - `cross_repo_validation_refs[]` for per-repo and integration validation evidence.
+- For bounded multirepo non-`no-write` delivery, `coordination.evidence_refs[]` remains the guardrail field that unblocks write-back. `lock_evidence_refs[]` and `cross_repo_validation_refs[]` are narrower lineage fields that make the lock and validation chain auditable in the downstream manifest and release packet.
 - `rerun_recovery` should preserve bounded retry semantics:
   - `rerun_of_run_ref`, `failed_step_ref`, and `packet_boundary`;
   - `status` (`not-requested|ready|blocked`) and `blocking_reasons[]`;

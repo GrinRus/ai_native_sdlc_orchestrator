@@ -172,6 +172,7 @@ Delivery/release response baseline:
 - `delivery_quality_gate_mode`, `delivery_quality_gate_status`, and `delivery_quality_gate_findings` for strict/observe gate evidence when the command exposes observe mode;
 - `delivery_governance_decision` for explicit deny/escalate reasoning;
 - `delivery_coordination` for multi-repo coordination requirement and evidence status;
+- `multirepo_coordination` for scoped lock and cross-repo validation status reads;
 - `delivery_rerun_recovery` for explicit rerun run-ref, failed-step, and packet-boundary scope;
 - `delivery_manifest_file` and `release_packet_file` as durable evidence outputs;
 - `runtime_harness_report_file` and `runtime_harness_overall_decision` for the latest Runtime Harness gate used by strict delivery/release checks;

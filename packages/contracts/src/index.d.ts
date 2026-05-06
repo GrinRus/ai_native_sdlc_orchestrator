@@ -17,6 +17,7 @@ export type ContractFamily =
   | "review-decision"
   | "runtime-harness-report"
   | "live-e2e-observation-report"
+  | "multirepo-coordination-status"
   | "planner-metrics-snapshot"
   | "dataset"
   | "evaluation-suite"
