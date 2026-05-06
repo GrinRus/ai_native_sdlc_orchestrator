@@ -55,17 +55,37 @@ Project bootstrap baseline:
 - delivery manifests and release packets
 - incidents and promotion decisions
 
-## Planned connected lifecycle mutations (W18 target)
+## Connected lifecycle mutations (W18 baseline)
 
-W18 tracks the backlog gap between the current bounded mutation baseline and a connected web surface that can drive the approved lifecycle through the control plane. This section is a target contract note, not a claim that every mutation is implemented today.
+W18 closes the first connected-web gap between the bounded run-control/UI mutation baseline and a web surface that can drive the approved lifecycle through the control plane. This is a bounded lifecycle subset, not a full CLI-over-HTTP parity claim.
 
-Lifecycle command mutations should:
+Lifecycle command mutations must:
 - cover the minimum bootstrap, intake, discovery, spec, planning, handoff, run, review, delivery, and learning actions needed by the web full-flow path;
 - call the same runtime command handlers used by CLI/headless flows instead of adding UI-owned orchestration logic;
 - return existing command response fields and durable artifact refs where available;
 - preserve policy, approval, validation, and blocked-next-step evidence in stable response shapes;
 - support the interactive continuation flow described by `step-result.requested_interaction`;
 - include an answer-submission command mutation for unresolved runner-requested interactions before web full-flow claims answer support.
+
+HTTP lifecycle command mutation baseline:
+- route: `POST /api/projects/:projectId/lifecycle-command/actions`;
+- payload fields: `command` plus optional `flags`;
+- `command` must be one of the bounded implemented lifecycle commands documented in `module-surface-baseline.yaml`;
+- `flags` is a JSON object whose keys map to CLI flags by replacing `_` with `-`;
+- `project_ref`, `project-ref`, `runtime_root`, `runtime-root`, and `help` are server-owned and cannot be supplied by clients;
+- the transport injects the scoped project ref and runtime root before invoking the existing CLI/runtime path;
+- successful responses return `{ lifecycle_command }` with `command_output` preserving the CLI JSON fields, `artifact_refs`, `evidence_refs`, `exit_code`, `stdout`, `stderr`, and `interactive_continuation`;
+- unsupported commands or invalid/missing required flags return HTTP `400` with `error.code` in `invalid_lifecycle_command | invalid_lifecycle_flags`;
+- command outputs that report policy, validation, guardrail, or interaction blocking return HTTP `409` with `{ error, lifecycle_command }` while preserving any durable output refs the runtime produced.
+
+HTTP interactive answer mutation baseline:
+- route: `POST /api/projects/:projectId/interactions/answers`;
+- payload fields: `run_id`, `interaction_id`, `answer`, and optional `reason`, `approval_ref`, `answer_evidence_ref`;
+- the referenced interaction must match the latest unresolved run-linked `step-result.requested_interaction`;
+- accepted answers write one durable `interaction-answer-*.json` audit artifact under the runtime reports root before any continuation state changes;
+- response payloads return `{ interaction_answer }` with `interaction_id`, `interaction_status`, `answer_audit_ref`, `step_result_ref`, `run_control_transition`, `blocked_reason`, and live event ids;
+- when the current runtime cannot resume from the recorded interaction boundary, the transport returns HTTP `409` with `error.code=interaction.continuation_blocked` and keeps the run blocked with evidence refs;
+- live events and query payloads must reference `answer_audit_ref` and must not include the raw answer text.
 
 ## Read surface baseline (module operations)
 
@@ -247,6 +267,8 @@ Connected-mode transport mapping is implemented for read, follow, and bounded mu
 - `GET /api/projects/:projectId/runs/:runId/events` (SSE + replay parameters).
 - `POST /api/projects/:projectId/run-control/actions`
 - `POST /api/projects/:projectId/ui-lifecycle/actions`
+- `POST /api/projects/:projectId/lifecycle-command/actions`
+- `POST /api/projects/:projectId/interactions/answers`
 
 Detached mutation payload baseline:
 - run-control payload fields: `action`, `run_id`, `target_step`, `reason`, `approval_ref`;
@@ -254,12 +276,18 @@ Detached mutation payload baseline:
 - blocked run-control transitions return `409` with `{ error: { code, message }, run_control }` while still persisting audit and lifecycle artifacts;
 - ui lifecycle payload fields: `action`, `run_id`, `control_plane`;
 - ui lifecycle response reuses module parity fields: `state_file`, `connection_state`, `headless_safe`, `idempotent`.
+- lifecycle-command payload fields: `command`, `flags`;
+- lifecycle-command response reuses CLI command output fields under `command_output` and adds transport-level `artifact_refs`, `evidence_refs`, `blocked`, and `blocked_reason`;
+- interaction answer payload fields: `run_id`, `interaction_id`, `answer`, `reason`, `approval_ref`, `answer_evidence_ref`;
+- interaction answer response writes and references durable answer audit evidence before reporting whether continuation remains blocked.
 
 Detached mutation error-shape baseline:
 - `invalid_json` for malformed request body;
 - `invalid_payload` for non-object JSON payload;
-- `invalid_run_control_action` and `invalid_ui_lifecycle_action` for unsupported actions;
+- `invalid_run_control_action`, `invalid_ui_lifecycle_action`, and `invalid_lifecycle_command` for unsupported actions;
+- `invalid_lifecycle_flags` and `interaction_answer.invalid_answer` for malformed mutation inputs;
 - `run_control.blocked` family codes for policy or transition blocking branches.
+- `lifecycle_command.blocked`, `lifecycle_command.interaction_required`, and `interaction.continuation_blocked` for bounded command and continuation blocking branches.
 
 Detached authn/authz baseline (W10-S04):
 - auth mode is optional and disabled by default for local trusted operator rehearsals;
@@ -270,7 +298,7 @@ Detached authn/authz baseline (W10-S04):
 - auth error payload includes `error.auth.required_permission`, `error.auth.project_id`, and `error.auth.token_id` (when available).
 
 Deferred beyond this baseline:
-- mutation-command HTTP endpoint parity for lifecycle commands outside the supported run-control and UI lifecycle actions; W18-S02 tracks the minimum connected web full-flow subset before any broader CLI-over-HTTP parity claim;
+- mutation-command HTTP endpoint parity for commands outside the supported W18 lifecycle subset;
 - production authn/authz and deployment hardening.
 
 ## API/UI alignment notes (W5-S04 + W9-S03 + W10-S03)

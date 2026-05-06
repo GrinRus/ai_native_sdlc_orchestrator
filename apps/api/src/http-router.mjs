@@ -129,6 +129,26 @@ const ROUTES = Object.freeze([
     params: ["projectId"],
     kind: "mutation",
   },
+  {
+    id: "lifecycle-command-actions",
+    pattern: /^\/api\/projects\/([^/]+)\/lifecycle-command\/actions$/u,
+    method: "POST",
+    allow: "POST",
+    permission: "mutate",
+    methodMessage: "Lifecycle command mutation route supports only POST.",
+    params: ["projectId"],
+    kind: "mutation",
+  },
+  {
+    id: "interaction-answers",
+    pattern: /^\/api\/projects\/([^/]+)\/interactions\/answers$/u,
+    method: "POST",
+    allow: "POST",
+    permission: "mutate",
+    methodMessage: "Interaction answer mutation route supports only POST.",
+    params: ["projectId"],
+    kind: "mutation",
+  },
 ]);
 
 /**

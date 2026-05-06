@@ -831,6 +831,7 @@ export function readRunEventHistory(options) {
   const mappedEvents = events.map((event) => {
     const payload = asRecord(event.payload);
     const policyContext = asRecord(payload.policy_context);
+    const interaction = asRecord(payload.interaction);
     return {
       event_id: asString(event.event_id) ?? "",
       timestamp: asString(event.timestamp) ?? null,
@@ -840,6 +841,20 @@ export function readRunEventHistory(options) {
       control_action: asString(payload.control_action),
       step_id: asString(payload.step_id),
       status: asString(payload.status),
+      interaction_id: asString(payload.interaction_id),
+      step_result_ref: asString(payload.step_result_ref),
+      answer_audit_ref: asString(payload.answer_audit_ref),
+      interaction:
+        Object.keys(interaction).length > 0
+          ? {
+              interaction_id: asString(interaction.interaction_id),
+              status: asString(interaction.status),
+              step_result_ref: asString(interaction.step_result_ref),
+              question_summary: asString(interaction.question_summary),
+              answer_required: asBoolean(interaction.answer_required),
+              answer_audit_refs: asStringArray(interaction.answer_audit_refs),
+            }
+          : null,
       policy_context:
         Object.keys(policyContext).length > 0
           ? {

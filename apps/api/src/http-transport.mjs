@@ -1,7 +1,12 @@
 import http from "node:http";
 
 import { authorizeRequest, normalizeAuthPolicy, sendAuthError } from "./http-auth.mjs";
-import { handleRunControlAction, handleUiLifecycleAction } from "./http-mutation-handlers.mjs";
+import {
+  handleInteractionAnswer,
+  handleLifecycleCommandAction,
+  handleRunControlAction,
+  handleUiLifecycleAction,
+} from "./http-mutation-handlers.mjs";
 import { handleReadRoute } from "./http-read-handlers.mjs";
 import { matchControlPlaneRoute } from "./http-router.mjs";
 import { handleRunEventStream } from "./http-stream-handlers.mjs";
@@ -109,6 +114,16 @@ export function createControlPlaneHttpServer(options) {
 
       if (route.id === "ui-lifecycle-actions") {
         await handleUiLifecycleAction({ request, response, runtimeOptions });
+        return;
+      }
+
+      if (route.id === "lifecycle-command-actions") {
+        await handleLifecycleCommandAction({ request, response, runtimeOptions });
+        return;
+      }
+
+      if (route.id === "interaction-answers") {
+        await handleInteractionAnswer({ request, response, runtimeOptions });
         return;
       }
 

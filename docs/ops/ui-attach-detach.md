@@ -13,7 +13,7 @@ aor ui attach \
 
 Note: when a reachable `--control-plane` URL is provided, connected mode uses detached transport for:
 - read/follow (`GET` + SSE);
-- bounded mutation actions (`POST /api/projects/:projectId/run-control/actions` and `POST /api/projects/:projectId/ui-lifecycle/actions`).
+- bounded mutation actions (`POST /api/projects/:projectId/run-control/actions`, `POST /api/projects/:projectId/ui-lifecycle/actions`, `POST /api/projects/:projectId/lifecycle-command/actions`, and `POST /api/projects/:projectId/interactions/answers`).
 Without a control-plane URL, attach remains disconnected/read-model mode while headless workflows stay available.
 
 Disconnected/read-model attach (no control-plane URL):
@@ -81,10 +81,31 @@ curl -sS \
   http://127.0.0.1:8080/api/projects/<PROJECT_ID>/ui-lifecycle/actions
 ```
 
+Lifecycle command over detached transport:
+```bash
+curl -sS \
+  -X POST \
+  -H "content-type: application/json" \
+  -d '{"command":"intake create","flags":{"request_title":"Connected intake","request_brief":"Operator-submitted lifecycle mutation."}}' \
+  http://127.0.0.1:8080/api/projects/<PROJECT_ID>/lifecycle-command/actions
+```
+
+Interaction answer over detached transport:
+```bash
+curl -sS \
+  -X POST \
+  -H "content-type: application/json" \
+  -d '{"run_id":"RUN-201","interaction_id":"question-1","answer":"Use the approved staging target.","reason":"operator selected safe target"}' \
+  http://127.0.0.1:8080/api/projects/<PROJECT_ID>/interactions/answers
+```
+
 Mutation error-shape checks:
 - malformed JSON returns `error.code: "invalid_json"`;
-- unsupported action returns `error.code: "invalid_run_control_action"` or `error.code: "invalid_ui_lifecycle_action"`;
+- unsupported action returns `error.code: "invalid_run_control_action"`, `error.code: "invalid_ui_lifecycle_action"`, or `error.code: "invalid_lifecycle_command"`;
+- missing lifecycle command flags return `error.code: "invalid_lifecycle_flags"`;
 - policy/transition block returns HTTP `409` with `error.code` in the `run_control.blocked` family and a durable `run_control.audit_file`.
+- lifecycle policy/validation blocks return HTTP `409` with `error.code` in the `lifecycle_command.*` family and the original CLI `command_output` preserved.
+- accepted interaction answers that cannot resume yet return HTTP `409` with `error.code: "interaction.continuation_blocked"` plus `interaction_answer.answer_audit_ref`.
 
 ## Auth-enabled detached mode
 If detached transport auth is enabled, pass bearer token on every read/follow/mutation request:
@@ -92,6 +113,16 @@ If detached transport auth is enabled, pass bearer token on every read/follow/mu
 curl -sS \
   -H "Authorization: Bearer <TOKEN>" \
   http://127.0.0.1:8080/api/projects/<PROJECT_ID>/state
+```
+
+Mutation requests use the same bearer header and require `mutate` permission:
+```bash
+curl -sS \
+  -X POST \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "content-type: application/json" \
+  -d '{"command":"intake create","flags":{"request_title":"Authenticated intake"}}' \
+  http://127.0.0.1:8080/api/projects/<PROJECT_ID>/lifecycle-command/actions
 ```
 
 Auth failure checks:

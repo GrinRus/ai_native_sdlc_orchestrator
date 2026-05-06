@@ -49,15 +49,66 @@ live_event_operations:
     replay_supported: true
     backpressure: bounded-replay-window
 
+lifecycle_command_operations:
+  owning_slice: W18-S02
+  status: implemented-bounded-subset
+  route: POST /api/projects/:projectId/lifecycle-command/actions
+  server_owned_flags:
+    - project-ref
+    - runtime-root
+    - help
+  commands:
+    - operation_id: project.init
+      command: project init
+    - operation_id: intake.create
+      command: intake create
+    - operation_id: discovery.run
+      command: discovery run
+    - operation_id: spec.build
+      command: spec build
+    - operation_id: wave.create
+      command: wave create
+    - operation_id: handoff.prepare
+      command: handoff prepare
+    - operation_id: handoff.approve
+      command: handoff approve
+    - operation_id: run.start
+      command: run start
+    - operation_id: run.pause
+      command: run pause
+    - operation_id: run.resume
+      command: run resume
+    - operation_id: run.steer
+      command: run steer
+    - operation_id: run.cancel
+      command: run cancel
+    - operation_id: review.run
+      command: review run
+    - operation_id: deliver.prepare
+      command: deliver prepare
+    - operation_id: release.prepare
+      command: release prepare
+    - operation_id: learning.handoff
+      command: learning handoff
+  response_contract:
+    preserves_cli_command_output: true
+    blocked_http_status: 409
+    invalid_input_http_status: 400
+    evidence_fields:
+      - artifact_refs
+      - evidence_refs
+      - command_output
+
 interactive_continuation:
   owning_slice: W18-S01
-  status: target-contract
+  status: implemented-bounded-subset
   request_contract_family: step-result
   event_contract_family: live-run-event
   request_field: requested_interaction
   answer_submission:
     operation_id: run.interaction.answer
-    implementation_status: planned-w18-s02
+    implementation_status: implemented-w18-s02
+    route: POST /api/projects/:projectId/interactions/answers
     required_payload_fields:
       - run_id
       - interaction_id
@@ -73,6 +124,7 @@ interactive_continuation:
       - step_result_ref
       - run_control_transition
       - blocked_reason
+    blocked_http_status: 409
   audit_behavior:
     raw_answer_storage: durable-audit-evidence-only
     live_event_answer_text: forbidden
@@ -97,8 +149,10 @@ deferred_transport:
     - GET /api/projects/:projectId/runs/:runId/events
     - POST /api/projects/:projectId/run-control/actions
     - POST /api/projects/:projectId/ui-lifecycle/actions
+    - POST /api/projects/:projectId/lifecycle-command/actions
+    - POST /api/projects/:projectId/interactions/answers
   out_of_scope:
-    - mutation-command endpoint parity for full CLI surface beyond run-control and ui-lifecycle baseline
+    - mutation-command endpoint parity for full CLI surface beyond W18 lifecycle subset
     - production authn/authz policy envelope
 
 authn_authz:

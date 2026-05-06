@@ -358,7 +358,14 @@ test("control-plane API baseline documents interactive continuation target metad
   assert.equal(loaded.document.interactive_continuation?.event_contract_family, "live-run-event");
   assert.equal(
     loaded.document.interactive_continuation?.answer_submission?.implementation_status,
-    "planned-w18-s02",
+    "implemented-w18-s02",
+  );
+  assert.equal(loaded.document.lifecycle_command_operations?.owning_slice, "W18-S02");
+  assert.ok(
+    loaded.document.lifecycle_command_operations?.commands?.some(
+      (entry) => entry.command === "intake create",
+    ),
+    "expected lifecycle command subset to include intake create",
   );
   assert.ok(
     loaded.document.interactive_continuation?.audit_behavior?.query_safe_refs?.includes("answer_audit_ref"),

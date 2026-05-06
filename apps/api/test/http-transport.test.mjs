@@ -357,6 +357,156 @@ test("detached control-plane transport supports bounded run-control and ui-lifec
   });
 });
 
+test("detached control-plane transport invokes bounded lifecycle command mutations through CLI/runtime path", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.transport.lifecycle.v1";
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const commandUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`;
+
+      const successResponse = await postJson(commandUrl, {
+        command: "intake create",
+        flags: {
+          request_title: "Connected lifecycle command smoke",
+          request_brief: "Exercise control-plane lifecycle mutation parity.",
+        },
+      });
+      assert.equal(successResponse.status, 200);
+      const successPayload = await successResponse.json();
+      assert.equal(successPayload.lifecycle_command.command, "intake create");
+      assert.equal(successPayload.lifecycle_command.blocked, false);
+      assert.equal(successPayload.lifecycle_command.command_output.command, "intake create");
+      assert.equal(fs.existsSync(successPayload.lifecycle_command.command_output.artifact_packet_file), true);
+      assert.ok(successPayload.lifecycle_command.artifact_refs.includes(successPayload.lifecycle_command.command_output.artifact_packet_file));
+
+      const invalidFlagResponse = await postJson(commandUrl, {
+        command: "review run",
+        flags: {},
+      });
+      assert.equal(invalidFlagResponse.status, 400);
+      const invalidFlagPayload = await invalidFlagResponse.json();
+      assert.equal(invalidFlagPayload.error.code, "invalid_lifecycle_flags");
+      assert.match(invalidFlagPayload.error.message, /--run-id/u);
+
+      const startResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
+        {
+          action: "start",
+          run_id: runId,
+        },
+      );
+      assert.equal(startResponse.status, 200);
+
+      const blockedResponse = await postJson(commandUrl, {
+        command: "run cancel",
+        flags: {
+          run_id: runId,
+          reason: "cancel without approval should return a stable lifecycle block",
+        },
+      });
+      assert.equal(blockedResponse.status, 409);
+      const blockedPayload = await blockedResponse.json();
+      assert.equal(blockedPayload.error.code, "lifecycle_command.blocked");
+      assert.equal(blockedPayload.lifecycle_command.command, "run cancel");
+      assert.equal(blockedPayload.lifecycle_command.command_output.run_control_blocked, true);
+      assert.equal(fs.existsSync(blockedPayload.lifecycle_command.command_output.run_control_audit_file), true);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("detached control-plane transport records interactive continuation answers without streaming raw answer text", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.transport.interaction.v1";
+    const interactionId = "question-1";
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const stateResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
+      assert.equal(stateResponse.status, 200);
+      const statePayload = await stateResponse.json();
+      const reportsRoot = statePayload.runtime_layout.reports_root ?? statePayload.runtime_layout.reportsRoot;
+      fs.mkdirSync(reportsRoot, { recursive: true });
+      const stepResultFile = path.join(reportsRoot, "step-result-interactive-question.json");
+      fs.writeFileSync(
+        stepResultFile,
+        `${JSON.stringify(
+          {
+            step_result_id: `${runId}.runner.question`,
+            run_id: runId,
+            step_id: "runner.implement",
+            step_class: "runner",
+            status: "failed",
+            summary: "Runner requested operator input.",
+            evidence_refs: ["evidence://reports/runner-question.json"],
+            requested_interaction: {
+              requested: true,
+              interaction_id: interactionId,
+              status: "requested",
+              summary: "Choose the deployment target.",
+              evidence_refs: ["evidence://reports/runner-question.json"],
+              continuation: {
+                next_action: "resume_from_boundary",
+              },
+            },
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+
+      const answerText = "Use the staging target.";
+      const answerResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/interactions/answers`,
+        {
+          run_id: runId,
+          interaction_id: interactionId,
+          answer: answerText,
+          reason: "operator selected a safe target",
+        },
+      );
+      assert.equal(answerResponse.status, 409);
+      const answerPayload = await answerResponse.json();
+      assert.equal(answerPayload.error.code, "interaction.continuation_blocked");
+      assert.equal(answerPayload.interaction_answer.interaction_id, interactionId);
+      assert.equal(answerPayload.interaction_answer.answer_accepted, true);
+      assert.equal(answerPayload.interaction_answer.interaction_status, "blocked");
+      assert.equal(fs.existsSync(answerPayload.interaction_answer.answer_audit_file), true);
+
+      const auditRecord = JSON.parse(fs.readFileSync(answerPayload.interaction_answer.answer_audit_file, "utf8"));
+      assert.equal(auditRecord.answer_text, answerText);
+
+      const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
+      assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+      assert.ok(updatedStepResult.requested_interaction.answer_audit_refs.includes(answerPayload.interaction_answer.answer_audit_ref));
+      assert.ok(updatedStepResult.evidence_refs.includes(answerPayload.interaction_answer.answer_audit_ref));
+
+      const historyResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events/history?limit=10`,
+      );
+      assert.equal(historyResponse.status, 200);
+      const historyPayload = await historyResponse.json();
+      assert.equal(JSON.stringify(historyPayload).includes(answerText), false);
+      assert.equal(JSON.stringify(historyPayload).includes(answerPayload.interaction_answer.answer_audit_ref), true);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
 test("detached control-plane authn/authz enforces bearer auth with project-scoped permissions", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.auth.v1";
