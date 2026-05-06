@@ -1,6 +1,7 @@
 project_id: aor-bounded-multirepo-sample
 display_name: AOR Bounded Multirepo Sample
 repo_topology: bounded-multirepo
+asset_mode: materialized
 repos:
   - repo_id: backend
     name: backend-services
@@ -74,6 +75,10 @@ registry_roots:
   routes: examples/routes
   wrappers: examples/wrappers
   prompts: examples/prompts
+  policies: examples/policies
+  adapters: examples/adapters
+  evaluation: examples
+  skills: examples/skills
   context_docs: examples/context/docs
   context_rules: examples/context/rules
   context_skills: examples/context/skills

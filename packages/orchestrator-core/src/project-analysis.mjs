@@ -8,7 +8,7 @@ import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.
 import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
 import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
 import { resolveStepPolicyMatrix } from "./policy-resolution.mjs";
-import { initializeProjectRuntime } from "./project-init.mjs";
+import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
 import { resolveProjectRepoScope } from "./repo-scope.mjs";
 
 const LANGUAGE_BY_EXTENSION = Object.freeze({
@@ -775,36 +775,43 @@ export function analyzeProjectRuntime(options = {}) {
   }
 
   const verificationPlan = createVerificationPlan(commandCandidates, unknownFacts);
+  const loadedProjectProfile = loadContractFile({
+    filePath: init.projectProfilePath,
+    family: "project-profile",
+  });
+  const projectProfile = asRecord(loadedProjectProfile.document);
+  const registryResolution = resolveProjectRegistryRoots(projectProfile, { projectRoot: init.projectRoot });
+  const registryRoots = registryResolution.roots;
   const routesRoot = options.routesRoot
     ? path.isAbsolute(options.routesRoot)
       ? options.routesRoot
       : path.resolve(init.projectRoot, options.routesRoot)
-    : path.join(init.projectRoot, "examples/routes");
+    : registryRoots.routes;
   const wrappersRoot = options.wrappersRoot
     ? path.isAbsolute(options.wrappersRoot)
       ? options.wrappersRoot
       : path.resolve(init.projectRoot, options.wrappersRoot)
-    : path.join(init.projectRoot, "examples/wrappers");
+    : registryRoots.wrappers;
   const promptsRoot = options.promptsRoot
     ? path.isAbsolute(options.promptsRoot)
       ? options.promptsRoot
       : path.resolve(init.projectRoot, options.promptsRoot)
-    : path.join(init.projectRoot, "examples/prompts");
+    : registryRoots.prompts;
   const contextBundlesRoot = options.contextBundlesRoot
     ? path.isAbsolute(options.contextBundlesRoot)
       ? options.contextBundlesRoot
       : path.resolve(init.projectRoot, options.contextBundlesRoot)
-    : path.join(path.dirname(init.projectProfilePath), "context/bundles");
+    : registryRoots.context_bundles;
   const policiesRoot = options.policiesRoot
     ? path.isAbsolute(options.policiesRoot)
       ? options.policiesRoot
       : path.resolve(init.projectRoot, options.policiesRoot)
-    : path.join(init.projectRoot, "examples/policies");
+    : registryRoots.policies;
   const adaptersRoot = options.adaptersRoot
     ? path.isAbsolute(options.adaptersRoot)
       ? options.adaptersRoot
       : path.resolve(init.projectRoot, options.adaptersRoot)
-    : path.join(init.projectRoot, "examples/adapters");
+    : registryRoots.adapters;
   const routeResolutionMatrix = resolveRouteMatrix({
     projectProfilePath: init.projectProfilePath,
     routesRoot,
@@ -834,9 +841,10 @@ export function analyzeProjectRuntime(options = {}) {
     ? path.isAbsolute(options.evaluationWorkspaceRoot)
       ? options.evaluationWorkspaceRoot
       : path.resolve(init.projectRoot, options.evaluationWorkspaceRoot)
-    : init.projectRoot;
+    : registryRoots.evaluation;
   const evaluationRegistry = loadEvaluationRegistry({
-    workspaceRoot: evaluationWorkspaceRoot,
+    workspaceRoot: init.projectRoot,
+    examplesRoot: evaluationWorkspaceRoot,
   });
 
   if (!evaluationRegistry.ok) {
@@ -866,11 +874,6 @@ export function analyzeProjectRuntime(options = {}) {
         ? options.inputPacketPath
         : undefined,
   });
-  const loadedProjectProfile = loadContractFile({
-    filePath: init.projectProfilePath,
-    family: "project-profile",
-  });
-  const projectProfile = asRecord(loadedProjectProfile.document);
   const repoScopeProof = resolveProjectRepoScope({ profile: projectProfile });
   const reportPath = path.join(init.runtimeLayout.reportsRoot, "project-analysis-report.json");
   const discoveryResearchReportPath = path.join(init.runtimeLayout.reportsRoot, "discovery-research-report.json");
@@ -892,6 +895,8 @@ export function analyzeProjectRuntime(options = {}) {
       project_root: init.projectRoot,
       selected_profile_ref: init.projectProfileRef,
     },
+    asset_mode: registryResolution.assetMode,
+    registry_roots: registryRoots,
     repo_facts: {
       topology: repoFacts.topology,
       declared_topology: repoScopeProof.topology,

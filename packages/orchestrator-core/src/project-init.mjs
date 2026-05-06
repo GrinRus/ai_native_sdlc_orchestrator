@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { stringify as stringifyYaml } from "../../contracts/node_modules/yaml/dist/index.js";
 
-import { loadContractFile } from "../../contracts/src/index.mjs";
+import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { materializeBootstrapArtifactPacket } from "./artifact-store.mjs";
 
 const DEFAULT_RUNTIME_ROOT = ".aor";
@@ -12,6 +12,20 @@ const DEFAULT_PROFILE_CANDIDATES = [
   "examples/project.aor.yaml",
   "examples/project.github.aor.yaml",
 ];
+const ASSET_MODES = new Set(["bundled", "materialized"]);
+const DEFAULT_REGISTRY_ROOTS = Object.freeze({
+  routes: "examples/routes",
+  wrappers: "examples/wrappers",
+  prompts: "examples/prompts",
+  policies: "examples/policies",
+  adapters: "examples/adapters",
+  evaluation: "examples",
+  skills: "examples/skills",
+  context_docs: "examples/context/docs",
+  context_rules: "examples/context/rules",
+  context_skills: "examples/context/skills",
+  context_bundles: "examples/context/bundles",
+});
 
 /**
  * @param {string} value
@@ -19,6 +33,86 @@ const DEFAULT_PROFILE_CANDIDATES = [
  */
 function normalizeId(value) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? /** @type {Record<string, unknown>} */ (value)
+    : {};
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toProjectRelativePath(projectRoot, filePath) {
+  return path.relative(projectRoot, filePath).replace(/\\/g, "/") || ".";
+}
+
+/**
+ * @param {unknown} value
+ * @param {"bundled" | "materialized"} fallback
+ * @returns {"bundled" | "materialized"}
+ */
+function normalizeAssetMode(value, fallback) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return fallback;
+  }
+  const normalized = value.trim();
+  if (!ASSET_MODES.has(normalized)) {
+    throw new Error(`Unsupported asset mode '${value}'. Expected one of: bundled, materialized.`);
+  }
+  return /** @type {"bundled" | "materialized"} */ (normalized);
+}
+
+/**
+ * @param {string} baseRoot
+ * @returns {Record<string, string>}
+ */
+function registryRootsFromBase(baseRoot) {
+  return {
+    routes: path.join(baseRoot, "routes"),
+    wrappers: path.join(baseRoot, "wrappers"),
+    prompts: path.join(baseRoot, "prompts"),
+    policies: path.join(baseRoot, "policies"),
+    adapters: path.join(baseRoot, "adapters"),
+    evaluation: baseRoot,
+    skills: path.join(baseRoot, "skills"),
+    context_docs: path.join(baseRoot, "context/docs"),
+    context_rules: path.join(baseRoot, "context/rules"),
+    context_skills: path.join(baseRoot, "context/skills"),
+    context_bundles: path.join(baseRoot, "context/bundles"),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {{ projectRoot: string }} options
+ * @returns {{ assetMode: "bundled" | "materialized", roots: Record<string, string> }}
+ */
+export function resolveProjectRegistryRoots(profile, options) {
+  const assetMode = normalizeAssetMode(profile.asset_mode, "materialized");
+  const declaredRoots = asRecord(profile.registry_roots);
+  /** @type {Record<string, string>} */
+  const roots = {};
+
+  for (const [key, fallbackValue] of Object.entries(DEFAULT_REGISTRY_ROOTS)) {
+    const declaredValue = declaredRoots[key];
+    const selectedValue =
+      typeof declaredValue === "string" && declaredValue.trim().length > 0
+        ? declaredValue.trim()
+        : fallbackValue;
+    roots[key] = path.isAbsolute(selectedValue)
+      ? selectedValue
+      : path.resolve(options.projectRoot, selectedValue);
+  }
+
+  return { assetMode, roots };
 }
 
 /**
@@ -90,6 +184,25 @@ export function resolveProjectProfilePath(options) {
   throw new Error(
     `Could not locate a project profile under '${options.projectRoot}'. Expected one of: ${DEFAULT_PROFILE_CANDIDATES.join(", ")}.`,
   );
+}
+
+/**
+ * @param {{ cwd?: string, projectRoot: string, projectProfile?: string }} options
+ * @returns {string | null}
+ */
+function resolveOptionalProjectProfilePath(options) {
+  if (typeof options.projectProfile === "string" && options.projectProfile.trim().length > 0) {
+    return resolveProjectProfilePath(options);
+  }
+
+  for (const candidate of DEFAULT_PROFILE_CANDIDATES) {
+    const resolved = path.resolve(options.projectRoot, candidate);
+    if (fs.existsSync(resolved)) {
+      return resolved;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -223,6 +336,110 @@ function detectVerificationCommands(projectRoot, overrides = {}) {
 
 /**
  * @param {{
+ *   bootstrapTemplate?: string,
+ *   cwd: string,
+ *   projectRoot: string,
+ * }} options
+ * @returns {{ templatePath: string, bundledExamplesRoot: string }}
+ */
+function resolveBootstrapTemplate(options) {
+  const bundledExamplesRoot = resolveBundledExamplesRoot();
+  const bootstrapTemplate = options.bootstrapTemplate ?? DEFAULT_BOOTSTRAP_TEMPLATE_ID;
+  let templatePath = null;
+  if (bootstrapTemplate === DEFAULT_BOOTSTRAP_TEMPLATE_ID) {
+    templatePath = path.join(bundledExamplesRoot, "project.github.aor.yaml");
+  } else {
+    const candidates = [
+      path.resolve(options.cwd, bootstrapTemplate),
+      path.resolve(options.projectRoot, bootstrapTemplate),
+      path.resolve(bundledExamplesRoot, bootstrapTemplate),
+    ];
+    templatePath = candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
+  }
+  if (!templatePath || !fs.existsSync(templatePath)) {
+    throw new Error(`Bootstrap template '${bootstrapTemplate}' was not found.`);
+  }
+
+  return { templatePath, bundledExamplesRoot };
+}
+
+/**
+ * @param {{
+ *   cwd: string,
+ *   projectRoot: string,
+ *   bootstrapTemplate?: string,
+ *   assetMode: "bundled" | "materialized",
+ *   repoBuildCommands?: string[],
+ *   repoLintCommands?: string[],
+ *   repoTestCommands?: string[],
+ * }} options
+ * @returns {{ profile: Record<string, unknown>, templatePath: string, bundledExamplesRoot: string }}
+ */
+function createBootstrapProjectProfile(options) {
+  const { templatePath, bundledExamplesRoot } = resolveBootstrapTemplate(options);
+  const loaded = loadContractFile({
+    filePath: templatePath,
+    family: "project-profile",
+  });
+  if (!loaded.ok) {
+    const issueSummary = loaded.validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Bootstrap template '${templatePath}' failed validation: ${issueSummary}`);
+  }
+
+  const projectName = path.basename(options.projectRoot);
+  const projectId = normalizeId(projectName) || "target-project";
+  const verification = detectVerificationCommands(options.projectRoot, {
+    buildCommands: options.repoBuildCommands,
+    lintCommands: options.repoLintCommands,
+    testCommands: options.repoTestCommands,
+  });
+  const profile = /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(loaded.document)));
+  profile.project_id = projectId;
+  profile.display_name = projectName;
+  profile.repo_topology = detectRepoTopology(options.projectRoot);
+  profile.asset_mode = options.assetMode;
+  profile.registry_roots =
+    options.assetMode === "bundled"
+      ? registryRootsFromBase(bundledExamplesRoot)
+      : { ...DEFAULT_REGISTRY_ROOTS };
+  delete profile.live_e2e_defaults;
+
+  const repos = Array.isArray(profile.repos) && profile.repos.length > 0
+    ? /** @type {Array<Record<string, unknown>>} */ (JSON.parse(JSON.stringify(profile.repos)))
+    : [{}];
+  const primaryRepo = repos[0];
+  primaryRepo.repo_id = typeof primaryRepo.repo_id === "string" && primaryRepo.repo_id.trim().length > 0
+    ? primaryRepo.repo_id
+    : "main";
+  primaryRepo.name = projectName;
+  primaryRepo.default_branch = detectDefaultBranch(options.projectRoot);
+  primaryRepo.role = typeof primaryRepo.role === "string" && primaryRepo.role.trim().length > 0
+    ? primaryRepo.role
+    : "application";
+  primaryRepo.source = {
+    kind: "local",
+    root: ".",
+  };
+  primaryRepo.build_commands = verification.buildCommands;
+  primaryRepo.lint_commands = verification.lintCommands;
+  primaryRepo.test_commands = verification.testCommands;
+  profile.repos = [primaryRepo];
+
+  const validation = validateContractDocument({
+    family: "project-profile",
+    document: profile,
+    source: `generated://${options.assetMode}-project-profile`,
+  });
+  if (!validation.ok) {
+    const issueSummary = validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Generated ${options.assetMode} project profile failed validation: ${issueSummary}`);
+  }
+
+  return { profile, templatePath, bundledExamplesRoot };
+}
+
+/**
+ * @param {{
  *   cwd: string,
  *   projectRoot: string,
  *   projectProfile?: string,
@@ -249,66 +466,16 @@ function ensureMaterializedProjectProfile(options) {
     };
   }
 
-  const bundledExamplesRoot = resolveBundledExamplesRoot();
-  const bootstrapTemplate = options.bootstrapTemplate ?? DEFAULT_BOOTSTRAP_TEMPLATE_ID;
-  let templatePath = null;
-  if (bootstrapTemplate === DEFAULT_BOOTSTRAP_TEMPLATE_ID) {
-    templatePath = path.join(bundledExamplesRoot, "project.github.aor.yaml");
-  } else {
-    const candidates = [
-      path.resolve(options.cwd, bootstrapTemplate),
-      path.resolve(options.projectRoot, bootstrapTemplate),
-      path.resolve(bundledExamplesRoot, bootstrapTemplate),
-    ];
-    templatePath = candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
-  }
-  if (!templatePath || !fs.existsSync(templatePath)) {
-    throw new Error(`Bootstrap template '${bootstrapTemplate}' was not found.`);
-  }
-
-  const loaded = loadContractFile({
-    filePath: templatePath,
-    family: "project-profile",
+  const generated = createBootstrapProjectProfile({
+    cwd: options.cwd,
+    projectRoot: options.projectRoot,
+    bootstrapTemplate: options.bootstrapTemplate,
+    assetMode: "materialized",
+    repoBuildCommands: options.repoBuildCommands,
+    repoLintCommands: options.repoLintCommands,
+    repoTestCommands: options.repoTestCommands,
   });
-  if (!loaded.ok) {
-    const issueSummary = loaded.validation.issues.map((issue) => issue.message).join("; ");
-    throw new Error(`Bootstrap template '${templatePath}' failed validation: ${issueSummary}`);
-  }
-
-  const projectName = path.basename(options.projectRoot);
-  const projectId = normalizeId(projectName) || "target-project";
-  const verification = detectVerificationCommands(options.projectRoot, {
-    buildCommands: options.repoBuildCommands,
-    lintCommands: options.repoLintCommands,
-    testCommands: options.repoTestCommands,
-  });
-  const profile = /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(loaded.document)));
-  profile.project_id = projectId;
-  profile.display_name = projectName;
-  profile.repo_topology = detectRepoTopology(options.projectRoot);
-  delete profile.live_e2e_defaults;
-
-  const repos = Array.isArray(profile.repos) && profile.repos.length > 0
-    ? /** @type {Array<Record<string, unknown>>} */ (JSON.parse(JSON.stringify(profile.repos)))
-    : [{}];
-  const primaryRepo = repos[0];
-  primaryRepo.repo_id = typeof primaryRepo.repo_id === "string" && primaryRepo.repo_id.trim().length > 0
-    ? primaryRepo.repo_id
-    : "main";
-  primaryRepo.name = projectName;
-  primaryRepo.default_branch = detectDefaultBranch(options.projectRoot);
-  primaryRepo.role = typeof primaryRepo.role === "string" && primaryRepo.role.trim().length > 0
-    ? primaryRepo.role
-    : "application";
-  primaryRepo.source = {
-    kind: "local",
-    root: ".",
-  };
-  primaryRepo.build_commands = verification.buildCommands;
-  primaryRepo.lint_commands = verification.lintCommands;
-  primaryRepo.test_commands = verification.testCommands;
-  profile.repos = [primaryRepo];
-
+  const profile = generated.profile;
   const serialized = stringifyYaml(profile);
   fs.mkdirSync(path.dirname(explicitPath), { recursive: true });
   fs.writeFileSync(explicitPath, serialized, "utf8");
@@ -317,56 +484,48 @@ function ensureMaterializedProjectProfile(options) {
     projectProfilePath: explicitPath,
     materialized: true,
     idempotent: false,
-    templatePath,
+    templatePath: generated.templatePath,
   };
 }
 
 /**
  * @param {{ projectRoot: string }} options
- * @returns {{ materializedRoot: string | null, materialized: boolean, idempotent: boolean }}
+ * @returns {{ materializedRoot: string | null, materialized: boolean, idempotent: boolean, materializedPaths: string[] }}
  */
 function ensureBootstrapAssets(options) {
   const bundledExamplesRoot = resolveBundledExamplesRoot();
   const targetExamplesRoot = path.join(options.projectRoot, "examples");
   const targetContextRoot = path.join(options.projectRoot, "context");
   let materialized = false;
+  const materializedPaths = [];
 
   if (!fs.existsSync(targetExamplesRoot)) {
     fs.cpSync(bundledExamplesRoot, targetExamplesRoot, { recursive: true });
     materialized = true;
+    materializedPaths.push(targetExamplesRoot);
   }
 
   const bundledContextRoot = path.join(bundledExamplesRoot, "context");
   if (fs.existsSync(bundledContextRoot) && !fs.existsSync(targetContextRoot)) {
     fs.cpSync(bundledContextRoot, targetContextRoot, { recursive: true });
     materialized = true;
+    materializedPaths.push(targetContextRoot);
   }
 
   return {
     materializedRoot: fs.existsSync(targetExamplesRoot) ? targetExamplesRoot : null,
     materialized,
     idempotent: !materialized,
+    materializedPaths,
   };
 }
 
 /**
- * @param {{ projectProfilePath: string }} options
+ * @param {{ projectProfilePath: string, profileDocument: Record<string, unknown> }} options
  * @returns {{ projectProfilePath: string, document: Record<string, unknown>, projectId: string, displayName: string, runtimeRootFromProfile: string }}
  */
-export function loadProjectProfileForRuntime(options) {
-  const loaded = loadContractFile({
-    filePath: options.projectProfilePath,
-    family: "project-profile",
-  });
-
-  if (!loaded.ok) {
-    const issueSummary = loaded.validation.issues.map((issue) => issue.message).join("; ");
-    throw new Error(
-      `Project profile '${options.projectProfilePath}' failed validation: ${issueSummary || "unknown validation issue"}.`,
-    );
-  }
-
-  const profileDocument = /** @type {Record<string, unknown>} */ (loaded.document);
+function resolveProjectProfileRuntimeMetadata(options) {
+  const profileDocument = options.profileDocument;
   const projectId = profileDocument.project_id;
   const displayName = profileDocument.display_name;
   const runtimeDefaults = /** @type {Record<string, unknown>} */ (profileDocument.runtime_defaults ?? {});
@@ -390,6 +549,29 @@ export function loadProjectProfileForRuntime(options) {
     displayName,
     runtimeRootFromProfile,
   };
+}
+
+/**
+ * @param {{ projectProfilePath: string }} options
+ * @returns {{ projectProfilePath: string, document: Record<string, unknown>, projectId: string, displayName: string, runtimeRootFromProfile: string }}
+ */
+export function loadProjectProfileForRuntime(options) {
+  const loaded = loadContractFile({
+    filePath: options.projectProfilePath,
+    family: "project-profile",
+  });
+
+  if (!loaded.ok) {
+    const issueSummary = loaded.validation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(
+      `Project profile '${options.projectProfilePath}' failed validation: ${issueSummary || "unknown validation issue"}.`,
+    );
+  }
+
+  return resolveProjectProfileRuntimeMetadata({
+    projectProfilePath: options.projectProfilePath,
+    profileDocument: /** @type {Record<string, unknown>} */ (loaded.document),
+  });
 }
 
 /**
@@ -437,17 +619,155 @@ export function ensureRuntimeLayout(options) {
 }
 
 /**
+ * @param {{ projectRoot: string, filePaths: string[] }} options
+ * @returns {string[]}
+ */
+function toProjectRelativePaths(options) {
+  return options.filePaths
+    .filter((filePath) => typeof filePath === "string" && filePath.length > 0)
+    .map((filePath) => toProjectRelativePath(options.projectRoot, filePath));
+}
+
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   projectId: string,
+ *   command: string,
+ *   projectProfileRef: string,
+ *   projectProfileSource: string,
+ *   projectProfilePath: string,
+ *   runtimeRoot: string,
+ *   assetMode: "bundled" | "materialized",
+ *   registryRoots: Record<string, string>,
+ *   runtimeLayout: { stateRoot: string, reportsRoot: string },
+ *   stateFile: string,
+ *   artifactPacketFile: string,
+ *   reportPath: string,
+ *   existingProfileFound: boolean,
+ *   targetRepoWrites: string[],
+ *   runtimeWrites: string[],
+ *   bootstrapAssetsMaterialized: boolean,
+ *   profileMaterialized: boolean,
+ *   repoTopology: string,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function createOnboardingReport(options) {
+  const requiredRegistryRoots = [
+    "routes",
+    "wrappers",
+    "prompts",
+    "policies",
+    "adapters",
+    "evaluation",
+    "context_bundles",
+  ];
+  const registryChecks = requiredRegistryRoots.map((key) => {
+    const root = options.registryRoots[key];
+    const exists = typeof root === "string" && fs.existsSync(root);
+    return {
+      check_id: `registry-root-${key}`,
+      status: exists ? "pass" : "fail",
+      summary: exists
+        ? `Registry root '${key}' is available.`
+        : `Registry root '${key}' is missing or not resolvable.`,
+      path: root ?? null,
+    };
+  });
+  const targetWriteBoundaryPass =
+    options.assetMode !== "bundled" || (options.targetRepoWrites.length === 0 && !options.bootstrapAssetsMaterialized);
+  const checks = [
+    {
+      check_id: "project-profile",
+      status: "pass",
+      summary:
+        options.projectProfileSource === "bundled-generated"
+          ? "Bundled project profile generated under runtime state."
+          : "Project profile resolved for onboarding.",
+      path: options.projectProfileRef,
+    },
+    ...registryChecks,
+    {
+      check_id: "target-write-boundary",
+      status: targetWriteBoundaryPass ? "pass" : "fail",
+      summary: targetWriteBoundaryPass
+        ? "Onboarding write effects match the selected asset mode."
+        : "Bundled onboarding attempted target-repo asset writes.",
+    },
+  ];
+  const blockers = checks
+    .filter((check) => check.status === "fail")
+    .map((check) => ({
+      code: check.check_id,
+      summary: check.summary,
+      next_command:
+        check.check_id === "target-write-boundary"
+          ? `aor onboard --project-ref ${options.projectRoot} --asset-mode materialized`
+          : `aor onboard --project-ref ${options.projectRoot} --asset-mode ${options.assetMode}`,
+    }));
+  const status = blockers.length > 0 ? "blocked" : "ready";
+
+  return {
+    report_id: `${options.projectId}.onboarding.v1`,
+    project_id: options.projectId,
+    version: 1,
+    generated_from: {
+      command: options.command,
+      project_root: options.projectRoot,
+      selected_profile_ref: options.projectProfileRef,
+      profile_source: options.projectProfileSource,
+    },
+    project_state: {
+      project_root: options.projectRoot,
+      runtime_root: options.runtimeRoot,
+      project_profile_ref: options.projectProfileRef,
+      project_profile_path: options.projectProfilePath,
+      existing_profile_found: options.existingProfileFound,
+      has_git: fs.existsSync(path.join(options.projectRoot, ".git")),
+      has_package_json: fs.existsSync(path.join(options.projectRoot, "package.json")),
+      repo_topology: options.repoTopology,
+    },
+    asset_mode: options.assetMode,
+    registry_roots: options.registryRoots,
+    readiness: {
+      status,
+      checks,
+    },
+    blockers,
+    next_action: {
+      command:
+        status === "ready"
+          ? `aor next --project-ref ${options.projectRoot}`
+          : blockers[0]?.next_command ?? `aor doctor --project-ref ${options.projectRoot}`,
+      reason:
+        status === "ready"
+          ? "Runtime bootstrap is ready for guided next-action resolution."
+          : "Onboarding is blocked until the failed readiness checks pass.",
+    },
+    write_effects: {
+      target_repo_writes: toProjectRelativePaths({ projectRoot: options.projectRoot, filePaths: options.targetRepoWrites }),
+      runtime_writes: toProjectRelativePaths({ projectRoot: options.projectRoot, filePaths: options.runtimeWrites }),
+      copied_example_registries: options.bootstrapAssetsMaterialized,
+      materialized_profile: options.profileMaterialized,
+    },
+    status,
+  };
+}
+
+/**
  * @param {{
  *   cwd?: string,
  *   projectRef?: string,
  *   projectProfile?: string,
  *   runtimeRoot?: string,
+ *   assetMode?: "bundled" | "materialized",
  *   materializeProjectProfile?: boolean,
  *   bootstrapTemplate?: string,
  *   materializeBootstrapAssets?: boolean,
  *   repoBuildCommands?: string[],
  *   repoLintCommands?: string[],
  *   repoTestCommands?: string[],
+ *   command?: string,
  * }} options
  * @returns {{
  *   projectRoot: string,
@@ -487,10 +807,22 @@ export function ensureRuntimeLayout(options) {
 export function initializeProjectRuntime(options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const projectRoot = discoverProjectRoot({ cwd, projectRef: options.projectRef });
-  const materializeProjectProfile = options.materializeProjectProfile === true;
-  const materializeBootstrapAssets = options.materializeBootstrapAssets === true;
+  const requestedAssetMode =
+    typeof options.assetMode === "string" ? normalizeAssetMode(options.assetMode, "bundled") : null;
+  if (
+    requestedAssetMode === "bundled" &&
+    (options.materializeProjectProfile === true || options.materializeBootstrapAssets === true)
+  ) {
+    throw new Error("Asset mode 'bundled' cannot be combined with materialization flags.");
+  }
+  const materializeProjectProfile =
+    options.materializeProjectProfile === true || requestedAssetMode === "materialized";
+  const materializeBootstrapAssets =
+    options.materializeBootstrapAssets === true || requestedAssetMode === "materialized";
 
   let projectProfilePath;
+  let projectProfileSource = "default-discovered";
+  let generatedBundledProfile = null;
   /** @type {{ materialized: boolean, idempotent: boolean, templatePath: string | null }} */
   let profileMaterialization = { materialized: false, idempotent: false, templatePath: null };
   if (materializeProjectProfile) {
@@ -507,17 +839,39 @@ export function initializeProjectRuntime(options = {}) {
       repoTestCommands: Array.isArray(options.repoTestCommands) ? options.repoTestCommands : [],
     });
     projectProfilePath = materialized.projectProfilePath;
+    projectProfileSource = materialized.materialized ? "materialized" : "existing-materialized";
     profileMaterialization = {
       materialized: materialized.materialized,
       idempotent: materialized.idempotent,
       templatePath: materialized.templatePath,
     };
   } else {
-    projectProfilePath = resolveProjectProfilePath({
+    projectProfilePath = resolveOptionalProjectProfilePath({
       cwd,
       projectRoot,
       projectProfile: options.projectProfile,
     });
+    if (projectProfilePath) {
+      projectProfileSource =
+        typeof options.projectProfile === "string" && options.projectProfile.trim().length > 0
+          ? "explicit"
+          : "default-discovered";
+    } else {
+      generatedBundledProfile = createBootstrapProjectProfile({
+        cwd,
+        projectRoot,
+        bootstrapTemplate:
+          typeof options.bootstrapTemplate === "string" && options.bootstrapTemplate.trim().length > 0
+            ? options.bootstrapTemplate.trim()
+            : undefined,
+        assetMode: "bundled",
+        repoBuildCommands: Array.isArray(options.repoBuildCommands) ? options.repoBuildCommands : [],
+        repoLintCommands: Array.isArray(options.repoLintCommands) ? options.repoLintCommands : [],
+        repoTestCommands: Array.isArray(options.repoTestCommands) ? options.repoTestCommands : [],
+      });
+      projectProfileSource = "bundled-generated";
+      projectProfilePath = "<generated-bundled-profile>";
+    }
   }
 
   const bootstrapAssetsMaterialization = materializeBootstrapAssets
@@ -526,9 +880,15 @@ export function initializeProjectRuntime(options = {}) {
         materializedRoot: null,
         materialized: false,
         idempotent: false,
+        materializedPaths: [],
       };
 
-  const loadedProfile = loadProjectProfileForRuntime({ projectProfilePath });
+  let loadedProfile = generatedBundledProfile
+    ? resolveProjectProfileRuntimeMetadata({
+        projectProfilePath,
+        profileDocument: generatedBundledProfile.profile,
+      })
+    : loadProjectProfileForRuntime({ projectProfilePath });
   const runtimeRoot = resolveRuntimeRoot({
     projectRoot,
     runtimeRootOverride: options.runtimeRoot,
@@ -540,13 +900,30 @@ export function initializeProjectRuntime(options = {}) {
     projectId: loadedProfile.projectId,
   });
 
+  if (generatedBundledProfile) {
+    projectProfilePath = path.join(runtimeLayout.stateRoot, "project.aor.yaml");
+    fs.writeFileSync(projectProfilePath, stringifyYaml(generatedBundledProfile.profile), "utf8");
+    loadedProfile = {
+      ...loadedProfile,
+      projectProfilePath,
+    };
+  }
+
+  const registryResolution = resolveProjectRegistryRoots(loadedProfile.document, { projectRoot });
+  const assetMode = registryResolution.assetMode;
+  const projectProfileRef = toProjectRelativePath(projectRoot, projectProfilePath);
+  const onboardingReportPath = path.join(runtimeLayout.reportsRoot, "onboarding-report.json");
+
   const state = {
     schema_version: 1,
     project_id: loadedProfile.projectId,
     display_name: loadedProfile.displayName,
-    selected_profile_ref: path.relative(projectRoot, projectProfilePath),
+    selected_profile_ref: projectProfileRef,
     project_root: projectRoot,
     runtime_root: runtimeRoot,
+    asset_mode: assetMode,
+    registry_roots: registryResolution.roots,
+    onboarding_report_ref: toProjectRelativePath(projectRoot, onboardingReportPath),
     runtime_layout: {
       project_runtime_root: runtimeLayout.projectRuntimeRoot,
       artifacts_root: runtimeLayout.artifactsRoot,
@@ -582,8 +959,54 @@ export function initializeProjectRuntime(options = {}) {
     projectRoot,
     projectProfileRef: state.selected_profile_ref,
     runtimeLayout,
-    command: "aor project init",
+    command: options.command ?? "aor project init",
   });
+
+  const targetRepoWrites = [];
+  if (profileMaterialization.materialized) {
+    targetRepoWrites.push(projectProfilePath);
+  }
+  if (bootstrapAssetsMaterialization.materialized && bootstrapAssetsMaterialization.materializedRoot) {
+    targetRepoWrites.push(...bootstrapAssetsMaterialization.materializedPaths);
+  }
+  const runtimeWrites = [
+    generatedBundledProfile ? projectProfilePath : null,
+    stateFile,
+    artifactPacket.packetFile,
+    artifactPacket.packetBodyFile,
+    onboardingReportPath,
+  ].filter((entry) => typeof entry === "string");
+  const onboardingReport = createOnboardingReport({
+    projectRoot,
+    projectId: loadedProfile.projectId,
+    command: options.command ?? "aor project init",
+    projectProfileRef,
+    projectProfileSource,
+    projectProfilePath,
+    runtimeRoot,
+    assetMode,
+    registryRoots: registryResolution.roots,
+    runtimeLayout,
+    stateFile,
+    artifactPacketFile: artifactPacket.packetFile,
+    reportPath: onboardingReportPath,
+    existingProfileFound: projectProfileSource !== "bundled-generated" && !profileMaterialization.materialized,
+    targetRepoWrites,
+    runtimeWrites,
+    bootstrapAssetsMaterialized: bootstrapAssetsMaterialization.materialized,
+    profileMaterialized: profileMaterialization.materialized,
+    repoTopology: typeof loadedProfile.document.repo_topology === "string" ? loadedProfile.document.repo_topology : "unknown",
+  });
+  const onboardingValidation = validateContractDocument({
+    family: "onboarding-report",
+    document: onboardingReport,
+    source: "runtime://onboarding-report",
+  });
+  if (!onboardingValidation.ok) {
+    const issueSummary = onboardingValidation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Generated onboarding report failed contract validation: ${issueSummary}`);
+  }
+  fs.writeFileSync(onboardingReportPath, `${JSON.stringify(onboardingReport, null, 2)}\n`, "utf8");
 
   return {
     projectRoot,
@@ -597,13 +1020,20 @@ export function initializeProjectRuntime(options = {}) {
     artifactPacketFile: artifactPacket.packetFile,
     artifactPacketBodyFile: artifactPacket.packetBodyFile,
     artifactPacketId: artifactPacket.packet.packet_id,
+    onboardingReport,
+    onboardingReportFile: onboardingReportPath,
+    onboardingReportId: onboardingReport.report_id,
+    assetMode,
+    registryRoots: registryResolution.roots,
     state,
     bootstrapMaterializationStatus:
       materializeProjectProfile || materializeBootstrapAssets
         ? profileMaterialization.materialized || bootstrapAssetsMaterialization.materialized
           ? "materialized"
           : "reused-existing"
-        : "not-requested",
+        : projectProfileSource === "bundled-generated"
+          ? "bundled"
+          : "not-requested",
     materializedProjectProfileFile: materializeProjectProfile ? projectProfilePath : null,
     materializedBootstrapAssetsRoot: materializeBootstrapAssets ? bootstrapAssetsMaterialization.materializedRoot : null,
     bootstrapMaterializationIdempotent:

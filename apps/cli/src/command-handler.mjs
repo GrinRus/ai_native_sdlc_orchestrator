@@ -160,6 +160,13 @@ function formatGuidedHumanOutput(output) {
     `Runtime root: ${String(output.resolved_runtime_root ?? "not resolved")}`,
   ];
 
+  if (output.asset_mode || output.onboarding_report_file) {
+    lines.push(
+      `Asset mode: ${String(output.asset_mode ?? "not resolved")}`,
+      `Onboarding report: ${String(output.onboarding_report_file ?? "not written")}`,
+    );
+  }
+
   if (checks.length > 0) {
     lines.push("", "Readiness:");
     for (const check of checks) {
@@ -271,10 +278,10 @@ export function formatCommandHelp(definition) {
       : definition.command === "onboard"
         ? [
             "- Onboard is a guided wrapper over 'aor project init'.",
-            "- Current bootstrap semantics still require a discoverable or explicit project profile; clean no-profile onboarding is owned by W21-S03.",
+            "- Clean repositories default to bundled asset mode and write the generated profile under .aor/.",
             "- Positional <repo> and --project-ref are alternatives; do not pass both.",
             "- Existing grouped commands remain available and keep their JSON output contract.",
-            "- Asset ejection remains explicit through --materialize-bootstrap-assets.",
+            "- Asset ejection remains explicit through --asset-mode materialized or --materialize-bootstrap-assets.",
             "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
           ]
         : definition.command === "app"
@@ -296,6 +303,8 @@ export function formatCommandHelp(definition) {
           "- --project-ref is optional. When omitted, the command discovers repo root from cwd.",
           "- --project-profile can override default profile discovery in project root.",
           `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
+          "- --asset-mode bundled is the clean default and resolves bundled registry roots without copying examples/.",
+          "- --asset-mode materialized requests explicit profile and bootstrap-asset materialization.",
           "- --materialize-project-profile writes project.aor.yaml from bundled bootstrap templates when the target repo is still clean.",
           "- --materialize-bootstrap-assets writes packaged examples/context bootstrap assets without proof-runner-side file injection.",
           "- --repo-build-command, --repo-lint-command, and --repo-test-command override detected verification commands during bootstrap materialization.",

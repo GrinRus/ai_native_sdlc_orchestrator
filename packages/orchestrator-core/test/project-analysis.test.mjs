@@ -114,6 +114,33 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
   });
 });
 
+test("analyzeProjectRuntime honors bundled project-profile registry roots for clean repos", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s03-analysis-clean-"));
+  fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
+  fs.writeFileSync(
+    path.join(repoRoot, "package.json"),
+    JSON.stringify({ name: "analysis-clean", scripts: { test: "node --test" } }, null, 2),
+    "utf8",
+  );
+
+  try {
+    const result = analyzeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+
+    assert.equal(result.assetMode, "bundled");
+    assert.equal(fs.existsSync(path.join(repoRoot, "examples")), false);
+    assert.equal(result.registryRoots.routes, path.join(workspaceRoot, "examples/routes"));
+    assert.equal(result.routeResolutionMatrix.length, 10);
+    assert.equal(result.assetResolutionMatrix.length, 10);
+    assert.equal(result.policyResolutionMatrix.length, 10);
+    assert.equal(result.evaluationRegistry.datasets.length > 0, true);
+    assert.equal(result.report.asset_mode, "bundled");
+    assert.equal(result.report.registry_roots.routes, path.join(workspaceRoot, "examples/routes"));
+    assert.equal(result.report.discovery_completeness.status, "pass");
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("analyzeProjectRuntime records bounded multirepo repo graph and validation proof", () => {
   withTempRepo((repoRoot) => {
     const result = analyzeProjectRuntime({

@@ -6,7 +6,7 @@ import { loadContractFile, validateContractDocument } from "../../contracts/src/
 import { scoreEvaluationSuite } from "../../harness/src/scorer-interface.mjs";
 
 import { loadEvaluationRegistry, resolveSuiteWithDataset } from "./evaluation-registry.mjs";
-import { initializeProjectRuntime } from "./project-init.mjs";
+import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
 
 const SUPPORTED_SUBJECT_TYPES = new Set(["run", "wrapper", "route", "adapter"]);
 
@@ -99,6 +99,7 @@ export function runEvaluationSuite(options) {
   }
 
   const profile = /** @type {Record<string, unknown>} */ (loadedProfile.document);
+  const registryResolution = resolveProjectRegistryRoots(profile, { projectRoot: init.projectRoot });
   const suiteRef = options.suiteRef ?? resolveDefaultSuiteRef(profile);
   if (!suiteRef) {
     throw new Error("No suite_ref provided and project profile has no eval_policy.default_release_suite_ref.");
@@ -107,7 +108,10 @@ export function runEvaluationSuite(options) {
   const subjectRef = options.subjectRef;
   const subjectType = inferSubjectType(subjectRef);
 
-  const evaluationRegistry = loadEvaluationRegistry({ workspaceRoot: init.projectRoot });
+  const evaluationRegistry = loadEvaluationRegistry({
+    workspaceRoot: init.projectRoot,
+    examplesRoot: registryResolution.roots.evaluation,
+  });
   if (!evaluationRegistry.ok) {
     const issueSummary = evaluationRegistry.issues.map((issue) => issue.message).join("; ");
     throw new Error(`Evaluation registry checks failed: ${issueSummary}`);

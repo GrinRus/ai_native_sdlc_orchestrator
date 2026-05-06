@@ -23,6 +23,8 @@ const COMPILER_REVISION_LIFECYCLE_VALUES = ["draft", "candidate", "stable", "fro
 const COMPILER_REVISION_STATUS_VALUES = ["ready", "blocked"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
+const ASSET_MODE_VALUES = ["bundled", "materialized"];
+const ONBOARDING_STATUS_VALUES = ["ready", "blocked"];
 export const LIVE_E2E_OBSERVATION_STATUS_VALUES = ["pass", "warn", "not_pass"];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
@@ -83,6 +85,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       allowed_providers: "array",
       allowed_adapters: "array",
       registry_roots: "object",
+      asset_mode: "string",
       default_route_profiles: "object",
       default_step_policies: "object",
       default_wrapper_profiles: "object",
@@ -96,7 +99,46 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       runtime_defaults: "object",
       writeback_policy: "object",
     },
-    enumChecks: [],
+    enumChecks: [{ field: "asset_mode", allowedValues: ASSET_MODE_VALUES }],
+  },
+  {
+    family: "onboarding-report",
+    familyGroup: "core-packets-and-profiles",
+    sourceContract: "docs/contracts/onboarding-report.md",
+    exampleGlob: "examples/reports/onboarding-report*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "report_id",
+      "project_id",
+      "version",
+      "generated_from",
+      "project_state",
+      "asset_mode",
+      "registry_roots",
+      "readiness",
+      "blockers",
+      "next_action",
+      "write_effects",
+      "status",
+    ],
+    fieldTypes: {
+      report_id: "string",
+      project_id: "string",
+      version: "number",
+      generated_from: "object",
+      project_state: "object",
+      asset_mode: "string",
+      registry_roots: "object",
+      readiness: "object",
+      blockers: "array",
+      next_action: "object",
+      write_effects: "object",
+      status: "string",
+    },
+    enumChecks: [
+      { field: "asset_mode", allowedValues: ASSET_MODE_VALUES },
+      { field: "status", allowedValues: ONBOARDING_STATUS_VALUES },
+    ],
   },
   {
     family: "project-analysis-report",
@@ -1326,6 +1368,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/context\/skills\/[^/]+\.ya?ml$/, family: "context-skill" },
   { regex: /^examples\/control-plane-api\/[^/]+\.ya?ml$/, family: "control-plane-api" },
   { regex: /^examples\/delivery-manifest[^/]*\.ya?ml$/, family: "delivery-manifest" },
+  { regex: /^examples\/reports\/onboarding-report[^/]*\.ya?ml$/, family: "onboarding-report" },
   { regex: /^examples\/reports\/discovery-research-report[^/]*\.ya?ml$/, family: "discovery-research-report" },
   { regex: /^examples\/reports\/incident-backfill-proposal[^/]*\.ya?ml$/, family: "incident-backfill-proposal" },
   { regex: /^examples\/reports\/planner-metrics-snapshot[^/]*\.ya?ml$/, family: "planner-metrics-snapshot" },

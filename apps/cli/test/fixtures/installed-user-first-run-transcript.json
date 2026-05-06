@@ -11,7 +11,10 @@
     "status": "implemented",
     "guided_stage": "onboard",
     "guided_low_level_command": "project init",
-    "has_runtime_state_file": true
+    "has_runtime_state_file": true,
+    "asset_mode": "bundled",
+    "has_onboarding_report_file": true,
+    "copied_example_registries": false
   },
   "app": {
     "command": "app",

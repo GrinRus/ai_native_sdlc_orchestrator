@@ -3,6 +3,7 @@ import path from "node:path";
 
 import {
   initializeProjectRuntime,
+  resolveOptionalAssetModeFlag,
   resolveOptionalBooleanFlag,
   resolveOptionalStringFlag,
   resolveOptionalStringListFlag,
@@ -168,6 +169,7 @@ export function handleGuidedCommand(context) {
       projectRef: resolveOptionalStringFlag("project-ref", flags["project-ref"]) ?? ".",
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      assetMode: resolveOptionalAssetModeFlag(flags["asset-mode"]),
       materializeProjectProfile: resolveOptionalBooleanFlag(
         "materialize-project-profile",
         flags["materialize-project-profile"],
@@ -180,6 +182,7 @@ export function handleGuidedCommand(context) {
       repoBuildCommands: resolveOptionalStringListFlag("repo-build-command", flags["repo-build-command"]),
       repoLintCommands: resolveOptionalStringListFlag("repo-lint-command", flags["repo-lint-command"]),
       repoTestCommands: resolveOptionalStringListFlag("repo-test-command", flags["repo-test-command"]),
+      command: "aor onboard",
     });
 
     outputState.resolvedProjectRef = initResult.projectRoot;
@@ -190,6 +193,10 @@ export function handleGuidedCommand(context) {
     outputState.artifactPacketId = initResult.artifactPacketId;
     outputState.artifactPacketFile = initResult.artifactPacketFile;
     outputState.artifactPacketBodyFile = initResult.artifactPacketBodyFile;
+    outputState.onboardingReportId = initResult.onboardingReportId;
+    outputState.onboardingReportFile = initResult.onboardingReportFile;
+    outputState.assetMode = initResult.assetMode;
+    outputState.registryRoots = initResult.registryRoots;
     outputState.bootstrapMaterializationStatus = initResult.bootstrapMaterializationStatus;
     outputState.materializedProjectProfileFile = initResult.materializedProjectProfileFile;
     outputState.materializedBootstrapAssetsRoot = initResult.materializedBootstrapAssetsRoot;

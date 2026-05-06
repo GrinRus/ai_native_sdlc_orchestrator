@@ -12,7 +12,7 @@ import { resolveRouteForStep } from "../../provider-routing/src/route-resolution
 import { resolveAssetBundleForStep } from "./asset-loader.mjs";
 import { compileStepContext } from "./context-compiler.mjs";
 import { materializeDeliveryPlan } from "./delivery-plan.mjs";
-import { initializeProjectRuntime } from "./project-init.mjs";
+import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
 import { analyzeProjectRuntime } from "./project-analysis.mjs";
 import {
   filterNonBootstrapChangedPaths,
@@ -483,42 +483,46 @@ function writeRuntimeRepairInput(options) {
  */
 export function executeRoutedStep(options) {
   const init = initializeProjectRuntime(options);
+  const registryRoots =
+    typeof init.registryRoots === "object" && init.registryRoots !== null
+      ? /** @type {Record<string, string>} */ (init.registryRoots)
+      : resolveProjectRegistryRoots({}, { projectRoot: init.projectRoot }).roots;
 
   const routesRoot = options.routesRoot
     ? path.isAbsolute(options.routesRoot)
       ? options.routesRoot
       : path.resolve(init.projectRoot, options.routesRoot)
-    : path.join(init.projectRoot, "examples/routes");
+    : registryRoots.routes;
   const wrappersRoot = options.wrappersRoot
     ? path.isAbsolute(options.wrappersRoot)
       ? options.wrappersRoot
       : path.resolve(init.projectRoot, options.wrappersRoot)
-    : path.join(init.projectRoot, "examples/wrappers");
+    : registryRoots.wrappers;
   const promptsRoot = options.promptsRoot
     ? path.isAbsolute(options.promptsRoot)
       ? options.promptsRoot
       : path.resolve(init.projectRoot, options.promptsRoot)
-    : path.join(init.projectRoot, "examples/prompts");
+    : registryRoots.prompts;
   const contextBundlesRoot = options.contextBundlesRoot
     ? path.isAbsolute(options.contextBundlesRoot)
       ? options.contextBundlesRoot
       : path.resolve(init.projectRoot, options.contextBundlesRoot)
-    : path.join(init.projectRoot, "examples/context/bundles");
+    : registryRoots.context_bundles;
   const policiesRoot = options.policiesRoot
     ? path.isAbsolute(options.policiesRoot)
       ? options.policiesRoot
       : path.resolve(init.projectRoot, options.policiesRoot)
-    : path.join(init.projectRoot, "examples/policies");
+    : registryRoots.policies;
   const adaptersRoot = options.adaptersRoot
     ? path.isAbsolute(options.adaptersRoot)
       ? options.adaptersRoot
       : path.resolve(init.projectRoot, options.adaptersRoot)
-    : path.join(init.projectRoot, "examples/adapters");
+    : registryRoots.adapters;
   const skillsRoot = options.skillsRoot
     ? path.isAbsolute(options.skillsRoot)
       ? options.skillsRoot
       : path.resolve(init.projectRoot, options.skillsRoot)
-    : path.join(init.projectRoot, "examples/skills");
+    : registryRoots.skills;
   const executionRoot = options.executionRoot
     ? path.isAbsolute(options.executionRoot)
       ? options.executionRoot

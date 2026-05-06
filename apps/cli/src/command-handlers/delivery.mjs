@@ -266,8 +266,14 @@ export function handleDeliveryCommand(context) {
     }
     const resolvedPolicy = resolveStepPolicyForStep({
       projectProfilePath: init.projectProfilePath,
-      routesRoot: path.join(init.projectRoot, "examples/routes"),
-      policiesRoot: path.join(init.projectRoot, "examples/policies"),
+      routesRoot:
+        typeof init.registryRoots === "object" && init.registryRoots !== null
+          ? /** @type {Record<string, string>} */ (init.registryRoots).routes
+          : path.join(init.projectRoot, "examples/routes"),
+      policiesRoot:
+        typeof init.registryRoots === "object" && init.registryRoots !== null
+          ? /** @type {Record<string, string>} */ (init.registryRoots).policies
+          : path.join(init.projectRoot, "examples/policies"),
       stepClass,
       routeOverrides,
       policyOverrides,

@@ -27,6 +27,10 @@ Persistent configuration for one target project, including repos, allowed provid
 ## Notes
 Use the project profile as the durable source of truth for runtime default selection.
 
+`asset_mode` is optional for backward compatibility and should be present on new or materialized profiles:
+- `bundled` resolves AOR-provided registry roots from the installed AOR asset bundle without copying example registries into the target repository;
+- `materialized` resolves registry roots from target-repo committed assets after the user explicitly materializes or ejects them.
+
 For bounded multirepo flows, one project profile owns all participating `repos[]` entries and any `repo_graph` dependency edges. This supports separate backend, mobile, frontend, documentation, or shared-library repositories inside one AOR flow; it is not the same as coordinating multiple independent AOR `project_id` profiles.
 
 Bounded multirepo profiles should keep each repo entry explicit:
@@ -42,12 +46,24 @@ Deterministic runtime default resolution follows this order:
 3. prompt bundle from `default_prompt_bundles.<step>`;
 4. context bundles from `default_context_bundles.<step>[]`.
 
-`registry_roots` declares the committed AOR asset roots for routes, wrappers, prompt bundles, and runtime context assets. Runtime context assets are AOR-owned committed artifacts, not contributor guidance files from the target repository.
-Committed registry roots are source assets and static samples only. Runtime-generated outputs still belong under `.aor/`.
+`registry_roots` declares AOR asset roots for routes, wrappers, prompt bundles, policies, adapters, evaluation registries, skill profiles, and runtime context assets. Runtime context assets are AOR-owned artifacts, not contributor guidance files from the target repository. Relative roots resolve from the target project root; absolute roots are allowed for bundled installed assets. Runtime-generated outputs still belong under `.aor/`.
 
-W21 guided onboarding will make asset-mode behavior explicit without changing the existing required project-profile fields:
-- `bundled` mode resolves AOR-provided registry roots without copying examples into the target repository;
-- `materialized` mode records intentional asset ejection/materialization when a user wants local committed AOR assets;
+The canonical registry-root keys are:
+- `routes`
+- `wrappers`
+- `prompts`
+- `policies`
+- `adapters`
+- `evaluation`
+- `skills`
+- `context_docs`
+- `context_rules`
+- `context_skills`
+- `context_bundles`
+
+W21 guided onboarding preserves both modes:
+- bundled mode is the default clean-repo path and must not copy `examples/` into the target repository;
+- materialized mode is explicit and records intentional asset ejection/materialization when a user wants local committed AOR assets;
 - runtime outputs still belong under `.aor/` in both modes.
 
 `default_prompt_bundles` is keyed by workflow step and resolves one prompt bundle ref per step.

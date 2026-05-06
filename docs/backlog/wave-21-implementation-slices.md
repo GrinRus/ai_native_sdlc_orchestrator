@@ -90,7 +90,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S03 — Clean project onboarding and asset-root resolution
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** ready
+- **State:** done
 - **Outcome:** Allow `aor onboard <repo>` to prepare a clean target repository without mandatory example-copy materialization, while still supporting explicit asset ejection when requested.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, `examples/**`, tests
 - **Hard dependencies:** W21-S01
@@ -124,7 +124,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S04 — Guided mission intake and next-action resolver
 - **Epic:** EPIC-2 Packet lifecycle
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Let users define a mission with goals, KPI/DoD, constraints, allowed paths, and delivery mode, then receive the next safe action for the current project state.
 - **Primary modules:** `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, tests
 - **Hard dependencies:** W19-S02, W21-S03

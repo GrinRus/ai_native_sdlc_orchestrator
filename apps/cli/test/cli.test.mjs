@@ -249,18 +249,17 @@ test("implemented command help documents inputs outputs and contracts", () => {
   assert.match(result.stdout, /Status: implemented in bootstrap shell \(W1-S01\)/);
   assert.match(
     result.stdout,
-    /Inputs: --project-ref <path> \(optional, defaults to cwd discovery\), --project-profile <path> \(optional\), --runtime-root <path> \(optional\), --materialize-project-profile \(optional\), --bootstrap-template <template_id\|path> \(optional\), --materialize-bootstrap-assets \(optional\), --repo-build-command <cmd> \(optional, repeatable\), --repo-lint-command <cmd> \(optional, repeatable\), --repo-test-command <cmd> \(optional, repeatable\), --help/,
+    /Inputs: --project-ref <path> \(optional, defaults to cwd discovery\), --project-profile <path> \(optional\), --runtime-root <path> \(optional\), --asset-mode <bundled\|materialized> \(optional, defaults to bundled for clean onboarding\), --materialize-project-profile \(optional\), --bootstrap-template <template_id\|path> \(optional\), --materialize-bootstrap-assets \(optional\), --repo-build-command <cmd> \(optional, repeatable\), --repo-lint-command <cmd> \(optional, repeatable\), --repo-test-command <cmd> \(optional, repeatable\), --help/,
   );
   assert.match(
     result.stdout,
-    /Outputs: resolved_project_ref, resolved_runtime_root, project_profile_ref, runtime_layout, runtime_state_file, artifact_packet_id, artifact_packet_file, artifact_packet_body_file, bootstrap_materialization_status, materialized_project_profile_file, materialized_bootstrap_assets_root, bootstrap_materialization_idempotent, contract_families, command_catalog_alignment/,
+    /Outputs: resolved_project_ref, resolved_runtime_root, project_profile_ref, runtime_layout, runtime_state_file, artifact_packet_id, artifact_packet_file, artifact_packet_body_file, onboarding_report_id, onboarding_report_file, asset_mode, registry_roots, bootstrap_materialization_status, materialized_project_profile_file, materialized_bootstrap_assets_root, bootstrap_materialization_idempotent, contract_families, command_catalog_alignment/,
   );
-  assert.match(result.stdout, /Contract families: project-profile/);
+  assert.match(result.stdout, /Contract families: project-profile, onboarding-report/);
 });
 
 test("guided first-run shortcuts expose help, human defaults, JSON mode, and grouped compatibility", () => {
   withTempProject((projectRoot) => {
-    const projectProfile = path.join(workspaceRoot, "examples/project.aor.yaml");
     fs.writeFileSync(
       path.join(projectRoot, "package.json"),
       JSON.stringify({ name: "guided-first-run-fixture", private: true }, null, 2),
@@ -302,8 +301,6 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     const invalidJsonOnboard = invokeCli([
       "onboard",
       invalidJsonProject,
-      "--project-profile",
-      projectProfile,
       "--json",
       "maybe",
     ]);
@@ -311,14 +308,19 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.match(invalidJsonOnboard.stderr, /Flag '--json'/);
     assert.equal(fs.existsSync(path.join(invalidJsonProject, ".aor")), false);
 
-    const onboardJson = invokeCli(["onboard", projectRoot, "--project-profile", projectProfile, "--json"]);
+    const onboardJson = invokeCli(["onboard", projectRoot, "--json"]);
     assert.equal(onboardJson.exitCode, 0, onboardJson.stderr);
     const onboardPayload = JSON.parse(onboardJson.stdout);
     assert.equal(onboardPayload.command, "onboard");
     assert.equal(onboardPayload.guided_low_level_command, "project init");
     assert.equal(fs.existsSync(onboardPayload.runtime_state_file), true);
+    assert.equal(onboardPayload.asset_mode, "bundled");
+    assert.equal(fs.existsSync(onboardPayload.onboarding_report_file), true);
+    assert.equal(fs.existsSync(path.join(projectRoot, "examples")), false);
+    const onboardingReport = JSON.parse(fs.readFileSync(onboardPayload.onboarding_report_file, "utf8"));
+    assert.deepEqual(onboardingReport.write_effects.target_repo_writes, []);
 
-    const groupedInit = invokeCli(["project", "init", "--project-ref", projectRoot, "--project-profile", projectProfile]);
+    const groupedInit = invokeCli(["project", "init", "--project-ref", projectRoot]);
     assert.equal(groupedInit.exitCode, 0, groupedInit.stderr);
     assert.equal(JSON.parse(groupedInit.stdout).command, "project init");
 
@@ -356,6 +358,9 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
           guided_stage: onboardPayload.guided_stage,
           guided_low_level_command: onboardPayload.guided_low_level_command,
           has_runtime_state_file: fs.existsSync(onboardPayload.runtime_state_file),
+          asset_mode: onboardPayload.asset_mode,
+          has_onboarding_report_file: fs.existsSync(onboardPayload.onboarding_report_file),
+          copied_example_registries: onboardingReport.write_effects.copied_example_registries,
         },
         app: {
           command: appPayload.command,

@@ -22,11 +22,7 @@ function withTempRepo(callback) {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w1-s02-"));
 
   fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
-  fs.mkdirSync(path.join(tempRoot, "examples"), { recursive: true });
-
-  const profileSource = path.join(workspaceRoot, "examples/project.aor.yaml");
-  const profileTarget = path.join(tempRoot, "examples/project.aor.yaml");
-  fs.copyFileSync(profileSource, profileTarget);
+  fs.cpSync(path.join(workspaceRoot, "examples"), path.join(tempRoot, "examples"), { recursive: true });
 
   try {
     callback(tempRoot);
@@ -93,12 +89,95 @@ test("initializeProjectRuntime creates idempotent runtime layout and durable sta
     assert.equal(parsedState.selected_profile_ref, "examples/project.aor.yaml");
     assert.equal(parsedState.project_root, tempRoot);
     assert.equal(parsedState.runtime_root, path.join(tempRoot, ".aor"));
+    assert.equal(parsedState.asset_mode, "materialized");
+    assert.equal(parsedState.onboarding_report_ref, ".aor/projects/aor-core/reports/onboarding-report.json");
+    assert.equal(fs.existsSync(firstRun.onboardingReportFile), true);
+    assert.equal(firstRun.onboardingReport.status, "ready");
+    assert.equal(firstRun.onboardingReport.asset_mode, "materialized");
 
     const packet = JSON.parse(fs.readFileSync(firstRun.artifactPacketFile, "utf8"));
     assert.equal(packet.packet_id, "aor-core.artifact.bootstrap.v1");
     assert.equal(packet.packet_type, "bootstrap");
     assert.equal(packet.project_id, "aor-core");
   });
+});
+
+test("initializeProjectRuntime onboards a clean repo in bundled mode without target asset copies", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s03-clean-"));
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "package.json"), JSON.stringify({ name: "clean-repo" }, null, 2), "utf8");
+
+  try {
+    const result = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+
+    assert.equal(result.projectId, path.basename(tempRoot).toLowerCase());
+    assert.equal(result.assetMode, "bundled");
+    assert.equal(result.bootstrapMaterializationStatus, "bundled");
+    assert.match(result.projectProfileRef, /^\.aor\/projects\/.+\/state\/project\.aor\.yaml$/);
+    assert.equal(fs.existsSync(path.join(tempRoot, "project.aor.yaml")), false);
+    assert.equal(fs.existsSync(path.join(tempRoot, "examples")), false);
+    assert.equal(fs.existsSync(result.projectProfilePath), true);
+    assert.equal(result.registryRoots.routes, path.join(workspaceRoot, "examples/routes"));
+
+    const report = JSON.parse(fs.readFileSync(result.onboardingReportFile, "utf8"));
+    assert.equal(report.status, "ready");
+    assert.equal(report.asset_mode, "bundled");
+    assert.equal(report.project_state.existing_profile_found, false);
+    assert.deepEqual(report.write_effects.target_repo_writes, []);
+    assert.equal(report.write_effects.copied_example_registries, false);
+    assert.equal(report.write_effects.materialized_profile, false);
+    assert.ok(report.write_effects.runtime_writes.includes(result.projectProfileRef));
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("initializeProjectRuntime materializes profile and assets only when materialized mode is explicit", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s03-materialized-"));
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+
+  try {
+    const result = initializeProjectRuntime({
+      cwd: tempRoot,
+      projectRef: tempRoot,
+      assetMode: "materialized",
+    });
+
+    assert.equal(result.assetMode, "materialized");
+    assert.equal(result.projectProfileRef, "project.aor.yaml");
+    assert.equal(fs.existsSync(path.join(tempRoot, "project.aor.yaml")), true);
+    assert.equal(fs.existsSync(path.join(tempRoot, "examples/routes")), true);
+    assert.equal(result.registryRoots.routes, path.join(tempRoot, "examples/routes"));
+
+    const report = JSON.parse(fs.readFileSync(result.onboardingReportFile, "utf8"));
+    assert.equal(report.asset_mode, "materialized");
+    assert.equal(report.write_effects.materialized_profile, true);
+    assert.equal(report.write_effects.copied_example_registries, true);
+    assert.ok(report.write_effects.target_repo_writes.includes("project.aor.yaml"));
+    assert.ok(report.write_effects.target_repo_writes.includes("examples"));
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("initializeProjectRuntime blocks invalid explicit profile references before writing runtime state", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s03-missing-profile-"));
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+
+  try {
+    assert.throws(
+      () =>
+        initializeProjectRuntime({
+          cwd: tempRoot,
+          projectRef: tempRoot,
+          projectProfile: "missing-project.aor.yaml",
+        }),
+      /Project profile 'missing-project\.aor\.yaml' was not found/,
+    );
+    assert.equal(fs.existsSync(path.join(tempRoot, ".aor")), false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test("initializeProjectRuntime fails clearly for invalid explicit project reference", () => {

@@ -43,6 +43,7 @@ import {
   executeRuntimeHarnessControlledStep,
   ensureRequiredFlags,
   resolveOptionalStringFlag,
+  resolveOptionalAssetModeFlag,
   resolveOptionalBooleanFlag,
   resolveOptionalIntegerFlag,
   resolveOptionalCsvFlag,
@@ -103,6 +104,7 @@ export function handleBootstrapCommand(context) {
       projectRef: resolveOptionalStringFlag("project-ref", flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      assetMode: resolveOptionalAssetModeFlag(flags["asset-mode"]),
       materializeProjectProfile: resolveOptionalBooleanFlag(
         "materialize-project-profile",
         flags["materialize-project-profile"],
@@ -125,6 +127,10 @@ export function handleBootstrapCommand(context) {
     outputState.artifactPacketId = initResult.artifactPacketId;
     outputState.artifactPacketFile = initResult.artifactPacketFile;
     outputState.artifactPacketBodyFile = initResult.artifactPacketBodyFile;
+    outputState.onboardingReportId = initResult.onboardingReportId;
+    outputState.onboardingReportFile = initResult.onboardingReportFile;
+    outputState.assetMode = initResult.assetMode;
+    outputState.registryRoots = initResult.registryRoots;
     outputState.bootstrapMaterializationStatus = initResult.bootstrapMaterializationStatus;
     outputState.materializedProjectProfileFile = initResult.materializedProjectProfileFile;
     outputState.materializedBootstrapAssetsRoot = initResult.materializedBootstrapAssetsRoot;

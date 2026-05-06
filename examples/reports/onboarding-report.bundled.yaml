@@ -1,0 +1,50 @@
+report_id: clean-repo.onboarding.v1
+project_id: clean-repo
+version: 1
+generated_from:
+  command: aor onboard
+  project_root: /tmp/clean-repo
+  selected_profile_ref: .aor/projects/clean-repo/state/project.aor.yaml
+  profile_source: bundled-generated
+project_state:
+  project_root: /tmp/clean-repo
+  runtime_root: /tmp/clean-repo/.aor
+  project_profile_ref: .aor/projects/clean-repo/state/project.aor.yaml
+  existing_profile_found: false
+  has_git: true
+  has_package_json: true
+  repo_topology: single-repo
+asset_mode: bundled
+registry_roots:
+  routes: /opt/aor/examples/routes
+  wrappers: /opt/aor/examples/wrappers
+  prompts: /opt/aor/examples/prompts
+  policies: /opt/aor/examples/policies
+  adapters: /opt/aor/examples/adapters
+  evaluation: /opt/aor/examples
+  context_docs: /opt/aor/examples/context/docs
+  context_rules: /opt/aor/examples/context/rules
+  context_skills: /opt/aor/examples/context/skills
+  context_bundles: /opt/aor/examples/context/bundles
+readiness:
+  status: ready
+  checks:
+    - check_id: project-profile
+      status: pass
+      summary: Bundled project profile generated under runtime state.
+    - check_id: registry-roots
+      status: pass
+      summary: Bundled registry roots resolved without target-repo asset copies.
+blockers: []
+next_action:
+  command: aor next --project-ref /tmp/clean-repo
+  reason: Runtime bootstrap is ready for guided next-action resolution.
+write_effects:
+  target_repo_writes: []
+  runtime_writes:
+    - .aor/projects/clean-repo/state/project.aor.yaml
+    - .aor/projects/clean-repo/state/project-init-state.json
+    - .aor/projects/clean-repo/reports/onboarding-report.json
+  copied_example_registries: false
+  materialized_profile: false
+status: ready

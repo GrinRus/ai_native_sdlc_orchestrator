@@ -117,6 +117,19 @@ export function resolveOptionalStringFlag(flagName, value) {
 }
 
 /**
+ * @param {string | string[] | true | undefined} value
+ * @returns {"bundled" | "materialized" | undefined}
+ */
+export function resolveOptionalAssetModeFlag(value) {
+  const assetMode = resolveOptionalStringFlag("asset-mode", value);
+  if (assetMode === undefined) return undefined;
+  if (assetMode !== "bundled" && assetMode !== "materialized") {
+    throw new CliUsageError("Flag '--asset-mode' must be one of: bundled, materialized.");
+  }
+  return assetMode;
+}
+
+/**
  * @param {string} flagName
  * @param {string | string[] | true | undefined} value
  * @returns {boolean}

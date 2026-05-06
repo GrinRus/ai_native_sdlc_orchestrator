@@ -9,7 +9,7 @@ import {
 
 import { validateApprovedHandoffGate } from "./handoff-packets.mjs";
 import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
-import { initializeProjectRuntime } from "./project-init.mjs";
+import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
 import { resolveProjectRepoScope } from "./repo-scope.mjs";
 
 /**
@@ -207,6 +207,7 @@ export function validateProjectRuntime(options = {}) {
   }
 
   const profile = /** @type {Record<string, unknown>} */ (loadedProfile.document ?? {});
+  const registryResolution = resolveProjectRegistryRoots(profile, { projectRoot: init.projectRoot });
   const repoScopeProof = resolveProjectRepoScope({ profile });
 
   const defaultsCheck = validateProfileDefaults(profile);
@@ -267,20 +268,25 @@ export function validateProjectRuntime(options = {}) {
     });
   }
 
-  const examplesDir = path.join(init.projectRoot, "examples");
+  const examplesDir = registryResolution.roots.evaluation;
   if (!fs.existsSync(examplesDir)) {
     validators.push({
       validator_id: "asset-reference-integrity",
       status: "warn",
-      summary: "No examples directory found; reference integrity checks were skipped.",
+      summary: "No project-profile evaluation registry root found; reference integrity checks were skipped.",
+      details: { expected_root: examplesDir },
     });
     validators.push({
       validator_id: "evaluation-registry",
       status: "warn",
-      summary: "No examples directory found; dataset/suite registry checks were skipped.",
+      summary: "No project-profile evaluation registry root found; dataset/suite registry checks were skipped.",
+      details: { expected_root: examplesDir },
     });
   } else {
-    const referenceIntegrity = validateExampleReferences({ workspaceRoot: init.projectRoot });
+    const referenceIntegrity = validateExampleReferences({
+      workspaceRoot: init.projectRoot,
+      examplesRoot: examplesDir,
+    });
     validators.push({
       validator_id: "asset-reference-integrity",
       status: referenceIntegrity.ok ? "pass" : "fail",
@@ -295,7 +301,10 @@ export function validateProjectRuntime(options = {}) {
     });
     evidenceRefs.push(`reference-integrity:${referenceIntegrity.checkedReferences}`);
 
-    const evaluationRegistry = loadEvaluationRegistry({ workspaceRoot: init.projectRoot });
+    const evaluationRegistry = loadEvaluationRegistry({
+      workspaceRoot: init.projectRoot,
+      examplesRoot: examplesDir,
+    });
     validators.push({
       validator_id: "evaluation-registry",
       status: evaluationRegistry.ok ? "pass" : "fail",
