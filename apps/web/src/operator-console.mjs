@@ -14,7 +14,28 @@ import {
   readStrategicSnapshot,
   readUiLifecycleState,
   readProjectState,
+  runLifecycleCommand,
+  submitInteractionAnswer,
 } from "../../api/src/index.mjs";
+
+const LIFECYCLE_COMMANDS = Object.freeze([
+  "project init",
+  "intake create",
+  "discovery run",
+  "spec build",
+  "wave create",
+  "handoff prepare",
+  "handoff approve",
+  "run start",
+  "run pause",
+  "run resume",
+  "run steer",
+  "run cancel",
+  "review run",
+  "deliver prepare",
+  "release prepare",
+  "learning handoff",
+]);
 
 /**
  * @param {unknown} value
@@ -86,6 +107,9 @@ function buildControlPlaneHeaders(options) {
   const headers = {
     accept: options.accept,
   };
+  if (options.accept !== "text/event-stream") {
+    headers.connection = "close";
+  }
   if (options.contentType) {
     headers["content-type"] = options.contentType;
   }
@@ -125,6 +149,7 @@ async function readControlPlaneJson(options) {
   *   pathname: string,
   *   body: Record<string, unknown>,
  *   authToken?: string,
+ *   allowedStatusCodes?: number[],
  * }} options
  */
 async function writeControlPlaneJson(options) {
@@ -149,7 +174,8 @@ async function writeControlPlaneJson(options) {
     }
   }
 
-  if (!response.ok) {
+  const allowedStatusCodes = options.allowedStatusCodes ?? [];
+  if (!response.ok && !allowedStatusCodes.includes(response.status)) {
     const errorPayload = asRecord(asRecord(payload).error);
     const message = asString(errorPayload.message) ?? (raw.trim().length > 0 ? raw.trim() : response.statusText);
     throw new Error(`Control-plane mutation failed (${response.status}) for '${url}': ${message}`);
@@ -168,6 +194,8 @@ async function writeControlPlaneJson(options) {
  */
 function openControlPlaneSseStream(options) {
   const controller = new AbortController();
+  /** @type {ReadableStreamDefaultReader<Uint8Array> | null} */
+  let reader = null;
 
   const done = (async () => {
     const url = buildControlPlaneUrl({
@@ -191,7 +219,7 @@ function openControlPlaneSseStream(options) {
       throw new Error("Control-plane SSE stream has no response body.");
     }
 
-    const reader = response.body.getReader();
+    reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
@@ -231,6 +259,9 @@ function openControlPlaneSseStream(options) {
   return {
     close() {
       controller.abort();
+      if (reader) {
+        reader.cancel().catch(() => {});
+      }
     },
     done: done.catch((error) => {
       if (error instanceof Error && error.name === "AbortError") {
@@ -275,6 +306,36 @@ function filterPacketsByRunId(packets, runId) {
     const runRefs = Array.isArray(packet.document.run_refs) ? packet.document.run_refs : [];
     return runRefs.includes(runId);
   });
+}
+
+/**
+ * @param {Array<{ artifact_ref?: string, file?: string, document: Record<string, unknown> }>} stepResults
+ * @returns {Array<Record<string, unknown>>}
+ */
+function collectRunnerInteractions(stepResults) {
+  return stepResults
+    .map((entry) => {
+      const requestedInteraction = asRecord(entry.document.requested_interaction);
+      if (requestedInteraction.requested !== true) {
+        return null;
+      }
+      const status = asString(requestedInteraction.status) ?? "requested";
+      return {
+        run_id: asString(entry.document.run_id),
+        step_id: asString(entry.document.step_id),
+        step_result_id: asString(entry.document.step_result_id),
+        step_result_ref: asString(entry.artifact_ref) ?? asString(entry.file),
+        interaction_id: asString(requestedInteraction.interaction_id),
+        interaction_status: status,
+        question_summary: asString(requestedInteraction.prompt_summary) ?? asString(requestedInteraction.summary),
+        answer_required: status === "requested",
+        answer_audit_refs: Array.isArray(requestedInteraction.answer_audit_refs)
+          ? requestedInteraction.answer_audit_refs.filter((value) => typeof value === "string")
+          : [],
+        continuation: asRecord(requestedInteraction.continuation),
+      };
+    })
+    .filter(Boolean);
 }
 
 /**
@@ -476,6 +537,144 @@ export async function applyOperatorUiLifecycle(options) {
  *   cwd?: string,
  *   projectRef: string,
  *   runtimeRoot?: string,
+ *   controlPlane?: string,
+ *   controlPlaneAuthToken?: string,
+ *   command: string,
+ *   flags?: Record<string, unknown>,
+ * }} options
+ */
+export async function applyOperatorLifecycleCommand(options) {
+  const requestedControlPlane = asString(options.controlPlane);
+  const controlPlaneAuthToken = asString(options.controlPlaneAuthToken) ?? undefined;
+  const uiLifecycle = readUiLifecycleState(options);
+  const connectedControlPlane = resolveControlPlaneUrl({
+    requestedControlPlane,
+    uiLifecycleState: uiLifecycle.state,
+  });
+
+  if (connectedControlPlane) {
+    const projectState = readProjectState(options);
+    const payload = await writeControlPlaneJson({
+      controlPlane: connectedControlPlane,
+      pathname: `/api/projects/${encodeURIComponent(projectState.project_id)}/lifecycle-command/actions`,
+      body: {
+        command: options.command,
+        flags: options.flags ?? {},
+      },
+      authToken: controlPlaneAuthToken,
+      allowedStatusCodes: [409],
+    });
+    return {
+      binding_mode: "detached-http-mutation",
+      control_plane: connectedControlPlane,
+      lifecycle_command: asRecord(payload).lifecycle_command ?? {},
+      error: asRecord(payload).error ?? null,
+    };
+  }
+
+  const result = runLifecycleCommand({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    runtimeRoot: options.runtimeRoot,
+    command: options.command,
+    flags: options.flags,
+  });
+
+  return {
+    binding_mode: "module-runtime-command",
+    control_plane: null,
+    lifecycle_command: result.ok ? result.result : result.result ?? {},
+    error: result.ok ? null : result.error,
+  };
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef: string,
+ *   runtimeRoot?: string,
+ *   controlPlane?: string,
+ *   controlPlaneAuthToken?: string,
+ *   runId: string,
+ *   interactionId: string,
+ *   answer: string,
+ *   reason?: string,
+ *   approvalRef?: string,
+ *   answerEvidenceRef?: string,
+ * }} options
+ */
+export async function submitOperatorInteractionAnswer(options) {
+  const requestedControlPlane = asString(options.controlPlane);
+  const controlPlaneAuthToken = asString(options.controlPlaneAuthToken) ?? undefined;
+  const uiLifecycle = readUiLifecycleState(options);
+  const connectedControlPlane = resolveControlPlaneUrl({
+    requestedControlPlane,
+    uiLifecycleState: uiLifecycle.state,
+  });
+
+  if (connectedControlPlane) {
+    const projectState = readProjectState(options);
+    const payload = await writeControlPlaneJson({
+      controlPlane: connectedControlPlane,
+      pathname: `/api/projects/${encodeURIComponent(projectState.project_id)}/interactions/answers`,
+      body: {
+        run_id: options.runId,
+        interaction_id: options.interactionId,
+        answer: options.answer,
+        reason: options.reason ?? null,
+        approval_ref: options.approvalRef ?? null,
+        answer_evidence_ref: options.answerEvidenceRef ?? null,
+      },
+      authToken: controlPlaneAuthToken,
+      allowedStatusCodes: [409],
+    });
+    return {
+      binding_mode: "detached-http-mutation",
+      control_plane: connectedControlPlane,
+      interaction_answer: asRecord(payload).interaction_answer ?? {},
+      error: asRecord(payload).error ?? null,
+    };
+  }
+
+  const result = submitInteractionAnswer({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    runtimeRoot: options.runtimeRoot,
+    runId: options.runId,
+    interactionId: options.interactionId,
+    answer: options.answer,
+    reason: options.reason,
+    approvalRef: options.approvalRef,
+    answerEvidenceRef: options.answerEvidenceRef,
+  });
+
+  return {
+    binding_mode: "module-runtime-command",
+    control_plane: null,
+    interaction_answer: {
+      run_id: result.runId,
+      interaction_id: result.interactionId,
+      interaction_status: result.interactionStatus,
+      answer_accepted: result.answerAccepted,
+      answer_audit_ref: result.answerAuditRef,
+      step_result_ref: result.stepResultRef,
+      blocked: result.blocked,
+      blocked_reason: result.blockedReason,
+    },
+    error: result.blocked
+      ? {
+          code: "interaction.continuation_blocked",
+          message: result.blockedReason?.message,
+        }
+      : null,
+  };
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef: string,
+ *   runtimeRoot?: string,
  *   runId?: string,
  *   controlPlane?: string,
  *   controlPlaneAuthToken?: string,
@@ -530,6 +729,7 @@ export async function buildOperatorConsoleSnapshot(options) {
       run_detail: {
         packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
         step_results: filterArtifactsByRunId(stepResults, selectedRunId),
+        interactions: collectRunnerInteractions(filterArtifactsByRunId(stepResults, selectedRunId)),
         quality_artifacts: filterArtifactsByRunId(qualityArtifacts, selectedRunId),
         delivery_manifests: filterArtifactsByRunId(deliveryManifests, selectedRunId),
         promotion_decisions: filterArtifactsByRunId(promotionDecisions, selectedRunId),
@@ -555,8 +755,11 @@ export async function buildOperatorConsoleSnapshot(options) {
           "MODULE run-control.apply (start|pause|resume|steer|cancel)",
           "MODULE ui-lifecycle.attach",
           "MODULE ui-lifecycle.detach",
+          "MODULE lifecycle-command.apply",
+          "MODULE interaction-answer.submit",
         ],
-        mutation_error_shapes: ["run_control.blocked", "invalid_payload"],
+        lifecycle_commands: LIFECYCLE_COMMANDS,
+        mutation_error_shapes: ["run_control.blocked", "lifecycle_command.blocked", "interaction.continuation_blocked", "invalid_payload"],
         live_stream: "GET /api/projects/:projectId/runs/:runId/events",
         event_contract_family: "live-run-event",
       },
@@ -654,6 +857,7 @@ export async function buildOperatorConsoleSnapshot(options) {
     run_detail: {
       packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
       step_results: filterArtifactsByRunId(stepResults, selectedRunId),
+      interactions: collectRunnerInteractions(filterArtifactsByRunId(stepResults, selectedRunId)),
       quality_artifacts: filterArtifactsByRunId(qualityArtifacts, selectedRunId),
       delivery_manifests: filterArtifactsByRunId(deliveryManifests, selectedRunId),
       promotion_decisions: filterArtifactsByRunId(promotionDecisions, selectedRunId),
@@ -678,8 +882,19 @@ export async function buildOperatorConsoleSnapshot(options) {
       mutation_model: [
         "POST /api/projects/:projectId/run-control/actions",
         "POST /api/projects/:projectId/ui-lifecycle/actions",
+        "POST /api/projects/:projectId/lifecycle-command/actions",
+        "POST /api/projects/:projectId/interactions/answers",
       ],
-      mutation_error_shapes: ["invalid_json", "invalid_payload", "invalid_run_control_action", "run_control.blocked"],
+      lifecycle_commands: LIFECYCLE_COMMANDS,
+      mutation_error_shapes: [
+        "invalid_json",
+        "invalid_payload",
+        "invalid_run_control_action",
+        "invalid_lifecycle_command",
+        "run_control.blocked",
+        "lifecycle_command.blocked",
+        "interaction.continuation_blocked",
+      ],
       auth_mode: "optional-bearer-token",
       live_stream: "GET /api/projects/:projectId/runs/:runId/events",
       event_contract_family: "live-run-event",
@@ -738,8 +953,22 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
       const eventType = escapeHtml(String(entry.event_type ?? "unknown"));
       const sequence = escapeHtml(String(entry.sequence ?? "n/a"));
       const policyRisk = escapeHtml(String(entry.policy_context?.risk_tier ?? "n/a"));
-      return `<li><code>${eventType}</code> seq=<code>${sequence}</code> risk=<code>${policyRisk}</code></li>`;
+      const interactionId = escapeHtml(String(entry.interaction_id ?? entry.interaction?.interaction_id ?? "n/a"));
+      const answerAuditRef = escapeHtml(String(entry.answer_audit_ref ?? "n/a"));
+      return `<li><code>${eventType}</code> seq=<code>${sequence}</code> risk=<code>${policyRisk}</code> interaction=<code>${interactionId}</code> answer=<code>${answerAuditRef}</code></li>`;
     })
+    .join("\n");
+  const interactionItems = (Array.isArray(snapshot.run_detail.interactions) ? snapshot.run_detail.interactions : [])
+    .map((interaction) => {
+      const interactionId = escapeHtml(String(interaction.interaction_id ?? "n/a"));
+      const status = escapeHtml(String(interaction.interaction_status ?? "unknown"));
+      const summary = escapeHtml(String(interaction.question_summary ?? "No summary available."));
+      const answerRequired = interaction.answer_required === true ? "yes" : "no";
+      return `<li><code>${interactionId}</code> status=<code>${status}</code> answer_required=<code>${answerRequired}</code> ${summary}</li>`;
+    })
+    .join("\n");
+  const lifecycleItems = (snapshot.api_ui_contract_alignment.lifecycle_commands ?? [])
+    .map((command) => `<li><code>${escapeHtml(String(command))}</code></li>`)
     .join("\n");
 
   return `<!doctype html>
@@ -801,6 +1030,14 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
     <section class="panel">
       <h2>Run list</h2>
       <ul>${runs || "<li>No runs found.</li>"}</ul>
+    </section>
+    <section class="panel">
+      <h2>Lifecycle commands</h2>
+      <ul>${lifecycleItems || "<li>No lifecycle command mutations available.</li>"}</ul>
+    </section>
+    <section class="panel">
+      <h2>Runner interactions</h2>
+      <ul>${interactionItems || "<li>No pending runner interactions.</li>"}</ul>
     </section>
     <section class="panel">
       <h2>Run detail evidence links</h2>

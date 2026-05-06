@@ -107,6 +107,23 @@ Mutation error-shape checks:
 - lifecycle policy/validation blocks return HTTP `409` with `error.code` in the `lifecycle_command.*` family and the original CLI `command_output` preserved.
 - accepted interaction answers that cannot resume yet return HTTP `409` with `error.code: "interaction.continuation_blocked"` plus `interaction_answer.answer_audit_ref`.
 
+## Full-flow console checks
+The detachable operator console must drive connected lifecycle actions through the control plane. Smoke the web module paths with:
+```bash
+node apps/web/scripts/operator-console-smoke.mjs \
+  --project-ref <AOR_WORKSPACE> \
+  --run-id <RUN_ID> \
+  --control-plane http://127.0.0.1:8080 \
+  --output-html .aor/web/operator-console-<RUN_ID>.html
+```
+
+Expected full-flow console evidence:
+- rendered HTML includes lifecycle command and runner interaction sections;
+- `contract_alignment.mutation_model` includes `POST /api/projects/:projectId/lifecycle-command/actions` and `POST /api/projects/:projectId/interactions/answers`;
+- pending runner questions are derived from `step-result.requested_interaction`;
+- submitted answers return `interaction_answer.answer_audit_ref` and live/event-history payloads reference that audit ref without raw answer text;
+- detaching the session stops web follow capture only; run state and evidence remain queryable through CLI/API.
+
 ## Auth-enabled detached mode
 If detached transport auth is enabled, pass bearer token on every read/follow/mutation request:
 ```bash

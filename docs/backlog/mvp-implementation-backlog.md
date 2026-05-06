@@ -188,7 +188,7 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W18-S01 | Interactive run continuation contract | EPIC-6 | done | `docs/contracts/**`, `docs/architecture/**`, `docs/product/**`, `docs/backlog/**` | none |
 | W18-S02 | Full lifecycle command mutations for connected web | EPIC-6 | done | `apps/api`, `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W18-S01 |
-| W18-S03 | Web full-flow operator console | EPIC-6 | ready | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S02 |
+| W18-S03 | Web full-flow operator console | EPIC-6 | done | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S02 |
 | W18-S04 | Monorepo and bounded multirepo flow proof | EPIC-5 | ready | `examples/**`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**`, `docs/ops/**`, tests | none |
 
 ## W19 slices

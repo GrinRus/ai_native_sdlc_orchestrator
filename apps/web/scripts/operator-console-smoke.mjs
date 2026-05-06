@@ -121,6 +121,7 @@ async function main() {
   fs.writeFileSync(outputHtml, html, "utf8");
 
   const detachSummary = session.detach();
+  await session.awaitStreamIdle();
   const summary = {
     mode: session.mode,
     project_id: session.snapshot.project.project_id,
@@ -130,10 +131,17 @@ async function main() {
     stream_protocol: session.stream_protocol,
     detached: detachSummary.detached,
     captured_event_count: detachSummary.captured_event_count,
+    lifecycle_command_count: Array.isArray(session.snapshot.api_ui_contract_alignment.lifecycle_commands)
+      ? session.snapshot.api_ui_contract_alignment.lifecycle_commands.length
+      : 0,
+    interaction_count: Array.isArray(session.snapshot.run_detail.interactions)
+      ? session.snapshot.run_detail.interactions.length
+      : 0,
     rendered_html_file: outputHtml,
     contract_alignment: session.snapshot.api_ui_contract_alignment,
   };
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+  process.exit(0);
 }
 
 try {

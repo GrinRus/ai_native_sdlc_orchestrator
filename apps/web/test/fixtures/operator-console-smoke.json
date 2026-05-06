@@ -1,7 +1,11 @@
 {
   "mode": "detachable-web-console",
-  "follow_enabled": true,
-  "stream_protocol": "sse",
+  "follow_enabled": false,
+  "stream_protocol": null,
   "detached": true,
+  "lifecycle_command_count": 16,
+  "interaction_count": 0,
+  "lifecycle_mutation_path_present": true,
+  "interaction_answer_path_present": true,
   "policy_history_path_present": true
 }

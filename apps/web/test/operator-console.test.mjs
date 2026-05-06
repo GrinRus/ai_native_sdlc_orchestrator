@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -11,9 +11,11 @@ import { invokeCli } from "../../cli/src/index.mjs";
 import {
   applyOperatorRunControl,
   applyOperatorUiLifecycle,
+  applyOperatorLifecycleCommand,
   attachOperatorConsoleSession,
   buildOperatorConsoleSnapshot,
   renderOperatorConsoleHtml,
+  submitOperatorInteractionAnswer,
 } from "../src/operator-console.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -30,6 +32,34 @@ async function withTempProject(callback) {
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+}
+
+/**
+ * @param {string[]} args
+ * @param {{ cwd: string }} options
+ * @returns {Promise<{ status: number | null, stdout: string, stderr: string }>}
+ */
+function spawnNode(args, options) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, args, {
+      cwd: options.cwd,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", reject);
+    child.on("close", (status) => {
+      resolve({ status, stdout, stderr });
+    });
+  });
 }
 
 /**
@@ -85,6 +115,49 @@ function seedOperatorArtifacts(projectRoot) {
   return runId;
 }
 
+/**
+ * @param {string} projectRoot
+ * @param {string} runId
+ * @param {string} interactionId
+ * @returns {string}
+ */
+function seedRequestedInteraction(projectRoot, runId, interactionId) {
+  const initResult = invokeCli(["project", "init", "--project-ref", projectRoot]);
+  assert.equal(initResult.exitCode, 0, initResult.stderr);
+  const initPayload = JSON.parse(initResult.stdout);
+  const reportsRoot = initPayload.runtime_layout.reportsRoot;
+  fs.mkdirSync(reportsRoot, { recursive: true });
+  const stepResultFile = path.join(reportsRoot, "step-result-web-interaction-question.json");
+  fs.writeFileSync(
+    stepResultFile,
+    `${JSON.stringify(
+      {
+        step_result_id: `${runId}.web.runner.question`,
+        run_id: runId,
+        step_id: "runner.implement",
+        step_class: "runner",
+        status: "failed",
+        summary: "Runner requested operator input.",
+        evidence_refs: ["evidence://reports/web-runner-question.json"],
+        requested_interaction: {
+          requested: true,
+          interaction_id: interactionId,
+          status: "requested",
+          summary: "Select the operator-approved target.",
+          evidence_refs: ["evidence://reports/web-runner-question.json"],
+          continuation: {
+            next_action: "resume_from_boundary",
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  return stepResultFile;
+}
+
 test("web console snapshot builds run list and run detail from shared API contracts", async () => {
   await withTempProject(async (projectRoot) => {
     const runId = seedOperatorArtifacts(projectRoot);
@@ -133,6 +206,8 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.match(html, /Event history entries/);
     assert.match(html, /Strategic Snapshot/);
     assert.match(html, /High-risk runs/);
+    assert.match(html, /Lifecycle commands/);
+    assert.match(html, /Runner interactions/);
   });
 });
 
@@ -272,41 +347,58 @@ test("operator console smoke script renders html and emits transcript summary", 
       eventType: "run.started",
       payload: { stage: "bootstrap" },
     });
+    const transport = await createControlPlaneHttpServer({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
 
-    const outputHtml = path.join(projectRoot, ".aor", "web", "operator-console-smoke.html");
-    const run = spawnSync(
-      process.execPath,
-      [
-        path.join(workspaceRoot, "apps/web/scripts/operator-console-smoke.mjs"),
-        "--project-ref",
-        projectRoot,
-        "--run-id",
-        runId,
-        "--follow",
-        "true",
-        "--output-html",
-        outputHtml,
-      ],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
+    try {
+      const outputHtml = path.join(projectRoot, ".aor", "web", "operator-console-smoke.html");
+      const run = await spawnNode(
+        [
+          path.join(workspaceRoot, "apps/web/scripts/operator-console-smoke.mjs"),
+          "--project-ref",
+          projectRoot,
+          "--run-id",
+          runId,
+          "--control-plane",
+          transport.baseUrl,
+          "--output-html",
+          outputHtml,
+        ],
+        { cwd: workspaceRoot },
+      );
 
-    assert.equal(run.status, 0, run.stderr);
-    const summary = JSON.parse(run.stdout);
-    assert.equal(fs.existsSync(summary.rendered_html_file), true);
+      assert.equal(run.status, 0, run.stderr);
+      const summary = JSON.parse(run.stdout);
+      assert.equal(fs.existsSync(summary.rendered_html_file), true);
 
-    const fixture = JSON.parse(
-      fs.readFileSync(path.join(fixturesDir, "operator-console-smoke.json"), "utf8"),
-    );
-    const subset = {
-      mode: summary.mode,
-      follow_enabled: summary.follow_enabled,
-      stream_protocol: summary.stream_protocol,
-      detached: summary.detached,
-      policy_history_path_present: Array.isArray(summary.contract_alignment.read_model)
-        ? summary.contract_alignment.read_model.includes("GET /api/projects/:projectId/runs/:runId/policy-history")
-        : false,
-    };
-    assert.deepEqual(subset, fixture);
+      const fixture = JSON.parse(
+        fs.readFileSync(path.join(fixturesDir, "operator-console-smoke.json"), "utf8"),
+      );
+      const subset = {
+        mode: summary.mode,
+        follow_enabled: summary.follow_enabled,
+        stream_protocol: summary.stream_protocol,
+        detached: summary.detached,
+        lifecycle_command_count: summary.lifecycle_command_count,
+        interaction_count: summary.interaction_count,
+        lifecycle_mutation_path_present: Array.isArray(summary.contract_alignment.mutation_model)
+          ? summary.contract_alignment.mutation_model.includes("POST /api/projects/:projectId/lifecycle-command/actions")
+          : false,
+        interaction_answer_path_present: Array.isArray(summary.contract_alignment.mutation_model)
+          ? summary.contract_alignment.mutation_model.includes("POST /api/projects/:projectId/interactions/answers")
+          : false,
+        policy_history_path_present: Array.isArray(summary.contract_alignment.read_model)
+          ? summary.contract_alignment.read_model.includes("GET /api/projects/:projectId/runs/:runId/policy-history")
+          : false,
+      };
+      assert.deepEqual(subset, fixture);
+    } finally {
+      await transport.close();
+    }
   });
 });
 
@@ -436,6 +528,146 @@ test("web connected mode routes run-control and ui-lifecycle mutations through d
       assert.equal(localPause.run_control.action, "pause");
       assert.equal(localPause.run_control.blocked, false);
       assert.equal(localPause.run_control.state.status, "paused");
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("web connected mode drives lifecycle commands through detached control-plane mutations", async () => {
+  await withTempProject(async (projectRoot) => {
+    const runId = seedOperatorArtifacts(projectRoot);
+    const transport = await createControlPlaneHttpServer({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const attachResult = invokeCli([
+        "ui",
+        "attach",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+        "--control-plane",
+        transport.baseUrl,
+      ]);
+      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
+
+      const result = await applyOperatorLifecycleCommand({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        command: "intake create",
+        flags: {
+          request_title: "Web connected lifecycle intake",
+          request_brief: "Submitted through the web full-flow console.",
+        },
+      });
+      assert.equal(result.binding_mode, "detached-http-mutation");
+      assert.equal(result.lifecycle_command.command, "intake create");
+      assert.equal(result.lifecycle_command.blocked, false);
+      assert.equal(fs.existsSync(result.lifecycle_command.command_output.artifact_packet_file), true);
+
+      const snapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+      });
+      assert.ok(
+        snapshot.api_ui_contract_alignment.mutation_model.includes(
+          "POST /api/projects/:projectId/lifecycle-command/actions",
+        ),
+      );
+      assert.ok(snapshot.api_ui_contract_alignment.lifecycle_commands.includes("intake create"));
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("web connected mode surfaces runner questions and submits blocked interaction answers", async () => {
+  await withTempProject(async (projectRoot) => {
+    const runId = seedOperatorArtifacts(projectRoot);
+    const interactionId = "web-question-1";
+    const stepResultFile = seedRequestedInteraction(projectRoot, runId, interactionId);
+    const transport = await createControlPlaneHttpServer({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const attachResult = invokeCli([
+        "ui",
+        "attach",
+        "--project-ref",
+        projectRoot,
+        "--run-id",
+        runId,
+        "--control-plane",
+        transport.baseUrl,
+      ]);
+      assert.equal(attachResult.exitCode, 0, attachResult.stderr);
+
+      const beforeSnapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+      });
+      const interaction = beforeSnapshot.run_detail.interactions.find(
+        (entry) => entry.interaction_id === interactionId,
+      );
+      assert.equal(interaction?.answer_required, true);
+      const beforeHtml = renderOperatorConsoleHtml(beforeSnapshot);
+      assert.match(beforeHtml, /web-question-1/);
+      assert.match(beforeHtml, /Select the operator-approved target/);
+
+      const answer = await submitOperatorInteractionAnswer({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+        interactionId,
+        answer: "Use staging.",
+        reason: "operator selected safe target",
+      });
+      assert.equal(answer.binding_mode, "detached-http-mutation");
+      assert.equal(answer.error.code, "interaction.continuation_blocked");
+      assert.equal(answer.interaction_answer.answer_accepted, true);
+      assert.equal(answer.interaction_answer.interaction_status, "blocked");
+
+      const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
+      assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+      assert.ok(updatedStepResult.requested_interaction.answer_audit_refs.includes(answer.interaction_answer.answer_audit_ref));
+
+      const afterSnapshot = await buildOperatorConsoleSnapshot({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+      });
+      const updatedInteraction = afterSnapshot.run_detail.interactions.find(
+        (entry) => entry.interaction_id === interactionId,
+      );
+      assert.equal(updatedInteraction?.interaction_status, "blocked");
+      assert.equal(updatedInteraction?.answer_required, false);
+      assert.equal(
+        JSON.stringify(afterSnapshot.run_detail.event_history).includes(answer.interaction_answer.answer_audit_ref),
+        true,
+      );
+
+      const session = await attachOperatorConsoleSession({
+        cwd: projectRoot,
+        projectRef: projectRoot,
+        runId,
+        follow: true,
+      });
+      const replayCount = session.replay_events.length;
+      const detached = session.detach();
+      assert.equal(detached.detached, true);
+      assert.equal(detached.captured_event_count, replayCount);
     } finally {
       await transport.close();
     }

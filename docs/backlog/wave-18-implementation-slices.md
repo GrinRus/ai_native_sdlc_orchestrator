@@ -89,7 +89,7 @@ Close the connected web full-flow and topology proof gaps while preserving the h
 
 ## W18-S03 — Web full-flow operator console
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Implement the detachable web path for the full approved lifecycle, including answer submission, live runner logs/events, and step evidence navigation.
 - **Primary modules:** `apps/web`, `apps/api`, `docs/ops/**`, tests
 - **Hard dependencies:** W18-S02
