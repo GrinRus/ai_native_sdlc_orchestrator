@@ -13,6 +13,8 @@ The guided layer targets the first-run vocabulary defined in `docs/product/02-in
 
 These are wrappers over runtime-owned command families. They must not remove or rename existing grouped commands, and they must keep ids, packet refs, report refs, blockers, and evidence locations visible.
 
+W21-S02 implements the first-run shell for `doctor`, `onboard`, `app`, and `next`. These shortcuts default to human-readable output for installed users and accept `--json` when scripts need machine-readable fields. `onboard` delegates to `project init`; `app` delegates by instruction to `ui attach` / `ui detach`; `next` is a discovery shortcut until W21-S04 adds the deterministic next-action report.
+
 ## Operator lifecycle
 1. initialize or inspect the project profile
 2. bootstrap and analyze / validate / verify the target project

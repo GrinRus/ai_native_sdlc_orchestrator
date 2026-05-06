@@ -1,6 +1,10 @@
 AOR CLI command surface
 
 Implemented commands:
+  - aor doctor
+  - aor onboard
+  - aor app
+  - aor next
   - aor project init
   - aor project analyze
   - aor project validate
@@ -42,4 +46,4 @@ Implemented commands:
 
 Planned commands (not implemented yet):
 
-Use 'aor <group> <command> --help' for implemented command contracts.
+Use 'aor <command> --help' for guided shortcuts or 'aor <group> <command> --help' for grouped command contracts.

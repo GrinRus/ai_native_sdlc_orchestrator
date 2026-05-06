@@ -56,7 +56,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S02 — Installable CLI and first-run entrypoints
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Make AOR understandable from first launch by adding guided public entrypoints for doctor, onboarding, app launch, and next-action discovery.
 - **Primary modules:** `package.json`, `apps/cli`, `docs/architecture/**`, `docs/ops/**`, tests
 - **Hard dependencies:** W21-S01

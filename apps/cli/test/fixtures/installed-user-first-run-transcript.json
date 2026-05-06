@@ -1,0 +1,30 @@
+{
+  "doctor": {
+    "command": "doctor",
+    "status": "implemented",
+    "guided_stage": "doctor",
+    "guided_status": "ready",
+    "blocker_codes": []
+  },
+  "onboard": {
+    "command": "onboard",
+    "status": "implemented",
+    "guided_stage": "onboard",
+    "guided_low_level_command": "project init",
+    "has_runtime_state_file": true
+  },
+  "app": {
+    "command": "app",
+    "status": "implemented",
+    "guided_stage": "optional-app",
+    "guided_web_optional": true,
+    "guided_web_mandatory": false
+  },
+  "next": {
+    "command": "next",
+    "status": "implemented",
+    "guided_stage": "next-action-preview",
+    "guided_low_level_command": "intake create",
+    "guided_status": "ready"
+  }
+}

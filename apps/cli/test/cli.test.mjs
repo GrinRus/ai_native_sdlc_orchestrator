@@ -258,6 +258,125 @@ test("implemented command help documents inputs outputs and contracts", () => {
   assert.match(result.stdout, /Contract families: project-profile/);
 });
 
+test("guided first-run shortcuts expose help, human defaults, JSON mode, and grouped compatibility", () => {
+  withTempProject((projectRoot) => {
+    const projectProfile = path.join(workspaceRoot, "examples/project.aor.yaml");
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify({ name: "guided-first-run-fixture", private: true }, null, 2),
+      "utf8",
+    );
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+
+    const binResult = spawnSync(process.execPath, [path.join(workspaceRoot, "apps/cli/bin/aor.mjs"), "--help"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+    assert.equal(binResult.status, 0, binResult.stderr);
+    assert.match(binResult.stdout, /aor doctor/);
+    assert.match(binResult.stdout, /aor onboard/);
+    assert.match(binResult.stdout, /aor app/);
+    assert.match(binResult.stdout, /aor next/);
+
+    const doctorHelp = invokeCli(["doctor", "--help"]);
+    assert.equal(doctorHelp.exitCode, 0);
+    assert.match(doctorHelp.stdout, /Status: implemented in guided first-run shell \(W21-S02\)/);
+    assert.match(doctorHelp.stdout, /Guided commands default to human-readable output/);
+
+    const humanDoctor = invokeCli(["doctor", "--project-ref", projectRoot]);
+    assert.equal(humanDoctor.exitCode, 0, humanDoctor.stderr);
+    assert.match(humanDoctor.stdout, /^aor doctor\nStatus: ready/m);
+    assert.match(humanDoctor.stdout, /Use --json for machine-readable output/);
+
+    const doctorJson = invokeCli(["doctor", "--project-ref", projectRoot, "--json"]);
+    assert.equal(doctorJson.exitCode, 0, doctorJson.stderr);
+    const doctorPayload = JSON.parse(doctorJson.stdout);
+    assert.equal(doctorPayload.command, "doctor");
+    assert.equal(doctorPayload.guided_stage, "doctor");
+    assert.equal(doctorPayload.guided_status, "ready");
+    assert.equal(doctorPayload.read_only, true);
+    assert.deepEqual(doctorPayload.guided_actionable_blockers, []);
+
+    const invalidJsonProject = path.join(projectRoot, "invalid-json-target");
+    fs.mkdirSync(invalidJsonProject, { recursive: true });
+    const invalidJsonOnboard = invokeCli([
+      "onboard",
+      invalidJsonProject,
+      "--project-profile",
+      projectProfile,
+      "--json",
+      "maybe",
+    ]);
+    assert.equal(invalidJsonOnboard.exitCode, 1);
+    assert.match(invalidJsonOnboard.stderr, /Flag '--json'/);
+    assert.equal(fs.existsSync(path.join(invalidJsonProject, ".aor")), false);
+
+    const onboardJson = invokeCli(["onboard", projectRoot, "--project-profile", projectProfile, "--json"]);
+    assert.equal(onboardJson.exitCode, 0, onboardJson.stderr);
+    const onboardPayload = JSON.parse(onboardJson.stdout);
+    assert.equal(onboardPayload.command, "onboard");
+    assert.equal(onboardPayload.guided_low_level_command, "project init");
+    assert.equal(fs.existsSync(onboardPayload.runtime_state_file), true);
+
+    const groupedInit = invokeCli(["project", "init", "--project-ref", projectRoot, "--project-profile", projectProfile]);
+    assert.equal(groupedInit.exitCode, 0, groupedInit.stderr);
+    assert.equal(JSON.parse(groupedInit.stdout).command, "project init");
+
+    const appHuman = invokeCli(["app", "--project-ref", projectRoot]);
+    assert.equal(appHuman.exitCode, 0, appHuman.stderr);
+    assert.match(appHuman.stdout, /^aor app\nStatus: ready/m);
+    assert.match(appHuman.stdout, /mandatory: false/);
+
+    const appJson = invokeCli(["app", "--project-ref", projectRoot, "--json"]);
+    assert.equal(appJson.exitCode, 0, appJson.stderr);
+    const appPayload = JSON.parse(appJson.stdout);
+    assert.equal(appPayload.guided_web_surface.optional, true);
+    assert.equal(appPayload.guided_web_surface.mandatory, false);
+
+    const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
+    assert.equal(nextJson.exitCode, 0, nextJson.stderr);
+    const nextPayload = JSON.parse(nextJson.stdout);
+    assert.equal(nextPayload.guided_low_level_command, "intake create");
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "installed-user-first-run-transcript.json"), "utf8"),
+    );
+    assert.deepEqual(
+      {
+        doctor: {
+          command: doctorPayload.command,
+          status: doctorPayload.status,
+          guided_stage: doctorPayload.guided_stage,
+          guided_status: doctorPayload.guided_status,
+          blocker_codes: doctorPayload.guided_actionable_blockers.map((blocker) => blocker.code),
+        },
+        onboard: {
+          command: onboardPayload.command,
+          status: onboardPayload.status,
+          guided_stage: onboardPayload.guided_stage,
+          guided_low_level_command: onboardPayload.guided_low_level_command,
+          has_runtime_state_file: fs.existsSync(onboardPayload.runtime_state_file),
+        },
+        app: {
+          command: appPayload.command,
+          status: appPayload.status,
+          guided_stage: appPayload.guided_stage,
+          guided_web_optional: appPayload.guided_web_surface.optional,
+          guided_web_mandatory: appPayload.guided_web_surface.mandatory,
+        },
+        next: {
+          command: nextPayload.command,
+          status: nextPayload.status,
+          guided_stage: nextPayload.guided_stage,
+          guided_low_level_command: nextPayload.guided_low_level_command,
+          guided_status: nextPayload.guided_status,
+        },
+      },
+      transcriptFixture,
+    );
+  });
+});
+
 test("operator command help documents routed delivery and audit metadata", () => {
   const verifyHelp = invokeCli(["project", "verify", "--help"]);
   const runStartHelp = invokeCli(["run", "start", "--help"]);
@@ -484,7 +603,10 @@ test("planned command section is empty when the current shell has no planned com
 
   assert.equal(result.exitCode, 0);
   assert.equal(result.stderr, "");
-  assert.match(result.stdout, /Planned commands \(not implemented yet\):\n\nUse 'aor <group> <command> --help'/);
+  assert.match(
+    result.stdout,
+    /Planned commands \(not implemented yet\):\n\nUse 'aor <command> --help' for guided shortcuts/,
+  );
 });
 
 test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () => {

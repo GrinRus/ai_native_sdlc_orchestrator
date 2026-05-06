@@ -24,7 +24,7 @@ An installed user can connect a repository, understand readiness, define a missi
 | Guided proof | Rehearse the installed-user journey on a clean repo with no upstream-write defaults. | Live E2E proof profile, CLI transcript, web smoke evidence, no-write assertions. | W21-S07 |
 
 ## Guided command vocabulary
-These public commands are the target vocabulary for W21. W21-S01 defines the vocabulary only; later W21 slices implement the command behavior.
+These public commands are the target vocabulary for W21. W21-S02 implements the first-run guided shell for `doctor`, `onboard`, `app`, and `next`; later W21 slices deepen onboarding internals, mission intake, deterministic next-action reports, web stages, and closure.
 
 | Guided command | Intent | Low-level ownership |
 |---|---|---|

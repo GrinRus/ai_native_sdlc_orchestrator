@@ -17,6 +17,8 @@ import { executeCommandHandlerGroup, resolveCommandHandlerGroup } from "./comman
 
 export { CliUsageError };
 
+const GUIDED_SHORTCUT_COMMANDS = new Set(["doctor", "onboard", "app", "next"]);
+
 /**
  * @typedef {{
  *   exitCode: number,
@@ -94,12 +96,122 @@ function parseFlags(args) {
 }
 
 /**
+ * @param {string} command
+ * @param {string[]} args
+ * @returns {{ type: "command-help", command: string } | { type: "execute", command: string, flags: Record<string, string | string[] | true> }}
+ */
+function parseGuidedShortcut(command, args) {
+  if (args.some((arg) => isHelpFlag(arg))) {
+    return { type: "command-help", command };
+  }
+
+  if (command !== "onboard" || args.length === 0 || args[0].startsWith("--")) {
+    return { type: "execute", command, flags: parseFlags(args) };
+  }
+
+  const [projectRef, ...rest] = args;
+  const flags = parseFlags(rest);
+  if (flags["project-ref"] !== undefined) {
+    throw new CliUsageError("Use either positional '<repo>' or '--project-ref <path>' for 'aor onboard', not both.");
+  }
+
+  flags["project-ref"] = projectRef;
+  return { type: "execute", command, flags };
+}
+
+/**
+ * @param {Record<string, string | string[] | true>} flags
+ * @returns {boolean}
+ */
+function isJsonOutputRequested(flags) {
+  const value = flags.json;
+  if (value === undefined) return false;
+  if (value === true || value === "true") return true;
+  if (value === "false") return false;
+  if (Array.isArray(value)) {
+    throw new CliUsageError("Flag '--json' accepts only one value.");
+  }
+  throw new CliUsageError("Flag '--json' accepts only boolean values when a value is provided.");
+}
+
+/**
+ * @param {Record<string, unknown>} output
+ * @returns {string}
+ */
+function formatGuidedHumanOutput(output) {
+  const blockers = Array.isArray(output.guided_actionable_blockers)
+    ? output.guided_actionable_blockers
+    : [];
+  const recommendedCommands = Array.isArray(output.guided_recommended_commands)
+    ? output.guided_recommended_commands
+    : [];
+  const readiness = typeof output.guided_readiness === "object" && output.guided_readiness !== null
+    ? /** @type {{ checks?: Array<Record<string, unknown>> }} */ (output.guided_readiness)
+    : null;
+  const checks = Array.isArray(readiness?.checks) ? readiness.checks : [];
+
+  const lines = [
+    String(output.guided_command ?? `aor ${output.command}`),
+    `Status: ${String(output.guided_status ?? output.status ?? "unknown")}`,
+    "",
+    String(output.guided_summary ?? ""),
+    "",
+    `Project: ${String(output.resolved_project_ref ?? "not resolved")}`,
+    `Runtime root: ${String(output.resolved_runtime_root ?? "not resolved")}`,
+  ];
+
+  if (checks.length > 0) {
+    lines.push("", "Readiness:");
+    for (const check of checks) {
+      lines.push(`- ${String(check.check_id ?? "check")}: ${String(check.status ?? "unknown")} - ${String(check.detail ?? "")}`);
+    }
+  }
+
+  lines.push("", "Actionable blockers:");
+  if (blockers.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const blocker of blockers) {
+      if (typeof blocker === "object" && blocker !== null) {
+        lines.push(`- ${String(blocker.code ?? "blocker")}: ${String(blocker.summary ?? "")}`);
+      } else {
+        lines.push(`- ${String(blocker)}`);
+      }
+    }
+  }
+
+  if (output.guided_web_surface && typeof output.guided_web_surface === "object") {
+    const web = /** @type {Record<string, unknown>} */ (output.guided_web_surface);
+    lines.push(
+      "",
+      "Optional web:",
+      `- mandatory: ${String(web.mandatory ?? false)}`,
+      `- attach: ${String(web.attach_command ?? "aor ui attach")}`,
+    );
+  }
+
+  lines.push("", "Recommended commands:");
+  if (recommendedCommands.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const command of recommendedCommands) {
+      lines.push(`- ${String(command)}`);
+    }
+  }
+
+  lines.push("", "Use --json for machine-readable output.");
+  return `${lines.join("\n")}\n`;
+}
+
+/**
  * @param {{ command: string, summary?: string, inputs?: string[], outputs?: string[], contractFamilies?: string[] }} definition
  * @returns {string}
  */
 export function formatCommandHelp(definition) {
   const statusLine =
-    definition.command === "eval run"
+    GUIDED_SHORTCUT_COMMANDS.has(definition.command)
+      ? "Status: implemented in guided first-run shell (W21-S02)"
+      : definition.command === "eval run"
       ? "Status: implemented in quality shell (W3-S03)"
       : definition.command === "harness replay"
         ? "Status: implemented in quality shell (W9-S05)"
@@ -148,7 +260,38 @@ export function formatCommandHelp(definition) {
           ? "Status: implemented in UI lifecycle shell (W6-S04)"
           : "Status: implemented in bootstrap shell (W1-S01)";
   const notes =
-    definition.command === "project init"
+    definition.command === "doctor"
+      ? [
+          "- Doctor is read-only and never mutates runtime state.",
+          "- --project-ref is optional and defaults to cwd for installed-user first-run checks.",
+          "- Missing project paths and unsupported Node versions are actionable blockers.",
+          "- Warnings such as missing runtime root point to guided follow-up commands instead of failing the probe.",
+          "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+        ]
+      : definition.command === "onboard"
+        ? [
+            "- Onboard is a guided wrapper over 'aor project init'.",
+            "- Current bootstrap semantics still require a discoverable or explicit project profile; clean no-profile onboarding is owned by W21-S03.",
+            "- Positional <repo> and --project-ref are alternatives; do not pass both.",
+            "- Existing grouped commands remain available and keep their JSON output contract.",
+            "- Asset ejection remains explicit through --materialize-bootstrap-assets.",
+            "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+          ]
+        : definition.command === "app"
+          ? [
+              "- App guidance is read-only and does not require the web app to be running.",
+              "- The web console is optional; CLI/API/headless operation remains valid when detached.",
+              "- Use the shown 'aor ui attach' command when a control-plane URL is available.",
+              "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+            ]
+          : definition.command === "next"
+            ? [
+                "- Next is a first-run discovery shortcut in W21-S02.",
+                "- It points to the safe low-level command for current first-run state without claiming the W21-S04 deterministic resolver.",
+                "- Runtime-initialized projects are directed toward intake or status inspection.",
+                "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+              ]
+    : definition.command === "project init"
       ? [
           "- --project-ref is optional. When omitted, the command discovers repo root from cwd.",
           "- --project-profile can override default profile discovery in project root.",
@@ -471,7 +614,7 @@ export function formatTopLevelHelp() {
     "Planned commands (not implemented yet):",
     ...plannedLines,
     "",
-    "Use 'aor <group> <command> --help' for implemented command contracts.",
+    "Use 'aor <command> --help' for guided shortcuts or 'aor <group> <command> --help' for grouped command contracts.",
   ];
 
   return `${lines.join("\n")}\n`;
@@ -487,6 +630,10 @@ export function parseInvocation(args) {
   }
 
   const [group, verb, ...rest] = args;
+  if (GUIDED_SHORTCUT_COMMANDS.has(group)) {
+    return parseGuidedShortcut(group, [verb, ...rest].filter((arg) => arg !== undefined));
+  }
+
   if (!verb || isHelpFlag(verb)) {
     throw new CliUsageError("Command must be '<group> <command>'. Use '--help' for catalog output.");
   }
@@ -521,6 +668,8 @@ export function executeImplementedCommand(command, flags, cwd) {
   if (definition.status !== "implemented") {
     throw new CliUsageError(`Command 'aor ${command}' is planned and not implemented yet.`);
   }
+
+  const guidedJsonOutput = GUIDED_SHORTCUT_COMMANDS.has(command) ? isJsonOutputRequested(flags) : false;
 
   const handlerGroup = resolveCommandHandlerGroup(command);
   if (!handlerGroup) {
@@ -561,6 +710,14 @@ export function executeImplementedCommand(command, flags, cwd) {
   });
 
   const output = buildCliOutput({ command, resolvedFamilies, state: outputState });
+
+  if (GUIDED_SHORTCUT_COMMANDS.has(command) && !guidedJsonOutput) {
+    return {
+      exitCode: 0,
+      stdout: formatGuidedHumanOutput(output),
+      stderr: "",
+    };
+  }
 
   return {
     exitCode: 0,
