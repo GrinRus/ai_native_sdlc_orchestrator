@@ -114,6 +114,8 @@ export function formatCommandHelp(definition) {
           ? "Status: implemented in intake and planning shell (W6-S02)"
         : definition.command === "review run"
           ? "Status: implemented in review shell (W13-S05)"
+        : definition.command === "review decide"
+          ? "Status: implemented in review decision shell (W19-S05)"
         : definition.command === "learning handoff"
           ? "Status: implemented in learning-loop shell (W13-S05)"
         : definition.command === "run start" ||
@@ -319,12 +321,14 @@ export function formatCommandHelp(definition) {
                   "- --network-write requires GitHub credentials (GITHUB_TOKEN) and bounded fork permissions.",
                   "- Multi-repo plans require --coordination-evidence-refs in non-no-write modes.",
                   "- Optional rerun flags persist packet-boundary and failed-step recovery scope for auditable retries.",
+                  "- --require-review-decision requires the latest run-linked review-decision to be approve.",
                   "- Output includes delivery_governance_decision with explicit allow/deny/escalate reasons.",
                 ]
               : definition.command === "release prepare"
                 ? [
                     "- Release prepare enforces release preconditions before delivery/release artifact materialization.",
                     "- If preconditions are blocked, the command fails with explicit blocking reasons.",
+                    "- --require-review-decision requires the latest run-linked review-decision to be approve.",
                     "- Optional rerun flags keep failed-step recovery bounded by explicit packet boundary metadata.",
                     "- Governance deny/escalate reasons are surfaced as machine-readable blocking codes.",
                     "- Successful execution links delivery-manifest and release-packet outputs for audit lineage.",
@@ -372,7 +376,14 @@ export function formatCommandHelp(definition) {
                         "- Review run is report-only at the command level and writes one durable review-report artifact.",
                         "- Review verdict checks feature traceability, discovery quality, artifact quality, and code quality.",
                         "- A failing review should be consumed by operator flow; it does not imply CLI transport failure on its own.",
+                        "- Use review decide to turn review and Runtime Harness evidence into an explicit approval, hold, or repair request.",
                       ]
+                    : definition.command === "review decide"
+                      ? [
+                          "- Review decide writes one durable review-decision artifact for approve, hold, or request-repair.",
+                          "- Approve is blocked unless the linked review-report and Runtime Harness report both pass.",
+                          "- Delivery and release can enforce this artifact with --require-review-decision.",
+                        ]
                     : definition.command === "learning handoff"
                       ? [
                           "- Learning handoff writes public learning-loop scorecard and handoff artifacts.",

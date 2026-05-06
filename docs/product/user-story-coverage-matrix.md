@@ -12,9 +12,9 @@ Coverage status values:
 |---|---|---|---|---|---|---|
 | PSO-01 | Product sponsor / owner | MVP | Define project goals and constraints for a target repository. | partial | `project init`, project profiles, W13-S03 feature-intent intake, W19-S02 intake-request body goals and constraints | W21-S04 |
 | PSO-02 | Product sponsor / owner | MVP | Start intake from issues, PRDs, RFCs, notes, or mail-like source material. | partial | `intake create`, W13-S03 public feature-intent intake, W19-S02 local issue/PRD/RFC/note/mail source refs | W21-S04 |
-| PSO-03 | Product sponsor / owner | MVP | Review discovery outputs and open questions before execution. | partial | `discovery run`, `spec build`, W13-S04 lifecycle evidence, W19-S03 discovery research open questions | W19-S05, W21-S05 |
+| PSO-03 | Product sponsor / owner | MVP | Review discovery outputs and open questions before execution. | partial | `discovery run`, `spec build`, W13-S04 lifecycle evidence, W19-S03 discovery research open questions | W21-S05 |
 | PSO-04 | Product sponsor / owner | MVP | Track wave status and implementation progress. | covered | `wave create`, `run status`, W8-S01 sponsor visibility | none |
-| PSO-05 | Product sponsor / owner | MVP | Inspect quality gates before approving delivery. | partial | review reports, Runtime Harness reports, W14-S06 review alignment | W19-S05, W21-S06 |
+| PSO-05 | Product sponsor / owner | MVP | Inspect quality gates before approving delivery. | partial | review reports, Runtime Harness reports, `review-decision`, `review decide`, delivery/release review-decision gate, W14-S06 review alignment, W19-S05 | W21-S06 |
 | PSO-06 | Product sponsor / owner | MVP | See delivery risk and release readiness. | covered | delivery manifests, `release prepare`, W6-S05 delivery/release command pack | none |
 | PSO-07 | Product sponsor / owner | MVP+ | Track KPIs and Definition of Done as product acceptance evidence. | partial | product docs, W19-S02 intake-request body KPI/Definition of Done evidence and completeness status | W21-S04 |
 | PSO-08 | Product sponsor / owner | Later | Use strategic product visibility across waves and outcomes. | partial | W8-S01 sponsor and planner visibility | W19-S06, W21-S05 |
@@ -46,18 +46,18 @@ Coverage status values:
 | DEV-02 | Delivery engineer | MVP | Run live work through the stable Codex CLI adapter baseline. | covered | W10-S01, W14 provider-pinned matrix evidence | none |
 | DEV-03 | Delivery engineer | MVP | Run Claude Code as a live-runnable candidate with matrix coverage. | covered | W14 anthropic-primary matrix coverage | none |
 | DEV-04 | Delivery engineer | MVP | Run OpenCode through a certified live-baseline adapter path. | blocked | extended OpenCode coverage only | W20-S03 |
-| DEV-05 | Delivery engineer | MVP | Run self-review, QA, retry, and repair in one orchestration model. | partial | review reports, Runtime Harness, W13-S05 | W19-S05, W21-S06 |
+| DEV-05 | Delivery engineer | MVP | Run self-review, QA, retry, and repair in one orchestration model. | partial | review reports, Runtime Harness, `review decide --decision request-repair`, W13-S05, W19-S05 | W21-S06 |
 | DEV-06 | Delivery engineer | MVP | Inspect diffs, logs, tool traces, and delivery artifacts. | covered | delivery manifests, run events, evidence show | none |
 | DEV-07 | Delivery engineer | MVP | Inspect compiled prompt and context lineage. | covered | compiled-context artifacts, W8-S08 | none |
 | DEV-08 | Delivery engineer | MVP+ | Use operator UI lifecycle commands during delivery support. | covered | `ui attach`, `ui detach`, W6-S04 | none |
 | DEV-09 | Delivery engineer | MVP+ | Execute with policy and audit guardrails. | covered | W6-S03 run-control guardrails, W10-S04 auth hardening | none |
 | DEV-10 | Delivery engineer | Later | Use later delivery and security governance maturity. | partial | W8-S03 route-governance maturity | W20-S02 |
 | RQA-01 | Reviewer / QA | MVP | Review structured review packets with risk notes and evidence. | covered | `review run`, review reports, W13-S05 | none |
-| RQA-02 | Reviewer / QA | MVP | Inspect machine-readable review verdicts before proceeding. | partial | review reports and Runtime Harness verdicts | W19-S05, W21-S06 |
+| RQA-02 | Reviewer / QA | MVP | Inspect machine-readable review verdicts before proceeding. | covered | review reports, Runtime Harness verdicts, `review-decision`, `review decide`, delivery/release `--require-review-decision`, W19-S05 | none |
 | RQA-03 | Reviewer / QA | MVP | Compare deterministic validation with judge-based eval outcomes. | covered | validation reports, eval runner, W3, W7-S01 | none |
 | RQA-04 | Reviewer / QA | MVP | Run suite-based comparisons against baselines. | covered | eval suites, harness capture/replay, W3-S03, W8-S05 | none |
 | RQA-05 | Reviewer / QA | MVP+ | Manage flaky cases and escalation paths. | covered | incident recertification plus proposal-only dataset backfill workflow, W7-S03, W19-S04 | none |
-| RQA-06 | Reviewer / QA | Later | Make review decisions explicit across quality and delivery gates. | partial | W13-S05 review closure, W14-S06 audit alignment | W19-S05, W21-S06 |
+| RQA-06 | Reviewer / QA | Later | Make review decisions explicit across quality and delivery gates. | partial | W13-S05 review closure, W14-S06 audit alignment, `review-decision`, delivery/release approval gate, W19-S05 | W21-S06 |
 | AIP-01 | AI platform owner | MVP | Manage prompt bundles as platform assets. | covered | prompt bundles, asset loader, W2-S02 | none |
 | AIP-02 | AI platform owner | MVP | Manage context docs, rules, skills, and bundles. | covered | context assets, compiled context, W8-S08, W8-S09 | none |
 | AIP-03 | AI platform owner | MVP | Manage wrappers, routes, and policies. | covered | route, wrapper, and policy registries, W2 | none |
@@ -73,7 +73,7 @@ Coverage status values:
 | OPS-01 | Operator / SRE | MVP | Watch live run state in CLI or web. | covered | `run status`, API read surface, web console, W5 | none |
 | OPS-02 | Operator / SRE | MVP | Tail logs and inspect live events. | covered | live event stream, `evidence show`, W5-S02 | none |
 | OPS-03 | Operator / SRE | MVP | Inspect policy and compile decisions. | covered | W8-S04 policy visibility, compiled context evidence | none |
-| OPS-04 | Operator / SRE | MVP | Approve risky actions with durable evidence. | partial | handoff approve, review reports, audit records | W19-S05, W21-S06 |
+| OPS-04 | Operator / SRE | MVP | Approve risky actions with durable evidence. | partial | handoff approve, review reports, `review-decision`, audit records, W19-S05 | W21-S06 |
 | OPS-05 | Operator / SRE | MVP | Replay failures through the Runtime Harness. | covered | `harness replay`, W9-S05 | none |
 | OPS-06 | Operator / SRE | MVP | Review installed-user black-box proof evidence. | covered | W12 proof runner, W14 proof bundles | none |
 | OPS-07 | Operator / SRE | MVP | Run curated full-journey live acceptance on real repositories. | covered | W14 coverage_with_findings proof on curated matrix repositories | none |

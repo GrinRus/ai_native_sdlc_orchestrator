@@ -5,6 +5,7 @@ import {
   attachUiLifecycle,
   detachUiLifecycle,
   listDeliveryManifests,
+  listReviewDecisions,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
@@ -29,6 +30,7 @@ import {
   replayHarnessCapture,
   applyIncidentRecertification,
   materializeLearningLoopArtifacts,
+  materializeReviewDecision,
   resolveStepPolicyForStep,
   analyzeProjectRuntime,
   initializeProjectRuntime,
@@ -78,6 +80,7 @@ export const QUALITY_COMMANDS = Object.freeze([
   "asset freeze",
   "harness certify",
   "review run",
+  "review decide",
   "learning handoff"
 ]);
 
@@ -281,7 +284,97 @@ export function handleQualityCommand(context) {
     outputState.readOnly = false;
     outputState.futureControlHooks = [
       `audit runs --run-id ${runId}`,
+      `review decide --run-id ${runId} --decision approve`,
       `learning handoff --run-id ${runId}`,
+      `evidence show --run-id ${runId}`,
+    ];
+  } else if (command === "review decide") {
+    ensureRequiredFlags(command, flags);
+    const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    if (!runId) {
+      throw new CliUsageError("Missing required flag '--run-id' for 'aor review decide'.");
+    }
+    const decision = resolveOptionalStringFlag("decision", flags.decision);
+    if (decision !== "approve" && decision !== "hold" && decision !== "request-repair") {
+      throw new CliUsageError("Flag '--decision' must be approve, hold, or request-repair.");
+    }
+
+    const reviewResult = materializeReviewReport({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId,
+    });
+    const runtimeHarness = materializeRuntimeHarnessReport({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId,
+    });
+    const qualityArtifacts = listQualityArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const deliveryManifestRefs = listDeliveryManifests({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    })
+      .filter((artifact) => artifact.document.run_id === runId)
+      .map((artifact) => artifact.artifact_ref);
+    const learningHandoffRefs = qualityArtifacts
+      .filter((artifact) => artifact.family === "learning-loop-handoff" && artifact.document.run_id === runId)
+      .map((artifact) => artifact.artifact_ref);
+    const priorDecisionRefs = listReviewDecisions({
+      projectRoot: reviewResult.projectRoot,
+      runtimeLayout: reviewResult.runtimeLayout,
+      runId,
+    }).map((entry) => entry.artifact_ref);
+    const decisionResult = materializeReviewDecision({
+      projectId: reviewResult.projectId,
+      projectRoot: reviewResult.projectRoot,
+      runtimeLayout: reviewResult.runtimeLayout,
+      runId,
+      decision,
+      deciderRef: resolveOptionalStringFlag("decider-ref", flags["decider-ref"]),
+      reason: resolveOptionalStringFlag("reason", flags.reason),
+      reviewReport: reviewResult.reviewReport,
+      reviewReportRef: reviewResult.reviewReportFile,
+      runtimeHarnessReport: runtimeHarness.report,
+      runtimeHarnessReportRef: runtimeHarness.reportPath,
+      deliveryManifestRefs,
+      learningHandoffRefs,
+      evidenceRefs: priorDecisionRefs,
+    });
+
+    outputState.resolvedProjectRef = reviewResult.projectRoot;
+    outputState.resolvedRuntimeRoot = reviewResult.runtimeRoot;
+    outputState.runtimeLayout = reviewResult.runtimeLayout;
+    outputState.runtimeStateFile = reviewResult.stateFile;
+    outputState.projectProfileRef = reviewResult.projectProfileRef;
+    outputState.reviewReportId = reviewResult.reviewReport.review_report_id;
+    outputState.reviewReportFile = reviewResult.reviewReportFile;
+    outputState.reviewOverallStatus = reviewResult.reviewReport.overall_status;
+    outputState.reviewRecommendation = reviewResult.reviewReport.review_recommendation;
+    outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;
+    outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
+    outputState.runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
+    outputState.reviewDecisionId = decisionResult.decision.decision_id;
+    outputState.reviewDecisionFile = decisionResult.decisionFile;
+    outputState.reviewDecision = decisionResult.decision.decision;
+    outputState.reviewDecisionGate =
+      typeof decisionResult.decision.delivery_gate === "object" && decisionResult.decision.delivery_gate
+        ? /** @type {{ status?: string }} */ (decisionResult.decision.delivery_gate).status ?? null
+        : null;
+    outputState.reviewDecisionReason = decisionResult.decision.reason;
+    outputState.reviewDecisionEvidenceRefs = decisionResult.decision.evidence_refs;
+    outputState.readOnly = false;
+    outputState.futureControlHooks = [
+      `deliver prepare --run-id ${runId} --require-review-decision`,
+      `release prepare --run-id ${runId} --require-review-decision`,
       `evidence show --run-id ${runId}`,
     ];
   } else if (command === "learning handoff") {

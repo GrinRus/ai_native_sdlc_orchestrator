@@ -394,6 +394,17 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(invalidFlagPayload.error.code, "invalid_lifecycle_flags");
       assert.match(invalidFlagPayload.error.message, /--run-id/u);
 
+      const invalidReviewDecisionResponse = await postJson(commandUrl, {
+        command: "review decide",
+        flags: {
+          decision: "hold",
+        },
+      });
+      assert.equal(invalidReviewDecisionResponse.status, 400);
+      const invalidReviewDecisionPayload = await invalidReviewDecisionResponse.json();
+      assert.equal(invalidReviewDecisionPayload.error.code, "invalid_lifecycle_flags");
+      assert.match(invalidReviewDecisionPayload.error.message, /--run-id/u);
+
       const startResponse = await postJson(
         `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
         {

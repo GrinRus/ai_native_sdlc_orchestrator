@@ -401,6 +401,16 @@ test("incident and audit command help documents run-linked operational semantics
   assert.match(auditHelp.stdout, /run-centric snapshots for packet, step, quality, and finance evidence refs/);
 });
 
+test("review decision command help documents durable approval semantics", () => {
+  const result = invokeCli(["review", "decide", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in review decision shell \(W19-S05\)/);
+  assert.match(result.stdout, /--decision <approve\|hold\|request-repair>/);
+  assert.match(result.stdout, /Approve is blocked unless the linked review-report and Runtime Harness report both pass/);
+});
+
 test("unknown command fails clearly", () => {
   const result = invokeCli(["project", "unknown"]);
 
@@ -3185,6 +3195,128 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         true,
       );
 
+      const missingReviewDecisionGate = invokeCli([
+        "deliver",
+        "prepare",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--mode",
+        "patch-only",
+        "--approved-handoff-ref",
+        approvedPayload.handoff_packet_file,
+        "--promotion-evidence-refs",
+        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        "--require-review-decision",
+      ]);
+      assert.equal(missingReviewDecisionGate.exitCode, 1);
+      assert.match(missingReviewDecisionGate.stderr, /requires an approved review decision/);
+
+      const holdDecision = invokeCli([
+        "review",
+        "decide",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--decision",
+        "hold",
+        "--reason",
+        "Hold for fixture operator review.",
+      ]);
+      assert.equal(holdDecision.exitCode, 0, holdDecision.stderr);
+      const holdDecisionPayload = JSON.parse(holdDecision.stdout);
+      assert.equal(holdDecisionPayload.review_decision, "hold");
+      assert.equal(holdDecisionPayload.review_decision_gate, "blocked");
+      const holdDecisionDocument = JSON.parse(fs.readFileSync(holdDecisionPayload.review_decision_file, "utf8"));
+      assert.equal(
+        validateContractDocument({
+          family: "review-decision",
+          document: holdDecisionDocument,
+          source: "fixture://review-decision-hold",
+        }).ok,
+        true,
+      );
+
+      const blockedByHoldDecision = invokeCli([
+        "deliver",
+        "prepare",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--mode",
+        "patch-only",
+        "--approved-handoff-ref",
+        approvedPayload.handoff_packet_file,
+        "--promotion-evidence-refs",
+        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        "--require-review-decision",
+      ]);
+      assert.equal(blockedByHoldDecision.exitCode, 1);
+      assert.match(blockedByHoldDecision.stderr, /latest decision .* is 'hold'/);
+
+      const approveDecision = invokeCli([
+        "review",
+        "decide",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--decision",
+        "approve",
+        "--reason",
+        "Review and Runtime Harness evidence pass.",
+      ]);
+      assert.equal(approveDecision.exitCode, 0, approveDecision.stderr);
+      const approveDecisionPayload = JSON.parse(approveDecision.stdout);
+      assert.equal(approveDecisionPayload.review_decision, "approve");
+      assert.equal(approveDecisionPayload.review_decision_gate, "pass");
+      assert.ok(approveDecisionPayload.review_decision_evidence_refs.some((ref) => ref.includes("review-report")));
+      const approveDecisionDocument = JSON.parse(fs.readFileSync(approveDecisionPayload.review_decision_file, "utf8"));
+      assert.equal(approveDecisionDocument.delivery_gate.status, "pass");
+      assert.equal(approveDecisionDocument.delivery_gate.blocks_downstream, false);
+      assert.equal(
+        validateContractDocument({
+          family: "review-decision",
+          document: approveDecisionDocument,
+          source: "fixture://review-decision-approve",
+        }).ok,
+        true,
+      );
+
+      const gatedDelivery = invokeCli([
+        "deliver",
+        "prepare",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--mode",
+        "patch-only",
+        "--approved-handoff-ref",
+        approvedPayload.handoff_packet_file,
+        "--promotion-evidence-refs",
+        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        "--require-review-decision",
+      ]);
+      assert.equal(gatedDelivery.exitCode, 0, gatedDelivery.stderr);
+      const gatedDeliveryPayload = JSON.parse(gatedDelivery.stdout);
+      assert.equal(gatedDeliveryPayload.review_decision, "approve");
+      assert.equal(gatedDeliveryPayload.review_decision_gate, "pass");
+      assert.equal(gatedDeliveryPayload.delivery_blocking, false);
+
       const auditRun = invokeCli([
         "audit",
         "runs",
@@ -3459,6 +3591,50 @@ test("review run reports feature_size_fit=fail when a small mission exceeds its 
         ),
       );
       assert.equal(reviewReport.provider_traceability.status, "pass");
+
+      const invalidApprove = invokeCli([
+        "review",
+        "decide",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--decision",
+        "approve",
+      ]);
+      assert.equal(invalidApprove.exitCode, 1);
+      assert.match(invalidApprove.stderr, /Cannot approve because review-report overall_status is 'fail'/);
+
+      const repairDecision = invokeCli([
+        "review",
+        "decide",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--decision",
+        "request-repair",
+        "--reason",
+        "Feature-size-fit findings require repair.",
+      ]);
+      assert.equal(repairDecision.exitCode, 0, repairDecision.stderr);
+      const repairDecisionPayload = JSON.parse(repairDecision.stdout);
+      assert.equal(repairDecisionPayload.review_decision, "request-repair");
+      assert.equal(repairDecisionPayload.review_decision_gate, "blocked");
+      const repairDecisionDocument = JSON.parse(fs.readFileSync(repairDecisionPayload.review_decision_file, "utf8"));
+      assert.equal(repairDecisionDocument.delivery_gate.blocks_downstream, true);
+      assert.equal(
+        validateContractDocument({
+          family: "review-decision",
+          document: repairDecisionDocument,
+          source: "fixture://review-decision-request-repair",
+        }).ok,
+        true,
+      );
 
       const auditRun = invokeCli([
         "audit",

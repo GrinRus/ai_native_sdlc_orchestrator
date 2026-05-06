@@ -10,6 +10,7 @@ read_operations:
       - project-profile
       - artifact-packet
       - step-result
+      - review-decision
       - promotion-decision
   - operation_id: read.run-history
     operation_family: read
@@ -84,6 +85,8 @@ lifecycle_command_operations:
       command: run cancel
     - operation_id: review.run
       command: review run
+    - operation_id: review.decide
+      command: review decide
     - operation_id: deliver.prepare
       command: deliver prepare
     - operation_id: release.prepare

@@ -1,0 +1,24 @@
+decision_id: fixture-review-mission.review-decision.approve.2026-05-06T00-00-00Z
+project_id: aor-core
+run_id: fixture-review-mission
+decision: approve
+decider_ref: operator://cli
+reason: Linked review and Runtime Harness evidence are passing.
+review_report_ref: evidence://.aor/projects/aor-core/reports/review-report-fixture-review-mission.json
+runtime_harness_report_ref: evidence://.aor/projects/aor-core/reports/runtime-harness-report-fixture-review-mission.json
+delivery_manifest_refs: []
+learning_handoff_refs: []
+decision_basis:
+  review_overall_status: pass
+  review_recommendation: proceed
+  runtime_harness_overall_decision: pass
+  blocking_findings: []
+delivery_gate:
+  status: pass
+  blocks_downstream: false
+  required_downstream_decision: approve
+  findings: []
+evidence_refs:
+  - evidence://.aor/projects/aor-core/reports/review-report-fixture-review-mission.json
+  - evidence://.aor/projects/aor-core/reports/runtime-harness-report-fixture-review-mission.json
+decided_at: "2026-05-06T00:00:00.000Z"

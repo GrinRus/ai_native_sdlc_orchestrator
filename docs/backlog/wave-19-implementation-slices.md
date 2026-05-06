@@ -149,7 +149,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S05 — Review decision and approval workflow
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add explicit review decisions beyond report-only review so operators can approve, hold, or request repair with durable evidence.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`
 - **Hard dependencies:** W19-S01, W13-S05, W14-S06

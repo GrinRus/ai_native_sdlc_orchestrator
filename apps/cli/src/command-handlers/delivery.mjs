@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 
 import {
@@ -139,6 +140,57 @@ export function handleDeliveryCommand(context) {
         report: runtimeHarness.report,
         command,
       });
+    }
+    const reviewDecisionRequired = resolveOptionalBooleanFlag(
+      "require-review-decision",
+      flags["require-review-decision"],
+    );
+    outputState.reviewDecisionGate = reviewDecisionRequired ? "required" : "not_required";
+    if (reviewDecisionRequired) {
+      const reviewDecisions = listQualityArtifacts({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      })
+        .filter((artifact) => artifact.family === "review-decision" && artifact.document.run_id === runId)
+        .sort((left, right) => {
+          const leftMs =
+            typeof left.document.decided_at === "string" ? Date.parse(left.document.decided_at) : Number.NEGATIVE_INFINITY;
+          const rightMs =
+            typeof right.document.decided_at === "string" ? Date.parse(right.document.decided_at) : Number.NEGATIVE_INFINITY;
+          const decidedAtDelta = (Number.isFinite(rightMs) ? rightMs : Number.NEGATIVE_INFINITY) -
+            (Number.isFinite(leftMs) ? leftMs : Number.NEGATIVE_INFINITY);
+          if (decidedAtDelta !== 0) return decidedAtDelta;
+          return fs.statSync(right.file).mtimeMs - fs.statSync(left.file).mtimeMs;
+        });
+      const latestDecision = reviewDecisions[0] ?? null;
+      if (!latestDecision) {
+        throw new CliUsageError(
+          `${command} requires an approved review decision for run '${runId}'. Run 'aor review decide --run-id ${runId} --decision approve' before delivery or release.`,
+        );
+      }
+      const reviewDecision = typeof latestDecision.document.decision === "string" ? latestDecision.document.decision : null;
+      const reviewDecisionGate =
+        typeof latestDecision.document.delivery_gate === "object" && latestDecision.document.delivery_gate
+          ? /** @type {{ status?: unknown, blocks_downstream?: unknown }} */ (latestDecision.document.delivery_gate)
+          : {};
+      outputState.reviewDecisionId =
+        typeof latestDecision.document.decision_id === "string" ? latestDecision.document.decision_id : null;
+      outputState.reviewDecisionFile = latestDecision.file;
+      outputState.reviewDecision = reviewDecision;
+      outputState.reviewDecisionGate =
+        typeof reviewDecisionGate.status === "string" ? reviewDecisionGate.status : outputState.reviewDecisionGate;
+      outputState.reviewDecisionReason =
+        typeof latestDecision.document.reason === "string" ? latestDecision.document.reason : null;
+      if (
+        reviewDecision !== "approve" ||
+        reviewDecisionGate.status !== "pass" ||
+        reviewDecisionGate.blocks_downstream === true
+      ) {
+        throw new CliUsageError(
+          `${command} requires review decision 'approve'; latest decision for run '${runId}' is '${reviewDecision ?? "unknown"}'.`,
+        );
+      }
     }
     const resolvedPolicy = resolveStepPolicyForStep({
       projectProfilePath: init.projectProfilePath,

@@ -15,6 +15,7 @@ const PROMOTION_CHANNEL_VALUES = ["draft", "candidate", "stable", "frozen", "dem
 const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"];
 const INCIDENT_STATUS_VALUES = ["open", "recertify", "hold", "re-enabled", "closed"];
 const INCIDENT_BACKFILL_PROPOSAL_STATE_VALUES = ["proposed", "approved", "rejected"];
+const REVIEW_DECISION_VALUES = ["approve", "hold", "request-repair"];
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
 export const LIVE_E2E_OBSERVATION_STATUS_VALUES = ["pass", "warn", "not_pass"];
@@ -552,6 +553,46 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       { field: "overall_status", allowedValues: ["pass", "warn", "fail"] },
       { field: "review_recommendation", allowedValues: ["proceed", "repair", "required-human-review"] },
     ],
+  },
+  {
+    family: "review-decision",
+    familyGroup: "execution-and-quality",
+    sourceContract: "docs/contracts/review-decision.md",
+    exampleGlob: "examples/reports/review-decision*.yaml",
+    status: "implemented",
+    requiredFields: [
+      "decision_id",
+      "project_id",
+      "run_id",
+      "decision",
+      "decider_ref",
+      "reason",
+      "review_report_ref",
+      "runtime_harness_report_ref",
+      "delivery_manifest_refs",
+      "learning_handoff_refs",
+      "decision_basis",
+      "delivery_gate",
+      "evidence_refs",
+      "decided_at",
+    ],
+    fieldTypes: {
+      decision_id: "string",
+      project_id: "string",
+      run_id: "string",
+      decision: "string",
+      decider_ref: "string",
+      reason: "string",
+      review_report_ref: "string",
+      runtime_harness_report_ref: "string",
+      delivery_manifest_refs: "array",
+      learning_handoff_refs: "array",
+      decision_basis: "object",
+      delivery_gate: "object",
+      evidence_refs: "array",
+      decided_at: "string",
+    },
+    enumChecks: [{ field: "decision", allowedValues: REVIEW_DECISION_VALUES }],
   },
   {
     family: "runtime-harness-report",
@@ -1139,6 +1180,7 @@ export const EXAMPLE_FAMILY_RESOLUTION_RULES = Object.freeze([
   { regex: /^examples\/eval\/report-[^/]+\.sample\.ya?ml$/, family: "evaluation-report" },
   { regex: /^examples\/eval\/suite-[^/]+\.ya?ml$/, family: "evaluation-suite" },
   { regex: /^examples\/reports\/live-e2e-observation-report[^/]*\.ya?ml$/, family: "live-e2e-observation-report" },
+  { regex: /^examples\/reports\/review-decision[^/]*\.ya?ml$/, family: "review-decision" },
   { regex: /^examples\/reports\/runtime-harness-report[^/]*\.ya?ml$/, family: "runtime-harness-report" },
   { regex: /^examples\/packets\/wave-ticket-[^/]+\.ya?ml$/, family: "wave-ticket" },
   { regex: /^examples\/packets\/handoff-[^/]+\.ya?ml$/, family: "handoff-packet" },

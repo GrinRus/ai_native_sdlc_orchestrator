@@ -23,6 +23,7 @@ const LIFECYCLE_COMMANDS = new Set([
   "run steer",
   "run cancel",
   "review run",
+  "review decide",
   "deliver prepare",
   "release prepare",
   "learning handoff",

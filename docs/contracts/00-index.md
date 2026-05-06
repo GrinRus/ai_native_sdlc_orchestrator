@@ -18,6 +18,7 @@
 - `validation-report.md`
 - `evaluation-report.md`
 - `review-report.md`
+- `review-decision.md`
 - `runtime-harness-report.md`
 - `live-e2e-observation-report.md`
 - `incident-backfill-proposal.md`

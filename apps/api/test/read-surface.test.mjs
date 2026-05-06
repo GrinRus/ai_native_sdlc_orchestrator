@@ -160,6 +160,36 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
         status: "open",
       },
     });
+    writeContractFile({
+      family: "review-decision",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "review-decision-runtime.json"),
+      document: {
+        decision_id: `${runId}.review-decision.approve.v1`,
+        project_id: init.projectId,
+        run_id: runId,
+        decision: "approve",
+        decider_ref: "operator://api-fixture",
+        reason: "Fixture approval for read-surface smoke test.",
+        review_report_ref: "evidence://reports/review-report-runtime.json",
+        runtime_harness_report_ref: "evidence://reports/runtime-harness-report-runtime.json",
+        delivery_manifest_refs: [deliveryResult.deliveryManifestFile],
+        learning_handoff_refs: [],
+        decision_basis: {
+          review_overall_status: "pass",
+          review_recommendation: "proceed",
+          runtime_harness_overall_decision: "pass",
+          blocking_findings: [],
+        },
+        delivery_gate: {
+          status: "pass",
+          blocks_downstream: false,
+          required_downstream_decision: "approve",
+          findings: [],
+        },
+        evidence_refs: [deliveryResult.deliveryManifestFile],
+        decided_at: new Date().toISOString(),
+      },
+    });
 
     const projectState = readProjectState({ projectRef: repoRoot, cwd: repoRoot });
     assert.equal(projectState.project_id, init.projectId);
@@ -183,6 +213,7 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     const qualityArtifacts = listQualityArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "validation-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "evaluation-report"));
+    assert.ok(qualityArtifacts.some((artifact) => artifact.family === "review-decision"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "incident-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "promotion-decision"));
 

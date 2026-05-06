@@ -33,6 +33,7 @@ Implemented commands:
   - aor audit runs
   - aor ui attach
   - aor review run
+  - aor review decide
   - aor learning handoff
   - aor ui detach
 

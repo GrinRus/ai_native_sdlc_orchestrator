@@ -40,8 +40,10 @@ export { runEvaluationSuite } from "../../../packages/orchestrator-core/src/eval
 export { replayHarnessCapture } from "../../../packages/orchestrator-core/src/harness-capture-replay.mjs";
 export {
   applyIncidentRecertification,
+  listReviewDecisions,
   materializeIncidentBackfillProposal,
   materializeLearningLoopArtifacts,
+  materializeReviewDecision,
 } from "../../../packages/observability/src/index.mjs";
 export { resolveStepPolicyForStep } from "../../../packages/orchestrator-core/src/policy-resolution.mjs";
 export { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";

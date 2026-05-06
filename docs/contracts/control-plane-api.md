@@ -51,7 +51,7 @@ Project bootstrap baseline:
 - runs
 - step results
 - validation and evaluation reports
-- review reports and learning-loop closure artifacts
+- review reports, review decisions, and learning-loop closure artifacts
 - delivery manifests and release packets
 - incidents and promotion decisions
 
@@ -211,6 +211,11 @@ Review run baseline:
 - response includes `review_report_file`, `review_overall_status`, and `review_recommendation`;
 - `review-report` must cover `feature_traceability`, `discovery_quality`, `artifact_quality`, `code_quality`, `feature_size_fit`, `provider_traceability`, `findings`, and `evidence_refs`;
 - artifact review must treat bootstrap-owned files and runner-produced request-input files as non-code when computing target code-scope findings.
+
+Review decision baseline:
+- `review decide` writes one durable `review-decision` artifact for `approve`, `hold`, or `request-repair`;
+- `approve` must be blocked unless linked `review-report` and Runtime Harness evidence both pass;
+- delivery/release commands may require this approval through `require_review_decision` lifecycle flags that map to `--require-review-decision`.
 
 Learning handoff baseline:
 - `learning handoff` writes one public `learning-loop-scorecard` and one public `learning-loop-handoff`;

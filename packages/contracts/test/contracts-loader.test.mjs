@@ -326,6 +326,29 @@ test("runtime harness report example loads through the shared contract path", ()
   assert.equal(loaded.ok, true, "expected runtime-harness-report example to load");
 });
 
+test("review decision example preserves explicit approval vocabulary", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/review-decision.approve.yaml"),
+    family: "review-decision",
+  });
+  assert.equal(loaded.ok, true, "expected review-decision example to load");
+  assert.equal(loaded.document.decision, "approve");
+  assert.equal(loaded.document.delivery_gate.status, "pass");
+
+  const invalid = structuredClone(loaded.document);
+  invalid.decision = "proceed";
+  const validation = validateContractDocument({
+    family: "review-decision",
+    document: invalid,
+    source: "test://review-decision-invalid-decision",
+  });
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === "decision"),
+    "expected invalid review decision value to be rejected",
+  );
+});
+
 test("discovery research report examples distinguish ADR-ready and incomplete evidence", () => {
   const ready = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/discovery-research-report.adr-ready.yaml"),

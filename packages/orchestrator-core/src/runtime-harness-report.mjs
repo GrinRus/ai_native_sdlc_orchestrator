@@ -578,6 +578,7 @@ function loadRunStepArtifacts(options) {
 function loadRunQualityArtifacts(options) {
   const families = [
     /** @type {const} */ ("review-report"),
+    /** @type {const} */ ("review-decision"),
     /** @type {const} */ ("evaluation-report"),
     /** @type {const} */ ("learning-loop-scorecard"),
     /** @type {const} */ ("learning-loop-handoff"),

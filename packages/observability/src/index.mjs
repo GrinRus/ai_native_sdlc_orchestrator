@@ -6,3 +6,4 @@ export {
   materializeIncidentBackfillProposal,
   materializeLearningLoopArtifacts,
 } from "./learning-loop.mjs";
+export { listReviewDecisions, materializeReviewDecision } from "./review-decision.mjs";
