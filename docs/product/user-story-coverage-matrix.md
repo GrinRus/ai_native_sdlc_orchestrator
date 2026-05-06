@@ -30,7 +30,7 @@ Coverage status values:
 | ARC-02 | Architect / tech lead | MVP | Inspect route, wrapper, policy, and runner choices for each step. | covered | route registry, compiled context, `run status`, W8-S04 visibility | none |
 | ARC-03 | Architect / tech lead | MVP | Separate deterministic validation from rubric-based evaluation. | covered | validation kernel, eval runner, harness, W3 quality foundation | none |
 | ARC-04 | Architect / tech lead | MVP | Define certification and freeze paths for platform assets. | covered | `harness certify`, `asset promote`, `asset freeze`, W7-S02 | none |
-| ARC-05 | Architect / tech lead | MVP | Trace plans back to architecture docs and contract references. | partial | backlog docs, contract index, command catalog checks | W19-S01 |
+| ARC-05 | Architect / tech lead | MVP | Trace plans back to architecture docs and contract references. | covered | story coverage matrix, backlog docs, contract index, command catalog checks, W19-S01 | none |
 | ARC-06 | Architect / tech lead | MVP+ | Control UI attach/detach lifecycle without breaking headless operation. | covered | `ui attach`, `ui detach`, W6-S04 UI lifecycle command pack | none |
 | ARC-07 | Architect / tech lead | MVP+ | Inspect governance guardrails and quality evidence parity. | covered | W7-S01 governance quality guardrails | none |
 | ARC-08 | Architect / tech lead | Later | Maintain later architecture maturity and ADR traceability. | partial | W8-S02 architecture maturity pack | W19-S03 |
@@ -86,11 +86,11 @@ Coverage status values:
 | SEC-04 | Security / compliance | MVP | Use stricter gates for higher-risk flows. | covered | step policies, delivery guards, W8-S03 | none |
 | SEC-05 | Security / compliance | MVP+ | Govern route and policy overrides. | covered | W6-S03 run-control policy guardrails | none |
 | SEC-06 | Security / compliance | Later | Harden production transport, logging, and redaction. | partial | detached transport auth baseline | W20-S02 |
-| RMO-01 | Repository / multirepo owner | MVP | Describe monolith or bounded multirepo topology. | covered | project profile topology, W8-S07 | none |
-| RMO-02 | Repository / multirepo owner | MVP | Track repo graph and ownership. | partial | project analysis and multirepo maturity docs | W20-S01 |
+| RMO-01 | Repository / multirepo owner | MVP | Describe monolith or bounded multirepo topology. | covered | project profile topology, bounded multirepo sample, W18-S04 | none |
+| RMO-02 | Repository / multirepo owner | MVP | Track repo graph and ownership. | partial | project analysis `repo_scope_proof`, bounded multirepo docs, W18-S04 | W20-S01 |
 | RMO-03 | Repository / multirepo owner | MVP | Use scoped locks for coordinated work. | gap | no dedicated scoped-lock subsystem | W20-S01 |
-| RMO-04 | Repository / multirepo owner | MVP | Run cross-repo validation before coordinated delivery. | gap | multirepo delivery maturity baseline only | W20-S01 |
-| RMO-05 | Repository / multirepo owner | MVP+ | Prepare bounded multirepo delivery and release evidence. | partial | W6-S05, W8-S07 delivery rerun maturity | W20-S01 |
+| RMO-04 | Repository / multirepo owner | MVP | Run cross-repo validation before coordinated delivery. | partial | W18-S04 per-repo and integration validation refs, delivery coordination guard | W20-S01 |
+| RMO-05 | Repository / multirepo owner | MVP+ | Prepare bounded multirepo delivery and release evidence. | partial | W6-S05, W8-S07 delivery rerun maturity, W18-S04 repo-level delivery lineage | W20-S01 |
 | RMO-06 | Repository / multirepo owner | Later | Mature multirepo delivery orchestration and reruns. | partial | W8-S07 later multirepo maturity | W20-S01 |
 | INC-01 | Incident / improvement owner | MVP | Open incident reports from failed runs or releases. | covered | `incident open`, W6-S06 | none |
 | INC-02 | Incident / improvement owner | MVP | Force recertification before re-enabling problematic routes. | covered | `incident recertify`, W7-S03 | none |
@@ -104,7 +104,7 @@ Coverage status values:
 | PBO-04 | Project bootstrap / onboarding | MVP | Materialize project-analysis reports with boundaries and risk zones. | covered | project-analysis reports, W1-S03 | none |
 | PBO-05 | Project bootstrap / onboarding | MVP | Block execution when prerequisites are missing. | covered | verify/preflight reports, W1-S05 | none |
 | PBO-06 | Project bootstrap / onboarding | MVP+ | Recommend missing AOR-native runtime context assets. | covered | W6-S02, W8-S08, W8-S09 | none |
-| PBO-07 | Project bootstrap / onboarding | MVP+ | Track project-profile coverage and missing source material. | partial | project profile validation, intake baseline | W19-S01, W19-S02, W21-S03, W21-S04 |
+| PBO-07 | Project bootstrap / onboarding | MVP+ | Track project-profile coverage and missing source material. | partial | project profile validation, story coverage matrix, intake baseline | W19-S02, W21-S03, W21-S04 |
 | PBO-08 | Project bootstrap / onboarding | Later | Support later bootstrap maturity for reruns and multirepo work. | partial | W8-S07 bootstrap and delivery rerun maturity | W19-S03, W20-S01, W21-S03 |
 | DTX-01 | Delivery transaction / Git / PR | MVP | Deliver output through patch-only mode. | covered | delivery driver, `deliver prepare`, W4-S03, W6-S05 | none |
 | DTX-02 | Delivery transaction / Git / PR | MVP | Deliver output through local-branch mode. | covered | local branch delivery driver, W4-S03 | none |
@@ -113,7 +113,7 @@ Coverage status values:
 | DTX-05 | Delivery transaction / Git / PR | MVP | Isolate parallel runs with worktree and branch semantics. | covered | isolated worktree foundation, W4-S01 | none |
 | DTX-06 | Delivery transaction / Git / PR | MVP+ | Rerun from a packet boundary or failed step. | covered | W8-S07 delivery rerun maturity | none |
 | DTX-07 | Delivery transaction / Git / PR | MVP+ | Prepare release evidence from delivery artifacts. | covered | `release prepare`, W6-S05 | none |
-| DTX-08 | Delivery transaction / Git / PR | Later | Coordinate bounded multirepo delivery manifests. | partial | W8-S07 multirepo delivery maturity | W20-S01 |
+| DTX-08 | Delivery transaction / Git / PR | Later | Coordinate bounded multirepo delivery manifests. | partial | W8-S07 multirepo delivery maturity, W18-S04 repo-level delivery manifest lineage | W20-S01 |
 | FIN-01 | Finance / audit / hygiene | MVP | Track cost by route, bundle, compiler revision, adapter, and project. | partial | finance evidence and audit records | W20-S05 |
 | FIN-02 | Finance / audit / hygiene | MVP | Track latency by route, bundle, compiler revision, adapter, and project. | partial | run/audit timing evidence | W20-S05 |
 | FIN-03 | Finance / audit / hygiene | MVP | Preserve durable evidence for reviews and audits. | covered | audit records, evidence show, W7-S04 | none |

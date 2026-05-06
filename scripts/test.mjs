@@ -712,6 +712,14 @@ function assertUserStoryCoverageMatrixDocumentation() {
         console.error(`User-story ${row.storyId} references unknown gap slice '${gapSlice}'.`);
         process.exit(1);
       }
+
+      const gapSliceState = masterSliceMap.get(gapSlice)?.state ?? waveSectionMap.get(gapSlice)?.state;
+      if (row.coverageStatus !== "covered" && gapSliceState === "done") {
+        console.error(
+          `Non-covered user-story ${row.storyId} references done gap slice '${gapSlice}'. Move completed evidence into the evidence cell or mark the story covered.`,
+        );
+        process.exit(1);
+      }
     }
 
     tierCountsByPrefix.get(prefix)[row.tier] += 1;

@@ -17,7 +17,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S01 — User-story registry and coverage evidence matrix
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Promote the supported user-story inventory into a machine-checkable 112-story coverage matrix with stable IDs, tiers, evidence pointers, coverage status, and backlog gap references.
 - **Primary modules:** `docs/product/**`, `docs/backlog/**`, `scripts/test.mjs`
 - **Hard dependencies:** W17-S01
