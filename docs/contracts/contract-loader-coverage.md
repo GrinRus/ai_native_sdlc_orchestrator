@@ -6,6 +6,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 |---|---|---|---|---|---|
 | Core packets and profiles | `project-profile.md` | `project-profile` | `examples/project*.aor.yaml` | implemented | Required fields + top-level type checks. |
 | Core packets and profiles | `project-analysis-report.md` | `project-analysis-report` | `examples/project-analysis-report.sample.yaml` | implemented | Required fields + top-level type checks, including route, asset, policy, evaluation-registry payloads, and later-maturity completeness/traceability fields. |
+| Core packets and profiles | `discovery-research-report.md` | `discovery-research-report` | `examples/reports/discovery-research-report*.yaml` | implemented | Required fields + closed status values for ADR-ready versus incomplete local research evidence. |
 | Core packets and profiles | `artifact-packet.md` | `artifact-packet` | none | implemented | Contract is loader-covered; no YAML example in this repo yet. |
 | Core packets and profiles | `intake-request-body.md` | `intake-request-body` | `examples/packets/intake-request-body*.yaml` | implemented | Required fields + nested validation for goals, constraints, KPIs, Definition of Done, local source refs, and completeness status. |
 | Core packets and profiles | `wave-ticket.md` | `wave-ticket` | `examples/packets/wave-ticket-*.yaml` | implemented | Required fields + top-level type checks. |

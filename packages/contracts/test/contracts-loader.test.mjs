@@ -326,6 +326,35 @@ test("runtime harness report example loads through the shared contract path", ()
   assert.equal(loaded.ok, true, "expected runtime-harness-report example to load");
 });
 
+test("discovery research report examples distinguish ADR-ready and incomplete evidence", () => {
+  const ready = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/discovery-research-report.adr-ready.yaml"),
+    family: "discovery-research-report",
+  });
+  assert.equal(ready.ok, true, "expected ADR-ready discovery research example to load");
+  assert.equal(ready.document.status, "adr-ready");
+
+  const incomplete = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/discovery-research-report.incomplete.yaml"),
+    family: "discovery-research-report",
+  });
+  assert.equal(incomplete.ok, true, "expected incomplete discovery research example to load");
+  assert.equal(incomplete.document.status, "incomplete");
+
+  const invalid = structuredClone(ready.document);
+  invalid.status = "ready";
+  const validation = validateContractDocument({
+    family: "discovery-research-report",
+    document: invalid,
+    source: "test://discovery-research-invalid-status",
+  });
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === "status"),
+    "expected invalid discovery research status to be rejected",
+  );
+});
+
 test("intake request body validates local source refs and rejects malformed product evidence", () => {
   const loaded = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/packets/intake-request-body.complete.yaml"),

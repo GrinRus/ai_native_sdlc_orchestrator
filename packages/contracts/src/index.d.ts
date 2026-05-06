@@ -1,6 +1,7 @@
 export type ContractFamily =
   | "project-profile"
   | "project-analysis-report"
+  | "discovery-research-report"
   | "artifact-packet"
   | "intake-request-body"
   | "wave-ticket"

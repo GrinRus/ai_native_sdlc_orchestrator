@@ -589,6 +589,8 @@ export function executeRoutedStep(options) {
    *   checks: Array<{ check_id: string, status: "pass" | "fail", blocking: boolean, summary: string, expected: unknown, actual: unknown }>,
    * } | null} */
   let discoveryCompletenessGate = null;
+  /** @type {Record<string, unknown> | null} */
+  let discoveryResearchGate = null;
   /** @type {{
    *   architecture_doc_refs: string[],
    *   contract_refs: string[],
@@ -615,6 +617,7 @@ export function executeRoutedStep(options) {
     });
     const completeness = discoveryResult.report.discovery_completeness;
     const architectureTraceability = discoveryResult.report.architecture_traceability;
+    const discoveryResearch = asRecord(discoveryResult.report.discovery_research);
 
     if (
       typeof completeness !== "object" ||
@@ -642,6 +645,15 @@ export function executeRoutedStep(options) {
           expected: Object.prototype.hasOwnProperty.call(check, "expected") ? check.expected : null,
           actual: Object.prototype.hasOwnProperty.call(check, "actual") ? check.actual : null,
         })),
+    };
+    discoveryResearchGate = {
+      report_id: typeof discoveryResearch.report_id === "string" ? discoveryResearch.report_id : null,
+      report_ref: typeof discoveryResearch.report_ref === "string" ? discoveryResearch.report_ref : null,
+      status: typeof discoveryResearch.status === "string" ? discoveryResearch.status : "incomplete",
+      adr_ready: discoveryResearch.adr_ready === true,
+      blocking: Boolean(discoveryResearch.blocking),
+      open_questions: Array.isArray(discoveryResearch.open_questions) ? discoveryResearch.open_questions : [],
+      checks: Array.isArray(discoveryResearch.checks) ? discoveryResearch.checks : [],
     };
     if (typeof architectureTraceability === "object" && architectureTraceability !== null) {
       discoveryArchitectureTraceability = {
@@ -920,6 +932,7 @@ export function executeRoutedStep(options) {
       },
       feature_traceability: featureTraceability,
       discovery_completeness_gate: discoveryCompletenessGate,
+      discovery_research_gate: discoveryResearchGate,
       architecture_traceability: {
         architecture_doc_refs: discoveryArchitectureTraceability?.architecture_doc_refs ?? [...STEP_ARCHITECTURE_DOC_REFS],
         contract_refs: discoveryArchitectureTraceability?.contract_refs ?? [...STEP_ARCHITECTURE_CONTRACT_REFS],

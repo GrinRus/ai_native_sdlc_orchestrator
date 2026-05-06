@@ -45,6 +45,8 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 - Produce ADR-ready research output with evidence.
 - Use explicit discovery completeness checks from command outputs before spec handoff.
 
+`W19-S03` makes the local research path executable: `discovery run` emits a `discovery-research-report` that links repository facts, runtime context assets, local intake source refs, open questions, and ADR-ready recommendations. `spec build` carries the same research gate into the routed step result so handoff can inspect ADR-readiness without rerunning discovery.
+
 ### Architect / tech lead
 - Define non-functional requirements, repo scope, risk tiers, and allowed commands.
 - Inspect the chosen route, wrapper, policy, and runner for each step.

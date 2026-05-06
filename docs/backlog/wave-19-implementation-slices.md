@@ -83,7 +83,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S03 — Discovery research and ADR evidence flow
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add a follow-up slice for executable discovery research output that can produce ADR-ready evidence from repository facts, runtime context assets, and local research inputs.
 - **Primary modules:** `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`
 - **Hard dependencies:** W19-S02, W8-S02

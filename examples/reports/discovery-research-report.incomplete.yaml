@@ -1,0 +1,43 @@
+report_id: aor-core.discovery-research.v1
+project_id: aor-core
+version: 1
+generated_from:
+  command: aor discovery run
+  project_analysis_report_ref: evidence://.aor/projects/aor-core/reports/project-analysis-report.json
+repository_facts:
+  topology: monorepo
+  languages:
+    - typescript
+  service_boundaries: []
+context_assets:
+  context_bundle_refs:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  context_doc_refs: []
+  context_rule_refs: []
+  context_skill_refs: []
+research_inputs:
+  intake_packet_ref: null
+  source_refs: []
+  goals: []
+  kpis: []
+  definition_of_done: []
+open_questions:
+  - question_id: missing-local-research-inputs
+    status: open
+    summary: Add local issue, PRD, RFC, note, or mail-like source refs before ADR handoff.
+    blocking: true
+adr_ready_recommendations:
+  - recommendation_id: adr.discovery-research-blocked
+    status: blocked
+    title: ADR candidate is blocked until local research inputs and product acceptance evidence are present.
+    rationale_refs: []
+    proposed_adr_refs: []
+completeness:
+  status: incomplete
+  blocking: true
+  checks:
+    - check_id: local-research-inputs
+      status: fail
+      blocking: true
+      summary: Local research input refs are missing.
+status: incomplete

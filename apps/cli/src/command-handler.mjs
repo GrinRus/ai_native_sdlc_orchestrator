@@ -243,18 +243,20 @@ export function formatCommandHelp(definition) {
           : definition.command === "discovery run"
             ? [
                 "- --project-ref must point to an existing directory.",
-                "- Discovery run materializes project-analysis plus route/asset/policy/eval registry reports.",
-                "- --input-packet links discovery output to one prior intake-request artifact packet.",
-                "- --route-overrides and --policy-overrides accept comma-separated step overrides.",
-                "- Output includes discovery completeness checks and architecture traceability linkage for planning handoff.",
+              "- Discovery run materializes project-analysis plus route/asset/policy/eval registry reports.",
+              "- --input-packet links discovery output to one prior intake-request artifact packet.",
+              "- --route-overrides and --policy-overrides accept comma-separated step overrides.",
+              "- Output includes discovery completeness checks and architecture traceability linkage for planning handoff.",
+              "- Output includes discovery research ADR-readiness, open questions, and local research source linkage.",
+            ]
+          : definition.command === "spec build"
+            ? [
+                "- --project-ref must point to an existing directory.",
+                "- Spec build runs routed dry-run step execution for step_class 'spec'.",
+                "- Output includes a durable step-result artifact under runtime reports.",
+                "- Spec build enforces discovery completeness gate and blocks when required checks fail.",
+                "- Spec build preserves the discovery research gate so ADR-readiness is visible at handoff.",
               ]
-            : definition.command === "spec build"
-              ? [
-                  "- --project-ref must point to an existing directory.",
-                  "- Spec build runs routed dry-run step execution for step_class 'spec'.",
-                  "- Output includes a durable step-result artifact under runtime reports.",
-                  "- Spec build enforces discovery completeness gate and blocks when required checks fail.",
-                ]
               : definition.command === "wave create"
                 ? [
                     "- --project-ref must point to an existing directory.",

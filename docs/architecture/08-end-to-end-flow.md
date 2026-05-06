@@ -7,7 +7,7 @@
 4. `project verify`
 5. feature-intent intake request
 6. discovery packet
-7. research / ADR packet
+7. discovery research / ADR-readiness report
 8. spec packet
 9. wave ticket
 10. handoff packet and approval

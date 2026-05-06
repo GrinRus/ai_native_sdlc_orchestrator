@@ -68,6 +68,13 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.equal(result.policyResolutionMatrix.length, 10);
     assert.equal(result.adapterResolutionMatrix.length, 10);
     assert.equal(fs.existsSync(result.evaluationRegistryPath), true);
+    assert.equal(fs.existsSync(result.discoveryResearchReportPath), true);
+    assert.equal(result.discoveryResearchReport.status, "incomplete");
+    assert.ok(
+      result.discoveryResearchReport.open_questions.some(
+        (entry) => entry.question_id === "local-research-inputs",
+      ),
+    );
     assert.ok(result.evaluationRegistry.datasets.length > 0);
     assert.ok(result.evaluationRegistry.suites.length > 0);
     assert.equal(
@@ -102,6 +109,8 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.ok(reloaded.architecture_traceability.architecture_doc_refs.includes("docs/architecture/14-cli-command-catalog.md"));
     assert.ok(Array.isArray(reloaded.architecture_traceability.step_linkage));
     assert.ok(reloaded.architecture_traceability.step_linkage.some((entry) => entry.step_class === "spec"));
+    assert.equal(reloaded.discovery_research.status, "incomplete");
+    assert.equal(reloaded.discovery_research.blocking, true);
   });
 });
 
@@ -197,6 +206,7 @@ test("analyzeProjectRuntime works on the AOR repository with isolated runtime ro
     assert.equal(fs.existsSync(result.assetResolutionPath), true);
     assert.equal(fs.existsSync(result.policyResolutionPath), true);
     assert.equal(fs.existsSync(result.evaluationRegistryPath), true);
+    assert.equal(fs.existsSync(result.discoveryResearchReportPath), true);
   } finally {
     fs.rmSync(runtimeRoot, { recursive: true, force: true });
   }

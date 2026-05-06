@@ -203,6 +203,11 @@ export function handleBootstrapCommand(context) {
     outputState.evaluationRegistryFile = analyzeResult.evaluationRegistryPath;
     outputState.evaluationRegistrySuites = analyzeResult.evaluationRegistry.suites;
     outputState.evaluationRegistryDatasets = analyzeResult.evaluationRegistry.datasets;
+    outputState.discoveryResearchReportId = analyzeResult.discoveryResearchReport.report_id;
+    outputState.discoveryResearchReportFile = analyzeResult.discoveryResearchReportPath;
+    outputState.discoveryResearchStatus = analyzeResult.discoveryResearchReport.status;
+    outputState.discoveryResearchAdrReady = analyzeResult.discoveryResearchReport.status === "adr-ready";
+    outputState.discoveryResearchOpenQuestions = analyzeResult.discoveryResearchReport.open_questions;
     outputState.discoveryCompletenessStatus = analyzeResult.report.discovery_completeness?.status ?? null;
     outputState.discoveryCompletenessBlocking = analyzeResult.report.discovery_completeness?.blocking ?? null;
     outputState.discoveryCompletenessChecks = analyzeResult.report.discovery_completeness?.checks ?? null;
@@ -247,6 +252,11 @@ export function handleBootstrapCommand(context) {
     outputState.evaluationRegistryFile = discoveryResult.evaluationRegistryPath;
     outputState.evaluationRegistrySuites = discoveryResult.evaluationRegistry.suites;
     outputState.evaluationRegistryDatasets = discoveryResult.evaluationRegistry.datasets;
+    outputState.discoveryResearchReportId = discoveryResult.discoveryResearchReport.report_id;
+    outputState.discoveryResearchReportFile = discoveryResult.discoveryResearchReportPath;
+    outputState.discoveryResearchStatus = discoveryResult.discoveryResearchReport.status;
+    outputState.discoveryResearchAdrReady = discoveryResult.discoveryResearchReport.status === "adr-ready";
+    outputState.discoveryResearchOpenQuestions = discoveryResult.discoveryResearchReport.open_questions;
     outputState.discoveryCompletenessStatus = discoveryResult.report.discovery_completeness?.status ?? null;
     outputState.discoveryCompletenessBlocking = discoveryResult.report.discovery_completeness?.blocking ?? null;
     outputState.discoveryCompletenessChecks = discoveryResult.report.discovery_completeness?.checks ?? null;
@@ -370,6 +380,10 @@ export function handleBootstrapCommand(context) {
     outputState.discoveryCompletenessStatus = specResult.stepResult.routed_execution.discovery_completeness_gate?.status ?? null;
     outputState.discoveryCompletenessBlocking = specResult.stepResult.routed_execution.discovery_completeness_gate?.blocking ?? null;
     outputState.discoveryCompletenessChecks = specResult.stepResult.routed_execution.discovery_completeness_gate?.checks ?? null;
+    outputState.discoveryResearchGate = specResult.stepResult.routed_execution.discovery_research_gate ?? null;
+    outputState.discoveryResearchStatus = specResult.stepResult.routed_execution.discovery_research_gate?.status ?? null;
+    outputState.discoveryResearchAdrReady = specResult.stepResult.routed_execution.discovery_research_gate?.adr_ready ?? null;
+    outputState.discoveryResearchOpenQuestions = specResult.stepResult.routed_execution.discovery_research_gate?.open_questions ?? null;
     outputState.architectureTraceability = specResult.stepResult.routed_execution.architecture_traceability ?? null;
   } else if (command === "handoff prepare") {
     ensureRequiredFlags(command, flags);

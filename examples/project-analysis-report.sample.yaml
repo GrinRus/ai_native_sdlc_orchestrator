@@ -113,6 +113,32 @@ evaluation_registry:
       subject_type: run
       dataset_ref: dataset://run-regression@2026-04-20T08:00:00Z
       source: examples/eval/suite-release-core.yaml
+discovery_research:
+  report_id: github-sandbox.discovery-research.v1
+  report_ref: evidence://.aor/projects/github-sandbox/reports/discovery-research-report.json
+  status: adr-ready
+  adr_ready: true
+  blocking: false
+  open_questions: []
+  checks:
+    - check_id: repository-facts-linked
+      status: pass
+      blocking: true
+      summary: Repository facts are available for discovery research.
+    - check_id: context-assets-linked
+      status: pass
+      blocking: true
+      summary: Runtime context asset refs are linked to discovery research.
+    - check_id: local-research-inputs
+      status: pass
+      blocking: true
+      summary: Local research source refs are linked to discovery research.
+    - check_id: product-acceptance-evidence
+      status: pass
+      blocking: true
+      summary: Goals, KPIs, and Definition of Done are present for ADR handoff.
+  recommendation_refs:
+    - adr.discovery-research-ready
 discovery_completeness:
   status: pass
   blocking: false

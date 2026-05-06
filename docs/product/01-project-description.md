@@ -115,6 +115,15 @@ Each intake body records product goals, constraints, KPIs, Definition of Done, s
 
 Live SaaS ingestion from Jira, GitHub Issues, Gmail, Outlook, or similar systems is out of scope for the MVP intake contract. Such sources must be exported or mirrored into local structured source refs before AOR treats them as product-intake evidence.
 
+## Discovery research and ADR readiness
+Discovery produces a `discovery-research-report` alongside the project analysis report. The report links repository facts, runtime context asset refs, local intake research inputs, open questions, and ADR-ready recommendations.
+
+The research report has two deterministic states:
+- `adr-ready` when repository facts, context assets, local research source refs, goals, KPIs, Definition of Done, and ADR recommendations are present;
+- `incomplete` when one or more evidence groups are missing.
+
+`spec build` carries this research gate into its routed `step-result`. The gate does not perform autonomous web research and does not block all specification work by itself, but it makes missing ADR evidence explicit before handoff.
+
 ## Live E2E posture
 AOR ships with four standard rehearsal classes:
 - regress short

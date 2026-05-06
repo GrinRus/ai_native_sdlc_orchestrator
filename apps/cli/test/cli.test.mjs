@@ -466,6 +466,14 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     assert.equal(discoveryPayload.discovery_completeness_status, "pass");
     assert.equal(discoveryPayload.discovery_completeness_blocking, false);
     assert.ok(Array.isArray(discoveryPayload.discovery_completeness_checks));
+    assert.equal(fs.existsSync(discoveryPayload.discovery_research_report_file), true);
+    assert.equal(discoveryPayload.discovery_research_status, "incomplete");
+    assert.equal(discoveryPayload.discovery_research_adr_ready, false);
+    assert.ok(
+      discoveryPayload.discovery_research_open_questions.some(
+        (entry) => entry.question_id === "product-acceptance-evidence",
+      ),
+    );
     assert.equal(typeof discoveryPayload.architecture_traceability, "object");
 
     const specResult = invokeCli(["spec", "build", "--project-ref", projectRoot]);
@@ -477,10 +485,13 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     assert.equal(specPayload.discovery_completeness_status, "pass");
     assert.equal(specPayload.discovery_completeness_blocking, false);
     assert.ok(Array.isArray(specPayload.discovery_completeness_checks));
+    assert.equal(specPayload.discovery_research_status, "incomplete");
+    assert.equal(specPayload.discovery_research_adr_ready, false);
     assert.equal(typeof specPayload.architecture_traceability, "object");
     const specStepResult = JSON.parse(fs.readFileSync(specPayload.routed_step_result_file, "utf8"));
     assert.equal(specStepResult.step_class, "artifact");
     assert.equal(specStepResult.routed_execution.discovery_completeness_gate.status, "pass");
+    assert.equal(specStepResult.routed_execution.discovery_research_gate.status, "incomplete");
     assert.equal(specStepResult.routed_execution.architecture_traceability.selected_step.step_class, "spec");
 
     const waveResult = invokeCli(["wave", "create", "--project-ref", projectRoot]);
@@ -2761,9 +2772,20 @@ test("intake create preserves mission traceability and discovery run consumes ex
     const discoveryPayload = JSON.parse(discoveryResult.stdout);
     const analysisReport = JSON.parse(fs.readFileSync(discoveryPayload.analysis_report_file, "utf8"));
     const intakePacketRef = `evidence://${path.relative(projectRoot, intakePayload.artifact_packet_file).replace(/\\/g, "/")}`;
+    assert.equal(discoveryPayload.discovery_research_status, "adr-ready");
+    assert.equal(discoveryPayload.discovery_research_adr_ready, true);
+    assert.deepEqual(discoveryPayload.discovery_research_open_questions, []);
+    assert.equal(fs.existsSync(discoveryPayload.discovery_research_report_file), true);
+    const discoveryResearchReport = JSON.parse(fs.readFileSync(discoveryPayload.discovery_research_report_file, "utf8"));
+    assert.equal(discoveryResearchReport.status, "adr-ready");
+    assert.ok(
+      discoveryResearchReport.adr_ready_recommendations.some((entry) => entry.status === "ready"),
+      "expected ADR-ready recommendation in discovery research report",
+    );
     assert.equal(analysisReport.feature_traceability.mission_id, "fixture-mission");
     assert.equal(analysisReport.feature_traceability.input_packet_ref, intakePacketRef);
     assert.deepEqual(analysisReport.feature_traceability.allowed_paths, ["source/**", "test/**"]);
+    assert.equal(analysisReport.discovery_research.status, "adr-ready");
 
     const autoDiscoveryResult = invokeCli(["discovery", "run", "--project-ref", projectRoot]);
     assert.equal(autoDiscoveryResult.exitCode, 0, autoDiscoveryResult.stderr);
@@ -2771,6 +2793,7 @@ test("intake create preserves mission traceability and discovery run consumes ex
     const autoAnalysisReport = JSON.parse(fs.readFileSync(autoDiscoveryPayload.analysis_report_file, "utf8"));
     assert.equal(autoAnalysisReport.feature_traceability.mission_id, "fixture-mission");
     assert.equal(autoAnalysisReport.feature_traceability.input_packet_ref, intakePacketRef);
+    assert.equal(autoDiscoveryPayload.discovery_research_status, "adr-ready");
   });
 });
 

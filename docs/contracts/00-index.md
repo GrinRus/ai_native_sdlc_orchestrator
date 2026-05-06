@@ -3,6 +3,7 @@
 ## Core packets and profiles
 - `project-profile.md`
 - `project-analysis-report.md`
+- `discovery-research-report.md`
 - `artifact-packet.md`
 - `intake-request-body.md`
 - `wave-ticket.md`
