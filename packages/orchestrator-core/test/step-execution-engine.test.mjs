@@ -60,6 +60,17 @@ function configureCodexExternalRuntime(repoRoot, runtime) {
   fs.writeFileSync(adapterPath, updated, "utf8");
 }
 
+/**
+ * @param {string} repoRoot
+ * @param {{ command: string }} runtime
+ */
+function configureOpenCodeExternalRuntime(repoRoot, runtime) {
+  const adapterPath = path.join(repoRoot, "examples/adapters/open-code.yaml");
+  const source = fs.readFileSync(adapterPath, "utf8");
+  const updated = source.replace(/\n    command: .+\n/u, `\n    command: ${JSON.stringify(runtime.command)}\n`);
+  fs.writeFileSync(adapterPath, updated, "utf8");
+}
+
 test("executeRoutedStep resolves route/assets/policy/adapter and persists compiled context for runner dry-runs", () => {
   withTempRepo((repoRoot) => {
     for (const stepClass of ["implement", "review", "qa"]) {
@@ -1092,6 +1103,10 @@ test("executeRoutedStep blocks live execution deterministically for unapproved o
       ),
     );
 
+    configureOpenCodeExternalRuntime(repoRoot, {
+      command: "__aor_missing_opencode_runner_command__",
+    });
+
     const misconfigured = executeRoutedStep({
       projectRef: repoRoot,
       cwd: repoRoot,
@@ -1105,11 +1120,11 @@ test("executeRoutedStep blocks live execution deterministically for unapproved o
     });
 
     assert.equal(misconfigured.stepResult.status, "failed");
-    assert.match(misconfigured.stepResult.summary, /live runtime is misconfigured/i);
+    assert.match(misconfigured.stepResult.summary, /external runner command .* is not available on PATH/i);
     assert.equal(misconfigured.stepResult.routed_execution.adapter_response.status, "blocked");
     assert.equal(
       misconfigured.stepResult.routed_execution.adapter_response.output.failure_kind,
-      "missing-live-runtime",
+      "missing-command",
     );
     assert.match(
       String(misconfigured.stepResult.routed_execution.blocked_next_step),

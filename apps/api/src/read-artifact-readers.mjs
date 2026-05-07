@@ -15,10 +15,16 @@ const STEP_RESULT_REGEX = /^step-result-.*\.json$/;
 const VALIDATION_REPORT_REGEX = /^validation-report.*\.json$/;
 const EVALUATION_REPORT_REGEX = /^evaluation-report.*\.json$/;
 const REVIEW_REPORT_REGEX = /^review-report.*\.json$/;
+const REVIEW_DECISION_REGEX = /^review-decision-.*\.json$/;
 const RUNTIME_HARNESS_REPORT_REGEX = /^runtime-harness-report.*\.json$/;
+const MULTIREPO_COORDINATION_STATUS_REGEX = /^multirepo-coordination-status-.*\.json$/;
+const COMPILER_REVISION_STATUS_REGEX = /^compiler-revision-status-.*\.json$/;
 const INCIDENT_REPORT_REGEX = /^incident-report-.*\.json$/;
+const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/;
 const LEARNING_LOOP_SCORECARD_REGEX = /^learning-loop-scorecard-.*\.json$/;
 const LEARNING_LOOP_HANDOFF_REGEX = /^learning-loop-handoff-.*\.json$/;
+const RUN_CONTROL_AUDIT_REGEX = /^run-control-event-.*\.json$/;
+const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/;
 
 /**
  * @param {string} value
@@ -94,6 +100,39 @@ function loadContractDocuments(options) {
       artifact_ref: toEvidenceRef(options.init, filePath),
       document: /** @type {Record<string, unknown>} */ (contract.document),
     });
+  }
+
+  return loaded;
+}
+
+/**
+ * @param {{ init: ReturnType<typeof initializeProjectRuntime>, files: string[], matcher: RegExp }}
+ * @returns {Array<{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> }>}
+ */
+function loadJsonDocuments(options) {
+  /** @type {Array<{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> }>} */
+  const loaded = [];
+
+  for (const filePath of options.files) {
+    const name = path.basename(filePath);
+    if (!options.matcher.test(name)) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        continue;
+      }
+      loaded.push({
+        family: "run-control-audit",
+        file: filePath,
+        artifact_ref: toEvidenceRef(options.init, filePath),
+        document: /** @type {Record<string, unknown>} */ (parsed),
+      });
+    } catch {
+      // Ignore malformed audit sidecars; contract-backed artifacts still load through validators.
+    }
   }
 
   return loaded;
@@ -198,13 +237,32 @@ export function listQualityArtifacts(options = {}) {
     ...loadContractDocuments({ init, files: reportFiles, family: "validation-report", matcher: VALIDATION_REPORT_REGEX }),
     ...loadContractDocuments({ init, files: reportFiles, family: "evaluation-report", matcher: EVALUATION_REPORT_REGEX }),
     ...loadContractDocuments({ init, files: reportFiles, family: "review-report", matcher: REVIEW_REPORT_REGEX }),
+    ...loadContractDocuments({ init, files: reportFiles, family: "review-decision", matcher: REVIEW_DECISION_REGEX }),
     ...loadContractDocuments({
       init,
       files: reportFiles,
       family: "runtime-harness-report",
       matcher: RUNTIME_HARNESS_REPORT_REGEX,
     }),
+    ...loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "multirepo-coordination-status",
+      matcher: MULTIREPO_COORDINATION_STATUS_REGEX,
+    }),
+    ...loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "compiler-revision-status",
+      matcher: COMPILER_REVISION_STATUS_REGEX,
+    }),
     ...loadContractDocuments({ init, files: reportFiles, family: "incident-report", matcher: INCIDENT_REPORT_REGEX }),
+    ...loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "incident-backfill-proposal",
+      matcher: INCIDENT_BACKFILL_PROPOSAL_REGEX,
+    }),
     ...loadContractDocuments({
       init,
       files: reportFiles,
@@ -219,4 +277,78 @@ export function listQualityArtifacts(options = {}) {
     }),
     ...listPromotionDecisions(options),
   ];
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ */
+export function listMultirepoCoordinationStatuses(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  return loadContractDocuments({
+    init,
+    files: reportFiles,
+    family: "multirepo-coordination-status",
+    matcher: MULTIREPO_COORDINATION_STATUS_REGEX,
+  });
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ */
+export function listCompilerRevisionStatuses(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  return loadContractDocuments({
+    init,
+    files: reportFiles,
+    family: "compiler-revision-status",
+    matcher: COMPILER_REVISION_STATUS_REGEX,
+  });
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ */
+export function listRunControlAudits(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  return loadJsonDocuments({ init, files: reportFiles, matcher: RUN_CONTROL_AUDIT_REGEX });
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ * @returns {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> } | null}
+ */
+export function readNextActionReport(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  return (
+    loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "next-action-report",
+      matcher: NEXT_ACTION_REPORT_REGEX,
+    })[0] ?? null
+  );
 }

@@ -10,6 +10,7 @@ import { parse as parseYaml } from "../../../packages/contracts/node_modules/yam
 
 import { appendRunEvent, applyRunControlAction } from "../../api/src/index.mjs";
 import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
+import { buildCliOutput } from "../src/cli-output.mjs";
 import { invokeCli } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -76,6 +77,51 @@ function writeContractFixture(options) {
   assert.equal(validation.ok, true, `${options.family} fixture must pass contract validation`);
   fs.writeFileSync(options.filePath, `${JSON.stringify(options.document, null, 2)}\n`, "utf8");
 }
+
+/**
+ * @param {string} filePath
+ * @param {Record<string, unknown>} document
+ */
+function writeRuntimeJson(filePath, document) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+}
+
+test("CLI output redacts configured secret values while preserving non-secret policy flags", () => {
+  const previous = process.env.AOR_REDACTION_SECRETS;
+  process.env.AOR_REDACTION_SECRETS = "cli-secret-token";
+  try {
+    const output = buildCliOutput({
+      command: "run status",
+      resolvedFamilies: [],
+      state: {
+        runEventHistory: {
+          events: [
+            {
+              event_id: "event.secret",
+              payload: {
+                summary: "operator pasted cli-secret-token",
+                security_policy: {
+                  redact_secrets: true,
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(JSON.stringify(output).includes("cli-secret-token"), false);
+    assert.equal(JSON.stringify(output).includes("[REDACTED]"), true);
+    assert.equal(output.run_event_history.events[0].payload.security_policy.redact_secrets, true);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.AOR_REDACTION_SECRETS;
+    } else {
+      process.env.AOR_REDACTION_SECRETS = previous;
+    }
+  }
+});
 
 /**
  * @param {{ projectRoot: string, command: string, args: string[] }} options
@@ -212,13 +258,315 @@ test("implemented command help documents inputs outputs and contracts", () => {
   assert.match(result.stdout, /Status: implemented in bootstrap shell \(W1-S01\)/);
   assert.match(
     result.stdout,
-    /Inputs: --project-ref <path> \(optional, defaults to cwd discovery\), --project-profile <path> \(optional\), --runtime-root <path> \(optional\), --materialize-project-profile \(optional\), --bootstrap-template <template_id\|path> \(optional\), --materialize-bootstrap-assets \(optional\), --repo-build-command <cmd> \(optional, repeatable\), --repo-lint-command <cmd> \(optional, repeatable\), --repo-test-command <cmd> \(optional, repeatable\), --help/,
+    /Inputs: --project-ref <path> \(optional, defaults to cwd discovery\), --project-profile <path> \(optional\), --runtime-root <path> \(optional\), --asset-mode <bundled\|materialized> \(optional, defaults to bundled for clean onboarding\), --materialize-project-profile \(optional\), --bootstrap-template <template_id\|path> \(optional\), --materialize-bootstrap-assets \(optional\), --repo-build-command <cmd> \(optional, repeatable\), --repo-lint-command <cmd> \(optional, repeatable\), --repo-test-command <cmd> \(optional, repeatable\), --help/,
   );
   assert.match(
     result.stdout,
-    /Outputs: resolved_project_ref, resolved_runtime_root, project_profile_ref, runtime_layout, runtime_state_file, artifact_packet_id, artifact_packet_file, artifact_packet_body_file, bootstrap_materialization_status, materialized_project_profile_file, materialized_bootstrap_assets_root, bootstrap_materialization_idempotent, contract_families, command_catalog_alignment/,
+    /Outputs: resolved_project_ref, resolved_runtime_root, project_profile_ref, runtime_layout, runtime_state_file, artifact_packet_id, artifact_packet_file, artifact_packet_body_file, onboarding_report_id, onboarding_report_file, asset_mode, registry_roots, bootstrap_materialization_status, materialized_project_profile_file, materialized_bootstrap_assets_root, bootstrap_materialization_idempotent, contract_families, command_catalog_alignment/,
   );
-  assert.match(result.stdout, /Contract families: project-profile/);
+  assert.match(result.stdout, /Contract families: project-profile, onboarding-report/);
+});
+
+test("guided first-run shortcuts expose help, human defaults, JSON mode, and grouped compatibility", () => {
+  withTempProject((projectRoot) => {
+    fs.writeFileSync(
+      path.join(projectRoot, "package.json"),
+      JSON.stringify({ name: "guided-first-run-fixture", private: true }, null, 2),
+      "utf8",
+    );
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+
+    const binResult = spawnSync(process.execPath, [path.join(workspaceRoot, "apps/cli/bin/aor.mjs"), "--help"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+    assert.equal(binResult.status, 0, binResult.stderr);
+    assert.match(binResult.stdout, /aor doctor/);
+    assert.match(binResult.stdout, /aor onboard/);
+    assert.match(binResult.stdout, /aor app/);
+    assert.match(binResult.stdout, /aor next/);
+
+    const doctorHelp = invokeCli(["doctor", "--help"]);
+    assert.equal(doctorHelp.exitCode, 0);
+    assert.match(doctorHelp.stdout, /Status: implemented in guided first-run shell \(W21-S02\)/);
+    assert.match(doctorHelp.stdout, /Guided commands default to human-readable output/);
+
+    const humanDoctor = invokeCli(["doctor", "--project-ref", projectRoot]);
+    assert.equal(humanDoctor.exitCode, 0, humanDoctor.stderr);
+    assert.match(humanDoctor.stdout, /^aor doctor\nStatus: ready/m);
+    assert.match(humanDoctor.stdout, /Use --json for machine-readable output/);
+
+    const doctorJson = invokeCli(["doctor", "--project-ref", projectRoot, "--json"]);
+    assert.equal(doctorJson.exitCode, 0, doctorJson.stderr);
+    const doctorPayload = JSON.parse(doctorJson.stdout);
+    assert.equal(doctorPayload.command, "doctor");
+    assert.equal(doctorPayload.guided_stage, "doctor");
+    assert.equal(doctorPayload.guided_status, "ready");
+    assert.equal(doctorPayload.read_only, true);
+    assert.deepEqual(doctorPayload.guided_actionable_blockers, []);
+
+    const invalidJsonProject = path.join(projectRoot, "invalid-json-target");
+    fs.mkdirSync(invalidJsonProject, { recursive: true });
+    const invalidJsonOnboard = invokeCli([
+      "onboard",
+      invalidJsonProject,
+      "--json",
+      "maybe",
+    ]);
+    assert.equal(invalidJsonOnboard.exitCode, 1);
+    assert.match(invalidJsonOnboard.stderr, /Flag '--json'/);
+    assert.equal(fs.existsSync(path.join(invalidJsonProject, ".aor")), false);
+
+    const onboardJson = invokeCli(["onboard", projectRoot, "--json"]);
+    assert.equal(onboardJson.exitCode, 0, onboardJson.stderr);
+    const onboardPayload = JSON.parse(onboardJson.stdout);
+    assert.equal(onboardPayload.command, "onboard");
+    assert.equal(onboardPayload.guided_low_level_command, "project init");
+    assert.equal(fs.existsSync(onboardPayload.runtime_state_file), true);
+    assert.equal(onboardPayload.asset_mode, "bundled");
+    assert.equal(fs.existsSync(onboardPayload.onboarding_report_file), true);
+    assert.equal(fs.existsSync(path.join(projectRoot, "examples")), false);
+    const onboardingReport = JSON.parse(fs.readFileSync(onboardPayload.onboarding_report_file, "utf8"));
+    assert.deepEqual(onboardingReport.write_effects.target_repo_writes, []);
+
+    const groupedInit = invokeCli(["project", "init", "--project-ref", projectRoot]);
+    assert.equal(groupedInit.exitCode, 0, groupedInit.stderr);
+    assert.equal(JSON.parse(groupedInit.stdout).command, "project init");
+
+    const appHuman = invokeCli(["app", "--project-ref", projectRoot]);
+    assert.equal(appHuman.exitCode, 0, appHuman.stderr);
+    assert.match(appHuman.stdout, /^aor app\nStatus: ready/m);
+    assert.match(appHuman.stdout, /mandatory: false/);
+
+    const appJson = invokeCli(["app", "--project-ref", projectRoot, "--json"]);
+    assert.equal(appJson.exitCode, 0, appJson.stderr);
+    const appPayload = JSON.parse(appJson.stdout);
+    assert.equal(appPayload.guided_web_surface.optional, true);
+    assert.equal(appPayload.guided_web_surface.mandatory, false);
+
+    const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
+    assert.equal(nextJson.exitCode, 0, nextJson.stderr);
+    const nextPayload = JSON.parse(nextJson.stdout);
+    assert.equal(nextPayload.guided_low_level_command, "intake create");
+    assert.equal(nextPayload.next_action_primary.action_id, "mission-create");
+    assert.equal(fs.existsSync(nextPayload.next_action_report_file), true);
+
+    const transcriptFixture = JSON.parse(
+      fs.readFileSync(path.join(fixturesDir, "installed-user-first-run-transcript.json"), "utf8"),
+    );
+    assert.deepEqual(
+      {
+        doctor: {
+          command: doctorPayload.command,
+          status: doctorPayload.status,
+          guided_stage: doctorPayload.guided_stage,
+          guided_status: doctorPayload.guided_status,
+          blocker_codes: doctorPayload.guided_actionable_blockers.map((blocker) => blocker.code),
+        },
+        onboard: {
+          command: onboardPayload.command,
+          status: onboardPayload.status,
+          guided_stage: onboardPayload.guided_stage,
+          guided_low_level_command: onboardPayload.guided_low_level_command,
+          has_runtime_state_file: fs.existsSync(onboardPayload.runtime_state_file),
+          asset_mode: onboardPayload.asset_mode,
+          has_onboarding_report_file: fs.existsSync(onboardPayload.onboarding_report_file),
+          copied_example_registries: onboardingReport.write_effects.copied_example_registries,
+        },
+        app: {
+          command: appPayload.command,
+          status: appPayload.status,
+          guided_stage: appPayload.guided_stage,
+          guided_web_optional: appPayload.guided_web_surface.optional,
+          guided_web_mandatory: appPayload.guided_web_surface.mandatory,
+        },
+        next: {
+          command: nextPayload.command,
+          status: nextPayload.status,
+          guided_stage: nextPayload.guided_stage,
+          guided_low_level_command: nextPayload.guided_low_level_command,
+          guided_status: nextPayload.guided_status,
+          has_next_action_report_file: fs.existsSync(nextPayload.next_action_report_file),
+        },
+      },
+      transcriptFixture,
+    );
+  });
+});
+
+test("guided mission create writes intake evidence and next resolves mission states", () => {
+  withTempProject((projectRoot) => {
+    fs.writeFileSync(path.join(projectRoot, "package.json"), JSON.stringify({ name: "mission-fixture" }, null, 2), "utf8");
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+
+    const completeMission = invokeCli([
+      "mission",
+      "create",
+      "--project-ref",
+      projectRoot,
+      "--mission-id",
+      "checkout-risk",
+      "--goal",
+      "Reduce checkout support tickets.",
+      "--constraint",
+      "Keep changes in web checkout.",
+      "--kpi",
+      "checkout-risk:Checkout risk:Reduce weekly tickets by 20%:Support tickets tagged checkout",
+      "--dod",
+      "Checkout errors show an actionable reason.",
+      "--allowed-path",
+      "apps/web/**",
+      "--forbidden-path",
+      "packages/settlement/**",
+      "--delivery-mode",
+      "patch-only",
+      "--source-kind",
+      "local-prd",
+      "--source-ref",
+      "docs/product/checkout-risk.md",
+      "--json",
+    ]);
+    assert.equal(completeMission.exitCode, 0, completeMission.stderr);
+    const missionPayload = JSON.parse(completeMission.stdout);
+    assert.equal(missionPayload.command, "mission create");
+    assert.equal(missionPayload.guided_status, "ready");
+    assert.equal(missionPayload.delivery_mode, "patch-only");
+    assert.equal(missionPayload.product_intake_completeness.status, "complete");
+    assert.equal(fs.existsSync(missionPayload.artifact_packet_body_file), true);
+
+    const missionBody = JSON.parse(fs.readFileSync(missionPayload.artifact_packet_body_file, "utf8"));
+    assert.equal(missionBody.generated_from.command, "aor mission create");
+    assert.deepEqual(missionBody.mission_scope.allowed_paths, ["apps/web/**"]);
+    assert.equal(missionBody.mission_scope.delivery_mode, "patch-only");
+    assert.equal(missionBody.mission_scope.writeback_policy.upstream_writes_default, false);
+
+    const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
+    assert.equal(nextJson.exitCode, 0, nextJson.stderr);
+    const nextPayload = JSON.parse(nextJson.stdout);
+    assert.equal(nextPayload.guided_stage, "discovery");
+    assert.equal(nextPayload.next_action_status, "ready");
+    assert.equal(nextPayload.next_action_primary.action_id, "discovery-run");
+    assert.equal(nextPayload.next_action_bounded_execution.requested_delivery_mode, "patch-only");
+    assert.equal(nextPayload.next_action_bounded_execution.requires_review_before_writeback, true);
+    assert.equal(nextPayload.next_action_closure_state.run_id, null);
+
+    const runtimeLayout = missionPayload.runtime_layout;
+    const closureRunId = "run.cli.closure.v1";
+    const closureProjectId = missionBody.project_identity.project_id;
+    writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `step-result-${closureRunId}.json`), {
+      step_result_id: `${closureRunId}.implement.pass`,
+      project_id: closureProjectId,
+      run_id: closureRunId,
+      step_id: "run.start.implement",
+      step_class: "runner",
+      status: "pass",
+      evidence_refs: [`evidence://reports/step-result-${closureRunId}.json`],
+    });
+    writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-report-${closureRunId}.json`), {
+      review_report_id: `${closureRunId}.review-report.v1`,
+      project_id: closureProjectId,
+      run_id: closureRunId,
+      overall_status: "pass",
+      review_recommendation: "proceed",
+      findings: [],
+      evidence_refs: [`evidence://reports/step-result-${closureRunId}.json`],
+    });
+    writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `runtime-harness-report-${closureRunId}.json`), {
+      report_id: `${closureRunId}.runtime-harness-report.v1`,
+      project_id: closureProjectId,
+      run_id: closureRunId,
+      overall_decision: "pass",
+      run_findings: [],
+      evidence_refs: [`evidence://reports/step-result-${closureRunId}.json`],
+    });
+    writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-decision-${closureRunId}-approve.json`), {
+      decision_id: `${closureRunId}.review-decision.approve.v1`,
+      project_id: closureProjectId,
+      run_id: closureRunId,
+      decision: "approve",
+      decider_ref: "operator://cli-test",
+      reason: "Approved CLI closure fixture.",
+      review_report_ref: `evidence://reports/review-report-${closureRunId}.json`,
+      runtime_harness_report_ref: `evidence://reports/runtime-harness-report-${closureRunId}.json`,
+      delivery_manifest_refs: [],
+      learning_handoff_refs: [],
+      decision_basis: {
+        review_overall_status: "pass",
+        review_recommendation: "proceed",
+        runtime_harness_overall_decision: "pass",
+        blocking_findings: [],
+      },
+      delivery_gate: {
+        status: "pass",
+        blocks_downstream: false,
+        required_downstream_decision: "approve",
+        findings: [],
+      },
+      evidence_refs: [
+        `evidence://reports/review-report-${closureRunId}.json`,
+        `evidence://reports/runtime-harness-report-${closureRunId}.json`,
+      ],
+      decided_at: "2026-05-06T00:00:00.000Z",
+    });
+
+    const closureNextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
+    assert.equal(closureNextJson.exitCode, 0, closureNextJson.stderr);
+    const closureNextPayload = JSON.parse(closureNextJson.stdout);
+    assert.equal(closureNextPayload.guided_stage, "delivery");
+    assert.equal(closureNextPayload.next_action_primary.action_id, "delivery-prepare");
+    assert.equal(closureNextPayload.next_action_closure_state.run_id, closureRunId);
+    assert.equal(closureNextPayload.next_action_closure_state.review.status, "approved");
+    assert.ok(closureNextPayload.next_action_evidence_refs.some((ref) => ref.includes(`review-decision-${closureRunId}-approve`)));
+  });
+
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    const incompleteMission = invokeCli([
+      "mission",
+      "create",
+      "--project-ref",
+      projectRoot,
+      "--mission-id",
+      "missing-acceptance",
+      "--goal",
+      "Define a bounded mission.",
+      "--constraint",
+      "Stay in docs.",
+      "--source-kind",
+      "local-note",
+      "--source-ref",
+      "docs/product/missing-acceptance.md",
+    ]);
+    assert.equal(incompleteMission.exitCode, 0, incompleteMission.stderr);
+    const incompletePayload = JSON.parse(incompleteMission.stdout);
+    assert.equal(incompletePayload.guided_status, "blocked");
+    assert.deepEqual(incompletePayload.product_intake_completeness.missing_fields, [
+      "kpis",
+      "definition_of_done",
+    ]);
+
+    const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
+    assert.equal(nextJson.exitCode, 0, nextJson.stderr);
+    const nextPayload = JSON.parse(nextJson.stdout);
+    const blockerCodes = nextPayload.next_action_blockers.map((blocker) => blocker.code);
+    assert.equal(nextPayload.next_action_status, "blocked");
+    assert.ok(blockerCodes.includes("mission-kpis-missing"));
+    assert.ok(blockerCodes.includes("mission-definition_of_done-missing"));
+  });
+
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    const invalidMission = invokeCli([
+      "mission",
+      "create",
+      "--project-ref",
+      projectRoot,
+      "--kpi",
+      "not-enough-parts",
+    ]);
+    assert.equal(invalidMission.exitCode, 1);
+    assert.match(invalidMission.stderr, /must use 'kpi_id:name:target\[:measurement\]'/);
+  });
 });
 
 test("operator command help documents routed delivery and audit metadata", () => {
@@ -372,14 +720,22 @@ test("delivery and release command help documents bounded policy semantics", () 
 
 test("incident and audit command help documents run-linked operational semantics", () => {
   const incidentHelp = invokeCli(["incident", "open", "--help"]);
+  const backfillHelp = invokeCli(["incident", "backfill", "--help"]);
   const recertifyHelp = invokeCli(["incident", "recertify", "--help"]);
   const auditHelp = invokeCli(["audit", "runs", "--help"]);
+  const financeHelp = invokeCli(["finance", "monitor", "--help"]);
 
   assert.equal(incidentHelp.exitCode, 0);
   assert.equal(incidentHelp.stderr, "");
   assert.match(incidentHelp.stdout, /Status: implemented in incident\/audit shell \(W6-S06\)/);
   assert.match(incidentHelp.stdout, /--run-id <id>/);
   assert.match(incidentHelp.stdout, /writes one contract-valid incident-report/);
+
+  assert.equal(backfillHelp.exitCode, 0);
+  assert.equal(backfillHelp.stderr, "");
+  assert.match(backfillHelp.stdout, /Status: implemented in incident backfill shell \(W19-S04\)/);
+  assert.match(backfillHelp.stdout, /--incident-id <id>/);
+  assert.match(backfillHelp.stdout, /incident-backfill-proposal report and never mutates stable datasets directly/);
 
   assert.equal(recertifyHelp.exitCode, 0);
   assert.equal(recertifyHelp.stderr, "");
@@ -392,6 +748,22 @@ test("incident and audit command help documents run-linked operational semantics
   assert.equal(auditHelp.exitCode, 0);
   assert.equal(auditHelp.stderr, "");
   assert.match(auditHelp.stdout, /run-centric snapshots for packet, step, quality, and finance evidence refs/);
+
+  assert.equal(financeHelp.exitCode, 0);
+  assert.equal(financeHelp.stderr, "");
+  assert.match(financeHelp.stdout, /Status: implemented in finance monitoring shell \(W20-S05\)/);
+  assert.match(financeHelp.stdout, /finance_monitoring_snapshot/);
+  assert.match(financeHelp.stdout, /Production monitoring evidence requires explicit live-event scope/);
+});
+
+test("review decision command help documents durable approval semantics", () => {
+  const result = invokeCli(["review", "decide", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Status: implemented in review decision shell \(W19-S05\)/);
+  assert.match(result.stdout, /--decision <approve\|hold\|request-repair>/);
+  assert.match(result.stdout, /Approve is blocked unless the linked review-report and Runtime Harness report both pass/);
 });
 
 test("unknown command fails clearly", () => {
@@ -423,7 +795,10 @@ test("planned command section is empty when the current shell has no planned com
 
   assert.equal(result.exitCode, 0);
   assert.equal(result.stderr, "");
-  assert.match(result.stdout, /Planned commands \(not implemented yet\):\n\nUse 'aor <group> <command> --help'/);
+  assert.match(
+    result.stdout,
+    /Planned commands \(not implemented yet\):\n\nUse 'aor <command> --help' for guided shortcuts/,
+  );
 });
 
 test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () => {
@@ -442,6 +817,20 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     const intakePayload = JSON.parse(intakeResult.stdout);
     assert.equal(intakePayload.command, "intake create");
     assert.equal(fs.existsSync(intakePayload.artifact_packet_file), true);
+    assert.equal(intakePayload.product_intake_completeness.status, "incomplete");
+    assert.deepEqual(intakePayload.product_intake_completeness.missing_fields, [
+      "constraints",
+      "kpis",
+      "definition_of_done",
+    ]);
+    assert.deepEqual(intakePayload.product_intake_source_refs, [
+      {
+        source_id: "manual-request",
+        source_kind: "local-note",
+        title: "Catalog-backed feature mission request",
+        ref: "runtime://manual-request",
+      },
+    ]);
 
     const discoveryResult = invokeCli(["discovery", "run", "--project-ref", projectRoot]);
     assert.equal(discoveryResult.exitCode, 0, discoveryResult.stderr);
@@ -452,6 +841,14 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     assert.equal(discoveryPayload.discovery_completeness_status, "pass");
     assert.equal(discoveryPayload.discovery_completeness_blocking, false);
     assert.ok(Array.isArray(discoveryPayload.discovery_completeness_checks));
+    assert.equal(fs.existsSync(discoveryPayload.discovery_research_report_file), true);
+    assert.equal(discoveryPayload.discovery_research_status, "incomplete");
+    assert.equal(discoveryPayload.discovery_research_adr_ready, false);
+    assert.ok(
+      discoveryPayload.discovery_research_open_questions.some(
+        (entry) => entry.question_id === "product-acceptance-evidence",
+      ),
+    );
     assert.equal(typeof discoveryPayload.architecture_traceability, "object");
 
     const specResult = invokeCli(["spec", "build", "--project-ref", projectRoot]);
@@ -463,10 +860,13 @@ test("W6 intake/discovery/spec/wave command pack writes durable artifacts", () =
     assert.equal(specPayload.discovery_completeness_status, "pass");
     assert.equal(specPayload.discovery_completeness_blocking, false);
     assert.ok(Array.isArray(specPayload.discovery_completeness_checks));
+    assert.equal(specPayload.discovery_research_status, "incomplete");
+    assert.equal(specPayload.discovery_research_adr_ready, false);
     assert.equal(typeof specPayload.architecture_traceability, "object");
     const specStepResult = JSON.parse(fs.readFileSync(specPayload.routed_step_result_file, "utf8"));
     assert.equal(specStepResult.step_class, "artifact");
     assert.equal(specStepResult.routed_execution.discovery_completeness_gate.status, "pass");
+    assert.equal(specStepResult.routed_execution.discovery_research_gate.status, "incomplete");
     assert.equal(specStepResult.routed_execution.architecture_traceability.selected_step.step_class, "spec");
 
     const waveResult = invokeCli(["wave", "create", "--project-ref", projectRoot]);
@@ -1096,24 +1496,9 @@ test("delivery and release outputs enforce multi-repo coordination evidence and 
     runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
     runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
 
-    const profilePath = path.join(projectRoot, "examples/project.aor.yaml");
-    const profileContent = fs.readFileSync(profilePath, "utf8");
-    fs.writeFileSync(
-      profilePath,
-      profileContent.replace(
-        "repo_graph: []",
-        [
-          "  - repo_id: docs",
-          "    name: docs",
-          "    source:",
-          "      kind: local",
-          "      root: docs",
-          "    default_branch: main",
-          "    role: documentation",
-          "repo_graph: []",
-        ].join("\n"),
-      ),
-      "utf8",
+    fs.copyFileSync(
+      path.join(projectRoot, "examples/project.bounded-multirepo.aor.yaml"),
+      path.join(projectRoot, "examples/project.aor.yaml"),
     );
     materializeSoftNoWriteIntake({ projectRoot, missionId: "w8-delivery-coordination-soft-rehearsal" });
 
@@ -1146,6 +1531,10 @@ test("delivery and release outputs enforce multi-repo coordination evidence and 
       "no-write",
       "--coordination-evidence-refs",
       "evidence://coordination/w8-deliver-rerun-coordination",
+      "--coordination-lock-evidence-refs",
+      "evidence://reports/multirepo-coordination-status-w8-deliver-rerun-coordination.json",
+      "--cross-repo-validation-refs",
+      "validation://integration/backend-frontend/api-contract",
       "--rerun-of-run-id",
       "w8-deliver-previous-failed",
       "--rerun-failed-step",
@@ -1157,13 +1546,149 @@ test("delivery and release outputs enforce multi-repo coordination evidence and 
     const deliverPayload = JSON.parse(deliverResult.stdout);
     assert.equal(deliverPayload.delivery_mode, "no-write");
     assert.equal(deliverPayload.delivery_coordination.required, true);
-    assert.deepEqual(deliverPayload.delivery_coordination.repo_ids, ["main", "docs"]);
+    assert.deepEqual(deliverPayload.delivery_coordination.repo_ids, ["backend", "mobile", "frontend"]);
     assert.equal(deliverPayload.delivery_coordination.status, "present");
+    assert.deepEqual(deliverPayload.delivery_coordination.lock_evidence_refs, [
+      "evidence://reports/multirepo-coordination-status-w8-deliver-rerun-coordination.json",
+    ]);
+    assert.deepEqual(deliverPayload.delivery_coordination.cross_repo_validation_refs, [
+      "validation://integration/backend-frontend/api-contract",
+    ]);
     assert.equal(deliverPayload.delivery_rerun_recovery.requested, true);
     assert.equal(deliverPayload.delivery_rerun_recovery.status, "ready");
     assert.equal(deliverPayload.delivery_rerun_recovery.failed_step_ref, "deliver.prepare");
     assert.equal(deliverPayload.delivery_rerun_recovery.packet_boundary, "delivery-manifest");
     assert.ok(deliverPayload.delivery_rerun_recovery.rerun_of_run_ref.includes("w8-deliver-previous-failed"));
+  });
+});
+
+test("multirepo lock command materializes scoped lock and validation status evidence", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+
+    const result = invokeCli([
+      "multirepo",
+      "lock",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      "examples/project.bounded-multirepo.aor.yaml",
+      "--action",
+      "acquire",
+      "--run-id",
+      "w20-cli-multirepo-lock",
+      "--owner-ref",
+      "operator://cli-test",
+      "--repo-ids",
+      "backend,mobile,frontend",
+      "--path-globs",
+      "apps/api/**,packages/contracts/**",
+      "--duration-minutes",
+      "30",
+      "--repo-validation-refs",
+      "backend=validation://repos/backend/profile-entry,mobile=validation://repos/mobile/profile-entry,frontend=validation://repos/frontend/profile-entry",
+      "--integration-validation-refs",
+      "validation://integration/backend-frontend/api-contract",
+    ]);
+
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.multirepo_coordination_status, "ready");
+    assert.equal(payload.multirepo_lock_state.status, "active");
+    assert.equal(payload.multirepo_cross_repo_validation.status, "pass");
+    assert.equal(fs.existsSync(payload.multirepo_coordination_file), true);
+    assert.ok(payload.multirepo_coordination_ref.includes("multirepo-coordination-status"));
+
+    const conflict = invokeCli([
+      "multirepo",
+      "lock",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      "examples/project.bounded-multirepo.aor.yaml",
+      "--action",
+      "acquire",
+      "--run-id",
+      "w20-cli-multirepo-conflict",
+      "--owner-ref",
+      "operator://cli-test-other",
+      "--repo-ids",
+      "backend",
+      "--path-globs",
+      "apps/api/routes/**",
+      "--repo-validation-refs",
+      "backend=validation://repos/backend/profile-entry",
+    ]);
+    assert.equal(conflict.exitCode, 0, conflict.stderr);
+    const conflictPayload = JSON.parse(conflict.stdout);
+    assert.equal(conflictPayload.multirepo_coordination_status, "blocked");
+    assert.deepEqual(conflictPayload.multirepo_coordination_blocking_reasons, ["lock-conflict"]);
+  });
+});
+
+test("compiler revision command materializes lifecycle status and history reads", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+
+    const promoteResult = invokeCli([
+      "compiler",
+      "revision",
+      "--project-ref",
+      projectRoot,
+      "--compiler-revision-ref",
+      "compiler-revision://runtime-context-compiler@v1",
+      "--action",
+      "promote",
+      "--promotion-decision-ref",
+      "evidence://.aor/projects/cli/artifacts/promotion-decision-compiler-v1.json",
+      "--compiled-context-refs",
+      "compiled-context://compiled-context.cli.implement.runtime-context-compiler",
+      "--evaluation-refs",
+      "evidence://.aor/projects/cli/reports/evaluation-report-runtime-context-compiler.json",
+      "--incident-refs",
+      "incident://INC-COMPILER-CLI-001",
+      "--compatibility-status",
+      "compatible",
+    ]);
+
+    assert.equal(promoteResult.exitCode, 0, promoteResult.stderr);
+    const promotePayload = JSON.parse(promoteResult.stdout);
+    assert.equal(promotePayload.command, "compiler revision");
+    assert.equal(promotePayload.compiler_revision_ref, "compiler-revision://runtime-context-compiler@v1");
+    assert.equal(promotePayload.compiler_revision_lifecycle_state, "stable");
+    assert.equal(promotePayload.compiler_revision_status, "ready");
+    assert.equal(promotePayload.compiler_revision_blocking, false);
+    assert.equal(promotePayload.compiler_revision_compatibility.status, "compatible");
+    assert.equal(fs.existsSync(promotePayload.compiler_revision_status_file), true);
+
+    const inspectResult = invokeCli([
+      "compiler",
+      "revision",
+      "--project-ref",
+      projectRoot,
+      "--compiler-revision-ref",
+      "compiler://runtime-context-compiler@v1",
+    ]);
+    assert.equal(inspectResult.exitCode, 0, inspectResult.stderr);
+    const inspectPayload = JSON.parse(inspectResult.stdout);
+    assert.equal(inspectPayload.read_only, true);
+    assert.equal(inspectPayload.compiler_revision_lifecycle_state, "stable");
+    assert.ok(
+      inspectPayload.compiler_revision_decision_history.some(
+        (entry) => entry.history_kind === "compiler-revision-status",
+      ),
+    );
+    assert.ok(
+      inspectPayload.compiler_revision_records.some(
+        (entry) => entry.family === "compiler-revision-status",
+      ),
+    );
   });
 });
 
@@ -1435,6 +1960,97 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     };
     assert.deepEqual(incidentSubset, incidentFixture);
 
+    const learningHandoffResult = invokeCli([
+      "learning",
+      "handoff",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+    ]);
+    assert.equal(learningHandoffResult.exitCode, 0, learningHandoffResult.stderr);
+    const learningHandoffPayload = JSON.parse(learningHandoffResult.stdout);
+    assert.equal(fs.existsSync(learningHandoffPayload.learning_loop_handoff_file), true);
+
+    const stableDatasetPath = path.join(projectRoot, "examples/eval/dataset-run-regression.yaml");
+    const stableDatasetBeforeBackfill = fs.readFileSync(stableDatasetPath, "utf8");
+    const backfillResult = invokeCli([
+      "incident",
+      "backfill",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      incidentOpenPayload.incident_id,
+      "--suite-ref",
+      "suite.regress.short@v1",
+      "--case-id",
+      "case-release-regression-follow-up",
+    ]);
+    assert.equal(backfillResult.exitCode, 0, backfillResult.stderr);
+    const backfillPayload = JSON.parse(backfillResult.stdout);
+    assert.equal(backfillPayload.incident_backfill_proposal_state, "proposed");
+    assert.equal(backfillPayload.incident_backfill_suite_ref, "suite.regress.short@v1");
+    assert.equal(backfillPayload.incident_backfill_dataset_ref, "dataset://run-regression@2026-04-20T08:00:00Z");
+    assert.deepEqual(backfillPayload.incident_backfill_case_ids, ["case-release-regression-follow-up"]);
+    assert.equal(backfillPayload.incident_backfill_review_required, true);
+    assert.equal(fs.existsSync(backfillPayload.incident_backfill_proposal_file), true);
+    assert.equal(fs.readFileSync(stableDatasetPath, "utf8"), stableDatasetBeforeBackfill);
+    const backfillProposal = JSON.parse(fs.readFileSync(backfillPayload.incident_backfill_proposal_file, "utf8"));
+    assert.equal(
+      validateContractDocument({
+        family: "incident-backfill-proposal",
+        document: backfillProposal,
+        source: "fixture://incident-backfill-proposal",
+      }).ok,
+      true,
+    );
+    assert.equal(backfillProposal.run_id, runId);
+    assert.equal(backfillProposal.target.dataset_mutation_mode, "proposal-only");
+    assert.equal(backfillProposal.mutation_policy.stable_dataset_mutation, "blocked");
+    assert.equal(backfillProposal.source_artifacts.incident_id, incidentOpenPayload.incident_id);
+    assert.match(backfillProposal.source_artifacts.learning_handoff_ref, /learning-loop-handoff/);
+    assert.ok(backfillProposal.proposed_cases[0].linked_asset_refs.includes("evidence://external/manual-note"));
+
+    const missingSuiteBackfill = invokeCli([
+      "incident",
+      "backfill",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      incidentOpenPayload.incident_id,
+      "--suite-ref",
+      "suite.missing@v1",
+    ]);
+    assert.equal(missingSuiteBackfill.exitCode, 1);
+    assert.match(missingSuiteBackfill.stderr, /Evaluation suite 'suite\.missing@v1' was not found/);
+
+    const emptyAssetIncidentFile = path.join(reportsRoot, "incident-report-empty-linked-assets.json");
+    writeContractFixture({
+      family: "incident-report",
+      filePath: emptyAssetIncidentFile,
+      document: {
+        incident_id: "empty-linked-assets",
+        project_id: "aor",
+        severity: "high",
+        summary: "Incident with no linked assets should not produce a dataset proposal.",
+        linked_run_refs: [`run://${runId}`],
+        linked_asset_refs: [],
+        status: "open",
+      },
+    });
+    const emptyAssetBackfill = invokeCli([
+      "incident",
+      "backfill",
+      "--project-ref",
+      projectRoot,
+      "--incident-id",
+      "empty-linked-assets",
+      "--suite-ref",
+      "suite.regress.short@v1",
+    ]);
+    assert.equal(emptyAssetBackfill.exitCode, 1);
+    assert.match(emptyAssetBackfill.stderr, /has no linked asset refs for dataset backfill/);
+
     const blockedRecertifyResult = invokeCli([
       "incident",
       "recertify",
@@ -1567,6 +2183,7 @@ test("W6 incident and audit command pack links run evidence to durable incident 
     assert.equal(Object.prototype.hasOwnProperty.call(incidentShowPayload.incident_records[0], legacyIncidentAlias), false);
     assert.equal(incidentShowPayload.incident_records[0].incident_report_file, incidentOpenPayload.incident_report_file);
     assert.ok(incidentShowPayload.incident_records[0].linked_run_refs.includes(`run://${runId}`));
+    assert.ok(incidentShowPayload.incident_records[0].backfill_proposal_refs.length >= 1);
 
     const auditResult = invokeCli([
       "audit",
@@ -1662,6 +2279,182 @@ test("W6 incident and audit command pack links run evidence to durable incident 
   });
 });
 
+test("finance monitor command reports no-data, partial-data, and ready states", () => {
+  withTempProject((emptyRoot) => {
+    fs.mkdirSync(path.join(emptyRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(emptyRoot, "examples"), { recursive: true });
+
+    const result = invokeCli(["finance", "monitor", "--project-ref", emptyRoot]);
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.finance_monitoring_snapshot.status, "no-data");
+    assert.equal(payload.finance_monitoring_snapshot.telemetry_state, "no-data");
+    assert.equal(payload.production_monitoring.status, "no-data");
+    assert.equal(payload.read_only, true);
+  });
+
+  withTempProject((partialRoot) => {
+    fs.mkdirSync(path.join(partialRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(partialRoot, "examples"), { recursive: true });
+
+    const initResult = invokeCli(["project", "init", "--project-ref", partialRoot]);
+    assert.equal(initResult.exitCode, 0, initResult.stderr);
+    const initPayload = JSON.parse(initResult.stdout);
+    const reportsRoot = initPayload.runtime_layout.reportsRoot;
+    const runId = "run.cli.finance.partial.v1";
+    writeContractFixture({
+      family: "step-result",
+      filePath: path.join(reportsRoot, "step-result-cli-finance-partial.json"),
+      document: {
+        step_result_id: `${runId}.step.finance.partial`,
+        run_id: runId,
+        step_id: "runner.finance.partial",
+        step_class: "runner",
+        status: "passed",
+        summary: "Partial CLI finance fixture.",
+        evidence_refs: [initPayload.runtime_state_file],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:00.000Z",
+          finished_at: "2026-01-01T00:00:02.000Z",
+          route_resolution: {
+            resolved_route_id: "route.cli.finance.partial",
+          },
+          asset_resolution: {
+            prompt_bundle: {
+              prompt_bundle_ref: "prompt-bundle://cli-finance-partial@v1",
+            },
+            context_bundles: {
+              bundle_refs: ["context-bundle://cli.finance.partial@v1"],
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.cli.finance.partial",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {},
+          },
+        },
+      },
+    });
+
+    const result = invokeCli(["finance", "monitor", "--project-ref", partialRoot]);
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.finance_monitoring_snapshot.status, "partial");
+    assert.equal(payload.finance_monitoring_snapshot.telemetry_state, "partial-data");
+    assert.ok(payload.finance_monitoring_snapshot.aggregation.partial_run_ids.includes(runId));
+    assert.ok(payload.finance_monitoring_snapshot.run_breakdown[0].missing_signals.includes("certification_latency"));
+    assert.equal(payload.finance_analytics.dimensions.route[0].key, "route.cli.finance.partial");
+  });
+
+  withTempProject((readyRoot) => {
+    fs.mkdirSync(path.join(readyRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(readyRoot, "examples"), { recursive: true });
+
+    const initResult = invokeCli(["project", "init", "--project-ref", readyRoot]);
+    assert.equal(initResult.exitCode, 0, initResult.stderr);
+    const initPayload = JSON.parse(initResult.stdout);
+    const reportsRoot = initPayload.runtime_layout.reportsRoot;
+    const artifactsRoot = initPayload.runtime_layout.artifactsRoot;
+    const runId = "run.cli.finance.ready.v1";
+    writeContractFixture({
+      family: "step-result",
+      filePath: path.join(reportsRoot, "step-result-cli-finance-ready.json"),
+      document: {
+        step_result_id: `${runId}.step.finance.ready`,
+        run_id: runId,
+        step_id: "runner.finance.ready",
+        step_class: "runner",
+        status: "passed",
+        summary: "Ready CLI finance fixture.",
+        evidence_refs: [initPayload.runtime_state_file],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:00.000Z",
+          finished_at: "2026-01-01T00:00:05.000Z",
+          route_resolution: {
+            resolved_route_id: "route.cli.finance.ready",
+          },
+          asset_resolution: {
+            prompt_bundle: {
+              prompt_bundle_ref: "prompt-bundle://cli-finance-ready@v1",
+            },
+            context_bundles: {
+              bundle_refs: ["context-bundle://cli.finance.ready@v1"],
+            },
+          },
+          context_compilation: {
+            compiled_context_artifact: {
+              provenance: {
+                compiler_revision_ref: "compiler-revision://cli-finance-compiler@v1",
+              },
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.cli.finance.ready",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {
+              budget: {
+                max_cost_usd: 23,
+              },
+            },
+          },
+        },
+      },
+    });
+    writeContractFixture({
+      family: "promotion-decision",
+      filePath: path.join(artifactsRoot, "promotion-decision-cli-finance-ready.json"),
+      document: {
+        decision_id: "cli.finance.ready.promotion",
+        run_id: runId,
+        subject_ref: "compiler-revision://cli-finance-compiler@v1",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [initPayload.runtime_state_file],
+        evidence_summary: {
+          finance_signals: {
+            total_latency_sec: 0.7,
+          },
+          compiler_revision_lifecycle: {
+            compiler_revision_ref: "compiler-revision://cli-finance-compiler@v1",
+          },
+        },
+        status: "pass",
+      },
+    });
+    appendRunEvent({
+      projectRef: readyRoot,
+      cwd: readyRoot,
+      runId,
+      eventType: "step.updated",
+      payload: {
+        evidence_scope: "production-monitoring",
+        status: "healthy",
+      },
+    });
+
+    const result = invokeCli(["finance", "monitor", "--project-ref", readyRoot]);
+    assert.equal(result.exitCode, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.finance_monitoring_snapshot.status, "ready");
+    assert.equal(payload.finance_monitoring_snapshot.telemetry_state, "ready");
+    assert.equal(payload.finance_analytics.dimensions.project[0].cost_limit_usd.max, 23);
+    assert.equal(
+      payload.finance_analytics.dimensions.compiler_revision[0].key,
+      "compiler-revision://cli-finance-compiler@v1",
+    );
+    assert.deepEqual(payload.finance_monitoring_snapshot.run_breakdown[0].production_monitoring_evidence_refs, [
+      `live-run-event://${runId}.event.000001`,
+    ]);
+    assert.equal(payload.production_monitoring.event_count, 1);
+  });
+});
+
 test("operator commands inspect runs, packets, and evidence through shared control-plane surfaces", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
@@ -1738,6 +2531,12 @@ test("operator commands inspect runs, packets, and evidence through shared contr
     assert.equal(typeof runStatusPayload.strategic_snapshot, "object");
     assert.ok(Array.isArray(runStatusPayload.strategic_snapshot.wave_snapshot.waves));
     assert.equal(typeof runStatusPayload.strategic_snapshot.risk_snapshot.level_totals.high, "number");
+    assert.deepEqual(runStatusPayload.strategic_snapshot.planner_metrics.metric_names, [
+      "clean_close_rate",
+      "retry_rate",
+      "repair_rate",
+      "blocker_rate",
+    ]);
     assert.equal(runStatusPayload.read_only, true);
     assert.ok(runStatusPayload.future_control_hooks.includes("run pause"));
 
@@ -2671,6 +3470,27 @@ test("intake create preserves mission traceability and discovery run consumes ex
       requestFile,
       `${JSON.stringify(
         {
+          goals: ["Reduce fixture mission regression risk before delivery."],
+          kpis: [
+            {
+              kpi_id: "fixture-regression-risk",
+              name: "Fixture regression risk",
+              target: "No fixture regression after bounded implementation.",
+              measurement: "All targeted fixture checks pass.",
+            },
+          ],
+          definition_of_done: [
+            "Implementation changes stay inside source and test paths.",
+            "Review evidence links back to the fixture mission request.",
+          ],
+          source_refs: [
+            {
+              source_id: "fixture-prd",
+              source_kind: "local-prd",
+              title: "Fixture PRD",
+              ref: "docs/product/fixture-prd.md",
+            },
+          ],
           allowed_paths: ["source/**", "test/**"],
           forbidden_paths: ["docs/**", "examples/**", "context/**"],
           expected_evidence: ["verify-summary", "review-report"],
@@ -2699,14 +3519,32 @@ test("intake create preserves mission traceability and discovery run consumes ex
       "avoid docs and control-plane content",
       "--request-file",
       requestFile,
+      "--source-kind",
+      "local-prd",
+      "--source-ref",
+      "docs/product/fixture-prd.md",
     ]);
     assert.equal(intakeResult.exitCode, 0, intakeResult.stderr);
     const intakePayload = JSON.parse(intakeResult.stdout);
     assert.equal(fs.existsSync(intakePayload.artifact_packet_file), true);
     assert.equal(fs.existsSync(intakePayload.artifact_packet_body_file), true);
+    assert.equal(intakePayload.product_intake_completeness.status, "complete");
+    assert.deepEqual(intakePayload.product_intake.goals, ["Reduce fixture mission regression risk before delivery."]);
+    assert.equal(intakePayload.product_intake.kpis[0].kpi_id, "fixture-regression-risk");
+    assert.deepEqual(intakePayload.product_intake.definition_of_done, [
+      "Implementation changes stay inside source and test paths.",
+      "Review evidence links back to the fixture mission request.",
+    ]);
+    assert.ok(
+      intakePayload.product_intake_source_refs.some(
+        (entry) => entry.source_kind === "local-prd" && entry.ref === "docs/product/fixture-prd.md",
+      ),
+      "expected CLI output to expose local PRD source refs",
+    );
     const intakeBody = JSON.parse(fs.readFileSync(intakePayload.artifact_packet_body_file, "utf8"));
     assert.equal(intakeBody.mission_traceability.mission_id, "fixture-mission");
     assert.equal(intakeBody.feature_request.request_file, requestFile);
+    assert.equal(intakeBody.product_intake_completeness.status, "complete");
     assert.deepEqual(intakeBody.feature_request.request_document.allowed_paths, ["source/**", "test/**"]);
     const newerTimestamp = new Date(Date.now() + 5_000);
     fs.utimesSync(intakePayload.artifact_packet_body_file, newerTimestamp, newerTimestamp);
@@ -2723,9 +3561,20 @@ test("intake create preserves mission traceability and discovery run consumes ex
     const discoveryPayload = JSON.parse(discoveryResult.stdout);
     const analysisReport = JSON.parse(fs.readFileSync(discoveryPayload.analysis_report_file, "utf8"));
     const intakePacketRef = `evidence://${path.relative(projectRoot, intakePayload.artifact_packet_file).replace(/\\/g, "/")}`;
+    assert.equal(discoveryPayload.discovery_research_status, "adr-ready");
+    assert.equal(discoveryPayload.discovery_research_adr_ready, true);
+    assert.deepEqual(discoveryPayload.discovery_research_open_questions, []);
+    assert.equal(fs.existsSync(discoveryPayload.discovery_research_report_file), true);
+    const discoveryResearchReport = JSON.parse(fs.readFileSync(discoveryPayload.discovery_research_report_file, "utf8"));
+    assert.equal(discoveryResearchReport.status, "adr-ready");
+    assert.ok(
+      discoveryResearchReport.adr_ready_recommendations.some((entry) => entry.status === "ready"),
+      "expected ADR-ready recommendation in discovery research report",
+    );
     assert.equal(analysisReport.feature_traceability.mission_id, "fixture-mission");
     assert.equal(analysisReport.feature_traceability.input_packet_ref, intakePacketRef);
     assert.deepEqual(analysisReport.feature_traceability.allowed_paths, ["source/**", "test/**"]);
+    assert.equal(analysisReport.discovery_research.status, "adr-ready");
 
     const autoDiscoveryResult = invokeCli(["discovery", "run", "--project-ref", projectRoot]);
     assert.equal(autoDiscoveryResult.exitCode, 0, autoDiscoveryResult.stderr);
@@ -2733,6 +3582,28 @@ test("intake create preserves mission traceability and discovery run consumes ex
     const autoAnalysisReport = JSON.parse(fs.readFileSync(autoDiscoveryPayload.analysis_report_file, "utf8"));
     assert.equal(autoAnalysisReport.feature_traceability.mission_id, "fixture-mission");
     assert.equal(autoAnalysisReport.feature_traceability.input_packet_ref, intakePacketRef);
+    assert.equal(autoDiscoveryPayload.discovery_research_status, "adr-ready");
+  });
+});
+
+test("intake create rejects unsupported external SaaS source kinds", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const intakeResult = invokeCli([
+      "intake",
+      "create",
+      "--project-ref",
+      projectRoot,
+      "--source-kind",
+      "github-issue",
+      "--source-ref",
+      "https://github.com/example/repo/issues/1",
+    ]);
+
+    assert.equal(intakeResult.exitCode, 1);
+    assert.match(intakeResult.stderr, /External SaaS connectors are out of scope/);
   });
 });
 
@@ -3003,6 +3874,128 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         }).ok,
         true,
       );
+
+      const missingReviewDecisionGate = invokeCli([
+        "deliver",
+        "prepare",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--mode",
+        "patch-only",
+        "--approved-handoff-ref",
+        approvedPayload.handoff_packet_file,
+        "--promotion-evidence-refs",
+        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        "--require-review-decision",
+      ]);
+      assert.equal(missingReviewDecisionGate.exitCode, 1);
+      assert.match(missingReviewDecisionGate.stderr, /requires an approved review decision/);
+
+      const holdDecision = invokeCli([
+        "review",
+        "decide",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--decision",
+        "hold",
+        "--reason",
+        "Hold for fixture operator review.",
+      ]);
+      assert.equal(holdDecision.exitCode, 0, holdDecision.stderr);
+      const holdDecisionPayload = JSON.parse(holdDecision.stdout);
+      assert.equal(holdDecisionPayload.review_decision, "hold");
+      assert.equal(holdDecisionPayload.review_decision_gate, "blocked");
+      const holdDecisionDocument = JSON.parse(fs.readFileSync(holdDecisionPayload.review_decision_file, "utf8"));
+      assert.equal(
+        validateContractDocument({
+          family: "review-decision",
+          document: holdDecisionDocument,
+          source: "fixture://review-decision-hold",
+        }).ok,
+        true,
+      );
+
+      const blockedByHoldDecision = invokeCli([
+        "deliver",
+        "prepare",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--mode",
+        "patch-only",
+        "--approved-handoff-ref",
+        approvedPayload.handoff_packet_file,
+        "--promotion-evidence-refs",
+        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        "--require-review-decision",
+      ]);
+      assert.equal(blockedByHoldDecision.exitCode, 1);
+      assert.match(blockedByHoldDecision.stderr, /latest decision .* is 'hold'/);
+
+      const approveDecision = invokeCli([
+        "review",
+        "decide",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--decision",
+        "approve",
+        "--reason",
+        "Review and Runtime Harness evidence pass.",
+      ]);
+      assert.equal(approveDecision.exitCode, 0, approveDecision.stderr);
+      const approveDecisionPayload = JSON.parse(approveDecision.stdout);
+      assert.equal(approveDecisionPayload.review_decision, "approve");
+      assert.equal(approveDecisionPayload.review_decision_gate, "pass");
+      assert.ok(approveDecisionPayload.review_decision_evidence_refs.some((ref) => ref.includes("review-report")));
+      const approveDecisionDocument = JSON.parse(fs.readFileSync(approveDecisionPayload.review_decision_file, "utf8"));
+      assert.equal(approveDecisionDocument.delivery_gate.status, "pass");
+      assert.equal(approveDecisionDocument.delivery_gate.blocks_downstream, false);
+      assert.equal(
+        validateContractDocument({
+          family: "review-decision",
+          document: approveDecisionDocument,
+          source: "fixture://review-decision-approve",
+        }).ok,
+        true,
+      );
+
+      const gatedDelivery = invokeCli([
+        "deliver",
+        "prepare",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--mode",
+        "patch-only",
+        "--approved-handoff-ref",
+        approvedPayload.handoff_packet_file,
+        "--promotion-evidence-refs",
+        [preflightPayload.verify_summary_file, ...preflightPayload.step_result_files].join(","),
+        "--require-review-decision",
+      ]);
+      assert.equal(gatedDelivery.exitCode, 0, gatedDelivery.stderr);
+      const gatedDeliveryPayload = JSON.parse(gatedDelivery.stdout);
+      assert.equal(gatedDeliveryPayload.review_decision, "approve");
+      assert.equal(gatedDeliveryPayload.review_decision_gate, "pass");
+      assert.equal(gatedDeliveryPayload.delivery_blocking, false);
 
       const auditRun = invokeCli([
         "audit",
@@ -3278,6 +4271,50 @@ test("review run reports feature_size_fit=fail when a small mission exceeds its 
         ),
       );
       assert.equal(reviewReport.provider_traceability.status, "pass");
+
+      const invalidApprove = invokeCli([
+        "review",
+        "decide",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--decision",
+        "approve",
+      ]);
+      assert.equal(invalidApprove.exitCode, 1);
+      assert.match(invalidApprove.stderr, /Cannot approve because review-report overall_status is 'fail'/);
+
+      const repairDecision = invokeCli([
+        "review",
+        "decide",
+        "--project-ref",
+        projectRoot,
+        "--project-profile",
+        "project.aor.yaml",
+        "--run-id",
+        runId,
+        "--decision",
+        "request-repair",
+        "--reason",
+        "Feature-size-fit findings require repair.",
+      ]);
+      assert.equal(repairDecision.exitCode, 0, repairDecision.stderr);
+      const repairDecisionPayload = JSON.parse(repairDecision.stdout);
+      assert.equal(repairDecisionPayload.review_decision, "request-repair");
+      assert.equal(repairDecisionPayload.review_decision_gate, "blocked");
+      const repairDecisionDocument = JSON.parse(fs.readFileSync(repairDecisionPayload.review_decision_file, "utf8"));
+      assert.equal(repairDecisionDocument.delivery_gate.blocks_downstream, true);
+      assert.equal(
+        validateContractDocument({
+          family: "review-decision",
+          document: repairDecisionDocument,
+          source: "fixture://review-decision-request-repair",
+        }).ok,
+        true,
+      );
 
       const auditRun = invokeCli([
         "audit",

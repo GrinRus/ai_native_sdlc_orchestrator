@@ -7,15 +7,19 @@ risk_tier: medium
 approved_objective: >
   Implement bounded multirepo support with repo graph, scoped locks and release delivery manifest.
 repo_scopes:
-  - repo_id: main
+  - repo_id: backend
     paths:
-      - docs/**
-      - packages/orchestrator-core/**
-      - packages/contracts/**
+      - repos/backend/**
+  - repo_id: mobile
+    paths:
+      - repos/mobile/**
+  - repo_id: frontend
+    paths:
+      - repos/frontend/**
 allowed_paths:
-  - docs/**
-  - packages/orchestrator-core/**
-  - packages/contracts/**
+  - repos/backend/**
+  - repos/mobile/**
+  - repos/frontend/**
 allowed_commands:
   - pnpm lint
   - pnpm test
@@ -33,6 +37,7 @@ approval_state:
   approval_refs:
     - approval://APP-882
 required_artifacts:
+  - examples/project.bounded-multirepo.aor.yaml
   - docs/architecture/10-multirepo-and-governance.md
   - docs/contracts/project-profile.md
   - docs/contracts/release-packet.md
@@ -49,5 +54,10 @@ approval_refs:
   - approval://APP-882
 baseline_refs:
   - route://route.implement.default@stable
+coordination_refs:
+  - evidence://coordination/WAVE-004/backend-mobile-frontend
+integration_validation_refs:
+  - validation://integration/backend-frontend/api-contract
+  - validation://integration/backend-mobile/api-contract
 material_assumptions:
   - No autonomous cross-team orchestration in MVP.

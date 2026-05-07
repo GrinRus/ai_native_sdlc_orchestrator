@@ -1,0 +1,40 @@
+status_id: compiler-revision-status-runtime-context-compiler-v1-20260506T020000Z
+project_id: aor
+compiler_revision_ref: compiler-revision://runtime-context-compiler@v1
+compiler_revision:
+  revision_id: runtime-context-compiler
+  version: 1
+  source_ref: compiler://runtime-context-compiler@v1
+  compiler_family: runtime-context
+  provenance_refs:
+    - compiled-context://compiled-context.aor-core.implement.runner-default
+lifecycle_state: stable
+compatibility:
+  status: compatible
+  compiled_context_refs:
+    - compiled-context://compiled-context.aor-core.implement.runner-default
+  evaluation_refs:
+    - evidence://.aor/projects/aor/reports/evaluation-report-runtime-context-compiler-v1.json
+  incident_refs: []
+  certification_evidence_refs:
+    - evidence://.aor/projects/aor/artifacts/promotion-decision-runtime-context-compiler-v1.json
+decision_history:
+  - history_id: promotion-decision-runtime-context-compiler-v1
+    history_ref: evidence://.aor/projects/aor/artifacts/promotion-decision-runtime-context-compiler-v1.json
+    history_kind: promotion-decision
+    lifecycle_state: stable
+    status: pass
+    created_at: "2026-05-06T01:59:00.000Z"
+evidence_links:
+  promotion_decision_refs:
+    - evidence://.aor/projects/aor/artifacts/promotion-decision-runtime-context-compiler-v1.json
+  compiled_context_refs:
+    - compiled-context://compiled-context.aor-core.implement.runner-default
+  evaluation_refs:
+    - evidence://.aor/projects/aor/reports/evaluation-report-runtime-context-compiler-v1.json
+  incident_refs: []
+  certification_evidence_refs:
+    - evidence://.aor/projects/aor/artifacts/promotion-decision-runtime-context-compiler-v1.json
+status: ready
+blocking_reasons: []
+created_at: "2026-05-06T02:00:00.000Z"

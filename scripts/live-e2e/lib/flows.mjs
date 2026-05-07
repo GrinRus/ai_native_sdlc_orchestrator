@@ -18,6 +18,11 @@ import {
 import { createStageMap, flattenStageMap, getProfileStages, markStage } from "./stages.mjs";
 import { DEFAULT_BACKLOG_REFS, createProofRunnerEnvironment, createSessionRoots } from "./profile-catalog.mjs";
 import {
+  buildGuidedJourneyProof,
+  isGuidedJourneyEnabled,
+  writeValidatedGuidedJourneyProof,
+} from "./guided-proof.mjs";
+import {
   materializeFeatureRequestFile,
   materializeGeneratedProjectProfile,
   materializeProviderPinnedRouteOverrides,
@@ -158,7 +163,9 @@ function runAorCommand(options) {
     finishedAt,
     durationSec: resolveDurationSeconds(startedAt, finishedAt),
     commandSurface:
-      options.args.length >= 2 ? `aor ${options.args[0]} ${options.args[1]}` : `aor ${options.args.join(" ")}`.trim(),
+      options.args.length >= 2 && !options.args[1].startsWith("--") && options.args[1] !== "."
+        ? `aor ${options.args[0]} ${options.args[1]}`
+        : `aor ${options.args[0]}`.trim(),
   };
 }
 
@@ -282,6 +289,195 @@ function getPreferredDeliveryMode(profile) {
  */
 function getEvalSuites(profile) {
   return asStringArray(asRecord(profile.verification).eval_suites);
+}
+
+/**
+ * @param {{ cwd: string, args: string[] }} options
+ * @returns {string | null}
+ */
+function runGitOutput(options) {
+  const result = spawnSync("git", options.args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return null;
+  return (result.stdout ?? "").trim();
+}
+
+/**
+ * @param {string} targetCheckoutRoot
+ * @returns {string[]}
+ */
+function collectTargetGitStatusWithoutRuntime(targetCheckoutRoot) {
+  const result = spawnSync(
+    "git",
+    [
+      "status",
+      "--short",
+      "--untracked-files=all",
+      "--",
+      ".",
+      ":(exclude).aor",
+      ":(exclude).aor/**",
+      ":(exclude).aor-live-e2e",
+      ":(exclude).aor-live-e2e/**",
+    ],
+    {
+      cwd: targetCheckoutRoot,
+      encoding: "utf8",
+    },
+  );
+  if (result.status !== 0) {
+    return [`git-status-failed: ${(result.stderr ?? result.stdout ?? "").trim()}`];
+  }
+  return (result.stdout ?? "")
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Array<{ kpi_id: string, name: string, target: string, measurement?: string }>}
+ */
+function normalizeMissionKpis(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry, index) => {
+      const record = asRecord(entry);
+      const kpiId = asNonEmptyString(record.kpi_id) || `mission-kpi-${index + 1}`;
+      const name = asNonEmptyString(record.name) || asNonEmptyString(record.label) || `Mission KPI ${index + 1}`;
+      const target = asNonEmptyString(record.target) || asNonEmptyString(record.threshold);
+      if (!target) return null;
+      const measurement = asNonEmptyString(record.measurement);
+      return {
+        kpi_id: kpiId,
+        name,
+        target,
+        ...(measurement ? { measurement } : {}),
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * @param {{ mission: Record<string, unknown>, featureRequest: ReturnType<typeof materializeFeatureRequestFile>, profile: Record<string, unknown> }}
+ * @returns {string[]}
+ */
+function buildGuidedMissionCreateArgs(options) {
+  const missionId = asNonEmptyString(options.mission.mission_id);
+  const title = asNonEmptyString(options.featureRequest.requestDocument.title) || missionId || "Guided mission";
+  const brief =
+    asNonEmptyString(options.featureRequest.requestDocument.brief) ||
+    asNonEmptyString(options.mission.brief) ||
+    "Prepare one bounded guided mission request.";
+  const goals = asStringArray(options.mission.goals);
+  const constraints = asStringArray(options.mission.acceptance_checks);
+  const definitionOfDone =
+    asStringArray(options.mission.definition_of_done).length > 0
+      ? asStringArray(options.mission.definition_of_done)
+      : asStringArray(options.mission.expected_evidence).map((entry) => `Materialize ${entry} evidence.`);
+  const kpis = normalizeMissionKpis(options.mission.kpis);
+  const effectiveKpis =
+    kpis.length > 0
+      ? kpis
+      : [
+          {
+            kpi_id: "guided-proof-artifacts",
+            name: "Guided proof artifacts",
+            target: "All required proof artifacts are materialized",
+            measurement: "installed-user guided proof validation",
+          },
+        ];
+
+  return [
+    "mission",
+    "create",
+    "--project-ref",
+    ".",
+    "--runtime-root",
+    ".aor",
+    "--request-file",
+    options.featureRequest.requestFile,
+    ...(missionId ? ["--mission-id", missionId] : []),
+    "--title",
+    title,
+    "--brief",
+    brief,
+    "--delivery-mode",
+    getPreferredDeliveryMode(options.profile),
+    "--source-kind",
+    "local-note",
+    "--source-ref",
+    options.featureRequest.requestFile,
+    ...((goals.length > 0 ? goals : [brief]).flatMap((entry) => ["--goal", entry])),
+    ...constraints.flatMap((entry) => ["--constraint", entry]),
+    ...((definitionOfDone.length > 0 ? definitionOfDone : constraints).flatMap((entry) => ["--dod", entry])),
+    ...effectiveKpis.flatMap((entry) => [
+      "--kpi",
+      `${entry.kpi_id}:${entry.name}:${entry.target}${entry.measurement ? `:${entry.measurement}` : ""}`,
+    ]),
+    ...asStringArray(options.mission.allowed_paths).flatMap((entry) => ["--allowed-path", entry]),
+    ...asStringArray(options.mission.forbidden_paths).flatMap((entry) => ["--forbidden-path", entry]),
+  ];
+}
+
+/**
+ * @param {{
+ *   hostRoot: string,
+ *   targetCheckoutRoot: string,
+ *   runId: string,
+ *   reportsRoot: string,
+ * }}
+ */
+function runGuidedWebSmoke(options) {
+  const outputHtml = path.join(
+    options.reportsRoot,
+    `installed-user-guided-web-smoke-${normalizeId(options.runId)}.html`,
+  );
+  const summaryFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-web-smoke-${normalizeId(options.runId)}.json`,
+  );
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.join(options.hostRoot, "apps/web/scripts/operator-console-smoke.mjs"),
+      "--project-ref",
+      options.targetCheckoutRoot,
+      "--runtime-root",
+      ".aor",
+      "--run-id",
+      options.runId,
+      "--output-html",
+      outputHtml,
+      "--max-replay",
+      "20",
+    ],
+    {
+      cwd: options.targetCheckoutRoot,
+      encoding: "utf8",
+    },
+  );
+  if (result.status !== 0) {
+    throw new Error(`Guided web smoke failed: ${(result.stderr ?? result.stdout ?? "").trim()}`);
+  }
+  /** @type {Record<string, unknown>} */
+  let summary;
+  try {
+    summary = asRecord(JSON.parse(result.stdout));
+  } catch {
+    throw new Error("Guided web smoke did not emit JSON summary.");
+  }
+  summary.summary_file = summaryFile;
+  summary.rendered_html_file = asNonEmptyString(summary.rendered_html_file) || outputHtml;
+  summary.command = "node apps/web/scripts/operator-console-smoke.mjs";
+  writeJson(summaryFile, summary);
+  return {
+    summaryFile,
+    htmlFile: outputHtml,
+    summary,
+  };
 }
 
 /**
@@ -1250,6 +1446,8 @@ export function executeFullJourneyFlow(options) {
   };
   const startedAt = nowIso();
   const internalTestHooks = asRecord(options.profile.internal_test_hooks);
+  const guidedJourneyEnabled = isGuidedJourneyEnabled(options.profile);
+  let targetHeadBefore = null;
 
   try {
     const targetCheckout = materializeTargetCheckout({
@@ -1261,6 +1459,11 @@ export function executeFullJourneyFlow(options) {
     artifacts.target_checkout_root = targetCheckout.targetCheckoutRoot;
     artifacts.target_repo_ref = targetCheckout.targetRepoRef;
     artifacts.target_repo_url = targetCheckout.targetRepoUrl;
+    artifacts.guided_journey_enabled = guidedJourneyEnabled;
+    targetHeadBefore = runGitOutput({
+      cwd: targetCheckout.targetCheckoutRoot,
+      args: ["rev-parse", "HEAD"],
+    });
 
     let commandIndex = 1;
     const runCommand = (label, args, runOptions = {}) => {
@@ -1281,6 +1484,51 @@ export function executeFullJourneyFlow(options) {
       }
       return result;
     };
+
+    if (guidedJourneyEnabled) {
+      const guidedDoctor = runCommand("guided-doctor", [
+        "doctor",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--json",
+      ]);
+      artifacts.guided_doctor_transcript_file = guidedDoctor.transcriptFile;
+
+      const guidedOnboard = runCommand("guided-onboard", [
+        "onboard",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--asset-mode",
+        "bundled",
+        "--json",
+      ]);
+      artifacts.onboarding_report_file = getStringField(guidedOnboard.payload, "onboarding_report_file");
+      artifacts.guided_onboard_transcript_file = guidedOnboard.transcriptFile;
+
+      const guidedApp = runCommand("guided-app", [
+        "app",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--json",
+      ]);
+      artifacts.guided_app_transcript_file = guidedApp.transcriptFile;
+
+      const guidedNextBeforeMission = runCommand("guided-next-before-mission", [
+        "next",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--json",
+      ]);
+      artifacts.next_action_report_file = getStringField(guidedNextBeforeMission.payload, "next_action_report_file");
+      artifacts.guided_next_before_mission_transcript_file = guidedNextBeforeMission.transcriptFile;
+    }
 
     const bootstrapTemplate = asNonEmptyString(options.profile.bootstrap_template) || "github-default";
     const catalogVerification = asRecord(options.catalogEntry.verification);
@@ -1364,25 +1612,44 @@ export function executeFullJourneyFlow(options) {
     });
     artifacts.feature_request_file = featureRequest.requestFile;
 
-    const intakeCreate = runCommand("intake-create", [
-      "intake",
-      "create",
-      "--project-ref",
-      ".",
-      "--runtime-root",
-      ".aor",
-      "--request-file",
-      featureRequest.requestFile,
-      "--mission-id",
-      asNonEmptyString(options.mission.mission_id),
-      "--request-title",
-      asNonEmptyString(featureRequest.requestDocument.title),
-      "--request-brief",
-      asNonEmptyString(featureRequest.requestDocument.brief),
-      ...asStringArray(options.mission.acceptance_checks).flatMap((entry) => ["--request-constraints", entry]),
-    ]);
+    const intakeCreate = guidedJourneyEnabled
+      ? runCommand("mission-create", buildGuidedMissionCreateArgs({
+          mission: options.mission,
+          featureRequest,
+          profile: options.profile,
+        }))
+      : runCommand("intake-create", [
+          "intake",
+          "create",
+          "--project-ref",
+          ".",
+          "--runtime-root",
+          ".aor",
+          "--request-file",
+          featureRequest.requestFile,
+          "--mission-id",
+          asNonEmptyString(options.mission.mission_id),
+          "--request-title",
+          asNonEmptyString(featureRequest.requestDocument.title),
+          "--request-brief",
+          asNonEmptyString(featureRequest.requestDocument.brief),
+          ...asStringArray(options.mission.acceptance_checks).flatMap((entry) => ["--request-constraints", entry]),
+        ]);
     artifacts.intake_artifact_packet_file = getStringField(intakeCreate.payload, "artifact_packet_file");
     artifacts.intake_artifact_packet_body_file = getStringField(intakeCreate.payload, "artifact_packet_body_file");
+    if (guidedJourneyEnabled) {
+      artifacts.guided_mission_create_transcript_file = intakeCreate.transcriptFile;
+      const guidedNextAfterMission = runCommand("guided-next-after-mission", [
+        "next",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--json",
+      ]);
+      artifacts.next_action_report_file = getStringField(guidedNextAfterMission.payload, "next_action_report_file");
+      artifacts.guided_next_after_mission_transcript_file = guidedNextAfterMission.transcriptFile;
+    }
 
     const analyze = runCommand("project-analyze", [
       "project",
@@ -1846,6 +2113,39 @@ export function executeFullJourneyFlow(options) {
       uniqueStrings([reviewRun.transcriptFile, ...collectStringRefs(reviewRun.payload)]),
       reviewOverallStatus === "fail" ? "Review report failed." : "Review report materialized.",
     );
+    if (guidedJourneyEnabled) {
+      const guidedNextAfterReview = runCommand("guided-next-after-review", [
+        "next",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--json",
+      ]);
+      artifacts.next_action_report_file = getStringField(guidedNextAfterReview.payload, "next_action_report_file");
+      artifacts.guided_next_after_review_transcript_file = guidedNextAfterReview.transcriptFile;
+
+      const reviewDecision = runCommand("review-decide-approve", [
+        "review",
+        "decide",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        "./project.aor.yaml",
+        "--runtime-root",
+        ".aor",
+        "--run-id",
+        options.runId,
+        "--decision",
+        "approve",
+        "--decider-ref",
+        "operator://installed-user-guided-proof",
+        "--reason",
+        "Approved by installed-user guided proof after review evidence materialized.",
+      ]);
+      artifacts.review_decision_file = getStringField(reviewDecision.payload, "review_decision_file");
+      artifacts.guided_review_decision_transcript_file = reviewDecision.transcriptFile;
+    }
 
     const evalSuites = getEvalSuites(options.profile);
     if (evalSuites.length > 0) {
@@ -1982,6 +2282,7 @@ export function executeFullJourneyFlow(options) {
           ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
           : []),
         ...(deliveryEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", deliveryEvidenceRefs.join(",")] : []),
+        ...(guidedJourneyEnabled ? ["--require-review-decision"] : []),
       ], { allowNonZeroWithPayload: true });
     } catch (error) {
       const summary = error instanceof Error ? error.message : String(error);
@@ -2044,7 +2345,59 @@ export function executeFullJourneyFlow(options) {
       }
     }
 
-    markStage(stageMap, "release", "skipped", [], "Observation v1 ends at delivery.");
+    if (guidedJourneyEnabled) {
+      const guidedNextAfterDelivery = runCommand("guided-next-after-delivery", [
+        "next",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--json",
+      ]);
+      artifacts.next_action_report_file = getStringField(guidedNextAfterDelivery.payload, "next_action_report_file");
+      artifacts.guided_next_after_delivery_transcript_file = guidedNextAfterDelivery.transcriptFile;
+
+      const releasePrepare = runCommand("release-prepare", [
+        "release",
+        "prepare",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        "./project.aor.yaml",
+        "--runtime-root",
+        ".aor",
+        "--run-id",
+        options.runId,
+        "--step-class",
+        "implement",
+        "--mode",
+        getPreferredDeliveryMode(options.profile),
+        "--require-review-decision",
+        ...(artifacts.approved_handoff_packet_file
+          ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
+          : []),
+        ...(deliveryEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", deliveryEvidenceRefs.join(",")] : []),
+      ], { allowNonZeroWithPayload: true });
+      artifacts.release_delivery_manifest_file = getStringField(releasePrepare.payload, "delivery_manifest_file");
+      artifacts.release_delivery_transcript_file = getStringField(releasePrepare.payload, "delivery_transcript_file");
+      artifacts.release_packet_file = getStringField(releasePrepare.payload, "release_packet_file");
+      artifacts.release_packet_status = getStringField(releasePrepare.payload, "release_packet_status");
+      artifacts.guided_release_prepare_transcript_file = releasePrepare.transcriptFile;
+      markStage(
+        stageMap,
+        "release",
+        artifacts.release_packet_file ? "pass" : "fail",
+        uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
+        artifacts.release_packet_file
+          ? "Release prepare materialized release packet evidence under the review gate."
+          : "Release prepare did not materialize release packet evidence.",
+      );
+      if (!artifacts.release_packet_file) {
+        throw new Error("Release prepare did not materialize release packet evidence.");
+      }
+    } else {
+      markStage(stageMap, "release", "skipped", [], "Observation v1 ends at delivery.");
+    }
 
     const auditRuns = runCommand("audit-runs", [
       "audit",
@@ -2161,6 +2514,57 @@ export function executeFullJourneyFlow(options) {
       artifacts.runtime_harness_overall_decision = null;
       artifacts.run_start_runtime_harness_report_file = null;
       artifacts.run_start_runtime_harness_decision = null;
+    }
+
+    if (guidedJourneyEnabled) {
+      const guidedNextAfterLearning = runCommand("guided-next-after-learning", [
+        "next",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--json",
+      ]);
+      artifacts.next_action_report_file = getStringField(guidedNextAfterLearning.payload, "next_action_report_file");
+      artifacts.guided_next_after_learning_transcript_file = guidedNextAfterLearning.transcriptFile;
+
+      const webSmoke = runGuidedWebSmoke({
+        hostRoot: options.hostRoot,
+        targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+        runId: options.runId,
+        reportsRoot: options.layout.reportsRoot,
+      });
+      artifacts.guided_web_smoke_summary_file = webSmoke.summaryFile;
+      artifacts.guided_web_smoke_html_file = webSmoke.htmlFile;
+      artifacts.guided_web_smoke = webSmoke.summary;
+
+      const targetHeadAfter = runGitOutput({
+        cwd: targetCheckout.targetCheckoutRoot,
+        args: ["rev-parse", "HEAD"],
+      });
+      const targetGitStatusWithoutRuntime = collectTargetGitStatusWithoutRuntime(targetCheckout.targetCheckoutRoot);
+      artifacts.target_head_before = targetHeadBefore;
+      artifacts.target_head_after = targetHeadAfter;
+      artifacts.target_git_status_without_runtime = targetGitStatusWithoutRuntime;
+      const guidedProof = buildGuidedJourneyProof({
+        runId: options.runId,
+        profile: options.profile,
+        commandResults,
+        artifacts,
+        targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+        reportsRoot: options.layout.reportsRoot,
+        targetHeadBefore,
+        targetHeadAfter,
+        targetGitStatusWithoutRuntime,
+      });
+      const writtenProof = writeValidatedGuidedJourneyProof({
+        proof: guidedProof,
+        targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+        reportsRoot: options.layout.reportsRoot,
+        runId: options.runId,
+      });
+      artifacts.guided_journey_proof_file = writtenProof.proofFile;
+      artifacts.guided_journey_proof = writtenProof.proof;
     }
 
     const targetBaselineStatus = asNonEmptyString(artifacts.baseline_verify_status) || "fail";

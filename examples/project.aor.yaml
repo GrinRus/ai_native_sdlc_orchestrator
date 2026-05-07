@@ -1,6 +1,7 @@
 project_id: aor-core
 display_name: AOR Core
 repo_topology: monorepo
+asset_mode: materialized
 repos:
   - repo_id: main
     name: main
@@ -29,6 +30,10 @@ registry_roots:
   routes: examples/routes
   wrappers: examples/wrappers
   prompts: examples/prompts
+  policies: examples/policies
+  adapters: examples/adapters
+  evaluation: examples
+  skills: examples/skills
   context_docs: examples/context/docs
   context_rules: examples/context/rules
   context_skills: examples/context/skills

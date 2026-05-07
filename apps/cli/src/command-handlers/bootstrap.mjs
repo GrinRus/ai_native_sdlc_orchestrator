@@ -43,6 +43,7 @@ import {
   executeRuntimeHarnessControlledStep,
   ensureRequiredFlags,
   resolveOptionalStringFlag,
+  resolveOptionalAssetModeFlag,
   resolveOptionalBooleanFlag,
   resolveOptionalIntegerFlag,
   resolveOptionalCsvFlag,
@@ -103,6 +104,7 @@ export function handleBootstrapCommand(context) {
       projectRef: resolveOptionalStringFlag("project-ref", flags["project-ref"]),
       projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      assetMode: resolveOptionalAssetModeFlag(flags["asset-mode"]),
       materializeProjectProfile: resolveOptionalBooleanFlag(
         "materialize-project-profile",
         flags["materialize-project-profile"],
@@ -125,6 +127,10 @@ export function handleBootstrapCommand(context) {
     outputState.artifactPacketId = initResult.artifactPacketId;
     outputState.artifactPacketFile = initResult.artifactPacketFile;
     outputState.artifactPacketBodyFile = initResult.artifactPacketBodyFile;
+    outputState.onboardingReportId = initResult.onboardingReportId;
+    outputState.onboardingReportFile = initResult.onboardingReportFile;
+    outputState.assetMode = initResult.assetMode;
+    outputState.registryRoots = initResult.registryRoots;
     outputState.bootstrapMaterializationStatus = initResult.bootstrapMaterializationStatus;
     outputState.materializedProjectProfileFile = initResult.materializedProjectProfileFile;
     outputState.materializedBootstrapAssetsRoot = initResult.materializedBootstrapAssetsRoot;
@@ -164,10 +170,15 @@ export function handleBootstrapCommand(context) {
       requestBrief: resolveOptionalStringFlag("request-brief", flags["request-brief"]) ?? null,
       requestConstraints: resolveOptionalCsvFlag("request-constraints", flags["request-constraints"]),
       requestFile: requestFile ?? null,
+      sourceKind: resolveOptionalStringFlag("source-kind", flags["source-kind"]) ?? null,
+      sourceRef: resolveOptionalStringFlag("source-ref", flags["source-ref"]) ?? null,
     });
     outputState.artifactPacketId = intakePacket.packet.packet_id;
     outputState.artifactPacketFile = intakePacket.packetFile;
     outputState.artifactPacketBodyFile = intakePacket.packetBodyFile;
+    outputState.productIntake = intakePacket.packetBody.product_intake;
+    outputState.productIntakeCompleteness = intakePacket.packetBody.product_intake_completeness;
+    outputState.productIntakeSourceRefs = intakePacket.packetBody.product_intake.source_refs;
   } else if (command === "project analyze") {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
@@ -198,6 +209,11 @@ export function handleBootstrapCommand(context) {
     outputState.evaluationRegistryFile = analyzeResult.evaluationRegistryPath;
     outputState.evaluationRegistrySuites = analyzeResult.evaluationRegistry.suites;
     outputState.evaluationRegistryDatasets = analyzeResult.evaluationRegistry.datasets;
+    outputState.discoveryResearchReportId = analyzeResult.discoveryResearchReport.report_id;
+    outputState.discoveryResearchReportFile = analyzeResult.discoveryResearchReportPath;
+    outputState.discoveryResearchStatus = analyzeResult.discoveryResearchReport.status;
+    outputState.discoveryResearchAdrReady = analyzeResult.discoveryResearchReport.status === "adr-ready";
+    outputState.discoveryResearchOpenQuestions = analyzeResult.discoveryResearchReport.open_questions;
     outputState.discoveryCompletenessStatus = analyzeResult.report.discovery_completeness?.status ?? null;
     outputState.discoveryCompletenessBlocking = analyzeResult.report.discovery_completeness?.blocking ?? null;
     outputState.discoveryCompletenessChecks = analyzeResult.report.discovery_completeness?.checks ?? null;
@@ -242,6 +258,11 @@ export function handleBootstrapCommand(context) {
     outputState.evaluationRegistryFile = discoveryResult.evaluationRegistryPath;
     outputState.evaluationRegistrySuites = discoveryResult.evaluationRegistry.suites;
     outputState.evaluationRegistryDatasets = discoveryResult.evaluationRegistry.datasets;
+    outputState.discoveryResearchReportId = discoveryResult.discoveryResearchReport.report_id;
+    outputState.discoveryResearchReportFile = discoveryResult.discoveryResearchReportPath;
+    outputState.discoveryResearchStatus = discoveryResult.discoveryResearchReport.status;
+    outputState.discoveryResearchAdrReady = discoveryResult.discoveryResearchReport.status === "adr-ready";
+    outputState.discoveryResearchOpenQuestions = discoveryResult.discoveryResearchReport.open_questions;
     outputState.discoveryCompletenessStatus = discoveryResult.report.discovery_completeness?.status ?? null;
     outputState.discoveryCompletenessBlocking = discoveryResult.report.discovery_completeness?.blocking ?? null;
     outputState.discoveryCompletenessChecks = discoveryResult.report.discovery_completeness?.checks ?? null;
@@ -365,6 +386,10 @@ export function handleBootstrapCommand(context) {
     outputState.discoveryCompletenessStatus = specResult.stepResult.routed_execution.discovery_completeness_gate?.status ?? null;
     outputState.discoveryCompletenessBlocking = specResult.stepResult.routed_execution.discovery_completeness_gate?.blocking ?? null;
     outputState.discoveryCompletenessChecks = specResult.stepResult.routed_execution.discovery_completeness_gate?.checks ?? null;
+    outputState.discoveryResearchGate = specResult.stepResult.routed_execution.discovery_research_gate ?? null;
+    outputState.discoveryResearchStatus = specResult.stepResult.routed_execution.discovery_research_gate?.status ?? null;
+    outputState.discoveryResearchAdrReady = specResult.stepResult.routed_execution.discovery_research_gate?.adr_ready ?? null;
+    outputState.discoveryResearchOpenQuestions = specResult.stepResult.routed_execution.discovery_research_gate?.open_questions ?? null;
     outputState.architectureTraceability = specResult.stepResult.routed_execution.architecture_traceability ?? null;
   } else if (command === "handoff prepare") {
     ensureRequiredFlags(command, flags);

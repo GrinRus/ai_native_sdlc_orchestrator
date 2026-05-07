@@ -36,12 +36,20 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 - Review discovery outputs, open questions, and approval gates before execution.
 - Track wave status, quality gates, and delivery risk.
 
+`W19-S02` adds the first machine-checkable intake source model: local issue, PRD, RFC, note, and mail-like source refs are preserved with goals, constraints, KPIs, Definition of Done, and completeness evidence in the intake-request body. Live SaaS connectors remain out of scope until a later integration slice exports or mirrors those sources into local structured refs.
+
+`W21-S01` defines the installed-user journey from first launch through learning closure. Product-facing guided intake remains additive: it should populate the existing product-intake contract and surface blockers through `aor next` or guided web stages rather than replacing low-level command evidence.
+
+`W21-S04` implements that product-facing boundary for the CLI: `aor mission create` writes the existing intake-request packet/body with goals, constraints, KPIs, Definition of Done, local source refs, allowed paths, and delivery mode, while `aor next` writes a deterministic next-action report that blocks on missing product evidence.
+
 ### Discovery / research
 - Build discovery packets from repository content, project analysis, AOR-owned runtime context assets, and external research.
 - Separate discovery from delivery.
 - Validate discovery completeness before planning.
 - Produce ADR-ready research output with evidence.
 - Use explicit discovery completeness checks from command outputs before spec handoff.
+
+`W19-S03` makes the local research path executable: `discovery run` emits a `discovery-research-report` that links repository facts, runtime context assets, local intake source refs, open questions, and ADR-ready recommendations. `spec build` carries the same research gate into the routed step result so handoff can inspect ADR-readiness without rerunning discovery.
 
 ### Architect / tech lead
 - Define non-functional requirements, repo scope, risk tiers, and allowed commands.
@@ -84,7 +92,7 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 - Select the required matrix cell by scenario family, pinned provider variant, and declared feature size.
 - Track which required matrix cells are still uncovered after each live E2E run.
 
-W18 tracks the remaining operator-surface gap for runner-requested questions: surface the question, submit an approved operator answer, and keep the answer trail auditable without making the web UI own orchestration.
+W18 closes the connected operator-surface path for runner-requested questions: surface the question from `step-result.requested_interaction`, submit an approved operator answer through the control plane, emit query-safe live events, and keep the answer trail auditable without making the web UI own orchestration.
 
 ### Security / compliance
 - Enforce provider and adapter allowlists.
@@ -102,7 +110,7 @@ Bounded multirepo means one AOR project profile can coordinate several explicit 
 
 ### Incident / improvement owner
 - Open incident reports from failed releases or production feedback.
-- Backfill incidents into datasets and suites.
+- Backfill incidents into datasets and suites through reviewed proposal artifacts.
 - See which routes, prompt/context assets, wrappers, adapters, or compiler revisions correlate with incidents.
 - Force recertification before re-enabling a problematic route.
 
@@ -111,6 +119,10 @@ Bounded multirepo means one AOR project profile can coordinate several explicit 
 - Materialize project-analysis reports with commands, service boundaries, risk zones, and runtime-context readiness.
 - Recommend missing AOR-native runtime context assets and project-profile coverage.
 - Block execution if prerequisites are missing.
+
+`W21-S01` makes onboarding a first-class installed-user journey rather than a list of independent bootstrap commands. Later W21 slices implement the guided CLI shortcuts, asset-mode onboarding report, next-action resolver, guided web stages, closure UX, and proof rehearsal.
+
+`W21-S04` closes the guided mission and next-action resolver portion: installed users get one primary next command, evidence refs, blockers, active-run handling, and explicit write-back policy before delivery-capable work is recommended.
 
 ### Delivery transaction / Git / PR flow
 - Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.

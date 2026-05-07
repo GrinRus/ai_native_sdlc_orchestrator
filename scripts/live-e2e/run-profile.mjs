@@ -628,6 +628,11 @@ function writeProofRunnerArtifacts(options) {
     stage_results: options.flowResult.stageResults,
     command_results: options.flowResult.commandResults,
     artifacts: options.flowResult.artifacts,
+    guided_journey:
+      typeof options.flowResult.artifacts.guided_journey_proof === "object" &&
+      options.flowResult.artifacts.guided_journey_proof
+        ? options.flowResult.artifacts.guided_journey_proof
+        : null,
     live_e2e_observation_report_file: observationReportFile,
     live_e2e_observation_overall_status: observationReport.overall_status,
     agent_artifact_review_request_file: agentArtifactReviewRequestFile,

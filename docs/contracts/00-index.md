@@ -2,8 +2,12 @@
 
 ## Core packets and profiles
 - `project-profile.md`
+- `onboarding-report.md`
+- `next-action-report.md`
 - `project-analysis-report.md`
+- `discovery-research-report.md`
 - `artifact-packet.md`
+- `intake-request-body.md`
 - `wave-ticket.md`
 - `handoff-packet.md`
 - `release-packet.md`
@@ -16,8 +20,11 @@
 - `validation-report.md`
 - `evaluation-report.md`
 - `review-report.md`
+- `review-decision.md`
 - `runtime-harness-report.md`
 - `live-e2e-observation-report.md`
+- `multirepo-coordination-status.md`
+- `incident-backfill-proposal.md`
 - `dataset.md`
 - `evaluation-suite.md`
 - `promotion-decision.md`
@@ -37,6 +44,9 @@
 
 ## Operations
 - `live-run-event.md`
+- `planner-metrics-snapshot.md`
+- `finance-monitoring-snapshot.md`
+- `compiler-revision-status.md`
 - `learning-loop-scorecard.md`
 - `learning-loop-handoff.md`
 - `live-e2e-provider-variant.md`

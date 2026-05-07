@@ -8,7 +8,8 @@ import { resolveRouteMatrix } from "../../provider-routing/src/route-resolution.
 import { resolveAssetBundleMatrix } from "./asset-loader.mjs";
 import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
 import { resolveStepPolicyMatrix } from "./policy-resolution.mjs";
-import { initializeProjectRuntime } from "./project-init.mjs";
+import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
+import { resolveProjectRepoScope } from "./repo-scope.mjs";
 
 const LANGUAGE_BY_EXTENSION = Object.freeze({
   ".ts": "typescript",
@@ -83,6 +84,8 @@ function asRecord(value) {
  *   expectedEvidence: string[],
  *   changeBudget: Record<string, unknown> | null,
  *   sourceKind: string | null,
+ *   productIntake: Record<string, unknown>,
+ *   productIntakeCompleteness: Record<string, unknown>,
  * } | null}
  */
 function resolveFeatureTraceability(options) {
@@ -127,6 +130,8 @@ function resolveFeatureTraceability(options) {
     : {};
   const missionTraceability = asRecord(packetBody.mission_traceability);
   const featureRequest = asRecord(packetBody.feature_request);
+  const productIntake = asRecord(packetBody.product_intake);
+  const productIntakeCompleteness = asRecord(packetBody.product_intake_completeness);
   const requestDocument = asRecord(featureRequest.request_document);
 
   return {
@@ -187,7 +192,33 @@ function resolveFeatureTraceability(options) {
         ? asRecord(requestDocument.change_budget)
         : null,
     sourceKind: typeof missionTraceability.source_kind === "string" ? missionTraceability.source_kind : null,
+    productIntake,
+    productIntakeCompleteness,
   };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function asStringArray(value) {
+  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string") : [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Array<Record<string, unknown>>}
+ */
+function asRecordArray(value) {
+  return Array.isArray(value) ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry)).map(asRecord) : [];
+}
+
+/**
+ * @param {unknown[]} values
+ * @returns {string[]}
+ */
+function uniqueStrings(values) {
+  return [...new Set(values.filter((entry) => typeof entry === "string" && entry.length > 0))];
 }
 
 /**
@@ -534,6 +565,143 @@ function resolveArchitectureTraceability(options) {
 }
 
 /**
+ * @param {Array<Record<string, unknown>>} assetResolutionMatrix
+ */
+function collectContextAssetRefs(assetResolutionMatrix) {
+  const contextBundleRefs = [];
+  const contextDocRefs = [];
+  const contextRuleRefs = [];
+  const contextSkillRefs = [];
+
+  for (const entry of assetResolutionMatrix) {
+    const contextBundles = asRecord(entry.context_bundles);
+    const expandedRefs = asRecord(contextBundles.expanded_refs);
+    contextBundleRefs.push(...asStringArray(contextBundles.bundle_refs));
+    contextDocRefs.push(...asStringArray(expandedRefs.context_doc_refs));
+    contextRuleRefs.push(...asStringArray(expandedRefs.context_rule_refs));
+    contextSkillRefs.push(...asStringArray(expandedRefs.context_skill_refs));
+  }
+
+  return {
+    context_bundle_refs: uniqueStrings(contextBundleRefs),
+    context_doc_refs: uniqueStrings(contextDocRefs),
+    context_rule_refs: uniqueStrings(contextRuleRefs),
+    context_skill_refs: uniqueStrings(contextSkillRefs),
+  };
+}
+
+/**
+ * @param {{
+ *   projectId: string,
+ *   repoFacts: Record<string, unknown>,
+ *   serviceBoundaries: Array<Record<string, unknown>>,
+ *   assetResolutionMatrix: Array<Record<string, unknown>>,
+ *   featureTraceability: ReturnType<typeof resolveFeatureTraceability>,
+ *   analysisReportRef: string,
+ * }} options
+ */
+function resolveDiscoveryResearchReport(options) {
+  const productIntake = asRecord(options.featureTraceability?.productIntake);
+  const productIntakeCompleteness = asRecord(options.featureTraceability?.productIntakeCompleteness);
+  const sourceRefs = asRecordArray(productIntake.source_refs);
+  const goals = asStringArray(productIntake.goals);
+  const kpis = asRecordArray(productIntake.kpis);
+  const definitionOfDone = asStringArray(productIntake.definition_of_done);
+  const contextAssets = collectContextAssetRefs(options.assetResolutionMatrix);
+  const checks = [
+    {
+      check_id: "repository-facts-linked",
+      status: options.repoFacts.topology && options.repoFacts.topology !== "unknown" ? "pass" : "fail",
+      blocking: true,
+      summary:
+        options.repoFacts.topology && options.repoFacts.topology !== "unknown"
+          ? "Repository facts are available for discovery research."
+          : "Repository facts are missing or unknown.",
+    },
+    {
+      check_id: "context-assets-linked",
+      status: contextAssets.context_bundle_refs.length > 0 ? "pass" : "fail",
+      blocking: true,
+      summary:
+        contextAssets.context_bundle_refs.length > 0
+          ? "Runtime context asset refs are linked to discovery research."
+          : "Runtime context asset refs are missing.",
+    },
+    {
+      check_id: "local-research-inputs",
+      status: sourceRefs.length > 0 ? "pass" : "fail",
+      blocking: true,
+      summary:
+        sourceRefs.length > 0
+          ? "Local research source refs are linked to discovery research."
+          : "Local issue, PRD, RFC, note, or mail-like source refs are missing.",
+    },
+    {
+      check_id: "product-acceptance-evidence",
+      status: goals.length > 0 && kpis.length > 0 && definitionOfDone.length > 0 ? "pass" : "fail",
+      blocking: true,
+      summary:
+        goals.length > 0 && kpis.length > 0 && definitionOfDone.length > 0
+          ? "Goals, KPIs, and Definition of Done are present for ADR handoff."
+          : "Goals, KPIs, or Definition of Done are missing from product intake.",
+    },
+  ];
+  const blocking = checks.some((check) => check.blocking && check.status === "fail");
+  const openQuestions = checks
+    .filter((check) => check.status === "fail")
+    .map((check) => ({
+      question_id: check.check_id,
+      status: "open",
+      summary: check.summary,
+      blocking: check.blocking,
+    }));
+  const status = blocking ? "incomplete" : "adr-ready";
+
+  return {
+    report_id: `${options.projectId}.discovery-research.v1`,
+    project_id: options.projectId,
+    version: 1,
+    generated_from: {
+      command: "aor discovery run",
+      project_analysis_report_ref: options.analysisReportRef,
+      intake_packet_ref: options.featureTraceability?.inputPacketRef ?? null,
+    },
+    repository_facts: {
+      topology: options.repoFacts.topology ?? null,
+      languages: asStringArray(options.repoFacts.languages),
+      service_boundaries: options.serviceBoundaries,
+    },
+    context_assets: contextAssets,
+    research_inputs: {
+      intake_packet_ref: options.featureTraceability?.inputPacketRef ?? null,
+      source_refs: sourceRefs,
+      goals,
+      kpis,
+      definition_of_done: definitionOfDone,
+      product_intake_completeness: productIntakeCompleteness,
+    },
+    open_questions: openQuestions,
+    adr_ready_recommendations: [
+      {
+        recommendation_id: blocking ? "adr.discovery-research-blocked" : "adr.discovery-research-ready",
+        status: blocking ? "blocked" : "ready",
+        title: blocking
+          ? "ADR candidate is blocked until local research inputs and product acceptance evidence are present."
+          : "Discovery evidence is ready to seed an ADR candidate before specification handoff.",
+        rationale_refs: sourceRefs.map((entry) => entry.ref).filter((entry) => typeof entry === "string"),
+        proposed_adr_refs: blocking ? [] : ["docs/architecture/adr/discovery-research-decision.md"],
+      },
+    ],
+    completeness: {
+      status,
+      blocking,
+      checks,
+    },
+    status,
+  };
+}
+
+/**
  * @param {{
  *  cwd?: string,
  *  projectRef?: string,
@@ -607,36 +775,43 @@ export function analyzeProjectRuntime(options = {}) {
   }
 
   const verificationPlan = createVerificationPlan(commandCandidates, unknownFacts);
+  const loadedProjectProfile = loadContractFile({
+    filePath: init.projectProfilePath,
+    family: "project-profile",
+  });
+  const projectProfile = asRecord(loadedProjectProfile.document);
+  const registryResolution = resolveProjectRegistryRoots(projectProfile, { projectRoot: init.projectRoot });
+  const registryRoots = registryResolution.roots;
   const routesRoot = options.routesRoot
     ? path.isAbsolute(options.routesRoot)
       ? options.routesRoot
       : path.resolve(init.projectRoot, options.routesRoot)
-    : path.join(init.projectRoot, "examples/routes");
+    : registryRoots.routes;
   const wrappersRoot = options.wrappersRoot
     ? path.isAbsolute(options.wrappersRoot)
       ? options.wrappersRoot
       : path.resolve(init.projectRoot, options.wrappersRoot)
-    : path.join(init.projectRoot, "examples/wrappers");
+    : registryRoots.wrappers;
   const promptsRoot = options.promptsRoot
     ? path.isAbsolute(options.promptsRoot)
       ? options.promptsRoot
       : path.resolve(init.projectRoot, options.promptsRoot)
-    : path.join(init.projectRoot, "examples/prompts");
+    : registryRoots.prompts;
   const contextBundlesRoot = options.contextBundlesRoot
     ? path.isAbsolute(options.contextBundlesRoot)
       ? options.contextBundlesRoot
       : path.resolve(init.projectRoot, options.contextBundlesRoot)
-    : path.join(path.dirname(init.projectProfilePath), "context/bundles");
+    : registryRoots.context_bundles;
   const policiesRoot = options.policiesRoot
     ? path.isAbsolute(options.policiesRoot)
       ? options.policiesRoot
       : path.resolve(init.projectRoot, options.policiesRoot)
-    : path.join(init.projectRoot, "examples/policies");
+    : registryRoots.policies;
   const adaptersRoot = options.adaptersRoot
     ? path.isAbsolute(options.adaptersRoot)
       ? options.adaptersRoot
       : path.resolve(init.projectRoot, options.adaptersRoot)
-    : path.join(init.projectRoot, "examples/adapters");
+    : registryRoots.adapters;
   const routeResolutionMatrix = resolveRouteMatrix({
     projectProfilePath: init.projectProfilePath,
     routesRoot,
@@ -666,9 +841,10 @@ export function analyzeProjectRuntime(options = {}) {
     ? path.isAbsolute(options.evaluationWorkspaceRoot)
       ? options.evaluationWorkspaceRoot
       : path.resolve(init.projectRoot, options.evaluationWorkspaceRoot)
-    : init.projectRoot;
+    : registryRoots.evaluation;
   const evaluationRegistry = loadEvaluationRegistry({
-    workspaceRoot: evaluationWorkspaceRoot,
+    workspaceRoot: init.projectRoot,
+    examplesRoot: evaluationWorkspaceRoot,
   });
 
   if (!evaluationRegistry.ok) {
@@ -698,6 +874,17 @@ export function analyzeProjectRuntime(options = {}) {
         ? options.inputPacketPath
         : undefined,
   });
+  const repoScopeProof = resolveProjectRepoScope({ profile: projectProfile });
+  const reportPath = path.join(init.runtimeLayout.reportsRoot, "project-analysis-report.json");
+  const discoveryResearchReportPath = path.join(init.runtimeLayout.reportsRoot, "discovery-research-report.json");
+  const discoveryResearchReport = resolveDiscoveryResearchReport({
+    projectId: init.projectId,
+    repoFacts,
+    serviceBoundaries: repoFacts.service_boundaries,
+    assetResolutionMatrix,
+    featureTraceability,
+    analysisReportRef: toEvidenceRef(init.projectRoot, reportPath),
+  });
 
   const report = {
     report_id: `${init.projectId}.analysis.v1`,
@@ -708,8 +895,14 @@ export function analyzeProjectRuntime(options = {}) {
       project_root: init.projectRoot,
       selected_profile_ref: init.projectProfileRef,
     },
+    asset_mode: registryResolution.assetMode,
+    registry_roots: registryRoots,
     repo_facts: {
       topology: repoFacts.topology,
+      declared_topology: repoScopeProof.topology,
+      declared_repo_count: repoScopeProof.repo_count,
+      declared_repo_ids: repoScopeProof.repo_ids,
+      repo_graph: repoScopeProof.repo_graph,
       package_manager: repoFacts.package_manager,
       languages: repoFacts.languages,
       ci_systems: repoFacts.ci_systems,
@@ -739,6 +932,18 @@ export function analyzeProjectRuntime(options = {}) {
       datasets: evaluationRegistry.datasets,
       suites: evaluationRegistry.suites,
     },
+    discovery_research: {
+      report_id: discoveryResearchReport.report_id,
+      report_ref: toEvidenceRef(init.projectRoot, discoveryResearchReportPath),
+      status: discoveryResearchReport.status,
+      adr_ready: discoveryResearchReport.status === "adr-ready",
+      blocking: discoveryResearchReport.completeness.blocking,
+      open_questions: discoveryResearchReport.open_questions,
+      checks: discoveryResearchReport.completeness.checks,
+      recommendation_refs: discoveryResearchReport.adr_ready_recommendations.map(
+        (recommendation) => recommendation.recommendation_id,
+      ),
+    },
     feature_traceability: featureTraceability
       ? {
           status: featureTraceability.missionId || featureTraceability.inputPacketRef ? "pass" : "warn",
@@ -756,8 +961,20 @@ export function analyzeProjectRuntime(options = {}) {
           expected_evidence: featureTraceability.expectedEvidence,
           change_budget: featureTraceability.changeBudget,
           source_kind: featureTraceability.sourceKind,
+          product_intake: featureTraceability.productIntake,
+          product_intake_completeness: featureTraceability.productIntakeCompleteness,
         }
       : null,
+    repo_scope_proof: {
+      topology: repoScopeProof.topology,
+      repo_count: repoScopeProof.repo_count,
+      repos: repoScopeProof.repos,
+      repo_graph: repoScopeProof.repo_graph,
+      impacted_repo_scope: repoScopeProof.impacted_repo_scope,
+      per_repo_validation_evidence: repoScopeProof.per_repo_validation_evidence,
+      integration_validation_refs: repoScopeProof.integration_validation_refs,
+      coordination_required: repoScopeProof.coordination_required,
+    },
     discovery_completeness: discoveryCompleteness,
     architecture_traceability: architectureTraceability,
     verification_plan: verificationPlan,
@@ -776,8 +993,18 @@ export function analyzeProjectRuntime(options = {}) {
     throw new Error(`Generated analysis report failed contract validation: ${issueSummary}`);
   }
 
-  const reportPath = path.join(init.runtimeLayout.reportsRoot, "project-analysis-report.json");
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  const researchValidation = validateContractDocument({
+    family: "discovery-research-report",
+    document: discoveryResearchReport,
+    source: "runtime://discovery-research-report",
+  });
+
+  if (!researchValidation.ok) {
+    const issueSummary = researchValidation.issues.map((issue) => issue.message).join("; ");
+    throw new Error(`Generated discovery research report failed contract validation: ${issueSummary}`);
+  }
+  fs.writeFileSync(discoveryResearchReportPath, `${JSON.stringify(discoveryResearchReport, null, 2)}\n`, "utf8");
   const routeResolutionPath = path.join(init.runtimeLayout.reportsRoot, "route-resolution-report.json");
   fs.writeFileSync(
     routeResolutionPath,
@@ -869,11 +1096,13 @@ export function analyzeProjectRuntime(options = {}) {
   return {
     ...init,
     reportPath,
+    discoveryResearchReportPath,
     routeResolutionPath,
     assetResolutionPath,
     policyResolutionPath,
     evaluationRegistryPath,
     report,
+    discoveryResearchReport,
     routeResolutionMatrix,
     assetResolutionMatrix,
     policyResolutionMatrix,

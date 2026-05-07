@@ -68,6 +68,13 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.equal(result.policyResolutionMatrix.length, 10);
     assert.equal(result.adapterResolutionMatrix.length, 10);
     assert.equal(fs.existsSync(result.evaluationRegistryPath), true);
+    assert.equal(fs.existsSync(result.discoveryResearchReportPath), true);
+    assert.equal(result.discoveryResearchReport.status, "incomplete");
+    assert.ok(
+      result.discoveryResearchReport.open_questions.some(
+        (entry) => entry.question_id === "local-research-inputs",
+      ),
+    );
     assert.ok(result.evaluationRegistry.datasets.length > 0);
     assert.ok(result.evaluationRegistry.suites.length > 0);
     assert.equal(
@@ -102,6 +109,65 @@ test("analyzeProjectRuntime records monorepo topology and runnable command candi
     assert.ok(reloaded.architecture_traceability.architecture_doc_refs.includes("docs/architecture/14-cli-command-catalog.md"));
     assert.ok(Array.isArray(reloaded.architecture_traceability.step_linkage));
     assert.ok(reloaded.architecture_traceability.step_linkage.some((entry) => entry.step_class === "spec"));
+    assert.equal(reloaded.discovery_research.status, "incomplete");
+    assert.equal(reloaded.discovery_research.blocking, true);
+  });
+});
+
+test("analyzeProjectRuntime honors bundled project-profile registry roots for clean repos", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s03-analysis-clean-"));
+  fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
+  fs.writeFileSync(
+    path.join(repoRoot, "package.json"),
+    JSON.stringify({ name: "analysis-clean", scripts: { test: "node --test" } }, null, 2),
+    "utf8",
+  );
+
+  try {
+    const result = analyzeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+
+    assert.equal(result.assetMode, "bundled");
+    assert.equal(fs.existsSync(path.join(repoRoot, "examples")), false);
+    assert.equal(result.registryRoots.routes, path.join(workspaceRoot, "examples/routes"));
+    assert.equal(result.routeResolutionMatrix.length, 10);
+    assert.equal(result.assetResolutionMatrix.length, 10);
+    assert.equal(result.policyResolutionMatrix.length, 10);
+    assert.equal(result.evaluationRegistry.datasets.length > 0, true);
+    assert.equal(result.report.asset_mode, "bundled");
+    assert.equal(result.report.registry_roots.routes, path.join(workspaceRoot, "examples/routes"));
+    assert.equal(result.report.discovery_completeness.status, "pass");
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("analyzeProjectRuntime records bounded multirepo repo graph and validation proof", () => {
+  withTempRepo((repoRoot) => {
+    const result = analyzeProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: path.join(repoRoot, "examples/project.bounded-multirepo.aor.yaml"),
+    });
+
+    assert.equal(result.report.project_id, "aor-bounded-multirepo-sample");
+    assert.equal(result.report.repo_facts.declared_topology, "bounded-multirepo");
+    assert.deepEqual(result.report.repo_facts.declared_repo_ids, ["backend", "mobile", "frontend"]);
+    assert.equal(result.report.repo_scope_proof.coordination_required, true);
+    assert.equal(result.report.repo_scope_proof.repo_graph.length, 2);
+    assert.deepEqual(
+      result.report.repo_scope_proof.impacted_repo_scope.map((entry) => entry.repo_id),
+      ["backend", "mobile", "frontend"],
+    );
+    assert.equal(result.report.repo_scope_proof.per_repo_validation_evidence.length, 3);
+    assert.ok(
+      result.report.repo_scope_proof.integration_validation_refs.includes(
+        "validation://integration/backend-frontend/api-contract",
+      ),
+    );
+
+    const reloaded = JSON.parse(fs.readFileSync(result.reportPath, "utf8"));
+    assert.equal(reloaded.repo_scope_proof.topology, "bounded-multirepo");
+    assert.equal(reloaded.repo_scope_proof.per_repo_validation_evidence.length, 3);
   });
 });
 
@@ -167,6 +233,7 @@ test("analyzeProjectRuntime works on the AOR repository with isolated runtime ro
     assert.equal(fs.existsSync(result.assetResolutionPath), true);
     assert.equal(fs.existsSync(result.policyResolutionPath), true);
     assert.equal(fs.existsSync(result.evaluationRegistryPath), true);
+    assert.equal(fs.existsSync(result.discoveryResearchReportPath), true);
   } finally {
     fs.rmSync(runtimeRoot, { recursive: true, force: true });
   }

@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 
+import { materializeCompilerRevisionStatus, parseCompilerRevisionRef } from "./compiler-revision.mjs";
 import { captureHarnessReplayArtifact, replayHarnessCapture } from "./harness-capture-replay.mjs";
 import { analyzeProjectRuntime } from "./project-analysis.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
@@ -12,6 +13,7 @@ const PROMOTION_CHANNEL_VALUES = new Set(["draft", "candidate", "stable", "froze
 const FLAKY_PASS_RATE_DELTA_THRESHOLD = 0.02;
 const MAJOR_DRIFT_DELTA_THRESHOLD = 0.1;
 const CONTEXT_ASSET_REF_PATTERN = /^(context-(?:bundle|doc|rule|skill)):\/\/([^@]+)@v(\d+)$/u;
+const COMPILER_REVISION_REF_PATTERN = /^compiler(?:-revision)?:\/\//u;
 const DEFAULT_WITHOUT_CONTEXT_BUNDLE_REF = "context-bundle://context.bundle.runner.empty@v1";
 
 /**
@@ -49,6 +51,14 @@ function asStringArray(value) {
   return Array.isArray(value)
     ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
     : [];
+}
+
+/**
+ * @param {Array<string | null | undefined>} values
+ * @returns {string[]}
+ */
+function uniqueStrings(values) {
+  return [...new Set(values.filter((entry) => typeof entry === "string" && entry.trim().length > 0))];
 }
 
 /**
@@ -816,6 +826,9 @@ export function certifyAssetPromotion(options) {
   const suiteRef = options.suiteRef ?? "suite.release.core@v1";
   const contextAsset = parseContextAssetReference(options.assetRef);
   const contextAssetEnabled = contextAsset !== null;
+  const compilerRevision = COMPILER_REVISION_REF_PATTERN.test(options.assetRef)
+    ? parseCompilerRevisionRef(options.assetRef)
+    : null;
 
   const captureResult = captureHarnessReplayArtifact({
     cwd: options.cwd,
@@ -931,7 +944,7 @@ export function certifyAssetPromotion(options) {
         latest_known_version: null,
         superseded_by_version: null,
       };
-  const contextProvenanceRefs = contextAssetEnabled
+  const contextProvenanceRefs = contextAssetEnabled || compilerRevision
     ? [
         ...extractCompiledContextProvenance({ stepResult: asRecord(captureResult.stepResult) }),
         ...extractCompiledContextProvenance({ stepResult: asRecord(replayResult.stepResult) }),
@@ -1146,6 +1159,37 @@ export function certifyAssetPromotion(options) {
             },
           }
         : {}),
+      ...(compilerRevision
+        ? {
+            compiler_revision_lifecycle: {
+              compiler_revision_ref: compilerRevision.compiler_revision_ref,
+              revision_id: compilerRevision.revision_id,
+              version: compilerRevision.version,
+              source_ref: compilerRevision.source_ref,
+              compiler_family: compilerRevision.compiler_family,
+              lifecycle_state:
+                toChannel === "stable"
+                  ? "stable"
+                  : toChannel === "frozen"
+                    ? "frozen"
+                    : toChannel === "demoted"
+                      ? "demoted"
+                      : "candidate",
+              compatibility_status:
+                decisionStatus === "fail" ? "incompatible" : baselineComparisonComplete ? "compatible" : "unknown",
+              compiled_context_refs: uniqueContextProvenanceRefs.filter((ref) => ref.startsWith("compiled-context://")),
+              evaluation_refs: uniqueStrings([
+                captureResult.evaluationReportPath,
+                replayResult.replayEvaluationReportPath,
+              ]),
+              certification_evidence_refs: uniqueStrings([
+                validationResult.validationReportPath,
+                captureResult.capturePath,
+                replayResult.replayReportPath,
+              ]),
+            },
+          }
+        : {}),
       evidence_bar: {
         required: [
           "validation-report",
@@ -1196,6 +1240,22 @@ export function certifyAssetPromotion(options) {
     `promotion-decision-${normalizeForId(options.assetRef)}-${Date.now()}.json`,
   );
   fs.writeFileSync(decisionPath, `${JSON.stringify(decision, null, 2)}\n`, "utf8");
+  const decisionRef = `evidence://${path.relative(init.projectRoot, decisionPath).replace(/\\/gu, "/")}`;
+  const compilerRevisionStatus = compilerRevision
+    ? materializeCompilerRevisionStatus({
+        cwd: options.cwd,
+        projectRef: options.projectRef,
+        projectProfile: options.projectProfile,
+        runtimeRoot: options.runtimeRoot,
+        compilerRevisionRef: compilerRevision.compiler_revision_ref,
+        action: toChannel === "frozen" ? "freeze" : toChannel === "demoted" ? "demote" : "promote",
+        promotionDecisionRef: decisionRef,
+        compiledContextRefs: asStringArray(decision.evidence_summary.compiler_revision_lifecycle?.compiled_context_refs),
+        evaluationRefs: asStringArray(decision.evidence_summary.compiler_revision_lifecycle?.evaluation_refs),
+        certificationEvidenceRefs: asStringArray(decision.evidence_summary.compiler_revision_lifecycle?.certification_evidence_refs),
+        compatibilityStatus: decision.evidence_summary.compiler_revision_lifecycle?.compatibility_status,
+      })
+    : null;
 
   return {
     ...init,
@@ -1207,6 +1267,7 @@ export function certifyAssetPromotion(options) {
     replayEvaluationReportPath: replayResult.replayEvaluationReportPath,
     validationReportPath: validationResult.validationReportPath,
     analysisReportPath: analysisResult.reportPath,
+    compilerRevisionStatus,
     governanceChecks,
   };
 }

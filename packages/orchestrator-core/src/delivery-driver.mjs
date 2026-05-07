@@ -7,6 +7,7 @@ import { materializeLearningLoopArtifacts } from "../../observability/src/index.
 
 import { runDeliveryMode } from "./delivery-mode-runners.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
+import { classifyChangedPathsByRepo } from "./repo-scope.mjs";
 
 const SUPPORTED_DELIVERY_MODES = new Set(["no-write", "patch-only", "local-branch", "fork-first-pr"]);
 
@@ -42,6 +43,62 @@ function asStringArray(value) {
  */
 function uniqueStrings(values) {
   return Array.from(new Set(values.filter((value) => typeof value === "string" && value.length > 0)));
+}
+
+/**
+ * @param {Record<string, unknown>} coordination
+ * @param {string[]} repoIds
+ * @returns {Array<{ repo_id: string, role: string | null, default_branch: string | null, source_root: string | null, source_kind: string | null }>}
+ */
+function resolveCoordinationRepos(coordination, repoIds) {
+  const repos = Array.isArray(coordination.repos)
+    ? coordination.repos
+        .filter((entry) => typeof entry === "object" && entry !== null)
+        .map((entry) => {
+          const repo = asRecord(entry);
+          return {
+            repo_id: asString(repo.repo_id),
+            role: asString(repo.role),
+            default_branch: asString(repo.default_branch),
+            source_root: asString(repo.source_root),
+            source_kind: asString(repo.source_kind),
+          };
+        })
+        .filter((repo) => typeof repo.repo_id === "string")
+    : [];
+
+  if (repos.length > 0) {
+    return /** @type {Array<{ repo_id: string, role: string | null, default_branch: string | null, source_root: string | null, source_kind: string | null }>} */ (repos);
+  }
+
+  return repoIds.map((repoId) => ({
+    repo_id: repoId,
+    role: null,
+    default_branch: null,
+    source_root: repoId === "main" ? "." : null,
+    source_kind: null,
+  }));
+}
+
+/**
+ * @param {{ files?: Array<{ path?: string, added?: number, deleted?: number }> }} diffStats
+ * @param {string[]} changedPaths
+ * @returns {{ files: number, added: number, deleted: number }}
+ */
+function summarizeDiffTotalsForPaths(diffStats, changedPaths) {
+  const pathSet = new Set(changedPaths);
+  const files = Array.isArray(diffStats.files)
+    ? diffStats.files.filter((entry) => typeof entry.path === "string" && pathSet.has(entry.path))
+    : [];
+
+  return files.reduce(
+    (acc, entry) => ({
+      files: acc.files + 1,
+      added: acc.added + (typeof entry.added === "number" ? entry.added : 0),
+      deleted: acc.deleted + (typeof entry.deleted === "number" ? entry.deleted : 0),
+    }),
+    { files: 0, added: 0, deleted: 0 },
+  );
 }
 
 /**
@@ -271,11 +328,17 @@ export function runDeliveryDriver(options = {}) {
   const coordination = asRecord(deliveryPlan.coordination);
   const coordinationRepoIds = asStringArray(coordination.repo_ids);
   const coordinationEvidenceRefs = asStringArray(coordination.evidence_refs);
+  const coordinationLockEvidenceRefs = asStringArray(coordination.lock_evidence_refs);
+  const crossRepoValidationRefs = asStringArray(coordination.cross_repo_validation_refs);
+  const coordinationRepos = resolveCoordinationRepos(coordination, coordinationRepoIds);
   const coordinationMetadata = {
     required: coordination.required === true,
     status: asString(coordination.status) ?? "not-required",
     repo_ids: coordinationRepoIds,
+    repos: coordinationRepos,
     evidence_refs: coordinationEvidenceRefs,
+    lock_evidence_refs: coordinationLockEvidenceRefs,
+    cross_repo_validation_refs: crossRepoValidationRefs,
   };
   const rerunRecovery = asRecord(deliveryPlan.rerun_recovery);
   const rerunMetadata = {
@@ -442,37 +505,70 @@ export function runDeliveryDriver(options = {}) {
             : "fork-pr-planned"
       : "failed";
 
-  const repoDelivery = {
-    repo_id: "main",
-    repo_root: executionRoot,
-    repo_root_ref: executionRootRef,
-    checkout_provenance: {
-      head_before: gitHeadBefore,
-      head_after: gitHeadAfter,
-    },
-    base_ref: gitHeadBefore.branch,
-    head_ref: gitHeadAfter.branch,
-    branch_name: typeof outputs.branch_name === "string" ? outputs.branch_name : null,
-    changed_paths: changedPaths,
-    diff_totals: diffStats.totals,
-    commit_refs: typeof outputs.commit_sha === "string" ? [outputs.commit_sha] : [],
-    writeback_result: writebackResult,
-    coordination: {
-      required: coordinationMetadata.required,
-      status: coordinationMetadata.status,
-      repo_ids: coordinationMetadata.repo_ids,
-    },
-  };
-  if (mode === "fork-first-pr" && asRecord(outputs.pr_draft).title) {
-    repoDelivery.pr_draft = {
-      title: asRecord(outputs.pr_draft).title,
-      base_repo: asRecord(outputs.pr_draft).base_repo,
-      base_branch: asRecord(outputs.pr_draft).base_branch,
-      head_repo: asRecord(outputs.pr_draft).head_repo,
-      head_branch: asRecord(outputs.pr_draft).head_branch,
-      is_draft: asRecord(outputs.pr_draft).is_draft,
+  const deliveryRepos =
+    coordinationRepos.length > 0
+      ? coordinationRepos
+      : [
+          {
+            repo_id: "main",
+            role: "application",
+            default_branch: gitHeadBefore.branch,
+            source_root: ".",
+            source_kind: "local",
+          },
+        ];
+  const changedPathsByRepo = classifyChangedPathsByRepo(changedPaths, deliveryRepos);
+  const prDraft = asRecord(outputs.pr_draft);
+  const repoDeliveries = deliveryRepos.map((repo) => {
+    const sourceRoot = asString(repo.source_root) ?? ".";
+    const repoRoot =
+      sourceRoot === "."
+        ? executionRoot
+        : path.isAbsolute(sourceRoot)
+          ? sourceRoot
+          : path.resolve(executionRoot, sourceRoot);
+    const repoChangedPaths = changedPathsByRepo.get(repo.repo_id) ?? [];
+    const repoDelivery = {
+      repo_id: repo.repo_id,
+      role: repo.role,
+      source_kind: repo.source_kind,
+      source_root: sourceRoot,
+      repo_root: repoRoot,
+      repo_root_ref: toEvidenceRef(init.projectRoot, repoRoot),
+      checkout_provenance: {
+        head_before: gitHeadBefore,
+        head_after: gitHeadAfter,
+      },
+      base_ref: repo.default_branch ?? gitHeadBefore.branch,
+      head_ref: gitHeadAfter.branch,
+      branch_name: typeof outputs.branch_name === "string" ? outputs.branch_name : null,
+      changed_paths: repoChangedPaths,
+      diff_totals: summarizeDiffTotalsForPaths(diffStats, repoChangedPaths),
+      commit_refs: typeof outputs.commit_sha === "string" ? [outputs.commit_sha] : [],
+      writeback_result: writebackResult,
+      coordination: {
+        required: coordinationMetadata.required,
+        status: coordinationMetadata.status,
+        repo_ids: coordinationMetadata.repo_ids,
+        evidence_refs: coordinationMetadata.evidence_refs,
+        lock_evidence_refs: coordinationMetadata.lock_evidence_refs,
+        cross_repo_validation_refs: coordinationMetadata.cross_repo_validation_refs,
+      },
     };
-  }
+
+    if (mode === "fork-first-pr" && prDraft.title) {
+      repoDelivery.pr_draft = {
+        title: prDraft.title,
+        base_repo: prDraft.base_repo,
+        base_branch: prDraft.base_branch,
+        head_repo: prDraft.head_repo,
+        head_branch: prDraft.head_branch,
+        is_draft: prDraft.is_draft,
+      };
+    }
+
+    return repoDelivery;
+  });
 
   const deliveryManifest = {
     manifest_id: `${init.projectId}.delivery-manifest.${normalizeForId(mode)}.${Date.now()}`,
@@ -488,7 +584,7 @@ export function runDeliveryDriver(options = {}) {
       blocking_reasons: asStringArray(deliveryPlan.blocking_reasons),
       network_mode: asString(outputs.network_mode) ?? "local",
     },
-    repo_deliveries: [repoDelivery],
+    repo_deliveries: repoDeliveries,
     verification_refs: uniqueStrings([...deliveryPlanEvidenceRefs, transcriptRef]),
     approval_context: {
       approved_handoff: asRecord(asRecord(deliveryPlan.preconditions).approved_handoff),
@@ -546,6 +642,8 @@ export function runDeliveryDriver(options = {}) {
       promotion_refs: evidenceGroups.promotionRefs,
       execution_refs: executionRefs,
       coordination_refs: coordinationMetadata.evidence_refs,
+      coordination_lock_refs: coordinationMetadata.lock_evidence_refs,
+      cross_repo_validation_refs: coordinationMetadata.cross_repo_validation_refs,
       rerun_refs: rerunMetadata.rerun_of_run_ref ? [rerunMetadata.rerun_of_run_ref] : [],
       delivery_output_refs: uniqueStrings([deliveryManifestRef, ...deliveryOutputRefs]),
     },

@@ -1,6 +1,11 @@
 AOR CLI command surface
 
 Implemented commands:
+  - aor doctor
+  - aor onboard
+  - aor app
+  - aor next
+  - aor mission create
   - aor project init
   - aor project analyze
   - aor project validate
@@ -10,6 +15,7 @@ Implemented commands:
   - aor harness certify
   - aor asset promote
   - aor asset freeze
+  - aor compiler revision
   - aor handoff prepare
   - aor handoff approve
   - aor intake create
@@ -24,17 +30,21 @@ Implemented commands:
   - aor run status
   - aor deliver prepare
   - aor release prepare
+  - aor multirepo lock
   - aor packet show
   - aor evidence show
   - aor incident open
+  - aor incident backfill
   - aor incident recertify
   - aor incident show
   - aor audit runs
+  - aor finance monitor
   - aor ui attach
   - aor review run
+  - aor review decide
   - aor learning handoff
   - aor ui detach
 
 Planned commands (not implemented yet):
 
-Use 'aor <group> <command> --help' for implemented command contracts.
+Use 'aor <command> --help' for guided shortcuts or 'aor <group> <command> --help' for grouped command contracts.

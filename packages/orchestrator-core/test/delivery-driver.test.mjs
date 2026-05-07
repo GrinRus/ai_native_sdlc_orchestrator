@@ -52,8 +52,10 @@ function withTempRepo(callback) {
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   runId: string,
  *   mode: "patch-only" | "local-branch" | "fork-first-pr",
- *   coordinationRepos?: Array<{ repo_id: string, role?: string, default_branch?: string }>,
+ *   coordinationRepos?: Array<{ repo_id: string, role?: string, default_branch?: string, source_root?: string, source_kind?: string }>,
  *   coordinationEvidenceRefs?: string[],
+ *   coordinationLockEvidenceRefs?: string[],
+ *   crossRepoValidationRefs?: string[],
  *   rerunOfRunRef?: string,
  *   rerunFailedStepRef?: string,
  *   rerunPacketBoundary?: string,
@@ -86,6 +88,8 @@ function createReadyPlan(options) {
     ],
     coordinationRepos: options.coordinationRepos,
     coordinationEvidenceRefs: options.coordinationEvidenceRefs,
+    coordinationLockEvidenceRefs: options.coordinationLockEvidenceRefs,
+    crossRepoValidationRefs: options.crossRepoValidationRefs,
     rerunOfRunRef: options.rerunOfRunRef,
     rerunFailedStepRef: options.rerunFailedStepRef,
     rerunPacketBoundary: options.rerunPacketBoundary,
@@ -451,6 +455,8 @@ test("runDeliveryDriver persists multi-repo coordination and bounded rerun metad
         { repo_id: "docs", role: "documentation", default_branch: "main" },
       ],
       coordinationEvidenceRefs: ["evidence://coordination/w8-s07"],
+      coordinationLockEvidenceRefs: ["evidence://reports/multirepo-coordination-status-w8-s07.json"],
+      crossRepoValidationRefs: ["validation://integration/main-docs"],
       rerunOfRunRef: fixture.rerun.rerun_of_run_ref,
       rerunFailedStepRef: fixture.rerun.failed_step_ref,
       rerunPacketBoundary: fixture.rerun.packet_boundary,
@@ -473,12 +479,97 @@ test("runDeliveryDriver persists multi-repo coordination and bounded rerun metad
     assert.equal(result.deliveryManifest.rerun_recovery.packet_boundary, fixture.rerun.packet_boundary);
     assert.equal(result.deliveryManifest.rerun_recovery.failed_step_ref, fixture.rerun.failed_step_ref);
     assert.ok(result.releasePacket.evidence_lineage.coordination_refs.includes("evidence://coordination/w8-s07"));
+    assert.ok(
+      result.releasePacket.evidence_lineage.coordination_lock_refs.includes(
+        "evidence://reports/multirepo-coordination-status-w8-s07.json",
+      ),
+    );
+    assert.ok(result.releasePacket.evidence_lineage.cross_repo_validation_refs.includes("validation://integration/main-docs"));
     assert.ok(result.releasePacket.evidence_lineage.rerun_refs.includes(fixture.rerun.rerun_of_run_ref));
 
     const transcript = JSON.parse(fs.readFileSync(result.transcriptFile, "utf8"));
     assert.equal(transcript.coordination.required, fixture.coordination_required);
     assert.equal(transcript.recovery_scope.packet_boundary, fixture.rerun.packet_boundary);
     assert.equal(transcript.recovery_scope.failed_step_ref, fixture.rerun.failed_step_ref);
+  });
+});
+
+test("runDeliveryDriver preserves repo-level changed paths for bounded multirepo delivery", () => {
+  withTempRepo((repoRoot) => {
+    const backendFile = path.join(repoRoot, "repos/backend/src/orders.ts");
+    const frontendFile = path.join(repoRoot, "repos/frontend/src/api-client.ts");
+    fs.mkdirSync(path.dirname(backendFile), { recursive: true });
+    fs.mkdirSync(path.dirname(frontendFile), { recursive: true });
+    fs.writeFileSync(backendFile, "export const version = 1;\n", "utf8");
+    fs.writeFileSync(frontendFile, "export const version = 1;\n", "utf8");
+    runGitChecked({ cwd: repoRoot, args: ["add", "repos"] });
+    runGitChecked({ cwd: repoRoot, args: ["commit", "-m", "add bounded multirepo fixture"] });
+
+    fs.writeFileSync(backendFile, "export const version = 2;\n", "utf8");
+    fs.writeFileSync(frontendFile, "export const version = 2;\n", "utf8");
+
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const { deliveryPlanFile } = createReadyPlan({
+      init,
+      runId: "run.delivery.bounded-multirepo.v1",
+      mode: "patch-only",
+      coordinationRepos: [
+        {
+          repo_id: "backend",
+          role: "backend",
+          default_branch: "main",
+          source_root: "repos/backend",
+          source_kind: "git",
+        },
+        {
+          repo_id: "mobile",
+          role: "mobile",
+          default_branch: "main",
+          source_root: "repos/mobile",
+          source_kind: "git",
+        },
+        {
+          repo_id: "frontend",
+          role: "frontend",
+          default_branch: "main",
+          source_root: "repos/frontend",
+          source_kind: "git",
+        },
+      ],
+      coordinationEvidenceRefs: ["evidence://coordination/w18-s04"],
+      coordinationLockEvidenceRefs: ["evidence://reports/multirepo-coordination-status-w18-s04.json"],
+      crossRepoValidationRefs: ["validation://integration/backend-frontend/api-contract"],
+    });
+
+    const result = runDeliveryDriver({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "run.delivery.bounded-multirepo.v1",
+      mode: "patch-only",
+      deliveryPlanPath: deliveryPlanFile,
+    });
+
+    assert.equal(result.status, "success");
+    assert.deepEqual(result.deliveryManifest.coordination.repo_ids, ["backend", "mobile", "frontend"]);
+    assert.ok(result.releasePacket.evidence_lineage.coordination_refs.includes("evidence://coordination/w18-s04"));
+
+    const deliveriesByRepo = new Map(
+      result.deliveryManifest.repo_deliveries.map((delivery) => [delivery.repo_id, delivery]),
+    );
+    assert.deepEqual(deliveriesByRepo.get("backend")?.changed_paths, ["repos/backend/src/orders.ts"]);
+    assert.deepEqual(deliveriesByRepo.get("frontend")?.changed_paths, ["repos/frontend/src/api-client.ts"]);
+    assert.deepEqual(deliveriesByRepo.get("mobile")?.changed_paths, []);
+    assert.deepEqual(deliveriesByRepo.get("backend")?.coordination.evidence_refs, [
+      "evidence://coordination/w18-s04",
+      "evidence://reports/multirepo-coordination-status-w18-s04.json",
+      "validation://integration/backend-frontend/api-contract",
+    ]);
+    assert.deepEqual(deliveriesByRepo.get("backend")?.coordination.lock_evidence_refs, [
+      "evidence://reports/multirepo-coordination-status-w18-s04.json",
+    ]);
+    assert.deepEqual(deliveriesByRepo.get("backend")?.coordination.cross_repo_validation_refs, [
+      "validation://integration/backend-frontend/api-contract",
+    ]);
   });
 });
 

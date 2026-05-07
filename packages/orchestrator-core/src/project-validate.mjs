@@ -9,7 +9,8 @@ import {
 
 import { validateApprovedHandoffGate } from "./handoff-packets.mjs";
 import { loadEvaluationRegistry } from "./evaluation-registry.mjs";
-import { initializeProjectRuntime } from "./project-init.mjs";
+import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project-init.mjs";
+import { resolveProjectRepoScope } from "./repo-scope.mjs";
 
 /**
  * @param {Array<{ validator_id: string, status: "pass" | "warn" | "fail", summary: string, details?: Record<string, unknown> }>} validators
@@ -101,6 +102,53 @@ function validateRuntimeDefaults(profile) {
 }
 
 /**
+ * @param {ReturnType<typeof resolveProjectRepoScope>} repoScope
+ * @returns {{ status: "pass" | "fail", summary: string, details: Record<string, unknown> }}
+ */
+function validateRepoScopeProof(repoScope) {
+  const repoIds = new Set(repoScope.repo_ids);
+  const unknownEdgeRefs = repoScope.repo_graph.filter(
+    (edge) => !repoIds.has(edge.from_repo_id) || !repoIds.has(edge.to_repo_id),
+  );
+  const boundedMultirepoDeclared = repoScope.topology === "bounded-multirepo";
+  const missingRepoEntries = repoScope.repo_count < 1;
+  const missingBoundedRepos = boundedMultirepoDeclared && repoScope.repo_count < 2;
+
+  if (unknownEdgeRefs.length > 0 || missingRepoEntries || missingBoundedRepos) {
+    return {
+      status: "fail",
+      summary: "Project profile repo scope proof is inconsistent.",
+      details: {
+        topology: repoScope.topology,
+        repo_count: repoScope.repo_count,
+        repo_ids: repoScope.repo_ids,
+        unknown_edge_refs: unknownEdgeRefs,
+        missing_repo_entries: missingRepoEntries,
+        missing_bounded_repos: missingBoundedRepos,
+      },
+    };
+  }
+
+  return {
+    status: "pass",
+    summary:
+      repoScope.repo_count > 1
+        ? "Bounded multirepo repo graph and validation evidence refs are present."
+        : "Single-repo or monorepo repo scope proof is present.",
+    details: {
+      topology: repoScope.topology,
+      repo_count: repoScope.repo_count,
+      repos: repoScope.repos,
+      repo_graph: repoScope.repo_graph,
+      impacted_repo_scope: repoScope.impacted_repo_scope,
+      per_repo_validation_evidence: repoScope.per_repo_validation_evidence,
+      integration_validation_refs: repoScope.integration_validation_refs,
+      coordination_required: repoScope.coordination_required,
+    },
+  };
+}
+
+/**
  * @param {string} reportPath
  * @returns {{ exists: boolean, status: string | null }}
  */
@@ -159,6 +207,8 @@ export function validateProjectRuntime(options = {}) {
   }
 
   const profile = /** @type {Record<string, unknown>} */ (loadedProfile.document ?? {});
+  const registryResolution = resolveProjectRegistryRoots(profile, { projectRoot: init.projectRoot });
+  const repoScopeProof = resolveProjectRepoScope({ profile });
 
   const defaultsCheck = validateProfileDefaults(profile);
   validators.push({
@@ -184,6 +234,21 @@ export function validateProjectRuntime(options = {}) {
     details: writebackCheck.details,
   });
 
+  const repoScopeCheck = validateRepoScopeProof(repoScopeProof);
+  validators.push({
+    validator_id: "repo-scope-proof",
+    status: repoScopeCheck.status,
+    summary: repoScopeCheck.summary,
+    details: repoScopeCheck.details,
+  });
+  evidenceRefs.push(
+    ...repoScopeProof.per_repo_validation_evidence.flatMap((entry) => [
+      ...entry.validation_refs,
+      ...entry.command_refs,
+    ]),
+    ...repoScopeProof.integration_validation_refs,
+  );
+
   const analysisReportPath = path.join(init.runtimeLayout.reportsRoot, "project-analysis-report.json");
   const analysisReportStatus = readAnalysisReportStatus(analysisReportPath);
   if (!analysisReportStatus.exists) {
@@ -203,20 +268,25 @@ export function validateProjectRuntime(options = {}) {
     });
   }
 
-  const examplesDir = path.join(init.projectRoot, "examples");
+  const examplesDir = registryResolution.roots.evaluation;
   if (!fs.existsSync(examplesDir)) {
     validators.push({
       validator_id: "asset-reference-integrity",
       status: "warn",
-      summary: "No examples directory found; reference integrity checks were skipped.",
+      summary: "No project-profile evaluation registry root found; reference integrity checks were skipped.",
+      details: { expected_root: examplesDir },
     });
     validators.push({
       validator_id: "evaluation-registry",
       status: "warn",
-      summary: "No examples directory found; dataset/suite registry checks were skipped.",
+      summary: "No project-profile evaluation registry root found; dataset/suite registry checks were skipped.",
+      details: { expected_root: examplesDir },
     });
   } else {
-    const referenceIntegrity = validateExampleReferences({ workspaceRoot: init.projectRoot });
+    const referenceIntegrity = validateExampleReferences({
+      workspaceRoot: init.projectRoot,
+      examplesRoot: examplesDir,
+    });
     validators.push({
       validator_id: "asset-reference-integrity",
       status: referenceIntegrity.ok ? "pass" : "fail",
@@ -231,7 +301,10 @@ export function validateProjectRuntime(options = {}) {
     });
     evidenceRefs.push(`reference-integrity:${referenceIntegrity.checkedReferences}`);
 
-    const evaluationRegistry = loadEvaluationRegistry({ workspaceRoot: init.projectRoot });
+    const evaluationRegistry = loadEvaluationRegistry({
+      workspaceRoot: init.projectRoot,
+      examplesRoot: examplesDir,
+    });
     validators.push({
       validator_id: "evaluation-registry",
       status: evaluationRegistry.ok ? "pass" : "fail",

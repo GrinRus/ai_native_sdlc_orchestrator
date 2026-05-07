@@ -29,10 +29,23 @@ Runtime Harness controllers may add optional decision metadata:
 
 These fields describe AOR runtime control decisions. They do not replace review, eval, delivery, learning, or promotion artifacts.
 `external_runner` is a routed live-execution evidence summary copied from the adapter response when an external runtime was invoked. It should preserve the selected runtime-agent permission mode, permission mode source, command surface, execution root, exit metadata, and raw evidence ref when available.
-`requested_interaction` is the operator-continuation surface for runner-requested input. Current runtimes may still treat `interactive-question-requested` as a blocking failure class, but the W18 target is for this field to carry query-safe question metadata, evidence refs, answer audit refs when present, and the continuation/blocking state needed by CLI, API, and web subscribers.
+`requested_interaction` is the operator-continuation surface for runner-requested input. It is optional and may be `null` when no operator input is required.
+
+When present, `requested_interaction` must stay query-safe and should carry:
+- `requested` (`true`);
+- `interaction_id` when the runtime can assign a stable run-local id;
+- `status` in `requested|answered|resumed|blocked`;
+- `prompt_summary` or `summary` with a short sanitized question summary;
+- `question_evidence_refs` or `evidence_refs` pointing at raw runner evidence;
+- `answer_audit_refs` after an operator answer has been accepted;
+- `continuation` with the intended control-plane next action (`resume_from_boundary|remain_blocked`) and a reason code when blocked.
+
+The field must not embed sensitive answer text. Operator answers belong in durable audit evidence and may be referenced from this field after submission. Existing runtimes may still emit the minimal shape `{ requested: true, summary, evidence_refs }` while `interactive-question-requested` remains a blocking failure class; that minimal shape is the compatibility floor for W18 and must be interpreted as `status=requested` with no accepted answer yet.
 `repair_attempts` is the step-local Runtime Harness ledger. It should preserve the trigger, failure class, selected policy action, input evidence refs, repair route/compiled-context refs when executed, result, and budget exhaustion metadata. When repair executes, `input_evidence_refs` should include the generated repair input evidence that carries previous findings, failed step-result refs, diff status, adapter evidence, validator findings, and the current Runtime Harness report ref.
 `mission_semantics` records the semantic validation evidence used by the step controller, including changed paths and strict no-op detection inputs when available.
 For mission-scoped runs, `mission_semantics` should also preserve ignored request input files, allowed/forbidden path rules, mission-scoped changed paths, and scope violation paths so run-start decisions cannot be satisfied by control/input artifacts alone.
+
+For `spec` routed steps, `routed_execution.discovery_research_gate` may carry the discovery research report status, ADR-ready flag, open questions, checks, and report refs from `aor discovery run`. This keeps ADR-readiness visible at specification handoff without making the spec step own research collection.
 For later discovery/architecture maturity flows, `routed_execution` may include `discovery_completeness_gate` and `architecture_traceability` payloads so planning handoff is auditable.
 For later operator troubleshooting maturity flows, `routed_execution.policy_resolution.governance_decision` should remain present when available so run-level policy history queries can avoid raw log inspection.
 

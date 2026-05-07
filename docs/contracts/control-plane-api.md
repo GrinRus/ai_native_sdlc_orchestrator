@@ -11,7 +11,7 @@ Current code is **hybrid module + detached transport**:
 - Contract and artifact semantics stay aligned across both bindings.
 
 Implemented operation families:
-- read: project state, packets, step results, manifests, promotion decisions, quality artifacts, runs, run event history, run policy history, strategic snapshot;
+- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
 - live events: append/read/open stream using the `live-run-event` contract family.
@@ -30,6 +30,32 @@ Current enum constraints:
 - `binding_mode=hybrid-module-and-detached-http-sse`;
 - `deferred_transport_status=implemented`.
 
+## Production hardening boundary (W20-S02)
+
+The detached HTTP/SSE transport now has two explicit security modes:
+- `local-trusted` is the default for loopback development and local harness use. It may run without bearer credentials, but it still uses the same route permission metadata and redaction helpers.
+- `production-hardened` requires bearer authentication for every read, stream, and mutation route. This mode is a transport hardening baseline, not an enterprise identity-provider integration or hosted SaaS claim.
+
+Auth and authorization behavior:
+- bearer principals are configured out-of-band when the detached transport starts;
+- each principal carries `read` and/or `mutate` permission scopes plus allowed `project_refs`;
+- all route definitions declare one required permission before handlers run;
+- missing, invalid, wrong-project, and insufficient-scope decisions return stable `auth.*` error codes with `required_permission`, `project_id`, `token_id`, and `security_mode`;
+- denied transport actions do not invoke mutation handlers.
+
+Secret-safe payload behavior:
+- configured bearer token values and additional configured redaction values are redacted from JSON responses and SSE events;
+- live-run event writes redact sensitive fields before appending JSONL logs;
+- run-control audit records redact configured secret values while preserving denial reasons and policy context;
+- CLI JSON output applies the same redaction primitive to configured local secret values from `AOR_REDACTION_SECRETS`;
+- durable audit evidence may retain non-secret operator intent, approval refs, state refs, and evidence refs for reviewability.
+
+Out of scope for this baseline:
+- external identity-provider federation;
+- hosted tenant isolation;
+- broad SaaS audit retention policy;
+- replacing repository/provider permissions with AOR transport auth.
+
 ## Command families
 - project bootstrap commands
 - intake and planning commands
@@ -39,6 +65,17 @@ Current enum constraints:
 - review and learning-loop commands
 - delivery and release commands
 - incident and promotion commands
+
+## Guided installed-user boundary (W21-S01)
+Guided UX surfaces use the installed-user journey defined in `docs/product/02-installed-user-onboarding-journey.md`.
+
+The control plane remains the orchestration owner:
+- `doctor`, `onboard`, `mission create`, `next`, and `app` are guided vocabulary over existing command/query families;
+- web stages read the same project, packet, run, quality, finance, and lifecycle state exposed by the control plane;
+- guided mutations must call runtime command handlers or existing control-plane mutation families;
+- guided web can invoke the bounded `mission create` and `next` lifecycle-command mutations to create mission evidence and refresh the durable `next-action-report`;
+- read-only, disconnected, connected, detached, blocked, and ready UI states must be derived from durable runtime state;
+- guided flows must preserve no-upstream-write defaults until delivery mode, policy, review, approval, and writeback evidence are explicit.
 
 Project bootstrap baseline:
 - `project init` may materialize a clean target repo through public bootstrap flags only;
@@ -51,20 +88,46 @@ Project bootstrap baseline:
 - runs
 - step results
 - validation and evaluation reports
-- review reports and learning-loop closure artifacts
+- review reports, review decisions, and learning-loop closure artifacts
 - delivery manifests and release packets
 - incidents and promotion decisions
+- compiler revision status reports
+- planner metric snapshots
+- finance monitoring snapshots
+- next-action reports
 
-## Planned connected lifecycle mutations (W18 target)
+## Connected lifecycle mutations (W18 baseline)
 
-W18 tracks the backlog gap between the current bounded mutation baseline and a connected web surface that can drive the approved lifecycle through the control plane. This section is a target contract note, not a claim that every mutation is implemented today.
+W18 closes the first connected-web gap between the bounded run-control/UI mutation baseline and a web surface that can drive the approved lifecycle through the control plane. This is a bounded lifecycle subset, not a full CLI-over-HTTP parity claim.
 
-Lifecycle command mutations should:
+Lifecycle command mutations must:
 - cover the minimum bootstrap, intake, discovery, spec, planning, handoff, run, review, delivery, and learning actions needed by the web full-flow path;
 - call the same runtime command handlers used by CLI/headless flows instead of adding UI-owned orchestration logic;
 - return existing command response fields and durable artifact refs where available;
 - preserve policy, approval, validation, and blocked-next-step evidence in stable response shapes;
-- support the interactive continuation flow described by `step-result.requested_interaction`.
+- support the interactive continuation flow described by `step-result.requested_interaction`;
+- include an answer-submission command mutation for unresolved runner-requested interactions before web full-flow claims answer support.
+
+HTTP lifecycle command mutation baseline:
+- route: `POST /api/projects/:projectId/lifecycle-command/actions`;
+- payload fields: `command` plus optional `flags`;
+- `command` must be one of the bounded implemented lifecycle commands documented in `module-surface-baseline.yaml`;
+- `flags` is a JSON object whose keys map to CLI flags by replacing `_` with `-`;
+- `project_ref`, `project-ref`, `runtime_root`, `runtime-root`, and `help` are server-owned and cannot be supplied by clients;
+- the transport injects the scoped project ref and runtime root before invoking the existing CLI/runtime path;
+- successful responses return `{ lifecycle_command }` with `command_output` preserving the CLI JSON fields, `artifact_refs`, `evidence_refs`, `exit_code`, `stdout`, `stderr`, and `interactive_continuation`;
+- `mission create` and `next` are included in the bounded mutation subset for guided web progress; `next` is treated as a mutation because it materializes a durable `next-action-report`;
+- unsupported commands or invalid/missing required flags return HTTP `400` with `error.code` in `invalid_lifecycle_command | invalid_lifecycle_flags`;
+- command outputs that report policy, validation, guardrail, or interaction blocking return HTTP `409` with `{ error, lifecycle_command }` while preserving any durable output refs the runtime produced.
+
+HTTP interactive answer mutation baseline:
+- route: `POST /api/projects/:projectId/interactions/answers`;
+- payload fields: `run_id`, `interaction_id`, `answer`, and optional `reason`, `approval_ref`, `answer_evidence_ref`;
+- the referenced interaction must match the latest unresolved run-linked `step-result.requested_interaction`;
+- accepted answers write one durable `interaction-answer-*.json` audit artifact under the runtime reports root before any continuation state changes;
+- response payloads return `{ interaction_answer }` with `interaction_id`, `interaction_status`, `answer_audit_ref`, `step_result_ref`, `run_control_transition`, `blocked_reason`, and live event ids;
+- when the current runtime cannot resume from the recorded interaction boundary, the transport returns HTTP `409` with `error.code=interaction.continuation_blocked` and keeps the run blocked with evidence refs;
+- live events and query payloads must reference `answer_audit_ref` and must not include the raw answer text.
 
 ## Read surface baseline (module operations)
 
@@ -74,6 +137,13 @@ Run-level read baseline:
 - run summaries include `context_lifecycle` when run-linked promotion decisions reference context assets, with context version refs, immutable provenance refs, and decision-trail history;
 - run event history remains bounded and replay-safe;
 - run policy history remains evidence-derived from `step-result` and `delivery-plan` outputs.
+- `strategic_snapshot.planner_metrics` and `GET /api/projects/:projectId/planner-metrics` expose one `planner-metrics-snapshot` read model with `clean_close_rate`, `retry_rate`, `repair_rate`, and `blocker_rate`.
+- `strategic_snapshot.finance_monitoring` and `GET /api/projects/:projectId/finance-monitoring` expose one `finance-monitoring-snapshot` read model with cost/latency grouping by project, route, bundle, compiler revision, and adapter.
+- `GET /api/projects/:projectId/compiler-revisions` returns contract-backed `compiler-revision-status` reports so compiler lifecycle, compatibility, decision history, incidents, and evaluation lineage are queryable without opening raw files.
+- `GET /api/projects/:projectId/next-action-report` returns the latest durable `next-action-report` if one exists, including `closure_state` for review, delivery, release, and learning final-stage evidence, or `null` when `aor next` has not materialized one yet. The read route does not generate or refresh the report.
+- Empty projects must return `status=no-data`, `no_data=true`, and `value=null` per metric rather than claiming a zero success or failure rate.
+- Planner metrics derive only from durable run, review, Runtime Harness, incident, and run-control audit artifacts; they do not mutate scheduler state.
+- Finance monitoring separates `production_monitoring`, `offline_certification`, and `rehearsal` evidence classes. Production monitoring requires explicit event scope and must not be inferred from certification or rehearsal artifacts.
 
 ## Run-control baseline (module operations)
 
@@ -110,8 +180,17 @@ Full-journey execution baseline (W13):
 Interactive continuation target (W18-S01):
 - when a routed step requests operator input, the run should preserve a query-safe `requested_interaction` payload in the run-linked step result;
 - operator answers should be submitted through a control-plane command path that records answer audit evidence before any continuation attempt;
+- answer submission payloads should include `run_id`, `interaction_id`, `answer`, and optional `reason`, `approval_ref`, or `answer_evidence_ref`;
+- answer submission responses should include `interaction_id`, `interaction_status`, `answer_audit_ref`, `step_result_ref`, `run_control_transition`, and `blocked_reason` when continuation cannot proceed;
 - continuation should either resume the bounded run from the recorded interaction boundary or remain blocked with explicit evidence refs and reason codes;
+- live event payloads should reference `requested_interaction` and `answer_audit_ref` without exposing raw answer text;
 - web clients may present and submit the interaction, but the control plane remains responsible for validation, audit, and run-state transitions.
+
+Answer validation baseline for W18:
+- the referenced `interaction_id` must match the latest unresolved run-linked `requested_interaction`;
+- empty answers are invalid unless an `answer_evidence_ref` points to a durable operator-provided artifact;
+- accepted answers must write one durable audit artifact before the run attempts to continue;
+- rejected answers must return a stable blocked/error shape and preserve the prior interaction evidence.
 
 ## Delivery/release baseline (module operations)
 
@@ -138,6 +217,7 @@ Delivery/release response baseline:
 - `delivery_quality_gate_mode`, `delivery_quality_gate_status`, and `delivery_quality_gate_findings` for strict/observe gate evidence when the command exposes observe mode;
 - `delivery_governance_decision` for explicit deny/escalate reasoning;
 - `delivery_coordination` for multi-repo coordination requirement and evidence status;
+- `multirepo_coordination` for scoped lock and cross-repo validation status reads;
 - `delivery_rerun_recovery` for explicit rerun run-ref, failed-step, and packet-boundary scope;
 - `delivery_manifest_file` and `release_packet_file` as durable evidence outputs;
 - `runtime_harness_report_file` and `runtime_harness_overall_decision` for the latest Runtime Harness gate used by strict delivery/release checks;
@@ -168,7 +248,7 @@ Incident recertify baseline (W7-S03):
 - recertification output includes explicit platform linkage (`platform_action`, `platform_linkage`, `rollback_required`) plus finance/quality evidence refs and roots.
 
 Audit runs baseline:
-- emits run-centric snapshots of packet, step-result, quality, incident, and promotion refs;
+  - emits run-centric snapshots of packet, step-result, quality, incident, and promotion refs;
 - emits `run_audit_records.finance_evidence` with route/wrapper/adapter IDs plus bounded cost/timeout/latency summaries;
 - emits `run_audit_records.provider_execution_status` from materialized adapter raw execution evidence, not from provider route traceability alone;
 - supports optional `run_id` filter and bounded `limit` window;
@@ -181,6 +261,11 @@ Review run baseline:
 - response includes `review_report_file`, `review_overall_status`, and `review_recommendation`;
 - `review-report` must cover `feature_traceability`, `discovery_quality`, `artifact_quality`, `code_quality`, `feature_size_fit`, `provider_traceability`, `findings`, and `evidence_refs`;
 - artifact review must treat bootstrap-owned files and runner-produced request-input files as non-code when computing target code-scope findings.
+
+Review decision baseline:
+- `review decide` writes one durable `review-decision` artifact for `approve`, `hold`, or `request-repair`;
+- `approve` must be blocked unless linked `review-report` and Runtime Harness evidence both pass;
+- delivery/release commands may require this approval through `require_review_decision` lifecycle flags that map to `--require-review-decision`.
 
 Learning handoff baseline:
 - `learning handoff` writes one public `learning-loop-scorecard` and one public `learning-loop-handoff`;
@@ -226,17 +311,23 @@ Reconnect and backpressure baseline:
 Connected-mode transport mapping is implemented for read, follow, and bounded mutation baseline:
 - `GET /api/projects/:projectId/state`
 - `GET /api/projects/:projectId/strategic-snapshot`
+- `GET /api/projects/:projectId/planner-metrics`
+- `GET /api/projects/:projectId/finance-monitoring`
+- `GET /api/projects/:projectId/next-action-report`
 - `GET /api/projects/:projectId/packets`
 - `GET /api/projects/:projectId/step-results`
 - `GET /api/projects/:projectId/quality-artifacts`
 - `GET /api/projects/:projectId/delivery-manifests`
 - `GET /api/projects/:projectId/promotion-decisions`
+- `GET /api/projects/:projectId/compiler-revisions`
 - `GET /api/projects/:projectId/runs`
 - `GET /api/projects/:projectId/runs/:runId/events/history`
 - `GET /api/projects/:projectId/runs/:runId/policy-history`
 - `GET /api/projects/:projectId/runs/:runId/events` (SSE + replay parameters).
 - `POST /api/projects/:projectId/run-control/actions`
 - `POST /api/projects/:projectId/ui-lifecycle/actions`
+- `POST /api/projects/:projectId/lifecycle-command/actions`
+- `POST /api/projects/:projectId/interactions/answers`
 
 Detached mutation payload baseline:
 - run-control payload fields: `action`, `run_id`, `target_step`, `reason`, `approval_ref`;
@@ -244,12 +335,18 @@ Detached mutation payload baseline:
 - blocked run-control transitions return `409` with `{ error: { code, message }, run_control }` while still persisting audit and lifecycle artifacts;
 - ui lifecycle payload fields: `action`, `run_id`, `control_plane`;
 - ui lifecycle response reuses module parity fields: `state_file`, `connection_state`, `headless_safe`, `idempotent`.
+- lifecycle-command payload fields: `command`, `flags`;
+- lifecycle-command response reuses CLI command output fields under `command_output` and adds transport-level `artifact_refs`, `evidence_refs`, `blocked`, and `blocked_reason`;
+- interaction answer payload fields: `run_id`, `interaction_id`, `answer`, `reason`, `approval_ref`, `answer_evidence_ref`;
+- interaction answer response writes and references durable answer audit evidence before reporting whether continuation remains blocked.
 
 Detached mutation error-shape baseline:
 - `invalid_json` for malformed request body;
 - `invalid_payload` for non-object JSON payload;
-- `invalid_run_control_action` and `invalid_ui_lifecycle_action` for unsupported actions;
+- `invalid_run_control_action`, `invalid_ui_lifecycle_action`, and `invalid_lifecycle_command` for unsupported actions;
+- `invalid_lifecycle_flags` and `interaction_answer.invalid_answer` for malformed mutation inputs;
 - `run_control.blocked` family codes for policy or transition blocking branches.
+- `lifecycle_command.blocked`, `lifecycle_command.interaction_required`, and `interaction.continuation_blocked` for bounded command and continuation blocking branches.
 
 Detached authn/authz baseline (W10-S04):
 - auth mode is optional and disabled by default for local trusted operator rehearsals;
@@ -260,7 +357,7 @@ Detached authn/authz baseline (W10-S04):
 - auth error payload includes `error.auth.required_permission`, `error.auth.project_id`, and `error.auth.token_id` (when available).
 
 Deferred beyond this baseline:
-- mutation-command HTTP endpoint parity for lifecycle commands outside the supported run-control and UI lifecycle actions; W18-S02 tracks the minimum connected web full-flow subset before any broader CLI-over-HTTP parity claim;
+- mutation-command HTTP endpoint parity for commands outside the supported W18 lifecycle subset;
 - production authn/authz and deployment hardening.
 
 ## API/UI alignment notes (W5-S04 + W9-S03 + W10-S03)

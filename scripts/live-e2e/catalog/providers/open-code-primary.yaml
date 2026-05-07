@@ -1,6 +1,6 @@
 provider_variant_id: open-code-primary
 provider: open-code
-coverage_tier: extended
+coverage_tier: required
 primary_adapter: open-code
 fallback_policy:
   mode: none

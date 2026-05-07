@@ -1,0 +1,94 @@
+schema_version: 1
+snapshot_id: aor-core.planner-metrics.snapshot.v1
+project_id: aor-core
+generated_at: "2026-05-06T00:00:00.000Z"
+status: ready
+no_data: false
+metric_names:
+  - clean_close_rate
+  - retry_rate
+  - repair_rate
+  - blocker_rate
+aggregation:
+  unit: run
+  denominator: 4
+  no_data_reason: null
+  partial_run_ids: []
+source_artifacts:
+  run_refs:
+    - run://run.clean-close
+    - run://run.retry
+    - run://run.repair
+    - run://run.blocked
+  review_report_refs:
+    - evidence://reports/review-report-run-clean-close.json
+  review_decision_refs:
+    - evidence://reports/review-decision-run-clean-close.json
+    - evidence://reports/review-decision-run-repair.json
+  runtime_harness_report_refs:
+    - evidence://reports/runtime-harness-report-run-clean-close.json
+    - evidence://reports/runtime-harness-report-run-retry.json
+    - evidence://reports/runtime-harness-report-run-repair.json
+    - evidence://reports/runtime-harness-report-run-blocked.json
+  incident_report_refs:
+    - evidence://reports/incident-report-run-blocked.json
+  audit_refs:
+    - evidence://reports/run-control-event-run-blocked-0002.json
+metrics:
+  clean_close_rate:
+    name: clean_close_rate
+    unit: ratio
+    numerator: 1
+    denominator: 4
+    value: 0.25
+    no_data: false
+    evidence_run_ids:
+      - run.clean-close
+  retry_rate:
+    name: retry_rate
+    unit: ratio
+    numerator: 1
+    denominator: 4
+    value: 0.25
+    no_data: false
+    evidence_run_ids:
+      - run.retry
+  repair_rate:
+    name: repair_rate
+    unit: ratio
+    numerator: 1
+    denominator: 4
+    value: 0.25
+    no_data: false
+    evidence_run_ids:
+      - run.repair
+  blocker_rate:
+    name: blocker_rate
+    unit: ratio
+    numerator: 2
+    denominator: 4
+    value: 0.5
+    no_data: false
+    evidence_run_ids:
+      - run.blocked
+      - run.repair
+run_breakdown:
+  - run_id: run.clean-close
+    classification: clean-close
+    no_data: false
+    signals:
+      clean_close: true
+      retry: false
+      repair: false
+      blocker: false
+      review_evidence: true
+      runtime_evidence: true
+      open_incident: false
+      blocked_audit_count: 0
+      retry_attempt_count: 0
+      repair_attempt_count: 0
+      runtime_decisions:
+        - pass
+    evidence_refs:
+      - evidence://reports/review-report-run-clean-close.json
+      - evidence://reports/runtime-harness-report-run-clean-close.json

@@ -21,20 +21,86 @@ writeback_policy:
   require_review_before_merge: true
   branch_pattern: aor/WAVE-004/RUN-101
 repo_deliveries:
-  - repo_id: main
+  - repo_id: backend
+    role: backend
+    source_kind: git
+    source_root: repos/backend
     base_ref: origin/main
     head_ref: refs/heads/aor/WAVE-004/RUN-101
     branch_name: aor/WAVE-004/RUN-101
     changed_paths:
-      - docs/architecture/**
-      - docs/contracts/**
+      - repos/backend/src/orders.ts
+      - repos/backend/contracts/openapi.yaml
     commit_refs:
       - 9f3c2ab
     pr_ref: https://github.com/your-org/your-repo/pull/42
     merge_strategy: squash
     writeback_result: pr-opened
+    coordination:
+      required: true
+      status: present
+      repo_ids:
+        - backend
+        - mobile
+        - frontend
+      evidence_refs:
+        - evidence://coordination/WAVE-004/backend-mobile-frontend
+      lock_evidence_refs:
+        - evidence://reports/multirepo-coordination-status.sample.yaml
+      cross_repo_validation_refs:
+        - validation://integration/backend-frontend/api-contract
     rollback_refs:
       - revert://9f3c2ab
+  - repo_id: mobile
+    role: mobile
+    source_kind: git
+    source_root: repos/mobile
+    base_ref: origin/main
+    head_ref: refs/heads/aor/WAVE-004/RUN-101
+    branch_name: aor/WAVE-004/RUN-101
+    changed_paths:
+      - repos/mobile/src/api/client.ts
+    commit_refs:
+      - 9f3c2ab
+    writeback_result: pr-opened
+    coordination:
+      required: true
+      status: present
+      repo_ids:
+        - backend
+        - mobile
+        - frontend
+      evidence_refs:
+        - evidence://coordination/WAVE-004/backend-mobile-frontend
+      lock_evidence_refs:
+        - evidence://reports/multirepo-coordination-status.sample.yaml
+      cross_repo_validation_refs:
+        - validation://integration/backend-frontend/api-contract
+  - repo_id: frontend
+    role: frontend
+    source_kind: git
+    source_root: repos/frontend
+    base_ref: origin/main
+    head_ref: refs/heads/aor/WAVE-004/RUN-101
+    branch_name: aor/WAVE-004/RUN-101
+    changed_paths:
+      - repos/frontend/src/api/client.ts
+    commit_refs:
+      - 9f3c2ab
+    writeback_result: pr-opened
+    coordination:
+      required: true
+      status: present
+      repo_ids:
+        - backend
+        - mobile
+        - frontend
+      evidence_refs:
+        - evidence://coordination/WAVE-004/backend-mobile-frontend
+      lock_evidence_refs:
+        - evidence://reports/multirepo-coordination-status.sample.yaml
+      cross_repo_validation_refs:
+        - validation://integration/backend-frontend/api-contract
 verification_refs:
   - evidence://reports/RUN-101/tests.xml
   - evidence://evaluation/RUN-101/release-suite.json
@@ -46,6 +112,27 @@ approval_context:
     status: present
     refs:
       - evidence://packets/promotion-decision-wrapper-pass.yaml
+  coordination_evidence:
+    status: present
+    refs:
+      - evidence://coordination/WAVE-004/backend-mobile-frontend
+    lock_refs:
+      - evidence://reports/multirepo-coordination-status.sample.yaml
+    cross_repo_validation_refs:
+      - validation://integration/backend-frontend/api-contract
+coordination:
+  required: true
+  status: present
+  repo_ids:
+    - backend
+    - mobile
+    - frontend
+  evidence_refs:
+    - evidence://coordination/WAVE-004/backend-mobile-frontend
+  lock_evidence_refs:
+    - evidence://reports/multirepo-coordination-status.sample.yaml
+  cross_repo_validation_refs:
+    - validation://integration/backend-frontend/api-contract
 evidence_root: /workspace/aor-core/.aor/projects/aor-core/reports
 source_refs:
   delivery_plan_ref: evidence://packets/delivery-plan-implement-fork-first-pr.yaml

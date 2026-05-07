@@ -22,7 +22,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S01 — Installed-user onboarding UX contract
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** blocked
+- **State:** done
 - **Outcome:** Define the installed-user journey contract and backlog narrative for install, doctor, onboard, mission intake, next action, web attach, review, delivery, release, and learning closure.
 - **Primary modules:** `docs/product/**`, `docs/contracts/**`, `docs/architecture/**`, `docs/backlog/**`
 - **Hard dependencies:** W19-S01
@@ -56,7 +56,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S02 — Installable CLI and first-run entrypoints
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Make AOR understandable from first launch by adding guided public entrypoints for doctor, onboarding, app launch, and next-action discovery.
 - **Primary modules:** `package.json`, `apps/cli`, `docs/architecture/**`, `docs/ops/**`, tests
 - **Hard dependencies:** W21-S01
@@ -90,7 +90,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S03 — Clean project onboarding and asset-root resolution
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** blocked
+- **State:** done
 - **Outcome:** Allow `aor onboard <repo>` to prepare a clean target repository without mandatory example-copy materialization, while still supporting explicit asset ejection when requested.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, `examples/**`, tests
 - **Hard dependencies:** W21-S01
@@ -124,7 +124,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S04 — Guided mission intake and next-action resolver
 - **Epic:** EPIC-2 Packet lifecycle
-- **State:** blocked
+- **State:** done
 - **Outcome:** Let users define a mission with goals, KPI/DoD, constraints, allowed paths, and delivery mode, then receive the next safe action for the current project state.
 - **Primary modules:** `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, tests
 - **Hard dependencies:** W19-S02, W21-S03
@@ -157,7 +157,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S05 — Guided web app full-flow console
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Make the optional web UI mirror the guided CLI journey from readiness through mission, discovery/spec/plan, execution, review/QA, delivery/release, and learning.
 - **Primary modules:** `apps/web`, `apps/api`, `docs/ops/**`, tests
 - **Hard dependencies:** W18-S03, W21-S04
@@ -191,7 +191,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S06 — Review, delivery, release, and learning closure UX
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Make the final guided steps understandable and evidence-backed for review decisions, delivery readiness, release packets, and learning-loop handoff.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`, `apps/web`, `docs/ops/**`, tests
 - **Hard dependencies:** W19-S05, W21-S05
@@ -224,7 +224,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S07 — Installed-user guided journey proof
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Prove the installed-user guided journey end to end on a clean repository with public-repo safety defaults.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/cli`, `apps/web`, tests
 - **Hard dependencies:** W21-S02, W21-S03, W21-S04, W21-S05, W21-S06

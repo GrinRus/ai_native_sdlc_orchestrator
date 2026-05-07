@@ -4,7 +4,9 @@ import {
   appendRunEvent,
   attachUiLifecycle,
   detachUiLifecycle,
+  listCompilerRevisionStatuses,
   listDeliveryManifests,
+  listReviewDecisions,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
@@ -22,6 +24,7 @@ import {
   approveHandoffArtifacts,
   prepareHandoffArtifacts,
   certifyAssetPromotion,
+  materializeCompilerRevisionStatus,
   runDeliveryDriver,
   materializeDeliveryPlan,
   normalizeDeliveryMode,
@@ -29,6 +32,7 @@ import {
   replayHarnessCapture,
   applyIncidentRecertification,
   materializeLearningLoopArtifacts,
+  materializeReviewDecision,
   resolveStepPolicyForStep,
   analyzeProjectRuntime,
   initializeProjectRuntime,
@@ -76,8 +80,10 @@ export const QUALITY_COMMANDS = Object.freeze([
   "harness replay",
   "asset promote",
   "asset freeze",
+  "compiler revision",
   "harness certify",
   "review run",
+  "review decide",
   "learning handoff"
 ]);
 
@@ -85,6 +91,37 @@ export const QUALITY_COMMAND_GROUP = Object.freeze({
   group_id: "quality",
   commands: QUALITY_COMMANDS,
 });
+
+/**
+ * @param {Record<string, unknown>} outputState
+ * @param {unknown} compilerRevisionStatus
+ */
+function assignCompilerRevisionOutput(outputState, compilerRevisionStatus) {
+  if (
+    typeof compilerRevisionStatus !== "object" ||
+    compilerRevisionStatus === null ||
+    !("report" in compilerRevisionStatus)
+  ) {
+    return;
+  }
+  const result = /** @type {{ report?: Record<string, unknown>, statusPath?: string, statusRef?: string, blocking?: boolean }} */ (
+    compilerRevisionStatus
+  );
+  const report = result.report;
+  if (!report) {
+    return;
+  }
+  outputState.compilerRevisionStatusId = report.status_id;
+  outputState.compilerRevisionStatusFile = result.statusPath ?? null;
+  outputState.compilerRevisionStatusRef = result.statusRef ?? null;
+  outputState.compilerRevisionRef = report.compiler_revision_ref;
+  outputState.compilerRevisionLifecycleState = report.lifecycle_state;
+  outputState.compilerRevisionStatus = report.status;
+  outputState.compilerRevisionBlocking = result.blocking ?? false;
+  outputState.compilerRevisionBlockingReasons = report.blocking_reasons;
+  outputState.compilerRevisionCompatibility = report.compatibility;
+  outputState.compilerRevisionDecisionHistory = report.decision_history;
+}
 
 /**
  * @param {{ command: string, flags: Record<string, string | string[] | true>, cwd: string, outputState: Record<string, unknown> }} context
@@ -174,6 +211,7 @@ export function handleQualityCommand(context) {
     outputState.certificationEvaluationReportFile = promoteResult.evaluationReportPath;
     outputState.certificationHarnessCaptureFile = promoteResult.harnessCapturePath;
     outputState.certificationHarnessReplayFile = promoteResult.harnessReplayPath;
+    assignCompilerRevisionOutput(outputState, promoteResult.compilerRevisionStatus);
   } else if (command === "asset freeze") {
     ensureRequiredFlags(command, flags);
 
@@ -207,6 +245,62 @@ export function handleQualityCommand(context) {
     outputState.certificationEvaluationReportFile = freezeResult.evaluationReportPath;
     outputState.certificationHarnessCaptureFile = freezeResult.harnessCapturePath;
     outputState.certificationHarnessReplayFile = freezeResult.harnessReplayPath;
+    assignCompilerRevisionOutput(outputState, freezeResult.compilerRevisionStatus);
+  } else if (command === "compiler revision") {
+    ensureRequiredFlags(command, flags);
+    const action = /** @type {"inspect" | "promote" | "freeze" | "demote" | undefined} */ (
+      resolveOptionalStringFlag("action", flags.action)
+    );
+
+    const statusResult = materializeCompilerRevisionStatus({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      compilerRevisionRef: /** @type {string} */ (
+        resolveOptionalStringFlag("compiler-revision-ref", flags["compiler-revision-ref"])
+      ),
+      action,
+      promotionDecisionRef: resolveOptionalStringFlag("promotion-decision-ref", flags["promotion-decision-ref"]),
+      compiledContextRefs: resolveOptionalCsvFlag("compiled-context-refs", flags["compiled-context-refs"]),
+      evaluationRefs: resolveOptionalCsvFlag("evaluation-refs", flags["evaluation-refs"]),
+      incidentRefs: resolveOptionalCsvFlag("incident-refs", flags["incident-refs"]),
+      certificationEvidenceRefs: resolveOptionalCsvFlag(
+        "certification-evidence-refs",
+        flags["certification-evidence-refs"],
+      ),
+      compatibilityStatus: /** @type {"compatible" | "incompatible" | "unknown" | undefined} */ (
+        resolveOptionalStringFlag("compatibility-status", flags["compatibility-status"])
+      ),
+    });
+
+    outputState.resolvedProjectRef = statusResult.projectRoot;
+    outputState.resolvedRuntimeRoot = statusResult.runtimeRoot;
+    outputState.runtimeLayout = statusResult.runtimeLayout;
+    outputState.runtimeStateFile = statusResult.stateFile;
+    outputState.projectProfileRef = statusResult.projectProfileRef;
+    outputState.compilerRevisionStatusId = statusResult.report.status_id;
+    outputState.compilerRevisionStatusFile = statusResult.statusPath;
+    outputState.compilerRevisionStatusRef = statusResult.statusRef;
+    outputState.compilerRevisionRef = statusResult.report.compiler_revision_ref;
+    outputState.compilerRevisionLifecycleState = statusResult.report.lifecycle_state;
+    outputState.compilerRevisionStatus = statusResult.report.status;
+    outputState.compilerRevisionBlocking = statusResult.blocking;
+    outputState.compilerRevisionBlockingReasons = statusResult.report.blocking_reasons;
+    outputState.compilerRevisionCompatibility = statusResult.report.compatibility;
+    outputState.compilerRevisionDecisionHistory = statusResult.report.decision_history;
+    outputState.compilerRevisionRecords = listCompilerRevisionStatuses({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    outputState.readOnly = (action ?? "inspect") === "inspect";
+    outputState.futureControlHooks = [
+      `asset promote --asset-ref ${statusResult.report.compiler_revision_ref} --subject-ref ${statusResult.report.compiler_revision_ref}`,
+      `compiler revision --compiler-revision-ref ${statusResult.report.compiler_revision_ref} --action freeze --promotion-decision-ref <evidence://...>`,
+      `evidence show --project-ref ${statusResult.projectRoot}`,
+    ];
   } else if (command === "harness certify") {
     ensureRequiredFlags(command, flags);
 
@@ -234,6 +328,7 @@ export function handleQualityCommand(context) {
     outputState.certificationEvaluationReportFile = certifyResult.evaluationReportPath;
     outputState.certificationHarnessCaptureFile = certifyResult.harnessCapturePath;
     outputState.certificationHarnessReplayFile = certifyResult.harnessReplayPath;
+    assignCompilerRevisionOutput(outputState, certifyResult.compilerRevisionStatus);
 
   } else if (command === "review run") {
     ensureRequiredFlags(command, flags);
@@ -281,7 +376,97 @@ export function handleQualityCommand(context) {
     outputState.readOnly = false;
     outputState.futureControlHooks = [
       `audit runs --run-id ${runId}`,
+      `review decide --run-id ${runId} --decision approve`,
       `learning handoff --run-id ${runId}`,
+      `evidence show --run-id ${runId}`,
+    ];
+  } else if (command === "review decide") {
+    ensureRequiredFlags(command, flags);
+    const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    if (!runId) {
+      throw new CliUsageError("Missing required flag '--run-id' for 'aor review decide'.");
+    }
+    const decision = resolveOptionalStringFlag("decision", flags.decision);
+    if (decision !== "approve" && decision !== "hold" && decision !== "request-repair") {
+      throw new CliUsageError("Flag '--decision' must be approve, hold, or request-repair.");
+    }
+
+    const reviewResult = materializeReviewReport({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId,
+    });
+    const runtimeHarness = materializeRuntimeHarnessReport({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      runId,
+    });
+    const qualityArtifacts = listQualityArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const deliveryManifestRefs = listDeliveryManifests({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    })
+      .filter((artifact) => artifact.document.run_id === runId)
+      .map((artifact) => artifact.artifact_ref);
+    const learningHandoffRefs = qualityArtifacts
+      .filter((artifact) => artifact.family === "learning-loop-handoff" && artifact.document.run_id === runId)
+      .map((artifact) => artifact.artifact_ref);
+    const priorDecisionRefs = listReviewDecisions({
+      projectRoot: reviewResult.projectRoot,
+      runtimeLayout: reviewResult.runtimeLayout,
+      runId,
+    }).map((entry) => entry.artifact_ref);
+    const decisionResult = materializeReviewDecision({
+      projectId: reviewResult.projectId,
+      projectRoot: reviewResult.projectRoot,
+      runtimeLayout: reviewResult.runtimeLayout,
+      runId,
+      decision,
+      deciderRef: resolveOptionalStringFlag("decider-ref", flags["decider-ref"]),
+      reason: resolveOptionalStringFlag("reason", flags.reason),
+      reviewReport: reviewResult.reviewReport,
+      reviewReportRef: reviewResult.reviewReportFile,
+      runtimeHarnessReport: runtimeHarness.report,
+      runtimeHarnessReportRef: runtimeHarness.reportPath,
+      deliveryManifestRefs,
+      learningHandoffRefs,
+      evidenceRefs: priorDecisionRefs,
+    });
+
+    outputState.resolvedProjectRef = reviewResult.projectRoot;
+    outputState.resolvedRuntimeRoot = reviewResult.runtimeRoot;
+    outputState.runtimeLayout = reviewResult.runtimeLayout;
+    outputState.runtimeStateFile = reviewResult.stateFile;
+    outputState.projectProfileRef = reviewResult.projectProfileRef;
+    outputState.reviewReportId = reviewResult.reviewReport.review_report_id;
+    outputState.reviewReportFile = reviewResult.reviewReportFile;
+    outputState.reviewOverallStatus = reviewResult.reviewReport.overall_status;
+    outputState.reviewRecommendation = reviewResult.reviewReport.review_recommendation;
+    outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;
+    outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
+    outputState.runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
+    outputState.reviewDecisionId = decisionResult.decision.decision_id;
+    outputState.reviewDecisionFile = decisionResult.decisionFile;
+    outputState.reviewDecision = decisionResult.decision.decision;
+    outputState.reviewDecisionGate =
+      typeof decisionResult.decision.delivery_gate === "object" && decisionResult.decision.delivery_gate
+        ? /** @type {{ status?: string }} */ (decisionResult.decision.delivery_gate).status ?? null
+        : null;
+    outputState.reviewDecisionReason = decisionResult.decision.reason;
+    outputState.reviewDecisionEvidenceRefs = decisionResult.decision.evidence_refs;
+    outputState.readOnly = false;
+    outputState.futureControlHooks = [
+      `deliver prepare --run-id ${runId} --require-review-decision`,
+      `release prepare --run-id ${runId} --require-review-decision`,
       `evidence show --run-id ${runId}`,
     ];
   } else if (command === "learning handoff") {

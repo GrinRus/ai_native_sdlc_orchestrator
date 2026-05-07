@@ -1,4 +1,7 @@
+import { normalizeRedactionPolicy } from "../../../packages/observability/src/index.mjs";
 import { asRecord, asString, sendJson } from "./http-utils.mjs";
+
+const AUTH_MODES = new Set(["local-trusted", "production-hardened"]);
 
 /**
  * @param {unknown} value
@@ -19,9 +22,13 @@ function extractBearerToken(value) {
  */
 export function normalizeAuthPolicy(value, projectId) {
   const auth = asRecord(value);
-  const enabled = auth.enabled === true;
+  const requestedMode = asString(auth.mode ?? auth.security_mode);
+  const mode = requestedMode && AUTH_MODES.has(requestedMode) ? requestedMode : "local-trusted";
+  const enabled = mode === "production-hardened" || auth.enabled === true;
   /** @type {Map<string, { tokenId: string, permissions: Set<string>, projectRefs: Set<string> }>} */
   const principals = new Map();
+  /** @type {string[]} */
+  const secretValues = [];
 
   const tokenEntries = Array.isArray(auth.tokens) ? auth.tokens : [];
   for (const entry of tokenEntries) {
@@ -30,6 +37,7 @@ export function normalizeAuthPolicy(value, projectId) {
     if (!token) {
       continue;
     }
+    secretValues.push(token);
     const tokenId = asString(tokenRecord.token_id) ?? `token.${principals.size + 1}`;
 
     const permissions = new Set();
@@ -66,7 +74,19 @@ export function normalizeAuthPolicy(value, projectId) {
 
   return {
     enabled,
+    mode,
     principals,
+    redactionPolicy: normalizeRedactionPolicy({
+      enabled: true,
+      secretValues: [
+        ...secretValues,
+        ...(Array.isArray(auth.secret_values)
+          ? auth.secret_values
+              .map((entry) => asString(entry))
+              .filter((entry) => typeof entry === "string")
+          : []),
+      ],
+    }),
   };
 }
 
@@ -95,6 +115,7 @@ export function authorizeRequest(options) {
       requiredPermission: options.requiredPermission,
       projectId: options.projectId,
       tokenId: null,
+      securityMode: options.policy.mode,
     };
   }
 
@@ -108,6 +129,7 @@ export function authorizeRequest(options) {
       requiredPermission: options.requiredPermission,
       projectId: options.projectId,
       tokenId: null,
+      securityMode: options.policy.mode,
     };
   }
 
@@ -120,6 +142,7 @@ export function authorizeRequest(options) {
       requiredPermission: options.requiredPermission,
       projectId: options.projectId,
       tokenId: principal.tokenId,
+      securityMode: options.policy.mode,
     };
   }
 
@@ -132,12 +155,14 @@ export function authorizeRequest(options) {
       requiredPermission: options.requiredPermission,
       projectId: options.projectId,
       tokenId: principal.tokenId,
+      securityMode: options.policy.mode,
     };
   }
 
   return {
     allowed: true,
     tokenId: principal.tokenId,
+    securityMode: options.policy.mode,
   };
 }
 
@@ -150,6 +175,7 @@ export function authorizeRequest(options) {
  *   requiredPermission: "read" | "mutate",
  *   projectId: string,
  *   tokenId: string | null,
+ *   securityMode?: string,
  * }} decision
  */
 export function sendAuthError(response, decision) {
@@ -161,6 +187,7 @@ export function sendAuthError(response, decision) {
         required_permission: decision.requiredPermission,
         project_id: decision.projectId,
         token_id: decision.tokenId,
+        security_mode: decision.securityMode ?? "local-trusted",
       },
     },
   });

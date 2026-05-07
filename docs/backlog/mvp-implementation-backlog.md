@@ -186,40 +186,40 @@ This is the master index for the implementation slices across all defined waves.
 ## W18 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W18-S01 | Interactive run continuation contract | EPIC-6 | ready | `docs/contracts/**`, `docs/architecture/**`, `docs/product/**`, `docs/backlog/**` | none |
-| W18-S02 | Full lifecycle command mutations for connected web | EPIC-6 | blocked | `apps/api`, `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W18-S01 |
-| W18-S03 | Web full-flow operator console | EPIC-6 | blocked | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S02 |
-| W18-S04 | Monorepo and bounded multirepo flow proof | EPIC-5 | ready | `examples/**`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**`, `docs/ops/**`, tests | none |
+| W18-S01 | Interactive run continuation contract | EPIC-6 | done | `docs/contracts/**`, `docs/architecture/**`, `docs/product/**`, `docs/backlog/**` | none |
+| W18-S02 | Full lifecycle command mutations for connected web | EPIC-6 | done | `apps/api`, `apps/cli`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/architecture/**`, `docs/ops/**` | W18-S01 |
+| W18-S03 | Web full-flow operator console | EPIC-6 | done | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S02 |
+| W18-S04 | Monorepo and bounded multirepo flow proof | EPIC-5 | done | `examples/**`, `packages/orchestrator-core`, `apps/cli`, `docs/contracts/**`, `docs/product/**`, `docs/ops/**`, tests | none |
 
 ## W19 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W19-S01 | User-story registry and coverage evidence matrix | EPIC-0 | ready | `docs/product/**`, `docs/backlog/**`, `scripts/test.mjs` | W17-S01 |
-| W19-S02 | Product intake source and KPI/DoD model | EPIC-2 | blocked | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli` | W19-S01, W13-S03 |
-| W19-S03 | Discovery research and ADR evidence flow | EPIC-1 | blocked | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli` | W19-S02, W8-S02 |
-| W19-S04 | Incident-to-dataset backfill workflow | EPIC-4 | blocked | `docs/contracts/**`, `packages/harness`, `packages/observability`, `packages/orchestrator-core`, `apps/cli` | W19-S01, W7-S03, W13-S05 |
-| W19-S05 | Review decision and approval workflow | EPIC-4 | blocked | `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api` | W19-S01, W13-S05, W14-S06 |
-| W19-S06 | Planner metrics and scheduler visibility | EPIC-6 | blocked | `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli` | W19-S01, W6-S03, W8-S01 |
+| W19-S01 | User-story registry and coverage evidence matrix | EPIC-0 | done | `docs/product/**`, `docs/backlog/**`, `scripts/test.mjs` | W17-S01 |
+| W19-S02 | Product intake source and KPI/DoD model | EPIC-2 | done | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli` | W19-S01, W13-S03 |
+| W19-S03 | Discovery research and ADR evidence flow | EPIC-1 | done | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli` | W19-S02, W8-S02 |
+| W19-S04 | Incident-to-dataset backfill workflow | EPIC-4 | done | `docs/contracts/**`, `packages/harness`, `packages/observability`, `packages/orchestrator-core`, `apps/cli` | W19-S01, W7-S03, W13-S05 |
+| W19-S05 | Review decision and approval workflow | EPIC-4 | done | `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api` | W19-S01, W13-S05, W14-S06 |
+| W19-S06 | Planner metrics and scheduler visibility | EPIC-6 | done | `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli` | W19-S01, W6-S03, W8-S01 |
 
 ## W20 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W20-S01 | Multirepo scoped locks and cross-repo validation | EPIC-5 | blocked | `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/ops/**` | W19-S01, W8-S07 |
-| W20-S02 | Production security and observability hardening baseline | EPIC-6 | blocked | `docs/contracts/**`, `docs/architecture/**`, `apps/api`, `apps/web`, `apps/cli`, `packages/observability` | W19-S01, W10-S04 |
-| W20-S03 | OpenCode live-baseline certification | EPIC-3 | blocked | `examples/adapters/**`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W16-S06, W20-S02 |
-| W20-S04 | Compiler revision asset lifecycle | EPIC-4 | blocked | `docs/contracts/**`, `packages/harness`, `packages/orchestrator-core`, `apps/cli`, `apps/api` | W19-S01, W8-S09 |
-| W20-S05 | Finance analytics and production monitoring loop | EPIC-7 | blocked | `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W20-S02, W7-S04 |
+| W20-S01 | Multirepo scoped locks and cross-repo validation | EPIC-5 | done | `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/ops/**` | W19-S01, W8-S07 |
+| W20-S02 | Production security and observability hardening baseline | EPIC-6 | done | `docs/contracts/**`, `docs/architecture/**`, `apps/api`, `apps/web`, `apps/cli`, `packages/observability` | W19-S01, W10-S04 |
+| W20-S03 | OpenCode live-baseline certification | EPIC-3 | done | `examples/adapters/**`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W16-S06, W20-S02 |
+| W20-S04 | Compiler revision asset lifecycle | EPIC-4 | done | `docs/contracts/**`, `packages/harness`, `packages/orchestrator-core`, `apps/cli`, `apps/api` | W19-S01, W8-S09 |
+| W20-S05 | Finance analytics and production monitoring loop | EPIC-7 | done | `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W20-S02, W7-S04 |
 
 ## W21 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W21-S01 | Installed-user onboarding UX contract | EPIC-1 | blocked | `docs/product/**`, `docs/contracts/**`, `docs/architecture/**`, `docs/backlog/**` | W19-S01 |
-| W21-S02 | Installable CLI and first-run entrypoints | EPIC-6 | blocked | `package.json`, `apps/cli`, `docs/architecture/**`, `docs/ops/**`, tests | W21-S01 |
-| W21-S03 | Clean project onboarding and asset-root resolution | EPIC-1 | blocked | `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, `examples/**`, tests | W21-S01 |
-| W21-S04 | Guided mission intake and next-action resolver | EPIC-2 | blocked | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, tests | W19-S02, W21-S03 |
-| W21-S05 | Guided web app full-flow console | EPIC-6 | blocked | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S03, W21-S04 |
-| W21-S06 | Review, delivery, release, and learning closure UX | EPIC-4 | blocked | `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`, `apps/web`, `docs/ops/**`, tests | W19-S05, W21-S05 |
-| W21-S07 | Installed-user guided journey proof | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/cli`, `apps/web`, tests | W21-S02, W21-S03, W21-S04, W21-S05, W21-S06 |
+| W21-S01 | Installed-user onboarding UX contract | EPIC-1 | done | `docs/product/**`, `docs/contracts/**`, `docs/architecture/**`, `docs/backlog/**` | W19-S01 |
+| W21-S02 | Installable CLI and first-run entrypoints | EPIC-6 | done | `package.json`, `apps/cli`, `docs/architecture/**`, `docs/ops/**`, tests | W21-S01 |
+| W21-S03 | Clean project onboarding and asset-root resolution | EPIC-1 | done | `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, `examples/**`, tests | W21-S01 |
+| W21-S04 | Guided mission intake and next-action resolver | EPIC-2 | done | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, tests | W19-S02, W21-S03 |
+| W21-S05 | Guided web app full-flow console | EPIC-6 | done | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S03, W21-S04 |
+| W21-S06 | Review, delivery, release, and learning closure UX | EPIC-4 | done | `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`, `apps/web`, `docs/ops/**`, tests | W19-S05, W21-S05 |
+| W21-S07 | Installed-user guided journey proof | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/cli`, `apps/web`, tests | W21-S02, W21-S03, W21-S04, W21-S05, W21-S06 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

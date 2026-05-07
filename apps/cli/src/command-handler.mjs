@@ -17,6 +17,8 @@ import { executeCommandHandlerGroup, resolveCommandHandlerGroup } from "./comman
 
 export { CliUsageError };
 
+const GUIDED_SHORTCUT_COMMANDS = new Set(["doctor", "onboard", "app", "next"]);
+
 /**
  * @typedef {{
  *   exitCode: number,
@@ -94,17 +96,138 @@ function parseFlags(args) {
 }
 
 /**
+ * @param {string} command
+ * @param {string[]} args
+ * @returns {{ type: "command-help", command: string } | { type: "execute", command: string, flags: Record<string, string | string[] | true> }}
+ */
+function parseGuidedShortcut(command, args) {
+  if (args.some((arg) => isHelpFlag(arg))) {
+    return { type: "command-help", command };
+  }
+
+  if (command !== "onboard" || args.length === 0 || args[0].startsWith("--")) {
+    return { type: "execute", command, flags: parseFlags(args) };
+  }
+
+  const [projectRef, ...rest] = args;
+  const flags = parseFlags(rest);
+  if (flags["project-ref"] !== undefined) {
+    throw new CliUsageError("Use either positional '<repo>' or '--project-ref <path>' for 'aor onboard', not both.");
+  }
+
+  flags["project-ref"] = projectRef;
+  return { type: "execute", command, flags };
+}
+
+/**
+ * @param {Record<string, string | string[] | true>} flags
+ * @returns {boolean}
+ */
+function isJsonOutputRequested(flags) {
+  const value = flags.json;
+  if (value === undefined) return false;
+  if (value === true || value === "true") return true;
+  if (value === "false") return false;
+  if (Array.isArray(value)) {
+    throw new CliUsageError("Flag '--json' accepts only one value.");
+  }
+  throw new CliUsageError("Flag '--json' accepts only boolean values when a value is provided.");
+}
+
+/**
+ * @param {Record<string, unknown>} output
+ * @returns {string}
+ */
+function formatGuidedHumanOutput(output) {
+  const blockers = Array.isArray(output.guided_actionable_blockers)
+    ? output.guided_actionable_blockers
+    : [];
+  const recommendedCommands = Array.isArray(output.guided_recommended_commands)
+    ? output.guided_recommended_commands
+    : [];
+  const readiness = typeof output.guided_readiness === "object" && output.guided_readiness !== null
+    ? /** @type {{ checks?: Array<Record<string, unknown>> }} */ (output.guided_readiness)
+    : null;
+  const checks = Array.isArray(readiness?.checks) ? readiness.checks : [];
+
+  const lines = [
+    String(output.guided_command ?? `aor ${output.command}`),
+    `Status: ${String(output.guided_status ?? output.status ?? "unknown")}`,
+    "",
+    String(output.guided_summary ?? ""),
+    "",
+    `Project: ${String(output.resolved_project_ref ?? "not resolved")}`,
+    `Runtime root: ${String(output.resolved_runtime_root ?? "not resolved")}`,
+  ];
+
+  if (output.asset_mode || output.onboarding_report_file) {
+    lines.push(
+      `Asset mode: ${String(output.asset_mode ?? "not resolved")}`,
+      `Onboarding report: ${String(output.onboarding_report_file ?? "not written")}`,
+    );
+  }
+
+  if (checks.length > 0) {
+    lines.push("", "Readiness:");
+    for (const check of checks) {
+      lines.push(`- ${String(check.check_id ?? "check")}: ${String(check.status ?? "unknown")} - ${String(check.detail ?? "")}`);
+    }
+  }
+
+  lines.push("", "Actionable blockers:");
+  if (blockers.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const blocker of blockers) {
+      if (typeof blocker === "object" && blocker !== null) {
+        lines.push(`- ${String(blocker.code ?? "blocker")}: ${String(blocker.summary ?? "")}`);
+      } else {
+        lines.push(`- ${String(blocker)}`);
+      }
+    }
+  }
+
+  if (output.guided_web_surface && typeof output.guided_web_surface === "object") {
+    const web = /** @type {Record<string, unknown>} */ (output.guided_web_surface);
+    lines.push(
+      "",
+      "Optional web:",
+      `- mandatory: ${String(web.mandatory ?? false)}`,
+      `- attach: ${String(web.attach_command ?? "aor ui attach")}`,
+    );
+  }
+
+  lines.push("", "Recommended commands:");
+  if (recommendedCommands.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const command of recommendedCommands) {
+      lines.push(`- ${String(command)}`);
+    }
+  }
+
+  lines.push("", "Use --json for machine-readable output.");
+  return `${lines.join("\n")}\n`;
+}
+
+/**
  * @param {{ command: string, summary?: string, inputs?: string[], outputs?: string[], contractFamilies?: string[] }} definition
  * @returns {string}
  */
 export function formatCommandHelp(definition) {
   const statusLine =
-    definition.command === "eval run"
+    GUIDED_SHORTCUT_COMMANDS.has(definition.command)
+      ? "Status: implemented in guided first-run shell (W21-S02)"
+      : definition.command === "mission create"
+        ? "Status: implemented in guided mission shell (W21-S04)"
+      : definition.command === "eval run"
       ? "Status: implemented in quality shell (W3-S03)"
       : definition.command === "harness replay"
         ? "Status: implemented in quality shell (W9-S05)"
       : definition.command === "asset promote" || definition.command === "asset freeze"
         ? "Status: implemented in quality shell (W9-S06)"
+      : definition.command === "compiler revision"
+        ? "Status: implemented in compiler revision shell (W20-S04)"
       : definition.command === "harness certify"
         ? "Status: implemented in quality shell (W3-S05)"
       : definition.command === "intake create" ||
@@ -114,6 +237,8 @@ export function formatCommandHelp(definition) {
           ? "Status: implemented in intake and planning shell (W6-S02)"
         : definition.command === "review run"
           ? "Status: implemented in review shell (W13-S05)"
+        : definition.command === "review decide"
+          ? "Status: implemented in review decision shell (W19-S05)"
         : definition.command === "learning handoff"
           ? "Status: implemented in learning-loop shell (W13-S05)"
         : definition.command === "run start" ||
@@ -128,21 +253,69 @@ export function formatCommandHelp(definition) {
           ? "Status: implemented in operator shell (W5-S03)"
         : definition.command === "deliver prepare" || definition.command === "release prepare"
           ? "Status: implemented in delivery/release shell (W6-S05)"
+        : definition.command === "multirepo lock"
+          ? "Status: implemented in multirepo coordination shell (W20-S01)"
         : definition.command === "incident recertify"
           ? "Status: implemented in incident recertification shell (W8-S06)"
+        : definition.command === "incident backfill"
+          ? "Status: implemented in incident backfill shell (W19-S04)"
         : definition.command === "incident open" ||
             definition.command === "incident show" ||
             definition.command === "audit runs"
           ? "Status: implemented in incident/audit shell (W6-S06)"
+        : definition.command === "finance monitor"
+          ? "Status: implemented in finance monitoring shell (W20-S05)"
         : definition.command === "ui attach" || definition.command === "ui detach"
           ? "Status: implemented in UI lifecycle shell (W6-S04)"
           : "Status: implemented in bootstrap shell (W1-S01)";
   const notes =
-    definition.command === "project init"
+    definition.command === "doctor"
+      ? [
+          "- Doctor is read-only and never mutates runtime state.",
+          "- --project-ref is optional and defaults to cwd for installed-user first-run checks.",
+          "- Missing project paths and unsupported Node versions are actionable blockers.",
+          "- Warnings such as missing runtime root point to guided follow-up commands instead of failing the probe.",
+          "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+        ]
+      : definition.command === "onboard"
+        ? [
+            "- Onboard is a guided wrapper over 'aor project init'.",
+            "- Clean repositories default to bundled asset mode and write the generated profile under .aor/.",
+            "- Positional <repo> and --project-ref are alternatives; do not pass both.",
+            "- Existing grouped commands remain available and keep their JSON output contract.",
+            "- Asset ejection remains explicit through --asset-mode materialized or --materialize-bootstrap-assets.",
+            "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+          ]
+        : definition.command === "app"
+          ? [
+              "- App guidance is read-only and does not require the web app to be running.",
+              "- The web console is optional; CLI/API/headless operation remains valid when detached.",
+              "- Use the shown 'aor ui attach' command when a control-plane URL is available.",
+              "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+            ]
+          : definition.command === "next"
+            ? [
+                "- Next writes a deterministic next-action-report under the project runtime root.",
+                "- It chooses one primary action from onboarding, mission intake, active run, and discovery evidence.",
+                "- Incomplete mission intake is blocked with missing product evidence fields and exact repair command.",
+                "- Delivery-capable modes keep write-back policy explicit and upstream writes disabled by default.",
+                "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+              ]
+            : definition.command === "mission create"
+              ? [
+                  "- Mission create is a guided wrapper over 'aor intake create'.",
+                  "- It writes the existing intake-request artifact packet and intake-request-body contract.",
+                  "- Goals, constraints, KPIs, Definition of Done, source refs, allowed paths, and delivery mode remain durable evidence.",
+                  "- Missing KPI or Definition of Done evidence is saved but blocks the next lifecycle action.",
+                  "- Delivery mode defaults to no-write; delivery-capable modes still require review before write-back.",
+                ]
+    : definition.command === "project init"
       ? [
           "- --project-ref is optional. When omitted, the command discovers repo root from cwd.",
           "- --project-profile can override default profile discovery in project root.",
           `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' from profile runtime defaults.`,
+          "- --asset-mode bundled is the clean default and resolves bundled registry roots without copying examples/.",
+          "- --asset-mode materialized requests explicit profile and bootstrap-asset materialization.",
           "- --materialize-project-profile writes project.aor.yaml from bundled bootstrap templates when the target repo is still clean.",
           "- --materialize-bootstrap-assets writes packaged examples/context bootstrap assets without proof-runner-side file injection.",
           "- --repo-build-command, --repo-lint-command, and --repo-test-command override detected verification commands during bootstrap materialization.",
@@ -218,6 +391,15 @@ export function formatCommandHelp(definition) {
             "- With regression evidence, rollout_decision.action can become freeze even when final decision status is fail.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
           ]
+      : definition.command === "compiler revision"
+        ? [
+            "- Inspect writes a read-only status snapshot for one compiler revision and includes prior decision history.",
+            "- Promote, freeze, and demote require --promotion-decision-ref to report ready; otherwise the status is blocked with promotion-decision-required.",
+            "- --compiled-context-refs, --evaluation-refs, --incident-refs, and --certification-evidence-refs preserve lifecycle lineage for audit and API reads.",
+            "- --compatibility-status=incompatible blocks the revision and keeps the lifecycle state blocked.",
+            "- Use asset promote/freeze with a compiler-revision:// asset ref to produce certification evidence plus this status report in one flow.",
+            `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
+          ]
       : definition.command === "handoff prepare"
         ? [
             "- --project-ref must point to an existing directory.",
@@ -235,24 +417,28 @@ export function formatCommandHelp(definition) {
               "- --project-ref must point to an existing directory.",
               "- Intake create writes an intake-request artifact-packet with feature request and optional mission traceability.",
               "- --request-file can carry structured JSON input that discovery and review can trace later.",
+              "- --source-kind and --source-ref preserve local issue, PRD, RFC, note, or mail-like source references.",
+              "- Product-intake completeness is explicit: goals, constraints, KPIs, Definition of Done, and source refs are reported as present or missing.",
               "- --request-constraints accepts comma-separated values and can be repeated.",
               `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,
             ]
           : definition.command === "discovery run"
             ? [
                 "- --project-ref must point to an existing directory.",
-                "- Discovery run materializes project-analysis plus route/asset/policy/eval registry reports.",
-                "- --input-packet links discovery output to one prior intake-request artifact packet.",
-                "- --route-overrides and --policy-overrides accept comma-separated step overrides.",
-                "- Output includes discovery completeness checks and architecture traceability linkage for planning handoff.",
+              "- Discovery run materializes project-analysis plus route/asset/policy/eval registry reports.",
+              "- --input-packet links discovery output to one prior intake-request artifact packet.",
+              "- --route-overrides and --policy-overrides accept comma-separated step overrides.",
+              "- Output includes discovery completeness checks and architecture traceability linkage for planning handoff.",
+              "- Output includes discovery research ADR-readiness, open questions, and local research source linkage.",
+            ]
+          : definition.command === "spec build"
+            ? [
+                "- --project-ref must point to an existing directory.",
+                "- Spec build runs routed dry-run step execution for step_class 'spec'.",
+                "- Output includes a durable step-result artifact under runtime reports.",
+                "- Spec build enforces discovery completeness gate and blocks when required checks fail.",
+                "- Spec build preserves the discovery research gate so ADR-readiness is visible at handoff.",
               ]
-            : definition.command === "spec build"
-              ? [
-                  "- --project-ref must point to an existing directory.",
-                  "- Spec build runs routed dry-run step execution for step_class 'spec'.",
-                  "- Output includes a durable step-result artifact under runtime reports.",
-                  "- Spec build enforces discovery completeness gate and blocks when required checks fail.",
-                ]
               : definition.command === "wave create"
                 ? [
                     "- --project-ref must point to an existing directory.",
@@ -311,17 +497,27 @@ export function formatCommandHelp(definition) {
                   "- Non-no-write modes require approved handoff and promotion evidence refs to pass guardrails.",
                   "- fork-first-pr stays in planning-only mode unless --network-write is explicitly enabled.",
                   "- --network-write requires GitHub credentials (GITHUB_TOKEN) and bounded fork permissions.",
-                  "- Multi-repo plans require --coordination-evidence-refs in non-no-write modes.",
+                  "- Multi-repo plans require --coordination-evidence-refs in non-no-write modes; lock and cross-repo refs can also be supplied separately.",
                   "- Optional rerun flags persist packet-boundary and failed-step recovery scope for auditable retries.",
+                  "- --require-review-decision requires the latest run-linked review-decision to be approve.",
                   "- Output includes delivery_governance_decision with explicit allow/deny/escalate reasons.",
                 ]
               : definition.command === "release prepare"
                 ? [
                     "- Release prepare enforces release preconditions before delivery/release artifact materialization.",
                     "- If preconditions are blocked, the command fails with explicit blocking reasons.",
+                    "- --require-review-decision requires the latest run-linked review-decision to be approve.",
                     "- Optional rerun flags keep failed-step recovery bounded by explicit packet boundary metadata.",
                     "- Governance deny/escalate reasons are surfaced as machine-readable blocking codes.",
                     "- Successful execution links delivery-manifest and release-packet outputs for audit lineage.",
+                  ]
+              : definition.command === "multirepo lock"
+                ? [
+                    "- The command writes one multirepo-coordination-status report for acquire, release, or inspect.",
+                    "- Acquire requires --owner-ref plus bounded --repo-ids; overlapping active locks block with lock-conflict.",
+                    "- Expired overlapping locks block with lock-stale until explicitly released or replaced.",
+                    "- --repo-validation-refs uses repo=ref pairs and reports missing or failed repo checks deterministically.",
+                    "- Pass multirepo_coordination_ref to delivery via --coordination-evidence-refs and lock/validation-specific evidence flags.",
                   ]
             : definition.command === "evidence show"
               ? [
@@ -342,24 +538,45 @@ export function formatCommandHelp(definition) {
                       "- Freeze/demote rollout actions trigger rollback-safe hold instead of direct re-enable.",
                       "- Recertification updates preserve run-linked, finance, and quality evidence refs with explicit roots.",
                     ]
-                : definition.command === "incident show"
-                  ? [
-                      "- Incident show is read-only and supports lookup by --incident-id or --run-id.",
-                      "- --limit bounds output size for operator review sessions.",
-                      "- Empty result sets are valid when no incident record matches the filter.",
-                    ]
+                  : definition.command === "incident backfill"
+                    ? [
+                        "- Incident backfill writes one incident-backfill-proposal report and never mutates stable datasets directly.",
+                        "- The proposal links incident, learning-loop, suite, dataset, and linked asset evidence for reviewer assessment.",
+                        "- Missing incident, suite, dataset, or linked asset evidence blocks proposal creation.",
+                      ]
+                    : definition.command === "incident show"
+                      ? [
+                          "- Incident show is read-only and supports lookup by --incident-id or --run-id.",
+                          "- --limit bounds output size for operator review sessions.",
+                          "- Incident records include backfill proposal refs when proposals exist.",
+                          "- Empty result sets are valid when no incident record matches the filter.",
+                        ]
                   : definition.command === "audit runs"
                     ? [
                         "- Audit runs is read-only and emits run-centric snapshots for packet, step, quality, and finance evidence refs.",
                         "- Use --run-id to scope one run or --limit for bounded list output.",
                         "- Audit output highlights incident/promotion lineage plus cost/latency signals for traceable governance follow-up.",
                       ]
+                    : definition.command === "finance monitor"
+                      ? [
+                          "- Finance monitor is read-only and exposes the finance-monitoring-snapshot read model.",
+                          "- Cost and latency are grouped by project, route, prompt/context bundle, compiler revision, and adapter.",
+                          "- Production monitoring evidence requires explicit live-event scope and is not inferred from certification or rehearsal artifacts.",
+                          "- Empty and incomplete telemetry remain visible as no-data or partial-data states.",
+                        ]
                   : definition.command === "review run"
                     ? [
                         "- Review run is report-only at the command level and writes one durable review-report artifact.",
                         "- Review verdict checks feature traceability, discovery quality, artifact quality, and code quality.",
                         "- A failing review should be consumed by operator flow; it does not imply CLI transport failure on its own.",
+                        "- Use review decide to turn review and Runtime Harness evidence into an explicit approval, hold, or repair request.",
                       ]
+                    : definition.command === "review decide"
+                      ? [
+                          "- Review decide writes one durable review-decision artifact for approve, hold, or request-repair.",
+                          "- Approve is blocked unless the linked review-report and Runtime Harness report both pass.",
+                          "- Delivery and release can enforce this artifact with --require-review-decision.",
+                        ]
                     : definition.command === "learning handoff"
                       ? [
                           "- Learning handoff writes public learning-loop scorecard and handoff artifacts.",
@@ -417,7 +634,7 @@ export function formatTopLevelHelp() {
     "Planned commands (not implemented yet):",
     ...plannedLines,
     "",
-    "Use 'aor <group> <command> --help' for implemented command contracts.",
+    "Use 'aor <command> --help' for guided shortcuts or 'aor <group> <command> --help' for grouped command contracts.",
   ];
 
   return `${lines.join("\n")}\n`;
@@ -433,6 +650,10 @@ export function parseInvocation(args) {
   }
 
   const [group, verb, ...rest] = args;
+  if (GUIDED_SHORTCUT_COMMANDS.has(group)) {
+    return parseGuidedShortcut(group, [verb, ...rest].filter((arg) => arg !== undefined));
+  }
+
   if (!verb || isHelpFlag(verb)) {
     throw new CliUsageError("Command must be '<group> <command>'. Use '--help' for catalog output.");
   }
@@ -467,6 +688,8 @@ export function executeImplementedCommand(command, flags, cwd) {
   if (definition.status !== "implemented") {
     throw new CliUsageError(`Command 'aor ${command}' is planned and not implemented yet.`);
   }
+
+  const guidedJsonOutput = GUIDED_SHORTCUT_COMMANDS.has(command) ? isJsonOutputRequested(flags) : false;
 
   const handlerGroup = resolveCommandHandlerGroup(command);
   if (!handlerGroup) {
@@ -507,6 +730,14 @@ export function executeImplementedCommand(command, flags, cwd) {
   });
 
   const output = buildCliOutput({ command, resolvedFamilies, state: outputState });
+
+  if (GUIDED_SHORTCUT_COMMANDS.has(command) && !guidedJsonOutput) {
+    return {
+      exitCode: 0,
+      stdout: formatGuidedHumanOutput(output),
+      stderr: "",
+    };
+  }
 
   return {
     exitCode: 0,

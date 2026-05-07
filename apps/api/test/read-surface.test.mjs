@@ -5,19 +5,25 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
+import { materializeCompilerRevisionStatus } from "../../../packages/orchestrator-core/src/compiler-revision.mjs";
 import { materializeDeliveryPlan } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
+import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 import { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
 import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
 import { appendRunEvent, attachUiLifecycle, detachUiLifecycle, readUiLifecycleState } from "../src/index.mjs";
 import {
   listDeliveryManifests,
+  listCompilerRevisionStatuses,
+  listMultirepoCoordinationStatuses,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
   readRunEventHistory,
   readRunPolicyHistory,
   listRuns,
+  readFinanceMonitoringSnapshot,
+  readPlannerMetrics,
   readStrategicSnapshot,
   listStepResults,
   readProjectState,
@@ -160,6 +166,60 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
         status: "open",
       },
     });
+    const multirepoCoordination = materializeMultirepoCoordinationStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      action: "inspect",
+      runId: "run.api.read.multirepo",
+      repoIds: ["backend", "frontend"],
+      repoValidationRefs: [
+        "backend=validation://repos/backend/profile-entry",
+        "frontend=validation://repos/frontend/profile-entry",
+      ],
+      integrationValidationRefs: ["validation://integration/backend-frontend/api-contract"],
+    });
+    const compilerRevision = materializeCompilerRevisionStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      compilerRevisionRef: "compiler-revision://runtime-context-compiler@v1",
+      action: "promote",
+      promotionDecisionRef: "evidence://.aor/projects/aor-core/artifacts/promotion-decision-compiler-v1.json",
+      compiledContextRefs: ["compiled-context://compiled-context.aor-core.implement.runtime-context-compiler"],
+      evaluationRefs: ["evidence://.aor/projects/aor-core/reports/evaluation-report-runtime-context-compiler.json"],
+      incidentRefs: ["incident://INC-COMPILER-001"],
+      compatibilityStatus: "compatible",
+    });
+
+    writeContractFile({
+      family: "review-decision",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "review-decision-runtime.json"),
+      document: {
+        decision_id: `${runId}.review-decision.approve.v1`,
+        project_id: init.projectId,
+        run_id: runId,
+        decision: "approve",
+        decider_ref: "operator://api-fixture",
+        reason: "Fixture approval for read-surface smoke test.",
+        review_report_ref: "evidence://reports/review-report-runtime.json",
+        runtime_harness_report_ref: "evidence://reports/runtime-harness-report-runtime.json",
+        delivery_manifest_refs: [deliveryResult.deliveryManifestFile],
+        learning_handoff_refs: [],
+        decision_basis: {
+          review_overall_status: "pass",
+          review_recommendation: "proceed",
+          runtime_harness_overall_decision: "pass",
+          blocking_findings: [],
+        },
+        delivery_gate: {
+          status: "pass",
+          blocks_downstream: false,
+          required_downstream_decision: "approve",
+          findings: [],
+        },
+        evidence_refs: [deliveryResult.deliveryManifestFile],
+        decided_at: new Date().toISOString(),
+      },
+    });
 
     const projectState = readProjectState({ projectRef: repoRoot, cwd: repoRoot });
     assert.equal(projectState.project_id, init.projectId);
@@ -183,8 +243,20 @@ test("read surface exposes project state, packets, runs, and quality artifacts",
     const qualityArtifacts = listQualityArtifacts({ projectRef: repoRoot, cwd: repoRoot });
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "validation-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "evaluation-report"));
+    assert.ok(qualityArtifacts.some((artifact) => artifact.family === "review-decision"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "incident-report"));
     assert.ok(qualityArtifacts.some((artifact) => artifact.family === "promotion-decision"));
+    assert.ok(qualityArtifacts.some((artifact) => artifact.family === "multirepo-coordination-status"));
+    assert.ok(qualityArtifacts.some((artifact) => artifact.family === "compiler-revision-status"));
+
+    const multirepoStatuses = listMultirepoCoordinationStatuses({ projectRef: repoRoot, cwd: repoRoot });
+    assert.ok(multirepoStatuses.some((entry) => entry.file === multirepoCoordination.statusPath));
+    assert.equal(multirepoStatuses[0].document.cross_repo_validation.status, "pass");
+
+    const compilerRevisionStatuses = listCompilerRevisionStatuses({ projectRef: repoRoot, cwd: repoRoot });
+    assert.ok(compilerRevisionStatuses.some((entry) => entry.file === compilerRevision.statusPath));
+    assert.equal(compilerRevisionStatuses[0].document.lifecycle_state, "stable");
+    assert.equal(compilerRevisionStatuses[0].document.compatibility.status, "compatible");
 
     const runs = listRuns({ projectRef: repoRoot, cwd: repoRoot });
     const runSummary = runs.find((run) => run.run_id === runId);
@@ -464,6 +536,169 @@ test("listRuns aggregates finance evidence across multiple run profiles", () => 
   });
 });
 
+test("finance monitoring read model exposes no-data, partial, and ready telemetry states", () => {
+  withTempRepo((emptyRoot) => {
+    const empty = readFinanceMonitoringSnapshot({ projectRef: emptyRoot, cwd: emptyRoot });
+    assert.equal(empty.status, "no-data");
+    assert.equal(empty.no_data, true);
+    assert.equal(empty.telemetry_state, "no-data");
+    assert.deepEqual(empty.aggregation.partial_run_ids, []);
+  });
+
+  withTempRepo((partialRoot) => {
+    const init = initializeProjectRuntime({ projectRef: partialRoot, cwd: partialRoot });
+    const runId = "run.finance.partial.v1";
+    writeContractFile({
+      family: "step-result",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "step-result-finance-partial.json"),
+      document: {
+        step_result_id: `${runId}.step.finance.partial`,
+        run_id: runId,
+        step_id: "runner.finance.partial",
+        step_class: "runner",
+        status: "passed",
+        summary: "Partial finance telemetry fixture.",
+        evidence_refs: [init.stateFile],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:00.000Z",
+          finished_at: "2026-01-01T00:00:04.000Z",
+          route_resolution: {
+            resolved_route_id: "route.finance.partial",
+          },
+          asset_resolution: {
+            prompt_bundle: {
+              prompt_bundle_ref: "prompt-bundle://finance-partial@v1",
+            },
+            context_bundles: {
+              bundle_refs: ["context-bundle://finance.partial@v1"],
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.finance.partial",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {},
+          },
+        },
+      },
+    });
+
+    const partial = readFinanceMonitoringSnapshot({ projectRef: partialRoot, cwd: partialRoot });
+    assert.equal(partial.status, "partial");
+    assert.equal(partial.telemetry_state, "partial-data");
+    assert.deepEqual(partial.aggregation.partial_run_ids, [runId]);
+    assert.ok(partial.run_breakdown[0].missing_signals.includes("cost"));
+    assert.ok(partial.run_breakdown[0].missing_signals.includes("certification_latency"));
+    assert.ok(partial.run_breakdown[0].missing_signals.includes("production_monitoring"));
+    assert.equal(partial.finance.dimensions.route[0].key, "route.finance.partial");
+    assert.equal(partial.monitoring_loop.evidence_classes.production_monitoring.status, "no-data");
+  });
+
+  withTempRepo((readyRoot) => {
+    const init = initializeProjectRuntime({ projectRef: readyRoot, cwd: readyRoot });
+    const runId = "run.finance.ready.v1";
+    writeContractFile({
+      family: "step-result",
+      filePath: path.join(init.runtimeLayout.reportsRoot, "step-result-finance-ready.json"),
+      document: {
+        step_result_id: `${runId}.step.finance.ready`,
+        run_id: runId,
+        step_id: "runner.finance.ready",
+        step_class: "runner",
+        status: "passed",
+        summary: "Ready finance telemetry fixture.",
+        evidence_refs: [init.stateFile],
+        routed_execution: {
+          started_at: "2026-01-01T00:00:00.000Z",
+          finished_at: "2026-01-01T00:00:06.000Z",
+          route_resolution: {
+            resolved_route_id: "route.finance.ready",
+          },
+          asset_resolution: {
+            prompt_bundle: {
+              prompt_bundle_ref: "prompt-bundle://finance-ready@v1",
+            },
+            context_bundles: {
+              bundle_refs: ["context-bundle://finance.ready@v1"],
+            },
+          },
+          context_compilation: {
+            compiled_context_artifact: {
+              provenance: {
+                compiler_revision_ref: "compiler-revision://finance-compiler@v2",
+              },
+            },
+          },
+          adapter_resolution: {
+            adapter: {
+              adapter_id: "adapter.finance.ready",
+            },
+          },
+          policy_resolution: {
+            resolved_bounds: {
+              budget: {
+                max_cost_usd: 18,
+                timeout_sec: 60,
+              },
+            },
+          },
+        },
+      },
+    });
+    writeContractFile({
+      family: "promotion-decision",
+      filePath: path.join(init.runtimeLayout.artifactsRoot, "promotion-decision-finance-ready.json"),
+      document: {
+        decision_id: `${init.projectId}.promotion.finance.ready`,
+        run_id: runId,
+        subject_ref: "compiler-revision://finance-compiler@v2",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [init.stateFile],
+        evidence_summary: {
+          finance_signals: {
+            total_latency_sec: 0.8,
+          },
+          compiler_revision_lifecycle: {
+            compiler_revision_ref: "compiler-revision://finance-compiler@v2",
+          },
+        },
+        status: "pass",
+      },
+    });
+    appendRunEvent({
+      projectRef: readyRoot,
+      cwd: readyRoot,
+      runId,
+      eventType: "step.updated",
+      payload: {
+        monitoring_scope: "production",
+        status: "healthy",
+      },
+    });
+
+    const ready = readFinanceMonitoringSnapshot({ projectRef: readyRoot, cwd: readyRoot });
+    assert.equal(ready.status, "ready");
+    assert.equal(ready.telemetry_state, "ready");
+    assert.deepEqual(ready.aggregation.partial_run_ids, []);
+    assert.equal(ready.finance.dimensions.project[0].cost_limit_usd.max, 18);
+    assert.equal(ready.finance.dimensions.route[0].key, "route.finance.ready");
+    assert.equal(ready.finance.dimensions.bundle.length, 2);
+    assert.equal(ready.finance.dimensions.compiler_revision[0].key, "compiler-revision://finance-compiler@v2");
+    assert.equal(ready.finance.dimensions.adapter[0].key, "adapter.finance.ready");
+    assert.equal(ready.monitoring_loop.evidence_classes.production_monitoring.event_count, 1);
+    assert.equal(ready.monitoring_loop.evidence_classes.offline_certification.status, "ready");
+    assert.deepEqual(ready.run_breakdown[0].production_monitoring_evidence_refs, [
+      `live-run-event://${runId}.event.000001`,
+    ]);
+
+    const strategic = readStrategicSnapshot({ projectRef: readyRoot, cwd: readyRoot });
+    assert.equal(strategic.finance_monitoring.status, "ready");
+  });
+});
+
 test("listRuns exposes context lifecycle status, provenance, and decision trail", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
@@ -719,6 +954,12 @@ test("readStrategicSnapshot reports wave progress from backlog state", () => {
   assert.ok(Array.isArray(snapshot.wave_snapshot.waves));
   assert.ok(snapshot.wave_snapshot.waves.some((wave) => wave.wave_id === "W8"));
   assert.equal(typeof snapshot.risk_snapshot.level_totals.high, "number");
+  assert.deepEqual(snapshot.planner_metrics.metric_names, [
+    "clean_close_rate",
+    "retry_rate",
+    "repair_rate",
+    "blocker_rate",
+  ]);
 });
 
 test("readStrategicSnapshot keeps risk reporting available when backlog file is missing", () => {
@@ -773,6 +1014,177 @@ test("readStrategicSnapshot keeps risk reporting available when backlog file is 
     assert.equal(snapshot.risk_snapshot.signal_totals.incident_linked_runs, 1);
     assert.equal(snapshot.risk_snapshot.signal_totals.regression_runs, 1);
     assert.deepEqual(snapshot.risk_snapshot.high_risk_run_ids, [runId]);
+  });
+});
+
+test("planner metrics expose empty, partial, and populated run histories", () => {
+  withTempRepo((emptyRoot) => {
+    const emptyMetrics = readPlannerMetrics({ projectRef: emptyRoot, cwd: emptyRoot });
+    assert.equal(emptyMetrics.status, "no-data");
+    assert.equal(emptyMetrics.no_data, true);
+    assert.equal(emptyMetrics.metrics.clean_close_rate.value, null);
+    assert.equal(emptyMetrics.metrics.clean_close_rate.no_data, true);
+  });
+
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const reportsRoot = init.runtimeLayout.reportsRoot;
+
+    const writeReviewReport = (runId, status = "pass", recommendation = "proceed") => {
+      writeContractFile({
+        family: "review-report",
+        filePath: path.join(reportsRoot, `review-report-${runId}.json`),
+        document: {
+          review_report_id: `${runId}.review-report.v1`,
+          project_id: init.projectId,
+          run_id: runId,
+          generated_at: new Date().toISOString(),
+          overall_status: status,
+          review_recommendation: recommendation,
+          feature_traceability: {},
+          discovery_quality: {},
+          artifact_quality: {},
+          code_quality: {},
+          feature_size_fit: {},
+          provider_traceability: {},
+          findings: [],
+          evidence_refs: [init.stateFile],
+        },
+      });
+    };
+
+    const writeRuntimeHarnessReport = (runId, decision, attemptAction = null) => {
+      writeContractFile({
+        family: "runtime-harness-report",
+        filePath: path.join(reportsRoot, `runtime-harness-report-${runId}.json`),
+        document: {
+          report_id: `${runId}.runtime-harness-report.v1`,
+          project_id: init.projectId,
+          run_id: runId,
+          generated_at: new Date().toISOString(),
+          mission_type: "code-changing",
+          strictness_profile: "strict-code-changing",
+          overall_decision: decision,
+          step_decisions: [
+            {
+              step_id: `${runId}.implement`,
+              step_class: "runner",
+              runtime_harness_decision: decision,
+              repair_attempts: attemptAction
+                ? [
+                    {
+                      attempt: 1,
+                      policy_action: attemptAction,
+                      runtime_harness_decision: attemptAction,
+                      result: `succeeded_after_${attemptAction}`,
+                    },
+                  ]
+                : [],
+            },
+          ],
+          run_findings: [],
+          recommendations: [],
+          impacted_asset_refs: [],
+          promotion_recommendations: [],
+          unresolved_gaps: [],
+          evidence_refs: [init.stateFile],
+        },
+      });
+    };
+
+    const writeReviewDecision = (runId, decision, gateStatus) => {
+      writeContractFile({
+        family: "review-decision",
+        filePath: path.join(reportsRoot, `review-decision-${runId}.json`),
+        document: {
+          decision_id: `${runId}.review-decision.${decision}.v1`,
+          project_id: init.projectId,
+          run_id: runId,
+          decision,
+          decider_ref: "operator://planner-metrics-test",
+          reason: `Fixture ${decision} decision.`,
+          review_report_ref: `evidence://reports/review-report-${runId}.json`,
+          runtime_harness_report_ref: `evidence://reports/runtime-harness-report-${runId}.json`,
+          delivery_manifest_refs: [],
+          learning_handoff_refs: [],
+          decision_basis: {},
+          delivery_gate: {
+            status: gateStatus,
+            blocks_downstream: gateStatus !== "pass",
+            required_downstream_decision: "approve",
+            findings: [],
+          },
+          evidence_refs: [init.stateFile],
+          decided_at: new Date().toISOString(),
+        },
+      });
+    };
+
+    writeReviewReport("run.clean.v1");
+    writeRuntimeHarnessReport("run.clean.v1", "pass");
+    writeReviewDecision("run.clean.v1", "approve", "pass");
+
+    writeReviewReport("run.retry.v1", "warn", "repair");
+    writeRuntimeHarnessReport("run.retry.v1", "retry", "retry");
+
+    writeReviewReport("run.repair.v1", "fail", "repair");
+    writeRuntimeHarnessReport("run.repair.v1", "repair", "repair");
+    writeReviewDecision("run.repair.v1", "request-repair", "blocked");
+
+    writeRuntimeHarnessReport("run.blocker.v1", "block");
+    writeContractFile({
+      family: "incident-report",
+      filePath: path.join(reportsRoot, "incident-report-run-blocker-v1.json"),
+      document: {
+        incident_id: `${init.projectId}.incident.blocker.v1`,
+        project_id: init.projectId,
+        severity: "high",
+        summary: "Blocked run fixture.",
+        linked_run_refs: ["run://run.blocker.v1"],
+        linked_asset_refs: [init.stateFile],
+        status: "open",
+      },
+    });
+    fs.writeFileSync(
+      path.join(reportsRoot, "run-control-event-run-blocker-v1-0002.json"),
+      `${JSON.stringify(
+        {
+          audit_id: "run.blocker.v1.run-control.0002",
+          run_id: "run.blocker.v1",
+          action: "steer",
+          blocked: true,
+          blocked_reason: { code: "approval.required" },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.stateRoot, "run-control-state-run-partial-v1.json"),
+      `${JSON.stringify({ schema_version: 1, run_id: "run.partial.v1", status: "running" }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const metrics = readPlannerMetrics({ projectRef: repoRoot, cwd: repoRoot });
+    assert.equal(metrics.status, "partial");
+    assert.equal(metrics.aggregation.denominator, 5);
+    assert.deepEqual(metrics.metric_names, ["clean_close_rate", "retry_rate", "repair_rate", "blocker_rate"]);
+    assert.equal(metrics.metrics.clean_close_rate.numerator, 1);
+    assert.equal(metrics.metrics.retry_rate.numerator, 1);
+    assert.equal(metrics.metrics.repair_rate.numerator, 1);
+    assert.equal(metrics.metrics.blocker_rate.numerator, 2);
+    assert.deepEqual(metrics.metrics.clean_close_rate.evidence_run_ids, ["run.clean.v1"]);
+    assert.deepEqual(metrics.metrics.retry_rate.evidence_run_ids, ["run.retry.v1"]);
+    assert.deepEqual(metrics.metrics.repair_rate.evidence_run_ids, ["run.repair.v1"]);
+    assert.deepEqual(metrics.metrics.blocker_rate.evidence_run_ids, ["run.blocker.v1", "run.repair.v1"]);
+    assert.deepEqual(metrics.aggregation.partial_run_ids, ["run.blocker.v1", "run.partial.v1"]);
+    assert.ok(metrics.source_artifacts.audit_refs.some((ref) => ref.includes("run-control-event-run-blocker-v1")));
+
+    const snapshot = readStrategicSnapshot({ projectRef: repoRoot, cwd: repoRoot });
+    assert.deepEqual(snapshot.planner_metrics.metric_names, metrics.metric_names);
+    assert.equal(snapshot.planner_metrics.metrics.blocker_rate.numerator, 2);
   });
 });
 

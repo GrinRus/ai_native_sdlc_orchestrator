@@ -14,7 +14,7 @@ AOR should not rely on one generic benchmark. It needs suites for:
 - release readiness,
 - wrapper certification,
 - adapter certification,
-- incident backfill,
+- reviewed incident backfill proposals,
 - live E2E rehearsal.
 
 ### 3. Treat datasets and suites as first-class assets

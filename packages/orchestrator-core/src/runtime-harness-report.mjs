@@ -578,10 +578,12 @@ function loadRunStepArtifacts(options) {
 function loadRunQualityArtifacts(options) {
   const families = [
     /** @type {const} */ ("review-report"),
+    /** @type {const} */ ("review-decision"),
     /** @type {const} */ ("evaluation-report"),
     /** @type {const} */ ("learning-loop-scorecard"),
     /** @type {const} */ ("learning-loop-handoff"),
     /** @type {const} */ ("incident-report"),
+    /** @type {const} */ ("incident-backfill-proposal"),
   ];
   const files = listJsonFiles(options.init.runtimeLayout.reportsRoot);
   /** @type {Array<{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> }>} */

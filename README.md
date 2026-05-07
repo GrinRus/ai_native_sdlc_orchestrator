@@ -29,7 +29,7 @@ What exists today:
 - root repository-integrity commands and CI for roadmap, guidance, and community-file consistency;
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
 - a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
-- implemented operator baseline surfaces: control-plane read APIs, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
+- implemented operator baseline surfaces: control-plane read APIs, planner metrics snapshots, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
 - expanded implementation backlog through `W21`, with W18 focused on connected web full-flow and topology proof gaps, W19/W20 focused on user-story gap traceability, product-quality closure, and production/platform maturity gaps, and W21 focused on installed-user onboarding plus guided UX closure while active queue tracking stays available via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - historical W10/W11 productionization closure for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and target-backed proof evidence.
 - stable live routed execution baseline for supported `codex-cli` adapter paths, plus live-runnable candidate `claude-code` matrix coverage and extended non-baseline `open-code` coverage with explicit delivery-guardrail blocking semantics.
@@ -38,13 +38,14 @@ What exists today:
 - W17 legacy-surface cleanup that removes public compatibility aliases from CLI incident outputs and delivery mode inputs.
 - W18 backlog coverage for control-plane-owned web lifecycle operation, runner question/answer continuation, and bounded multirepo proof.
 - W19/W20/W21 backlog gap intake that maps all 112 supported user stories to current evidence, coverage status, and explicit follow-up slices for remaining gaps.
+- W20 production-hardening baseline for detached control-plane transport mode, bearer auth/authz scopes, redaction of configured secrets across JSON/SSE/CLI surfaces, and denied-action audit evidence.
 
 What does **not** exist yet:
 
 - a production-ready orchestrator runtime;
 - broad multi-provider production-grade adapter coverage beyond the stable `codex-cli` live baseline and candidate `claude-code` rehearsal coverage;
 - delivery write-back automation to upstream repositories;
-- production hardening and operator parity for every CLI/API/web control surface;
+- enterprise identity-provider integration, hosted SaaS deployment hardening, and operator parity for every CLI/API/web control surface;
 - a real code-changing full-journey proof with `overall_verdict=pass`; the current W14 matrix proof is coverage evidence with findings, and this target is not assigned to the current W18-W21 backlog horizon.
 
 Use the backlog docs for the implementation roadmap.
@@ -55,12 +56,13 @@ Start here if you want to understand the project before implementing anything:
 
 1. `AGENTS.md`
 2. `docs/product/01-project-description.md`
-3. `docs/architecture/12-orchestrator-operating-model.md`
-4. `docs/contracts/00-index.md`
-5. `docs/backlog/backlog-operating-model.md`
-6. `docs/backlog/mvp-roadmap.md`
-7. `docs/ops/live-e2e-target-catalog.md`
-8. `docs/ops/live-e2e-dependency-matrix.md`
+3. `docs/product/02-installed-user-onboarding-journey.md`
+4. `docs/architecture/12-orchestrator-operating-model.md`
+5. `docs/contracts/00-index.md`
+6. `docs/backlog/backlog-operating-model.md`
+7. `docs/backlog/mvp-roadmap.md`
+8. `docs/ops/live-e2e-target-catalog.md`
+9. `docs/ops/live-e2e-dependency-matrix.md`
 
 ## Contributor quickstart
 
@@ -132,16 +134,17 @@ At a high level, AOR is intended to work like this:
 
 ## Command surface status
 
-The CLI command surface currently includes **33 implemented** commands and **0 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
+The CLI command surface currently includes **43 implemented** commands and **0 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
 
 Implemented command groups:
+- guided first-run: `doctor`, `onboard`, `app`, `next`;
 - project lifecycle: `project init`, `project analyze`, `project validate`, `project verify`;
 - intake/discovery/spec/wave: `intake create`, `discovery run`, `spec build`, `wave create`;
 - run control and monitoring: `run start`, `run pause`, `run resume`, `run steer`, `run cancel`, `run status`;
-- quality and handoff: `eval run`, `harness replay`, `harness certify`, `asset promote`, `asset freeze`, `handoff prepare`, `handoff approve`;
-- delivery/release and operator reads: `deliver prepare`, `release prepare`, `packet show`, `evidence show`;
-- incidents and audit: `incident open`, `incident recertify`, `incident show`, `audit runs`;
-- review and learning closure: `review run`, `learning handoff`;
+- quality and handoff: `eval run`, `harness replay`, `harness certify`, `asset promote`, `asset freeze`, `compiler revision`, `handoff prepare`, `handoff approve`;
+- delivery/release and operator reads: `deliver prepare`, `release prepare`, `multirepo lock`, `packet show`, `evidence show`;
+- incidents and audit: `incident open`, `incident backfill`, `incident recertify`, `incident show`, `audit runs`;
+- review and learning closure: `review run`, `review decide`, `learning handoff`;
 - UI lifecycle: `ui attach`, `ui detach`.
 
 Planned commands:
@@ -169,9 +172,9 @@ For exact command inputs/outputs and contract linkage, use `docs/architecture/14
 - `examples/**` — project profiles, routes, wrappers, prompt bundles, policies, adapters, packets, eval assets, and proof fixtures.
 
 ### Code scaffold
-- `apps/api/` — implemented control-plane read/event baseline with detached HTTP/SSE transport for connected-mode read/follow surfaces.
-- `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, delivery, incident, and UI-lifecycle command baseline with production-hardening extensions still outstanding.
-- `apps/web/` — implemented detachable operator console baseline with production-hardening extensions still outstanding.
+- `apps/api/` — implemented control-plane read/event baseline with detached HTTP/SSE transport, production-hardened bearer auth/authz mode, and redacted response/event surfaces.
+- `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, delivery, incident, and UI-lifecycle command baseline with secret-safe JSON output support.
+- `apps/web/` — implemented detachable operator console baseline over shared control-plane auth and mutation semantics.
 - `packages/**` — implemented shared runtime modules (contracts, orchestrator core, routing, adapter SDK, harness, observability) with roadmap extensions.
 - `packages/harness/` — asset certification capture/replay primitives used by certification and promotion decisions.
 - `scripts/live-e2e/**` — installed-user black-box proof runner and private scenario profiles.

@@ -35,6 +35,7 @@ Before switching from planning-only to real network write:
    - `delivery_mode`,
    - `repo_deliveries[].changed_paths`,
    - `coordination.required`, `coordination.status`, and `coordination.evidence_refs`,
+   - `coordination.lock_evidence_refs` and `coordination.cross_repo_validation_refs` when bounded multirepo work used `aor multirepo lock`,
    - `rerun_recovery` (`rerun_of_run_ref`, `failed_step_ref`, `packet_boundary`, `status`),
    - `approval_context`,
    - `source_refs.delivery_transcript_ref`.
@@ -43,10 +44,19 @@ Before switching from planning-only to real network write:
    - `evidence_lineage.handoff_refs`,
    - `evidence_lineage.promotion_refs`,
    - `evidence_lineage.coordination_refs`,
+   - `evidence_lineage.coordination_lock_refs` and `evidence_lineage.cross_repo_validation_refs` when present,
    - `evidence_lineage.rerun_refs`,
    - `evidence_lineage.execution_refs`.
 3. If any checkpoint is missing, stop and rerun rehearsal in no-write mode.
 4. Only after all checkpoints pass may operators run bounded network write-back.
+
+## Bounded multirepo lock checkpoint
+Before any non-`no-write` bounded multirepo delivery:
+1. Run `aor multirepo lock --action acquire` with explicit `--owner-ref`, `--repo-ids`, `--path-globs`, and repo validation refs.
+2. Confirm the latest `multirepo-coordination-status-*.json` has `status=ready`, `lock_state.status=active`, and `cross_repo_validation.status=pass`.
+3. Pass the emitted `multirepo_coordination_ref` to delivery using `--coordination-evidence-refs`; pass the same ref to `--coordination-lock-evidence-refs` and pass repo/integration refs to `--cross-repo-validation-refs`.
+4. If the report is blocked by `lock-conflict`, `lock-stale`, `cross-repo-validation-missing`, or `cross-repo-validation-failed`, stop before delivery and resolve the listed repo/path scope.
+5. Release the lock with `aor multirepo lock --action release --lock-id <id>` after delivery or after aborting the coordinated change.
 
 ## Recovery checkpoints
 On delivery failure:

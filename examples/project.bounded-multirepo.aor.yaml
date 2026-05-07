@@ -1,0 +1,201 @@
+project_id: aor-bounded-multirepo-sample
+display_name: AOR Bounded Multirepo Sample
+repo_topology: bounded-multirepo
+asset_mode: materialized
+repos:
+  - repo_id: backend
+    name: backend-services
+    source:
+      kind: git
+      remote_url: https://github.com/your-org/backend-services.git
+      root: repos/backend
+      clone_depth: 1
+      default_ref: main
+    default_branch: main
+    role: backend
+    build_commands:
+      - pnpm --dir repos/backend build
+    test_commands:
+      - pnpm --dir repos/backend test
+    lint_commands:
+      - pnpm --dir repos/backend lint
+  - repo_id: mobile
+    name: mobile-app
+    source:
+      kind: git
+      remote_url: https://github.com/your-org/mobile-app.git
+      root: repos/mobile
+      clone_depth: 1
+      default_ref: main
+    default_branch: main
+    role: mobile
+    build_commands:
+      - pnpm --dir repos/mobile build
+    test_commands:
+      - pnpm --dir repos/mobile test
+    lint_commands:
+      - pnpm --dir repos/mobile lint
+  - repo_id: frontend
+    name: frontend-app
+    source:
+      kind: git
+      remote_url: https://github.com/your-org/frontend-app.git
+      root: repos/frontend
+      clone_depth: 1
+      default_ref: main
+    default_branch: main
+    role: frontend
+    build_commands:
+      - pnpm --dir repos/frontend build
+    test_commands:
+      - pnpm --dir repos/frontend test
+    lint_commands:
+      - pnpm --dir repos/frontend lint
+repo_graph:
+  - from_repo_id: backend
+    to_repo_id: frontend
+    relationship: api-contract
+    validation_refs:
+      - validation://integration/backend-frontend/api-contract
+  - from_repo_id: backend
+    to_repo_id: mobile
+    relationship: api-contract
+    validation_refs:
+      - validation://integration/backend-mobile/api-contract
+allowed_providers:
+  - openai
+  - anthropic
+  - open-code
+allowed_adapters:
+  - codex-cli
+  - claude-code
+  - open-code
+  - mock-runner
+registry_roots:
+  routes: examples/routes
+  wrappers: examples/wrappers
+  prompts: examples/prompts
+  policies: examples/policies
+  adapters: examples/adapters
+  evaluation: examples
+  skills: examples/skills
+  context_docs: examples/context/docs
+  context_rules: examples/context/rules
+  context_skills: examples/context/skills
+  context_bundles: examples/context/bundles
+default_route_profiles:
+  discovery: route.discovery.default
+  research: route.research.default
+  spec: route.spec.default
+  planning: route.plan.default
+  implement: route.implement.default
+  review: route.review.default
+  qa: route.qa.default
+  repair: route.repair.default
+  eval: route.eval.default
+  harness: route.harness.default
+default_step_policies:
+  artifact: policy.step.artifact.default
+  planner: policy.step.planner.default
+  runner: policy.step.runner.default
+  repair: policy.step.repair.default
+  eval: policy.step.eval.default
+  harness: policy.step.harness.default
+default_wrapper_profiles:
+  artifact: wrapper.artifact.default@v1
+  planner: wrapper.planner.default@v1
+  runner: wrapper.runner.default@v3
+  repair: wrapper.repair.default@v1
+  eval: wrapper.eval.default@v1
+  harness: wrapper.harness.default@v1
+default_prompt_bundles:
+  discovery: prompt-bundle://artifact-default@v1
+  research: prompt-bundle://artifact-default@v1
+  spec: prompt-bundle://artifact-default@v1
+  planning: prompt-bundle://planner-default@v1
+  implement: prompt-bundle://runner-default@v3
+  review: prompt-bundle://runner-default@v3
+  qa: prompt-bundle://runner-default@v3
+  repair: prompt-bundle://repair-default@v1
+  eval: prompt-bundle://eval-default@v1
+  harness: prompt-bundle://harness-default@v1
+default_context_bundles:
+  discovery:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  research:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  spec:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  planning:
+    - context-bundle://context.bundle.planner.foundation@v1
+  implement:
+    - context-bundle://context.bundle.runner.foundation@v1
+  review:
+    - context-bundle://context.bundle.runner.foundation@v1
+  qa:
+    - context-bundle://context.bundle.runner.foundation@v1
+  repair:
+    - context-bundle://context.bundle.repair.foundation@v1
+  eval:
+    - context-bundle://context.bundle.eval.foundation@v1
+  harness:
+    - context-bundle://context.bundle.harness.foundation@v1
+default_skill_profiles:
+  artifact:
+    - skill.artifact.default@v1
+  planner:
+    - skill.planner.default@v1
+  runner:
+    - skill.runner.default@v1
+  repair:
+    - skill.repair.default@v1
+  eval:
+    - skill.eval.default@v1
+  harness:
+    - skill.harness.default@v1
+skill_overrides:
+  implement:
+    - skill.runner.implement@v1
+  review:
+    - skill.runner.review@v1
+  qa:
+    - skill.runner.qa@v1
+budget_policy:
+  default_cost_limit_usd: 100
+  default_timeout_sec: 7200
+approval_policy:
+  required_for_execution: true
+  invalidate_on_material_change: true
+security_policy:
+  redact_secrets: true
+  provider_allowlist_enforced: true
+eval_policy:
+  required_for_release: true
+  default_release_suite_ref: suite.release.long@v1
+runtime_defaults:
+  runtime_root: .aor
+  workspace_mode: workspace-clone
+bootstrap_policy:
+  run_project_analysis: true
+  require_project_verify: true
+writeback_policy:
+  default_delivery_mode: fork-first-pr
+  allow_direct_write: false
+  require_delivery_manifest: true
+tooling_policy:
+  network_mode: deny-by-default
+  mcp_allowlist: []
+risk_tiers:
+  low:
+    require_human_approval: false
+  medium:
+    require_human_approval: true
+  high:
+    require_human_approval: true
+    require_security_review: true
+live_ops:
+  enabled: true
+  transport: sse
+  ui_attachable: true
+  ui_catchup_mode: read-model-plus-stream
+  retain_logs_days: 30

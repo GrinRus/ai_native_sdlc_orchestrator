@@ -5,6 +5,8 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
+import { materializeCompilerRevisionStatus } from "../../../packages/orchestrator-core/src/compiler-revision.mjs";
+import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 import { applyRunControlAction, appendRunEvent, createControlPlaneHttpServer } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -91,6 +93,85 @@ async function postJson(url, payload) {
 }
 
 /**
+ * @param {string} filePath
+ * @param {Record<string, unknown>} document
+ */
+function writeRuntimeJson(filePath, document) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+}
+
+/**
+ * @param {{ artifactsRoot: string, reportsRoot: string }} runtimeLayout
+ * @param {string} projectId
+ * @param {string} runId
+ */
+function writeApprovedClosureArtifacts(runtimeLayout, projectId, runId) {
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `step-result-${runId}.json`), {
+    step_result_id: `${runId}.implement.pass`,
+    project_id: projectId,
+    run_id: runId,
+    step_id: "run.start.implement",
+    step_class: "runner",
+    status: "pass",
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-report-${runId}.json`), {
+    review_report_id: `${runId}.review-report.v1`,
+    project_id: projectId,
+    run_id: runId,
+    overall_status: "pass",
+    review_recommendation: "proceed",
+    findings: [],
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `runtime-harness-report-${runId}.json`), {
+    report_id: `${runId}.runtime-harness-report.v1`,
+    project_id: projectId,
+    run_id: runId,
+    overall_decision: "pass",
+    run_findings: [],
+    evidence_refs: [`evidence://reports/step-result-${runId}.json`],
+  });
+  writeRuntimeJson(path.join(runtimeLayout.reportsRoot, `review-decision-${runId}-approve.json`), {
+    decision_id: `${runId}.review-decision.approve.v1`,
+    project_id: projectId,
+    run_id: runId,
+    decision: "approve",
+    decider_ref: "operator://api-test",
+    reason: "Approved closure API fixture.",
+    review_report_ref: `evidence://reports/review-report-${runId}.json`,
+    runtime_harness_report_ref: `evidence://reports/runtime-harness-report-${runId}.json`,
+    delivery_manifest_refs: [],
+    learning_handoff_refs: [],
+    decision_basis: {
+      review_overall_status: "pass",
+      review_recommendation: "proceed",
+      runtime_harness_overall_decision: "pass",
+      blocking_findings: [],
+    },
+    delivery_gate: {
+      status: "pass",
+      blocks_downstream: false,
+      required_downstream_decision: "approve",
+      findings: [],
+    },
+    evidence_refs: [`evidence://reports/review-report-${runId}.json`, `evidence://reports/runtime-harness-report-${runId}.json`],
+    decided_at: "2026-05-06T00:00:00.000Z",
+  });
+  writeRuntimeJson(path.join(runtimeLayout.artifactsRoot, `delivery-plan-${runId}.json`), {
+    plan_id: `${runId}.delivery-plan.implement.v1`,
+    project_id: projectId,
+    run_id: runId,
+    step_class: "implement",
+    delivery_mode: "patch-only",
+    status: "ready",
+    blocking_reasons: [],
+    evidence_refs: [`evidence://reports/review-decision-${runId}-approve.json`],
+  });
+}
+
+/**
  * @param {string} url
  * @param {string | null} token
  */
@@ -144,6 +225,27 @@ test("detached control-plane transport serves read baseline endpoints", async ()
         step_id: "runner.implement",
         status: "pass",
       },
+    });
+    materializeMultirepoCoordinationStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      action: "inspect",
+      runId: "run.http.transport.multirepo",
+      repoIds: ["backend", "frontend"],
+      repoValidationRefs: [
+        "backend=validation://repos/backend/profile-entry",
+        "frontend=validation://repos/frontend/profile-entry",
+      ],
+    });
+    materializeCompilerRevisionStatus({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      compilerRevisionRef: "compiler-revision://runtime-context-compiler@v1",
+      action: "promote",
+      promotionDecisionRef: "evidence://.aor/projects/http/artifacts/promotion-decision-compiler-v1.json",
+      compiledContextRefs: ["compiled-context://compiled-context.http.implement.runtime-context-compiler"],
+      evaluationRefs: ["evidence://.aor/projects/http/reports/evaluation-report-runtime-context-compiler.json"],
+      compatibilityStatus: "compatible",
     });
 
     const transport = await createControlPlaneHttpServer({
@@ -200,6 +302,44 @@ test("detached control-plane transport serves read baseline endpoints", async ()
       assert.equal(strategicResponse.status, 200);
       const strategicSnapshot = await strategicResponse.json();
       assert.equal(typeof strategicSnapshot.wave_snapshot.total_slices, "number");
+      assert.equal(strategicSnapshot.planner_metrics.metric_names.includes("clean_close_rate"), true);
+
+      const plannerMetricsResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/planner-metrics`,
+      );
+      assert.equal(plannerMetricsResponse.status, 200);
+      const plannerMetrics = await plannerMetricsResponse.json();
+      assert.deepEqual(plannerMetrics.metric_names, strategicSnapshot.planner_metrics.metric_names);
+
+      const financeMonitoringResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/finance-monitoring`,
+      );
+      assert.equal(financeMonitoringResponse.status, 200);
+      const financeMonitoring = await financeMonitoringResponse.json();
+      assert.deepEqual(financeMonitoring.dimension_names, strategicSnapshot.finance_monitoring.dimension_names);
+      assert.equal(typeof financeMonitoring.monitoring_loop.evidence_classes.production_monitoring.status, "string");
+
+      const multirepoResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/multirepo-coordination`,
+      );
+      assert.equal(multirepoResponse.status, 200);
+      const multirepoStatuses = await multirepoResponse.json();
+      assert.equal(Array.isArray(multirepoStatuses), true);
+      assert.ok(multirepoStatuses.some((entry) => entry.family === "multirepo-coordination-status"));
+
+      const compilerRevisionResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/compiler-revisions`,
+      );
+      assert.equal(compilerRevisionResponse.status, 200);
+      const compilerRevisionStatuses = await compilerRevisionResponse.json();
+      assert.equal(Array.isArray(compilerRevisionStatuses), true);
+      assert.ok(compilerRevisionStatuses.some((entry) => entry.family === "compiler-revision-status"));
+
+      const nextActionResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/next-action-report`,
+      );
+      assert.equal(nextActionResponse.status, 200);
+      assert.equal(await nextActionResponse.json(), null);
     } finally {
       await transport.close();
     }
@@ -357,6 +497,232 @@ test("detached control-plane transport supports bounded run-control and ui-lifec
   });
 });
 
+test("detached control-plane transport invokes bounded lifecycle command mutations through CLI/runtime path", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.transport.lifecycle.v1";
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const commandUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`;
+
+      const successResponse = await postJson(commandUrl, {
+        command: "intake create",
+        flags: {
+          request_title: "Connected lifecycle command smoke",
+          request_brief: "Exercise control-plane lifecycle mutation parity.",
+        },
+      });
+      assert.equal(successResponse.status, 200);
+      const successPayload = await successResponse.json();
+      assert.equal(successPayload.lifecycle_command.command, "intake create");
+      assert.equal(successPayload.lifecycle_command.blocked, false);
+      assert.equal(successPayload.lifecycle_command.command_output.command, "intake create");
+      assert.equal(fs.existsSync(successPayload.lifecycle_command.command_output.artifact_packet_file), true);
+      assert.ok(successPayload.lifecycle_command.artifact_refs.includes(successPayload.lifecycle_command.command_output.artifact_packet_file));
+
+      const missionResponse = await postJson(commandUrl, {
+        command: "mission create",
+        flags: {
+          mission_id: "web-guided-flow",
+          goal: "Expose guided lifecycle in the web console.",
+          constraint: "Keep orchestration owned by the runtime.",
+          kpi: "guided-web:Guided web:Operator reaches next action:Console smoke",
+          dod: "Console shows blockers, evidence, and next action.",
+          allowed_path: "apps/web/**",
+          forbidden_path: "secrets/**",
+          delivery_mode: "patch-only",
+          source_kind: "local-note",
+          source_ref: "docs/ops/ui-attach-detach.md",
+        },
+      });
+      assert.equal(missionResponse.status, 200);
+      const missionPayload = await missionResponse.json();
+      assert.equal(missionPayload.lifecycle_command.command, "mission create");
+      assert.equal(missionPayload.lifecycle_command.blocked, false);
+      assert.equal(missionPayload.lifecycle_command.command_output.product_intake_completeness.status, "complete");
+
+      const nextResponse = await postJson(commandUrl, {
+        command: "next",
+        flags: {},
+      });
+      assert.equal(nextResponse.status, 200);
+      const nextPayload = await nextResponse.json();
+      assert.equal(nextPayload.lifecycle_command.command, "next");
+      assert.equal(nextPayload.lifecycle_command.command_output.next_action_primary.action_id, "discovery-run");
+      assert.equal(fs.existsSync(nextPayload.lifecycle_command.command_output.next_action_report_file), true);
+
+      const nextReportResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/next-action-report`);
+      assert.equal(nextReportResponse.status, 200);
+      const nextReportPayload = await nextReportResponse.json();
+      assert.equal(nextReportPayload.family, "next-action-report");
+      assert.equal(nextReportPayload.document.primary_action.action_id, "discovery-run");
+      assert.equal(nextReportPayload.document.closure_state.run_id, null);
+
+      const runtimeLayout = missionPayload.lifecycle_command.command_output.runtime_layout;
+      assert.equal(typeof runtimeLayout.reportsRoot, "string");
+      assert.equal(typeof runtimeLayout.artifactsRoot, "string");
+      writeApprovedClosureArtifacts(runtimeLayout, transport.projectId, "run.api.closure.v1");
+
+      const closureNextResponse = await postJson(commandUrl, {
+        command: "next",
+        flags: {},
+      });
+      assert.equal(closureNextResponse.status, 200);
+      const closureNextPayload = await closureNextResponse.json();
+      const closureOutput = closureNextPayload.lifecycle_command.command_output;
+      assert.equal(closureOutput.next_action_primary.action_id, "release-prepare");
+      assert.equal(closureOutput.next_action_closure_state.run_id, "run.api.closure.v1");
+      assert.equal(closureOutput.next_action_closure_state.review.status, "approved");
+      assert.equal(closureOutput.next_action_closure_state.delivery.status, "delivery-plan-ready");
+
+      const closureReportResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/next-action-report`);
+      assert.equal(closureReportResponse.status, 200);
+      const closureReportPayload = await closureReportResponse.json();
+      assert.equal(closureReportPayload.family, "next-action-report");
+      assert.equal(closureReportPayload.document.closure_state.run_id, "run.api.closure.v1");
+      assert.equal(
+        closureReportPayload.document.closure_state.evidence_chain.join("\n").includes("review-decision-run.api.closure.v1-approve"),
+        true,
+      );
+
+      const invalidFlagResponse = await postJson(commandUrl, {
+        command: "review run",
+        flags: {},
+      });
+      assert.equal(invalidFlagResponse.status, 400);
+      const invalidFlagPayload = await invalidFlagResponse.json();
+      assert.equal(invalidFlagPayload.error.code, "invalid_lifecycle_flags");
+      assert.match(invalidFlagPayload.error.message, /--run-id/u);
+
+      const invalidReviewDecisionResponse = await postJson(commandUrl, {
+        command: "review decide",
+        flags: {
+          decision: "hold",
+        },
+      });
+      assert.equal(invalidReviewDecisionResponse.status, 400);
+      const invalidReviewDecisionPayload = await invalidReviewDecisionResponse.json();
+      assert.equal(invalidReviewDecisionPayload.error.code, "invalid_lifecycle_flags");
+      assert.match(invalidReviewDecisionPayload.error.message, /--run-id/u);
+
+      const startResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`,
+        {
+          action: "start",
+          run_id: runId,
+        },
+      );
+      assert.equal(startResponse.status, 200);
+
+      const blockedResponse = await postJson(commandUrl, {
+        command: "run cancel",
+        flags: {
+          run_id: runId,
+          reason: "cancel without approval should return a stable lifecycle block",
+        },
+      });
+      assert.equal(blockedResponse.status, 409);
+      const blockedPayload = await blockedResponse.json();
+      assert.equal(blockedPayload.error.code, "lifecycle_command.blocked");
+      assert.equal(blockedPayload.lifecycle_command.command, "run cancel");
+      assert.equal(blockedPayload.lifecycle_command.command_output.run_control_blocked, true);
+      assert.equal(fs.existsSync(blockedPayload.lifecycle_command.command_output.run_control_audit_file), true);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("detached control-plane transport records interactive continuation answers without streaming raw answer text", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.transport.interaction.v1";
+    const interactionId = "question-1";
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const stateResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
+      assert.equal(stateResponse.status, 200);
+      const statePayload = await stateResponse.json();
+      const reportsRoot = statePayload.runtime_layout.reports_root ?? statePayload.runtime_layout.reportsRoot;
+      fs.mkdirSync(reportsRoot, { recursive: true });
+      const stepResultFile = path.join(reportsRoot, "step-result-interactive-question.json");
+      fs.writeFileSync(
+        stepResultFile,
+        `${JSON.stringify(
+          {
+            step_result_id: `${runId}.runner.question`,
+            run_id: runId,
+            step_id: "runner.implement",
+            step_class: "runner",
+            status: "failed",
+            summary: "Runner requested operator input.",
+            evidence_refs: ["evidence://reports/runner-question.json"],
+            requested_interaction: {
+              requested: true,
+              interaction_id: interactionId,
+              status: "requested",
+              summary: "Choose the deployment target.",
+              evidence_refs: ["evidence://reports/runner-question.json"],
+              continuation: {
+                next_action: "resume_from_boundary",
+              },
+            },
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+
+      const answerText = "Use the staging target.";
+      const answerResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/interactions/answers`,
+        {
+          run_id: runId,
+          interaction_id: interactionId,
+          answer: answerText,
+          reason: "operator selected a safe target",
+        },
+      );
+      assert.equal(answerResponse.status, 409);
+      const answerPayload = await answerResponse.json();
+      assert.equal(answerPayload.error.code, "interaction.continuation_blocked");
+      assert.equal(answerPayload.interaction_answer.interaction_id, interactionId);
+      assert.equal(answerPayload.interaction_answer.answer_accepted, true);
+      assert.equal(answerPayload.interaction_answer.interaction_status, "blocked");
+      assert.equal(fs.existsSync(answerPayload.interaction_answer.answer_audit_file), true);
+
+      const auditRecord = JSON.parse(fs.readFileSync(answerPayload.interaction_answer.answer_audit_file, "utf8"));
+      assert.equal(auditRecord.answer_text, answerText);
+
+      const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
+      assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+      assert.ok(updatedStepResult.requested_interaction.answer_audit_refs.includes(answerPayload.interaction_answer.answer_audit_ref));
+      assert.ok(updatedStepResult.evidence_refs.includes(answerPayload.interaction_answer.answer_audit_ref));
+
+      const historyResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events/history?limit=10`,
+      );
+      assert.equal(historyResponse.status, 200);
+      const historyPayload = await historyResponse.json();
+      assert.equal(JSON.stringify(historyPayload).includes(answerText), false);
+      assert.equal(JSON.stringify(historyPayload).includes(answerPayload.interaction_answer.answer_audit_ref), true);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
 test("detached control-plane authn/authz enforces bearer auth with project-scoped permissions", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.auth.v1";
@@ -435,6 +801,101 @@ test("detached control-plane authn/authz enforces bearer auth with project-scope
       assert.equal(mutateAllowedPayload.run_control.action, "start");
       assert.equal(mutateAllowedPayload.run_control.blocked, false);
       assert.equal(fs.existsSync(mutateAllowedPayload.run_control.audit_file), true);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("production-hardened transport enforces authz and redacts configured secrets from denials and logs", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const runId = "run.http.transport.production-hardening.v1";
+    const secretToken = "prod-secret-token";
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+      auth: {
+        mode: "production-hardened",
+        tokens: [
+          {
+            token: "reader-prod-token",
+            token_id: "reader",
+            permissions: ["read"],
+          },
+          {
+            token: secretToken,
+            token_id: "operator",
+            permissions: ["read", "mutate"],
+          },
+        ],
+      },
+    });
+
+    try {
+      const stateUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/state`;
+      const runControlUrl = `${transport.baseUrl}/api/projects/${transport.projectId}/run-control/actions`;
+
+      const missingAuthResponse = await getJson(stateUrl);
+      assert.equal(missingAuthResponse.status, 401);
+      const missingAuthPayload = await missingAuthResponse.json();
+      assert.equal(missingAuthPayload.error.code, "auth.missing_credentials");
+      assert.equal(missingAuthPayload.error.auth.security_mode, "production-hardened");
+
+      const deniedMutateResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "start",
+          run_id: runId,
+        },
+        "reader-prod-token",
+      );
+      assert.equal(deniedMutateResponse.status, 403);
+      const deniedMutatePayload = await deniedMutateResponse.json();
+      assert.equal(deniedMutatePayload.error.code, "auth.insufficient_permission");
+      assert.equal(JSON.stringify(deniedMutatePayload).includes(secretToken), false);
+
+      const startResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "start",
+          run_id: runId,
+          reason: "production hardening baseline",
+        },
+        secretToken,
+      );
+      assert.equal(startResponse.status, 200);
+
+      const blockedResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "cancel",
+          run_id: runId,
+          reason: `operator pasted ${secretToken} while requesting cancel`,
+        },
+        secretToken,
+      );
+      assert.equal(blockedResponse.status, 409);
+      const blockedPayload = await blockedResponse.json();
+      assert.equal(blockedPayload.error.code, "approval.required");
+      assert.equal(blockedPayload.run_control.blocked, true);
+      assert.equal(JSON.stringify(blockedPayload).includes(secretToken), false);
+
+      const auditRaw = fs.readFileSync(blockedPayload.run_control.audit_file, "utf8");
+      assert.equal(auditRaw.includes(secretToken), false);
+      assert.equal(auditRaw.includes("[REDACTED]"), true);
+
+      const eventLogRaw = fs.readFileSync(blockedPayload.run_control.stream_log_file, "utf8");
+      assert.equal(eventLogRaw.includes(secretToken), false);
+
+      const historyResponse = await getJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events/history?limit=25`,
+        secretToken,
+      );
+      assert.equal(historyResponse.status, 200);
+      const historyPayload = await historyResponse.json();
+      assert.equal(JSON.stringify(historyPayload).includes(secretToken), false);
     } finally {
       await transport.close();
     }

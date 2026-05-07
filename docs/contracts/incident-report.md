@@ -61,3 +61,5 @@ Rollback-safe recertification behavior:
 
 ## Notes
 An incident report should be able to backfill a dataset case, trigger recertification, and point to backlog planning surfaces for follow-up slices.
+
+`linked_asset_refs[]` may include `compiler-revision://...` refs when an incident correlates with the compiler that produced compiled-context artifacts. Follow-up compiler lifecycle status reports should mirror those incident refs through `compiler-revision-status.compatibility.incident_refs` and `evidence_links.incident_refs`.

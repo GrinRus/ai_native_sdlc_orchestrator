@@ -17,7 +17,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S01 — User-story registry and coverage evidence matrix
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Promote the supported user-story inventory into a machine-checkable 112-story coverage matrix with stable IDs, tiers, evidence pointers, coverage status, and backlog gap references.
 - **Primary modules:** `docs/product/**`, `docs/backlog/**`, `scripts/test.mjs`
 - **Hard dependencies:** W17-S01
@@ -50,7 +50,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S02 — Product intake source and KPI/DoD model
 - **Epic:** EPIC-2 Packet lifecycle
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add a bounded product-intake follow-up slice for project goals, constraints, KPIs, Definition of Done, and local source-material references.
 - **Primary modules:** `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`
 - **Hard dependencies:** W19-S01, W13-S03
@@ -83,7 +83,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S03 — Discovery research and ADR evidence flow
 - **Epic:** EPIC-1 Bootstrap and onboarding
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add a follow-up slice for executable discovery research output that can produce ADR-ready evidence from repository facts, runtime context assets, and local research inputs.
 - **Primary modules:** `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`
 - **Hard dependencies:** W19-S02, W8-S02
@@ -116,7 +116,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S04 — Incident-to-dataset backfill workflow
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add a controlled workflow that turns incidents and learning-loop handoffs into reviewed dataset or suite backfill proposals.
 - **Primary modules:** `docs/contracts/**`, `packages/harness`, `packages/observability`, `packages/orchestrator-core`, `apps/cli`
 - **Hard dependencies:** W19-S01, W7-S03, W13-S05
@@ -149,7 +149,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S05 — Review decision and approval workflow
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add explicit review decisions beyond report-only review so operators can approve, hold, or request repair with durable evidence.
 - **Primary modules:** `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`
 - **Hard dependencies:** W19-S01, W13-S05, W14-S06
@@ -182,7 +182,7 @@ Turn the user-story gap audit into executable backlog targets, starting with mac
 
 ## W19-S06 — Planner metrics and scheduler visibility
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add planner/operator visibility for decomposition quality, clean-close rate, retry rate, repair rate, and blocker rate.
 - **Primary modules:** `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli`
 - **Hard dependencies:** W19-S01, W6-S03, W8-S01

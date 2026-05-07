@@ -10,13 +10,32 @@ read_operations:
       - project-profile
       - artifact-packet
       - step-result
+      - review-decision
       - promotion-decision
+      - planner-metrics-snapshot
+      - finance-monitoring-snapshot
   - operation_id: read.run-history
     operation_family: read
     output_contract_families:
       - live-run-event
       - step-result
       - delivery-plan
+  - operation_id: read.multirepo-coordination
+    operation_family: read
+    output_contract_families:
+      - multirepo-coordination-status
+  - operation_id: read.compiler-revisions
+    operation_family: read
+    output_contract_families:
+      - compiler-revision-status
+  - operation_id: read.finance-monitoring
+    operation_family: read
+    output_contract_families:
+      - finance-monitoring-snapshot
+  - operation_id: read.next-action-report
+    operation_family: read
+    output_contract_families:
+      - next-action-report
 
 run_control_operations:
   - operation_id: run.start
@@ -49,31 +68,126 @@ live_event_operations:
     replay_supported: true
     backpressure: bounded-replay-window
 
+lifecycle_command_operations:
+  owning_slice: W18-S02
+  status: implemented-bounded-subset
+  route: POST /api/projects/:projectId/lifecycle-command/actions
+  server_owned_flags:
+    - project-ref
+    - runtime-root
+    - help
+  commands:
+    - operation_id: project.init
+      command: project init
+    - operation_id: intake.create
+      command: intake create
+    - operation_id: mission.create
+      command: mission create
+    - operation_id: next.resolve
+      command: next
+    - operation_id: discovery.run
+      command: discovery run
+    - operation_id: spec.build
+      command: spec build
+    - operation_id: wave.create
+      command: wave create
+    - operation_id: handoff.prepare
+      command: handoff prepare
+    - operation_id: handoff.approve
+      command: handoff approve
+    - operation_id: run.start
+      command: run start
+    - operation_id: run.pause
+      command: run pause
+    - operation_id: run.resume
+      command: run resume
+    - operation_id: run.steer
+      command: run steer
+    - operation_id: run.cancel
+      command: run cancel
+    - operation_id: review.run
+      command: review run
+    - operation_id: review.decide
+      command: review decide
+    - operation_id: deliver.prepare
+      command: deliver prepare
+    - operation_id: release.prepare
+      command: release prepare
+    - operation_id: learning.handoff
+      command: learning handoff
+  response_contract:
+    preserves_cli_command_output: true
+    blocked_http_status: 409
+    invalid_input_http_status: 400
+    evidence_fields:
+      - artifact_refs
+      - evidence_refs
+      - command_output
+
+interactive_continuation:
+  owning_slice: W18-S01
+  status: implemented-bounded-subset
+  request_contract_family: step-result
+  event_contract_family: live-run-event
+  request_field: requested_interaction
+  answer_submission:
+    operation_id: run.interaction.answer
+    implementation_status: implemented-w18-s02
+    route: POST /api/projects/:projectId/interactions/answers
+    required_payload_fields:
+      - run_id
+      - interaction_id
+      - answer
+    optional_payload_fields:
+      - reason
+      - approval_ref
+      - answer_evidence_ref
+    response_fields:
+      - interaction_id
+      - interaction_status
+      - answer_audit_ref
+      - step_result_ref
+      - run_control_transition
+      - blocked_reason
+    blocked_http_status: 409
+  audit_behavior:
+    raw_answer_storage: durable-audit-evidence-only
+    live_event_answer_text: forbidden
+    query_safe_refs:
+      - requested_interaction
+      - answer_audit_ref
+
 deferred_transport:
   owning_slice: W9-S07
   status: implemented
   implemented_mappings:
     - GET /api/projects/:projectId/state
     - GET /api/projects/:projectId/strategic-snapshot
+    - GET /api/projects/:projectId/planner-metrics
+    - GET /api/projects/:projectId/finance-monitoring
+    - GET /api/projects/:projectId/next-action-report
     - GET /api/projects/:projectId/packets
     - GET /api/projects/:projectId/step-results
     - GET /api/projects/:projectId/quality-artifacts
     - GET /api/projects/:projectId/delivery-manifests
     - GET /api/projects/:projectId/promotion-decisions
+    - GET /api/projects/:projectId/compiler-revisions
     - GET /api/projects/:projectId/runs
     - GET /api/projects/:projectId/runs/:runId/events/history
     - GET /api/projects/:projectId/runs/:runId/policy-history
     - GET /api/projects/:projectId/runs/:runId/events
     - POST /api/projects/:projectId/run-control/actions
     - POST /api/projects/:projectId/ui-lifecycle/actions
+    - POST /api/projects/:projectId/lifecycle-command/actions
+    - POST /api/projects/:projectId/interactions/answers
   out_of_scope:
-    - mutation-command endpoint parity for full CLI surface beyond run-control and ui-lifecycle baseline
+    - mutation-command endpoint parity for full CLI surface beyond W18 lifecycle subset
     - production authn/authz policy envelope
 
 authn_authz:
-  mode: optional-bearer-token
+  mode: local-trusted | production-hardened
   defaults:
-    enabled: false
+    mode: local-trusted
   when_enabled:
     required_header: "Authorization: Bearer <token>"
     permission_scopes:
@@ -84,3 +198,35 @@ authn_authz:
       - auth.invalid_token
       - auth.forbidden_project
       - auth.insufficient_permission
+
+production_hardening:
+  owning_slice: W20-S02
+  status: implemented-baseline
+  transport_modes:
+    - mode: local-trusted
+      auth_required: false
+      intended_scope: loopback development and local harness operation
+    - mode: production-hardened
+      auth_required: true
+      intended_scope: connected operator transport with explicit bearer principals
+  authorization:
+    route_permission_metadata: required
+    scopes:
+      - read
+      - mutate
+    denied_action_behavior:
+      invokes_mutation_handler: false
+      audit_reason_shape: auth error with security_mode and required_permission
+  redaction:
+    configured_secret_sources:
+      - bearer token values
+      - explicit redaction secret values
+      - AOR_REDACTION_SECRETS for CLI JSON output
+    response_surfaces:
+      - HTTP JSON responses
+      - SSE data payloads
+      - CLI JSON output
+    durable_log_surfaces:
+      - live-run-event JSONL payloads
+      - run-control audit records
+    replacement: "[REDACTED]"

@@ -9,13 +9,18 @@ export {
   attachUiLifecycle,
   detachUiLifecycle,
   listDeliveryManifests,
+  listCompilerRevisionStatuses,
+  listMultirepoCoordinationStatuses,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
+  listRunControlAudits,
+  readFinanceMonitoringSnapshot,
   readRunControlState,
   readRunEventHistory,
   readRunPolicyHistory,
   listRuns,
+  readPlannerMetrics,
   listStepResults,
   readStrategicSnapshot,
   openRunEventStream,
@@ -31,20 +36,29 @@ export {
   prepareHandoffArtifacts,
 } from "../../../packages/orchestrator-core/src/handoff-packets.mjs";
 export { certifyAssetPromotion } from "../../../packages/orchestrator-core/src/certification-decision.mjs";
+export {
+  materializeCompilerRevisionStatus,
+  parseCompilerRevisionRef,
+} from "../../../packages/orchestrator-core/src/compiler-revision.mjs";
 export { runDeliveryDriver } from "../../../packages/orchestrator-core/src/delivery-driver.mjs";
 export {
   materializeDeliveryPlan,
   normalizeDeliveryMode,
 } from "../../../packages/orchestrator-core/src/delivery-plan.mjs";
+export { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
 export { runEvaluationSuite } from "../../../packages/orchestrator-core/src/eval-runner.mjs";
 export { replayHarnessCapture } from "../../../packages/orchestrator-core/src/harness-capture-replay.mjs";
 export {
   applyIncidentRecertification,
+  listReviewDecisions,
+  materializeIncidentBackfillProposal,
   materializeLearningLoopArtifacts,
+  materializeReviewDecision,
 } from "../../../packages/observability/src/index.mjs";
 export { resolveStepPolicyForStep } from "../../../packages/orchestrator-core/src/policy-resolution.mjs";
 export { analyzeProjectRuntime } from "../../../packages/orchestrator-core/src/project-analysis.mjs";
 export { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
+export { resolveNextAction } from "../../../packages/orchestrator-core/src/next-action.mjs";
 export { validateProjectRuntime } from "../../../packages/orchestrator-core/src/project-validate.mjs";
 export { verifyProjectRuntime } from "../../../packages/orchestrator-core/src/project-verify.mjs";
 export { materializeIntakeArtifactPacket } from "../../../packages/orchestrator-core/src/artifact-store.mjs";
@@ -101,6 +115,19 @@ export function resolveOptionalStringFlag(flagName, value) {
     throw new CliUsageError(`Flag '--${flagName}' cannot be empty.`);
   }
   return value;
+}
+
+/**
+ * @param {string | string[] | true | undefined} value
+ * @returns {"bundled" | "materialized" | undefined}
+ */
+export function resolveOptionalAssetModeFlag(value) {
+  const assetMode = resolveOptionalStringFlag("asset-mode", value);
+  if (assetMode === undefined) return undefined;
+  if (assetMode !== "bundled" && assetMode !== "materialized") {
+    throw new CliUsageError("Flag '--asset-mode' must be one of: bundled, materialized.");
+  }
+  return assetMode;
 }
 
 /**

@@ -63,6 +63,71 @@ test("validateProjectRuntime emits pass status when safety checks and analysis r
   });
 });
 
+test("validateProjectRuntime uses bundled registry roots when a clean repo has no examples directory", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s03-validate-clean-"));
+  fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
+
+  try {
+    const result = validateProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+
+    assert.equal(fs.existsSync(path.join(repoRoot, "examples")), false);
+    assert.equal(result.report.status, "warn");
+    const referenceValidator = result.report.validators.find(
+      (validator) => validator.validator_id === "asset-reference-integrity",
+    );
+    assert.ok(referenceValidator);
+    assert.equal(referenceValidator.status, "pass");
+    assert.equal(referenceValidator.details?.checked_references > 0, true);
+    const registryValidator = result.report.validators.find(
+      (validator) => validator.validator_id === "evaluation-registry",
+    );
+    assert.ok(registryValidator);
+    assert.equal(registryValidator.status, "pass");
+    assert.equal(registryValidator.details?.suite_count > 0, true);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("validateProjectRuntime emits bounded multirepo per-repo and integration evidence", () => {
+  withTempRepo((repoRoot) => {
+    analyzeProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: path.join(repoRoot, "examples/project.bounded-multirepo.aor.yaml"),
+    });
+    const result = validateProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      projectProfile: path.join(repoRoot, "examples/project.bounded-multirepo.aor.yaml"),
+    });
+
+    assert.equal(result.report.status, "pass");
+    const repoScopeValidator = result.report.validators.find(
+      (validator) => validator.validator_id === "repo-scope-proof",
+    );
+    assert.ok(repoScopeValidator, "expected repo-scope-proof validator");
+    assert.equal(repoScopeValidator.status, "pass");
+    assert.equal(repoScopeValidator.details?.coordination_required, true);
+    assert.deepEqual(
+      /** @type {{ repo_id: string }[]} */ (repoScopeValidator.details?.impacted_repo_scope).map(
+        (entry) => entry.repo_id,
+      ),
+      ["backend", "mobile", "frontend"],
+    );
+    assert.ok(
+      result.report.evidence_refs.includes("validation://integration/backend-frontend/api-contract"),
+      "expected integration validation ref in validation report evidence",
+    );
+    assert.ok(
+      result.report.evidence_refs.includes(
+        "validation://repos/aor-bounded-multirepo-sample/backend/profile-entry",
+      ),
+      "expected backend per-repo validation evidence ref",
+    );
+  });
+});
+
 test("validateProjectRuntime emits fail status for unsafe writeback policy", () => {
   withTempRepo((repoRoot) => {
     const profilePath = path.join(repoRoot, "examples/project.aor.yaml");

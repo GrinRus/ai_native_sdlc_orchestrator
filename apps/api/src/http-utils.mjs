@@ -1,3 +1,7 @@
+import { redactSensitiveValue } from "../../../packages/observability/src/index.mjs";
+
+const RESPONSE_REDACTION_POLICY = Symbol.for("aor.http.responseRedactionPolicy");
+
 const JSON_HEADERS = Object.freeze({
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
@@ -32,12 +36,29 @@ export function asRecord(value) {
 
 /**
  * @param {import("node:http").ServerResponse} response
+ * @param {unknown} policy
+ */
+export function attachResponseRedactionPolicy(response, policy) {
+  response[RESPONSE_REDACTION_POLICY] = policy;
+}
+
+/**
+ * @param {import("node:http").ServerResponse} response
+ * @returns {unknown}
+ */
+export function getResponseRedactionPolicy(response) {
+  return response[RESPONSE_REDACTION_POLICY];
+}
+
+/**
+ * @param {import("node:http").ServerResponse} response
  * @param {number} statusCode
  * @param {Record<string, unknown> | Array<unknown>} payload
  */
 export function sendJson(response, statusCode, payload) {
+  const redactedPayload = redactSensitiveValue(payload, getResponseRedactionPolicy(response));
   response.writeHead(statusCode, JSON_HEADERS);
-  response.end(`${JSON.stringify(payload, null, 2)}\n`);
+  response.end(`${JSON.stringify(redactedPayload, null, 2)}\n`);
 }
 
 /**

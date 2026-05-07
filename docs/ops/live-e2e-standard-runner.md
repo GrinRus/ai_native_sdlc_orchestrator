@@ -23,6 +23,7 @@ Bounded rehearsal profiles:
 - `w7-governance-integration.yaml`
 
 Catalog-backed full-journey profiles:
+- `installed-user-guided-journey.yaml`
 - `full-journey-regress-ky.yaml`
 - `full-journey-regress-ky-anthropic.yaml`
 - `full-journey-regress-ky-medium-anthropic.yaml`
@@ -59,7 +60,8 @@ Provider permission-mode analogues:
 - Codex restricted: configured non-interactive `codex exec` args without the approval bypass.
 - Claude Code full-bypass: `--dangerously-skip-permissions`.
 - Claude Code restricted: `--permission-mode auto`.
-- OpenCode full-bypass candidate: `opencode run --format json --dangerously-skip-permissions`; keep `open-code-primary` extended until the adapter profile declares and proves a live baseline runtime.
+- OpenCode full-bypass: `opencode run --format json --dangerously-skip-permissions`.
+- OpenCode restricted: `opencode run --format json`.
 
 Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
 
@@ -105,6 +107,8 @@ Full-journey layer:
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
 - may still run legacy audit or learning diagnostics after delivery for compatibility, but `release` and `learning` are excluded from the v1 observation matrix.
 
+Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, and capture an operator-console web smoke artifact. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, web smoke output, and no-upstream-write assertions must be materialized.
+
 No proof-runner-side `examples/context/project profile` injection is allowed on the full-journey path.
 
 ## Inspect
@@ -138,6 +142,16 @@ Full-journey summaries must carry:
 - `live_e2e_observation_overall_status`
 - `agent_artifact_review_request_file`
 - `verdict_matrix` when legacy diagnostics ran
+
+Guided full-journey summaries also carry:
+- `guided_journey`
+- `artifacts.guided_journey_proof_file`
+- `artifacts.guided_web_smoke_summary_file`
+- `artifacts.guided_web_smoke_html_file`
+- `artifacts.review_decision_file`
+- `artifacts.release_packet_file`
+- `artifacts.target_head_before` and `artifacts.target_head_after`
+- `artifacts.target_git_status_without_runtime`
 
 Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for product observation success when required step evidence is missing.
 
@@ -216,6 +230,29 @@ Legacy `overall_verdict=fail` no longer forces the live E2E observation status t
 - `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and `runtime_harness_decision` are observed post-delivery dimensions. Failures downgrade observation to `warn` when delivery evidence exists.
 - `delivery_manifest_file` exists and is anchored to the target checkout.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.
+- Guided proof execution starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; the target repository HEAD must remain unchanged and no remote write commands may be recorded unless an explicit future profile opts into network write-back.
+
+## W21-S07 guided proof bundle (2026-05-06)
+Canonical profile:
+- `scripts/live-e2e/profiles/installed-user-guided-journey.yaml`
+
+Canonical fixtures:
+- `examples/live-e2e/fixtures/w21-s07/installed-user-guided-proof.sample.json`
+- `examples/live-e2e/fixtures/w21-s07/installed-user-guided-web-smoke.sample.json`
+- `examples/live-e2e/fixtures/w21-s07/installed-user-guided-blocked-readiness.sample.json`
+
+Run command:
+```bash
+node ./scripts/live-e2e/run-profile.mjs \
+  --project-ref . \
+  --profile ./scripts/live-e2e/profiles/installed-user-guided-journey.yaml
+```
+
+Pass evidence requires all of the following:
+- CLI transcript files for doctor, onboard, app, next, mission create, run execution, review decision, delivery, release, and learning closure.
+- Durable onboarding, intake, next-action, run, review, review-decision, delivery, release, learning, and web smoke artifacts.
+- Public-repo safety assertions: `write_back_to_remote=false`, `patch-only` delivery mode, unchanged target `HEAD`, runtime state under `.aor/`, and no `.aor-live-e2e` state.
+- Blocked and partial-readiness branches must keep the same no-write defaults visible and must not be marked pass without durable artifacts.
 
 ## W14-S07 matrix proof bundle (2026-04-24)
 Observed curated runs:

@@ -27,7 +27,18 @@ Persistent configuration for one target project, including repos, allowed provid
 ## Notes
 Use the project profile as the durable source of truth for runtime default selection.
 
+`asset_mode` is optional for backward compatibility and should be present on new or materialized profiles:
+- `bundled` resolves AOR-provided registry roots from the installed AOR asset bundle without copying example registries into the target repository;
+- `materialized` resolves registry roots from target-repo committed assets after the user explicitly materializes or ejects them.
+
 For bounded multirepo flows, one project profile owns all participating `repos[]` entries and any `repo_graph` dependency edges. This supports separate backend, mobile, frontend, documentation, or shared-library repositories inside one AOR flow; it is not the same as coordinating multiple independent AOR `project_id` profiles.
+
+Bounded multirepo profiles should keep each repo entry explicit:
+- `repo_id`, `role`, `default_branch`, and `source.kind`;
+- a stable checkout or workspace-local `source.root` when delivery evidence must classify changed paths by repo;
+- per-repo build, lint, and test command candidates when they are known.
+
+`repo_graph[]` edges should identify `from_repo_id`, `to_repo_id`, and `relationship`. Edges may carry `validation_refs[]` for integration checks such as backend-to-frontend API compatibility or backend-to-mobile contract compatibility. These refs become deterministic integration validation evidence in project analysis and validation reports.
 
 Deterministic runtime default resolution follows this order:
 1. route from `default_route_profiles.<step>`;
@@ -35,8 +46,25 @@ Deterministic runtime default resolution follows this order:
 3. prompt bundle from `default_prompt_bundles.<step>`;
 4. context bundles from `default_context_bundles.<step>[]`.
 
-`registry_roots` declares the committed AOR asset roots for routes, wrappers, prompt bundles, and runtime context assets. Runtime context assets are AOR-owned committed artifacts, not contributor guidance files from the target repository.
-Committed registry roots are source assets and static samples only. Runtime-generated outputs still belong under `.aor/`.
+`registry_roots` declares AOR asset roots for routes, wrappers, prompt bundles, policies, adapters, evaluation registries, skill profiles, and runtime context assets. Runtime context assets are AOR-owned artifacts, not contributor guidance files from the target repository. Relative roots resolve from the target project root; absolute roots are allowed for bundled installed assets. Runtime-generated outputs still belong under `.aor/`.
+
+The canonical registry-root keys are:
+- `routes`
+- `wrappers`
+- `prompts`
+- `policies`
+- `adapters`
+- `evaluation`
+- `skills`
+- `context_docs`
+- `context_rules`
+- `context_skills`
+- `context_bundles`
+
+W21 guided onboarding preserves both modes:
+- bundled mode is the default clean-repo path and must not copy `examples/` into the target repository;
+- materialized mode is explicit and records intentional asset ejection/materialization when a user wants local committed AOR assets;
+- runtime outputs still belong under `.aor/` in both modes.
 
 `default_prompt_bundles` is keyed by workflow step and resolves one prompt bundle ref per step.
 `default_context_bundles` is keyed by workflow step and resolves one or more context bundle refs per step.
@@ -61,4 +89,4 @@ Optional `runtime_defaults.workspace_cleanup` can define `on_success`, `on_abort
 Non-canonical aliases are rejected instead of normalized.
 
 ## Example
-See `examples/project.aor.yaml` and `examples/project.github.aor.yaml`.
+See `examples/project.aor.yaml`, `examples/project.github.aor.yaml`, and `examples/project.bounded-multirepo.aor.yaml`.

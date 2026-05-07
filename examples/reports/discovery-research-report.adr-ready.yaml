@@ -1,0 +1,55 @@
+report_id: aor-core.discovery-research.v1
+project_id: aor-core
+version: 1
+generated_from:
+  command: aor discovery run
+  project_analysis_report_ref: evidence://.aor/projects/aor-core/reports/project-analysis-report.json
+repository_facts:
+  topology: monorepo
+  languages:
+    - typescript
+  service_boundaries:
+    - service_id: apps
+      paths:
+        - apps/**
+context_assets:
+  context_bundle_refs:
+    - context-bundle://context.bundle.artifact.foundation@v1
+  context_doc_refs:
+    - context-doc://context.doc.repo-map.core@v1
+  context_rule_refs:
+    - context-rule://context.rule.public-repo-safety@v1
+  context_skill_refs: []
+research_inputs:
+  intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+  source_refs:
+    - source_id: checkout-risk-prd
+      source_kind: local-prd
+      title: Checkout risk PRD
+      ref: docs/product/checkout-risk-prd.md
+  goals:
+    - Reduce checkout support tickets caused by unclear payment failures.
+  kpis:
+    - kpi_id: checkout-error-ticket-rate
+      name: Checkout error ticket rate
+      target: Reduce weekly checkout-error tickets by 20%.
+  definition_of_done:
+    - Payment errors show a user-actionable reason.
+open_questions: []
+adr_ready_recommendations:
+  - recommendation_id: adr.checkout-error-boundary
+    status: ready
+    title: Record checkout error handling boundary as an ADR candidate.
+    rationale_refs:
+      - docs/product/checkout-risk-prd.md
+    proposed_adr_refs:
+      - docs/architecture/adr/checkout-error-boundary.md
+completeness:
+  status: adr-ready
+  blocking: false
+  checks:
+    - check_id: local-research-inputs
+      status: pass
+      blocking: true
+      summary: Local research input refs are present.
+status: adr-ready

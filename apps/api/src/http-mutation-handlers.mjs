@@ -1,5 +1,12 @@
 import { asString, readJsonRequestBody, sendError, sendJson } from "./http-utils.mjs";
-import { toRunControlResponse, toUiLifecycleResponse } from "./http-presenters.mjs";
+import {
+  toInteractionAnswerResponse,
+  toLifecycleCommandResponse,
+  toRunControlResponse,
+  toUiLifecycleResponse,
+} from "./http-presenters.mjs";
+import { InteractionAnswerError, submitInteractionAnswer } from "./interaction-answer.mjs";
+import { runLifecycleCommand } from "./lifecycle-command.mjs";
 import { applyRunControlAction } from "./run-control.mjs";
 import { attachUiLifecycle, detachUiLifecycle } from "./ui-lifecycle.mjs";
 
@@ -31,7 +38,7 @@ async function readMutationPayload(request, response) {
  * @param {{
  *   request: import("node:http").IncomingMessage,
  *   response: import("node:http").ServerResponse,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string },
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
  * }} options
  */
 export async function handleRunControlAction({ request, response, runtimeOptions }) {
@@ -76,7 +83,7 @@ export async function handleRunControlAction({ request, response, runtimeOptions
  * @param {{
  *   request: import("node:http").IncomingMessage,
  *   response: import("node:http").ServerResponse,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string },
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
  * }} options
  */
 export async function handleUiLifecycleAction({ request, response, runtimeOptions }) {
@@ -106,4 +113,113 @@ export async function handleUiLifecycleAction({ request, response, runtimeOption
   sendJson(response, 200, {
     ui_lifecycle: toUiLifecycleResponse(result),
   });
+}
+
+/**
+ * @param {{
+ *   request: import("node:http").IncomingMessage,
+ *   response: import("node:http").ServerResponse,
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
+ * }} options
+ */
+export async function handleLifecycleCommandAction({ request, response, runtimeOptions }) {
+  const payload = await readMutationPayload(request, response);
+  if (!payload) {
+    return;
+  }
+
+  const command = asString(payload.command);
+  const flags = typeof payload.flags === "object" && payload.flags !== null && !Array.isArray(payload.flags)
+    ? /** @type {Record<string, unknown>} */ (payload.flags)
+    : {};
+  if (payload.flags !== undefined && (typeof payload.flags !== "object" || payload.flags === null || Array.isArray(payload.flags))) {
+    sendError(response, 400, "invalid_lifecycle_flags", "Lifecycle command flags must be a JSON object when supplied.");
+    return;
+  }
+
+  const result = runLifecycleCommand({
+    ...runtimeOptions,
+    command: command ?? "",
+    flags,
+  });
+
+  if (!result.ok) {
+    sendJson(response, result.statusCode, {
+      error: result.error,
+      ...(result.result ? { lifecycle_command: toLifecycleCommandResponse(result.result) } : {}),
+    });
+    return;
+  }
+
+  sendJson(response, 200, {
+    lifecycle_command: toLifecycleCommandResponse(result.result),
+  });
+}
+
+/**
+ * @param {{
+ *   request: import("node:http").IncomingMessage,
+ *   response: import("node:http").ServerResponse,
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
+ * }} options
+ */
+export async function handleInteractionAnswer({ request, response, runtimeOptions }) {
+  const payload = await readMutationPayload(request, response);
+  if (!payload) {
+    return;
+  }
+
+  const runId = asString(payload.run_id);
+  const interactionId = asString(payload.interaction_id);
+  const answerEvidenceRef = asString(payload.answer_evidence_ref) ?? undefined;
+  const answer = typeof payload.answer === "string" ? payload.answer.trim() : "";
+
+  if (!runId || !interactionId) {
+    sendError(response, 400, "interaction_answer.invalid_payload", "run_id and interaction_id are required.");
+    return;
+  }
+
+  if (answer.length === 0 && !answerEvidenceRef) {
+    sendError(
+      response,
+      400,
+      "interaction_answer.invalid_answer",
+      "answer is required unless answer_evidence_ref points to durable operator evidence.",
+    );
+    return;
+  }
+
+  try {
+    const result = submitInteractionAnswer({
+      ...runtimeOptions,
+      runId,
+      interactionId,
+      answer,
+      reason: asString(payload.reason) ?? undefined,
+      approvalRef: asString(payload.approval_ref) ?? undefined,
+      answerEvidenceRef,
+    });
+    const answerPayload = toInteractionAnswerResponse(result);
+
+    if (result.blocked) {
+      sendJson(response, 409, {
+        error: {
+          code: "interaction.continuation_blocked",
+          message: result.blockedReason?.message ?? "Interaction answer was accepted but continuation remains blocked.",
+        },
+        interaction_answer: answerPayload,
+      });
+      return;
+    }
+
+    sendJson(response, 200, {
+      interaction_answer: answerPayload,
+    });
+  } catch (error) {
+    if (error instanceof InteractionAnswerError) {
+      sendError(response, error.statusCode, error.code, error.message);
+      return;
+    }
+    throw error;
+  }
 }

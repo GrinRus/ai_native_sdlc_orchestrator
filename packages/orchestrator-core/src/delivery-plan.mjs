@@ -130,8 +130,10 @@ function resolveGovernanceSource(policyResolution) {
  *   policyResolution: Record<string, unknown>,
  *   handoffApproval?: { status?: string, ref?: string | null },
  *   promotionEvidenceRefs?: string[],
- *   coordinationRepos?: Array<{ repo_id?: string, role?: string, default_branch?: string }>,
+ *   coordinationRepos?: Array<{ repo_id?: string, role?: string, default_branch?: string, source_root?: string, source_kind?: string, source?: Record<string, unknown> }>,
  *   coordinationEvidenceRefs?: string[],
+ *   coordinationLockEvidenceRefs?: string[],
+ *   crossRepoValidationRefs?: string[],
  *   rerunOfRunRef?: string,
  *   rerunFailedStepRef?: string,
  *   rerunPacketBoundary?: string,
@@ -156,17 +158,29 @@ export function materializeDeliveryPlan(options) {
   const coordinationRepos = Array.isArray(options.coordinationRepos)
     ? options.coordinationRepos
         .filter((repo) => typeof repo === "object" && repo !== null)
-        .map((repo) => ({
-          repo_id: asString(asRecord(repo).repo_id),
-          role: asString(asRecord(repo).role),
-          default_branch: asString(asRecord(repo).default_branch),
-        }))
+        .map((repo) => {
+          const repoRecord = asRecord(repo);
+          const source = asRecord(repoRecord.source);
+          return {
+            repo_id: asString(repoRecord.repo_id),
+            role: asString(repoRecord.role),
+            default_branch: asString(repoRecord.default_branch),
+            source_root: asString(repoRecord.source_root) ?? asString(source.root),
+            source_kind: asString(repoRecord.source_kind) ?? asString(source.kind),
+          };
+        })
         .filter((repo) => typeof repo.repo_id === "string")
     : [];
   const coordinationRepoIds = uniqueStrings(
     coordinationRepos.map((repo) => /** @type {string} */ (repo.repo_id)),
   );
-  const coordinationEvidenceRefs = uniqueStrings(asStringArray(options.coordinationEvidenceRefs ?? []));
+  const coordinationLockEvidenceRefs = uniqueStrings(asStringArray(options.coordinationLockEvidenceRefs ?? []));
+  const crossRepoValidationRefs = uniqueStrings(asStringArray(options.crossRepoValidationRefs ?? []));
+  const coordinationEvidenceRefs = uniqueStrings([
+    ...asStringArray(options.coordinationEvidenceRefs ?? []),
+    ...coordinationLockEvidenceRefs,
+    ...crossRepoValidationRefs,
+  ]);
   const multiRepoRequired = coordinationRepoIds.length > 1;
   const coordinationStatus = multiRepoRequired
     ? coordinationEvidenceRefs.length > 0
@@ -264,6 +278,8 @@ export function materializeDeliveryPlan(options) {
         required: nonReadOnlyMode && multiRepoRequired,
         status: nonReadOnlyMode && multiRepoRequired ? coordinationStatus : "not-required",
         refs: coordinationEvidenceRefs,
+        lock_refs: coordinationLockEvidenceRefs,
+        cross_repo_validation_refs: crossRepoValidationRefs,
       },
     },
     governance,
@@ -273,6 +289,8 @@ export function materializeDeliveryPlan(options) {
       repo_ids: coordinationRepoIds,
       repos: coordinationRepos,
       evidence_refs: coordinationEvidenceRefs,
+      lock_evidence_refs: coordinationLockEvidenceRefs,
+      cross_repo_validation_refs: crossRepoValidationRefs,
     },
     rerun_recovery: {
       requested: rerunRequested,

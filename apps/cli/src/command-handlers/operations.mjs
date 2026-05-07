@@ -16,6 +16,7 @@ import {
   readRunPolicyHistory,
   listRuns,
   listStepResults,
+  readFinanceMonitoringSnapshot,
   readStrategicSnapshot,
   openRunEventStream,
   readUiLifecycleState,
@@ -31,6 +32,7 @@ import {
   runEvaluationSuite,
   replayHarnessCapture,
   applyIncidentRecertification,
+  materializeIncidentBackfillProposal,
   materializeLearningLoopArtifacts,
   resolveStepPolicyForStep,
   analyzeProjectRuntime,
@@ -78,9 +80,11 @@ export const OPERATIONS_COMMANDS = Object.freeze([
   "packet show",
   "evidence show",
   "incident open",
+  "incident backfill",
   "incident recertify",
   "incident show",
-  "audit runs"
+  "audit runs",
+  "finance monitor"
 ]);
 
 export const OPERATIONS_COMMAND_GROUP = Object.freeze({
@@ -277,9 +281,127 @@ export function handleOperationsCommand(context) {
     outputState.readOnly = false;
     outputState.futureControlHooks = [
       `incident show --incident-id ${incidentDocument.incident_id}`,
+      `incident backfill --incident-id ${incidentDocument.incident_id}`,
       `incident recertify --incident-id ${incidentDocument.incident_id} --decision recertify`,
       `audit runs --run-id ${runId}`,
       `evidence show --run-id ${runId}`,
+    ];
+  } else if (command === "incident backfill") {
+    ensureRequiredFlags(command, flags);
+    const incidentIdValue = /** @type {string} */ (resolveOptionalStringFlag("incident-id", flags["incident-id"]));
+    const suiteRefInput = resolveOptionalStringFlag("suite-ref", flags["suite-ref"]);
+    const caseIdInput = resolveOptionalStringFlag("case-id", flags["case-id"]);
+    const proposalState = resolveOptionalStringFlag("proposal-state", flags["proposal-state"]) ?? "proposed";
+    if (!["proposed", "approved", "rejected"].includes(proposalState)) {
+      throw new CliUsageError("Flag '--proposal-state' must be one of proposed, approved, or rejected.");
+    }
+
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    outputState.resolvedProjectRef = projectState.project_root;
+    outputState.resolvedRuntimeRoot = projectState.runtime_root;
+    outputState.runtimeLayout = projectState.runtime_layout;
+    outputState.runtimeStateFile = projectState.state_file;
+    outputState.projectProfileRef = projectState.project_profile_ref;
+
+    const qualityArtifactList = listQualityArtifacts({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const incidentArtifact = qualityArtifactList
+      .filter((artifact) => artifact.family === "incident-report")
+      .find((artifact) => artifact.document.incident_id === incidentIdValue);
+    if (!incidentArtifact) {
+      throw new CliUsageError(`Incident '${incidentIdValue}' was not found.`);
+    }
+
+    const linkedAssetRefs = asStringArray(incidentArtifact.document.linked_asset_refs);
+    if (linkedAssetRefs.length === 0) {
+      throw new CliUsageError(`Incident '${incidentIdValue}' has no linked asset refs for dataset backfill.`);
+    }
+
+    const analysis = analyzeProjectRuntime({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    const preferredSuite =
+      suiteRefInput ??
+      analysis.evaluationRegistry.suites.find((suite) => suite.suite_ref === "suite.regress.short@v1")?.suite_ref ??
+      analysis.evaluationRegistry.suites[0]?.suite_ref ??
+      null;
+    const suite = preferredSuite
+      ? analysis.evaluationRegistry.suites.find((candidate) => candidate.suite_ref === preferredSuite)
+      : null;
+    if (!suite) {
+      throw new CliUsageError(
+        suiteRefInput
+          ? `Evaluation suite '${suiteRefInput}' was not found in the project registry.`
+          : "No evaluation suite is available for incident backfill.",
+      );
+    }
+    if (!suite.dataset_ref) {
+      throw new CliUsageError(`Evaluation suite '${suite.suite_ref}' does not declare a dataset_ref.`);
+    }
+    const dataset = analysis.evaluationRegistry.datasets.find((candidate) => candidate.dataset_ref === suite.dataset_ref);
+    if (!dataset) {
+      throw new CliUsageError(`Dataset '${suite.dataset_ref}' for suite '${suite.suite_ref}' was not found.`);
+    }
+
+    const linkedRunRefs = asStringArray(incidentArtifact.document.linked_run_refs);
+    const firstRunRef = linkedRunRefs[0] ?? null;
+    const runId = firstRunRef ? normalizeRunRef(firstRunRef) : null;
+    const learningHandoff = qualityArtifactList
+      .filter((artifact) => artifact.family === "learning-loop-handoff")
+      .find((artifact) => {
+        if (artifact.document.incident_ref === incidentArtifact.artifact_ref) return true;
+        return runId && artifact.document.run_id === runId;
+      });
+    const scorecardRefs = qualityArtifactList
+      .filter((artifact) => artifact.family === "learning-loop-scorecard")
+      .filter((artifact) => !runId || artifact.document.run_id === runId)
+      .map((artifact) => artifact.artifact_ref);
+
+    const proposalResult = materializeIncidentBackfillProposal({
+      projectId: projectState.project_id,
+      projectRoot: projectState.project_root,
+      runtimeLayout: { reportsRoot: projectState.runtime_layout.reports_root },
+      incidentRef: incidentArtifact.artifact_ref,
+      incident: incidentArtifact.document,
+      suiteRef: suite.suite_ref,
+      datasetRef: suite.dataset_ref,
+      subjectType: dataset.subject_type ?? suite.subject_type,
+      learningHandoffRef: learningHandoff?.artifact_ref ?? null,
+      scorecardRefs,
+      evidenceRefs: linkedAssetRefs,
+      proposedCaseId: caseIdInput,
+      proposalState: /** @type {"proposed" | "approved" | "rejected"} */ (proposalState),
+    });
+
+    outputState.incidentId = incidentIdValue;
+    outputState.incidentReportFile = incidentArtifact.file;
+    outputState.incidentStatus =
+      typeof incidentArtifact.document.status === "string" ? incidentArtifact.document.status : null;
+    outputState.incidentRunRef = firstRunRef;
+    outputState.incidentLinkedAssetRefs = linkedAssetRefs;
+    outputState.learningLoopHandoffFile = learningHandoff?.file ?? null;
+    outputState.incidentBackfillProposalId = proposalResult.proposal.proposal_id;
+    outputState.incidentBackfillProposalFile = proposalResult.proposalFile;
+    outputState.incidentBackfillProposalState = proposalResult.proposal.proposal_state;
+    outputState.incidentBackfillSuiteRef = proposalResult.proposal.target.suite_ref;
+    outputState.incidentBackfillDatasetRef = proposalResult.proposal.target.dataset_ref;
+    outputState.incidentBackfillCaseIds = proposalResult.proposal.proposed_cases.map((entry) => entry.case_id);
+    outputState.incidentBackfillReviewRequired = proposalResult.proposal.mutation_policy.requires_review === true;
+    outputState.auditEvidenceRefs = proposalResult.proposal.evidence_refs;
+    outputState.readOnly = false;
+    outputState.futureControlHooks = [
+      `incident show --incident-id ${incidentIdValue}`,
+      `evidence show${runId ? ` --run-id ${runId}` : ""}`,
+      `eval run --suite-ref ${suite.suite_ref} --subject-ref run://${runId ?? "<run-id>"}`,
     ];
   } else if (command === "incident recertify") {
     ensureRequiredFlags(command, flags);
@@ -538,11 +660,13 @@ export function handleOperationsCommand(context) {
     outputState.runtimeStateFile = projectState.state_file;
     outputState.projectProfileRef = projectState.project_profile_ref;
 
-    const incidents = listQualityArtifacts({
+    const qualityArtifacts = listQualityArtifacts({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-    }).filter((artifact) => artifact.family === "incident-report");
+    });
+    const incidents = qualityArtifacts.filter((artifact) => artifact.family === "incident-report");
+    const backfillProposals = qualityArtifacts.filter((artifact) => artifact.family === "incident-backfill-proposal");
 
     const runRefFilter = runIdFilter ? toRunRef(runIdFilter) : null;
     const incidentMatches = incidents
@@ -574,6 +698,12 @@ export function handleOperationsCommand(context) {
       linked_run_refs: asStringArray(artifact.document.linked_run_refs),
       linked_asset_refs: asStringArray(artifact.document.linked_asset_refs),
       linked_backlog_refs: asStringArray(artifact.document.linked_backlog_refs),
+      backfill_proposal_refs: backfillProposals
+        .filter((proposal) => {
+          const sourceArtifacts = asPlainObject(proposal.document.source_artifacts);
+          return sourceArtifacts.incident_ref === artifact.artifact_ref || sourceArtifacts.incident_id === artifact.document.incident_id;
+        })
+        .map((proposal) => proposal.artifact_ref),
       recertification:
         typeof artifact.document.recertification === "object" &&
         artifact.document.recertification !== null &&
@@ -736,7 +866,34 @@ export function handleOperationsCommand(context) {
           "incident open --run-id <id> --summary <text>",
           "incident show --run-id <id>",
           "incident recertify --incident-id <id> --decision recertify",
-        ];
+      ];
+  } else if (command === "finance monitor") {
+    ensureRequiredFlags(command, flags);
+    const projectState = readProjectState({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    outputState.resolvedProjectRef = projectState.project_root;
+    outputState.resolvedRuntimeRoot = projectState.runtime_root;
+    outputState.runtimeLayout = projectState.runtime_layout;
+    outputState.runtimeStateFile = projectState.state_file;
+    outputState.projectProfileRef = projectState.project_profile_ref;
+
+    const snapshot = readFinanceMonitoringSnapshot({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+    });
+    outputState.financeMonitoringSnapshot = snapshot;
+    outputState.financeAnalytics = snapshot.finance;
+    outputState.productionMonitoring = snapshot.monitoring_loop.evidence_classes.production_monitoring;
+    outputState.readOnly = true;
+    outputState.futureControlHooks = [
+      "audit runs",
+      "run status --follow=true --run-id <id>",
+      "incident open --run-id <id> --summary <text>",
+    ];
   } else {
     return false;
   }

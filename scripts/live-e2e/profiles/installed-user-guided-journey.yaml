@@ -1,0 +1,54 @@
+profile_id: live-e2e.installed-user.guided-journey
+version: 1
+journey_mode: full-journey
+flow_kind: guided-regress
+duration_class: long
+target_catalog_id: ky
+feature_mission_id: ky-header-regression
+scenario_family: regress
+provider_variant_id: openai-primary
+bootstrap_template: github-default
+guided_journey:
+  enabled: true
+  starts_from_first_run: true
+  web_smoke:
+    enabled: true
+  proof_requirements:
+    - cli-transcripts
+    - web-smoke
+    - durable-packets-and-reports
+    - no-upstream-write-assertions
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - release
+  - learning
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  eval_suites:
+    - suite.regress.short@v1
+  harness:
+    enabled: false
+output_policy:
+  materialize_release_packet: true
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+learning_loop:
+  backlog_refs:
+    - docs/backlog/mvp-implementation-backlog.md
+    - docs/backlog/mvp-roadmap.md
+    - docs/ops/live-e2e-standard-runner.md
+    - docs/ops/installed-user-first-run.md

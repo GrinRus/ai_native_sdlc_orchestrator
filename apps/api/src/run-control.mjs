@@ -107,6 +107,7 @@ function buildPrimaryPayload(result) {
  *   targetStep?: string,
  *   reason?: string,
  *   approvalRef?: string,
+ *   redactionPolicy?: unknown,
  * }} options
  */
 export function applyRunControlAction(options) {
@@ -116,6 +117,7 @@ export function applyRunControlAction(options) {
     cwd: options.cwd,
     projectRef: options.projectRef,
     runtimeRoot: options.runtimeRoot,
+    redactionPolicy: options.redactionPolicy,
     runId: result.runId,
     eventType: primaryEventType,
     payload: buildPrimaryPayload(result),
@@ -125,6 +127,7 @@ export function applyRunControlAction(options) {
     cwd: options.cwd,
     projectRef: options.projectRef,
     runtimeRoot: options.runtimeRoot,
+    redactionPolicy: options.redactionPolicy,
     runId: result.runId,
     eventType: "evidence.linked",
     payload: {

@@ -1,11 +1,16 @@
 import { readQueryInteger, sendJson } from "./http-utils.mjs";
 import {
+  listCompilerRevisionStatuses,
   listDeliveryManifests,
+  listMultirepoCoordinationStatuses,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
   listRuns,
+  readFinanceMonitoringSnapshot,
+  readNextActionReport,
   listStepResults,
+  readPlannerMetrics,
   readProjectState,
   readRunEventHistory,
   readRunPolicyHistory,
@@ -18,7 +23,7 @@ import {
  *   params: Record<string, string>,
  *   requestUrl: URL,
  *   response: import("node:http").ServerResponse,
- *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string },
+ *   runtimeOptions: { cwd?: string, projectRef: string, runtimeRoot?: string, redactionPolicy?: unknown },
  * }} options
  */
 export function handleReadRoute({ routeId, params, requestUrl, response, runtimeOptions }) {
@@ -43,6 +48,21 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
       return;
     case "strategic-snapshot":
       sendJson(response, 200, readStrategicSnapshot(runtimeOptions));
+      return;
+    case "planner-metrics":
+      sendJson(response, 200, readPlannerMetrics(runtimeOptions));
+      return;
+    case "finance-monitoring":
+      sendJson(response, 200, readFinanceMonitoringSnapshot(runtimeOptions));
+      return;
+    case "next-action-report":
+      sendJson(response, 200, readNextActionReport(runtimeOptions));
+      return;
+    case "multirepo-coordination":
+      sendJson(response, 200, listMultirepoCoordinationStatuses(runtimeOptions));
+      return;
+    case "compiler-revisions":
+      sendJson(response, 200, listCompilerRevisionStatuses(runtimeOptions));
       return;
     case "runs":
       sendJson(response, 200, listRuns(runtimeOptions));

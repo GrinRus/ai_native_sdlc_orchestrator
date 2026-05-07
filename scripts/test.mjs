@@ -712,6 +712,14 @@ function assertUserStoryCoverageMatrixDocumentation() {
         console.error(`User-story ${row.storyId} references unknown gap slice '${gapSlice}'.`);
         process.exit(1);
       }
+
+      const gapSliceState = masterSliceMap.get(gapSlice)?.state ?? waveSectionMap.get(gapSlice)?.state;
+      if (row.coverageStatus !== "covered" && gapSliceState === "done") {
+        console.error(
+          `Non-covered user-story ${row.storyId} references done gap slice '${gapSlice}'. Move completed evidence into the evidence cell or mark the story covered.`,
+        );
+        process.exit(1);
+      }
     }
 
     tierCountsByPrefix.get(prefix)[row.tier] += 1;
@@ -903,6 +911,7 @@ console.log("cli tests ok: bootstrap command contracts, parsing, and help output
 const apiTests = [
   path.join(root, "apps/api/test/read-surface.test.mjs"),
   path.join(root, "apps/api/test/live-event-stream.test.mjs"),
+  path.join(root, "apps/api/test/http-transport.test.mjs"),
 ];
 const apiTestRun = spawnSync(process.execPath, ["--test", ...apiTests], {
   cwd: root,
@@ -914,6 +923,20 @@ if (apiTestRun.status !== 0) {
 }
 
 console.log("api tests ok: control-plane read surface smoke endpoints");
+
+const observabilityTests = [
+  path.join(root, "packages/observability/test/redaction.test.mjs"),
+];
+const observabilityTestRun = spawnSync(process.execPath, ["--test", ...observabilityTests], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (observabilityTestRun.status !== 0) {
+  process.exit(observabilityTestRun.status ?? 1);
+}
+
+console.log("observability tests ok: redaction and secret-safe payload helpers");
 
 const webTests = [
   path.join(root, "apps/web/test/operator-console.test.mjs"),
@@ -972,10 +995,12 @@ console.log("harness tests ok: scorer interface plus capture-format compatibilit
 
 const orchestratorCoreTests = [
   path.join(root, "packages/orchestrator-core/test/project-init.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/next-action.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/handoff-packets.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/evaluation-registry.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/eval-runner.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/certification-decision.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/compiler-revision.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/harness-capture-replay.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/asset-loader.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/context-compiler.test.mjs"),

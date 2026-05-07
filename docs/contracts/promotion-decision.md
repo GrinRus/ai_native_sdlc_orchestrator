@@ -88,6 +88,18 @@ Context-asset lifecycle evidence should be explicit when `subject_ref` is a cont
 - `context_lifecycle.quality_comparison` with explicit `with_context` and `without_context` evidence refs/status/pass-rate
 - `context_lifecycle.decision_trail[]` with version/channel/status lineage for operator audits
 
+Compiler revision lifecycle evidence should be explicit when `subject_ref` is a compiler revision (`compiler-revision://...`; legacy `compiler://...` is normalized by runtime readers):
+- `compiler_revision_lifecycle.compiler_revision_ref`
+- `compiler_revision_lifecycle.revision_id`
+- `compiler_revision_lifecycle.version`
+- `compiler_revision_lifecycle.source_ref`
+- `compiler_revision_lifecycle.compiler_family`
+- `compiler_revision_lifecycle.lifecycle_state` (`candidate|stable|frozen|demoted`)
+- `compiler_revision_lifecycle.compatibility_status` (`compatible|incompatible|unknown`)
+- `compiler_revision_lifecycle.compiled_context_refs`
+- `compiler_revision_lifecycle.evaluation_refs`
+- `compiler_revision_lifecycle.certification_evidence_refs`
+
 `evidence_bar.required` should include deterministic validation, evaluative artifacts, and finance signals when policy quality gate is required.
 For maturity transitions:
 - include `baseline-comparison` for `stable`, `frozen`, and `demoted`;

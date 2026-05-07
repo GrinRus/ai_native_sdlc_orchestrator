@@ -1,0 +1,31 @@
+{
+  "mode": "module",
+  "project_id": "local-target",
+  "selected_run_id": "w21-s07.installed-user-guided",
+  "run_count": 1,
+  "follow_enabled": false,
+  "stream_protocol": "none",
+  "detached": true,
+  "captured_event_count": 0,
+  "lifecycle_command_count": 6,
+  "interaction_count": 0,
+  "guided_lifecycle_state": "ready",
+  "guided_current_stage_id": "learning",
+  "guided_stage_count": 7,
+  "rendered_html_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.html",
+  "contract_alignment": {
+    "control_plane_routes": [
+      "GET /api/projects/:projectId",
+      "GET /api/projects/:projectId/next-action-report",
+      "POST /api/projects/:projectId/lifecycle-command/actions"
+    ],
+    "lifecycle_commands": [
+      "mission create",
+      "next",
+      "review decide",
+      "deliver prepare",
+      "release prepare",
+      "learning handoff"
+    ]
+  }
+}

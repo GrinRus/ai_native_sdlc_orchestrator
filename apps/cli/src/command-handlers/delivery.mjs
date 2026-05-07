@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 
 import {
@@ -39,6 +40,7 @@ import {
   materializeIntakeArtifactPacket,
   materializeReviewReport,
   materializeRuntimeHarnessReport,
+  materializeMultirepoCoordinationStatus,
   executeRoutedStep,
   executeRuntimeHarnessControlledStep,
   ensureRequiredFlags,
@@ -77,7 +79,8 @@ import {
 
 export const DELIVERY_COMMANDS = Object.freeze([
   "deliver prepare",
-  "release prepare"
+  "release prepare",
+  "multirepo lock"
 ]);
 
 export const DELIVERY_COMMAND_GROUP = Object.freeze({
@@ -91,7 +94,77 @@ export const DELIVERY_COMMAND_GROUP = Object.freeze({
  */
 export function handleDeliveryCommand(context) {
   const { command, flags, cwd, outputState } = context;
-  if (command === "deliver prepare" || command === "release prepare") {
+  if (command === "multirepo lock") {
+    ensureRequiredFlags(command, flags);
+    const action = resolveOptionalStringFlag("action", flags.action) ?? "inspect";
+    if (!["acquire", "release", "inspect"].includes(action)) {
+      throw new CliUsageError("Flag '--action' must be one of: acquire, release, inspect.");
+    }
+    const repoIds = resolveOptionalCsvFlag("repo-ids", flags["repo-ids"]);
+    const pathGlobs = resolveOptionalCsvFlag("path-globs", flags["path-globs"]);
+    const durationMinutes = resolveOptionalIntegerFlag("duration-minutes", flags["duration-minutes"], { min: 1 });
+    if (action === "acquire" && !flags["owner-ref"]) {
+      throw new CliUsageError("Flag '--owner-ref' is required for 'aor multirepo lock --action acquire'.");
+    }
+    if (action === "acquire" && repoIds.length === 0) {
+      throw new CliUsageError("Flag '--repo-ids' is required for 'aor multirepo lock --action acquire'.");
+    }
+    if (action === "release" && !flags["lock-id"]) {
+      throw new CliUsageError("Flag '--lock-id' is required for 'aor multirepo lock --action release'.");
+    }
+
+    const coordination = materializeMultirepoCoordinationStatus({
+      cwd,
+      projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      action: /** @type {"acquire" | "release" | "inspect"} */ (action),
+      runId: resolveOptionalStringFlag("run-id", flags["run-id"]),
+      ownerRef: resolveOptionalStringFlag("owner-ref", flags["owner-ref"]),
+      repoIds,
+      pathGlobs: pathGlobs.length > 0 ? pathGlobs : undefined,
+      durationMinutes,
+      lockId: resolveOptionalStringFlag("lock-id", flags["lock-id"]),
+      releaseEvidenceRefs: resolveOptionalCsvFlag("release-evidence-refs", flags["release-evidence-refs"]),
+      repoValidationRefs: resolveOptionalCsvFlag("repo-validation-refs", flags["repo-validation-refs"]),
+      failedRepoIds: resolveOptionalCsvFlag("failed-repo-ids", flags["failed-repo-ids"]),
+      integrationValidationRefs: resolveOptionalCsvFlag(
+        "integration-validation-refs",
+        flags["integration-validation-refs"],
+      ),
+    });
+
+    outputState.resolvedProjectRef = coordination.projectRoot;
+    outputState.resolvedRuntimeRoot = coordination.runtimeRoot;
+    outputState.runtimeLayout = coordination.runtimeLayout;
+    outputState.runtimeStateFile = coordination.stateFile;
+    outputState.projectProfileRef = coordination.projectProfileRef;
+    outputState.multirepoCoordinationId =
+      typeof coordination.report.status_id === "string" ? coordination.report.status_id : null;
+    outputState.multirepoCoordinationFile = coordination.statusPath;
+    outputState.multirepoCoordinationRef = coordination.statusRef;
+    outputState.multirepoCoordinationStatus =
+      typeof coordination.report.status === "string" ? coordination.report.status : null;
+    outputState.multirepoCoordinationBlocking = coordination.blocking;
+    outputState.multirepoCoordinationBlockingReasons = Array.isArray(coordination.report.blocking_reasons)
+      ? coordination.report.blocking_reasons
+      : [];
+    outputState.multirepoLockState =
+      typeof coordination.report.lock_state === "object" && coordination.report.lock_state
+        ? coordination.report.lock_state
+        : null;
+    outputState.multirepoCrossRepoValidation =
+      typeof coordination.report.cross_repo_validation === "object" && coordination.report.cross_repo_validation
+        ? coordination.report.cross_repo_validation
+        : null;
+    outputState.multirepoCoordinationRecords = [coordination.report];
+    outputState.readOnly = action === "inspect";
+    outputState.futureControlHooks = [
+      `deliver prepare --coordination-evidence-refs ${coordination.statusRef}`,
+      `deliver prepare --coordination-lock-evidence-refs ${coordination.statusRef}`,
+      "delivery manifests preserve multirepo lock and cross-repo validation refs",
+    ];
+  } else if (command === "deliver prepare" || command === "release prepare") {
     ensureRequiredFlags(command, flags);
     const routeOverrides = resolveRouteOverridesFlag(flags["route-overrides"]);
     const policyOverrides = resolvePolicyOverridesFlag(flags["policy-overrides"]);
@@ -140,10 +213,67 @@ export function handleDeliveryCommand(context) {
         command,
       });
     }
+    const reviewDecisionRequired = resolveOptionalBooleanFlag(
+      "require-review-decision",
+      flags["require-review-decision"],
+    );
+    outputState.reviewDecisionGate = reviewDecisionRequired ? "required" : "not_required";
+    if (reviewDecisionRequired) {
+      const reviewDecisions = listQualityArtifacts({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+      })
+        .filter((artifact) => artifact.family === "review-decision" && artifact.document.run_id === runId)
+        .sort((left, right) => {
+          const leftMs =
+            typeof left.document.decided_at === "string" ? Date.parse(left.document.decided_at) : Number.NEGATIVE_INFINITY;
+          const rightMs =
+            typeof right.document.decided_at === "string" ? Date.parse(right.document.decided_at) : Number.NEGATIVE_INFINITY;
+          const decidedAtDelta = (Number.isFinite(rightMs) ? rightMs : Number.NEGATIVE_INFINITY) -
+            (Number.isFinite(leftMs) ? leftMs : Number.NEGATIVE_INFINITY);
+          if (decidedAtDelta !== 0) return decidedAtDelta;
+          return fs.statSync(right.file).mtimeMs - fs.statSync(left.file).mtimeMs;
+        });
+      const latestDecision = reviewDecisions[0] ?? null;
+      if (!latestDecision) {
+        throw new CliUsageError(
+          `${command} requires an approved review decision for run '${runId}'. Run 'aor review decide --run-id ${runId} --decision approve' before delivery or release.`,
+        );
+      }
+      const reviewDecision = typeof latestDecision.document.decision === "string" ? latestDecision.document.decision : null;
+      const reviewDecisionGate =
+        typeof latestDecision.document.delivery_gate === "object" && latestDecision.document.delivery_gate
+          ? /** @type {{ status?: unknown, blocks_downstream?: unknown }} */ (latestDecision.document.delivery_gate)
+          : {};
+      outputState.reviewDecisionId =
+        typeof latestDecision.document.decision_id === "string" ? latestDecision.document.decision_id : null;
+      outputState.reviewDecisionFile = latestDecision.file;
+      outputState.reviewDecision = reviewDecision;
+      outputState.reviewDecisionGate =
+        typeof reviewDecisionGate.status === "string" ? reviewDecisionGate.status : outputState.reviewDecisionGate;
+      outputState.reviewDecisionReason =
+        typeof latestDecision.document.reason === "string" ? latestDecision.document.reason : null;
+      if (
+        reviewDecision !== "approve" ||
+        reviewDecisionGate.status !== "pass" ||
+        reviewDecisionGate.blocks_downstream === true
+      ) {
+        throw new CliUsageError(
+          `${command} requires review decision 'approve'; latest decision for run '${runId}' is '${reviewDecision ?? "unknown"}'.`,
+        );
+      }
+    }
     const resolvedPolicy = resolveStepPolicyForStep({
       projectProfilePath: init.projectProfilePath,
-      routesRoot: path.join(init.projectRoot, "examples/routes"),
-      policiesRoot: path.join(init.projectRoot, "examples/policies"),
+      routesRoot:
+        typeof init.registryRoots === "object" && init.registryRoots !== null
+          ? /** @type {Record<string, string>} */ (init.registryRoots).routes
+          : path.join(init.projectRoot, "examples/routes"),
+      policiesRoot:
+        typeof init.registryRoots === "object" && init.registryRoots !== null
+          ? /** @type {Record<string, string>} */ (init.registryRoots).policies
+          : path.join(init.projectRoot, "examples/policies"),
       stepClass,
       routeOverrides,
       policyOverrides,
@@ -170,6 +300,14 @@ export function handleDeliveryCommand(context) {
       "coordination-evidence-refs",
       flags["coordination-evidence-refs"],
     );
+    const coordinationLockEvidenceRefs = resolveOptionalCsvFlag(
+      "coordination-lock-evidence-refs",
+      flags["coordination-lock-evidence-refs"],
+    );
+    const crossRepoValidationRefs = resolveOptionalCsvFlag(
+      "cross-repo-validation-refs",
+      flags["cross-repo-validation-refs"],
+    );
     const rerunOfRunId = resolveOptionalStringFlag("rerun-of-run-id", flags["rerun-of-run-id"]);
     const rerunFailedStep = resolveOptionalStringFlag("rerun-failed-step", flags["rerun-failed-step"]);
     const rerunPacketBoundary = resolveOptionalStringFlag(
@@ -189,10 +327,16 @@ export function handleDeliveryCommand(context) {
           .filter((repo) => typeof repo === "object" && repo !== null)
           .map((repo) => {
             const repoRecord = /** @type {Record<string, unknown>} */ (repo);
+            const sourceRecord =
+              typeof repoRecord.source === "object" && repoRecord.source
+                ? /** @type {Record<string, unknown>} */ (repoRecord.source)
+                : {};
             return {
               repo_id: typeof repoRecord.repo_id === "string" ? repoRecord.repo_id : null,
               role: typeof repoRecord.role === "string" ? repoRecord.role : null,
               default_branch: typeof repoRecord.default_branch === "string" ? repoRecord.default_branch : null,
+              source_root: typeof sourceRecord.root === "string" ? sourceRecord.root : null,
+              source_kind: typeof sourceRecord.kind === "string" ? sourceRecord.kind : null,
             };
           })
           .filter((repo) => typeof repo.repo_id === "string")
@@ -215,6 +359,8 @@ export function handleDeliveryCommand(context) {
       promotionEvidenceRefs,
       coordinationRepos,
       coordinationEvidenceRefs,
+      coordinationLockEvidenceRefs,
+      crossRepoValidationRefs,
       rerunOfRunRef: rerunOfRunId ? toRunRef(rerunOfRunId) : undefined,
       rerunFailedStepRef: rerunFailedStep ?? undefined,
       rerunPacketBoundary: rerunPacketBoundary ?? undefined,

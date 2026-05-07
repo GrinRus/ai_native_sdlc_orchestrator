@@ -71,6 +71,16 @@ test("loads all examples through the shared contracts path", () => {
   assert.equal(loaded.ok, true, "batch example loading should pass");
 });
 
+test("loads monorepo and bounded multirepo profiles through the same project-profile contract path", () => {
+  for (const profileName of ["project.aor.yaml", "project.bounded-multirepo.aor.yaml"]) {
+    const loaded = loadContractFile({
+      filePath: path.join(workspaceRoot, "examples", profileName),
+      family: "project-profile",
+    });
+    assert.equal(loaded.ok, true, `${profileName} should load as project-profile`);
+  }
+});
+
 test("returns actionable error when required field is missing", () => {
   const source = path.join(workspaceRoot, "examples/project.aor.yaml");
   const loaded = loadContractFile({ filePath: source, family: "project-profile" });
@@ -316,6 +326,196 @@ test("runtime harness report example loads through the shared contract path", ()
   assert.equal(loaded.ok, true, "expected runtime-harness-report example to load");
 });
 
+test("review decision example preserves explicit approval vocabulary", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/review-decision.approve.yaml"),
+    family: "review-decision",
+  });
+  assert.equal(loaded.ok, true, "expected review-decision example to load");
+  assert.equal(loaded.document.decision, "approve");
+  assert.equal(loaded.document.delivery_gate.status, "pass");
+
+  const invalid = structuredClone(loaded.document);
+  invalid.decision = "proceed";
+  const validation = validateContractDocument({
+    family: "review-decision",
+    document: invalid,
+    source: "test://review-decision-invalid-decision",
+  });
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === "decision"),
+    "expected invalid review decision value to be rejected",
+  );
+});
+
+test("planner metrics snapshot example preserves no-data capable metric vocabulary", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/planner-metrics-snapshot.sample.yaml"),
+    family: "planner-metrics-snapshot",
+  });
+  assert.equal(loaded.ok, true, "expected planner-metrics-snapshot example to load");
+  assert.deepEqual(loaded.document.metric_names, [
+    "clean_close_rate",
+    "retry_rate",
+    "repair_rate",
+    "blocker_rate",
+  ]);
+  assert.equal(loaded.document.metrics.clean_close_rate.value, 0.25);
+
+  const invalid = structuredClone(loaded.document);
+  invalid.status = "green";
+  const validation = validateContractDocument({
+    family: "planner-metrics-snapshot",
+    document: invalid,
+    source: "test://planner-metrics-invalid-status",
+  });
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === "status"),
+    "expected invalid planner metrics status to be rejected",
+  );
+});
+
+test("discovery research report examples distinguish ADR-ready and incomplete evidence", () => {
+  const ready = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/discovery-research-report.adr-ready.yaml"),
+    family: "discovery-research-report",
+  });
+  assert.equal(ready.ok, true, "expected ADR-ready discovery research example to load");
+  assert.equal(ready.document.status, "adr-ready");
+
+  const incomplete = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/discovery-research-report.incomplete.yaml"),
+    family: "discovery-research-report",
+  });
+  assert.equal(incomplete.ok, true, "expected incomplete discovery research example to load");
+  assert.equal(incomplete.document.status, "incomplete");
+
+  const invalid = structuredClone(ready.document);
+  invalid.status = "ready";
+  const validation = validateContractDocument({
+    family: "discovery-research-report",
+    document: invalid,
+    source: "test://discovery-research-invalid-status",
+  });
+  assert.equal(validation.ok, false);
+  assert.ok(
+    validation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === "status"),
+    "expected invalid discovery research status to be rejected",
+  );
+});
+
+test("incident backfill proposal example preserves proposal-only review state", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/incident-backfill-proposal.proposed.yaml"),
+    family: "incident-backfill-proposal",
+  });
+  assert.equal(loaded.ok, true, "expected incident-backfill-proposal example to load");
+  assert.equal(loaded.document.proposal_state, "proposed");
+  assert.equal(loaded.document.target.dataset_mutation_mode, "proposal-only");
+  assert.equal(loaded.document.mutation_policy.stable_dataset_mutation, "blocked");
+
+  const invalidState = structuredClone(loaded.document);
+  invalidState.proposal_state = "applied";
+  const invalidStateValidation = validateContractDocument({
+    family: "incident-backfill-proposal",
+    document: invalidState,
+    source: "test://incident-backfill-invalid-state",
+  });
+  assert.equal(invalidStateValidation.ok, false);
+  assert.ok(
+    invalidStateValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "proposal_state",
+    ),
+    "expected applied proposal state to be rejected",
+  );
+
+  const missingTarget = structuredClone(loaded.document);
+  delete missingTarget.target;
+  const missingTargetValidation = validateContractDocument({
+    family: "incident-backfill-proposal",
+    document: missingTarget,
+    source: "test://incident-backfill-missing-target",
+  });
+  assert.equal(missingTargetValidation.ok, false);
+  assert.ok(
+    missingTargetValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "target",
+    ),
+    "expected missing target to be rejected",
+  );
+});
+
+test("intake request body validates local source refs and rejects malformed product evidence", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/packets/intake-request-body.complete.yaml"),
+    family: "intake-request-body",
+  });
+  assert.equal(loaded.ok, true, "expected complete intake-request-body example to load");
+
+  const invalidSource = structuredClone(loaded.document);
+  invalidSource.product_intake.source_refs[0].source_kind = "github-issue";
+  const invalidSourceValidation = validateContractDocument({
+    family: "intake-request-body",
+    document: invalidSource,
+    source: "test://intake-request-body-external-source",
+  });
+  assert.equal(invalidSourceValidation.ok, false);
+  assert.ok(
+    invalidSourceValidation.issues.some(
+      (problem) =>
+        problem.code === "enum_value_invalid" && problem.field === "product_intake.source_refs[0].source_kind",
+    ),
+    "expected external SaaS source kind to be rejected",
+  );
+
+  const missingKpis = structuredClone(loaded.document);
+  delete missingKpis.product_intake.kpis;
+  const missingKpisValidation = validateContractDocument({
+    family: "intake-request-body",
+    document: missingKpis,
+    source: "test://intake-request-body-missing-kpis",
+  });
+  assert.equal(missingKpisValidation.ok, false);
+  assert.ok(
+    missingKpisValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "product_intake.kpis",
+    ),
+    "expected missing product_intake.kpis to be rejected",
+  );
+
+  const malformedKpi = structuredClone(loaded.document);
+  delete malformedKpi.product_intake.kpis[0].target;
+  const malformedKpiValidation = validateContractDocument({
+    family: "intake-request-body",
+    document: malformedKpi,
+    source: "test://intake-request-body-malformed-kpi",
+  });
+  assert.equal(malformedKpiValidation.ok, false);
+  assert.ok(
+    malformedKpiValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "product_intake.kpis[0].target",
+    ),
+    "expected malformed KPI target to be rejected",
+  );
+
+  const invalidDeliveryMode = structuredClone(loaded.document);
+  invalidDeliveryMode.mission_scope.delivery_mode = "upstream-main";
+  const invalidDeliveryModeValidation = validateContractDocument({
+    family: "intake-request-body",
+    document: invalidDeliveryMode,
+    source: "test://intake-request-body-invalid-delivery-mode",
+  });
+  assert.equal(invalidDeliveryModeValidation.ok, false);
+  assert.ok(
+    invalidDeliveryModeValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "mission_scope.delivery_mode",
+    ),
+    "expected unsupported mission delivery mode to be rejected",
+  );
+});
+
 test("context assets require metadata and source reference fields in the supported shape", () => {
   const source = path.join(workspaceRoot, "examples/context/skills/runner-verification-default.yaml");
   const loaded = loadContractFile({ filePath: source, family: "context-skill" });
@@ -346,6 +546,62 @@ test("control-plane API baseline example loads through the shared contract path"
   const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
   const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
   assert.equal(loaded.ok, true, "expected control-plane-api baseline example to load");
+});
+
+test("control-plane API baseline documents interactive continuation target metadata", () => {
+  const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
+  assert.equal(loaded.ok, true, "fixture should load before assertions");
+
+  assert.equal(loaded.document.interactive_continuation?.owning_slice, "W18-S01");
+  assert.equal(loaded.document.interactive_continuation?.request_contract_family, "step-result");
+  assert.equal(loaded.document.interactive_continuation?.event_contract_family, "live-run-event");
+  assert.equal(
+    loaded.document.interactive_continuation?.answer_submission?.implementation_status,
+    "implemented-w18-s02",
+  );
+  assert.equal(loaded.document.lifecycle_command_operations?.owning_slice, "W18-S02");
+  assert.ok(
+    loaded.document.lifecycle_command_operations?.commands?.some(
+      (entry) => entry.command === "intake create",
+    ),
+    "expected lifecycle command subset to include intake create",
+  );
+  assert.ok(
+    loaded.document.lifecycle_command_operations?.commands?.some(
+      (entry) => entry.command === "mission create",
+    ),
+    "expected lifecycle command subset to include guided mission create",
+  );
+  assert.ok(
+    loaded.document.deferred_transport?.implemented_mappings?.includes(
+      "GET /api/projects/:projectId/next-action-report",
+    ),
+    "expected next-action report read mapping for guided web",
+  );
+  assert.ok(
+    loaded.document.interactive_continuation?.audit_behavior?.query_safe_refs?.includes("answer_audit_ref"),
+    "expected answer audit refs to be query-safe",
+  );
+});
+
+test("control-plane API baseline documents production hardening metadata", () => {
+  const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
+  assert.equal(loaded.ok, true, "fixture should load before assertions");
+
+  assert.equal(loaded.document.production_hardening?.owning_slice, "W20-S02");
+  assert.equal(loaded.document.production_hardening?.status, "implemented-baseline");
+  assert.ok(
+    loaded.document.production_hardening?.transport_modes?.some(
+      (entry) => entry.mode === "production-hardened" && entry.auth_required === true,
+    ),
+    "expected production-hardened mode to require auth",
+  );
+  assert.ok(
+    loaded.document.production_hardening?.redaction?.response_surfaces?.includes("SSE data payloads"),
+    "expected SSE response redaction metadata",
+  );
 });
 
 test("control-plane API contract rejects invalid binding mode", () => {

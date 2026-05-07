@@ -1,0 +1,223 @@
+schema_version: 1
+snapshot_id: aor-core.finance-monitoring.snapshot.v1
+project_id: aor-core
+generated_at: "2026-05-06T03:00:00.000Z"
+status: ready
+no_data: false
+telemetry_state: ready
+dimension_names:
+  - project
+  - route
+  - bundle
+  - compiler_revision
+  - adapter
+tenant_like_grouping:
+  grouping_key: project_id
+  tenant_semantics: not-production-saas-tenancy
+  note: Project grouping is used for installed and bounded multirepo reporting without claiming hosted tenant isolation.
+aggregation:
+  unit: run
+  denominator: 1
+  no_data_reason: null
+  partial_run_ids: []
+finance:
+  cost_signal: policy_max_cost_usd_or_provider_reported_cost_when_available
+  latency_signal: step_and_certification_latency_seconds
+  dimensions:
+    project:
+      - dimension: project
+        key: aor-core
+        run_count: 1
+        run_ids:
+          - run.finance.ready.v1
+        cost_limit_usd:
+          unit: usd
+          samples: 1
+          total: 12
+          min: 12
+          max: 12
+          avg: 12
+        step_latency_sec:
+          samples: 1
+          min: 5
+          max: 5
+          avg: 5
+        certification_latency_sec:
+          samples: 1
+          min: 0.8
+          max: 0.8
+          avg: 0.8
+        evidence_refs:
+          - evidence://reports/step-result-finance-ready.json
+          - evidence://artifacts/promotion-decision-finance-ready.json
+    route:
+      - dimension: route
+        key: route.implement.default
+        run_count: 1
+        run_ids:
+          - run.finance.ready.v1
+        cost_limit_usd:
+          unit: usd
+          samples: 1
+          total: 12
+          min: 12
+          max: 12
+          avg: 12
+        step_latency_sec:
+          samples: 1
+          min: 5
+          max: 5
+          avg: 5
+        certification_latency_sec:
+          samples: 1
+          min: 0.8
+          max: 0.8
+          avg: 0.8
+        evidence_refs:
+          - evidence://reports/step-result-finance-ready.json
+    bundle:
+      - dimension: bundle
+        key: prompt-bundle://runner-default@v3
+        run_count: 1
+        run_ids:
+          - run.finance.ready.v1
+        cost_limit_usd:
+          unit: usd
+          samples: 1
+          total: 12
+          min: 12
+          max: 12
+          avg: 12
+        step_latency_sec:
+          samples: 1
+          min: 5
+          max: 5
+          avg: 5
+        certification_latency_sec:
+          samples: 1
+          min: 0.8
+          max: 0.8
+          avg: 0.8
+        evidence_refs:
+          - evidence://reports/step-result-finance-ready.json
+    compiler_revision:
+      - dimension: compiler_revision
+        key: compiler-revision://runtime-context-compiler@v1
+        run_count: 1
+        run_ids:
+          - run.finance.ready.v1
+        cost_limit_usd:
+          unit: usd
+          samples: 1
+          total: 12
+          min: 12
+          max: 12
+          avg: 12
+        step_latency_sec:
+          samples: 1
+          min: 5
+          max: 5
+          avg: 5
+        certification_latency_sec:
+          samples: 1
+          min: 0.8
+          max: 0.8
+          avg: 0.8
+        evidence_refs:
+          - evidence://reports/compiler-revision-status-runtime-context-compiler-v1.json
+    adapter:
+      - dimension: adapter
+        key: adapter.openai.default
+        run_count: 1
+        run_ids:
+          - run.finance.ready.v1
+        cost_limit_usd:
+          unit: usd
+          samples: 1
+          total: 12
+          min: 12
+          max: 12
+          avg: 12
+        step_latency_sec:
+          samples: 1
+          min: 5
+          max: 5
+          avg: 5
+        certification_latency_sec:
+          samples: 1
+          min: 0.8
+          max: 0.8
+          avg: 0.8
+        evidence_refs:
+          - evidence://reports/step-result-finance-ready.json
+monitoring_loop:
+  evidence_classes:
+    production_monitoring:
+      evidence_class: production_monitoring
+      status: ready
+      run_ids:
+        - run.finance.ready.v1
+      evidence_refs:
+        - live-run-event://run.finance.ready.v1.event.000001
+      event_count: 1
+    offline_certification:
+      evidence_class: offline_certification
+      status: ready
+      run_ids:
+        - run.finance.ready.v1
+      evidence_refs:
+        - evidence://artifacts/promotion-decision-finance-ready.json
+      event_count: 0
+    rehearsal:
+      evidence_class: rehearsal
+      status: no-data
+      run_ids: []
+      evidence_refs: []
+      event_count: 0
+  separation_rules:
+    production_monitoring_requires_explicit_scope: true
+    offline_certification_families:
+      - promotion-decision
+      - evaluation-report
+      - runtime-harness-report
+    rehearsal_evidence_is_not_production_monitoring: true
+source_artifacts:
+  run_refs:
+    - run://run.finance.ready.v1
+  evidence_refs:
+    - evidence://reports/step-result-finance-ready.json
+    - evidence://artifacts/promotion-decision-finance-ready.json
+  live_event_refs:
+    - live-run-event://run.finance.ready.v1.event.000001
+run_breakdown:
+  - run_id: run.finance.ready.v1
+    telemetry_state: ready
+    missing_signals: []
+    dimensions:
+      project_id: aor-core
+      route_ids:
+        - route.implement.default
+      prompt_bundle_refs:
+        - prompt-bundle://runner-default@v3
+      context_bundle_refs:
+        - context-bundle://context.bundle.runner.foundation@v1
+      compiler_revision_refs:
+        - compiler-revision://runtime-context-compiler@v1
+      adapter_ids:
+        - adapter.openai.default
+    cost_limit_usd: 12
+    step_latency_sec:
+      samples: 1
+      min: 5
+      max: 5
+      avg: 5
+    certification_latency_sec:
+      samples: 1
+      min: 0.8
+      max: 0.8
+      avg: 0.8
+    production_monitoring_evidence_refs:
+      - live-run-event://run.finance.ready.v1.event.000001
+    evidence_refs:
+      - evidence://reports/step-result-finance-ready.json
+      - evidence://artifacts/promotion-decision-finance-ready.json

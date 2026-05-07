@@ -145,7 +145,7 @@ Required coverage matrix:
 Provider comparison rule:
 - every curated repo must prove at least one equivalent mission class on both `openai-primary` and `anthropic-primary`.
 - `openai-primary` and `anthropic-primary` are mandatory provider variants for W14 matrix coverage.
-- `open-code-primary` remains extended coverage and is not a day-one required acceptance gate.
+- `open-code-primary` is required only for catalog cells that explicitly list it, starting with `ky.regress.small.open-code`; full provider parity remains out of scope for W20-S03.
 
 Canonical matrix-cell examples:
 - `small/regress/openai-primary`: `full-journey-regress-ky.yaml`

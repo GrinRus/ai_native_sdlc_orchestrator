@@ -36,6 +36,7 @@ function resolveRunEventLogFile(options) {
  *   eventType: string,
  *   payload: Record<string, unknown>,
  *   timestamp?: string,
+ *   redactionPolicy?: unknown,
  * }} options
  */
 export function appendRunEvent(options) {
@@ -50,6 +51,7 @@ export function appendRunEvent(options) {
     eventType: options.eventType,
     payload: options.payload,
     timestamp: options.timestamp,
+    redactionPolicy: options.redactionPolicy,
   });
 
   return {
@@ -88,6 +90,7 @@ export function readRunEvents(options) {
  *   runId: string,
  *   afterEventId?: string,
  *   maxReplay?: number,
+ *   redactionPolicy?: unknown,
  * }} options
  */
 export function openRunEventStream(options) {
@@ -101,6 +104,7 @@ export function openRunEventStream(options) {
     runId: options.runId,
     afterEventId: options.afterEventId,
     maxReplay: options.maxReplay,
+    redactionPolicy: options.redactionPolicy,
   });
 
   return {

@@ -72,6 +72,8 @@ Quality boundaries are explicit:
 
 Strictness is mission-type driven. Code-changing, live, and release missions use strict semantic gates. Docs-only, no-write rehearsal, and asset-certification flows may use softer profiles, but their softness must be explicit in runtime evidence.
 
+When classification finds `interactive-question-requested`, the run is not terminal by UI decision. The Runtime Harness writes a `requested_interaction` boundary into the step result, emits query-safe live events, and waits for a control-plane-owned answer submission. After answer audit evidence is written, the runtime may resume from that boundary; if validation or policy blocks continuation, the run remains blocked with the same interaction and reason evidence.
+
 ## Delivery model
 AOR should support these delivery modes:
 - `no-write`
@@ -98,8 +100,8 @@ Promotion must be based on certification evidence, not intuition.
 When a run fails or a release causes trouble:
 1. create an incident report;
 2. link the incident to run, route, wrapper, prompt/context assets, adapter, compiler revision, and packets;
-3. backfill a dataset case;
-4. update or create suites;
+3. create a reviewed incident-backfill proposal for the target dataset or suite;
+4. update or create suites only after proposal review accepts the change;
 5. recertify the impacted platform asset before restoring it to stable use.
 
 For full-journey live E2E, the same loop must also leave behind:
