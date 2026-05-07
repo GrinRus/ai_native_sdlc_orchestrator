@@ -61,7 +61,7 @@ test("live e2e provider catalog required variants point at live-runnable adapter
   assert.equal(result.ok, true, "expected live E2E provider catalog references to pass");
   assert.equal(result.issues.length, 0, "expected zero live E2E catalog reference issues");
   assert.ok(result.checkedReferences >= 3, "expected provider variants to be checked");
-  assert.ok(result.checkedCompatibility >= 2, "expected required provider live-runtime compatibility checks");
+  assert.ok(result.checkedCompatibility >= 3, "expected required provider live-runtime compatibility checks");
 });
 
 test("live e2e provider catalog rejects required variants without adapter execution runtime", () => {
@@ -102,6 +102,27 @@ test("live e2e provider catalog keeps mandatory primary providers live-runnable 
         candidate.reference === "codex-cli",
     );
     assert.ok(issue, "expected mandatory openai-primary adapter runtime compatibility issue");
+  });
+});
+
+test("live e2e provider catalog rejects required OpenCode without permission policy", () => {
+  withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "examples/adapters/open-code.yaml", (document) => {
+      const execution = /** @type {Record<string, unknown>} */ (document.execution);
+      const externalRuntime = /** @type {Record<string, unknown>} */ (execution.external_runtime);
+      delete externalRuntime.permission_policy;
+    });
+
+    const result = validateLiveE2eCatalogReferences({ workspaceRoot: tempRoot });
+    assert.equal(result.ok, false);
+
+    const issue = result.issues.find(
+      (candidate) =>
+        candidate.code === "reference_target_incompatible" &&
+        candidate.field === "primary_adapter" &&
+        candidate.reference === "open-code",
+    );
+    assert.ok(issue, "expected required OpenCode adapter permission policy compatibility issue");
   });
 });
 

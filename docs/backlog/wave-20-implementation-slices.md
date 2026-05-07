@@ -6,11 +6,11 @@ Close the production and platform maturity gaps that remain after the W19 story-
 ## Wave exit criteria
 - W20 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
 - multirepo coordination, production security, provider certification, compiler revision lifecycle, and finance monitoring gaps have explicit acceptance evidence paths
-- OpenCode remains blocked unless a stable live runtime can produce contract-valid certification evidence
+- OpenCode has a bounded live-baseline certification path backed by contract-valid runtime evidence
 
 ## Sequencing notes
 - `W20-S01`, `W20-S02`, `W20-S04`, and `W20-S05` can proceed after W19 story evidence stabilizes and their earlier foundation slices remain done.
-- `W20-S03` has an external runtime blocker in addition to hard dependencies because OpenCode live-baseline certification cannot be claimed from mock or documentation-only evidence.
+- `W20-S03` must keep mock-only evidence from promoting OpenCode; live certification evidence is required for done state.
 
 ---
 
@@ -82,11 +82,11 @@ Close the production and platform maturity gaps that remain after the W19 story-
 
 ## W20-S03 — OpenCode live-baseline certification
 - **Epic:** EPIC-3 Routed execution
-- **State:** blocked
+- **State:** done
 - **Outcome:** Promote OpenCode from extended/non-live-baseline coverage to a certified live baseline only after stable non-interactive runtime evidence exists.
 - **Primary modules:** `examples/adapters/**`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W16-S06, W20-S02
-- **External blocker:** Stable installed OpenCode runtime with non-interactive execution, usable permissions, and contract-valid live output for certification evidence.
+- **Certification evidence:** `run_id=w20-s03.opencode-ky-regress`, `matrix_cell=ky.regress.small.open-code`, deterministic verdict `pass`; observation status is `warn` only because no agent judge file was supplied.
 - **Primary user-story surfaces:** delivery engineer, AI platform owner, operator / SRE
 
 ### Local tasks
@@ -103,7 +103,7 @@ Close the production and platform maturity gaps that remain after the W19 story-
 4. Docs no longer describe OpenCode as extended-only after certification succeeds.
 
 ### Done evidence
-- live OpenCode certification report
+- live OpenCode certification report for `run_id=w20-s03.opencode-ky-regress`
 - updated adapter metadata and contract examples
 - provider maturity docs reflecting certified baseline status
 

@@ -3,6 +3,7 @@ runner_family: opencode
 version: 1
 launch_modes:
   - interactive
+  - non-interactive
 capabilities:
   repo_read: true
   repo_write: true
@@ -15,6 +16,30 @@ constraints:
   requires_local_runtime: true
   default_network_mode: deny-by-default
   supports_no_write_rehearsal: true
+execution:
+  live_baseline: true
+  runtime_mode: external-process
+  handler: open-code-external-runner
+  evidence_namespace: evidence://adapter-live/open-code
+  external_runtime:
+    command: opencode
+    permission_policy:
+      default_mode: full-bypass
+      modes:
+        full-bypass:
+          args:
+            - run
+            - --format
+            - json
+            - --dangerously-skip-permissions
+        restricted:
+          args:
+            - run
+            - --format
+            - json
+    request_via_stdin: true
+    preflight_timeout_ms: 120000
+    timeout_ms: 600000
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true
@@ -24,7 +49,6 @@ log_features:
   stderr: true
   tool_calls: true
   normalized_summary: true
-certification_state: candidate
+certification_state: stable
 limitations:
-  - Discovered non-interactive equivalent is `opencode run --format json --dangerously-skip-permissions`, but wrapper/output normalization still requires certification.
-  - Not a live_baseline adapter until a stable non-interactive external runtime is certified.
+  - W20-S03 certifies the `ky.regress.small.open-code` required matrix cell; full OpenCode provider parity requires separate coverage.

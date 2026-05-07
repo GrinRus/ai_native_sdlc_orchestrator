@@ -160,10 +160,19 @@ test("computeStateSyncChanges degrades ready slices with explicit external block
 });
 
 test("applySliceStateTransition requires force to bypass an explicit external blocker", () => {
-  const model = loadBacklogModel(process.cwd());
+  const model = buildSyntheticModel(
+    [
+      {
+        sliceId: "W0-S01",
+        state: "blocked",
+        externalBlocker: "External runner credentials are unavailable.",
+      },
+    ],
+    ["W0-S01"],
+  );
   assert.throws(
-    () => applySliceStateTransition(model, "W20-S03", "done"),
-    /Cannot set W20-S03 to done: external blocker remains:/,
+    () => applySliceStateTransition(model, "W0-S01", "done"),
+    /Cannot set W0-S01 to done: external blocker remains:/,
   );
 });
 

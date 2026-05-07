@@ -45,7 +45,7 @@ Coverage status values:
 | DEV-01 | Delivery engineer | MVP | Execute approved work through runner-agnostic routes. | covered | route registry, adapter SDK, W2-S05, W13-S04 | none |
 | DEV-02 | Delivery engineer | MVP | Run live work through the stable Codex CLI adapter baseline. | covered | W10-S01, W14 provider-pinned matrix evidence | none |
 | DEV-03 | Delivery engineer | MVP | Run Claude Code as a live-runnable candidate with matrix coverage. | covered | W14 anthropic-primary matrix coverage | none |
-| DEV-04 | Delivery engineer | MVP | Run OpenCode through a certified live-baseline adapter path. | blocked | extended OpenCode coverage only | W20-S03 |
+| DEV-04 | Delivery engineer | MVP | Run OpenCode through a certified live-baseline adapter path. | covered | OpenCode live-baseline adapter, `ky.regress.small.open-code` certification evidence, W20-S03 | none |
 | DEV-05 | Delivery engineer | MVP | Run self-review, QA, retry, and repair in one orchestration model. | covered | review reports, Runtime Harness, `review decide --decision request-repair`, `next-action-report` hold/repair blockers, W13-S05, W19-S05, W21-S06 guided closure resolver | none |
 | DEV-06 | Delivery engineer | MVP | Inspect diffs, logs, tool traces, and delivery artifacts. | covered | delivery manifests, run events, evidence show | none |
 | DEV-07 | Delivery engineer | MVP | Inspect compiled prompt and context lineage. | covered | compiled-context artifacts, W8-S08 | none |
@@ -69,7 +69,7 @@ Coverage status values:
 | AIP-09 | AI platform owner | MVP+ | Demote or re-enable assets through incident evidence. | covered | incident recertification, W7-S03 | none |
 | AIP-10 | AI platform owner | MVP+ | Link promotion decisions to finance evidence. | covered | W7-S02, W7-S04 finance evidence | none |
 | AIP-11 | AI platform owner | Later | Compare later-stage baselines across candidates. | covered | W8-S05 baseline comparison maturity | none |
-| AIP-12 | AI platform owner | Later | Certify extended adapters such as OpenCode as live baselines. | blocked | OpenCode is extended non-live-baseline coverage | W20-S03 |
+| AIP-12 | AI platform owner | Later | Certify extended adapters such as OpenCode as live baselines. | covered | OpenCode certified as a live baseline for `ky.regress.small.open-code`, W20-S03 | none |
 | OPS-01 | Operator / SRE | MVP | Watch live run state in CLI or web. | covered | `run status`, API read surface, web console, W5 | none |
 | OPS-02 | Operator / SRE | MVP | Tail logs and inspect live events. | covered | live event stream, `evidence show`, W5-S02 | none |
 | OPS-03 | Operator / SRE | MVP | Inspect policy and compile decisions. | covered | W8-S04 policy visibility, compiled context evidence | none |

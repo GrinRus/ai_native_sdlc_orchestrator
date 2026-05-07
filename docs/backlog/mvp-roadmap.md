@@ -365,7 +365,7 @@ The authoritative planning model for implementation lives in:
 - W20 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
 - multirepo scoped locks and cross-repo validation have a bounded backlog path
 - production auth, redaction, logging, and observability hardening are separated from local trusted baselines
-- OpenCode live-baseline certification remains blocked unless live runtime evidence exists
+- OpenCode live-baseline certification is backed by W20-S03 live runtime evidence for `ky.regress.small.open-code`
 - compiler revisions and finance monitoring loops have first-class backlog slices
 
 **Detailed slices:** `docs/backlog/wave-20-implementation-slices.md`

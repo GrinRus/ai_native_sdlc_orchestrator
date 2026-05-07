@@ -15,6 +15,7 @@ import { validateGuidedJourneyProof } from "../live-e2e/lib/guided-proof.mjs";
 const currentFilePath = fileURLToPath(import.meta.url);
 const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../..");
 const proofRunnerScriptPath = path.join(workspaceRoot, "scripts/live-e2e/run-profile.mjs");
+const defaultProofRunnerTimeoutMs = Number(process.env.AOR_PROOF_RUNNER_TEST_TIMEOUT_MS ?? 120000);
 
 /**
  * @param {(tempRoot: string) => void} callback
@@ -800,6 +801,7 @@ function writeLocalFullJourneyProfile(options) {
  *   runtimeAgentPermissionMode?: string,
  *   agentJudgeFile?: string | null,
  *   skipAgentJudge?: boolean,
+ *   timeoutMs?: number,
  * }} options
  */
 function runProofRunner(options) {
@@ -859,17 +861,90 @@ function runProofRunner(options) {
     );
     args.push("--agent-judge-file", judgeFile);
   }
+  const run = spawnProofRunnerProcess(args, {
+    timeoutMs: options.timeoutMs,
+    extraEnv: options.extraEnv,
+  });
+  assert.equal(run.status, 0, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
+  return JSON.parse(run.stdout);
+}
+
+/**
+ * @param {string[]} args
+ * @param {{ timeoutMs?: number, extraEnv?: Record<string, string | undefined> }} [options]
+ * @returns {ReturnType<typeof spawnSync> & { proof_runner_timeout_ms?: number }}
+ */
+function spawnProofRunnerProcess(args, options = {}) {
+  const timeoutMs = options.timeoutMs ?? defaultProofRunnerTimeoutMs;
   const run = spawnSync(process.execPath, args, {
     cwd: workspaceRoot,
     encoding: "utf8",
+    timeout: timeoutMs,
     env: {
       ...process.env,
       ...(options.extraEnv ?? {}),
     },
   });
-  assert.equal(run.status, 0, run.stderr);
-  return JSON.parse(run.stdout);
+  run.proof_runner_timeout_ms = timeoutMs;
+  return run;
 }
+
+/**
+ * @param {{ proof_runner_timeout_ms?: number }} run
+ * @returns {number}
+ */
+function proofRunnerTimeoutMs(run) {
+  return run.proof_runner_timeout_ms ?? defaultProofRunnerTimeoutMs;
+}
+
+/**
+ * @param {ReturnType<typeof spawnSync>} run
+ * @param {number} timeoutMs
+ * @returns {string}
+ */
+function formatProofRunnerFailure(run, timeoutMs) {
+  const stderr = typeof run.stderr === "string" ? run.stderr.trim() : "";
+  const stdout = typeof run.stdout === "string" ? run.stdout.trim() : "";
+  const error = run.error instanceof Error ? run.error : null;
+  const timedOut = error?.code === "ETIMEDOUT" || run.signal === "SIGTERM";
+  return [
+    timedOut ? `proof runner timed out after ${timeoutMs}ms` : "proof runner failed",
+    `status=${String(run.status)}`,
+    `signal=${String(run.signal)}`,
+    error ? `error=${error.message}` : "",
+    stderr ? `stderr=${stderr}` : "",
+    stdout ? `stdout=${stdout.slice(0, 4000)}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+test("installed-user proof runner subprocesses have a bounded timeout diagnostic", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const profilePath = path.join(tempRoot, "regress-short.timeout.yaml");
+    writeLocalProofRunnerProfile({
+      templateProfilePath: path.join(workspaceRoot, "scripts/live-e2e/profiles/regress-short.yaml"),
+      outputProfilePath: profilePath,
+      targetRepoRoot: targetRepo.targetRepoRoot,
+      targetRef: targetRepo.targetRef,
+    });
+
+    assert.throws(
+      () =>
+        runProofRunner({
+          runtimeRoot: path.join(tempRoot, "runtime"),
+          examplesRoot,
+          profilePath,
+          runId: "installed-user-timeout",
+          timeoutMs: 1,
+        }),
+      /proof runner timed out after 1ms/u,
+    );
+  });
+});
 
 test("installed-user proof runner runs a valid short profile through public CLI subprocesses", () => {
   withTempRoot((tempRoot) => {
@@ -2141,26 +2216,22 @@ test("full-journey mode rejects unknown catalog targets", () => {
       missionId: "local-mission",
     });
 
-    const run = spawnSync(
-      process.execPath,
-      [
-        proofRunnerScriptPath,
-        "--project-ref",
-        workspaceRoot,
-        "--runtime-root",
-        path.join(tempRoot, "runtime"),
-        "--examples-root",
-        examplesRoot,
-        "--profile",
-        profilePath,
-        "--run-id",
-        "full-journey-missing-target",
-        "--catalog-root",
-        catalogRoot,
-      ],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-    assert.equal(run.status, 1);
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--examples-root",
+      examplesRoot,
+      "--profile",
+      profilePath,
+      "--run-id",
+      "full-journey-missing-target",
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.equal(run.status, 1, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
     assert.match(run.stderr, /Target catalog 'missing-target' was not found/u);
   });
 });
@@ -2186,26 +2257,22 @@ test("full-journey mode rejects unknown feature missions", () => {
       missionId: "missing-mission",
     });
 
-    const run = spawnSync(
-      process.execPath,
-      [
-        proofRunnerScriptPath,
-        "--project-ref",
-        workspaceRoot,
-        "--runtime-root",
-        path.join(tempRoot, "runtime"),
-        "--examples-root",
-        examplesRoot,
-        "--profile",
-        profilePath,
-        "--run-id",
-        "full-journey-missing-mission",
-        "--catalog-root",
-        catalogRoot,
-      ],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-    assert.equal(run.status, 1);
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--examples-root",
+      examplesRoot,
+      "--profile",
+      profilePath,
+      "--run-id",
+      "full-journey-missing-mission",
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.equal(run.status, 1, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
     assert.match(run.stderr, /Feature mission 'missing-mission' was not found/u);
   });
 });
@@ -2222,12 +2289,16 @@ test("full-journey mode rejects profiles without scenario_family", () => {
     delete profile.scenario_family;
     fs.writeFileSync(profilePath, stringifyYaml(profile), "utf8");
 
-    const run = spawnSync(
-      process.execPath,
-      [proofRunnerScriptPath, "--project-ref", workspaceRoot, "--runtime-root", path.join(tempRoot, "runtime"), "--profile", profilePath],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-    assert.equal(run.status, 1);
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--profile",
+      profilePath,
+    ]);
+    assert.equal(run.status, 1, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
     assert.match(run.stderr, /Full-journey profiles require scenario_family/u);
   });
 });
@@ -2244,12 +2315,16 @@ test("full-journey mode rejects profiles without provider_variant_id", () => {
     delete profile.provider_variant_id;
     fs.writeFileSync(profilePath, stringifyYaml(profile), "utf8");
 
-    const run = spawnSync(
-      process.execPath,
-      [proofRunnerScriptPath, "--project-ref", workspaceRoot, "--runtime-root", path.join(tempRoot, "runtime"), "--profile", profilePath],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-    assert.equal(run.status, 1);
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--profile",
+      profilePath,
+    ]);
+    assert.equal(run.status, 1, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
     assert.match(run.stderr, /Full-journey profiles require provider_variant_id/u);
   });
 });
@@ -2276,24 +2351,20 @@ test("full-journey mode rejects unknown provider variants", () => {
       providerVariantId: "missing-provider",
     });
 
-    const run = spawnSync(
-      process.execPath,
-      [
-        proofRunnerScriptPath,
-        "--project-ref",
-        workspaceRoot,
-        "--runtime-root",
-        path.join(tempRoot, "runtime"),
-        "--examples-root",
-        examplesRoot,
-        "--profile",
-        profilePath,
-        "--catalog-root",
-        catalogRoot,
-      ],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-    assert.equal(run.status, 1);
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--examples-root",
+      examplesRoot,
+      "--profile",
+      profilePath,
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.equal(run.status, 1, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
     assert.match(run.stderr, /Provider variant 'missing-provider' was not found/u);
   });
 });
@@ -2320,24 +2391,20 @@ test("full-journey mode rejects unknown scenario families", () => {
       scenarioFamily: "unsupported-scenario",
     });
 
-    const run = spawnSync(
-      process.execPath,
-      [
-        proofRunnerScriptPath,
-        "--project-ref",
-        workspaceRoot,
-        "--runtime-root",
-        path.join(tempRoot, "runtime"),
-        "--examples-root",
-        examplesRoot,
-        "--profile",
-        profilePath,
-        "--catalog-root",
-        catalogRoot,
-      ],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-    assert.equal(run.status, 1);
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--examples-root",
+      examplesRoot,
+      "--profile",
+      profilePath,
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.equal(run.status, 1, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
     assert.match(run.stderr, /Scenario policy 'unsupported-scenario' was not found/u);
   });
 });
@@ -2370,24 +2437,20 @@ test("full-journey mode rejects unsupported mission scenario combinations", () =
       scenarioFamily: "regress",
     });
 
-    const run = spawnSync(
-      process.execPath,
-      [
-        proofRunnerScriptPath,
-        "--project-ref",
-        workspaceRoot,
-        "--runtime-root",
-        path.join(tempRoot, "runtime"),
-        "--examples-root",
-        examplesRoot,
-        "--profile",
-        profilePath,
-        "--catalog-root",
-        catalogRoot,
-      ],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-    assert.equal(run.status, 1);
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--examples-root",
+      examplesRoot,
+      "--profile",
+      profilePath,
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.equal(run.status, 1, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
     assert.match(run.stderr, /Scenario 'regress' is not allowed/u);
   });
 });
@@ -2420,24 +2483,20 @@ test("full-journey mode rejects unsupported mission provider combinations", () =
       providerVariantId: "anthropic-primary",
     });
 
-    const run = spawnSync(
-      process.execPath,
-      [
-        proofRunnerScriptPath,
-        "--project-ref",
-        workspaceRoot,
-        "--runtime-root",
-        path.join(tempRoot, "runtime"),
-        "--examples-root",
-        examplesRoot,
-        "--profile",
-        profilePath,
-        "--catalog-root",
-        catalogRoot,
-      ],
-      { cwd: workspaceRoot, encoding: "utf8" },
-    );
-    assert.equal(run.status, 1);
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--examples-root",
+      examplesRoot,
+      "--profile",
+      profilePath,
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.equal(run.status, 1, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
     assert.match(run.stderr, /Provider variant 'anthropic-primary' is not allowed/u);
   });
 });

@@ -60,7 +60,8 @@ Provider permission-mode analogues:
 - Codex restricted: configured non-interactive `codex exec` args without the approval bypass.
 - Claude Code full-bypass: `--dangerously-skip-permissions`.
 - Claude Code restricted: `--permission-mode auto`.
-- OpenCode full-bypass candidate: `opencode run --format json --dangerously-skip-permissions`; keep `open-code-primary` extended until the adapter profile declares and proves a live baseline runtime.
+- OpenCode full-bypass: `opencode run --format json --dangerously-skip-permissions`.
+- OpenCode restricted: `opencode run --format json`.
 
 Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
 
