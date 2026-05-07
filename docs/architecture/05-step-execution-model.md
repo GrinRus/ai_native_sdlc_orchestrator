@@ -35,6 +35,19 @@ For routed adapter-backed steps, AOR uses a prepare-first lifecycle:
 
 Simple read, list, and approval commands may participate in run evidence without compiling prompt/context artifacts.
 
+## Runtime Harness run lifecycle (W24-S01)
+
+The run-level Runtime Harness controller owns the durable run-stage ledger for normal execution. It wraps the existing step engine rather than replacing it:
+1. `prepare` project/runtime state;
+2. `execute` by delegating the routed step to the current step engine;
+3. `classify` the final step outcome;
+4. `validate` mission semantics and scope evidence;
+5. record bounded `retry`, `repair`, or `escalate` evidence when policy loops run;
+6. `verify` report contract generation inputs;
+7. `close` passed runs or `block` unresolved/failing runs.
+
+Controller-generated `runtime-harness-report` artifacts include `run_controller`, `run_transitions`, and `run_decision`. Older step-only reports remain valid diagnostic evidence, but they are not run-level production ownership proof.
+
 ## Adapter SDK baseline (W2-S04 + W9-S08)
 Adapter invocation uses one stable envelope pair:
 - request envelope: `request_id`, `run_id`, `step_id`, `step_class`, resolved route/asset/policy bundles, input packet refs, compiled context, and dry-run flag;

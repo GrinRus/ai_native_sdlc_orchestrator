@@ -339,6 +339,38 @@ test("runtime harness report example loads through the shared contract path", ()
   assert.equal(loaded.ok, true, "expected runtime-harness-report example to load");
 });
 
+test("runtime harness report rejects invalid run-level controller evidence", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/runtime-harness-report.sample.yaml"),
+    family: "runtime-harness-report",
+  });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const invalidStage = structuredClone(loaded.document);
+  invalidStage.run_transitions[0].stage = "teleport";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "runtime-harness-report",
+      document: invalidStage,
+      source: "test://runtime-harness-report-invalid-stage",
+    }),
+    "enum_value_invalid",
+    "run_transitions[0].stage",
+  );
+
+  const missingDecisionEvidence = structuredClone(loaded.document);
+  delete missingDecisionEvidence.run_decision.evidence_refs;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "runtime-harness-report",
+      document: missingDecisionEvidence,
+      source: "test://runtime-harness-report-missing-decision-evidence",
+    }),
+    "required_field_missing",
+    "run_decision.evidence_refs",
+  );
+});
+
 test("review decision example preserves explicit approval vocabulary", () => {
   const loaded = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/review-decision.approve.yaml"),

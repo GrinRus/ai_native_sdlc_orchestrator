@@ -70,6 +70,7 @@ export { verifyProjectRuntime } from "../project-verify.mjs";
 export { materializeIntakeArtifactPacket } from "../artifact-store.mjs";
 export { materializeReviewReport } from "../review-run.mjs";
 export { materializeRuntimeHarnessReport } from "../runtime-harness-report.mjs";
+export { executeRuntimeHarnessRun } from "../runtime-harness-controller.mjs";
 export {
   executeRoutedStep,
   executeRuntimeHarnessControlledStep,

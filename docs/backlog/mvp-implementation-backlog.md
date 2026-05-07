@@ -238,7 +238,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W24 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W24-S01 | Run-level Runtime Harness controller | EPIC-4 | blocked | `packages/orchestrator-core/**`, `packages/harness/**`, `packages/observability/**`, `apps/cli/**`, tests | W23-S01, W23-S03 |
+| W24-S01 | Run-level Runtime Harness controller | EPIC-4 | done | `packages/orchestrator-core/**`, `packages/harness/**`, `packages/observability/**`, `apps/cli/**`, tests | W23-S01, W23-S03 |
 | W24-S02 | Interactive continuation hardening | EPIC-6 | blocked | `docs/contracts/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W24-S01, W23-S02 |
 | W24-S03 | Strict delivery gate consolidation | EPIC-5 | blocked | `packages/orchestrator-core/**`, `apps/cli/**`, `docs/contracts/**`, delivery tests | W24-S01, W23-S01 |
 

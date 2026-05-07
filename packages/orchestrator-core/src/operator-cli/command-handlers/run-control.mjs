@@ -36,9 +36,7 @@ import {
   verifyProjectRuntime,
   materializeIntakeArtifactPacket,
   materializeReviewReport,
-  materializeRuntimeHarnessReport,
-  executeRoutedStep,
-  executeRuntimeHarnessControlledStep,
+  executeRuntimeHarnessRun,
   ensureRequiredFlags,
   resolveOptionalStringFlag,
   resolveOptionalBooleanFlag,
@@ -179,7 +177,7 @@ export function handleRunControlCommand(context) {
         }
       }
 
-      const routedExecution = executeRuntimeHarnessControlledStep({
+      const routedExecution = executeRuntimeHarnessRun({
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
         projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
@@ -237,13 +235,7 @@ export function handleRunControlCommand(context) {
       outputState.evidenceEventId = stepEvent.event.event_id;
       outputState.primaryEventId = terminalEvent.event.event_id;
       outputState.streamLogFile = terminalEvent.logFile;
-      const runtimeHarness = materializeRuntimeHarnessReport({
-        cwd,
-        projectRef: /** @type {string} */ (flags["project-ref"]),
-        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
-        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-        runId: controlResult.runId,
-      });
+      const runtimeHarness = routedExecution.runtimeHarness;
       outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;
       outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
       outputState.runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;

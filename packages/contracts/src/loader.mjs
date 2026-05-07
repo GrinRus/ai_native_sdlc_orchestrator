@@ -13,6 +13,21 @@ const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary",
 const VALIDATION_STATUS_VALUES = ["pass", "warn", "fail", "blocked"];
 const REVIEW_STATUS_VALUES = ["pass", "warn", "fail"];
 const RUNTIME_HARNESS_DECISION_VALUES = ["pass", "retry", "repair", "escalate", "block", "fail"];
+const RUNTIME_HARNESS_RUN_CONTROLLER_STATUS_VALUES = ["running", "closed", "blocked", "failed"];
+const RUNTIME_HARNESS_RUN_TRANSITION_STAGE_VALUES = [
+  "prepare",
+  "execute",
+  "classify",
+  "validate",
+  "retry",
+  "repair",
+  "escalate",
+  "verify",
+  "close",
+  "block",
+];
+const RUNTIME_HARNESS_RUN_TRANSITION_STATUS_VALUES = ["pass", "fail", "blocked", "skipped"];
+const RUNTIME_HARNESS_RUN_TERMINAL_STATUS_VALUES = ["closed", "blocked", "failed"];
 const INCIDENT_RECERTIFICATION_DECISION_VALUES = ["recertify", "hold", "re-enable"];
 const PLATFORM_RECERTIFICATION_LINKAGE_VALUES = ["linked", "rollback", "unlinked"];
 const PLATFORM_ROLLOUT_ACTION_VALUES = ["promote", "hold", "reject", "freeze", "demote"];
@@ -196,12 +211,189 @@ export function validateContractDocument({ family, document, source = "<in-memor
     issues.push(...validateLearningLoopHandoff(document, source));
   }
 
+  if (family === "runtime-harness-report") {
+    issues.push(...validateRuntimeHarnessReport(document, source));
+  }
+
   return {
     ok: issues.length === 0,
     family,
     source,
     issues,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} source
+ * @returns {import("./index.d.ts").ContractValidationIssue[]}
+ */
+function validateRuntimeHarnessReport(document, source) {
+  /** @type {import("./index.d.ts").ContractValidationIssue[]} */
+  const issues = [];
+
+  const runController = validateOptionalObjectField({
+    record: document,
+    source,
+    field: "run_controller",
+    issues,
+  });
+  if (runController) {
+    for (const field of ["controller_id", "controller_version", "started_at", "finished_at", "terminal_transition_id"]) {
+      validateNestedStringField({
+        record: runController,
+        source,
+        field: `run_controller.${field}`,
+        issues,
+        required: true,
+      });
+    }
+    validateNestedEnumStringField({
+      record: runController,
+      source,
+      field: "run_controller.status",
+      allowedValues: RUNTIME_HARNESS_RUN_CONTROLLER_STATUS_VALUES,
+      issues,
+      required: true,
+    });
+    validateNestedNumberField({
+      record: runController,
+      source,
+      field: "run_controller.transition_count",
+      issues,
+      required: true,
+    });
+  }
+
+  const runTransitions = validateOptionalArrayField({
+    record: document,
+    source,
+    field: "run_transitions",
+    issues,
+  });
+  if (runTransitions) {
+    runTransitions.forEach((entry, index) => {
+      if (!isPlainObject(entry)) {
+        issues.push(
+          issue({
+            code: "field_type_mismatch",
+            source,
+            field: `run_transitions[${index}]`,
+            expected: "object",
+            actual: describeActualType(entry),
+            message: `Field 'run_transitions[${index}]' must be 'object'.`,
+          }),
+        );
+        return;
+      }
+
+      for (const field of ["transition_id", "summary", "started_at", "finished_at"]) {
+        validateNestedStringField({
+          record: entry,
+          source,
+          field: `run_transitions[${index}].${field}`,
+          issues,
+          required: true,
+        });
+      }
+      validateNestedEnumStringField({
+        record: entry,
+        source,
+        field: `run_transitions[${index}].stage`,
+        allowedValues: RUNTIME_HARNESS_RUN_TRANSITION_STAGE_VALUES,
+        issues,
+        required: true,
+      });
+      validateNestedEnumStringField({
+        record: entry,
+        source,
+        field: `run_transitions[${index}].status`,
+        allowedValues: RUNTIME_HARNESS_RUN_TRANSITION_STATUS_VALUES,
+        issues,
+        required: true,
+      });
+      validateNestedEnumStringField({
+        record: entry,
+        source,
+        field: `run_transitions[${index}].runtime_harness_decision`,
+        allowedValues: RUNTIME_HARNESS_DECISION_VALUES,
+        issues,
+        required: true,
+      });
+      validateNestedArrayField({
+        record: entry,
+        source,
+        field: `run_transitions[${index}].evidence_refs`,
+        issues,
+      });
+      validateStringArrayItems({
+        values: entry.evidence_refs,
+        source,
+        field: `run_transitions[${index}].evidence_refs`,
+        issues,
+      });
+    });
+  }
+
+  const runDecision = validateOptionalObjectField({
+    record: document,
+    source,
+    field: "run_decision",
+    issues,
+  });
+  if (runDecision) {
+    validateNestedEnumStringField({
+      record: runDecision,
+      source,
+      field: "run_decision.overall_decision",
+      allowedValues: RUNTIME_HARNESS_DECISION_VALUES,
+      issues,
+      required: true,
+    });
+    validateNestedEnumStringField({
+      record: runDecision,
+      source,
+      field: "run_decision.terminal_status",
+      allowedValues: RUNTIME_HARNESS_RUN_TERMINAL_STATUS_VALUES,
+      issues,
+      required: true,
+    });
+    validateNestedNullableStringField({
+      record: runDecision,
+      source,
+      field: "run_decision.failure_class",
+      issues,
+      required: true,
+    });
+    validateNestedNullableStringField({
+      record: runDecision,
+      source,
+      field: "run_decision.repair_status",
+      issues,
+      required: true,
+    });
+    validateNestedStringField({
+      record: runDecision,
+      source,
+      field: "run_decision.summary",
+      issues,
+      required: true,
+    });
+    validateNestedArrayField({
+      record: runDecision,
+      source,
+      field: "run_decision.evidence_refs",
+      issues,
+    });
+    validateStringArrayItems({
+      values: runDecision.evidence_refs,
+      source,
+      field: "run_decision.evidence_refs",
+      issues,
+    });
+  }
+
+  return issues;
 }
 
 /**

@@ -17,7 +17,7 @@ Move from step-level harness strength to run-level Runtime Harness ownership for
 
 ## W24-S01 — Run-level Runtime Harness controller
 - **Epic:** EPIC-4 Quality platform
-- **State:** blocked
+- **State:** done
 - **Outcome:** Add a run controller that owns run-level stage transitions and delegates individual routed steps to the existing step engine.
 - **Primary modules:** `packages/orchestrator-core/**`, `packages/harness/**`, `packages/observability/**`, `apps/cli/**`, tests
 - **Hard dependencies:** W23-S01, W23-S03

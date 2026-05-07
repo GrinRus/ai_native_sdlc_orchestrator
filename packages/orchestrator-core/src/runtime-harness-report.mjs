@@ -61,6 +61,14 @@ function asRecordArray(value) {
 
 /**
  * @param {unknown} value
+ * @returns {unknown}
+ */
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+/**
+ * @param {unknown} value
  * @returns {boolean}
  */
 function hasNonEmptyPermissionDenials(value) {
@@ -788,6 +796,9 @@ function recommendationActionForFinding(finding) {
  *   runId: string,
  *   missionType?: string,
  *   strictnessProfile?: string,
+ *   runController?: Record<string, unknown>,
+ *   runTransitions?: Array<Record<string, unknown>>,
+ *   runDecision?: Record<string, unknown>,
  * }} options
  */
 export function materializeRuntimeHarnessReport(options) {
@@ -888,6 +899,15 @@ export function materializeRuntimeHarnessReport(options) {
     unresolved_gaps: unresolvedGaps,
     evidence_refs: evidenceRefs,
   };
+  if (options.runController && Object.keys(asRecord(options.runController)).length > 0) {
+    report.run_controller = cloneJson(options.runController);
+  }
+  if (Array.isArray(options.runTransitions)) {
+    report.run_transitions = cloneJson(options.runTransitions);
+  }
+  if (options.runDecision && Object.keys(asRecord(options.runDecision)).length > 0) {
+    report.run_decision = cloneJson(options.runDecision);
+  }
 
   const validation = validateContractDocument({
     family: "runtime-harness-report",

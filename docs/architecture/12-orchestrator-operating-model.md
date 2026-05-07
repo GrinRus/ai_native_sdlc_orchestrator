@@ -24,6 +24,8 @@ For every routed adapter-backed step, the Runtime Harness owns:
 
 The Runtime Harness writes step-level decision evidence and a completed-run `runtime-harness-report`. It diagnoses AOR runtime quality: whether AOR prepared the right context, invoked the adapter, interpreted the result, enforced mission semantics, bounded repair, and closed or blocked the flow correctly.
 
+As of W24-S01, normal `run start` execution uses a run-level Runtime Harness controller. The controller owns the run-stage ledger (`prepare`, `execute`, `classify`, `validate`, `retry`/`repair`/`escalate`, `verify`, `close`/`block`) and delegates routed step execution to the step engine. Controller-generated reports add `run_controller`, `run_transitions`, and `run_decision` so pass, block, fail, repair, and exhausted-repair outcomes are visible at run level without provider-specific behavior entering core.
+
 Quality boundaries are explicit:
 - feature result quality is owned by review, eval, delivery, and release evidence;
 - AOR runtime quality is owned by Runtime Harness decisions and `runtime-harness-report`;
