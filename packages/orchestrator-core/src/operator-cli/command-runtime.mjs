@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { listQualityArtifacts as listQualityArtifactsForRuntime } from "../control-plane/read-surface.mjs";
+
 import { getCommandDefinition, RUNTIME_ROOT_DIRNAME } from "./command-catalog.mjs";
 
 export {
@@ -423,11 +425,47 @@ export function isStrictRuntimeHarnessReport(report) {
  */
 export function runtimeHarnessReportHasMeaningfulPatch(report) {
   const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
-  return stepDecisions.some((entry) => {
+  return resolveRuntimeHarnessMissionScopedChangedPaths(report).length > 0;
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @returns {boolean}
+ */
+export function isRunLevelRuntimeHarnessReport(report) {
+  const runController = asPlainObject(report.run_controller);
+  const runDecision = asPlainObject(report.run_decision);
+  return Object.keys(runController).length > 0 && Array.isArray(report.run_transitions) && Object.keys(runDecision).length > 0;
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @returns {string[]}
+ */
+export function resolveRuntimeHarnessMissionScopedChangedPaths(report) {
+  const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
+  return uniqueStrings(stepDecisions.flatMap((entry) => {
     const decision = asPlainObject(entry);
     const semantics = asPlainObject(decision.mission_semantics);
-    return asStringArray(semantics.mission_scoped_changed_paths).length > 0;
-  });
+    return asStringArray(semantics.mission_scoped_changed_paths);
+  }));
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @returns {string[]}
+ */
+export function resolveRuntimeHarnessScopeViolationPaths(report) {
+  const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
+  return uniqueStrings(stepDecisions.flatMap((entry) => {
+    const decision = asPlainObject(entry);
+    const semantics = asPlainObject(decision.mission_semantics);
+    return [
+      ...asStringArray(semantics.scope_violation_paths),
+      ...asStringArray(semantics.out_of_scope_changed_paths),
+      ...asStringArray(semantics.forbidden_changed_paths),
+    ];
+  }));
 }
 
 /**
@@ -443,12 +481,24 @@ export function resolveQualityGateMode(value) {
 }
 
 /**
- * @param {{ report: Record<string, unknown>, command: string }} options
- * @returns {{ status: "pass" | "not_pass", findings: string[] }}
+ * @param {{ report: Record<string, unknown>, command: string, requireRunLevel?: boolean }} options
+ * @returns {{ status: "pass" | "not_pass", findings: string[], missionScopedChangedPaths: string[], scopeViolationPaths: string[] }}
  */
 export function evaluateRuntimeHarnessDeliveryGate(options) {
+  const missionScopedChangedPaths = resolveRuntimeHarnessMissionScopedChangedPaths(options.report);
+  const scopeViolationPaths = resolveRuntimeHarnessScopeViolationPaths(options.report);
   if (!isStrictRuntimeHarnessReport(options.report)) {
-    return { status: "pass", findings: [] };
+    return { status: "pass", findings: [], missionScopedChangedPaths, scopeViolationPaths };
+  }
+  if (options.requireRunLevel === true && !isRunLevelRuntimeHarnessReport(options.report)) {
+    return {
+      status: "not_pass",
+      findings: [
+        `${options.command} blocked because the latest Runtime Harness report is not run-level controller evidence. Run 'aor run start' and use the generated run-level report before delivery or release.`,
+      ],
+      missionScopedChangedPaths,
+      scopeViolationPaths,
+    };
   }
   const stepDecisions = Array.isArray(options.report.step_decisions) ? options.report.step_decisions : [];
   if (stepDecisions.length === 0) {
@@ -457,6 +507,18 @@ export function evaluateRuntimeHarnessDeliveryGate(options) {
       findings: [
         `${options.command} blocked because Runtime Harness has no routed step decisions for a strict mission. Run 'aor run start' and close Runtime Harness findings before delivery or release.`,
       ],
+      missionScopedChangedPaths,
+      scopeViolationPaths,
+    };
+  }
+  if (scopeViolationPaths.length > 0) {
+    return {
+      status: "not_pass",
+      findings: [
+        `${options.command} blocked because Runtime Harness found out-of-scope changed paths for a strict mission: ${scopeViolationPaths.join(", ")}.`,
+      ],
+      missionScopedChangedPaths,
+      scopeViolationPaths,
     };
   }
   const overallDecision = typeof options.report.overall_decision === "string" ? options.report.overall_decision : "unknown";
@@ -466,6 +528,32 @@ export function evaluateRuntimeHarnessDeliveryGate(options) {
       findings: [
         `${options.command} blocked by Runtime Harness decision '${overallDecision}'. Resolve runtime findings before delivery or release.`,
       ],
+      missionScopedChangedPaths,
+      scopeViolationPaths,
+    };
+  }
+  const runDecision = asPlainObject(options.report.run_decision);
+  const runOverallDecision =
+    typeof runDecision.overall_decision === "string" ? runDecision.overall_decision : overallDecision;
+  if (options.requireRunLevel === true && runOverallDecision !== "pass") {
+    return {
+      status: "not_pass",
+      findings: [
+        `${options.command} blocked by Runtime Harness run_decision '${runOverallDecision}'. Resolve run-level findings before delivery or release.`,
+      ],
+      missionScopedChangedPaths,
+      scopeViolationPaths,
+    };
+  }
+  const terminalStatus = typeof runDecision.terminal_status === "string" ? runDecision.terminal_status : "unknown";
+  if (options.requireRunLevel === true && terminalStatus !== "closed") {
+    return {
+      status: "not_pass",
+      findings: [
+        `${options.command} blocked because Runtime Harness run_decision terminal_status is '${terminalStatus}', not 'closed'.`,
+      ],
+      missionScopedChangedPaths,
+      scopeViolationPaths,
     };
   }
   if (!runtimeHarnessReportHasMeaningfulPatch(options.report)) {
@@ -474,19 +562,52 @@ export function evaluateRuntimeHarnessDeliveryGate(options) {
       findings: [
         `${options.command} blocked because Runtime Harness found no meaningful mission-scoped patch for a strict mission.`,
       ],
+      missionScopedChangedPaths,
+      scopeViolationPaths,
     };
   }
-  return { status: "pass", findings: [] };
+  return { status: "pass", findings: [], missionScopedChangedPaths, scopeViolationPaths };
 }
 
 /**
- * @param {{ report: Record<string, unknown>, command: string }} options
+ * @param {{ report: Record<string, unknown>, command: string, requireRunLevel?: boolean }} options
  */
 export function assertRuntimeHarnessAllowsDelivery(options) {
   const gate = evaluateRuntimeHarnessDeliveryGate(options);
   if (gate.status !== "pass") {
     throw new CliUsageError(gate.findings[0] ?? `${options.command} blocked by Runtime Harness quality gate.`);
   }
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   runId: string,
+ * }} options
+ * @returns {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> } | null}
+ */
+export function findLatestRuntimeHarnessReportForRun(options) {
+  const reports = listQualityArtifactsForRuntime({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+  })
+    .filter((artifact) => artifact.family === "runtime-harness-report" && artifact.document.run_id === options.runId)
+    .sort((left, right) => {
+      const leftGeneratedAt = typeof left.document.generated_at === "string" ? Date.parse(left.document.generated_at) : NaN;
+      const rightGeneratedAt = typeof right.document.generated_at === "string" ? Date.parse(right.document.generated_at) : NaN;
+      const generatedAtDelta =
+        (Number.isFinite(rightGeneratedAt) ? rightGeneratedAt : Number.NEGATIVE_INFINITY) -
+        (Number.isFinite(leftGeneratedAt) ? leftGeneratedAt : Number.NEGATIVE_INFINITY);
+      if (generatedAtDelta !== 0) return generatedAtDelta;
+      return fs.statSync(right.file).mtimeMs - fs.statSync(left.file).mtimeMs;
+    });
+
+  return reports[0] ?? null;
 }
 
 /**

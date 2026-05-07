@@ -122,6 +122,8 @@ When an intake request declares `allowed_paths` or `forbidden_paths`, semantic v
 - Runtime Harness reports diagnose AOR runtime behavior and may recommend recertification, but they do not promote or freeze assets.
 - Strict production run closure must prefer `run_decision` when present; older step-only reports remain diagnostic evidence but not run-level ownership proof.
 - Strict delivery and release commands must treat an empty `step_decisions[]` set as missing Runtime Harness execution evidence, not as a pass.
+- Strict non-`no-write` delivery and release commands must use the latest existing run-level report for the same `run_id`; they must not create a fresh empty report to satisfy the gate.
+- Strict delivery and release gates require top-level `overall_decision=pass`, `run_decision.overall_decision=pass`, `run_decision.terminal_status=closed`, non-empty `mission_semantics.mission_scoped_changed_paths[]`, and empty scope-violation fields.
 - Learning handoff may link a Runtime Harness report and carry next actions, but it does not replace this report.
 - Asset certification commands may link a run for provenance, but certification evidence remains fresh and separate from run diagnosis.
 - Live E2E summaries should reference this report when proving the installed-user journey.

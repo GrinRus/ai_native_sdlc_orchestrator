@@ -63,9 +63,8 @@ import {
   resolveOptionalRefOrPathFlag,
   DEFAULT_LEARNING_BACKLOG_REFS,
   normalizeLearningRunStatus,
-  isStrictRuntimeHarnessReport,
-  runtimeHarnessReportHasMeaningfulPatch,
   evaluateRuntimeHarnessDeliveryGate,
+  findLatestRuntimeHarnessReportForRun,
   resolveQualityGateMode,
   assertRuntimeHarnessAllowsDelivery,
   finalizeRunControlState,
@@ -190,19 +189,72 @@ export function handleDeliveryCommand(context) {
     const runId =
       resolveOptionalStringFlag("run-id", flags["run-id"]) ??
       `${init.projectId}.${command === "deliver prepare" ? "delivery" : "release"}.prepare.v1`;
-    const runtimeHarness = materializeRuntimeHarnessReport({
-      cwd,
-      projectRef: /** @type {string} */ (flags["project-ref"]),
-      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
-      runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
-      runId,
+    const resolvedPolicy = resolveStepPolicyForStep({
+      projectProfilePath: init.projectProfilePath,
+      routesRoot:
+        typeof init.registryRoots === "object" && init.registryRoots !== null
+          ? /** @type {Record<string, string>} */ (init.registryRoots).routes
+          : path.join(init.projectRoot, "examples/routes"),
+      policiesRoot:
+        typeof init.registryRoots === "object" && init.registryRoots !== null
+          ? /** @type {Record<string, string>} */ (init.registryRoots).policies
+          : path.join(init.projectRoot, "examples/policies"),
+      stepClass,
+      routeOverrides,
+      policyOverrides,
     });
+    const requestedMode = resolveOptionalStringFlag("mode", flags.mode);
+    if (requestedMode) {
+      const canonicalMode = normalizeDeliveryMode(requestedMode);
+      resolvedPolicy.resolved_bounds.writeback_mode.mode = canonicalMode;
+      resolvedPolicy.resolved_bounds.writeback_mode.resolution_source = {
+        kind: "step-override",
+        field: "--mode",
+      };
+    }
+    const resolvedWritebackMode = asPlainObject(asPlainObject(resolvedPolicy.resolved_bounds).writeback_mode);
+    const deliveryModeForGate = normalizeDeliveryMode(
+      typeof resolvedWritebackMode.mode === "string" ? resolvedWritebackMode.mode : "",
+    );
+    const strictDeliveryGateRequired = deliveryModeForGate !== "no-write";
+
+    let runtimeHarness = null;
+    if (strictDeliveryGateRequired) {
+      const latestRuntimeHarness = findLatestRuntimeHarnessReportForRun({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId,
+      });
+      if (latestRuntimeHarness) {
+        runtimeHarness = {
+          report: latestRuntimeHarness.document,
+          reportPath: latestRuntimeHarness.file,
+          reportRef: latestRuntimeHarness.artifact_ref,
+        };
+      } else if (deliveryQualityGateMode === "strict") {
+        throw new CliUsageError(
+          `${command} requires a latest run-level Runtime Harness report for run '${runId}' before strict '${deliveryModeForGate}' delivery. Run 'aor run start --run-id ${runId}' and close Runtime Harness findings before delivery or release.`,
+        );
+      }
+    }
+    if (!runtimeHarness) {
+      runtimeHarness = materializeRuntimeHarnessReport({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId,
+      });
+    }
     outputState.runtimeHarnessReportId = runtimeHarness.report.report_id;
     outputState.runtimeHarnessReportFile = runtimeHarness.reportPath;
     outputState.runtimeHarnessOverallDecision = runtimeHarness.report.overall_decision;
     const runtimeHarnessDeliveryGate = evaluateRuntimeHarnessDeliveryGate({
       report: runtimeHarness.report,
       command,
+      requireRunLevel: strictDeliveryGateRequired,
     });
     outputState.deliveryQualityGateMode = deliveryQualityGateMode;
     outputState.deliveryQualityGateStatus = runtimeHarnessDeliveryGate.status;
@@ -211,6 +263,7 @@ export function handleDeliveryCommand(context) {
       assertRuntimeHarnessAllowsDelivery({
         report: runtimeHarness.report,
         command,
+        requireRunLevel: strictDeliveryGateRequired,
       });
     }
     const reviewDecisionRequired = resolveOptionalBooleanFlag(
@@ -264,30 +317,6 @@ export function handleDeliveryCommand(context) {
         );
       }
     }
-    const resolvedPolicy = resolveStepPolicyForStep({
-      projectProfilePath: init.projectProfilePath,
-      routesRoot:
-        typeof init.registryRoots === "object" && init.registryRoots !== null
-          ? /** @type {Record<string, string>} */ (init.registryRoots).routes
-          : path.join(init.projectRoot, "examples/routes"),
-      policiesRoot:
-        typeof init.registryRoots === "object" && init.registryRoots !== null
-          ? /** @type {Record<string, string>} */ (init.registryRoots).policies
-          : path.join(init.projectRoot, "examples/policies"),
-      stepClass,
-      routeOverrides,
-      policyOverrides,
-    });
-    const requestedMode = resolveOptionalStringFlag("mode", flags.mode);
-    if (requestedMode) {
-      const canonicalMode = normalizeDeliveryMode(requestedMode);
-      resolvedPolicy.resolved_bounds.writeback_mode.mode = canonicalMode;
-      resolvedPolicy.resolved_bounds.writeback_mode.resolution_source = {
-        kind: "step-override",
-        field: "--mode",
-      };
-    }
-
     const approvedHandoffRef = resolveOptionalStringFlag(
       "approved-handoff-ref",
       flags["approved-handoff-ref"],
@@ -361,6 +390,28 @@ export function handleDeliveryCommand(context) {
       coordinationEvidenceRefs,
       coordinationLockEvidenceRefs,
       crossRepoValidationRefs,
+      runtimeHarnessGate: {
+        required: strictDeliveryGateRequired,
+        enforced: deliveryQualityGateMode === "strict",
+        status: runtimeHarnessDeliveryGate.status,
+        reportId: typeof runtimeHarness.report.report_id === "string" ? runtimeHarness.report.report_id : null,
+        reportRef:
+          typeof runtimeHarness.reportRef === "string"
+            ? runtimeHarness.reportRef
+            : toEvidenceRef(init.projectRoot, runtimeHarness.reportPath),
+        overallDecision:
+          typeof runtimeHarness.report.overall_decision === "string" ? runtimeHarness.report.overall_decision : null,
+        runDecision:
+          typeof asPlainObject(runtimeHarness.report.run_decision).overall_decision === "string"
+            ? /** @type {string} */ (asPlainObject(runtimeHarness.report.run_decision).overall_decision)
+            : null,
+        routedStepDecisionCount: Array.isArray(runtimeHarness.report.step_decisions)
+          ? runtimeHarness.report.step_decisions.length
+          : 0,
+        missionScopedChangedPaths: runtimeHarnessDeliveryGate.missionScopedChangedPaths,
+        scopeViolationPaths: runtimeHarnessDeliveryGate.scopeViolationPaths,
+        findings: runtimeHarnessDeliveryGate.findings,
+      },
       rerunOfRunRef: rerunOfRunId ? toRunRef(rerunOfRunId) : undefined,
       rerunFailedStepRef: rerunFailedStep ?? undefined,
       rerunPacketBoundary: rerunPacketBoundary ?? undefined,
@@ -397,11 +448,12 @@ export function handleDeliveryCommand(context) {
         ? planResult.deliveryPlan.rerun_recovery
         : null;
 
-    if (command === "release prepare" && outputState.deliveryPlanStatus !== "ready") {
+    if (outputState.deliveryPlanStatus !== "ready") {
       const reasons = outputState.deliveryBlockingReasons.length > 0
         ? outputState.deliveryBlockingReasons.join(", ")
         : "delivery-plan-blocked";
-      throw new CliUsageError(`Release preconditions failed: ${reasons}.`);
+      const label = command === "release prepare" ? "Release" : "Delivery";
+      throw new CliUsageError(`${label} preconditions failed: ${reasons}.`);
     }
 
     const deliveryResult = runDeliveryDriver({

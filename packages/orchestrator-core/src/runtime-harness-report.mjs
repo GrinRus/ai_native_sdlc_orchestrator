@@ -883,6 +883,17 @@ export function materializeRuntimeHarnessReport(options) {
     ...stepDecisions.flatMap((decision) => asStringArray(decision.evidence_refs)),
   ]);
 
+  const reportPath = path.join(
+    init.runtimeLayout.reportsRoot,
+    `runtime-harness-report-${normalizeId(options.runId)}.json`,
+  );
+  const previousReport = readJsonFile(reportPath);
+  const previousRunController = asRecord(previousReport?.run_controller);
+  const previousRunTransitions = Array.isArray(previousReport?.run_transitions)
+    ? previousReport.run_transitions
+    : null;
+  const previousRunDecision = asRecord(previousReport?.run_decision);
+
   const report = {
     report_id: `${options.runId}.runtime-harness-report.v1`,
     project_id: init.projectId,
@@ -901,12 +912,18 @@ export function materializeRuntimeHarnessReport(options) {
   };
   if (options.runController && Object.keys(asRecord(options.runController)).length > 0) {
     report.run_controller = cloneJson(options.runController);
+  } else if (Object.keys(previousRunController).length > 0) {
+    report.run_controller = cloneJson(previousRunController);
   }
   if (Array.isArray(options.runTransitions)) {
     report.run_transitions = cloneJson(options.runTransitions);
+  } else if (previousRunTransitions) {
+    report.run_transitions = cloneJson(previousRunTransitions);
   }
   if (options.runDecision && Object.keys(asRecord(options.runDecision)).length > 0) {
     report.run_decision = cloneJson(options.runDecision);
+  } else if (Object.keys(previousRunDecision).length > 0) {
+    report.run_decision = cloneJson(previousRunDecision);
   }
 
   const validation = validateContractDocument({
@@ -919,10 +936,6 @@ export function materializeRuntimeHarnessReport(options) {
     throw new Error(`Generated runtime harness report failed contract validation: ${issueSummary}`);
   }
 
-  const reportPath = path.join(
-    init.runtimeLayout.reportsRoot,
-    `runtime-harness-report-${normalizeId(options.runId)}.json`,
-  );
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 

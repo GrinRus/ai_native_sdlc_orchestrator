@@ -112,6 +112,22 @@ approval_context:
     status: present
     refs:
       - evidence://packets/promotion-decision-wrapper-pass.yaml
+  runtime_harness:
+    required: true
+    enforced: true
+    status: pass
+    report_id: RUN-101.runtime-harness-report.v1
+    report_ref: evidence://reports/runtime-harness-report-strict-delivery-pass.yaml
+    overall_decision: pass
+    run_decision: pass
+    routed_step_decision_count: 1
+    mission_scoped_changed_paths:
+      - repos/backend/src/orders.ts
+      - repos/backend/contracts/openapi.yaml
+      - repos/mobile/src/api/client.ts
+      - repos/frontend/src/api/client.ts
+    scope_violation_paths: []
+    findings: []
   coordination_evidence:
     status: present
     refs:

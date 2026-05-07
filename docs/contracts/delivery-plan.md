@@ -28,6 +28,12 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
 - Non-`no-write` modes (`patch-only`, `local-branch`, `fork-first-pr`) must require:
   - approved handoff evidence;
   - promotion evidence.
+- Strict non-`no-write` delivery/release preparation must also require `preconditions.runtime_harness`:
+  - `required=true`;
+  - `enforced=true` for strict gates and `enforced=false` only for observe-mode diagnostics;
+  - `status=pass` before write-back can start;
+  - `report_ref` pointing to the latest run-level Runtime Harness report for the same `run_id`;
+  - `overall_decision=pass`, `run_decision=pass`, non-empty `mission_scoped_changed_paths[]`, and empty `scope_violation_paths[]`.
 - `status=blocked` means write-back is not allowed for the planned mode yet.
 - `governance` should expose route-governance decision semantics (`allow|deny|escalate`) with explicit reason codes for security/compliance review.
 - `coordination` should preserve repo-level coordination requirements:
@@ -41,6 +47,7 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
   - `rerun_of_run_ref`, `failed_step_ref`, and `packet_boundary`;
   - `status` (`not-requested|ready|blocked`) and `blocking_reasons[]`;
   - `strategy` (`resume-failed-step|rebuild-release-packet`).
+- `runtime-harness-gate-required` is the canonical blocking reason when strict delivery has not been backed by pass-level Runtime Harness evidence.
 
 ## Example
 See `examples/packets/delivery-plan-*.yaml`.

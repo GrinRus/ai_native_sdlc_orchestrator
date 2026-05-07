@@ -77,7 +77,7 @@ Move from step-level harness strength to run-level Runtime Harness ownership for
 
 ## W24-S03 — Strict delivery gate consolidation
 - **Epic:** EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Consolidate strict delivery gates so code-changing delivery requires current run-level harness pass evidence and meaningful mission-scoped changed paths.
 - **Primary modules:** `packages/orchestrator-core/**`, `apps/cli/**`, `docs/contracts/**`, delivery tests
 - **Hard dependencies:** W24-S01, W23-S01
