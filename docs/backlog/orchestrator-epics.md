@@ -15,6 +15,8 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W16:** `W16-S01` Complexity baseline and shared helper extraction
 - **W17:** `W17-S01` Legacy surface cleanup after W16
 - **W19:** `W19-S01` User-story registry and coverage evidence matrix
+- **W22:** `W22-S01` Evidence-strength story coverage model; `W22-S02` Production readiness source-of-truth
+- **W26:** `W26-S01` Production readiness gate; `W26-S02` Maintainability stabilization
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -45,7 +47,8 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W11:** `W11-S03` Profile-driven preflight and routed live execution
 - **W13:** `W13-S04` Feature-driven discovery and execution lifecycle
 - **W16:** `W16-S04` Orchestrator-core execution decomposition; `W16-S06` Adapter permission legacy removal
-- **W20:** `W20-S03` OpenCode live-baseline certification
+- **W20:** `W20-S03` OpenCode candidate evidence and downgrade follow-up
+- **W22:** `W22-S03` OpenCode maturity downgrade
 
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -61,6 +64,8 @@ Implement validation, eval, harness, certification, and promotion.
 - **W19:** `W19-S04` Incident-to-dataset backfill workflow; `W19-S05` Review decision and approval workflow
 - **W20:** `W20-S04` Compiler revision asset lifecycle
 - **W21:** `W21-S06` Review, delivery, release, and learning closure UX
+- **W23:** `W23-S01` Nested contract validation pack
+- **W24:** `W24-S01` Run-level Runtime Harness controller
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -73,6 +78,7 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W11:** `W11-S04` Target-anchored delivery and release evidence
 - **W18:** `W18-S04` Monorepo and bounded multirepo flow proof
 - **W20:** `W20-S01` Multirepo scoped locks and cross-repo validation
+- **W24:** `W24-S03` Strict delivery gate consolidation
 
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
@@ -90,6 +96,8 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W19:** `W19-S06` Planner metrics and scheduler visibility
 - **W20:** `W20-S02` Production security and observability hardening baseline
 - **W21:** `W21-S02` Installable CLI and first-run entrypoints; `W21-S05` Guided web app full-flow console
+- **W23:** `W23-S02` Explicit production auth scopes; `W23-S03` Shared lifecycle service boundary
+- **W24:** `W24-S02` Interactive continuation hardening
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -113,3 +121,5 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W16:** `W16-S05` Installed-user live E2E runner decomposition
 - **W20:** `W20-S05` Finance analytics and production monitoring loop
 - **W21:** `W21-S07` Installed-user guided journey proof
+- **W25:** `W25-S01` Real external-runner proof profile; `W25-S02` Code-changing full-journey pass; `W25-S03` Proof fixture and story upgrade
+- **W26:** `W26-S03` Self-hosted release documentation

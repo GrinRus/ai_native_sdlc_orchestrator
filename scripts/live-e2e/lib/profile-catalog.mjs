@@ -258,19 +258,21 @@ function isFeatureSize(value) {
  * @param {string} providerVariantId
  */
 function resolveMatrixCell(catalogEntry, featureMissionId, scenarioFamily, providerVariantId) {
-  const requiredCells = Array.isArray(catalogEntry.required_matrix_cells)
+  const trackedCells = Array.isArray(catalogEntry.required_matrix_cells)
     ? /** @type {Array<Record<string, unknown>>} */ (catalogEntry.required_matrix_cells)
     : [];
+  const requiredCells = trackedCells.filter((cell) => (asNonEmptyString(cell.coverage_tier) || "required") === "required");
   const matchingCell =
-    requiredCells.find(
+    trackedCells.find(
       (cell) =>
         asNonEmptyString(cell.feature_mission_id) === featureMissionId &&
         asNonEmptyString(cell.scenario_family) === scenarioFamily &&
         asNonEmptyString(cell.provider_variant_id) === providerVariantId,
     ) ?? null;
   const remainingRequiredCells = requiredCells.filter((cell) => cell !== matchingCell);
+  const matchingCellCoverageTier = matchingCell ? asNonEmptyString(matchingCell.coverage_tier) || "required" : "extended";
   return {
-    coverageTier: matchingCell ? asNonEmptyString(matchingCell.coverage_tier) || "required" : "extended",
+    coverageTier: matchingCellCoverageTier,
     currentCell: {
       cell_id:
         asNonEmptyString(asRecord(matchingCell ?? {}).cell_id) ||
@@ -282,10 +284,10 @@ function resolveMatrixCell(catalogEntry, featureMissionId, scenarioFamily, provi
       scenario_family: scenarioFamily,
       provider_variant_id: providerVariantId,
       feature_size: null,
-      coverage_tier: matchingCell ? asNonEmptyString(asRecord(matchingCell).coverage_tier) || "required" : "extended",
+      coverage_tier: matchingCellCoverageTier,
     },
     coverageFollowUp: {
-      current_cell_required: matchingCell !== null,
+      current_cell_required: matchingCellCoverageTier === "required",
       next_required_matrix_cell:
         remainingRequiredCells.length > 0
           ? {
@@ -428,4 +430,3 @@ export function resolveFullJourneyProfile(options) {
     coverageTier: matrixCell.coverageTier,
   };
 }
-

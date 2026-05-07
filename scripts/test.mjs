@@ -595,7 +595,8 @@ const userStoryFamilies = [
 ];
 
 const validStoryTiers = new Set(["MVP", "MVP+", "Later"]);
-const validCoverageStatuses = new Set(["covered", "partial", "gap", "blocked"]);
+const validCoverageStatuses = new Set(["baseline-covered", "proof-covered", "partial", "blocked"]);
+const coveredCoverageStatuses = new Set(["baseline-covered", "proof-covered"]);
 
 function parseUserStoryCoverageMatrixDocumentation() {
   const matrix = read("docs/product/user-story-coverage-matrix.md");
@@ -697,12 +698,22 @@ function assertUserStoryCoverageMatrixDocumentation() {
       process.exit(1);
     }
 
-    if (row.coverageStatus === "covered" && row.gapSlices.length > 0) {
+    if (coveredCoverageStatuses.has(row.coverageStatus) && row.gapSlices.length > 0) {
       console.error(`Covered user-story ${row.storyId} must not reference gap slices.`);
       process.exit(1);
     }
 
-    if (row.coverageStatus !== "covered" && row.gapSlices.length === 0) {
+    if (
+      row.coverageStatus === "proof-covered" &&
+      !/(proof|overall_verdict=pass|real_code_change_proof_complete=true|external_runner_mode=real-external-process|examples\/live-e2e\/fixtures)/iu.test(row.evidence)
+    ) {
+      console.error(
+        `Proof-covered user-story ${row.storyId} must cite executable proof evidence, not only baseline implementation evidence.`,
+      );
+      process.exit(1);
+    }
+
+    if (!coveredCoverageStatuses.has(row.coverageStatus) && row.gapSlices.length === 0) {
       console.error(`Non-covered user-story ${row.storyId} must reference at least one gap slice.`);
       process.exit(1);
     }
@@ -714,7 +725,7 @@ function assertUserStoryCoverageMatrixDocumentation() {
       }
 
       const gapSliceState = masterSliceMap.get(gapSlice)?.state ?? waveSectionMap.get(gapSlice)?.state;
-      if (row.coverageStatus !== "covered" && gapSliceState === "done") {
+      if (!coveredCoverageStatuses.has(row.coverageStatus) && gapSliceState === "done") {
         console.error(
           `Non-covered user-story ${row.storyId} references done gap slice '${gapSlice}'. Move completed evidence into the evidence cell or mark the story covered.`,
         );

@@ -70,7 +70,7 @@ Operational rules:
 - each curated repo must expose `small`, `medium`, and `large` missions in its target catalog;
 - review and learning closure artifacts must carry `matrix_cell` and `coverage_follow_up`;
 - provider comparison coverage is required between `openai-primary` and `anthropic-primary` for at least one equivalent mission class per curated repo.
-- `openai-primary` and `anthropic-primary` are mandatory provider variants across comparison coverage; `open-code-primary` is mandatory for explicitly required OpenCode cells such as `ky.regress.small.open-code`.
+- `openai-primary` and `anthropic-primary` are mandatory provider variants across comparison coverage; `open-code-primary` is extended candidate coverage until a future real-runner proof promotes it.
 
 ## W14-S07 refreshed matrix full-journey proof bundle (2026-04-24)
 

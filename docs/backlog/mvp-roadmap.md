@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-21-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-26-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -30,8 +30,13 @@ The authoritative planning model for implementation lives in:
 | W17 | Remove post-W16 legacy public aliases and stale compatibility documentation. | 1 | EPIC-0, EPIC-3, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-17-implementation-slices.md` |
 | W18 | Close the connected web full-flow and topology proof gaps with control-plane-owned lifecycle mutations, interactive continuation semantics, and monorepo/bounded multirepo evidence. | 4 | EPIC-5, EPIC-6 | `docs/backlog/wave-18-implementation-slices.md` |
 | W19 | Convert the user-story gap audit into traceable product, discovery, quality, learning, and planner backlog slices. | 6 | EPIC-0, EPIC-1, EPIC-2, EPIC-4, EPIC-6 | `docs/backlog/wave-19-implementation-slices.md` |
-| W20 | Capture production and platform maturity gaps for multirepo locks, hardening, OpenCode certification, compiler revisions, and finance monitoring. | 5 | EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-20-implementation-slices.md` |
+| W20 | Capture production and platform maturity gaps for multirepo locks, hardening, OpenCode candidate evidence, compiler revisions, and finance monitoring. | 5 | EPIC-3, EPIC-4, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-20-implementation-slices.md` |
 | W21 | Close installed-user onboarding and guided UX gaps from first launch through review, delivery, release, and learning closure. | 7 | EPIC-1, EPIC-2, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-21-implementation-slices.md` |
+| W22 | Repair source-of-truth claims so the repository distinguishes baseline readiness from production readiness and treats OpenCode as extended candidate coverage until real certification exists. | 3 | EPIC-0, EPIC-3 | `docs/backlog/wave-22-implementation-slices.md` |
+| W23 | Harden contract-first validation, production API auth scopes, and CLI/API lifecycle boundaries before deeper runtime ownership changes. | 3 | EPIC-4, EPIC-6 | `docs/backlog/wave-23-implementation-slices.md` |
+| W24 | Move from step-level harness strength to run-level Runtime Harness ownership for production-grade orchestration decisions. | 3 | EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-24-implementation-slices.md` |
+| W25 | Produce the first real non-mock full-journey production proof with code-changing evidence and no upstream writes. | 3 | EPIC-7 | `docs/backlog/wave-25-implementation-slices.md` |
+| W26 | Make self-hosted production readiness repeatable, reviewable, and documented as a CLI/API production candidate with optional web. | 3 | EPIC-0, EPIC-7 | `docs/backlog/wave-26-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -110,6 +115,21 @@ The authoritative planning model for implementation lives in:
 | W21-S05 | installed-user guided UX target: PSO-03, PSO-08, OPS-01, OPS-02, OPS-04, OPS-10 |
 | W21-S06 | installed-user guided UX target: PSO-05, DEV-05, RQA-02, RQA-06, OPS-04, DTX-07 |
 | W21-S07 | installed-user guided UX target: OPS-06, OPS-07, PBO-01, PBO-02, PBO-03, DTX-07 |
+| W22-S01 | evidence-strength status repair target: all 112 story IDs |
+| W22-S02 | production-readiness source-of-truth repair (no direct story closure) |
+| W22-S03 | OpenCode downgrade target: DEV-04, AIP-12, OPS-07 |
+| W23-S01 | production contract validation target: review, incident, learning, packet, and runtime evidence stories |
+| W23-S02 | production auth target: SEC-02, SEC-06, DEV-10, OPS-04 |
+| W23-S03 | lifecycle boundary target: CLI/API headless-first operator stories |
+| W24-S01 | run-level harness target: DEV-05, RQA-02, RQA-06, OPS-05 |
+| W24-S02 | interactive continuation target: EMP-03, OPS-04, DEV-05, SEC-02 |
+| W24-S03 | strict delivery target: PSO-05, DEV-05, DTX-01, DTX-02, DTX-03, DTX-04 |
+| W25-S01 | real external-runner proof target: OPS-06, OPS-07, DEV-03, DEV-04, AIP-12 |
+| W25-S02 | real code-changing proof target: OPS-07, DEV-05, DTX-01, DTX-04, FIN-03 |
+| W25-S03 | proof fixture and story upgrade target: OPS-07 and directly proven related stories |
+| W26-S01 | production-readiness gate target: production security, proof, and traceability stories |
+| W26-S02 | maintainability stabilization target: production-touched runtime and control-plane surfaces |
+| W26-S03 | self-hosted release documentation target: operator, security, delivery, release, and readiness surfaces |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -359,13 +379,13 @@ The authoritative planning model for implementation lives in:
 
 
 ## W20 — production and platform maturity gap closure
-**Goal:** Capture remaining production and platform maturity gaps after W19, including multirepo locks, security hardening, OpenCode certification, compiler revision lifecycle, and finance monitoring.
+**Goal:** Capture remaining production and platform maturity gaps after W19, including multirepo locks, security hardening, OpenCode candidate evidence, compiler revision lifecycle, and finance monitoring.
 
 **Exit criteria:**
 - W20 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
 - multirepo scoped locks and cross-repo validation have a bounded backlog path
 - production auth, redaction, logging, and observability hardening are separated from local trusted baselines
-- OpenCode live-baseline certification is backed by W20-S03 live runtime evidence for `ky.regress.small.open-code`
+- OpenCode W20-S03 evidence is treated as historical candidate evidence after W22-S03; required baseline certification awaits future real-runner proof
 - compiler revisions and finance monitoring loops have first-class backlog slices
 
 **Detailed slices:** `docs/backlog/wave-20-implementation-slices.md`
@@ -383,6 +403,56 @@ The authoritative planning model for implementation lives in:
 
 **Detailed slices:** `docs/backlog/wave-21-implementation-slices.md`
 
+
+## W22 — source-of-truth repair
+**Goal:** Repair source-of-truth claims so the repository distinguishes baseline readiness from production readiness and treats OpenCode as extended candidate coverage until real certification exists.
+
+**Exit criteria:**
+- Story coverage uses evidence-strength statuses across all 112 stories.
+- Production readiness docs state the current baseline is not production-ready.
+- OpenCode is downgraded to extended candidate coverage until real certification exists.
+
+**Detailed slices:** `docs/backlog/wave-22-implementation-slices.md`
+
+## W23 — contracts, auth, and control-plane boundary
+**Goal:** Harden contract-first validation, production API auth scopes, and CLI/API lifecycle boundaries before deeper runtime ownership changes.
+
+**Exit criteria:**
+- Nested contract validators fail closed for production-critical packets and reports.
+- Production-hardened API auth requires explicit permissions.
+- CLI and API lifecycle behavior share a service boundary without app-to-app implementation cycles.
+
+**Detailed slices:** `docs/backlog/wave-23-implementation-slices.md`
+
+## W24 — run-level Runtime Harness
+**Goal:** Move from step-level harness strength to run-level Runtime Harness ownership for production-grade orchestration decisions.
+
+**Exit criteria:**
+- A run-level Runtime Harness controller owns run transitions and closure decisions.
+- Interactive continuation has audited requested, answered, resumed, and blocked states.
+- Strict code-changing delivery requires current run-level pass evidence and mission-scoped changes.
+
+**Detailed slices:** `docs/backlog/wave-24-implementation-slices.md`
+
+## W25 — real full-journey production proof
+**Goal:** Produce the first real non-mock full-journey production proof with code-changing evidence and no upstream writes.
+
+**Exit criteria:**
+- A curated real external-runner profile fails closed without auth, permissions, target verification, or no-write safety.
+- One curated public target mission passes end to end with real code-changing evidence.
+- Production proof fixtures and story upgrades reject mock-backed claims.
+
+**Detailed slices:** `docs/backlog/wave-25-implementation-slices.md`
+
+## W26 — self-hosted production release gate
+**Goal:** Make self-hosted production readiness repeatable, reviewable, and documented as a CLI/API production candidate with optional web.
+
+**Exit criteria:**
+- A separate production-readiness gate verifies production evidence beyond root baseline checks.
+- Production-touched hotspots are stabilized without unrelated redesign.
+- Self-hosted CLI/API production candidate docs are complete and bounded to declared non-goals.
+
+**Detailed slices:** `docs/backlog/wave-26-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

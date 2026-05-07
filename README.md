@@ -30,14 +30,14 @@ What exists today:
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
 - a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
 - implemented operator baseline surfaces: control-plane read APIs, planner metrics snapshots, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
-- expanded implementation backlog through `W21`, with W18 focused on connected web full-flow and topology proof gaps, W19/W20 focused on user-story gap traceability, product-quality closure, and production/platform maturity gaps, and W21 focused on installed-user onboarding plus guided UX closure while active queue tracking stays available via `pnpm slice:status` and `pnpm slice:next -- --json`.
+- expanded implementation backlog through `W26`, with W22 source-of-truth repair now closed, W23 queued for contract/auth/control-plane boundary hardening, W24-W26 tracking run-level harness, real production proof, and self-hosted production release gates while active queue tracking stays available via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - historical W10/W11 productionization closure for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and target-backed proof evidence.
 - stable live routed execution baseline for supported `codex-cli` adapter paths, plus live-runnable candidate `claude-code` matrix coverage and extended non-baseline `open-code` coverage with explicit delivery-guardrail blocking semantics.
 - W15 readiness-hardening work that makes source-of-truth drift, package/module-map drift, and mock-backed proof claims machine-checkable.
 - W16 complexity-reduction work that decomposes monolithic CLI/API/core/live-E2E surfaces and isolates adapter permission legacy cleanup.
 - W17 legacy-surface cleanup that removes public compatibility aliases from CLI incident outputs and delivery mode inputs.
 - W18 backlog coverage for control-plane-owned web lifecycle operation, runner question/answer continuation, and bounded multirepo proof.
-- W19/W20/W21 backlog gap intake that maps all 112 supported user stories to current evidence, coverage status, and explicit follow-up slices for remaining gaps.
+- W19/W20/W21 backlog gap intake plus W22 evidence-strength repair that maps all 112 supported user stories to `baseline-covered`, `proof-covered`, `partial`, or `blocked` status with explicit follow-up slices for remaining gaps.
 - W20 production-hardening baseline for detached control-plane transport mode, bearer auth/authz scopes, redaction of configured secrets across JSON/SSE/CLI surfaces, and denied-action audit evidence.
 
 What does **not** exist yet:
@@ -46,7 +46,7 @@ What does **not** exist yet:
 - broad multi-provider production-grade adapter coverage beyond the stable `codex-cli` live baseline and candidate `claude-code` rehearsal coverage;
 - delivery write-back automation to upstream repositories;
 - enterprise identity-provider integration, hosted SaaS deployment hardening, and operator parity for every CLI/API/web control surface;
-- a real code-changing full-journey proof with `overall_verdict=pass`; the current W14 matrix proof is coverage evidence with findings, and this target is not assigned to the current W18-W21 backlog horizon.
+- a real code-changing full-journey proof with `overall_verdict=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`; the current W14 matrix proof is coverage evidence with findings, and W25 owns the future production proof target.
 
 Use the backlog docs for the implementation roadmap.
 
@@ -61,8 +61,9 @@ Start here if you want to understand the project before implementing anything:
 5. `docs/contracts/00-index.md`
 6. `docs/backlog/backlog-operating-model.md`
 7. `docs/backlog/mvp-roadmap.md`
-8. `docs/ops/live-e2e-target-catalog.md`
-9. `docs/ops/live-e2e-dependency-matrix.md`
+8. `docs/backlog/self-hosted-production-readiness.md`
+9. `docs/ops/live-e2e-target-catalog.md`
+10. `docs/ops/live-e2e-dependency-matrix.md`
 
 ## Contributor quickstart
 
@@ -225,6 +226,7 @@ Start with:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
+- `docs/backlog/self-hosted-production-readiness.md`
 
 Detailed wave plans:
 
@@ -250,6 +252,11 @@ Detailed wave plans:
 - `docs/backlog/wave-19-implementation-slices.md`
 - `docs/backlog/wave-20-implementation-slices.md`
 - `docs/backlog/wave-21-implementation-slices.md`
+- `docs/backlog/wave-22-implementation-slices.md`
+- `docs/backlog/wave-23-implementation-slices.md`
+- `docs/backlog/wave-24-implementation-slices.md`
+- `docs/backlog/wave-25-implementation-slices.md`
+- `docs/backlog/wave-26-implementation-slices.md`
 
 ## Contributing
 

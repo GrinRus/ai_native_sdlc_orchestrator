@@ -153,6 +153,6 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 ## Current planning coverage
 
-The repo carries detailed wave documents for every currently defined `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is `W21`: W18 covers connected web and topology proof gaps, W19 carries user-story traceability and product-quality gap slices, W20 tracks production and platform maturity gaps, and W21 closes installed-user onboarding and guided UX gaps.
+The repo carries detailed wave documents for every currently defined `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is `W26`: W22 repairs source-of-truth and OpenCode maturity claims, W23 queues contract/auth/control-plane hardening, W24 owns run-level Runtime Harness work, W25 owns real non-mock production proof, and W26 owns the self-hosted production release gate.
 
-The implementation order is still constrained by hard dependencies. A later-wave slice can be described in detail and still remain blocked until earlier-wave slices close.
+The implementation order is still constrained by hard dependencies and explicit external blockers. A later-wave slice can be described in detail and still remain blocked until earlier-wave slices close or required real-runner proof prerequisites become available.

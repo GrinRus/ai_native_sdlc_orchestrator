@@ -206,7 +206,7 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W20-S01 | Multirepo scoped locks and cross-repo validation | EPIC-5 | done | `docs/contracts/**`, `packages/orchestrator-core`, `apps/cli`, `apps/api`, `docs/ops/**` | W19-S01, W8-S07 |
 | W20-S02 | Production security and observability hardening baseline | EPIC-6 | done | `docs/contracts/**`, `docs/architecture/**`, `apps/api`, `apps/web`, `apps/cli`, `packages/observability` | W19-S01, W10-S04 |
-| W20-S03 | OpenCode live-baseline certification | EPIC-3 | done | `examples/adapters/**`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W16-S06, W20-S02 |
+| W20-S03 | OpenCode candidate evidence and downgrade follow-up | EPIC-3 | done | `examples/adapters/**`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**` | W16-S06, W20-S02 |
 | W20-S04 | Compiler revision asset lifecycle | EPIC-4 | done | `docs/contracts/**`, `packages/harness`, `packages/orchestrator-core`, `apps/cli`, `apps/api` | W19-S01, W8-S09 |
 | W20-S05 | Finance analytics and production monitoring loop | EPIC-7 | done | `docs/contracts/**`, `packages/observability`, `apps/api`, `apps/web`, `apps/cli`, `docs/ops/**` | W20-S02, W7-S04 |
 
@@ -220,6 +220,41 @@ This is the master index for the implementation slices across all defined waves.
 | W21-S05 | Guided web app full-flow console | EPIC-6 | done | `apps/web`, `apps/api`, `docs/ops/**`, tests | W18-S03, W21-S04 |
 | W21-S06 | Review, delivery, release, and learning closure UX | EPIC-4 | done | `docs/contracts/**`, `packages/orchestrator-core`, `packages/observability`, `apps/cli`, `apps/api`, `apps/web`, `docs/ops/**`, tests | W19-S05, W21-S05 |
 | W21-S07 | Installed-user guided journey proof | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/cli`, `apps/web`, tests | W21-S02, W21-S03, W21-S04, W21-S05, W21-S06 |
+
+## W22 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W22-S01 | Evidence-strength story coverage model | EPIC-0 | done | `docs/product/**`, `docs/backlog/**`, `scripts/test.mjs` | none |
+| W22-S02 | Production readiness source-of-truth | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**` | W22-S01 |
+| W22-S03 | OpenCode maturity downgrade | EPIC-3 | done | `examples/adapters/**`, `scripts/live-e2e/catalog/**`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**`, contract tests | W22-S01 |
+
+## W23 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W23-S01 | Nested contract validation pack | EPIC-4 | ready | `docs/contracts/**`, `packages/contracts/**`, `examples/**`, `scripts/reference-integrity.mjs` | W22-S01 |
+| W23-S02 | Explicit production auth scopes | EPIC-6 | ready | `apps/api/**`, `apps/cli/**`, `packages/observability/**`, `docs/contracts/control-plane-api.md`, tests | W22-S02 |
+| W23-S03 | Shared lifecycle service boundary | EPIC-6 | ready | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, tests, dependency checks | W22-S02 |
+
+## W24 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W24-S01 | Run-level Runtime Harness controller | EPIC-4 | blocked | `packages/orchestrator-core/**`, `packages/harness/**`, `packages/observability/**`, `apps/cli/**`, tests | W23-S01, W23-S03 |
+| W24-S02 | Interactive continuation hardening | EPIC-6 | blocked | `docs/contracts/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W24-S01, W23-S02 |
+| W24-S03 | Strict delivery gate consolidation | EPIC-5 | blocked | `packages/orchestrator-core/**`, `apps/cli/**`, `docs/contracts/**`, delivery tests | W24-S01, W23-S01 |
+
+## W25 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W25-S01 | Real external-runner proof profile | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, provider catalog tests | W24-S01, W23-S02 |
+| W25-S02 | Code-changing full-journey pass | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**` | W25-S01, W24-S03 |
+| W25-S03 | Proof fixture and story upgrade | EPIC-7 | blocked | `examples/live-e2e/**`, `docs/product/**`, `scripts/test.mjs`, `docs/ops/**` | W25-S02, W22-S01 |
+
+## W26 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W26-S01 | Production readiness gate | EPIC-0 | blocked | `scripts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/live-e2e/**` | W25-S03, W23-S01, W23-S02, W24-S01 |
+| W26-S02 | Maintainability stabilization | EPIC-0 | blocked | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests | W26-S01 |
+| W26-S03 | Self-hosted release documentation | EPIC-7 | blocked | `README.md`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**` | W26-S01 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.
