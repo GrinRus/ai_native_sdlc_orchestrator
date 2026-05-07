@@ -232,7 +232,7 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W23-S01 | Nested contract validation pack | EPIC-4 | done | `docs/contracts/**`, `packages/contracts/**`, `examples/**`, `scripts/reference-integrity.mjs` | W22-S01 |
-| W23-S02 | Explicit production auth scopes | EPIC-6 | ready | `apps/api/**`, `apps/cli/**`, `packages/observability/**`, `docs/contracts/control-plane-api.md`, tests | W22-S02 |
+| W23-S02 | Explicit production auth scopes | EPIC-6 | done | `apps/api/**`, `apps/cli/**`, `packages/observability/**`, `docs/contracts/control-plane-api.md`, tests | W22-S02 |
 | W23-S03 | Shared lifecycle service boundary | EPIC-6 | ready | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, tests, dependency checks | W22-S02 |
 
 ## W24 slices

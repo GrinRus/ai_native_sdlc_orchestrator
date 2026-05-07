@@ -745,6 +745,15 @@ test("detached control-plane authn/authz enforces bearer auth with project-scope
             permissions: ["read", "mutate"],
           },
           {
+            token: "legacy-default-token",
+            token_id: "legacy-default",
+          },
+          {
+            token: "legacy-empty-token",
+            token_id: "legacy-empty",
+            permissions: [],
+          },
+          {
             token: "foreign-token",
             token_id: "foreign",
             permissions: ["read"],
@@ -774,6 +783,21 @@ test("detached control-plane authn/authz enforces bearer auth with project-scope
       assert.equal(readAllowedResponse.status, 200);
       const readAllowedPayload = await readAllowedResponse.json();
       assert.equal(readAllowedPayload.project_id, transport.projectId);
+
+      const legacyDefaultReadResponse = await getJson(stateUrl, "legacy-default-token");
+      assert.equal(legacyDefaultReadResponse.status, 200);
+
+      const legacyEmptyMutateResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "start",
+          run_id: "run.http.transport.auth.local-trusted-defaults.v1",
+        },
+        "legacy-empty-token",
+      );
+      assert.equal(legacyEmptyMutateResponse.status, 200);
+      const legacyEmptyMutatePayload = await legacyEmptyMutateResponse.json();
+      assert.equal(legacyEmptyMutatePayload.run_control.blocked, false);
 
       const mutateForbiddenResponse = await postJsonWithToken(
         runControlUrl,
@@ -825,6 +849,26 @@ test("production-hardened transport enforces authz and redacts configured secret
             permissions: ["read"],
           },
           {
+            token: "mutate-prod-token",
+            token_id: "mutator",
+            permissions: ["mutate"],
+          },
+          {
+            token: "missing-permissions-prod-token",
+            token_id: "missing-permissions",
+          },
+          {
+            token: "empty-permissions-prod-token",
+            token_id: "empty-permissions",
+            permissions: [],
+          },
+          {
+            token: "foreign-prod-token",
+            token_id: "foreign",
+            permissions: ["read", "mutate"],
+            project_refs: ["project.unrelated"],
+          },
+          {
             token: secretToken,
             token_id: "operator",
             permissions: ["read", "mutate"],
@@ -842,6 +886,44 @@ test("production-hardened transport enforces authz and redacts configured secret
       const missingAuthPayload = await missingAuthResponse.json();
       assert.equal(missingAuthPayload.error.code, "auth.missing_credentials");
       assert.equal(missingAuthPayload.error.auth.security_mode, "production-hardened");
+
+      const missingPermissionsResponse = await getJson(stateUrl, "missing-permissions-prod-token");
+      assert.equal(missingPermissionsResponse.status, 403);
+      const missingPermissionsPayload = await missingPermissionsResponse.json();
+      assert.equal(missingPermissionsPayload.error.code, "auth.insufficient_permission");
+      assert.equal(missingPermissionsPayload.error.auth.required_permission, "read");
+      assert.equal(JSON.stringify(missingPermissionsPayload).includes("missing-permissions-prod-token"), false);
+
+      const emptyPermissionsResponse = await getJson(stateUrl, "empty-permissions-prod-token");
+      assert.equal(emptyPermissionsResponse.status, 403);
+      const emptyPermissionsPayload = await emptyPermissionsResponse.json();
+      assert.equal(emptyPermissionsPayload.error.code, "auth.insufficient_permission");
+      assert.equal(emptyPermissionsPayload.error.auth.required_permission, "read");
+      assert.equal(JSON.stringify(emptyPermissionsPayload).includes("empty-permissions-prod-token"), false);
+
+      const mutateOnlyReadResponse = await getJson(stateUrl, "mutate-prod-token");
+      assert.equal(mutateOnlyReadResponse.status, 403);
+      const mutateOnlyReadPayload = await mutateOnlyReadResponse.json();
+      assert.equal(mutateOnlyReadPayload.error.code, "auth.insufficient_permission");
+      assert.equal(mutateOnlyReadPayload.error.auth.required_permission, "read");
+
+      const wrongProjectResponse = await getJson(stateUrl, "foreign-prod-token");
+      assert.equal(wrongProjectResponse.status, 403);
+      const wrongProjectPayload = await wrongProjectResponse.json();
+      assert.equal(wrongProjectPayload.error.code, "auth.forbidden_project");
+      assert.equal(JSON.stringify(wrongProjectPayload).includes("foreign-prod-token"), false);
+
+      const mutateOnlyAllowedResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "start",
+          run_id: "run.http.transport.production-mutator-only.v1",
+        },
+        "mutate-prod-token",
+      );
+      assert.equal(mutateOnlyAllowedResponse.status, 200);
+      const mutateOnlyAllowedPayload = await mutateOnlyAllowedResponse.json();
+      assert.equal(mutateOnlyAllowedPayload.run_control.blocked, false);
 
       const deniedMutateResponse = await postJsonWithToken(
         runControlUrl,

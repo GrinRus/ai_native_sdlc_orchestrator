@@ -46,7 +46,7 @@ Harden contract-first validation, production API auth scopes, and CLI/API lifecy
 
 ## W23-S02 — Explicit production auth scopes
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Make production-hardened API authorization fail closed for bearer tokens that do not declare explicit permissions while preserving local trusted behavior.
 - **Primary modules:** `apps/api/**`, `apps/cli/**`, `packages/observability/**`, `docs/contracts/control-plane-api.md`, tests
 - **Hard dependencies:** W22-S02
