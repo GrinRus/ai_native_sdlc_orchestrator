@@ -1,0 +1,15 @@
+event_id: event.canonical.1
+run_id: run.canonical
+timestamp: "2026-05-07T00:00:00.000Z"
+event_type: step.updated
+payload:
+  sequence: 1
+  status: waiting-for-operator
+  summary: Interaction answer accepted and the run can resume.
+  interaction:
+    status: answered
+    step_result_ref: evidence://contracts/w23-s01/step-result
+    question_summary: Operator confirmed the safe continuation boundary.
+    answer_required: false
+    answer_audit_refs:
+      - evidence://contracts/w23-s01/interaction-answer-audit

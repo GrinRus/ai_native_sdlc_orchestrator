@@ -1,0 +1,31 @@
+incident_id: incident.canonical
+project_id: aor-example
+severity: medium
+summary: Canonical incident with recertification linkage.
+linked_run_refs:
+  - run://canonical
+linked_asset_refs:
+  - compiler-revision://runtime-context-compiler@v1
+status: hold
+linked_eval_suite_refs:
+  - suite.release.core@v1
+linked_harness_capture_refs:
+  - evidence://contracts/w23-s01/harness-capture
+linked_backlog_refs:
+  - backlog://W23-S01
+recertification:
+  decision: hold
+  from_status: open
+  to_status: hold
+  run_ref: run://canonical
+  evidence_refs:
+    - evidence://contracts/w23-s01/incident-recertification
+  evidence_root: evidence://contracts/w23-s01/incident
+  finance_evidence_refs:
+    - evidence://contracts/w23-s01/finance
+  quality_evidence_refs:
+    - evidence://contracts/w23-s01/quality
+  platform_recertification:
+    linkage_status: linked
+    rollback_required: true
+    rollout_action: freeze

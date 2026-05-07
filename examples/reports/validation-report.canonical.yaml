@@ -1,0 +1,14 @@
+report_id: validation-report.canonical
+subject_ref: packet://canonical
+validators:
+  - validator_id: contract-loader
+    status: pass
+    summary: Contract loader accepted the canonical nested shape.
+    details:
+      family: step-result
+      nested_validation: true
+    evidence_refs:
+      - evidence://contracts/w23-s01/validation-report
+status: pass
+evidence_refs:
+  - evidence://contracts/w23-s01/validation-report

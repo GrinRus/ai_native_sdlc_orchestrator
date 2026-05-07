@@ -92,6 +92,15 @@ Each finding should keep:
 - `summary`
 - `evidence_refs`
 
+## Loader validation
+The shared contract loader validates the nested review report shape used by CLI/API/runtime readers:
+- section `status` fields must use `pass|warn|fail` when present; legacy read-model fixtures may keep empty section objects;
+- path and evidence arrays must contain strings;
+- nested `matrix_cell` values validate known identity, scenario, and provider fields when those fields are present;
+- nested `coverage_follow_up` validates `current_cell_required` and next/remaining matrix cells when those fields are present; legacy non-catalog outputs may keep an empty object;
+- optional provider traceability fields may be strings or `null` when the upstream runtime evidence was intentionally missing or blocked;
+- each finding must be an object with `finding_id`, `severity`, `category`, `summary`, and `evidence_refs[]`.
+
 ## Notes
 `review-report` is report-only. A failing review must remain machine-readable without forcing command failure unless the CLI itself encounters usage, runtime, or contract-resolution errors.
 

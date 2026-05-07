@@ -16,7 +16,7 @@ Harden contract-first validation, production API auth scopes, and CLI/API lifecy
 
 ## W23-S01 — Nested contract validation pack
 - **Epic:** EPIC-4 Quality platform
-- **State:** ready
+- **State:** done
 - **Outcome:** Add canonical nested examples and loader validation for packet/report/event shapes that production gates depend on.
 - **Primary modules:** `docs/contracts/**`, `packages/contracts/**`, `examples/**`, `scripts/reference-integrity.mjs`
 - **Hard dependencies:** W22-S01

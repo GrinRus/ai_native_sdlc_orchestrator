@@ -8,7 +8,7 @@ Coverage status values:
 - `partial` - current implementation covers part of the outcome, but a backlog slice owns the missing behavior, hardening, or proof evidence.
 - `blocked` - the outcome cannot be closed honestly until a named prerequisite or real proof slice lands.
 
-Current W22-S01 status counts: `baseline-covered=60`, `proof-covered=0`, `partial=49`, `blocked=3`.
+Current W23-S01 status counts: `baseline-covered=65`, `proof-covered=0`, `partial=44`, `blocked=3`.
 
 | Story ID | Role cluster | Tier | Outcome | Coverage status | Evidence | Gap slice |
 |---|---|---|---|---|---|---|
@@ -22,7 +22,7 @@ Current W22-S01 status counts: `baseline-covered=60`, `proof-covered=0`, `partia
 | PSO-08 | Product sponsor / owner | Later | Use strategic product visibility across waves and outcomes. | partial | W8-S01 sponsor/planner visibility, W19-S06 planner metrics in strategic snapshot, W21-S05 guided web lifecycle and strategic/finance panels. Baseline evidence only; production-strength gap owned by W26-S01. | W26-S01 |
 | DIS-01 | Discovery / research | MVP | Build discovery packets from repository content. | baseline-covered | `project analyze`, `discovery run`, W1-S03 project analysis | none |
 | DIS-02 | Discovery / research | MVP | Include AOR-owned runtime context assets in discovery. | baseline-covered | context compiler and asset lifecycle, W8-S08, W8-S09 | none |
-| DIS-03 | Discovery / research | MVP | Preserve local research inputs alongside discovery facts. | partial | `discovery-research-report`, local intake source refs, W19-S03. Baseline evidence only; production-strength gap owned by W23-S01. | W23-S01 |
+| DIS-03 | Discovery / research | MVP | Preserve local research inputs alongside discovery facts. | baseline-covered | `discovery-research-report`, local intake source refs, W19-S03, W23-S01 nested `artifact-packet` and `validation-report` canonical examples plus loader validation. | none |
 | DIS-04 | Discovery / research | MVP | Keep discovery separate from delivery execution. | baseline-covered | packet lifecycle, delivery policies, W4 delivery foundation | none |
 | DIS-05 | Discovery / research | MVP | Validate discovery completeness before planning. | baseline-covered | `discovery run`, `spec build`, validation reports | none |
 | DIS-06 | Discovery / research | MVP | Hand discovery evidence into specification. | baseline-covered | `spec build`, handoff packets, W6-S02 command pack | none |
@@ -32,7 +32,7 @@ Current W22-S01 status counts: `baseline-covered=60`, `proof-covered=0`, `partia
 | ARC-02 | Architect / tech lead | MVP | Inspect route, wrapper, policy, and runner choices for each step. | baseline-covered | route registry, compiled context, `run status`, W8-S04 visibility | none |
 | ARC-03 | Architect / tech lead | MVP | Separate deterministic validation from rubric-based evaluation. | baseline-covered | validation kernel, eval runner, harness, W3 quality foundation | none |
 | ARC-04 | Architect / tech lead | MVP | Define certification and freeze paths for platform assets. | baseline-covered | `harness certify`, `asset promote`, `asset freeze`, W7-S02 | none |
-| ARC-05 | Architect / tech lead | MVP | Trace plans back to architecture docs and contract references. | partial | story coverage matrix, backlog docs, contract index, command catalog checks, W19-S01. Baseline evidence only; production-strength gap owned by W23-S01. | W23-S01 |
+| ARC-05 | Architect / tech lead | MVP | Trace plans back to architecture docs and contract references. | baseline-covered | story coverage matrix, backlog docs, contract index, command catalog checks, W19-S01, W23-S01 canonical nested examples and contract-loader coverage alignment. | none |
 | ARC-06 | Architect / tech lead | MVP+ | Control UI attach/detach lifecycle without breaking headless operation. | baseline-covered | `ui attach`, `ui detach`, W6-S04 UI lifecycle command pack | none |
 | ARC-07 | Architect / tech lead | MVP+ | Inspect governance guardrails and quality evidence parity. | partial | W7-S01 governance quality guardrails. Baseline evidence only; production-strength gap owned by W24-S01. | W24-S01 |
 | ARC-08 | Architect / tech lead | Later | Maintain later architecture maturity and ADR traceability. | partial | W8-S02 architecture maturity pack, W19-S03 discovery research ADR-ready recommendations. Baseline evidence only; production-strength gap owned by W26-S03. | W26-S03 |
@@ -55,7 +55,7 @@ Current W22-S01 status counts: `baseline-covered=60`, `proof-covered=0`, `partia
 | DEV-09 | Delivery engineer | MVP+ | Execute with policy and audit guardrails. | baseline-covered | W6-S03 run-control guardrails, W10-S04 auth hardening | none |
 | DEV-10 | Delivery engineer | Later | Use later delivery and security governance maturity. | partial | W8-S03 route-governance maturity, W20-S02 production-hardened transport/redaction baseline. Baseline evidence only; production-strength gap owned by W23-S02. | W23-S02 |
 | RQA-01 | Reviewer / QA | MVP | Review structured review packets with risk notes and evidence. | baseline-covered | `review run`, review reports, W13-S05 | none |
-| RQA-02 | Reviewer / QA | MVP | Inspect machine-readable review verdicts before proceeding. | partial | review reports, Runtime Harness verdicts, `review-decision`, `review decide`, delivery/release `--require-review-decision`, W19-S05. Baseline evidence only; production-strength gap owned by W23-S01, W24-S01. | W23-S01, W24-S01 |
+| RQA-02 | Reviewer / QA | MVP | Inspect machine-readable review verdicts before proceeding. | partial | review reports, Runtime Harness verdicts, `review-decision`, `review decide`, delivery/release `--require-review-decision`, W19-S05, W23-S01 nested `review-report` validation. Baseline evidence only; remaining production-strength run-level gap owned by W24-S01. | W24-S01 |
 | RQA-03 | Reviewer / QA | MVP | Compare deterministic validation with judge-based eval outcomes. | baseline-covered | validation reports, eval runner, W3, W7-S01 | none |
 | RQA-04 | Reviewer / QA | MVP | Run suite-based comparisons against baselines. | baseline-covered | eval suites, harness capture/replay, W3-S03, W8-S05 | none |
 | RQA-05 | Reviewer / QA | MVP+ | Manage flaky cases and escalation paths. | partial | incident recertification plus proposal-only dataset backfill workflow, W7-S03, W19-S04. Baseline evidence only; production-strength gap owned by W24-S01. | W24-S01 |
@@ -64,7 +64,7 @@ Current W22-S01 status counts: `baseline-covered=60`, `proof-covered=0`, `partia
 | AIP-02 | AI platform owner | MVP | Manage context docs, rules, skills, and bundles. | baseline-covered | context assets, compiled context, W8-S08, W8-S09 | none |
 | AIP-03 | AI platform owner | MVP | Manage wrappers, routes, and policies. | baseline-covered | route, wrapper, and policy registries, W2 | none |
 | AIP-04 | AI platform owner | MVP | Manage adapters and capability metadata. | baseline-covered | adapter SDK, adapter contracts, W16-S06 | none |
-| AIP-05 | AI platform owner | MVP | Manage compiler revisions as platform assets. | partial | `compiler-revision-status`, `aor compiler revision`, certification-linked compiler lifecycle status, API `compiler-revisions`, W20-S04. Baseline evidence only; production-strength gap owned by W23-S01. | W23-S01 |
+| AIP-05 | AI platform owner | MVP | Manage compiler revisions as platform assets. | baseline-covered | `compiler-revision-status`, `aor compiler revision`, certification-linked compiler lifecycle status, API `compiler-revisions`, W20-S04, W23-S01 nested incident/learning validation for compiler-linked incident evidence. | none |
 | AIP-06 | AI platform owner | MVP | Run certification before promotion. | baseline-covered | `harness certify`, promotion decisions, W3-S05 | none |
 | AIP-07 | AI platform owner | MVP+ | Compare new candidates against stable baselines. | partial | W7-S02 promotion/freeze maturity. Baseline evidence only; production-strength gap owned by W24-S01. | W24-S01 |
 | AIP-08 | AI platform owner | MVP+ | Freeze problematic platform assets. | baseline-covered | `asset freeze`, W7-S02 | none |
@@ -96,7 +96,7 @@ Current W22-S01 status counts: `baseline-covered=60`, `proof-covered=0`, `partia
 | RMO-06 | Repository / multirepo owner | Later | Mature multirepo delivery orchestration and reruns. | partial | W8-S07 rerun maturity plus W20-S01 lock and validation lineage. Baseline evidence only; production-strength gap owned by W24-S03. | W24-S03 |
 | INC-01 | Incident / improvement owner | MVP | Open incident reports from failed runs or releases. | baseline-covered | `incident open`, W6-S06 | none |
 | INC-02 | Incident / improvement owner | MVP | Force recertification before re-enabling problematic routes. | baseline-covered | `incident recertify`, W7-S03 | none |
-| INC-03 | Incident / improvement owner | MVP | Correlate incidents with routes, assets, wrappers, adapters, or compiler revisions. | partial | incident reports, learning-loop handoffs, `incident-backfill-proposal` linked asset correlation, and `compiler-revision-status.evidence_links.incident_refs`, W20-S04. Baseline evidence only; production-strength gap owned by W23-S01. | W23-S01 |
+| INC-03 | Incident / improvement owner | MVP | Correlate incidents with routes, assets, wrappers, adapters, or compiler revisions. | baseline-covered | incident reports, learning-loop handoffs, `incident-backfill-proposal` linked asset correlation, `compiler-revision-status.evidence_links.incident_refs`, W20-S04, W23-S01 nested `incident-report` validation for linkage and recertification metadata. | none |
 | INC-04 | Incident / improvement owner | MVP+ | Use controlled re-enable after recertification. | partial | W7-S03 controlled re-enable flow. Baseline evidence only; production-strength gap owned by W24-S01. | W24-S01 |
 | INC-05 | Incident / improvement owner | MVP+ | Backfill incidents into datasets and suites. | baseline-covered | `incident backfill`, `incident-backfill-proposal`, proposal-only mutation policy, W19-S04 | none |
 | INC-06 | Incident / improvement owner | Later | Close the production feedback loop into monitoring and learning. | partial | W8-S06 incident maturity, `finance-monitoring-snapshot.monitoring_loop.evidence_classes`, `aor finance monitor`, W20-S05. Baseline evidence only; production-strength gap owned by W26-S01. | W26-S01 |
@@ -120,7 +120,7 @@ Current W22-S01 status counts: `baseline-covered=60`, `proof-covered=0`, `partia
 | FIN-02 | Finance / audit / hygiene | MVP | Track latency by route, bundle, compiler revision, adapter, and project. | partial | `finance-monitoring-snapshot` step and certification latency summaries, CLI/API/web finance monitoring reads, W20-S05. Baseline evidence only; production-strength gap owned by W26-S01. | W26-S01 |
 | FIN-03 | Finance / audit / hygiene | MVP | Preserve durable evidence for reviews and audits. | baseline-covered | audit records, evidence show, W7-S04 | none |
 | FIN-04 | Finance / audit / hygiene | MVP | Keep audit evidence queryable from command and API surfaces. | baseline-covered | `audit runs`, API read surface, W7-S04 | none |
-| FIN-05 | Finance / audit / hygiene | MVP+ | Link promotion and freeze decisions to finance evidence. | partial | W7-S02, W7-S04. Baseline evidence only; production-strength gap owned by W23-S01. | W23-S01 |
+| FIN-05 | Finance / audit / hygiene | MVP+ | Link promotion and freeze decisions to finance evidence. | baseline-covered | W7-S02, W7-S04, W23-S01 nested `incident-report` recertification validation for finance and quality evidence refs. | none |
 | FIN-06 | Finance / audit / hygiene | MVP+ | Expand finance evidence durability. | partial | W7-S04 finance evidence expansion. Baseline evidence only; production-strength gap owned by W26-S01. | W26-S01 |
 | FIN-07 | Finance / audit / hygiene | MVP+ | Make platform hygiene visible through regression signals. | partial | W7-S01, W7-S04, W8-S09, W20-S05 monitoring-loop evidence classes. Baseline evidence only; production-strength gap owned by W26-S01. | W26-S01 |
 | FIN-08 | Finance / audit / hygiene | Later | Distinguish production monitoring from offline certification. | partial | `finance-monitoring-snapshot.monitoring_loop.evidence_classes.production_monitoring`, offline certification/rehearsal separation rules, W20-S05. Baseline evidence only; production-strength gap owned by W26-S01. | W26-S01 |

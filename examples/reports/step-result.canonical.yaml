@@ -1,0 +1,44 @@
+step_result_id: step-result.canonical.runner
+run_id: run.canonical
+step_id: step.runner.1
+step_class: runner
+status: pass
+summary: Canonical routed runner step with interaction and repair evidence.
+evidence_refs:
+  - evidence://contracts/w23-s01/step-result
+runtime_harness_decision: pass
+external_runner:
+  runtime_mode: external-process
+  command: codex
+  raw_evidence_ref: evidence://contracts/w23-s01/external-runner-raw
+  exit_code: 0
+  timed_out: false
+requested_interaction:
+  requested: true
+  interaction_id: interaction.canonical.1
+  status: answered
+  prompt_summary: Operator confirmed the safe continuation boundary.
+  question_evidence_refs:
+    - evidence://contracts/w23-s01/interaction-question
+  answer_audit_refs:
+    - evidence://contracts/w23-s01/interaction-answer-audit
+  continuation:
+    next_action: resume_from_boundary
+    reason_code: answer-accepted
+repair_attempts:
+  - attempt: 1
+    trigger: schema-mismatch
+    result: repaired
+    input_evidence_refs:
+      - evidence://contracts/w23-s01/repair-input
+mission_semantics:
+  changed_paths:
+    - packages/example/src/index.ts
+  allowed_paths:
+    - packages/example/**
+  forbidden_paths:
+    - docs/**
+  mission_scoped_changed_paths:
+    - packages/example/src/index.ts
+  scope_violation_paths: []
+  ignored_request_input_files: []

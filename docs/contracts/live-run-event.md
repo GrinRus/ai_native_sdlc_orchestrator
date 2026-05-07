@@ -42,6 +42,13 @@ Recommended event use:
 
 Live streams must never include raw answer text. Subscribers should replay from the read model and treat the latest event for one `interaction_id` as the current continuation state.
 
+## Loader validation
+The shared contract loader validates the query-safe nested event surface:
+- `payload.sequence` is required and must be numeric;
+- `payload.interaction.status` must use `requested|answered|resumed|blocked` when an interaction payload is present;
+- `payload.interaction.answer_audit_refs[]` must contain strings when present;
+- raw answer fields such as `answer`, `answer_text`, and `raw_answer` are rejected in `payload` and `payload.interaction`.
+
 ## Notes
 Live events should support catch-up from a read model plus the live stream.
 Reconnect behavior should support replay from the last acknowledged `event_id`.

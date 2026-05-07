@@ -45,6 +45,15 @@ The field must not embed sensitive answer text. Operator answers belong in durab
 `mission_semantics` records the semantic validation evidence used by the step controller, including changed paths and strict no-op detection inputs when available.
 For mission-scoped runs, `mission_semantics` should also preserve ignored request input files, allowed/forbidden path rules, mission-scoped changed paths, and scope violation paths so run-start decisions cannot be satisfied by control/input artifacts alone.
 
+## Loader validation
+The shared contract loader validates nested step-result fields that carry runtime control evidence:
+- `evidence_refs[]` and nested evidence arrays must contain strings.
+- `runtime_harness_decision` must use `pass|retry|repair|escalate|block|fail` when present.
+- `requested_interaction` may be `null`; when present it must be an object with `requested` as a boolean, optional `status` in `requested|answered|resumed|blocked`, query-safe evidence refs, and no raw answer fields.
+- `external_runner` must preserve `runtime_mode` and `command` when present; `raw_evidence_ref` is validated as a string when available, and `exit_code` is numeric when available or `null` for missing-command preflight failures.
+- `repair_attempts[]` entries must be objects with `attempt`, `trigger`, `result`, and `input_evidence_refs[]`.
+- `mission_semantics` path arrays must contain strings when present.
+
 For `spec` routed steps, `routed_execution.discovery_research_gate` may carry the discovery research report status, ADR-ready flag, open questions, checks, and report refs from `aor discovery run`. This keeps ADR-readiness visible at specification handoff without making the spec step own research collection.
 For later discovery/architecture maturity flows, `routed_execution` may include `discovery_completeness_gate` and `architecture_traceability` payloads so planning handoff is auditable.
 For later operator troubleshooting maturity flows, `routed_execution.policy_resolution.governance_decision` should remain present when available so run-level policy history queries can avoid raw log inspection.

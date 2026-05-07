@@ -63,3 +63,11 @@ Rollback-safe recertification behavior:
 An incident report should be able to backfill a dataset case, trigger recertification, and point to backlog planning surfaces for follow-up slices.
 
 `linked_asset_refs[]` may include `compiler-revision://...` refs when an incident correlates with the compiler that produced compiled-context artifacts. Follow-up compiler lifecycle status reports should mirror those incident refs through `compiler-revision-status.compatibility.incident_refs` and `evidence_links.incident_refs`.
+
+## Loader validation
+The shared contract loader validates operational linkage shapes:
+- linkage arrays such as `linked_run_refs[]`, `linked_asset_refs[]`, `linked_eval_suite_refs[]`, `linked_harness_capture_refs[]`, and `linked_backlog_refs[]` must contain strings when present;
+- `recertification` must be an object when present and must include `decision`, `from_status`, `to_status`, `run_ref`, and `evidence_root`;
+- `recertification.decision` must use `recertify|hold|re-enable`;
+- recertification evidence arrays must contain strings;
+- `platform_recertification`, when present, must carry a supported `linkage_status`, boolean `rollback_required`, and supported optional `rollout_action`; `rollout_action` may be `null` when no rollout decision exists yet.
