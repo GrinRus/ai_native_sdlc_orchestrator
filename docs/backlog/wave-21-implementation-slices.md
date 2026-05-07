@@ -224,7 +224,7 @@ Close the installed-user onboarding and guided UX gap so an external user can in
 
 ## W21-S07 — Installed-user guided journey proof
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Prove the installed-user guided journey end to end on a clean repository with public-repo safety defaults.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/cli`, `apps/web`, tests
 - **Hard dependencies:** W21-S02, W21-S03, W21-S04, W21-S05, W21-S06

@@ -21,7 +21,7 @@ An installed user can connect a repository, understand readiness, define a missi
 | Review and QA | Expose verdicts, holds, approval, repair requests, and missing evidence as durable artifacts. | Review report, review decision, Runtime Harness report, eval reports. | W21-S06 |
 | Delivery and release | Prepare delivery and release evidence only under explicit delivery mode and review gates. | Delivery plan, delivery manifest, release packet, writeback result. | W21-S06 |
 | Learning closure | Preserve scorecard and follow-up handoff with incident, monitoring, and recertification links. | Learning-loop scorecard, learning-loop handoff, incident reports, finance monitoring snapshot. | W21-S06 |
-| Guided proof | Rehearse the installed-user journey on a clean repo with no upstream-write defaults. | Live E2E proof profile, CLI transcript, web smoke evidence, no-write assertions. | W21-S07 |
+| Guided proof | Rehearse the installed-user journey on a clean repo with no upstream-write defaults. | `installed-user-guided-journey.yaml`, CLI transcript files, web smoke evidence, guided proof summary, no-write assertions. | W21-S07 |
 
 ## Guided command vocabulary
 These public commands are the target vocabulary for W21. W21-S02 implements the first-run guided shell for `doctor`, `onboard`, `app`, and the initial `next` shell. W21-S03 adds clean bundled onboarding evidence, and W21-S04 adds guided mission intake plus deterministic next-action reports. Later W21 slices deepen web stages and closure.
@@ -87,7 +87,7 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 | Next action | `next-action-report` | W21-S04 resolves one primary action with blockers, evidence refs, mission state, active run state, and explicit write-back policy; W21-S06 adds `closure_state` for review, delivery, release, and learning. |
 | Web lifecycle | `control-plane-api`, `live-run-event` | W21-S05 maps guided stages to read models and lifecycle mutations without UI-owned orchestration. |
 | Closure | `next-action-report`, `review-decision`, `delivery-plan`, `delivery-manifest`, `release-packet`, `learning-loop-handoff` | W21-S06 exposes final-stage decisions, blockers, evidence refs, and exact next actions consistently across CLI/API/web. |
-| Proof | Live E2E profiles and observation reports | W21-S07 proves the clean installed-user journey with no-upstream-write assertions. |
+| Proof | Live E2E profiles and observation reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, web smoke evidence, durable closure artifacts, and no-upstream-write assertions. |
 
 ## Out of scope for W21-S01
 - implementing `aor doctor`, `aor onboard`, `aor mission create`, `aor next`, or `aor app`;

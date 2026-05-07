@@ -1,0 +1,24 @@
+{
+  "proof_id": "w21-s07.installed-user-guided-blocked.v1",
+  "status": "blocked",
+  "blocked_branch": "missing-runtime-prerequisite",
+  "command_label": "guided-doctor",
+  "public_safety_defaults": {
+    "write_back_to_remote": false,
+    "preferred_delivery_mode": "patch-only",
+    "runtime_state_root": ".aor"
+  },
+  "actionable_blockers": [
+    {
+      "code": "project-ref-missing",
+      "summary": "The target repository path does not exist.",
+      "next_command": "Create or clone the repository, then rerun aor doctor --project-ref <path>."
+    }
+  ],
+  "rejected_claims": [
+    "success without command transcript",
+    "success without durable packets or reports",
+    "success without web smoke or no-write assertions"
+  ],
+  "expected_next_step": "Resolve the prerequisite and rerun the same installed-user guided profile."
+}

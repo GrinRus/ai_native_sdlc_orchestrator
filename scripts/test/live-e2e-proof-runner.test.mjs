@@ -10,6 +10,7 @@ import {
   parse as parseYaml,
   stringify as stringifyYaml,
 } from "../../packages/contracts/node_modules/yaml/dist/index.js";
+import { validateGuidedJourneyProof } from "../live-e2e/lib/guided-proof.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../..");
@@ -744,6 +745,7 @@ function writeLocalCatalogTarget(options) {
  *   internalTestHooks?: Record<string, unknown>,
  *   liveAdapterPreflight?: Record<string, unknown>,
  *   outputPolicy?: Record<string, unknown>,
+ *   guidedJourney?: Record<string, unknown>,
  * }} options
  */
 function writeLocalFullJourneyProfile(options) {
@@ -777,6 +779,7 @@ function writeLocalFullJourneyProfile(options) {
         preferred_delivery_mode: "patch-only",
         ...(options.outputPolicy ?? {}),
       },
+      ...(options.guidedJourney ? { guided_journey: options.guidedJourney } : {}),
       ...(options.liveAdapterPreflight ? { live_adapter_preflight: options.liveAdapterPreflight } : {}),
       ...(options.internalTestHooks ? { internal_test_hooks: options.internalTestHooks } : {}),
     }),
@@ -1288,6 +1291,108 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     assert.deepEqual(learningScorecard.coverage_follow_up, summary.coverage_follow_up);
     assert.deepEqual(learningHandoff.matrix_cell, summary.matrix_cell);
     assert.deepEqual(learningHandoff.coverage_follow_up, summary.coverage_follow_up);
+  });
+});
+
+test("installed-user guided journey proof captures CLI, web, closure, and no-write evidence", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "installed-user-guided.local.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      outputPolicy: {
+        materialize_release_packet: true,
+        write_back_to_remote: false,
+        preferred_delivery_mode: "patch-only",
+      },
+      guidedJourney: {
+        enabled: true,
+        web_smoke: {
+          enabled: true,
+        },
+      },
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "installed-user-guided-local",
+      catalogRoot,
+    });
+
+    assert.equal(
+      result.live_e2e_run_status,
+      "pass",
+      fs.existsSync(result.live_e2e_run_summary_file)
+        ? fs.readFileSync(result.live_e2e_run_summary_file, "utf8")
+        : result.live_e2e_run_summary_file,
+    );
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    const guidedProof = summary.guided_journey;
+    assert.equal(summary.status, "pass");
+    assert.equal(guidedProof.status, "pass");
+    assert.equal(fs.existsSync(summary.artifacts.guided_journey_proof_file), true);
+    for (const label of [
+      "guided-doctor",
+      "guided-onboard",
+      "guided-app",
+      "guided-next-before-mission",
+      "mission-create",
+      "guided-next-after-mission",
+      "review-run",
+      "guided-next-after-review",
+      "review-decide-approve",
+      "deliver-prepare",
+      "guided-next-after-delivery",
+      "release-prepare",
+      "learning-handoff",
+      "guided-next-after-learning",
+    ]) {
+      assert.ok(guidedProof.command_labels.includes(label), `missing ${label}`);
+    }
+    for (const transcriptFile of guidedProof.command_transcript_files) {
+      assert.equal(fs.existsSync(transcriptFile), true, transcriptFile);
+    }
+    for (const artifactFile of Object.values(guidedProof.durable_artifact_files)) {
+      assert.equal(fs.existsSync(artifactFile), true, String(artifactFile));
+    }
+    assert.equal(fs.existsSync(summary.artifacts.guided_web_smoke_summary_file), true);
+    assert.equal(fs.existsSync(summary.artifacts.guided_web_smoke_html_file), true);
+    assert.equal(guidedProof.web_smoke.detached, true);
+    assert.equal(typeof guidedProof.web_smoke.guided_lifecycle_state, "string");
+    assert.equal(guidedProof.no_write_assertions.output_policy_write_back_to_remote, true);
+    assert.equal(guidedProof.no_write_assertions.target_head_unchanged, true);
+    assert.equal(guidedProof.no_write_assertions.runtime_state_under_aor, true);
+    assert.equal(guidedProof.no_write_assertions.target_aor_live_e2e_absent, true);
+    assert.deepEqual(guidedProof.no_write_assertions.remote_write_commands, []);
+    assert.equal(fs.existsSync(summary.artifacts.release_packet_file), true);
+    assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor doctor"), true);
+    assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor onboard"), true);
+    assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor app"), true);
+    assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor mission create"), true);
+    assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor review decide"), true);
+    assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor release prepare"), true);
+
+    const narrativeOnly = structuredClone(guidedProof);
+    narrativeOnly.durable_artifact_files.web_smoke_html_file = "";
+    const issues = validateGuidedJourneyProof(narrativeOnly, {
+      targetCheckoutRoot: summary.target_checkout_root,
+    });
+    assert.ok(issues.some((issue) => issue.includes("web_smoke_html_file")));
   });
 });
 

@@ -75,8 +75,8 @@ Coverage status values:
 | OPS-03 | Operator / SRE | MVP | Inspect policy and compile decisions. | covered | W8-S04 policy visibility, compiled context evidence | none |
 | OPS-04 | Operator / SRE | MVP | Approve risky actions with durable evidence. | covered | handoff approve, review reports, `review-decision`, audit records, W19-S05, W21-S06 web `safety_gates` and CLI/API `next_action_closure_state` for hold/repair/approval branches | none |
 | OPS-05 | Operator / SRE | MVP | Replay failures through the Runtime Harness. | covered | `harness replay`, W9-S05 | none |
-| OPS-06 | Operator / SRE | MVP | Review installed-user black-box proof evidence. | covered | W12 proof runner, W14 proof bundles | none |
-| OPS-07 | Operator / SRE | MVP | Run curated full-journey live acceptance on real repositories. | covered | W14 coverage_with_findings proof on curated matrix repositories | none |
+| OPS-06 | Operator / SRE | MVP | Review installed-user black-box proof evidence. | covered | W12 proof runner, W14 proof bundles, W21-S07 guided proof summary with CLI transcripts, web smoke evidence, and no-write assertions | none |
+| OPS-07 | Operator / SRE | MVP | Run curated full-journey live acceptance on real repositories. | covered | W14 coverage_with_findings proof on curated matrix repositories, W21-S07 guided full-journey profile over curated catalog targets | none |
 | OPS-08 | Operator / SRE | MVP | Select required matrix cells by scenario, provider, and feature size. | covered | W14 scenario/provider/feature-size matrix | none |
 | OPS-09 | Operator / SRE | MVP+ | Inspect policy and audit guardrails for run controls. | covered | W6-S03 run-control audit guardrails | none |
 | OPS-10 | Operator / SRE | Later | Use richer event, policy, and production observability views. | covered | W8-S04 operator visibility, W19-S06 planner metrics projection, W20-S02 redacted production transport/event baseline, W20-S05 finance monitoring projection, W21-S05 guided stage policy/event counts and finance monitoring panel | none |
@@ -98,9 +98,9 @@ Coverage status values:
 | INC-04 | Incident / improvement owner | MVP+ | Use controlled re-enable after recertification. | covered | W7-S03 controlled re-enable flow | none |
 | INC-05 | Incident / improvement owner | MVP+ | Backfill incidents into datasets and suites. | covered | `incident backfill`, `incident-backfill-proposal`, proposal-only mutation policy, W19-S04 | none |
 | INC-06 | Incident / improvement owner | Later | Close the production feedback loop into monitoring and learning. | covered | W8-S06 incident maturity, `finance-monitoring-snapshot.monitoring_loop.evidence_classes`, `aor finance monitor`, W20-S05 | none |
-| PBO-01 | Project bootstrap / onboarding | MVP | Run project analysis. | covered | `project analyze`, W1-S03 | none |
-| PBO-02 | Project bootstrap / onboarding | MVP | Run deterministic project validation. | covered | `project validate`, W1-S04 | none |
-| PBO-03 | Project bootstrap / onboarding | MVP | Run bounded project verification. | covered | `project verify`, W1-S05 | none |
+| PBO-01 | Project bootstrap / onboarding | MVP | Run project analysis. | covered | `project analyze`, W1-S03, W21-S07 guided proof transcript from clean installed-user onboarding to analysis | none |
+| PBO-02 | Project bootstrap / onboarding | MVP | Run deterministic project validation. | covered | `project validate`, W1-S04, W21-S07 guided proof transcript after mission intake | none |
+| PBO-03 | Project bootstrap / onboarding | MVP | Run bounded project verification. | covered | `project verify`, W1-S05, W21-S07 preflight and post-run verification evidence | none |
 | PBO-04 | Project bootstrap / onboarding | MVP | Materialize project-analysis reports with boundaries and risk zones. | covered | project-analysis reports, W1-S03 | none |
 | PBO-05 | Project bootstrap / onboarding | MVP | Block execution when prerequisites are missing. | covered | verify/preflight reports, W1-S05 | none |
 | PBO-06 | Project bootstrap / onboarding | MVP+ | Recommend missing AOR-native runtime context assets. | covered | W6-S02, W8-S08, W8-S09 | none |

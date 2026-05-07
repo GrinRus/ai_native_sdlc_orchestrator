@@ -1,0 +1,81 @@
+{
+  "proof_id": "w21-s07.installed-user-guided-journey.v1",
+  "run_id": "w21-s07.installed-user-guided",
+  "profile_id": "live-e2e.installed-user.guided-journey",
+  "status": "pass",
+  "command_labels": [
+    "guided-doctor",
+    "guided-onboard",
+    "guided-app",
+    "guided-next-before-mission",
+    "project-init",
+    "mission-create",
+    "guided-next-after-mission",
+    "project-analyze",
+    "project-validate",
+    "project-verify-preflight",
+    "discovery-run",
+    "spec-build",
+    "wave-create",
+    "handoff-approve",
+    "project-validate-approved-handoff",
+    "run-start",
+    "run-status",
+    "project-verify-post-run-primary",
+    "review-run",
+    "guided-next-after-review",
+    "review-decide-approve",
+    "eval-run",
+    "deliver-prepare",
+    "guided-next-after-delivery",
+    "release-prepare",
+    "audit-runs",
+    "learning-handoff",
+    "guided-next-after-learning"
+  ],
+  "command_transcript_files": [
+    ".aor/projects/aor-core/reports/live-e2e-command-traces-w21-s07/01-guided-doctor.json",
+    ".aor/projects/aor-core/reports/live-e2e-command-traces-w21-s07/02-guided-onboard.json",
+    ".aor/projects/aor-core/reports/live-e2e-command-traces-w21-s07/05-mission-create.json"
+  ],
+  "durable_artifact_files": {
+    "onboarding_report_file": ".aor/projects/local-target/reports/onboarding-report.json",
+    "mission_artifact_packet_file": ".aor/projects/local-target/artifacts/local-target.artifact.intake.local-mission.v1.json",
+    "mission_artifact_packet_body_file": ".aor/projects/local-target/artifacts/local-target.artifact.intake.local-mission.v1.body.json",
+    "next_action_report_file": ".aor/projects/local-target/reports/next-action-report.json",
+    "routed_step_result_file": ".aor/projects/local-target/reports/step-result-w21-s07.installed-user-guided.json",
+    "review_report_file": ".aor/projects/local-target/reports/review-report-w21-s07.installed-user-guided.json",
+    "review_decision_file": ".aor/projects/local-target/reports/review-decision-w21-s07.installed-user-guided-approve.json",
+    "delivery_manifest_file": ".aor/projects/local-target/reports/delivery-manifest-w21-s07.installed-user-guided.json",
+    "delivery_transcript_file": ".aor/projects/local-target/reports/delivery-transcript-w21-s07.installed-user-guided.json",
+    "release_packet_file": ".aor/projects/local-target/reports/release-packet-w21-s07.installed-user-guided.json",
+    "learning_loop_scorecard_file": ".aor/projects/local-target/reports/learning-loop-scorecard-w21-s07.installed-user-guided.json",
+    "learning_loop_handoff_file": ".aor/projects/local-target/reports/learning-loop-handoff-w21-s07.installed-user-guided.json",
+    "web_smoke_summary_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.json",
+    "web_smoke_html_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.html"
+  },
+  "web_smoke": {
+    "summary_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.json",
+    "rendered_html_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.html",
+    "guided_lifecycle_state": "ready",
+    "guided_current_stage_id": "learning",
+    "detached": true
+  },
+  "no_write_assertions": {
+    "output_policy_write_back_to_remote": true,
+    "preferred_delivery_mode": "patch-only",
+    "upstream_writes_default": false,
+    "remote_write_commands": [],
+    "target_head_before": "0000000000000000000000000000000000000000",
+    "target_head_after": "0000000000000000000000000000000000000000",
+    "target_head_unchanged": true,
+    "target_runtime_root": ".aor",
+    "runtime_state_under_aor": true,
+    "target_uncommitted_changes_without_runtime": [
+      "M src/index.js",
+      "?? project.aor.yaml"
+    ],
+    "target_committed_file_changes": [],
+    "target_aor_live_e2e_absent": true
+  }
+}

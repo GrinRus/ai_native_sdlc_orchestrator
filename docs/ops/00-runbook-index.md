@@ -8,7 +8,7 @@
 - `live-e2e-release-short.md` — short release rehearsal that still materializes a release packet.
 - `live-e2e-release-long.md` — long monorepo release rehearsal with stronger gates.
 - `live-e2e-standard-runner.md` — installed-user black-box proof runner and artifact map for catalog profiles.
-- `installed-user-first-run.md` — public guided `aor doctor`, `aor onboard`, `aor next`, and `aor app` first-run shortcuts.
+- `installed-user-first-run.md` — public guided `aor doctor`, `aor onboard`, `aor mission create`, `aor next`, `aor app`, and W21-S07 guided proof shortcuts.
 - `live-e2e-learning-loop.md` — repeatable scorecard/incident capture and backlog-quality handoff flow.
 - `live-e2e-w7-governance-closure.md` — integrated W7 governance closure rehearsal and wave-level smoke checks.
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
