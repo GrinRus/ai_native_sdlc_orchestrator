@@ -17,7 +17,7 @@ Produce the first real non-mock full-journey production proof with code-changing
 
 ## W25-S01 — Real external-runner proof profile
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Add a curated full-journey profile that uses a real external runner path rather than deterministic mock output while preserving public-repo safety.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, provider catalog tests
 - **Hard dependencies:** W24-S01, W23-S02

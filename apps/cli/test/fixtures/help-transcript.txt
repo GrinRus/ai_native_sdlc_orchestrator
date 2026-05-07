@@ -27,6 +27,7 @@ Implemented commands:
   - aor run resume
   - aor run steer
   - aor run cancel
+  - aor run answer
   - aor run status
   - aor deliver prepare
   - aor release prepare

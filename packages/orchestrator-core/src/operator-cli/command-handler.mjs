@@ -247,6 +247,8 @@ export function formatCommandHelp(definition) {
             definition.command === "run steer" ||
             definition.command === "run cancel"
           ? "Status: implemented in run-control shell (W6-S03)"
+        : definition.command === "run answer"
+          ? "Status: implemented in interactive continuation shell (W24-S02)"
         : definition.command === "run status" ||
             definition.command === "packet show" ||
             definition.command === "evidence show"
@@ -471,11 +473,17 @@ export function formatCommandHelp(definition) {
                       "- High-risk steer requires --approval-ref when policy guardrails demand approval.",
                       "- Successful steer keeps deterministic status while recording target_step intent.",
                     ]
-                  : definition.command === "run cancel"
+                : definition.command === "run cancel"
+                  ? [
+                      "- Cancel transitions only from running or paused state.",
+                      "- High-risk cancel requires --approval-ref when policy guardrails demand approval.",
+                      "- Command emits terminal control-plane event and durable control audit evidence.",
+                    ]
+                  : definition.command === "run answer"
                     ? [
-                        "- Cancel transitions only from running or paused state.",
-                        "- High-risk cancel requires --approval-ref when policy guardrails demand approval.",
-                        "- Command emits terminal control-plane event and durable control audit evidence.",
+                        "- Answer submission writes one durable answer audit artifact before any continuation state changes.",
+                        "- Raw answer text is not emitted in CLI output, live events, read models, or web snapshots.",
+                        "- If the runtime cannot resume from the recorded boundary, the command reports interaction_answer.blocked=true with a deterministic next action.",
                       ]
           : definition.command === "run status"
             ? [

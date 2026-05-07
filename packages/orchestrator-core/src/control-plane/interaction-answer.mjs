@@ -120,6 +120,80 @@ function uniqueStrings(values) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Array<Record<string, unknown>>}
+ */
+function asRecordArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
+    : [];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
+function optionalRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? /** @type {Record<string, unknown>} */ (value)
+    : null;
+}
+
+/**
+ * @param {{
+ *   status: "requested" | "answered" | "resumed" | "blocked",
+ *   timestamp: string,
+ *   summary?: string | null,
+ *   evidenceRefs?: string[],
+ *   answerAuditRefs?: string[],
+ *   continuation?: Record<string, unknown> | null,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function buildInteractionStateEntry(options) {
+  const entry = {
+    status: options.status,
+    timestamp: options.timestamp,
+    summary: options.summary ?? null,
+    evidence_refs: uniqueStrings(options.evidenceRefs ?? []),
+    answer_audit_refs: uniqueStrings(options.answerAuditRefs ?? []),
+  };
+  if (options.continuation) {
+    entry.continuation = options.continuation;
+  }
+  return entry;
+}
+
+/**
+ * @param {{
+ *   requestedInteraction: Record<string, unknown>,
+ *   timestamp: string,
+ *   questionSummary?: string | null,
+ *   questionEvidenceRefs: string[],
+ * }}
+ * @returns {Array<Record<string, unknown>>}
+ */
+function resolveExistingStateHistory(options) {
+  const existing = asRecordArray(options.requestedInteraction.state_history);
+  if (existing.length > 0) {
+    return existing;
+  }
+
+  return [
+    buildInteractionStateEntry({
+      status: "requested",
+      timestamp: options.timestamp,
+      summary: options.questionSummary ?? "Operator input requested.",
+      evidenceRefs: options.questionEvidenceRefs,
+      continuation: optionalRecord(options.requestedInteraction.continuation) ?? {
+        next_action: "resume_from_boundary",
+        reason_code: "operator-answer-required",
+      },
+    }),
+  ];
+}
+
+/**
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
@@ -170,10 +244,43 @@ export function submitInteractionAnswer(options) {
 
   const previousAnswerRefs = asStringArray(match.requestedInteraction.answer_audit_refs);
   const questionSummary = asString(match.requestedInteraction.prompt_summary) ?? asString(match.requestedInteraction.summary);
+  const questionEvidenceRefs = uniqueStrings([
+    ...asStringArray(match.requestedInteraction.question_evidence_refs),
+    ...asStringArray(match.requestedInteraction.evidence_refs),
+  ]);
   const blockedReason = {
     code: "continuation.runtime_boundary_unavailable",
     message: "Answer audit was accepted, but this runtime cannot yet resume from the recorded interaction boundary.",
   };
+  const previousHistory = resolveExistingStateHistory({
+    requestedInteraction: match.requestedInteraction,
+    timestamp,
+    questionSummary,
+    questionEvidenceRefs,
+  });
+  const answeredHistoryEntry = buildInteractionStateEntry({
+    status: "answered",
+    timestamp,
+    summary: "Operator answer audit evidence accepted.",
+    evidenceRefs: [answerAuditRef],
+    answerAuditRefs: [answerAuditRef],
+    continuation: {
+      next_action: "resume_from_boundary",
+      reason_code: "answer-accepted",
+    },
+  });
+  const blockedHistoryEntry = buildInteractionStateEntry({
+    status: "blocked",
+    timestamp,
+    summary: blockedReason.message,
+    evidenceRefs: [answerAuditRef],
+    answerAuditRefs: [answerAuditRef],
+    continuation: {
+      next_action: "remain_blocked",
+      reason_code: blockedReason.code,
+      summary: blockedReason.message,
+    },
+  });
   const requestedInteraction = {
     ...match.requestedInteraction,
     interaction_id: options.interactionId,
@@ -184,6 +291,7 @@ export function submitInteractionAnswer(options) {
       reason_code: blockedReason.code,
       summary: blockedReason.message,
     },
+    state_history: [...previousHistory, answeredHistoryEntry, blockedHistoryEntry],
   };
   const nextDocument = {
     ...match.document,
@@ -217,11 +325,38 @@ export function submitInteractionAnswer(options) {
     payload: {
       interaction: {
         interaction_id: options.interactionId,
+        status: "answered",
+        step_result_ref: match.artifactRef,
+        question_summary: questionSummary,
+        answer_required: false,
+        answer_audit_refs: [answerAuditRef],
+        continuation: {
+          next_action: "resume_from_boundary",
+          reason_code: "answer-accepted",
+        },
+      },
+      summary: "Operator answer audit evidence accepted.",
+    },
+  });
+  const blockedEvent = appendRunEvent({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    runtimeRoot: options.runtimeRoot,
+    redactionPolicy: options.redactionPolicy,
+    runId: options.runId,
+    eventType: "step.updated",
+    payload: {
+      interaction: {
+        interaction_id: options.interactionId,
         status: "blocked",
         step_result_ref: match.artifactRef,
         question_summary: questionSummary,
         answer_required: false,
         answer_audit_refs: [answerAuditRef],
+        continuation: {
+          next_action: "remain_blocked",
+          reason_code: blockedReason.code,
+        },
       },
       summary: blockedReason.message,
     },
@@ -243,6 +378,10 @@ export function submitInteractionAnswer(options) {
   });
 
   return {
+    projectRoot: init.projectRoot,
+    runtimeRoot: init.runtimeRoot,
+    runtimeLayout: init.runtimeLayout,
+    projectProfileRef: init.projectProfileRef,
     runId: options.runId,
     interactionId: options.interactionId,
     interactionStatus: "blocked",
@@ -256,6 +395,7 @@ export function submitInteractionAnswer(options) {
     blockedReason,
     evidenceEvent: evidenceEvent.event,
     stepEvent: stepEvent.event,
+    blockedEvent: blockedEvent.event,
     warningEvent: warningEvent.event,
     streamLogFile: warningEvent.logFile,
   };

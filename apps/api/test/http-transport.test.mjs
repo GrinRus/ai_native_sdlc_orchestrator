@@ -25,7 +25,17 @@ async function withTempRepo(callback) {
  * @param {{ timeoutMs?: number }} [options]
  */
 async function readNextLiveRunEvent(response, options = {}) {
+  const events = await readLiveRunEvents(response, { ...options, count: 1 });
+  return events[0];
+}
+
+/**
+ * @param {Response} response
+ * @param {{ timeoutMs?: number, count?: number }} [options]
+ */
+async function readLiveRunEvents(response, options = {}) {
   const timeoutMs = options.timeoutMs ?? 3000;
+  const count = options.count ?? 1;
   if (!response.body) {
     throw new Error("SSE response body is missing.");
   }
@@ -34,44 +44,52 @@ async function readNextLiveRunEvent(response, options = {}) {
   const decoder = new TextDecoder();
   let buffer = "";
   const timeoutAt = Date.now() + timeoutMs;
+  const events = [];
 
-  while (Date.now() < timeoutAt) {
-    const remaining = timeoutAt - Date.now();
-    const readResult = await Promise.race([
-      reader.read(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timed out waiting for SSE event")), remaining)),
-    ]);
+  try {
+    while (Date.now() < timeoutAt && events.length < count) {
+      const remaining = timeoutAt - Date.now();
+      const readResult = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timed out waiting for SSE event")), remaining)),
+      ]);
 
-    if (readResult.done) {
-      break;
-    }
+      if (readResult.done) {
+        break;
+      }
 
-    buffer += decoder.decode(readResult.value, { stream: true });
+      buffer += decoder.decode(readResult.value, { stream: true });
 
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      const block = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      boundary = buffer.indexOf("\n\n");
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary >= 0) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        boundary = buffer.indexOf("\n\n");
 
-      const normalized = block.replace(/\r/g, "");
-      const lines = normalized.split("\n");
-      let event = "message";
-      let data = "";
-      for (const line of lines) {
-        if (line.startsWith("event:")) {
-          event = line.slice(6).trim();
-        } else if (line.startsWith("data:")) {
-          data = data.length > 0 ? `${data}\n${line.slice(5).trimStart()}` : line.slice(5).trimStart();
+        const normalized = block.replace(/\r/g, "");
+        const lines = normalized.split("\n");
+        let event = "message";
+        let data = "";
+        for (const line of lines) {
+          if (line.startsWith("event:")) {
+            event = line.slice(6).trim();
+          } else if (line.startsWith("data:")) {
+            data = data.length > 0 ? `${data}\n${line.slice(5).trimStart()}` : line.slice(5).trimStart();
+          }
+        }
+
+        if (event !== "live-run-event" || data.length === 0) {
+          continue;
+        }
+
+        events.push(JSON.parse(data));
+        if (events.length >= count) {
+          return events;
         }
       }
-
-      if (event !== "live-run-event" || data.length === 0) {
-        continue;
-      }
-
-      return JSON.parse(data);
     }
+  } finally {
+    await reader.cancel().catch(() => {});
   }
 
   throw new Error("timed out waiting for live-run-event payload");
@@ -671,11 +689,25 @@ test("detached control-plane transport records interactive continuation answers 
               requested: true,
               interaction_id: interactionId,
               status: "requested",
-              summary: "Choose the deployment target.",
-              evidence_refs: ["evidence://reports/runner-question.json"],
+              prompt_summary: "Choose the deployment target.",
+              question_evidence_refs: ["evidence://reports/runner-question.json"],
+              answer_audit_refs: [],
               continuation: {
                 next_action: "resume_from_boundary",
+                reason_code: "operator-answer-required",
               },
+              state_history: [
+                {
+                  status: "requested",
+                  timestamp: "2026-05-07T00:00:00.000Z",
+                  summary: "Choose the deployment target.",
+                  evidence_refs: ["evidence://reports/runner-question.json"],
+                  continuation: {
+                    next_action: "resume_from_boundary",
+                    reason_code: "operator-answer-required",
+                  },
+                },
+              ],
             },
           },
           null,
@@ -706,7 +738,13 @@ test("detached control-plane transport records interactive continuation answers 
       assert.equal(auditRecord.answer_text, answerText);
 
       const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
+      assert.equal(JSON.stringify(updatedStepResult).includes(answerText), false);
       assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+      assert.deepEqual(
+        updatedStepResult.requested_interaction.state_history.map((entry) => entry.status),
+        ["requested", "answered", "blocked"],
+      );
+      assert.equal(updatedStepResult.requested_interaction.continuation.next_action, "remain_blocked");
       assert.ok(updatedStepResult.requested_interaction.answer_audit_refs.includes(answerPayload.interaction_answer.answer_audit_ref));
       assert.ok(updatedStepResult.evidence_refs.includes(answerPayload.interaction_answer.answer_audit_ref));
 
@@ -717,6 +755,24 @@ test("detached control-plane transport records interactive continuation answers 
       const historyPayload = await historyResponse.json();
       assert.equal(JSON.stringify(historyPayload).includes(answerText), false);
       assert.equal(JSON.stringify(historyPayload).includes(answerPayload.interaction_answer.answer_audit_ref), true);
+
+      const streamResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events?max_replay=10`,
+        {
+          headers: {
+            accept: "text/event-stream",
+          },
+        },
+      );
+      assert.equal(streamResponse.status, 200);
+      const streamedEvents = await readLiveRunEvents(streamResponse, { count: 3, timeoutMs: 3000 });
+      assert.equal(JSON.stringify(streamedEvents).includes(answerText), false);
+      assert.deepEqual(
+        streamedEvents
+          .map((event) => event.interaction?.status)
+          .filter((status) => typeof status === "string"),
+        ["answered", "blocked"],
+      );
     } finally {
       await transport.close();
     }

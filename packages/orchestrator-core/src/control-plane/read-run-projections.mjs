@@ -856,6 +856,7 @@ export function readRunEventHistory(options) {
     const payload = asRecord(event.payload);
     const policyContext = asRecord(payload.policy_context);
     const interaction = asRecord(payload.interaction);
+    const continuation = asRecord(interaction.continuation);
     return {
       event_id: asString(event.event_id) ?? "",
       timestamp: asString(event.timestamp) ?? null,
@@ -877,6 +878,13 @@ export function readRunEventHistory(options) {
               question_summary: asString(interaction.question_summary),
               answer_required: asBoolean(interaction.answer_required),
               answer_audit_refs: asStringArray(interaction.answer_audit_refs),
+              continuation:
+                Object.keys(continuation).length > 0
+                  ? {
+                      next_action: asString(continuation.next_action),
+                      reason_code: asString(continuation.reason_code),
+                    }
+                  : null,
             }
           : null,
       policy_context:

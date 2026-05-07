@@ -1,5 +1,6 @@
 import {
   CliUsageError,
+  InteractionAnswerError,
   applyRunControlAction,
   appendRunEvent,
   attachUiLifecycle,
@@ -37,6 +38,7 @@ import {
   materializeIntakeArtifactPacket,
   materializeReviewReport,
   executeRuntimeHarnessRun,
+  submitInteractionAnswer,
   ensureRequiredFlags,
   resolveOptionalStringFlag,
   resolveOptionalBooleanFlag,
@@ -75,6 +77,7 @@ export const RUN_CONTROL_COMMANDS = Object.freeze([
   "run resume",
   "run steer",
   "run cancel",
+  "run answer",
   "run status",
   "ui attach",
   "ui detach"
@@ -204,6 +207,30 @@ export function handleRunControlCommand(context) {
         stepResultFile: routedExecution.stepResultPath,
       });
 
+      const requestedInteraction = asPlainObject(routedExecution.stepResult.requested_interaction);
+      const interactionStatus =
+        typeof requestedInteraction.status === "string" && requestedInteraction.status.trim().length > 0
+          ? requestedInteraction.status.trim()
+          : "requested";
+      const interactionPayload =
+        requestedInteraction.requested === true
+          ? {
+              interaction_id:
+                typeof requestedInteraction.interaction_id === "string" ? requestedInteraction.interaction_id : null,
+              status: interactionStatus,
+              step_result_ref: toEvidenceRef(controlResult.projectRoot, routedExecution.stepResultPath),
+              question_summary:
+                typeof requestedInteraction.prompt_summary === "string"
+                  ? requestedInteraction.prompt_summary
+                  : typeof requestedInteraction.summary === "string"
+                    ? requestedInteraction.summary
+                    : null,
+              answer_required: interactionStatus === "requested",
+              answer_audit_refs: asStringArray(requestedInteraction.answer_audit_refs),
+              continuation: asPlainObject(requestedInteraction.continuation),
+            }
+          : null;
+
       const stepEvent = appendRunEvent({
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
@@ -215,6 +242,7 @@ export function handleRunControlCommand(context) {
           status: routedExecution.stepResult.status,
           summary: routedExecution.stepResult.summary,
           step_result_ref: toEvidenceRef(controlResult.projectRoot, routedExecution.stepResultPath),
+          ...(interactionPayload ? { interaction: interactionPayload } : {}),
         },
       });
       const terminalEvent = appendRunEvent({
@@ -251,6 +279,61 @@ export function handleRunControlCommand(context) {
               `review run --run-id ${controlResult.runId}`,
               `audit runs --run-id ${controlResult.runId}`,
             ];
+    }
+  } else if (command === "run answer") {
+    ensureRequiredFlags(command, flags);
+    const answerEvidenceRef = resolveOptionalStringFlag("answer-evidence-ref", flags["answer-evidence-ref"]);
+    const answer =
+      flags.answer === undefined ? "" : (resolveOptionalStringFlag("answer", flags.answer) ?? "");
+    if (answer.length === 0 && !answerEvidenceRef) {
+      throw new CliUsageError("Flag '--answer' is required unless '--answer-evidence-ref' points to durable evidence.");
+    }
+
+    try {
+      const answerResult = submitInteractionAnswer({
+        cwd,
+        projectRef: /** @type {string} */ (flags["project-ref"]),
+        runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        runId: /** @type {string} */ (resolveOptionalStringFlag("run-id", flags["run-id"])),
+        interactionId: /** @type {string} */ (resolveOptionalStringFlag("interaction-id", flags["interaction-id"])),
+        answer,
+        reason: resolveOptionalStringFlag("reason", flags.reason),
+        approvalRef: resolveOptionalStringFlag("approval-ref", flags["approval-ref"]),
+        answerEvidenceRef,
+      });
+
+      outputState.resolvedProjectRef = answerResult.projectRoot;
+      outputState.resolvedRuntimeRoot = answerResult.runtimeRoot;
+      outputState.runtimeLayout = answerResult.runtimeLayout;
+      outputState.projectProfileRef = answerResult.projectProfileRef;
+      outputState.interactionAnswer = {
+        run_id: answerResult.runId,
+        interaction_id: answerResult.interactionId,
+        interaction_status: answerResult.interactionStatus,
+        answer_accepted: answerResult.answerAccepted,
+        answer_audit_file: answerResult.answerAuditFile,
+        answer_audit_ref: answerResult.answerAuditRef,
+        step_result_file: answerResult.stepResultFile,
+        step_result_ref: answerResult.stepResultRef,
+        run_control_transition: answerResult.runControlTransition,
+        blocked: answerResult.blocked,
+        blocked_reason: answerResult.blockedReason,
+        evidence_event_id: answerResult.evidenceEvent.event_id,
+        step_event_id: answerResult.stepEvent.event_id,
+        blocked_event_id: answerResult.blockedEvent?.event_id ?? null,
+        warning_event_id: answerResult.warningEvent.event_id,
+        stream_log_file: answerResult.streamLogFile,
+      };
+      outputState.streamLogFile = answerResult.streamLogFile;
+      outputState.readOnly = false;
+      outputState.futureControlHooks = answerResult.blocked
+        ? [`incident open --run-id ${answerResult.runId} --summary <text>`, `run status --run-id ${answerResult.runId}`]
+        : [`run status --run-id ${answerResult.runId}`, `review run --run-id ${answerResult.runId}`];
+    } catch (error) {
+      if (error instanceof InteractionAnswerError) {
+        throw new CliUsageError(error.message);
+      }
+      throw error;
     }
   } else if (command === "run status") {
     ensureRequiredFlags(command, flags);
@@ -345,7 +428,7 @@ export function handleRunControlCommand(context) {
     }
 
     outputState.readOnly = true;
-    outputState.futureControlHooks = ["run start", "run pause", "run resume", "run steer", "run cancel"];
+    outputState.futureControlHooks = ["run start", "run pause", "run resume", "run steer", "run cancel", "run answer"];
 
   } else if (command === "ui attach") {
     ensureRequiredFlags(command, flags);

@@ -149,6 +149,7 @@ interactive_continuation:
       - step_result_ref
       - run_control_transition
       - blocked_reason
+      - blocked_event_id
     blocked_http_status: 409
   audit_behavior:
     raw_answer_storage: durable-audit-evidence-only

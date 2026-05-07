@@ -47,7 +47,7 @@ Move from step-level harness strength to run-level Runtime Harness ownership for
 
 ## W24-S02 — Interactive continuation hardening
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** done
 - **Outcome:** Harden requested-interaction handling so requested, answered, resumed, and blocked states have audit refs and raw answers are not streamed.
 - **Primary modules:** `docs/contracts/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests
 - **Hard dependencies:** W24-S01, W23-S02
@@ -77,7 +77,7 @@ Move from step-level harness strength to run-level Runtime Harness ownership for
 
 ## W24-S03 — Strict delivery gate consolidation
 - **Epic:** EPIC-5 Delivery and release
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Consolidate strict delivery gates so code-changing delivery requires current run-level harness pass evidence and meaningful mission-scoped changed paths.
 - **Primary modules:** `packages/orchestrator-core/**`, `apps/cli/**`, `docs/contracts/**`, delivery tests
 - **Hard dependencies:** W24-S01, W23-S01

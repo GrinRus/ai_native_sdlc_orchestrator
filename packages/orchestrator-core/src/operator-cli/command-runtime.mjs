@@ -29,6 +29,10 @@ export {
   readRunControlState,
 } from "../control-plane/run-control.mjs";
 export {
+  InteractionAnswerError,
+  submitInteractionAnswer,
+} from "../control-plane/interaction-answer.mjs";
+export {
   attachUiLifecycle,
   detachUiLifecycle,
   readUiLifecycleState,

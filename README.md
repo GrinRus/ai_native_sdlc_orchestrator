@@ -135,13 +135,13 @@ At a high level, AOR is intended to work like this:
 
 ## Command surface status
 
-The CLI command surface currently includes **43 implemented** commands and **0 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
+The CLI command surface currently includes **44 implemented** commands and **0 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
 
 Implemented command groups:
 - guided first-run: `doctor`, `onboard`, `app`, `next`;
 - project lifecycle: `project init`, `project analyze`, `project validate`, `project verify`;
 - intake/discovery/spec/wave: `intake create`, `discovery run`, `spec build`, `wave create`;
-- run control and monitoring: `run start`, `run pause`, `run resume`, `run steer`, `run cancel`, `run status`;
+- run control and monitoring: `run start`, `run pause`, `run resume`, `run steer`, `run cancel`, `run answer`, `run status`;
 - quality and handoff: `eval run`, `harness replay`, `harness certify`, `asset promote`, `asset freeze`, `compiler revision`, `handoff prepare`, `handoff approve`;
 - delivery/release and operator reads: `deliver prepare`, `release prepare`, `multirepo lock`, `packet show`, `evidence show`;
 - incidents and audit: `incident open`, `incident backfill`, `incident recertify`, `incident show`, `audit runs`;

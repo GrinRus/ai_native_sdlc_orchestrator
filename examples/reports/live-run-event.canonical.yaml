@@ -7,9 +7,13 @@ payload:
   status: waiting-for-operator
   summary: Interaction answer accepted and the run can resume.
   interaction:
+    interaction_id: interaction.canonical.1
     status: answered
     step_result_ref: evidence://contracts/w23-s01/step-result
     question_summary: Operator confirmed the safe continuation boundary.
     answer_required: false
     answer_audit_refs:
       - evidence://contracts/w23-s01/interaction-answer-audit
+    continuation:
+      next_action: resume_from_boundary
+      reason_code: answer-accepted

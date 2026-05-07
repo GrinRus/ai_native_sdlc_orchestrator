@@ -239,13 +239,13 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W24-S01 | Run-level Runtime Harness controller | EPIC-4 | done | `packages/orchestrator-core/**`, `packages/harness/**`, `packages/observability/**`, `apps/cli/**`, tests | W23-S01, W23-S03 |
-| W24-S02 | Interactive continuation hardening | EPIC-6 | blocked | `docs/contracts/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W24-S01, W23-S02 |
-| W24-S03 | Strict delivery gate consolidation | EPIC-5 | blocked | `packages/orchestrator-core/**`, `apps/cli/**`, `docs/contracts/**`, delivery tests | W24-S01, W23-S01 |
+| W24-S02 | Interactive continuation hardening | EPIC-6 | done | `docs/contracts/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W24-S01, W23-S02 |
+| W24-S03 | Strict delivery gate consolidation | EPIC-5 | ready | `packages/orchestrator-core/**`, `apps/cli/**`, `docs/contracts/**`, delivery tests | W24-S01, W23-S01 |
 
 ## W25 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W25-S01 | Real external-runner proof profile | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, provider catalog tests | W24-S01, W23-S02 |
+| W25-S01 | Real external-runner proof profile | EPIC-7 | ready | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, provider catalog tests | W24-S01, W23-S02 |
 | W25-S02 | Code-changing full-journey pass | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**` | W25-S01, W24-S03 |
 | W25-S03 | Proof fixture and story upgrade | EPIC-7 | blocked | `examples/live-e2e/**`, `docs/product/**`, `scripts/test.mjs`, `docs/ops/**` | W25-S02, W22-S01 |
 

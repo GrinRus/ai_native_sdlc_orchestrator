@@ -766,6 +766,28 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
     "unsupported_field_present",
     "requested_interaction.answer_text",
   );
+  const invalidInteractionHistory = structuredClone(stepResult.document);
+  invalidInteractionHistory.requested_interaction.state_history[0].status = "waiting";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "step-result",
+      document: invalidInteractionHistory,
+      source: "test://w24-step-result-invalid-interaction-state-history",
+    }),
+    "enum_value_invalid",
+    "requested_interaction.state_history[0].status",
+  );
+  const invalidInteractionHistoryAnswer = structuredClone(stepResult.document);
+  invalidInteractionHistoryAnswer.requested_interaction.state_history[0].answer_text = "sensitive answer";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "step-result",
+      document: invalidInteractionHistoryAnswer,
+      source: "test://w24-step-result-state-history-raw-answer",
+    }),
+    "unsupported_field_present",
+    "requested_interaction.state_history[0].answer_text",
+  );
 
   const validationReport = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/validation-report.canonical.yaml"),
@@ -816,6 +838,17 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
     }),
     "field_type_mismatch",
     "payload.sequence",
+  );
+  const invalidLiveRunEventContinuation = structuredClone(liveRunEvent.document);
+  delete invalidLiveRunEventContinuation.payload.interaction.continuation.next_action;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-run-event",
+      document: invalidLiveRunEventContinuation,
+      source: "test://w24-live-run-event-invalid-continuation",
+    }),
+    "required_field_missing",
+    "payload.interaction.continuation.next_action",
   );
 
   const incidentReport = loadContractFile({

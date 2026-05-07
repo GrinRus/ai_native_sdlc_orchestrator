@@ -131,6 +131,7 @@ HTTP interactive answer mutation baseline:
 - response payloads return `{ interaction_answer }` with `interaction_id`, `interaction_status`, `answer_audit_ref`, `step_result_ref`, `run_control_transition`, `blocked_reason`, and live event ids;
 - when the current runtime cannot resume from the recorded interaction boundary, the transport returns HTTP `409` with `error.code=interaction.continuation_blocked` and keeps the run blocked with evidence refs;
 - live events and query payloads must reference `answer_audit_ref` and must not include the raw answer text.
+- CLI, API, and web surfaces expose the same query-safe answer result; raw answer text is allowed only in the durable answer audit artifact, never in command output, read models, SSE payloads, or web snapshots.
 
 ## Read surface baseline (module operations)
 
@@ -188,6 +189,7 @@ Interactive continuation target (W18-S01):
 - continuation should either resume the bounded run from the recorded interaction boundary or remain blocked with explicit evidence refs and reason codes;
 - live event payloads should reference `requested_interaction` and `answer_audit_ref` without exposing raw answer text;
 - web clients may present and submit the interaction, but the control plane remains responsible for validation, audit, and run-state transitions.
+- the persisted `requested_interaction.state_history[]` ledger should preserve requested, answered, resumed, and blocked transitions with audit refs so clients can render the latest state without replaying raw logs.
 
 Answer validation baseline for W18:
 - the referenced `interaction_id` must match the latest unresolved run-linked `requested_interaction`;

@@ -536,6 +536,92 @@ function validateStepResult(document, source) {
         required: false,
       });
     }
+
+    const stateHistory = validateOptionalArrayField({
+      record: requestedInteraction,
+      source,
+      field: "requested_interaction.state_history",
+      issues,
+    });
+    if (stateHistory) {
+      stateHistory.forEach((entry, index) => {
+        const entryField = `requested_interaction.state_history[${index}]`;
+        if (!isPlainObject(entry)) {
+          issues.push(
+            issue({
+              code: "field_type_mismatch",
+              source,
+              field: entryField,
+              expected: "object",
+              actual: describeActualType(entry),
+              message: `Field '${entryField}' must be 'object'.`,
+            }),
+          );
+          return;
+        }
+
+        validateNestedEnumStringField({
+          record: entry,
+          source,
+          field: `${entryField}.status`,
+          allowedValues: INTERACTION_STATUS_VALUES,
+          issues,
+          required: true,
+        });
+        validateNestedStringField({
+          record: entry,
+          source,
+          field: `${entryField}.timestamp`,
+          issues,
+          required: false,
+        });
+        validateNestedStringField({
+          record: entry,
+          source,
+          field: `${entryField}.summary`,
+          issues,
+          required: false,
+        });
+        for (const field of ["evidence_refs", "answer_audit_refs"]) {
+          validateOptionalStringArrayField({
+            record: entry,
+            source,
+            field: `${entryField}.${field}`,
+            issues,
+          });
+        }
+        validateUnsupportedNestedFields({
+          record: entry,
+          source,
+          parentField: entryField,
+          fields: ["answer", "answer_text", "raw_answer"],
+          issues,
+        });
+
+        const entryContinuation = validateOptionalObjectField({
+          record: entry,
+          source,
+          field: `${entryField}.continuation`,
+          issues,
+        });
+        if (entryContinuation) {
+          validateNestedStringField({
+            record: entryContinuation,
+            source,
+            field: `${entryField}.continuation.next_action`,
+            issues,
+            required: true,
+          });
+          validateNestedStringField({
+            record: entryContinuation,
+            source,
+            field: `${entryField}.continuation.reason_code`,
+            issues,
+            required: false,
+          });
+        }
+      });
+    }
   }
 
   const externalRunner = validateOptionalObjectField({
@@ -1078,6 +1164,28 @@ function validateLiveRunEvent(document, source) {
       field: "payload.interaction.answer_audit_refs",
       issues,
     });
+    const continuation = validateOptionalObjectField({
+      record: interaction,
+      source,
+      field: "payload.interaction.continuation",
+      issues,
+    });
+    if (continuation) {
+      validateNestedStringField({
+        record: continuation,
+        source,
+        field: "payload.interaction.continuation.next_action",
+        issues,
+        required: true,
+      });
+      validateNestedStringField({
+        record: continuation,
+        source,
+        field: "payload.interaction.continuation.reason_code",
+        issues,
+        required: false,
+      });
+    }
     validateUnsupportedNestedFields({
       record: interaction,
       source,

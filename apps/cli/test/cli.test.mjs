@@ -87,6 +87,55 @@ function writeRuntimeJson(filePath, document) {
   fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
 }
 
+/**
+ * @param {string} projectRoot
+ * @param {string} runId
+ * @param {string} interactionId
+ * @returns {string}
+ */
+function seedCliRequestedInteraction(projectRoot, runId, interactionId) {
+  fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+  const initResult = invokeCli(["project", "init", "--project-ref", projectRoot]);
+  assert.equal(initResult.exitCode, 0, initResult.stderr);
+  const initPayload = JSON.parse(initResult.stdout);
+  const reportsRoot = initPayload.runtime_layout.reportsRoot;
+  const stepResultFile = path.join(reportsRoot, "step-result-cli-interaction-question.json");
+  writeRuntimeJson(stepResultFile, {
+    step_result_id: `${runId}.cli.runner.question`,
+    run_id: runId,
+    step_id: "runner.implement",
+    step_class: "runner",
+    status: "failed",
+    summary: "Runner requested operator input.",
+    evidence_refs: ["evidence://reports/cli-runner-question.json"],
+    requested_interaction: {
+      requested: true,
+      interaction_id: interactionId,
+      status: "requested",
+      prompt_summary: "Select the operator-approved target.",
+      question_evidence_refs: ["evidence://reports/cli-runner-question.json"],
+      answer_audit_refs: [],
+      continuation: {
+        next_action: "resume_from_boundary",
+        reason_code: "operator-answer-required",
+      },
+      state_history: [
+        {
+          status: "requested",
+          timestamp: "2026-05-07T00:00:00.000Z",
+          summary: "Select the operator-approved target.",
+          evidence_refs: ["evidence://reports/cli-runner-question.json"],
+          continuation: {
+            next_action: "resume_from_boundary",
+            reason_code: "operator-answer-required",
+          },
+        },
+      ],
+    },
+  });
+  return stepResultFile;
+}
+
 test("CLI output redacts configured secret values while preserving non-secret policy flags", () => {
   const previous = process.env.AOR_REDACTION_SECRETS;
   process.env.AOR_REDACTION_SECRETS = "cli-secret-token";
@@ -1135,6 +1184,65 @@ test("W6 run-control command pack enforces guardrails, transitions, and durable 
       },
     };
     assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("CLI run answer writes audit refs and keeps raw answer out of command and follow output", () => {
+  withTempProject((projectRoot) => {
+    const runId = "run.cli.interaction.answer.v1";
+    const interactionId = "cli-question-1";
+    const stepResultFile = seedCliRequestedInteraction(projectRoot, runId, interactionId);
+    const answerText = "Use staging via CLI.";
+
+    const answerResult = invokeCli([
+      "run",
+      "answer",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+      "--interaction-id",
+      interactionId,
+      "--answer",
+      answerText,
+      "--reason",
+      "operator selected safe target",
+    ]);
+    assert.equal(answerResult.exitCode, 0, answerResult.stderr);
+    assert.equal(answerResult.stdout.includes(answerText), false);
+    const answerPayload = JSON.parse(answerResult.stdout);
+    assert.equal(answerPayload.interaction_answer.interaction_status, "blocked");
+    assert.equal(answerPayload.interaction_answer.answer_accepted, true);
+    assert.equal(answerPayload.interaction_answer.blocked_reason.code, "continuation.runtime_boundary_unavailable");
+    assert.equal(fs.existsSync(answerPayload.interaction_answer.answer_audit_file), true);
+
+    const auditRecord = JSON.parse(fs.readFileSync(answerPayload.interaction_answer.answer_audit_file, "utf8"));
+    assert.equal(auditRecord.answer_text, answerText);
+
+    const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
+    assert.equal(JSON.stringify(updatedStepResult).includes(answerText), false);
+    assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+    assert.deepEqual(
+      updatedStepResult.requested_interaction.state_history.map((entry) => entry.status),
+      ["requested", "answered", "blocked"],
+    );
+
+    const followResult = invokeCli([
+      "run",
+      "status",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+      "--follow",
+      "true",
+      "--max-replay",
+      "10",
+    ]);
+    assert.equal(followResult.exitCode, 0, followResult.stderr);
+    assert.equal(followResult.stdout.includes(answerText), false);
+    const followPayload = JSON.parse(followResult.stdout);
+    assert.equal(JSON.stringify(followPayload.replay_events).includes(answerPayload.interaction_answer.answer_audit_ref), true);
   });
 });
 

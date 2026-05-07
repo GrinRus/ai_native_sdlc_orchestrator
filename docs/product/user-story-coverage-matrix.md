@@ -8,7 +8,7 @@ Coverage status values:
 - `partial` - current implementation covers part of the outcome, but a backlog slice owns the missing behavior, hardening, or proof evidence.
 - `blocked` - the outcome cannot be closed honestly until a named prerequisite or real proof slice lands.
 
-Current W24-S01 status counts: `baseline-covered=76`, `proof-covered=0`, `partial=33`, `blocked=3`.
+Current W24-S02 status counts: `baseline-covered=79`, `proof-covered=0`, `partial=30`, `blocked=3`.
 
 | Story ID | Role cluster | Tier | Outcome | Coverage status | Evidence | Gap slice |
 |---|---|---|---|---|---|---|
@@ -38,7 +38,7 @@ Current W24-S01 status counts: `baseline-covered=76`, `proof-covered=0`, `partia
 | ARC-08 | Architect / tech lead | Later | Maintain later architecture maturity and ADR traceability. | partial | W8-S02 architecture maturity pack, W19-S03 discovery research ADR-ready recommendations. Baseline evidence only; production-strength gap owned by W26-S03. | W26-S03 |
 | EMP-01 | Engineering manager / planner | MVP | Convert approved scope into wave tickets and handoff packets. | baseline-covered | `wave create`, `handoff prepare`, W1-S07 handoff foundation | none |
 | EMP-02 | Engineering manager / planner | MVP | Split work into bounded implementation steps. | baseline-covered | wave tickets, run-control command pack, W19-S06 decomposition-quality visibility metrics, W21-S04 deterministic next-action stages, and W24-S01 run-level Runtime Harness transition ledger. | none |
-| EMP-03 | Engineering manager / planner | MVP | Coordinate sequential or parallel execution steps. | partial | route policies, run-control command pack, W19-S06 scheduler visibility metrics, W21-S04 active-run and next-stage resolver. Baseline evidence only; production-strength gap owned by W24-S02. | W24-S02 |
+| EMP-03 | Engineering manager / planner | MVP | Coordinate sequential or parallel execution steps. | baseline-covered | route policies, run-control command pack, W19-S06 scheduler visibility metrics, W21-S04 active-run and next-stage resolver, W24-S02 audited continuation answer/block semantics through CLI/API/web. | none |
 | EMP-04 | Engineering manager / planner | MVP | Manage budgets during execution. | baseline-covered | step policies, budgets, W2-S03, W6-S03 | none |
 | EMP-05 | Engineering manager / planner | MVP | Pause, resume, and cancel active runs. | baseline-covered | `run pause`, `run resume`, `run cancel`, W6-S03 | none |
 | EMP-06 | Engineering manager / planner | MVP | Steer bounded execution with policy and audit traceability. | baseline-covered | `run steer`, audit records, W6-S03 | none |
@@ -75,7 +75,7 @@ Current W24-S01 status counts: `baseline-covered=76`, `proof-covered=0`, `partia
 | OPS-01 | Operator / SRE | MVP | Watch live run state in CLI or web. | baseline-covered | `run status`, API read surface, web console, W5 | none |
 | OPS-02 | Operator / SRE | MVP | Tail logs and inspect live events. | baseline-covered | live event stream, `evidence show`, W5-S02 | none |
 | OPS-03 | Operator / SRE | MVP | Inspect policy and compile decisions. | baseline-covered | W8-S04 policy visibility, compiled context evidence | none |
-| OPS-04 | Operator / SRE | MVP | Approve risky actions with durable evidence. | partial | handoff approve, review reports, `review-decision`, audit records, W19-S05, W21-S06 web `safety_gates` and CLI/API `next_action_closure_state` for hold/repair/approval branches, W23-S02 explicit production auth scopes before mutation handlers. Baseline evidence only; remaining production-strength continuation gap owned by W24-S02. | W24-S02 |
+| OPS-04 | Operator / SRE | MVP | Approve risky actions with durable evidence. | baseline-covered | handoff approve, review reports, `review-decision`, audit records, W19-S05, W21-S06 web `safety_gates` and CLI/API `next_action_closure_state` for hold/repair/approval branches, W23-S02 explicit production auth scopes before mutation handlers, W24-S02 answer audit refs and deterministic continuation blocking. | none |
 | OPS-05 | Operator / SRE | MVP | Replay failures through the Runtime Harness. | baseline-covered | `harness replay`, W9-S05 | none |
 | OPS-06 | Operator / SRE | MVP | Review installed-user black-box proof evidence. | partial | W12 proof runner, W14 proof bundles, W21-S07 guided proof summary with CLI transcripts, web smoke evidence, and no-write assertions. Baseline evidence only; production-strength gap owned by W25-S01. | W25-S01 |
 | OPS-07 | Operator / SRE | MVP | Run curated full-journey live acceptance on real repositories. | blocked | W14/W21 provide installed-user and catalog-backed coverage with findings; no real non-mock code-changing full-journey pass exists yet. | W25-S02, W25-S03 |
@@ -83,7 +83,7 @@ Current W24-S01 status counts: `baseline-covered=76`, `proof-covered=0`, `partia
 | OPS-09 | Operator / SRE | MVP+ | Inspect policy and audit guardrails for run controls. | baseline-covered | W6-S03 run-control audit guardrails | none |
 | OPS-10 | Operator / SRE | Later | Use richer event, policy, and production observability views. | partial | W8-S04 operator visibility, W19-S06 planner metrics projection, W20-S02 redacted production transport/event baseline, W20-S05 finance monitoring projection, W21-S05 guided stage policy/event counts and finance monitoring panel, W23-S02 explicit production auth denial coverage. Baseline evidence only; remaining production-readiness gate gap owned by W26-S01. | W26-S01 |
 | SEC-01 | Security / compliance | MVP | Enforce provider and adapter allowlists. | baseline-covered | route policies, adapter capability validation, W2-S03, W8-S03 | none |
-| SEC-02 | Security / compliance | MVP | Apply secret-safe logging and redaction. | partial | W10-S04 auth hardening baseline, W20-S02 shared redaction across HTTP/SSE/CLI/live logs/run-control audit, W23-S02 production-hardened denied-action redaction coverage for missing/empty/read-only/mutate-only/wrong-project scopes. Baseline evidence only; remaining continuation redaction gap owned by W24-S02. | W24-S02 |
+| SEC-02 | Security / compliance | MVP | Apply secret-safe logging and redaction. | baseline-covered | W10-S04 auth hardening baseline, W20-S02 shared redaction across HTTP/SSE/CLI/live logs/run-control audit, W23-S02 production-hardened denied-action redaction coverage for missing/empty/read-only/mutate-only/wrong-project scopes, W24-S02 continuation tests proving raw answers stay out of CLI/API/SSE/web read surfaces. | none |
 | SEC-03 | Security / compliance | MVP | Preserve audit trails for approvals, overrides, and route changes. | baseline-covered | audit records, W6-S03, W7-S04 | none |
 | SEC-04 | Security / compliance | MVP | Use stricter gates for higher-risk flows. | partial | step policies, delivery guards, W8-S03. Baseline evidence only; production-strength gap owned by W24-S03. | W24-S03 |
 | SEC-05 | Security / compliance | MVP+ | Govern route and policy overrides. | baseline-covered | W6-S03 run-control policy guardrails | none |
