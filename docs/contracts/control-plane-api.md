@@ -8,6 +8,7 @@ Define one control-plane surface for command, query, and live-stream operations 
 Current code is **hybrid module + detached transport**:
 - API surface is exported from `apps/api/src/index.mjs` as function operations for headless/in-process workflows.
 - Detached HTTP/SSE transport baseline is implemented in `apps/api/src/http-transport.mjs` for connected web mode.
+- CLI/API lifecycle behavior is owned by shared package services under `packages/orchestrator-core/src/operator-cli/**` and `packages/orchestrator-core/src/control-plane/**`; app-level API and CLI modules are transports/wrappers and must not import each other.
 - Contract and artifact semantics stay aligned across both bindings.
 
 Implemented operation families:
@@ -116,7 +117,7 @@ HTTP lifecycle command mutation baseline:
 - `command` must be one of the bounded implemented lifecycle commands documented in `module-surface-baseline.yaml`;
 - `flags` is a JSON object whose keys map to CLI flags by replacing `_` with `-`;
 - `project_ref`, `project-ref`, `runtime_root`, `runtime-root`, and `help` are server-owned and cannot be supplied by clients;
-- the transport injects the scoped project ref and runtime root before invoking the existing CLI/runtime path;
+- the transport injects the scoped project ref and runtime root before invoking the shared operator lifecycle service;
 - successful responses return `{ lifecycle_command }` with `command_output` preserving the CLI JSON fields, `artifact_refs`, `evidence_refs`, `exit_code`, `stdout`, `stderr`, and `interactive_continuation`;
 - `mission create` and `next` are included in the bounded mutation subset for guided web progress; `next` is treated as a mutation because it materializes a durable `next-action-report`;
 - unsupported commands or invalid/missing required flags return HTTP `400` with `error.code` in `invalid_lifecycle_command | invalid_lifecycle_flags`;

@@ -76,7 +76,7 @@ Harden contract-first validation, production API auth scopes, and CLI/API lifecy
 
 ## W23-S03 — Shared lifecycle service boundary
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Remove API-to-CLI and CLI-to-API implementation coupling by extracting lifecycle command behavior into a shared application/service layer.
 - **Primary modules:** `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, tests, dependency checks
 - **Hard dependencies:** W22-S02
