@@ -86,6 +86,7 @@ function resolveCommandForPreflight(command, env, cwd) {
  *   runnerAuthSource: string,
  *   runtimeAgentPermissionMode: string,
  *   authProbeRequired: boolean,
+ *   permissionReadinessRequired?: boolean,
  *   runId: string,
  *   reportsRoot: string,
  * }} options
@@ -96,6 +97,7 @@ export function runLiveAdapterPreflight(options) {
   const provider = asNonEmptyString(options.providerVariant.provider);
   const providerCoverageTier = asNonEmptyString(options.providerVariant.coverage_tier);
   const requiredProvider = options.coverageTier === "required" || providerCoverageTier === "required";
+  const editAndPermissionReadinessRequired = requiredProvider || options.permissionReadinessRequired === true;
   const adapterProfileFile = path.join(options.targetCheckoutRoot, "examples", "adapters", `${normalizeId(adapterId)}.yaml`);
   const reportFile = path.join(
     options.reportsRoot,
@@ -385,7 +387,7 @@ export function runLiveAdapterPreflight(options) {
     };
   }
 
-  const editReadiness = requiredProvider
+  const editReadiness = editAndPermissionReadinessRequired
     ? runProbeAttempt(
         "preflight-edit-readiness",
         1,
@@ -412,7 +414,7 @@ export function runLiveAdapterPreflight(options) {
   }
 
   let permissionReadiness = null;
-  if (requiredProvider) {
+  if (editAndPermissionReadinessRequired) {
     fs.mkdirSync(permissionProbeRoot, { recursive: true });
     fs.writeFileSync(permissionNonceFile, `${permissionMarkerContents}\n`, "utf8");
     fs.rmSync(permissionMarkerFile, { force: true });
@@ -546,4 +548,3 @@ export function runLiveAdapterPreflight(options) {
     reportFile,
   };
 }
-

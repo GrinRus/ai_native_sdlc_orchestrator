@@ -128,7 +128,7 @@ Full-journey layer:
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
 - runner auth probe is required;
-- edit and permission readiness are required for required provider variants;
+- edit and permission readiness are required before `run start`;
 - target setup and verification commands must be declared;
 - baseline target verification must use blocking mode;
 - write-back must remain disabled and delivery mode must be `patch-only` or `local-branch`;

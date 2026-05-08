@@ -26,7 +26,7 @@ pnpm check
 | `regress-short` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | `xo: command not found` (dependencies not installed) or `browserType.launch: Executable doesn't exist` (Playwright browsers not installed) |
 | `release-short` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | `xo: command not found` or Playwright browser executable missing |
 | `w7-governance-integration` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | promotion/learning-loop linkage missing or release rehearsal path fails before closure evidence materialization |
-| `full-journey-production-proof-ky-openai` | `node >=22`, `npm`, `git`, Playwright runtime support, authenticated `codex` CLI with non-interactive edit permissions | `npm install`<br>`npx playwright install` | `npx xo`<br>`npm run build`<br>`npx ava test/headers.ts` | npm packages + Playwright browser binaries + external runner auth/config | `not authenticated`, permission/readiness denial, missing `codex`, or blocking target verification failure before `run start` |
+| `full-journey-production-proof-ky-openai` | `node >=22`, `npm`, `git`, Playwright runtime support, authenticated `codex` CLI with non-interactive edit permissions | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries + external runner auth/config | `not authenticated`, permission/readiness denial, missing `codex`, or blocking target verification failure before `run start` |
 | `regress-long` | `python3`, `make`, `git` | `make install` | `make test`<br>`make codestyle` | Python dependencies from index/mirror | `No module named ...`, `make: *** ... Error` |
 | `release-long` | `node`, `yarn`, `git` | `yarn install --immutable` | `yarn g:lint`<br>`yarn g:typecheck`<br>`yarn workspace @your-org/ts-utils test-unit`<br>`yarn workspace @your-org/core-lib test-unit` | Yarn workspace dependencies | `YN0000/YN...` install errors, workspace script failure |
 
@@ -51,6 +51,7 @@ Fail-closed prerequisites:
 - runner auth probe, edit readiness, and permission readiness must pass before `run start`;
 - `verification.baseline_gate.mode=blocking`, so target verification failure blocks before provider execution;
 - `output_policy.write_back_to_remote=false` and `preferred_delivery_mode=patch-only`.
+- post-run primary quality gates come from the curated mission and run `npx xo`, `npm run build`, and `npx ava test/headers.ts`; these are separate from baseline `verification.commands`.
 
 Proof-mode fields:
 - `production_proof.enabled=true`;

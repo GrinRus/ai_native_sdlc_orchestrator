@@ -305,11 +305,26 @@ function assertProductionProofReadiness(resolvedProfile, proofPolicy) {
   if (asNonEmptyString(proofPolicy.external_runner_mode) !== "real-external-process") {
     problems.push("production_proof.external_runner_mode must be 'real-external-process'");
   }
+  if (asNonEmptyString(proofPolicy.required_failure_mode) !== "fail-closed") {
+    problems.push("production_proof.required_failure_mode must be 'fail-closed'");
+  }
+  if (proofPolicy.real_code_change_proof_required !== true) {
+    problems.push("production_proof.real_code_change_proof_required must stay true for production-proof profiles");
+  }
   if (proofPolicy.mock_runner_allowed === true) {
     problems.push("production_proof.mock_runner_allowed must stay false for production-proof profiles");
   }
+  if (proofPolicy.require_runner_auth !== true) {
+    problems.push("production_proof.require_runner_auth must stay true for production-proof profiles");
+  }
   if (proofPolicy.require_runner_auth === true && resolvedProfile.live_adapter_preflight?.auth_probe_required === false) {
     problems.push("live_adapter_preflight.auth_probe_required cannot be false for production-proof profiles");
+  }
+  if (proofPolicy.require_permission_readiness !== true) {
+    problems.push("production_proof.require_permission_readiness must stay true for production-proof profiles");
+  }
+  if (proofPolicy.no_upstream_write_required !== true) {
+    problems.push("production_proof.no_upstream_write_required must stay true for production-proof profiles");
   }
   if (proofPolicy.no_upstream_write_required === true && outputPolicy.write_back_to_remote !== false) {
     problems.push("output_policy.write_back_to_remote must be false for production-proof profiles");
@@ -318,6 +333,9 @@ function assertProductionProofReadiness(resolvedProfile, proofPolicy) {
     problems.push(
       `output_policy.preferred_delivery_mode must be one of ${allowedProductionDeliveryModes.join(", ")} for production-proof profiles`,
     );
+  }
+  if (proofPolicy.require_blocking_target_verification !== true) {
+    problems.push("production_proof.require_blocking_target_verification must stay true for production-proof profiles");
   }
   if (proofPolicy.require_blocking_target_verification === true && baselineGateMode !== "blocking") {
     problems.push("verification.baseline_gate.mode must be 'blocking' for production-proof profiles");

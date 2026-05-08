@@ -1709,6 +1709,102 @@ test("production proof profile rejects unsafe write-back settings", () => {
   });
 });
 
+test("production proof profile rejects disabled fail-closed policy flags", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "production-proof-disabled-fail-closed.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      productionProof: {
+        ...productionProofPolicy(),
+        require_runner_auth: false,
+        require_permission_readiness: false,
+        required_failure_mode: "diagnostic",
+      },
+    });
+
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--profile",
+      profilePath,
+      "--run-id",
+      "production-proof-disabled-fail-closed",
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.notEqual(run.status, 0);
+    assert.match(String(run.stderr), /required_failure_mode must be 'fail-closed'/u);
+    assert.match(String(run.stderr), /require_runner_auth must stay true/u);
+    assert.match(String(run.stderr), /require_permission_readiness must stay true/u);
+  });
+});
+
+test("production proof profile rejects missing target verification commands", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+      setupCommands: [],
+      verifyCommands: [],
+    });
+    const profilePath = path.join(tempRoot, "production-proof-missing-target-verification.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      productionProof: productionProofPolicy(),
+    });
+
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--profile",
+      profilePath,
+      "--run-id",
+      "production-proof-missing-target-verification",
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.notEqual(run.status, 0);
+    assert.match(String(run.stderr), /verification\.setup_commands must declare/u);
+    assert.match(String(run.stderr), /verification\.commands must declare/u);
+  });
+});
+
 test("production proof profile fails closed when target verification blocks", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });

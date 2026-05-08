@@ -1571,6 +1571,7 @@ export function executeFullJourneyFlow(options) {
       runnerAuthSource: proofRunnerEnvironment.runnerAuthSource,
       runtimeAgentPermissionMode: options.runtimeAgentPermissionMode,
       authProbeRequired: options.authProbeRequired,
+      permissionReadinessRequired: asRecord(options.profile.production_proof).require_permission_readiness === true,
       runId: options.runId,
       reportsRoot: options.layout.reportsRoot,
     });
