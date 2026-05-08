@@ -31,6 +31,7 @@ import {
 } from "./lib/profile-catalog.mjs";
 import { executeFullJourneyFlow, executeInstalledUserFlow, resolveAorLaunch } from "./lib/flows.mjs";
 import { resolveAuthProbeRequired } from "./lib/preflight.mjs";
+import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib/production-proof.mjs";
 
 const LIVE_E2E_OBSERVATION_STEPS = Object.freeze([
   "discovery",
@@ -49,7 +50,6 @@ const LIVE_E2E_OBSERVATION_PRELUDE_STEPS = Object.freeze([
   "project-validate",
 ]);
 const LIVE_E2E_OBSERVATION_EXCLUDED_STEPS = Object.freeze(["release", "learning"]);
-
 /**
  * @param {unknown} value
  * @returns {string[]}
@@ -525,6 +525,7 @@ function writeProofRunnerArtifacts(options) {
     `live-e2e-scorecard-target-${normalizeId(options.runId)}.json`,
   );
   const agentJudgeDocument = loadAgentJudgeDocument(options.agentJudgeFile);
+  const productionProofPolicy = buildProductionProofSummary(options.profile);
   const observationReport = buildObservationReport({
     runId: options.runId,
     profilePath: options.profilePath,
@@ -554,6 +555,13 @@ function writeProofRunnerArtifacts(options) {
   options.flowResult.artifacts.live_e2e_observation_report_file = observationReportFile;
   options.flowResult.artifacts.agent_artifact_review_request_file = agentArtifactReviewRequestFile;
   options.flowResult.artifacts.live_e2e_observation_overall_status = observationReport.overall_status;
+  const productionProof = applyProductionProofEvidence({
+    productionProof: productionProofPolicy,
+    flowResult: options.flowResult,
+  });
+  if (productionProof) {
+    options.flowResult.artifacts.production_proof = productionProof;
+  }
 
   const summary = {
     run_id: options.runId,
@@ -640,6 +648,16 @@ function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
         ? options.flowResult.artifacts.matrix_cell
         : null,
+    production_proof: productionProof,
+    proof_scope: productionProof?.proof_scope ?? null,
+    external_runner_mode: productionProof?.external_runner_mode ?? null,
+    real_code_change_proof_complete: productionProof?.real_code_change_proof_complete ?? null,
+    production_proof_evidence_status: productionProof?.evidence_status ?? null,
+    production_proof_evidence_refs: productionProof?.evidence_refs ?? null,
+    no_upstream_write_assertion: productionProof?.no_upstream_write_assertion ?? null,
+    delivery_manifest_file: productionProof?.evidence_refs?.delivery_manifest_file ?? null,
+    review_report_file: productionProof?.evidence_refs?.review_report_file ?? null,
+    latest_runtime_harness_report_file: productionProof?.evidence_refs?.runtime_harness_report_file ?? null,
     coverage_follow_up:
       typeof options.flowResult.artifacts.coverage_follow_up === "object" && options.flowResult.artifacts.coverage_follow_up
         ? options.flowResult.artifacts.coverage_follow_up
@@ -757,6 +775,12 @@ function runCli(rawArgs) {
       })
     : null;
   const profile = fullJourneyResolution?.resolvedProfile ?? loadedProfile;
+  const productionProof = fullJourneyResolution ? buildProductionProofSummary(profile) : null;
+  if (productionProof && explicitExamplesRoot && productionProof.mock_runner_allowed !== true) {
+    throw new UsageError(
+      `Production proof profile '${asNonEmptyString(profile.profile_id) || profileRef}' cannot use --examples-root; packaged bootstrap assets are required to prevent deterministic mock injection.`,
+    );
+  }
   const examplesRoot = explicitExamplesRoot
     ? requireDirectory(explicitExamplesRoot)
     : fullJourneyResolution

@@ -48,7 +48,7 @@ export function normalizeAuthPolicy(value, projectId) {
         permissions.add(normalized);
       }
     }
-    if (permissions.size === 0) {
+    if (permissions.size === 0 && mode !== "production-hardened") {
       permissions.add("read");
       permissions.add("mutate");
     }

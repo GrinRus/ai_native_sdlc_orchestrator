@@ -162,6 +162,72 @@ function createFakeCodexBinary(options) {
 /**
  * @param {{ tempRoot: string }} options
  */
+function createFakeCodexAuthFailureBinary(options) {
+  const binRoot = path.join(options.tempRoot, "fake-auth-fail-bin");
+  fs.mkdirSync(binRoot, { recursive: true });
+  const codexPath = path.join(binRoot, "codex");
+  fs.writeFileSync(
+    codexPath,
+    [
+      "#!/usr/bin/env node",
+      "process.stderr.write('not authenticated for production proof');",
+      "process.exit(1);",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  fs.chmodSync(codexPath, 0o755);
+  return {
+    binRoot,
+    codexPath,
+  };
+}
+
+/**
+ * @param {{ tempRoot: string }} options
+ */
+function createFakeCodexPermissionDeniedBinary(options) {
+  const binRoot = path.join(options.tempRoot, "fake-permission-denied-bin");
+  fs.mkdirSync(binRoot, { recursive: true });
+  const codexPath = path.join(binRoot, "codex");
+  fs.writeFileSync(
+    codexPath,
+    [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      "const input = JSON.parse(fs.readFileSync(0, 'utf8'));",
+      "const request = input.request || {};",
+      "if (request.step_class === 'preflight-permission-readiness') {",
+      "  process.stdout.write(JSON.stringify({",
+      "    type: 'result',",
+      "    subtype: 'success',",
+      "    result: 'permission blocked',",
+      "    permission_denials: [{ tool_name: 'Write', tool_input: { file_path: request.permission_probe && request.permission_probe.marker_file } }],",
+      "  }));",
+      "  process.exit(0);",
+      "}",
+      ...permissionProbeSnippet(),
+      "process.stdout.write(JSON.stringify({",
+      "  status: 'success',",
+      "  summary: 'fake codex permission preflight ok before marker check',",
+      "  output: { runner: 'fake-codex-permission-denied', step_class: request.step_class || null, execution_root: process.cwd() },",
+      "  evidence_refs: ['evidence://external-runner/live-e2e-proof-runner-fake-permission-denied'],",
+      "  tool_traces: [{ phase: 'invoke_adapter', kind: 'fake-codex-permission-denied', detail: 'path-override' }],",
+      "}));",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  fs.chmodSync(codexPath, 0o755);
+  return {
+    binRoot,
+    codexPath,
+  };
+}
+
+/**
+ * @param {{ tempRoot: string }} options
+ */
 function createFakeClaudeBinary(options) {
   const binRoot = path.join(options.tempRoot, "fake-claude-bin");
   fs.mkdirSync(binRoot, { recursive: true });
@@ -747,6 +813,8 @@ function writeLocalCatalogTarget(options) {
  *   liveAdapterPreflight?: Record<string, unknown>,
  *   outputPolicy?: Record<string, unknown>,
  *   guidedJourney?: Record<string, unknown>,
+ *   verification?: Record<string, unknown>,
+ *   productionProof?: Record<string, unknown>,
  * }} options
  */
 function writeLocalFullJourneyProfile(options) {
@@ -773,6 +841,7 @@ function writeLocalFullJourneyProfile(options) {
         harness: {
           enabled: false,
         },
+        ...(options.verification ?? {}),
       },
       output_policy: {
         materialize_release_packet: false,
@@ -780,6 +849,7 @@ function writeLocalFullJourneyProfile(options) {
         preferred_delivery_mode: "patch-only",
         ...(options.outputPolicy ?? {}),
       },
+      ...(options.productionProof ? { production_proof: options.productionProof } : {}),
       ...(options.guidedJourney ? { guided_journey: options.guidedJourney } : {}),
       ...(options.liveAdapterPreflight ? { live_adapter_preflight: options.liveAdapterPreflight } : {}),
       ...(options.internalTestHooks ? { internal_test_hooks: options.internalTestHooks } : {}),
@@ -917,6 +987,23 @@ function formatProofRunnerFailure(run, timeoutMs) {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function productionProofPolicy() {
+  return {
+    enabled: true,
+    profile_status: "candidate",
+    proof_scope: "full_code_changing_runtime_candidate",
+    external_runner_mode: "real-external-process",
+    real_code_change_proof_required: true,
+    real_code_change_proof_complete: false,
+    mock_runner_allowed: false,
+    no_upstream_write_required: true,
+    require_runner_auth: true,
+    require_permission_readiness: true,
+    require_blocking_target_verification: true,
+    required_failure_mode: "fail-closed",
+  };
 }
 
 test("installed-user proof runner subprocesses have a bounded timeout diagnostic", () => {
@@ -1507,6 +1594,415 @@ test("full-journey mode defaults to packaged bootstrap assets when --examples-ro
     assert.equal(summary.control_surfaces.examples_root, null);
     assert.equal(fs.existsSync(summary.generated_project_profile_file), true);
     assert.equal(fs.existsSync(summary.artifacts.target_examples_root), true);
+  });
+});
+
+test("production proof profile documents fail-closed real external runner mode", () => {
+  const profilePath = path.join(
+    workspaceRoot,
+    "scripts/live-e2e/profiles/full-journey-production-proof-ky-openai.yaml",
+  );
+  const profile = parseYaml(fs.readFileSync(profilePath, "utf8"));
+  assert.equal(profile.journey_mode, "full-journey");
+  assert.equal(profile.target_catalog_id, "ky");
+  assert.equal(profile.feature_mission_id, "ky-header-regression");
+  assert.equal(profile.provider_variant_id, "openai-primary");
+  assert.equal(profile.verification.baseline_gate.mode, "blocking");
+  assert.equal(profile.output_policy.write_back_to_remote, false);
+  assert.equal(profile.output_policy.preferred_delivery_mode, "patch-only");
+  assert.equal(profile.production_proof.enabled, true);
+  assert.equal(profile.production_proof.external_runner_mode, "real-external-process");
+  assert.equal(profile.production_proof.real_code_change_proof_complete, false);
+  assert.equal(profile.production_proof.mock_runner_allowed, false);
+  assert.equal(profile.target_repo, undefined);
+});
+
+test("production proof profile rejects deterministic examples-root override", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "production-proof.examples-root-blocked.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      productionProof: productionProofPolicy(),
+    });
+
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--profile",
+      profilePath,
+      "--run-id",
+      "production-proof-examples-root-blocked",
+      "--catalog-root",
+      catalogRoot,
+      "--examples-root",
+      examplesRoot,
+    ]);
+    assert.notEqual(run.status, 0);
+    assert.match(String(run.stderr), /cannot use --examples-root/u);
+  });
+});
+
+test("production proof profile rejects unsafe write-back settings", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "production-proof-unsafe-writeback.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      outputPolicy: {
+        write_back_to_remote: true,
+      },
+      productionProof: productionProofPolicy(),
+    });
+
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--profile",
+      profilePath,
+      "--run-id",
+      "production-proof-unsafe-writeback",
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.notEqual(run.status, 0);
+    assert.match(String(run.stderr), /write_back_to_remote must be false/u);
+  });
+});
+
+test("production proof profile rejects disabled fail-closed policy flags", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "production-proof-disabled-fail-closed.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      productionProof: {
+        ...productionProofPolicy(),
+        require_runner_auth: false,
+        require_permission_readiness: false,
+        required_failure_mode: "diagnostic",
+      },
+    });
+
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--profile",
+      profilePath,
+      "--run-id",
+      "production-proof-disabled-fail-closed",
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.notEqual(run.status, 0);
+    assert.match(String(run.stderr), /required_failure_mode must be 'fail-closed'/u);
+    assert.match(String(run.stderr), /require_runner_auth must stay true/u);
+    assert.match(String(run.stderr), /require_permission_readiness must stay true/u);
+  });
+});
+
+test("production proof profile rejects missing target verification commands", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+      setupCommands: [],
+      verifyCommands: [],
+    });
+    const profilePath = path.join(tempRoot, "production-proof-missing-target-verification.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      productionProof: productionProofPolicy(),
+    });
+
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--profile",
+      profilePath,
+      "--run-id",
+      "production-proof-missing-target-verification",
+      "--catalog-root",
+      catalogRoot,
+    ]);
+    assert.notEqual(run.status, 0);
+    assert.match(String(run.stderr), /verification\.setup_commands must declare/u);
+    assert.match(String(run.stderr), /verification\.commands must declare/u);
+  });
+});
+
+test("production proof profile fails closed when target verification blocks", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const fakeCodex = createFakeCodexBinary({ tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+      verifyCommands: [
+        "node -e \"const fs=require('node:fs');const text=fs.readFileSync('src/index.js','utf8');process.exit(text.includes('liveE2eCodexPatch')?0:1)\"",
+      ],
+    });
+    const profilePath = path.join(tempRoot, "production-proof-target-verification-blocked.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      productionProof: productionProofPolicy(),
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      profilePath,
+      runId: "production-proof-target-verification-blocked",
+      catalogRoot,
+      omitExamplesRoot: true,
+      extraEnv: {
+        PATH: `${fakeCodex.binRoot}${path.delimiter}${process.env.PATH ?? ""}`,
+      },
+    });
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "not_pass");
+    assert.equal(summary.production_proof.external_runner_mode, "real-external-process");
+    assert.equal(summary.proof_scope, "full_code_changing_runtime_candidate");
+    assert.equal(summary.real_code_change_proof_complete, false);
+    assert.equal(summary.artifacts.baseline_verify_gate_decision.mode, "blocking");
+    assert.equal(summary.artifacts.baseline_verify_gate_decision.decision, "block");
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+  });
+});
+
+test("production proof profile fails closed when runner auth preflight fails", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const fakeCodex = createFakeCodexAuthFailureBinary({ tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "production-proof-auth-failed.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      productionProof: productionProofPolicy(),
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      profilePath,
+      runId: "production-proof-auth-failed",
+      catalogRoot,
+      omitExamplesRoot: true,
+      extraEnv: {
+        PATH: `${fakeCodex.binRoot}${path.delimiter}${process.env.PATH ?? ""}`,
+      },
+    });
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "not_pass");
+    assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "auth-failed");
+    assert.equal(summary.artifacts.live_adapter_preflight.auth_probe.status, "fail");
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+  });
+});
+
+test("production proof profile fails closed when permission readiness fails", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const fakeCodex = createFakeCodexPermissionDeniedBinary({ tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "production-proof-permission-failed.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      productionProof: productionProofPolicy(),
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      profilePath,
+      runId: "production-proof-permission-failed",
+      catalogRoot,
+      omitExamplesRoot: true,
+      extraEnv: {
+        PATH: `${fakeCodex.binRoot}${path.delimiter}${process.env.PATH ?? ""}`,
+      },
+    });
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "not_pass");
+    assert.equal(summary.artifacts.live_adapter_preflight.status, "fail");
+    assert.equal(summary.artifacts.live_adapter_preflight.failure_kind, "permission-mode-blocked");
+    assert.equal(summary.artifacts.live_adapter_preflight.permission_readiness.status, "fail");
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+  });
+});
+
+test("production proof profile promotes a complete code-changing pass from executable evidence", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const fakeCodex = createFakeCodexBinary({ tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "production-proof-complete.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      productionProof: productionProofPolicy(),
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      profilePath,
+      runId: "production-proof-complete",
+      catalogRoot,
+      omitExamplesRoot: true,
+      extraEnv: {
+        PATH: `${fakeCodex.binRoot}${path.delimiter}${process.env.PATH ?? ""}`,
+      },
+    });
+    assert.equal(result.live_e2e_run_status, "pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.verdict_matrix.overall_verdict, "pass");
+    assert.equal(summary.production_proof.external_runner_mode, "real-external-process");
+    assert.equal(summary.proof_scope, "full_code_changing_runtime");
+    assert.equal(summary.real_code_change_proof_complete, true);
+    assert.equal(summary.production_proof_evidence_status, "pass");
+    assert.equal(summary.production_proof.evidence_status, "pass");
+    assert.equal(summary.production_proof.target_verdicts.status, "pass");
+    assert.equal(summary.production_proof.runtime_harness.status, "pass");
+    assert.equal(summary.production_proof.review.status, "pass");
+    assert.equal(summary.no_upstream_write_assertion.status, "pass");
+    assert.equal(summary.no_upstream_write_assertion.target_head_unchanged, true);
+    assert.deepEqual(summary.no_upstream_write_assertion.commit_refs, []);
+    assert.deepEqual(summary.production_proof.findings, []);
+    assert.ok(summary.production_proof.changed_paths.includes("src/index.js"));
+    assert.equal(fs.existsSync(summary.delivery_manifest_file), true);
+    assert.equal(fs.existsSync(summary.review_report_file), true);
+    assert.equal(fs.existsSync(summary.latest_runtime_harness_report_file), true);
   });
 });
 

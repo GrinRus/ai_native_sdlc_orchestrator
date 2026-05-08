@@ -8,6 +8,7 @@ Define one control-plane surface for command, query, and live-stream operations 
 Current code is **hybrid module + detached transport**:
 - API surface is exported from `apps/api/src/index.mjs` as function operations for headless/in-process workflows.
 - Detached HTTP/SSE transport baseline is implemented in `apps/api/src/http-transport.mjs` for connected web mode.
+- CLI/API lifecycle behavior is owned by shared package services under `packages/orchestrator-core/src/operator-cli/**` and `packages/orchestrator-core/src/control-plane/**`; app-level API and CLI modules are transports/wrappers and must not import each other.
 - Contract and artifact semantics stay aligned across both bindings.
 
 Implemented operation families:
@@ -39,6 +40,8 @@ The detached HTTP/SSE transport now has two explicit security modes:
 Auth and authorization behavior:
 - bearer principals are configured out-of-band when the detached transport starts;
 - each principal carries `read` and/or `mutate` permission scopes plus allowed `project_refs`;
+- in `production-hardened` mode, permission scopes must be declared explicitly as a non-empty array with at least one supported scope; tokens with missing, empty, or unknown-only `permissions` authenticate as configured principals but fail authorization with `auth.insufficient_permission` for every route because no implicit production scope is granted;
+- in `local-trusted` mode, tokens that omit `permissions` keep the legacy local development default of `read+mutate` so existing loopback smoke paths remain compatible;
 - all route definitions declare one required permission before handlers run;
 - missing, invalid, wrong-project, and insufficient-scope decisions return stable `auth.*` error codes with `required_permission`, `project_id`, `token_id`, and `security_mode`;
 - denied transport actions do not invoke mutation handlers.
@@ -114,7 +117,7 @@ HTTP lifecycle command mutation baseline:
 - `command` must be one of the bounded implemented lifecycle commands documented in `module-surface-baseline.yaml`;
 - `flags` is a JSON object whose keys map to CLI flags by replacing `_` with `-`;
 - `project_ref`, `project-ref`, `runtime_root`, `runtime-root`, and `help` are server-owned and cannot be supplied by clients;
-- the transport injects the scoped project ref and runtime root before invoking the existing CLI/runtime path;
+- the transport injects the scoped project ref and runtime root before invoking the shared operator lifecycle service;
 - successful responses return `{ lifecycle_command }` with `command_output` preserving the CLI JSON fields, `artifact_refs`, `evidence_refs`, `exit_code`, `stdout`, `stderr`, and `interactive_continuation`;
 - `mission create` and `next` are included in the bounded mutation subset for guided web progress; `next` is treated as a mutation because it materializes a durable `next-action-report`;
 - unsupported commands or invalid/missing required flags return HTTP `400` with `error.code` in `invalid_lifecycle_command | invalid_lifecycle_flags`;
@@ -128,6 +131,7 @@ HTTP interactive answer mutation baseline:
 - response payloads return `{ interaction_answer }` with `interaction_id`, `interaction_status`, `answer_audit_ref`, `step_result_ref`, `run_control_transition`, `blocked_reason`, and live event ids;
 - when the current runtime cannot resume from the recorded interaction boundary, the transport returns HTTP `409` with `error.code=interaction.continuation_blocked` and keeps the run blocked with evidence refs;
 - live events and query payloads must reference `answer_audit_ref` and must not include the raw answer text.
+- CLI, API, and web surfaces expose the same query-safe answer result; raw answer text is allowed only in the durable answer audit artifact, never in command output, read models, SSE payloads, or web snapshots.
 
 ## Read surface baseline (module operations)
 
@@ -185,6 +189,7 @@ Interactive continuation target (W18-S01):
 - continuation should either resume the bounded run from the recorded interaction boundary or remain blocked with explicit evidence refs and reason codes;
 - live event payloads should reference `requested_interaction` and `answer_audit_ref` without exposing raw answer text;
 - web clients may present and submit the interaction, but the control plane remains responsible for validation, audit, and run-state transitions.
+- the persisted `requested_interaction.state_history[]` ledger should preserve requested, answered, resumed, and blocked transitions with audit refs so clients can render the latest state without replaying raw logs.
 
 Answer validation baseline for W18:
 - the referenced `interaction_id` must match the latest unresolved run-linked `requested_interaction`;
@@ -352,6 +357,8 @@ Detached authn/authz baseline (W10-S04):
 - auth mode is optional and disabled by default for local trusted operator rehearsals;
 - when auth is enabled, requests require `Authorization: Bearer <token>`;
 - tokens are project-scoped and permission-scoped (`read` and `mutate`);
+- `local-trusted` auth keeps backward-compatible `read+mutate` defaults for tokens without explicit `permissions`;
+- `production-hardened` auth does not infer default permissions; missing, empty, or invalid-only permission arrays leave the token with no route authorization;
 - missing or invalid credentials return HTTP `401` with `error.code` in `auth.missing_credentials | auth.invalid_token`;
 - project mismatch or missing permission return HTTP `403` with `error.code` in `auth.forbidden_project | auth.insufficient_permission`;
 - auth error payload includes `error.auth.required_permission`, `error.auth.project_id`, and `error.auth.token_id` (when available).

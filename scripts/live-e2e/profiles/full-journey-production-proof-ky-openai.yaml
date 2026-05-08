@@ -1,0 +1,57 @@
+profile_id: live-e2e.production-proof.regress.ky.openai
+version: 1
+journey_mode: full-journey
+flow_kind: regress
+duration_class: long
+target_catalog_id: ky
+feature_mission_id: ky-header-regression
+scenario_family: regress
+provider_variant_id: openai-primary
+bootstrap_template: github-default
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - learning
+verification:
+  baseline_gate:
+    mode: blocking
+  build: true
+  lint: true
+  tests: project-default
+  eval_suites:
+    - suite.regress.short@v1
+  harness:
+    enabled: false
+output_policy:
+  materialize_release_packet: false
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+production_proof:
+  enabled: true
+  profile_status: candidate
+  proof_scope: full_code_changing_runtime_candidate
+  external_runner_mode: real-external-process
+  real_code_change_proof_required: true
+  real_code_change_proof_complete: false
+  mock_runner_allowed: false
+  no_upstream_write_required: true
+  require_runner_auth: true
+  require_permission_readiness: true
+  require_blocking_target_verification: true
+  required_failure_mode: fail-closed
+learning_loop:
+  backlog_refs:
+    - docs/backlog/mvp-implementation-backlog.md
+    - docs/backlog/mvp-roadmap.md
+    - docs/ops/live-e2e-standard-runner.md

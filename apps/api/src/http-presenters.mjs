@@ -60,7 +60,7 @@ export function toLifecycleCommandResponse(result) {
 }
 
 /**
- * @param {{ runId: string, interactionId: string, interactionStatus: string, answerAccepted: boolean, answerAuditFile: string, answerAuditRef: string, stepResultFile: string, stepResultRef: string, runControlTransition: unknown, blocked: boolean, blockedReason: Record<string, unknown> | null, evidenceEvent: { event_id: string }, stepEvent: { event_id: string }, warningEvent: { event_id: string }, streamLogFile: string }} result
+ * @param {{ runId: string, interactionId: string, interactionStatus: string, answerAccepted: boolean, answerAuditFile: string, answerAuditRef: string, stepResultFile: string, stepResultRef: string, runControlTransition: unknown, blocked: boolean, blockedReason: Record<string, unknown> | null, evidenceEvent: { event_id: string }, stepEvent: { event_id: string }, blockedEvent?: { event_id: string }, warningEvent: { event_id: string }, streamLogFile: string }} result
  * @returns {Record<string, unknown>}
  */
 export function toInteractionAnswerResponse(result) {
@@ -78,6 +78,7 @@ export function toInteractionAnswerResponse(result) {
     blocked_reason: result.blockedReason,
     evidence_event_id: result.evidenceEvent.event_id,
     step_event_id: result.stepEvent.event_id,
+    blocked_event_id: result.blockedEvent?.event_id ?? null,
     warning_event_id: result.warningEvent.event_id,
     stream_log_file: result.streamLogFile,
   };
@@ -117,6 +118,7 @@ function toPolicyContext(payload) {
 export function toHistoryEvent(event) {
   const payload = asRecord(event.payload);
   const interaction = asRecord(payload.interaction);
+  const continuation = asRecord(interaction.continuation);
   return {
     event_id: asString(event.event_id) ?? "",
     timestamp: asString(event.timestamp),
@@ -138,6 +140,13 @@ export function toHistoryEvent(event) {
             question_summary: asString(interaction.question_summary),
             answer_required: interaction.answer_required === true,
             answer_audit_refs: asStringArray(interaction.answer_audit_refs),
+            continuation:
+              Object.keys(continuation).length > 0
+                ? {
+                    next_action: asString(continuation.next_action),
+                    reason_code: asString(continuation.reason_code),
+                  }
+                : null,
           }
         : null,
     policy_context: toPolicyContext(payload),

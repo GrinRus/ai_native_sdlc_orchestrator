@@ -219,9 +219,20 @@ function assertLatestWaveSourceOfTruth() {
   console.log(`source-of-truth latest-wave checks ok: ${latestWaveLabel}`);
 }
 
-function assertProofBundleIntegrity() {
-  const bundlePath = "examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json";
-  const proof = JSON.parse(read(bundlePath));
+function collectProofChangedPaths(proof) {
+  return [
+    ...(Array.isArray(proof.changed_paths) ? proof.changed_paths : []),
+    ...(Array.isArray(proof.no_upstream_write_assertion?.changed_paths)
+      ? proof.no_upstream_write_assertion.changed_paths
+      : []),
+    ...(Array.isArray(proof.evidence?.runtime_harness?.mission_scoped_changed_paths)
+      ? proof.evidence.runtime_harness.mission_scoped_changed_paths
+      : []),
+  ];
+}
+
+function validateProofBundleIntegrity(proof, bundlePath) {
+  const errors = [];
   const targetVerdicts = Array.isArray(proof.targets)
     ? proof.targets.map((target) => target.overall_verdict).filter(Boolean)
     : [];
@@ -230,35 +241,101 @@ function assertProofBundleIntegrity() {
 
   if (hasPassWithFindings) {
     if (proof.proof_scope !== "coverage_with_findings") {
-      console.error(`${bundlePath} uses pass_with_findings but lacks proof_scope=coverage_with_findings.`);
-      process.exit(1);
+      errors.push(`${bundlePath} uses pass_with_findings but lacks proof_scope=coverage_with_findings.`);
     }
     if (proof.real_code_change_proof_complete !== false) {
-      console.error(`${bundlePath} uses pass_with_findings but does not set real_code_change_proof_complete=false.`);
-      process.exit(1);
+      errors.push(`${bundlePath} uses pass_with_findings but does not set real_code_change_proof_complete=false.`);
     }
   }
 
   if (proof.proof_scope === "coverage_with_findings" && !externalRunnerMode.includes("mock")) {
-    console.error(`${bundlePath} is coverage_with_findings but does not record a mock external runner mode.`);
-    process.exit(1);
+    errors.push(`${bundlePath} is coverage_with_findings but does not record a mock external runner mode.`);
   }
 
   if (proof.proof_scope === "full_code_changing_runtime") {
     if (proof.real_code_change_proof_complete !== true) {
-      console.error(`${bundlePath} claims full_code_changing_runtime without real_code_change_proof_complete=true.`);
-      process.exit(1);
+      errors.push(`${bundlePath} claims full_code_changing_runtime without real_code_change_proof_complete=true.`);
+    }
+    if (targetVerdicts.length === 0) {
+      errors.push(`${bundlePath} claims full_code_changing_runtime without target verdict evidence.`);
     }
     if (targetVerdicts.some((verdict) => verdict !== "pass")) {
-      console.error(`${bundlePath} claims full_code_changing_runtime but not all target verdicts are pass.`);
-      process.exit(1);
+      errors.push(`${bundlePath} claims full_code_changing_runtime but not all target verdicts are pass.`);
+    }
+    if (proof.verdict_matrix?.overall_verdict && proof.verdict_matrix.overall_verdict !== "pass") {
+      errors.push(`${bundlePath} claims full_code_changing_runtime without verdict_matrix.overall_verdict=pass.`);
     }
     if (externalRunnerMode.includes("mock")) {
-      console.error(`${bundlePath} claims full_code_changing_runtime but records a mock external runner mode.`);
+      errors.push(`${bundlePath} claims full_code_changing_runtime but records a mock external runner mode.`);
+    }
+    if (externalRunnerMode !== "real-external-process") {
+      errors.push(`${bundlePath} claims full_code_changing_runtime without external_runner_mode=real-external-process.`);
+    }
+    if (proof.proof_method?.mock_runner_allowed === true) {
+      errors.push(`${bundlePath} claims full_code_changing_runtime while allowing a mock runner.`);
+    }
+    if (proof.proof_method?.examples_root_override) {
+      errors.push(`${bundlePath} claims full_code_changing_runtime while using an examples_root_override.`);
+    }
+
+    const noUpstreamWrite = proof.no_upstream_write_assertion ?? {};
+    if (noUpstreamWrite.status !== "pass") {
+      errors.push(`${bundlePath} claims full_code_changing_runtime without no_upstream_write_assertion.status=pass.`);
+    }
+    if (noUpstreamWrite.write_back_to_remote === true) {
+      errors.push(`${bundlePath} claims full_code_changing_runtime but allows write_back_to_remote.`);
+    }
+    if (noUpstreamWrite.target_head_unchanged !== true) {
+      errors.push(`${bundlePath} claims full_code_changing_runtime without target_head_unchanged=true.`);
+    }
+    if (Array.isArray(noUpstreamWrite.commit_refs) && noUpstreamWrite.commit_refs.length > 0) {
+      errors.push(`${bundlePath} claims full_code_changing_runtime but records upstream commit refs.`);
+    }
+
+    const changedPaths = collectProofChangedPaths(proof);
+    if (changedPaths.length === 0) {
+      errors.push(`${bundlePath} claims full_code_changing_runtime without mission-scoped changed paths.`);
+    }
+    for (const changedPath of changedPaths) {
+      if (path.isAbsolute(changedPath) || changedPath.startsWith(".aor/") || changedPath.includes("/.aor/")) {
+        errors.push(`${bundlePath} records a runtime or absolute changed path: ${changedPath}`);
+      }
+    }
+
+    const serializedProof = JSON.stringify(proof);
+    const forbiddenPatterns = [
+      { pattern: /\/Users\//u, label: "local absolute path" },
+      { pattern: /\.aor\/projects/u, label: "runtime project path" },
+      { pattern: /target-checkouts/u, label: "target checkout path" },
+      { pattern: /ctx7sk-[A-Za-z0-9_-]+/u, label: "Context7 token" },
+      { pattern: /sk-[A-Za-z0-9_-]{10,}/u, label: "API secret" },
+    ];
+    for (const { pattern, label } of forbiddenPatterns) {
+      if (pattern.test(serializedProof)) {
+        errors.push(`${bundlePath} contains ${label}; production proof fixtures must be sanitized.`);
+      }
+    }
+  }
+
+  return errors;
+}
+
+function assertProofBundleIntegrity() {
+  const bundlePaths = [
+    "examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json",
+    "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json",
+  ];
+
+  for (const bundlePath of bundlePaths) {
+    const proof = JSON.parse(read(bundlePath));
+    const errors = validateProofBundleIntegrity(proof, bundlePath);
+    if (errors.length > 0) {
+      for (const error of errors) console.error(error);
       process.exit(1);
     }
   }
 
+  const proof = JSON.parse(read("examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json"));
   const proofClaimFiles = ["README.md", "docs/ops/live-e2e-standard-runner.md"];
   if (proof.proof_scope === "coverage_with_findings") {
     for (const file of proofClaimFiles) {
@@ -281,7 +358,40 @@ function assertProofBundleIntegrity() {
     }
   }
 
-  console.log(`proof integrity ok: W14 bundle is ${proof.proof_scope}`);
+  const mockBackedFullRuntimeClaim = {
+    fixture_id: "negative.mock-backed-full-runtime-claim",
+    proof_scope: "full_code_changing_runtime",
+    real_code_change_proof_complete: true,
+    proof_method: {
+      external_runner_mode: "deterministic-external-process-mock",
+      mock_runner_allowed: true,
+      examples_root_override: "examples/live-e2e/fixtures/mock",
+    },
+    targets: [
+      {
+        overall_verdict: "pass",
+      },
+    ],
+    changed_paths: ["source/utils/merge.ts"],
+    no_upstream_write_assertion: {
+      status: "pass",
+      write_back_to_remote: false,
+      target_head_unchanged: true,
+      commit_refs: [],
+      changed_paths: ["source/utils/merge.ts"],
+    },
+  };
+  const negativeErrors = validateProofBundleIntegrity(
+    mockBackedFullRuntimeClaim,
+    "fixture://negative/mock-backed-full-runtime-claim",
+  );
+  if (!negativeErrors.some((error) => error.includes("mock"))) {
+    console.error("Proof integrity negative check did not reject a mock-backed full_code_changing_runtime claim.");
+    process.exit(1);
+  }
+
+  const scopes = bundlePaths.map((bundlePath) => `${path.basename(bundlePath)}=${JSON.parse(read(bundlePath)).proof_scope}`);
+  console.log(`proof integrity ok: ${scopes.join(", ")}`);
 }
 
 function splitMarkdownTableRow(line) {
@@ -595,7 +705,16 @@ const userStoryFamilies = [
 ];
 
 const validStoryTiers = new Set(["MVP", "MVP+", "Later"]);
-const validCoverageStatuses = new Set(["covered", "partial", "gap", "blocked"]);
+const validCoverageStatuses = new Set(["baseline-covered", "proof-covered", "partial", "blocked"]);
+const coveredCoverageStatuses = new Set(["baseline-covered", "proof-covered"]);
+
+function hasExplicitExternalBlocker(row) {
+  return (
+    row.coverageStatus === "blocked" &&
+    row.gapSlices.length === 0 &&
+    /(outside .*scope|out of scope|future|external prerequisite|not in scope)/iu.test(row.evidence)
+  );
+}
 
 function parseUserStoryCoverageMatrixDocumentation() {
   const matrix = read("docs/product/user-story-coverage-matrix.md");
@@ -697,13 +816,29 @@ function assertUserStoryCoverageMatrixDocumentation() {
       process.exit(1);
     }
 
-    if (row.coverageStatus === "covered" && row.gapSlices.length > 0) {
+    if (coveredCoverageStatuses.has(row.coverageStatus) && row.gapSlices.length > 0) {
       console.error(`Covered user-story ${row.storyId} must not reference gap slices.`);
       process.exit(1);
     }
 
-    if (row.coverageStatus !== "covered" && row.gapSlices.length === 0) {
-      console.error(`Non-covered user-story ${row.storyId} must reference at least one gap slice.`);
+    if (
+      row.coverageStatus === "proof-covered" &&
+      !/(proof|overall_verdict=pass|real_code_change_proof_complete=true|external_runner_mode=real-external-process|examples\/live-e2e\/fixtures)/iu.test(row.evidence)
+    ) {
+      console.error(
+        `Proof-covered user-story ${row.storyId} must cite executable proof evidence, not only baseline implementation evidence.`,
+      );
+      process.exit(1);
+    }
+
+    if (
+      !coveredCoverageStatuses.has(row.coverageStatus) &&
+      row.gapSlices.length === 0 &&
+      !hasExplicitExternalBlocker(row)
+    ) {
+      console.error(
+        `Non-covered user-story ${row.storyId} must reference at least one gap slice or explain an external blocker.`,
+      );
       process.exit(1);
     }
 
@@ -714,7 +849,7 @@ function assertUserStoryCoverageMatrixDocumentation() {
       }
 
       const gapSliceState = masterSliceMap.get(gapSlice)?.state ?? waveSectionMap.get(gapSlice)?.state;
-      if (row.coverageStatus !== "covered" && gapSliceState === "done") {
+      if (!coveredCoverageStatuses.has(row.coverageStatus) && gapSliceState === "done") {
         console.error(
           `Non-covered user-story ${row.storyId} references done gap slice '${gapSlice}'. Move completed evidence into the evidence cell or mark the story covered.`,
         );
@@ -883,6 +1018,18 @@ if (sliceCycleTestRun.status !== 0) {
 }
 
 console.log("slice cycle tests ok: selection, state sync, and plan extraction");
+
+const productionReadinessTestsPath = path.join(root, "scripts/test/production-readiness.test.mjs");
+const productionReadinessTestRun = spawnSync(process.execPath, ["--test", productionReadinessTestsPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (productionReadinessTestRun.status !== 0) {
+  process.exit(productionReadinessTestRun.status ?? 1);
+}
+
+console.log("production readiness tests ok: gate passes only with real W25 proof evidence");
 
 const liveE2EProofRunnerTestsPath = path.join(root, "scripts/test/live-e2e-proof-runner.test.mjs");
 const liveE2EProofRunnerTestRun = spawnSync(process.execPath, ["--test", liveE2EProofRunnerTestsPath], {

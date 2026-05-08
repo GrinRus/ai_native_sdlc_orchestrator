@@ -149,6 +149,7 @@ interactive_continuation:
       - step_result_ref
       - run_control_transition
       - blocked_reason
+      - blocked_event_id
     blocked_http_status: 409
   audit_behavior:
     raw_answer_storage: durable-audit-evidence-only
@@ -193,6 +194,10 @@ authn_authz:
     permission_scopes:
       - read
       - mutate
+    permission_declaration:
+      local_trusted_default: read+mutate when permissions are omitted for loopback compatibility
+      production_hardened_required: explicit non-empty permissions array with read and/or mutate
+      production_hardened_missing_or_empty_result: auth.insufficient_permission for every route
     error_codes:
       - auth.missing_credentials
       - auth.invalid_token
@@ -211,6 +216,7 @@ production_hardening:
       intended_scope: connected operator transport with explicit bearer principals
   authorization:
     route_permission_metadata: required
+    permission_declaration: explicit non-empty permissions required in production-hardened mode
     scopes:
       - read
       - mutate

@@ -86,6 +86,7 @@ Guardrail expectation:
 - delivery manifest exists;
 - delivery manifest `repo_deliveries[0].repo_root` matches `target_checkout_root`;
 - delivery manifest `repo_deliveries[0].changed_paths` stays target-relative (no absolute paths, no `..`);
+- strict non-`no-write` delivery preserves `approval_context.runtime_harness.status=pass` with the latest run-level Runtime Harness report ref;
 - write-back target is `patch-only`, `local-branch`, or `fork-first-pr`.
 
 ## Post-run artifact inspection

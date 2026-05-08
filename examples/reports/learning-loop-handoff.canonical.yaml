@@ -1,0 +1,42 @@
+handoff_id: handoff.canonical
+project_id: aor-example
+run_id: run.canonical
+run_status: pass
+source_kind: live-e2e
+scorecard_ref: scorecard://scorecard.canonical
+incident_ref: null
+backlog_refs:
+  - backlog://W23-S01
+quality_refs:
+  - suite.release.core@v1
+evidence_refs:
+  - evidence://contracts/w23-s01/handoff
+matrix_cell:
+  cell_id: canonical.release.medium.openai
+  target_catalog_id: canonical-target
+  feature_mission_id: canonical-mission
+  scenario_family: release
+  provider_variant_id: openai-primary
+  feature_size: medium
+  coverage_tier: required
+coverage_follow_up:
+  current_cell_required: true
+  next_required_matrix_cell:
+    cell_id: canonical.repair.medium.anthropic
+    target_catalog_id: canonical-target
+    feature_mission_id: canonical-repair
+    scenario_family: repair
+    provider_variant_id: anthropic-primary
+    feature_size: medium
+    coverage_tier: required
+  remaining_required_matrix_cells:
+    - cell_id: canonical.repair.medium.anthropic
+      target_catalog_id: canonical-target
+      feature_mission_id: canonical-repair
+      scenario_family: repair
+      provider_variant_id: anthropic-primary
+      feature_size: medium
+      coverage_tier: required
+next_actions:
+  - Keep production proof evidence attached to the owning slice.
+generated_at: "2026-05-07T00:00:00.000Z"

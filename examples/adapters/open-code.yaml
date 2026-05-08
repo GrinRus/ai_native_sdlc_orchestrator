@@ -17,7 +17,7 @@ constraints:
   default_network_mode: deny-by-default
   supports_no_write_rehearsal: true
 execution:
-  live_baseline: true
+  live_baseline: false
   runtime_mode: external-process
   handler: open-code-external-runner
   evidence_namespace: evidence://adapter-live/open-code
@@ -49,6 +49,6 @@ log_features:
   stderr: true
   tool_calls: true
   normalized_summary: true
-certification_state: stable
+certification_state: candidate
 limitations:
-  - W20-S03 certifies the `ky.regress.small.open-code` required matrix cell; full OpenCode provider parity requires separate coverage.
+  - W22-S03 keeps OpenCode as an extended candidate until a real live certification run promotes it back to required baseline coverage.

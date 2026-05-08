@@ -5,6 +5,77 @@ generated_at: "2026-04-26T00:00:00.000Z"
 mission_type: code-changing
 strictness_profile: strict-code-changing
 overall_decision: repair
+run_controller:
+  controller_id: runtime-harness-run-controller
+  controller_version: v1
+  status: blocked
+  started_at: "2026-04-26T00:00:00.000Z"
+  finished_at: "2026-04-26T00:00:02.000Z"
+  transition_count: 6
+  terminal_transition_id: run.sample.transition.block.006
+run_transitions:
+  - transition_id: run.sample.transition.prepare.001
+    stage: prepare
+    status: pass
+    runtime_harness_decision: pass
+    summary: Runtime Harness prepared run state and project profile inputs.
+    started_at: "2026-04-26T00:00:00.000Z"
+    finished_at: "2026-04-26T00:00:00.100Z"
+    evidence_refs:
+      - evidence://reports/step-result-routed-run-sample.json
+  - transition_id: run.sample.transition.execute.002
+    stage: execute
+    status: pass
+    runtime_harness_decision: repair
+    summary: Runtime Harness delegated the routed step to the step engine.
+    started_at: "2026-04-26T00:00:00.100Z"
+    finished_at: "2026-04-26T00:00:01.000Z"
+    evidence_refs:
+      - evidence://reports/step-result-routed-run-sample.json
+  - transition_id: run.sample.transition.classify.003
+    stage: classify
+    status: blocked
+    runtime_harness_decision: repair
+    summary: Runtime Harness classified permission-mode-blocked evidence.
+    started_at: "2026-04-26T00:00:01.000Z"
+    finished_at: "2026-04-26T00:00:01.100Z"
+    evidence_refs:
+      - evidence://reports/step-result-routed-run-sample.json
+  - transition_id: run.sample.transition.repair.004
+    stage: repair
+    status: blocked
+    runtime_harness_decision: repair
+    summary: Runtime Harness selected repair policy for the blocked runner step.
+    started_at: "2026-04-26T00:00:01.100Z"
+    finished_at: "2026-04-26T00:00:01.200Z"
+    evidence_refs:
+      - evidence://reports/step-result-routed-run-sample.json
+  - transition_id: run.sample.transition.verify.005
+    stage: verify
+    status: pass
+    runtime_harness_decision: repair
+    summary: Runtime Harness materialized and validated the report contract.
+    started_at: "2026-04-26T00:00:01.200Z"
+    finished_at: "2026-04-26T00:00:01.300Z"
+    evidence_refs:
+      - evidence://reports/step-result-routed-run-sample.json
+  - transition_id: run.sample.transition.block.006
+    stage: block
+    status: blocked
+    runtime_harness_decision: repair
+    summary: Runtime Harness blocked run closure until repair evidence exists.
+    started_at: "2026-04-26T00:00:01.300Z"
+    finished_at: "2026-04-26T00:00:02.000Z"
+    evidence_refs:
+      - evidence://reports/step-result-routed-run-sample.json
+run_decision:
+  overall_decision: repair
+  terminal_status: blocked
+  failure_class: permission-mode-blocked
+  repair_status: pending
+  summary: Runtime Harness blocked run closure until repair evidence exists.
+  evidence_refs:
+    - evidence://reports/step-result-routed-run-sample.json
 step_decisions:
   - step_id: run.start.implement
     step_class: runner

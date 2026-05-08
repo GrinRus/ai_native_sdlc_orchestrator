@@ -119,7 +119,7 @@ graph TD
   W19S06[W19-S06 Planner metrics and scheduler visibility]
   W20S01[W20-S01 Multirepo scoped locks and cross-repo validation]
   W20S02[W20-S02 Production security and observability hardening baseline]
-  W20S03[W20-S03 OpenCode live-baseline certification]
+  W20S03[W20-S03 OpenCode candidate evidence and downgrade follow-up]
   W20S04[W20-S04 Compiler revision asset lifecycle]
   W20S05[W20-S05 Finance analytics and production monitoring loop]
   W21S01[W21-S01 Installed-user onboarding UX contract]
@@ -129,6 +129,21 @@ graph TD
   W21S05[W21-S05 Guided web app full-flow console]
   W21S06[W21-S06 Review, delivery, release, and learning closure UX]
   W21S07[W21-S07 Installed-user guided journey proof]
+  W22S01[W22-S01 Evidence-strength story coverage model]
+  W22S02[W22-S02 Production readiness source-of-truth]
+  W22S03[W22-S03 OpenCode maturity downgrade]
+  W23S01[W23-S01 Nested contract validation pack]
+  W23S02[W23-S02 Explicit production auth scopes]
+  W23S03[W23-S03 Shared lifecycle service boundary]
+  W24S01[W24-S01 Run-level Runtime Harness controller]
+  W24S02[W24-S02 Interactive continuation hardening]
+  W24S03[W24-S03 Strict delivery gate consolidation]
+  W25S01[W25-S01 Real external-runner proof profile]
+  W25S02[W25-S02 Code-changing full-journey pass]
+  W25S03[W25-S03 Proof fixture and story upgrade]
+  W26S01[W26-S01 Production readiness gate]
+  W26S02[W26-S02 Maintainability stabilization]
+  W26S03[W26-S03 Self-hosted release documentation]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -337,6 +352,29 @@ graph TD
   W21S04 --> W21S07
   W21S05 --> W21S07
   W21S06 --> W21S07
+  W22S01 --> W22S02
+  W22S01 --> W22S03
+  W22S01 --> W23S01
+  W22S02 --> W23S02
+  W22S02 --> W23S03
+  W23S01 --> W24S01
+  W23S03 --> W24S01
+  W24S01 --> W24S02
+  W23S02 --> W24S02
+  W24S01 --> W24S03
+  W23S01 --> W24S03
+  W24S01 --> W25S01
+  W23S02 --> W25S01
+  W25S01 --> W25S02
+  W24S03 --> W25S02
+  W25S02 --> W25S03
+  W22S01 --> W25S03
+  W25S03 --> W26S01
+  W23S01 --> W26S01
+  W23S02 --> W26S01
+  W24S01 --> W26S01
+  W26S01 --> W26S02
+  W26S01 --> W26S03
 ```
 
 ## W0 hard dependencies
@@ -552,6 +590,41 @@ graph TD
 | W21-S06 | W19-S05, W21-S05 |
 | W21-S07 | W21-S02, W21-S03, W21-S04, W21-S05, W21-S06 |
 
+## W22 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W22-S01 | none |
+| W22-S02 | W22-S01 |
+| W22-S03 | W22-S01 |
+
+## W23 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W23-S01 | W22-S01 |
+| W23-S02 | W22-S02 |
+| W23-S03 | W22-S02 |
+
+## W24 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W24-S01 | W23-S01, W23-S03 |
+| W24-S02 | W24-S01, W23-S02 |
+| W24-S03 | W24-S01, W23-S01 |
+
+## W25 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W25-S01 | W24-S01, W23-S02 |
+| W25-S02 | W25-S01, W24-S03 |
+| W25-S03 | W25-S02, W22-S01 |
+
+## W26 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W26-S01 | W25-S03, W23-S01, W23-S02, W24-S01 |
+| W26-S02 | W26-S01 |
+| W26-S03 | W26-S01 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -678,6 +751,21 @@ graph TD
 123. W21-S05
 124. W21-S06
 125. W21-S07
+126. W22-S01
+127. W22-S02
+128. W22-S03
+129. W23-S01
+130. W23-S02
+131. W23-S03
+132. W24-S01
+133. W24-S02
+134. W24-S03
+135. W25-S01
+136. W25-S02
+137. W25-S03
+138. W26-S01
+139. W26-S02
+140. W26-S03
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

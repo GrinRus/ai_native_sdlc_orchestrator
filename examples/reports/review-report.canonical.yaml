@@ -1,0 +1,94 @@
+review_report_id: review-report.canonical
+project_id: aor-example
+run_id: run.canonical
+generated_at: "2026-05-07T00:00:00.000Z"
+overall_status: pass
+review_recommendation: proceed
+feature_traceability:
+  status: pass
+  mission_id: canonical-mission
+  input_packet_ref: packet://canonical
+  request_title: Canonical production-readiness slice
+  request_brief: Demonstrate nested review-report validation.
+  scenario_family: release
+  provider_variant_id: openai-primary
+  feature_size: medium
+  matrix_cell:
+    cell_id: canonical.release.medium.openai
+    target_catalog_id: canonical-target
+    feature_mission_id: canonical-mission
+    scenario_family: release
+    provider_variant_id: openai-primary
+    feature_size: medium
+    coverage_tier: required
+  coverage_follow_up:
+    current_cell_required: true
+    next_required_matrix_cell:
+      cell_id: canonical.repair.medium.anthropic
+      target_catalog_id: canonical-target
+      feature_mission_id: canonical-repair
+      scenario_family: repair
+      provider_variant_id: anthropic-primary
+      feature_size: medium
+      coverage_tier: required
+    remaining_required_matrix_cells:
+      - cell_id: canonical.repair.medium.anthropic
+        target_catalog_id: canonical-target
+        feature_mission_id: canonical-repair
+        scenario_family: repair
+        provider_variant_id: anthropic-primary
+        feature_size: medium
+        coverage_tier: required
+discovery_quality:
+  status: pass
+  analysis_report_ref: evidence://contracts/w23-s01/project-analysis
+  spec_step_result_ref: evidence://contracts/w23-s01/spec-step-result
+  handoff_packet_ref: packet://handoff
+  findings: []
+artifact_quality:
+  status: pass
+  verify_summary_ref: evidence://contracts/w23-s01/verify-summary
+  execution_step_result_refs:
+    - evidence://contracts/w23-s01/step-result
+  delivery_manifest_ref: delivery-manifest://canonical
+  release_packet_ref: packet://release
+  findings: []
+code_quality:
+  status: pass
+  changed_paths:
+    - packages/example/src/index.ts
+  allowed_paths:
+    - packages/example/**
+  forbidden_paths:
+    - docs/**
+  findings: []
+feature_size_fit:
+  status: pass
+  feature_size: medium
+  size_budget:
+    max_changed_files: 8
+    max_added_lines: 200
+  actual_change:
+    changed_files: 1
+    added_lines: 12
+    deleted_lines: 2
+  findings: []
+provider_traceability:
+  status: pass
+  provider_variant_id: openai-primary
+  requested_provider: openai
+  requested_adapter: codex-cli
+  actual_provider: openai
+  actual_adapter: codex-cli
+  route_id: route.implement.default.openai-primary
+  route_profile_source: examples/routes/implement-default.yaml
+  findings: []
+findings:
+  - finding_id: review.canonical.1
+    severity: info
+    category: traceability
+    summary: Canonical nested review finding.
+    evidence_refs:
+      - evidence://contracts/w23-s01/review-finding
+evidence_refs:
+  - evidence://contracts/w23-s01/review-report

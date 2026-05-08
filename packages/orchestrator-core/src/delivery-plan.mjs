@@ -31,6 +31,14 @@ function asString(value) {
 
 /**
  * @param {unknown} value
+ * @returns {number | null}
+ */
+function asNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {unknown} value
  * @returns {string[]}
  */
 function asStringArray(value) {
@@ -134,6 +142,19 @@ function resolveGovernanceSource(policyResolution) {
  *   coordinationEvidenceRefs?: string[],
  *   coordinationLockEvidenceRefs?: string[],
  *   crossRepoValidationRefs?: string[],
+ *   runtimeHarnessGate?: {
+ *     required?: boolean,
+ *     enforced?: boolean,
+ *     status?: string,
+ *     reportId?: string | null,
+ *     reportRef?: string | null,
+ *     overallDecision?: string | null,
+ *     runDecision?: string | null,
+ *     routedStepDecisionCount?: number,
+ *     missionScopedChangedPaths?: string[],
+ *     scopeViolationPaths?: string[],
+ *     findings?: string[],
+ *   },
  *   rerunOfRunRef?: string,
  *   rerunFailedStepRef?: string,
  *   rerunPacketBoundary?: string,
@@ -155,6 +176,24 @@ export function materializeDeliveryPlan(options) {
 
   const promotionEvidenceRefs = [...new Set(asStringArray(options.promotionEvidenceRefs ?? []))];
   const promotionStatus = promotionEvidenceRefs.length > 0 ? "present" : "missing";
+  const runtimeHarnessGate = asRecord(options.runtimeHarnessGate ?? {});
+  const runtimeHarnessRequired = nonReadOnlyMode && runtimeHarnessGate.required === true;
+  const runtimeHarnessEnforced = runtimeHarnessRequired && runtimeHarnessGate.enforced === true;
+  const runtimeHarnessStatus = runtimeHarnessRequired ? asString(runtimeHarnessGate.status) ?? "missing" : "not-required";
+  const runtimeHarnessReportRef = asString(runtimeHarnessGate.reportRef);
+  const runtimeHarnessPrecondition = {
+    required: runtimeHarnessRequired,
+    enforced: runtimeHarnessEnforced,
+    status: runtimeHarnessStatus,
+    report_id: asString(runtimeHarnessGate.reportId),
+    report_ref: runtimeHarnessReportRef,
+    overall_decision: asString(runtimeHarnessGate.overallDecision),
+    run_decision: asString(runtimeHarnessGate.runDecision),
+    routed_step_decision_count: asNumber(runtimeHarnessGate.routedStepDecisionCount) ?? 0,
+    mission_scoped_changed_paths: uniqueStrings(asStringArray(runtimeHarnessGate.missionScopedChangedPaths)),
+    scope_violation_paths: uniqueStrings(asStringArray(runtimeHarnessGate.scopeViolationPaths)),
+    findings: uniqueStrings(asStringArray(runtimeHarnessGate.findings)),
+  };
   const coordinationRepos = Array.isArray(options.coordinationRepos)
     ? options.coordinationRepos
         .filter((repo) => typeof repo === "object" && repo !== null)
@@ -219,6 +258,9 @@ export function materializeDeliveryPlan(options) {
   if (nonReadOnlyMode && promotionStatus !== "present") {
     blockingReasons.push("promotion-evidence-required");
   }
+  if (runtimeHarnessEnforced && runtimeHarnessStatus !== "pass") {
+    blockingReasons.push("runtime-harness-gate-required");
+  }
   if (nonReadOnlyMode && multiRepoRequired && coordinationStatus !== "present") {
     blockingReasons.push("multi-repo-coordination-evidence-required");
   }
@@ -274,6 +316,7 @@ export function materializeDeliveryPlan(options) {
         status: nonReadOnlyMode ? promotionStatus : "not-required",
         refs: promotionEvidenceRefs,
       },
+      runtime_harness: runtimeHarnessPrecondition,
       coordination_evidence: {
         required: nonReadOnlyMode && multiRepoRequired,
         status: nonReadOnlyMode && multiRepoRequired ? coordinationStatus : "not-required",
@@ -304,7 +347,11 @@ export function materializeDeliveryPlan(options) {
     writeback_allowed: writebackAllowed,
     blocking_reasons: blockingReasons,
     status,
-    evidence_refs: uniqueStrings([...evidenceRefs, ...coordinationEvidenceRefs]),
+    evidence_refs: uniqueStrings([
+      ...evidenceRefs,
+      ...(runtimeHarnessReportRef ? [runtimeHarnessReportRef] : []),
+      ...coordinationEvidenceRefs,
+    ]),
     created_at: createdAt,
   };
 

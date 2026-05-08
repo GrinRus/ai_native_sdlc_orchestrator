@@ -589,6 +589,7 @@ export function runDeliveryDriver(options = {}) {
     approval_context: {
       approved_handoff: asRecord(asRecord(deliveryPlan.preconditions).approved_handoff),
       promotion_evidence: asRecord(asRecord(deliveryPlan.preconditions).promotion_evidence),
+      runtime_harness: asRecord(asRecord(deliveryPlan.preconditions).runtime_harness),
       coordination_evidence: asRecord(asRecord(deliveryPlan.preconditions).coordination_evidence),
       evidence_refs: deliveryPlanEvidenceRefs,
     },

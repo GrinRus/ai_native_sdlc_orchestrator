@@ -56,4 +56,4 @@ Full-journey reports must distinguish:
 ## Notes
 - The catalog is curated, not cartesian-complete.
 - Every curated repo should expose at least one `small`, one `medium`, and one `large` mission.
-- Required matrix cells are the canonical acceptance subset for that repo.
+- Cells with `coverage_tier=required` are the canonical acceptance subset for that repo. Historical `required_matrix_cells` entries with `coverage_tier=extended` are tracked candidate cells and must not count as mandatory acceptance coverage.

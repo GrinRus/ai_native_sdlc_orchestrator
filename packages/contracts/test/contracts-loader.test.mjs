@@ -59,6 +59,19 @@ function assertDirectoryContractsLoad(root, family) {
   }
 }
 
+/**
+ * @param {import("../src/index.d.ts").ContractValidationResult} validation
+ * @param {string} code
+ * @param {string} field
+ */
+function assertValidationIssue(validation, code, field) {
+  assert.equal(validation.ok, false, `expected validation to fail for ${field}`);
+  assert.ok(
+    validation.issues.some((problem) => problem.code === code && problem.field === field),
+    `expected ${code} for ${field}`,
+  );
+}
+
 test("loads all examples through the shared contracts path", () => {
   const examplesRoot = path.join(workspaceRoot, "examples");
   const expectedYamlCount = listYamlFiles(examplesRoot).length;
@@ -324,6 +337,38 @@ test("runtime harness report example loads through the shared contract path", ()
   });
 
   assert.equal(loaded.ok, true, "expected runtime-harness-report example to load");
+});
+
+test("runtime harness report rejects invalid run-level controller evidence", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/runtime-harness-report.sample.yaml"),
+    family: "runtime-harness-report",
+  });
+  assert.equal(loaded.ok, true, "fixture should load before mutation");
+
+  const invalidStage = structuredClone(loaded.document);
+  invalidStage.run_transitions[0].stage = "teleport";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "runtime-harness-report",
+      document: invalidStage,
+      source: "test://runtime-harness-report-invalid-stage",
+    }),
+    "enum_value_invalid",
+    "run_transitions[0].stage",
+  );
+
+  const missingDecisionEvidence = structuredClone(loaded.document);
+  delete missingDecisionEvidence.run_decision.evidence_refs;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "runtime-harness-report",
+      document: missingDecisionEvidence,
+      source: "test://runtime-harness-report-missing-decision-evidence",
+    }),
+    "required_field_missing",
+    "run_decision.evidence_refs",
+  );
 });
 
 test("review decision example preserves explicit approval vocabulary", () => {
@@ -667,6 +712,195 @@ test("live E2E observation report loads and enforces status scale", () => {
       `expected enum_value_invalid for ${field}`,
     );
   }
+});
+
+test("W23 nested canonical contract examples load through the shared contract path", () => {
+  const examples = [
+    [path.join(workspaceRoot, "examples/packets/artifact-packet.canonical.yaml"), "artifact-packet"],
+    [path.join(workspaceRoot, "examples/reports/step-result.canonical.yaml"), "step-result"],
+    [path.join(workspaceRoot, "examples/reports/validation-report.canonical.yaml"), "validation-report"],
+    [path.join(workspaceRoot, "examples/reports/review-report.canonical.yaml"), "review-report"],
+    [path.join(workspaceRoot, "examples/reports/live-run-event.canonical.yaml"), "live-run-event"],
+    [path.join(workspaceRoot, "examples/reports/incident-report.canonical.yaml"), "incident-report"],
+    [path.join(workspaceRoot, "examples/reports/learning-loop-scorecard.canonical.yaml"), "learning-loop-scorecard"],
+    [path.join(workspaceRoot, "examples/reports/learning-loop-handoff.canonical.yaml"), "learning-loop-handoff"],
+  ];
+
+  for (const [filePath, family] of examples) {
+    const loaded = loadContractFile({ filePath, family });
+    assert.equal(loaded.ok, true, `expected ${family} canonical example to load`);
+  }
+});
+
+test("W23 nested validators reject invalid nested shapes deterministically", () => {
+  const artifactPacket = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/packets/artifact-packet.canonical.yaml"),
+    family: "artifact-packet",
+  });
+  assert.equal(artifactPacket.ok, true);
+  const invalidArtifactPacket = structuredClone(artifactPacket.document);
+  invalidArtifactPacket.invocation_context.mission_id = 42;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "artifact-packet",
+      document: invalidArtifactPacket,
+      source: "test://w23-artifact-packet-invalid-nested",
+    }),
+    "field_type_mismatch",
+    "invocation_context.mission_id",
+  );
+
+  const stepResult = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/step-result.canonical.yaml"),
+    family: "step-result",
+  });
+  assert.equal(stepResult.ok, true);
+  const invalidStepResult = structuredClone(stepResult.document);
+  invalidStepResult.requested_interaction.answer_text = "sensitive answer";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "step-result",
+      document: invalidStepResult,
+      source: "test://w23-step-result-raw-answer",
+    }),
+    "unsupported_field_present",
+    "requested_interaction.answer_text",
+  );
+  const invalidInteractionHistory = structuredClone(stepResult.document);
+  invalidInteractionHistory.requested_interaction.state_history[0].status = "waiting";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "step-result",
+      document: invalidInteractionHistory,
+      source: "test://w24-step-result-invalid-interaction-state-history",
+    }),
+    "enum_value_invalid",
+    "requested_interaction.state_history[0].status",
+  );
+  const invalidInteractionHistoryAnswer = structuredClone(stepResult.document);
+  invalidInteractionHistoryAnswer.requested_interaction.state_history[0].answer_text = "sensitive answer";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "step-result",
+      document: invalidInteractionHistoryAnswer,
+      source: "test://w24-step-result-state-history-raw-answer",
+    }),
+    "unsupported_field_present",
+    "requested_interaction.state_history[0].answer_text",
+  );
+
+  const validationReport = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/validation-report.canonical.yaml"),
+    family: "validation-report",
+  });
+  assert.equal(validationReport.ok, true);
+  const invalidValidationReport = structuredClone(validationReport.document);
+  invalidValidationReport.validators[0].status = "green";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "validation-report",
+      document: invalidValidationReport,
+      source: "test://w23-validation-report-invalid-status",
+    }),
+    "enum_value_invalid",
+    "validators[0].status",
+  );
+
+  const reviewReport = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/review-report.canonical.yaml"),
+    family: "review-report",
+  });
+  assert.equal(reviewReport.ok, true);
+  const invalidReviewReport = structuredClone(reviewReport.document);
+  invalidReviewReport.findings[0].evidence_refs = "evidence://contracts/w23-s01/not-array";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-report",
+      document: invalidReviewReport,
+      source: "test://w23-review-report-invalid-finding-evidence",
+    }),
+    "field_type_mismatch",
+    "findings[0].evidence_refs",
+  );
+
+  const liveRunEvent = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/live-run-event.canonical.yaml"),
+    family: "live-run-event",
+  });
+  assert.equal(liveRunEvent.ok, true);
+  const invalidLiveRunEvent = structuredClone(liveRunEvent.document);
+  invalidLiveRunEvent.payload.sequence = "1";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-run-event",
+      document: invalidLiveRunEvent,
+      source: "test://w23-live-run-event-invalid-sequence",
+    }),
+    "field_type_mismatch",
+    "payload.sequence",
+  );
+  const invalidLiveRunEventContinuation = structuredClone(liveRunEvent.document);
+  delete invalidLiveRunEventContinuation.payload.interaction.continuation.next_action;
+  assertValidationIssue(
+    validateContractDocument({
+      family: "live-run-event",
+      document: invalidLiveRunEventContinuation,
+      source: "test://w24-live-run-event-invalid-continuation",
+    }),
+    "required_field_missing",
+    "payload.interaction.continuation.next_action",
+  );
+
+  const incidentReport = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/incident-report.canonical.yaml"),
+    family: "incident-report",
+  });
+  assert.equal(incidentReport.ok, true);
+  const invalidIncidentReport = structuredClone(incidentReport.document);
+  invalidIncidentReport.recertification.platform_recertification.rollback_required = "true";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "incident-report",
+      document: invalidIncidentReport,
+      source: "test://w23-incident-report-invalid-rollback",
+    }),
+    "field_type_mismatch",
+    "recertification.platform_recertification.rollback_required",
+  );
+
+  const scorecard = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/learning-loop-scorecard.canonical.yaml"),
+    family: "learning-loop-scorecard",
+  });
+  assert.equal(scorecard.ok, true);
+  const invalidScorecard = structuredClone(scorecard.document);
+  invalidScorecard.matrix_cell.scenario_family = "unknown";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "learning-loop-scorecard",
+      document: invalidScorecard,
+      source: "test://w23-scorecard-invalid-scenario",
+    }),
+    "enum_value_invalid",
+    "matrix_cell.scenario_family",
+  );
+
+  const handoff = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/reports/learning-loop-handoff.canonical.yaml"),
+    family: "learning-loop-handoff",
+  });
+  assert.equal(handoff.ok, true);
+  const invalidHandoff = structuredClone(handoff.document);
+  invalidHandoff.coverage_follow_up.remaining_required_matrix_cells[0] = "not-a-cell";
+  assertValidationIssue(
+    validateContractDocument({
+      family: "learning-loop-handoff",
+      document: invalidHandoff,
+      source: "test://w23-handoff-invalid-remaining-cell",
+    }),
+    "field_type_mismatch",
+    "coverage_follow_up.remaining_required_matrix_cells[0]",
+  );
 });
 
 test("contract index mapping covers every docs/contracts/00-index entry", () => {

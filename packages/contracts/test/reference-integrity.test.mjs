@@ -61,7 +61,7 @@ test("live e2e provider catalog required variants point at live-runnable adapter
   assert.equal(result.ok, true, "expected live E2E provider catalog references to pass");
   assert.equal(result.issues.length, 0, "expected zero live E2E catalog reference issues");
   assert.ok(result.checkedReferences >= 3, "expected provider variants to be checked");
-  assert.ok(result.checkedCompatibility >= 3, "expected required provider live-runtime compatibility checks");
+  assert.ok(result.checkedCompatibility >= 2, "expected required provider live-runtime compatibility checks");
 });
 
 test("live e2e provider catalog rejects required variants without adapter execution runtime", () => {
@@ -105,8 +105,16 @@ test("live e2e provider catalog keeps mandatory primary providers live-runnable 
   });
 });
 
-test("live e2e provider catalog rejects required OpenCode without permission policy", () => {
+test("live e2e provider catalog rejects promoted OpenCode without permission policy", () => {
   withTempWorkspace((tempRoot) => {
+    mutateYamlFile(tempRoot, "scripts/live-e2e/catalog/providers/open-code-primary.yaml", (document) => {
+      document.coverage_tier = "required";
+    });
+    mutateYamlFile(tempRoot, "examples/adapters/open-code.yaml", (document) => {
+      const execution = /** @type {Record<string, unknown>} */ (document.execution);
+      execution.live_baseline = true;
+      document.certification_state = "stable";
+    });
     mutateYamlFile(tempRoot, "examples/adapters/open-code.yaml", (document) => {
       const execution = /** @type {Record<string, unknown>} */ (document.execution);
       const externalRuntime = /** @type {Record<string, unknown>} */ (execution.external_runtime);
@@ -122,7 +130,7 @@ test("live e2e provider catalog rejects required OpenCode without permission pol
         candidate.field === "primary_adapter" &&
         candidate.reference === "open-code",
     );
-    assert.ok(issue, "expected required OpenCode adapter permission policy compatibility issue");
+    assert.ok(issue, "expected promoted OpenCode adapter permission policy compatibility issue");
   });
 });
 

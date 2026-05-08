@@ -26,6 +26,7 @@ pnpm check
 | `regress-short` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | `xo: command not found` (dependencies not installed) or `browserType.launch: Executable doesn't exist` (Playwright browsers not installed) |
 | `release-short` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | `xo: command not found` or Playwright browser executable missing |
 | `w7-governance-integration` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | promotion/learning-loop linkage missing or release rehearsal path fails before closure evidence materialization |
+| `full-journey-production-proof-ky-openai` | `node >=22`, `npm`, `git`, Playwright runtime support, authenticated `codex` CLI with non-interactive edit permissions | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries + external runner auth/config | `not authenticated`, permission/readiness denial, missing `codex`, or blocking target verification failure before `run start` |
 | `regress-long` | `python3`, `make`, `git` | `make install` | `make test`<br>`make codestyle` | Python dependencies from index/mirror | `No module named ...`, `make: *** ... Error` |
 | `release-long` | `node`, `yarn`, `git` | `yarn install --immutable` | `yarn g:lint`<br>`yarn g:typecheck`<br>`yarn workspace @your-org/ts-utils test-unit`<br>`yarn workspace @your-org/core-lib test-unit` | Yarn workspace dependencies | `YN0000/YN...` install errors, workspace script failure |
 
@@ -37,6 +38,28 @@ pnpm check
 - Release-shaped runs should anchor `delivery-manifest.repo_deliveries[].repo_root` and `release-packet.source_provenance.delivery_execution_root` to the same target checkout root.
 - Public-repo rehearsals keep `write_back_to_remote=false` by default.
 - If an external CDN/network dependency is unavailable (for example Playwright browser download), mark the run as external `inconclusive` for smoke tracking.
+
+## W25-S01 production-proof candidate profile
+
+Canonical profile:
+- `scripts/live-e2e/profiles/full-journey-production-proof-ky-openai.yaml`
+
+Fail-closed prerequisites:
+- profile resolves `target_catalog_id=ky` and `feature_mission_id=ky-header-regression`;
+- packaged bootstrap assets are required; `--examples-root` is rejected for this profile;
+- provider variant `openai-primary` must resolve to the packaged `codex-cli` external process adapter;
+- runner auth probe, edit readiness, and permission readiness must pass before `run start`;
+- `verification.baseline_gate.mode=blocking`, so target verification failure blocks before provider execution;
+- `output_policy.write_back_to_remote=false` and `preferred_delivery_mode=patch-only`.
+- post-run primary quality gates come from the curated mission and run `npx xo`, `npm run build`, and `npx ava test/headers.ts`; these are separate from baseline `verification.commands`.
+
+Proof-mode fields:
+- `production_proof.enabled=true`;
+- `proof_scope=full_code_changing_runtime_candidate` before executable proof promotion;
+- `external_runner_mode=real-external-process`;
+- `real_code_change_proof_complete=false` until W25-S02 captures a real code-changing pass;
+- promoted run summaries must record `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, passing required target verdicts, Runtime Harness/review/delivery evidence refs, and `no_upstream_write_assertion.status=pass`.
+- the committed W25-S03 fixture lives at `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`; it is sanitized proof evidence for the `ky.regress.small.openai` production cell only, and proof integrity rejects mock-backed `full_code_changing_runtime` claims.
 
 ## W12-S04 refreshed short-profile proof bundle (2026-04-23)
 
@@ -70,7 +93,7 @@ Operational rules:
 - each curated repo must expose `small`, `medium`, and `large` missions in its target catalog;
 - review and learning closure artifacts must carry `matrix_cell` and `coverage_follow_up`;
 - provider comparison coverage is required between `openai-primary` and `anthropic-primary` for at least one equivalent mission class per curated repo.
-- `openai-primary` and `anthropic-primary` are mandatory provider variants across comparison coverage; `open-code-primary` is mandatory for explicitly required OpenCode cells such as `ky.regress.small.open-code`.
+- `openai-primary` and `anthropic-primary` are mandatory provider variants across comparison coverage; `open-code-primary` is extended candidate coverage until a future real-runner proof promotes it.
 
 ## W14-S07 refreshed matrix full-journey proof bundle (2026-04-24)
 

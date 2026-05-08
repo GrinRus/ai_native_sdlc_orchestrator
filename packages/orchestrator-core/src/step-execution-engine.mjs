@@ -165,6 +165,43 @@ function toEvidenceRef(projectRoot, filePath) {
 }
 
 /**
+ * @param {{
+ *   stepResultId: string,
+ *   summary: string,
+ *   evidenceRefs: string[],
+ *   timestamp: string,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function buildRequestedInteraction(options) {
+  return {
+    requested: true,
+    interaction_id: `interaction.${normalizeRefSuffix(options.stepResultId) || "step"}.1`,
+    status: "requested",
+    prompt_summary: options.summary,
+    question_evidence_refs: options.evidenceRefs,
+    evidence_refs: options.evidenceRefs,
+    answer_audit_refs: [],
+    continuation: {
+      next_action: "resume_from_boundary",
+      reason_code: "operator-answer-required",
+    },
+    state_history: [
+      {
+        status: "requested",
+        timestamp: options.timestamp,
+        summary: options.summary,
+        evidence_refs: options.evidenceRefs,
+        continuation: {
+          next_action: "resume_from_boundary",
+          reason_code: "operator-answer-required",
+        },
+      },
+    ],
+  };
+}
+
+/**
  * @param {string} projectId
  * @param {string} runId
  * @param {string} stepId
@@ -1035,11 +1072,12 @@ export function executeRoutedStep(options) {
       : [];
   stepResult.requested_interaction =
     runtimeOutcome.failureClass === "interactive-question-requested"
-      ? {
-          requested: true,
+      ? buildRequestedInteraction({
+          stepResultId,
           summary,
-          evidence_refs: evidenceRefs,
-        }
+          evidenceRefs,
+          timestamp: finishedAt,
+        })
       : null;
 
   const stepResultPath = writeStepResult({

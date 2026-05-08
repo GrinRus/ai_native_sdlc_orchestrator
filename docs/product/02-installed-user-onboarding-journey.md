@@ -94,4 +94,4 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 - changing low-level command output shapes;
 - changing detached transport routes;
 - making the web UI mandatory;
-- expanding W20-S03 OpenCode certification beyond the explicitly certified `ky.regress.small.open-code` required matrix cell.
+- promoting OpenCode beyond extended candidate coverage before a future real-runner certification proves it.

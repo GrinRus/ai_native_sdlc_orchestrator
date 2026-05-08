@@ -143,11 +143,25 @@ function seedRequestedInteraction(projectRoot, runId, interactionId) {
           requested: true,
           interaction_id: interactionId,
           status: "requested",
-          summary: "Select the operator-approved target.",
-          evidence_refs: ["evidence://reports/web-runner-question.json"],
+          prompt_summary: "Select the operator-approved target.",
+          question_evidence_refs: ["evidence://reports/web-runner-question.json"],
+          answer_audit_refs: [],
           continuation: {
             next_action: "resume_from_boundary",
+            reason_code: "operator-answer-required",
           },
+          state_history: [
+            {
+              status: "requested",
+              timestamp: "2026-05-07T00:00:00.000Z",
+              summary: "Select the operator-approved target.",
+              evidence_refs: ["evidence://reports/web-runner-question.json"],
+              continuation: {
+                next_action: "resume_from_boundary",
+                reason_code: "operator-answer-required",
+              },
+            },
+          ],
         },
       },
       null,
@@ -999,12 +1013,13 @@ test("web connected mode surfaces runner questions and submits blocked interacti
       assert.match(beforeHtml, /web-question-1/);
       assert.match(beforeHtml, /Select the operator-approved target/);
 
+      const answerText = "Use staging.";
       const answer = await submitOperatorInteractionAnswer({
         cwd: projectRoot,
         projectRef: projectRoot,
         runId,
         interactionId,
-        answer: "Use staging.",
+        answer: answerText,
         reason: "operator selected safe target",
       });
       assert.equal(answer.binding_mode, "detached-http-mutation");
@@ -1013,7 +1028,12 @@ test("web connected mode surfaces runner questions and submits blocked interacti
       assert.equal(answer.interaction_answer.interaction_status, "blocked");
 
       const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
+      assert.equal(JSON.stringify(updatedStepResult).includes(answerText), false);
       assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+      assert.deepEqual(
+        updatedStepResult.requested_interaction.state_history.map((entry) => entry.status),
+        ["requested", "answered", "blocked"],
+      );
       assert.ok(updatedStepResult.requested_interaction.answer_audit_refs.includes(answer.interaction_answer.answer_audit_ref));
 
       const afterSnapshot = await buildOperatorConsoleSnapshot({
@@ -1026,6 +1046,8 @@ test("web connected mode surfaces runner questions and submits blocked interacti
       );
       assert.equal(updatedInteraction?.interaction_status, "blocked");
       assert.equal(updatedInteraction?.answer_required, false);
+      assert.equal(JSON.stringify(afterSnapshot).includes(answerText), false);
+      assert.equal(renderOperatorConsoleHtml(afterSnapshot).includes(answerText), false);
       assert.equal(
         JSON.stringify(afterSnapshot.run_detail.event_history).includes(answer.interaction_answer.answer_audit_ref),
         true,

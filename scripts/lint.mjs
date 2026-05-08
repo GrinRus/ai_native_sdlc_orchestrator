@@ -55,6 +55,87 @@ function read(file) {
   return fs.readFileSync(path.join(root, file), "utf8");
 }
 
+/**
+ * @param {string} dir
+ * @returns {string[]}
+ */
+function listSourceFiles(dir) {
+  const absoluteDir = path.join(root, dir);
+  if (!fs.existsSync(absoluteDir)) {
+    return [];
+  }
+
+  /** @type {string[]} */
+  const files = [];
+  for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listSourceFiles(entryPath));
+    } else if (entry.isFile() && entry.name.endsWith(".mjs")) {
+      files.push(entryPath);
+    }
+  }
+  return files;
+}
+
+/**
+ * @param {string} sourceFile
+ * @param {string} sourceRoot
+ * @param {string} forbiddenRoot
+ * @returns {string[]}
+ */
+function findForbiddenSourceEdges(sourceFile, sourceRoot, forbiddenRoot) {
+  const content = read(sourceFile);
+  const sourceDir = path.dirname(path.join(root, sourceFile));
+  const forbiddenAbsolute = path.join(root, forbiddenRoot);
+  const sourceRootLabel = sourceRoot.replace(/\/$/u, "");
+  const forbiddenRootLabel = forbiddenRoot.replace(/\/$/u, "");
+  /** @type {string[]} */
+  const violations = [];
+  const specifierRegex = /\b(?:import|export)\b[\s\S]*?\bfrom\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/gu;
+
+  for (const match of content.matchAll(specifierRegex)) {
+    const specifier = match[1] ?? match[2];
+    if (!specifier) {
+      continue;
+    }
+    if (specifier.includes(forbiddenRootLabel)) {
+      violations.push(`${sourceFile} imports ${specifier}`);
+      continue;
+    }
+    if (specifier.startsWith(".")) {
+      const resolved = path.resolve(sourceDir, specifier);
+      if (resolved === forbiddenAbsolute || resolved.startsWith(`${forbiddenAbsolute}${path.sep}`)) {
+        violations.push(`${sourceFile} imports ${specifier}`);
+      }
+    }
+  }
+
+  if (content.includes(`${forbiddenRootLabel}/`)) {
+    violations.push(`${sourceFile} references ${forbiddenRootLabel}/`);
+  }
+
+  return violations.filter((entry) => entry.includes(sourceRootLabel) || entry.includes(sourceFile));
+}
+
+function assertNoAppToAppSourceEdges() {
+  const checks = [
+    { sourceRoot: "apps/api/src", forbiddenRoot: "apps/cli" },
+    { sourceRoot: "apps/cli/src", forbiddenRoot: "apps/api" },
+  ];
+  const violations = checks.flatMap(({ sourceRoot, forbiddenRoot }) =>
+    listSourceFiles(sourceRoot).flatMap((file) => findForbiddenSourceEdges(file, sourceRoot, forbiddenRoot)),
+  );
+  if (violations.length > 0) {
+    console.error("Disallowed API/CLI app-to-app source dependency edges:");
+    for (const violation of violations) {
+      console.error(`- ${violation}`);
+    }
+    process.exit(1);
+  }
+  console.log("app boundary ok: no apps/api <-> apps/cli source edges");
+}
+
 const missing = [...requiredAgents, ...requiredDocs].filter(
   (file) => !fs.existsSync(path.join(root, file)),
 );
@@ -90,3 +171,4 @@ for (const file of [
 }
 
 console.log(`guidance coverage ok: ${requiredAgents.length} AGENTS files, ${requiredDocs.length} required docs`);
+assertNoAppToAppSourceEdges();

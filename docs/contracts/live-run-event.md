@@ -34,6 +34,7 @@ Event payloads should use `run_id + interaction_id` when an interaction id is av
 - `interaction.question_summary`, sanitized for query subscribers;
 - `interaction.answer_required` while the run is waiting for an operator answer;
 - `interaction.answer_audit_refs` after an answer is accepted.
+- `interaction.continuation.next_action` when the event is reporting a deterministic resume/block decision.
 
 Recommended event use:
 - `step.updated` when the interaction is requested, answered, resumed, or remains blocked;
@@ -41,6 +42,14 @@ Recommended event use:
 - `warning.raised` when validation rejects an answer or the run cannot continue.
 
 Live streams must never include raw answer text. Subscribers should replay from the read model and treat the latest event for one `interaction_id` as the current continuation state.
+
+## Loader validation
+The shared contract loader validates the query-safe nested event surface:
+- `payload.sequence` is required and must be numeric;
+- `payload.interaction.status` must use `requested|answered|resumed|blocked` when an interaction payload is present;
+- `payload.interaction.answer_audit_refs[]` must contain strings when present;
+- `payload.interaction.continuation.next_action` must be a string when continuation metadata is present;
+- raw answer fields such as `answer`, `answer_text`, and `raw_answer` are rejected in `payload` and `payload.interaction`.
 
 ## Notes
 Live events should support catch-up from a read model plus the live stream.

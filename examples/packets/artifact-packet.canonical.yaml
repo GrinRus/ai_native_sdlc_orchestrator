@@ -1,0 +1,14 @@
+packet_id: packet.canonical.intake
+project_id: aor-example
+packet_type: intake-request
+version: 1
+status: ready
+summary: Canonical intake artifact packet with runtime invocation context.
+body_ref: artifact-body://packet.canonical.intake.body.v1
+evidence_refs:
+  - evidence://contracts/w23-s01/artifact-packet
+invocation_context:
+  command: aor intake create
+  project_root: /workspace/aor-example
+  project_profile_ref: project.aor.yaml
+  mission_id: canonical-mission

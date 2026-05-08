@@ -25,7 +25,17 @@ async function withTempRepo(callback) {
  * @param {{ timeoutMs?: number }} [options]
  */
 async function readNextLiveRunEvent(response, options = {}) {
+  const events = await readLiveRunEvents(response, { ...options, count: 1 });
+  return events[0];
+}
+
+/**
+ * @param {Response} response
+ * @param {{ timeoutMs?: number, count?: number }} [options]
+ */
+async function readLiveRunEvents(response, options = {}) {
   const timeoutMs = options.timeoutMs ?? 3000;
+  const count = options.count ?? 1;
   if (!response.body) {
     throw new Error("SSE response body is missing.");
   }
@@ -34,44 +44,52 @@ async function readNextLiveRunEvent(response, options = {}) {
   const decoder = new TextDecoder();
   let buffer = "";
   const timeoutAt = Date.now() + timeoutMs;
+  const events = [];
 
-  while (Date.now() < timeoutAt) {
-    const remaining = timeoutAt - Date.now();
-    const readResult = await Promise.race([
-      reader.read(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timed out waiting for SSE event")), remaining)),
-    ]);
+  try {
+    while (Date.now() < timeoutAt && events.length < count) {
+      const remaining = timeoutAt - Date.now();
+      const readResult = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timed out waiting for SSE event")), remaining)),
+      ]);
 
-    if (readResult.done) {
-      break;
-    }
+      if (readResult.done) {
+        break;
+      }
 
-    buffer += decoder.decode(readResult.value, { stream: true });
+      buffer += decoder.decode(readResult.value, { stream: true });
 
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      const block = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      boundary = buffer.indexOf("\n\n");
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary >= 0) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        boundary = buffer.indexOf("\n\n");
 
-      const normalized = block.replace(/\r/g, "");
-      const lines = normalized.split("\n");
-      let event = "message";
-      let data = "";
-      for (const line of lines) {
-        if (line.startsWith("event:")) {
-          event = line.slice(6).trim();
-        } else if (line.startsWith("data:")) {
-          data = data.length > 0 ? `${data}\n${line.slice(5).trimStart()}` : line.slice(5).trimStart();
+        const normalized = block.replace(/\r/g, "");
+        const lines = normalized.split("\n");
+        let event = "message";
+        let data = "";
+        for (const line of lines) {
+          if (line.startsWith("event:")) {
+            event = line.slice(6).trim();
+          } else if (line.startsWith("data:")) {
+            data = data.length > 0 ? `${data}\n${line.slice(5).trimStart()}` : line.slice(5).trimStart();
+          }
+        }
+
+        if (event !== "live-run-event" || data.length === 0) {
+          continue;
+        }
+
+        events.push(JSON.parse(data));
+        if (events.length >= count) {
+          return events;
         }
       }
-
-      if (event !== "live-run-event" || data.length === 0) {
-        continue;
-      }
-
-      return JSON.parse(data);
     }
+  } finally {
+    await reader.cancel().catch(() => {});
   }
 
   throw new Error("timed out waiting for live-run-event payload");
@@ -671,11 +689,25 @@ test("detached control-plane transport records interactive continuation answers 
               requested: true,
               interaction_id: interactionId,
               status: "requested",
-              summary: "Choose the deployment target.",
-              evidence_refs: ["evidence://reports/runner-question.json"],
+              prompt_summary: "Choose the deployment target.",
+              question_evidence_refs: ["evidence://reports/runner-question.json"],
+              answer_audit_refs: [],
               continuation: {
                 next_action: "resume_from_boundary",
+                reason_code: "operator-answer-required",
               },
+              state_history: [
+                {
+                  status: "requested",
+                  timestamp: "2026-05-07T00:00:00.000Z",
+                  summary: "Choose the deployment target.",
+                  evidence_refs: ["evidence://reports/runner-question.json"],
+                  continuation: {
+                    next_action: "resume_from_boundary",
+                    reason_code: "operator-answer-required",
+                  },
+                },
+              ],
             },
           },
           null,
@@ -706,7 +738,13 @@ test("detached control-plane transport records interactive continuation answers 
       assert.equal(auditRecord.answer_text, answerText);
 
       const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
+      assert.equal(JSON.stringify(updatedStepResult).includes(answerText), false);
       assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+      assert.deepEqual(
+        updatedStepResult.requested_interaction.state_history.map((entry) => entry.status),
+        ["requested", "answered", "blocked"],
+      );
+      assert.equal(updatedStepResult.requested_interaction.continuation.next_action, "remain_blocked");
       assert.ok(updatedStepResult.requested_interaction.answer_audit_refs.includes(answerPayload.interaction_answer.answer_audit_ref));
       assert.ok(updatedStepResult.evidence_refs.includes(answerPayload.interaction_answer.answer_audit_ref));
 
@@ -717,6 +755,24 @@ test("detached control-plane transport records interactive continuation answers 
       const historyPayload = await historyResponse.json();
       assert.equal(JSON.stringify(historyPayload).includes(answerText), false);
       assert.equal(JSON.stringify(historyPayload).includes(answerPayload.interaction_answer.answer_audit_ref), true);
+
+      const streamResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/runs/${runId}/events?max_replay=10`,
+        {
+          headers: {
+            accept: "text/event-stream",
+          },
+        },
+      );
+      assert.equal(streamResponse.status, 200);
+      const streamedEvents = await readLiveRunEvents(streamResponse, { count: 3, timeoutMs: 3000 });
+      assert.equal(JSON.stringify(streamedEvents).includes(answerText), false);
+      assert.deepEqual(
+        streamedEvents
+          .map((event) => event.interaction?.status)
+          .filter((status) => typeof status === "string"),
+        ["answered", "blocked"],
+      );
     } finally {
       await transport.close();
     }
@@ -743,6 +799,15 @@ test("detached control-plane authn/authz enforces bearer auth with project-scope
             token: "operator-token",
             token_id: "operator",
             permissions: ["read", "mutate"],
+          },
+          {
+            token: "legacy-default-token",
+            token_id: "legacy-default",
+          },
+          {
+            token: "legacy-empty-token",
+            token_id: "legacy-empty",
+            permissions: [],
           },
           {
             token: "foreign-token",
@@ -774,6 +839,21 @@ test("detached control-plane authn/authz enforces bearer auth with project-scope
       assert.equal(readAllowedResponse.status, 200);
       const readAllowedPayload = await readAllowedResponse.json();
       assert.equal(readAllowedPayload.project_id, transport.projectId);
+
+      const legacyDefaultReadResponse = await getJson(stateUrl, "legacy-default-token");
+      assert.equal(legacyDefaultReadResponse.status, 200);
+
+      const legacyEmptyMutateResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "start",
+          run_id: "run.http.transport.auth.local-trusted-defaults.v1",
+        },
+        "legacy-empty-token",
+      );
+      assert.equal(legacyEmptyMutateResponse.status, 200);
+      const legacyEmptyMutatePayload = await legacyEmptyMutateResponse.json();
+      assert.equal(legacyEmptyMutatePayload.run_control.blocked, false);
 
       const mutateForbiddenResponse = await postJsonWithToken(
         runControlUrl,
@@ -825,6 +905,26 @@ test("production-hardened transport enforces authz and redacts configured secret
             permissions: ["read"],
           },
           {
+            token: "mutate-prod-token",
+            token_id: "mutator",
+            permissions: ["mutate"],
+          },
+          {
+            token: "missing-permissions-prod-token",
+            token_id: "missing-permissions",
+          },
+          {
+            token: "empty-permissions-prod-token",
+            token_id: "empty-permissions",
+            permissions: [],
+          },
+          {
+            token: "foreign-prod-token",
+            token_id: "foreign",
+            permissions: ["read", "mutate"],
+            project_refs: ["project.unrelated"],
+          },
+          {
             token: secretToken,
             token_id: "operator",
             permissions: ["read", "mutate"],
@@ -842,6 +942,44 @@ test("production-hardened transport enforces authz and redacts configured secret
       const missingAuthPayload = await missingAuthResponse.json();
       assert.equal(missingAuthPayload.error.code, "auth.missing_credentials");
       assert.equal(missingAuthPayload.error.auth.security_mode, "production-hardened");
+
+      const missingPermissionsResponse = await getJson(stateUrl, "missing-permissions-prod-token");
+      assert.equal(missingPermissionsResponse.status, 403);
+      const missingPermissionsPayload = await missingPermissionsResponse.json();
+      assert.equal(missingPermissionsPayload.error.code, "auth.insufficient_permission");
+      assert.equal(missingPermissionsPayload.error.auth.required_permission, "read");
+      assert.equal(JSON.stringify(missingPermissionsPayload).includes("missing-permissions-prod-token"), false);
+
+      const emptyPermissionsResponse = await getJson(stateUrl, "empty-permissions-prod-token");
+      assert.equal(emptyPermissionsResponse.status, 403);
+      const emptyPermissionsPayload = await emptyPermissionsResponse.json();
+      assert.equal(emptyPermissionsPayload.error.code, "auth.insufficient_permission");
+      assert.equal(emptyPermissionsPayload.error.auth.required_permission, "read");
+      assert.equal(JSON.stringify(emptyPermissionsPayload).includes("empty-permissions-prod-token"), false);
+
+      const mutateOnlyReadResponse = await getJson(stateUrl, "mutate-prod-token");
+      assert.equal(mutateOnlyReadResponse.status, 403);
+      const mutateOnlyReadPayload = await mutateOnlyReadResponse.json();
+      assert.equal(mutateOnlyReadPayload.error.code, "auth.insufficient_permission");
+      assert.equal(mutateOnlyReadPayload.error.auth.required_permission, "read");
+
+      const wrongProjectResponse = await getJson(stateUrl, "foreign-prod-token");
+      assert.equal(wrongProjectResponse.status, 403);
+      const wrongProjectPayload = await wrongProjectResponse.json();
+      assert.equal(wrongProjectPayload.error.code, "auth.forbidden_project");
+      assert.equal(JSON.stringify(wrongProjectPayload).includes("foreign-prod-token"), false);
+
+      const mutateOnlyAllowedResponse = await postJsonWithToken(
+        runControlUrl,
+        {
+          action: "start",
+          run_id: "run.http.transport.production-mutator-only.v1",
+        },
+        "mutate-prod-token",
+      );
+      assert.equal(mutateOnlyAllowedResponse.status, 200);
+      const mutateOnlyAllowedPayload = await mutateOnlyAllowedResponse.json();
+      assert.equal(mutateOnlyAllowedPayload.run_control.blocked, false);
 
       const deniedMutateResponse = await postJsonWithToken(
         runControlUrl,

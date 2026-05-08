@@ -1,0 +1,50 @@
+step_result_id: step-result.blocked-interaction.runner
+run_id: run.blocked-interaction
+step_id: step.runner.blocked-interaction
+step_class: runner
+status: failed
+summary: Runner interaction remained blocked after the operator answer audit was accepted.
+evidence_refs:
+  - evidence://contracts/w24-s02/interaction-question
+  - evidence://contracts/w24-s02/interaction-answer-audit
+runtime_harness_decision: block
+requested_interaction:
+  requested: true
+  interaction_id: interaction.blocked.1
+  status: blocked
+  prompt_summary: Operator selected a target, but this runtime cannot resume from the boundary.
+  question_evidence_refs:
+    - evidence://contracts/w24-s02/interaction-question
+  answer_audit_refs:
+    - evidence://contracts/w24-s02/interaction-answer-audit
+  continuation:
+    next_action: remain_blocked
+    reason_code: continuation.runtime_boundary_unavailable
+  state_history:
+    - status: requested
+      timestamp: "2026-05-07T00:00:00.000Z"
+      summary: Operator input was requested at the bounded runner boundary.
+      evidence_refs:
+        - evidence://contracts/w24-s02/interaction-question
+      continuation:
+        next_action: resume_from_boundary
+    - status: answered
+      timestamp: "2026-05-07T00:01:00.000Z"
+      summary: Operator answer audit evidence was accepted.
+      evidence_refs:
+        - evidence://contracts/w24-s02/interaction-answer-audit
+      answer_audit_refs:
+        - evidence://contracts/w24-s02/interaction-answer-audit
+      continuation:
+        next_action: resume_from_boundary
+        reason_code: answer-accepted
+    - status: blocked
+      timestamp: "2026-05-07T00:01:01.000Z"
+      summary: Runtime boundary was unavailable, so continuation remained blocked.
+      evidence_refs:
+        - evidence://contracts/w24-s02/interaction-answer-audit
+      answer_audit_refs:
+        - evidence://contracts/w24-s02/interaction-answer-audit
+      continuation:
+        next_action: remain_blocked
+        reason_code: continuation.runtime_boundary_unavailable

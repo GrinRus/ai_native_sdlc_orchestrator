@@ -24,6 +24,7 @@ Bounded rehearsal profiles:
 
 Catalog-backed full-journey profiles:
 - `installed-user-guided-journey.yaml`
+- `full-journey-production-proof-ky-openai.yaml`
 - `full-journey-regress-ky.yaml`
 - `full-journey-regress-ky-anthropic.yaml`
 - `full-journey-regress-ky-medium-anthropic.yaml`
@@ -83,6 +84,24 @@ node ./scripts/live-e2e/run-profile.mjs \
 
 For full-journey acceptance, packaged bootstrap assets are used by default. `--examples-root` is an explicit internal override for proof generation and deterministic fixture-backed runs.
 
+Production-proof candidate profile:
+
+```bash
+node ./scripts/live-e2e/run-profile.mjs \
+  --project-ref . \
+  --profile ./scripts/live-e2e/profiles/full-journey-production-proof-ky-openai.yaml \
+  --runner-auth-mode host \
+  --runtime-agent-permission-mode full-bypass
+```
+
+`full-journey-production-proof-ky-openai.yaml` is stricter than the W14 coverage profiles:
+- it resolves `ky` and `ky-header-regression` from the curated target catalog;
+- it uses the packaged `codex-cli` adapter profile and `external_runner_mode=real-external-process`;
+- it rejects `--examples-root` because production proof cannot use deterministic mock adapter injection;
+- it sets `verification.baseline_gate.mode=blocking`, so target verification failures block before provider execution;
+- it keeps `output_policy.write_back_to_remote=false` and `preferred_delivery_mode=patch-only`;
+- it starts from candidate profile metadata, then promotes the run summary to `proof_scope=full_code_changing_runtime` and `real_code_change_proof_complete=true` only when executable evidence proves a real code-changing pass, required target verdicts pass, Runtime Harness/review/delivery evidence exists, and the no-upstream-write assertion passes.
+
 Expected output includes:
 - `run_id`
 - `live_e2e_run_summary_file`
@@ -106,6 +125,14 @@ Full-journey layer:
 - writes an execution-readiness decision before `run start` so promotion evidence is based on readiness and routed dry-run proof, not on a failed baseline target check;
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
 - may still run legacy audit or learning diagnostics after delivery for compatibility, but `release` and `learning` are excluded from the v1 observation matrix.
+
+Production-proof profiles add a fail-closed layer on top of full-journey behavior:
+- runner auth probe is required;
+- edit and permission readiness are required before `run start`;
+- target setup and verification commands must be declared;
+- baseline target verification must use blocking mode;
+- write-back must remain disabled and delivery mode must be `patch-only` or `local-branch`;
+- deterministic proof-runner `--examples-root` overrides are rejected.
 
 Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, and capture an operator-console web smoke artifact. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, web smoke output, and no-upstream-write assertions must be materialized.
 
@@ -142,6 +169,25 @@ Full-journey summaries must carry:
 - `live_e2e_observation_overall_status`
 - `agent_artifact_review_request_file`
 - `verdict_matrix` when legacy diagnostics ran
+
+Production-proof candidate summaries additionally carry:
+- `production_proof`
+- `proof_scope`
+- `external_runner_mode`
+- `real_code_change_proof_complete`
+- `production_proof_evidence_status`
+- `production_proof_evidence_refs`
+- `no_upstream_write_assertion`
+- `delivery_manifest_file`
+- `review_report_file`
+- `latest_runtime_harness_report_file`
+
+The W25-S03 committed production proof fixture is
+`examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`. It is a sanitized derivative of the real
+W25-S02 `full-journey-production-proof-ky-openai.yaml` run and records `proof_scope=full_code_changing_runtime`,
+`real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, `overall_verdict=pass`,
+mission-scoped changed paths, Runtime Harness/review/delivery evidence summaries, and a passing no-upstream-write
+assertion. It intentionally excludes runtime output paths, target checkout contents, raw transcripts, and secrets.
 
 Guided full-journey summaries also carry:
 - `guided_journey`
@@ -270,3 +316,14 @@ Evidence note:
 - the bundle proves all mandatory scenario families: `regress`, `release`, `repair`, and `governance`.
 - the bundle is explicitly classified as `proof_scope=coverage_with_findings` with `real_code_change_proof_complete=false`; it is coverage evidence, not full code-changing runtime proof.
 - `overall_verdict` remains `pass_with_findings` in the committed proof because the deterministic external runner mock does not materialize mission code changes, leaving `review-report.code_quality=warn`.
+
+## W25-S03 production proof fixture (2026-05-08)
+Canonical fixture:
+- `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`
+
+Evidence note:
+- the fixture is derived from a real `full-journey-production-proof-ky-openai.yaml` run, not from `--examples-root` or a deterministic mock runner.
+- it covers the required `ky.regress.small.openai` cell with `overall_verdict=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
+- it records mission-scoped changed paths under `source/utils/merge.ts` and `test/headers.ts`, plus pass summaries for post-run verification, Runtime Harness, review, delivery, and learning-loop closure.
+- it records `delivery_mode=patch-only`, `write_back_to_remote=false`, unchanged target `HEAD`, empty `commit_refs`, and `writeback_results=[patch-materialized]`.
+- it is sanitized for commit: no runtime output tree, target checkout, local absolute path, raw transcript, or secret material is included.

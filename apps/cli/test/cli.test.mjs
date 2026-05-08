@@ -87,6 +87,211 @@ function writeRuntimeJson(filePath, document) {
   fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
 }
 
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   runId: string,
+ *   overallDecision?: "pass" | "retry" | "repair" | "escalate" | "block" | "fail",
+ *   runDecision?: "pass" | "retry" | "repair" | "escalate" | "block" | "fail",
+ *   terminalStatus?: "closed" | "blocked" | "failed",
+ *   missionScopedChangedPaths?: string[],
+ *   scopeViolationPaths?: string[],
+ *   includeRunLevel?: boolean,
+ * }} options
+ * @returns {{ reportFile: string, reportRef: string, initPayload: Record<string, unknown> }}
+ */
+function seedStrictRuntimeHarnessReport(options) {
+  const initResult = invokeCli(["project", "init", "--project-ref", options.projectRoot]);
+  assert.equal(initResult.exitCode, 0, initResult.stderr);
+  const initPayload = JSON.parse(initResult.stdout);
+  const reportsRoot = initPayload.runtime_layout.reportsRoot;
+  const projectId = initPayload.project_id ?? "aor-cli-test";
+  const overallDecision = options.overallDecision ?? "pass";
+  const runDecision = options.runDecision ?? overallDecision;
+  const terminalStatus = options.terminalStatus ?? (runDecision === "pass" ? "closed" : "blocked");
+  const missionScopedChangedPaths = options.missionScopedChangedPaths ?? ["examples/project.aor.yaml"];
+  const scopeViolationPaths = options.scopeViolationPaths ?? [];
+  const reportFile = path.join(reportsRoot, `runtime-harness-report-${options.runId}.json`);
+  const reportRef = `evidence://${path.relative(options.projectRoot, reportFile).replace(/\\/g, "/")}`;
+  const generatedAt = new Date().toISOString();
+  const report = {
+    report_id: `${options.runId}.runtime-harness-report.v1`,
+    project_id: projectId,
+    run_id: options.runId,
+    generated_at: generatedAt,
+    mission_type: "code-changing",
+    strictness_profile: "strict-code-changing",
+    overall_decision: overallDecision,
+    ...(options.includeRunLevel === false
+      ? {}
+      : {
+          run_controller: {
+            controller_id: "runtime-harness-run-controller",
+            controller_version: "v1",
+            status: terminalStatus,
+            started_at: generatedAt,
+            finished_at: generatedAt,
+            transition_count: 4,
+            terminal_transition_id: `${options.runId}.transition.close.004`,
+          },
+          run_transitions: [
+            {
+              transition_id: `${options.runId}.transition.prepare.001`,
+              stage: "prepare",
+              status: "pass",
+              runtime_harness_decision: "pass",
+              summary: "Runtime Harness prepared strict delivery fixture evidence.",
+              started_at: generatedAt,
+              finished_at: generatedAt,
+              evidence_refs: [`evidence://reports/step-result-${options.runId}.json`],
+            },
+            {
+              transition_id: `${options.runId}.transition.execute.002`,
+              stage: "execute",
+              status: "pass",
+              runtime_harness_decision: runDecision,
+              summary: "Runtime Harness delegated fixture execution.",
+              started_at: generatedAt,
+              finished_at: generatedAt,
+              evidence_refs: [`evidence://reports/step-result-${options.runId}.json`],
+            },
+            {
+              transition_id: `${options.runId}.transition.verify.003`,
+              stage: "verify",
+              status: runDecision === "pass" ? "pass" : "blocked",
+              runtime_harness_decision: runDecision,
+              summary: "Runtime Harness verified strict delivery fixture evidence.",
+              started_at: generatedAt,
+              finished_at: generatedAt,
+              evidence_refs: [`evidence://reports/step-result-${options.runId}.json`],
+            },
+            {
+              transition_id: `${options.runId}.transition.close.004`,
+              stage: terminalStatus === "closed" ? "close" : "block",
+              status: terminalStatus === "closed" ? "pass" : "blocked",
+              runtime_harness_decision: runDecision,
+              summary: "Runtime Harness closed strict delivery fixture evidence.",
+              started_at: generatedAt,
+              finished_at: generatedAt,
+              evidence_refs: [`evidence://reports/step-result-${options.runId}.json`],
+            },
+          ],
+          run_decision: {
+            overall_decision: runDecision,
+            terminal_status: terminalStatus,
+            failure_class: runDecision === "pass" ? null : "no-op",
+            repair_status: runDecision === "pass" ? null : "pending",
+            summary: "Runtime Harness strict delivery fixture run decision.",
+            evidence_refs: [`evidence://reports/step-result-${options.runId}.json`],
+          },
+        }),
+    step_decisions: [
+      {
+        step_id: "run.start.implement",
+        step_class: "runner",
+        compiled_context_ref: `compiled-context://${options.runId}.implement`,
+        adapter_status: overallDecision === "pass" ? "success" : "blocked",
+        failure_class: overallDecision === "pass" ? null : "no-op",
+        mission_outcome: overallDecision === "pass" ? "satisfied" : "not_satisfied",
+        runtime_harness_decision: overallDecision,
+        repair_attempts: [],
+        verification_status: overallDecision === "pass" ? "pass" : "not_run",
+        stage_timings: {
+          started_at: generatedAt,
+          finished_at: generatedAt,
+          duration_sec: 0,
+        },
+        mission_semantics: {
+          git_status_available: true,
+          changed_paths: [...missionScopedChangedPaths, ...scopeViolationPaths],
+          non_bootstrap_changed_paths: [...missionScopedChangedPaths, ...scopeViolationPaths],
+          non_input_changed_paths: [...missionScopedChangedPaths, ...scopeViolationPaths],
+          mission_scoped_changed_paths: missionScopedChangedPaths,
+          ignored_input_files: [],
+          allowed_paths: ["examples/**", "source/**"],
+          forbidden_paths: ["docs/**"],
+          forbidden_changed_paths: scopeViolationPaths.filter((entry) => entry.startsWith("docs/")),
+          out_of_scope_changed_paths: scopeViolationPaths,
+          scope_violation_paths: scopeViolationPaths,
+          strict_code_changing_noop: missionScopedChangedPaths.length === 0,
+        },
+        evidence_refs: [`evidence://reports/step-result-${options.runId}.json`],
+      },
+    ],
+    run_findings: overallDecision === "pass" ? [] : [
+      {
+        finding_id: `${options.runId}.runtime.no-op`,
+        severity: "fail",
+        category: "runtime",
+        failure_class: "no-op",
+        summary: "Runtime Harness found no meaningful mission-scoped patch.",
+        evidence_refs: [`evidence://reports/step-result-${options.runId}.json`],
+      },
+    ],
+    recommendations: [],
+    impacted_asset_refs: [],
+    promotion_recommendations: [],
+    unresolved_gaps: [],
+    evidence_refs: [`evidence://reports/step-result-${options.runId}.json`],
+  };
+
+  writeContractFixture({
+    family: "runtime-harness-report",
+    filePath: reportFile,
+    document: report,
+  });
+  return { reportFile, reportRef, initPayload };
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} runId
+ * @param {string} interactionId
+ * @returns {string}
+ */
+function seedCliRequestedInteraction(projectRoot, runId, interactionId) {
+  fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+  const initResult = invokeCli(["project", "init", "--project-ref", projectRoot]);
+  assert.equal(initResult.exitCode, 0, initResult.stderr);
+  const initPayload = JSON.parse(initResult.stdout);
+  const reportsRoot = initPayload.runtime_layout.reportsRoot;
+  const stepResultFile = path.join(reportsRoot, "step-result-cli-interaction-question.json");
+  writeRuntimeJson(stepResultFile, {
+    step_result_id: `${runId}.cli.runner.question`,
+    run_id: runId,
+    step_id: "runner.implement",
+    step_class: "runner",
+    status: "failed",
+    summary: "Runner requested operator input.",
+    evidence_refs: ["evidence://reports/cli-runner-question.json"],
+    requested_interaction: {
+      requested: true,
+      interaction_id: interactionId,
+      status: "requested",
+      prompt_summary: "Select the operator-approved target.",
+      question_evidence_refs: ["evidence://reports/cli-runner-question.json"],
+      answer_audit_refs: [],
+      continuation: {
+        next_action: "resume_from_boundary",
+        reason_code: "operator-answer-required",
+      },
+      state_history: [
+        {
+          status: "requested",
+          timestamp: "2026-05-07T00:00:00.000Z",
+          summary: "Select the operator-approved target.",
+          evidence_refs: ["evidence://reports/cli-runner-question.json"],
+          continuation: {
+            next_action: "resume_from_boundary",
+            reason_code: "operator-answer-required",
+          },
+        },
+      ],
+    },
+  });
+  return stepResultFile;
+}
+
 test("CLI output redacts configured secret values while preserving non-secret policy flags", () => {
   const previous = process.env.AOR_REDACTION_SECRETS;
   process.env.AOR_REDACTION_SECRETS = "cli-secret-token";
@@ -1138,6 +1343,65 @@ test("W6 run-control command pack enforces guardrails, transitions, and durable 
   });
 });
 
+test("CLI run answer writes audit refs and keeps raw answer out of command and follow output", () => {
+  withTempProject((projectRoot) => {
+    const runId = "run.cli.interaction.answer.v1";
+    const interactionId = "cli-question-1";
+    const stepResultFile = seedCliRequestedInteraction(projectRoot, runId, interactionId);
+    const answerText = "Use staging via CLI.";
+
+    const answerResult = invokeCli([
+      "run",
+      "answer",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+      "--interaction-id",
+      interactionId,
+      "--answer",
+      answerText,
+      "--reason",
+      "operator selected safe target",
+    ]);
+    assert.equal(answerResult.exitCode, 0, answerResult.stderr);
+    assert.equal(answerResult.stdout.includes(answerText), false);
+    const answerPayload = JSON.parse(answerResult.stdout);
+    assert.equal(answerPayload.interaction_answer.interaction_status, "blocked");
+    assert.equal(answerPayload.interaction_answer.answer_accepted, true);
+    assert.equal(answerPayload.interaction_answer.blocked_reason.code, "continuation.runtime_boundary_unavailable");
+    assert.equal(fs.existsSync(answerPayload.interaction_answer.answer_audit_file), true);
+
+    const auditRecord = JSON.parse(fs.readFileSync(answerPayload.interaction_answer.answer_audit_file, "utf8"));
+    assert.equal(auditRecord.answer_text, answerText);
+
+    const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
+    assert.equal(JSON.stringify(updatedStepResult).includes(answerText), false);
+    assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+    assert.deepEqual(
+      updatedStepResult.requested_interaction.state_history.map((entry) => entry.status),
+      ["requested", "answered", "blocked"],
+    );
+
+    const followResult = invokeCli([
+      "run",
+      "status",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+      "--follow",
+      "true",
+      "--max-replay",
+      "10",
+    ]);
+    assert.equal(followResult.exitCode, 0, followResult.stderr);
+    assert.equal(followResult.stdout.includes(answerText), false);
+    const followPayload = JSON.parse(followResult.stdout);
+    assert.equal(JSON.stringify(followPayload.replay_events).includes(answerPayload.interaction_answer.answer_audit_ref), true);
+  });
+});
+
 test("W6 ui attach/detach command pack reports lifecycle state and preserves headless operation", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
@@ -1311,6 +1575,11 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
     assert.deepEqual(releasePacketSubset, releasePacketFixture);
 
     fs.appendFileSync(targetFile, "\n# w6-s05 local-branch prepare smoke\n", "utf8");
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "w6-deliver-local-branch",
+      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+    });
     const branchResult = invokeCli([
       "deliver",
       "prepare",
@@ -1345,6 +1614,11 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
     assert.equal(branchName, "aor/w6-s05-local-branch");
 
     fs.appendFileSync(targetFile, "\n# w6-s05 fork-first prepare smoke\n", "utf8");
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "w6-deliver-fork-first",
+      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+    });
     const forkResult = invokeCli([
       "deliver",
       "prepare",
@@ -1375,6 +1649,11 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
     assert.equal(fs.existsSync(forkPayload.delivery_manifest_file), true);
     assert.equal(fs.existsSync(forkPayload.release_packet_file), true);
 
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "w6-release-blocked",
+      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+    });
     const releaseBlockedResult = invokeCli([
       "release",
       "prepare",
@@ -1421,7 +1700,7 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
   });
 });
 
-test("strict delivery prepare blocks without Runtime Harness routed step decisions", () => {
+test("strict delivery prepare blocks without latest run-level Runtime Harness report", () => {
   withTempProject((projectRoot) => {
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
     runGitChecked({ cwd: projectRoot, args: ["init"] });
@@ -1447,7 +1726,7 @@ test("strict delivery prepare blocks without Runtime Harness routed step decisio
 
     assert.equal(result.exitCode, 1);
     assert.equal(result.stdout, "");
-    assert.match(result.stderr, /Runtime Harness has no routed step decisions for a strict mission/u);
+    assert.match(result.stderr, /requires a latest run-level Runtime Harness report/u);
   });
 });
 
@@ -1481,9 +1760,148 @@ test("delivery prepare observe mode materializes evidence with Runtime Harness f
     const payload = JSON.parse(result.stdout);
     assert.equal(payload.delivery_quality_gate_mode, "observe");
     assert.equal(payload.delivery_quality_gate_status, "not_pass");
-    assert.match(payload.delivery_quality_gate_findings.join("\n"), /Runtime Harness has no routed step decisions/u);
+    assert.match(payload.delivery_quality_gate_findings.join("\n"), /not run-level controller evidence/u);
     assert.equal(fs.existsSync(payload.delivery_manifest_file), true);
     assert.equal(fs.existsSync(payload.runtime_harness_report_file), true);
+  });
+});
+
+test("strict delivery prepare blocks no-op, out-of-scope, missing handoff, missing promotion, and allows patch-only pass", () => {
+  withTempProject((projectRoot) => {
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    runGitChecked({ cwd: projectRoot, args: ["init"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.email", "aor@example.com"] });
+    runGitChecked({ cwd: projectRoot, args: ["config", "user.name", "AOR Test"] });
+    runGitChecked({ cwd: projectRoot, args: ["add", "-A"] });
+    runGitChecked({ cwd: projectRoot, args: ["commit", "-m", "initial"] });
+
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "strict-delivery-no-op",
+      missionScopedChangedPaths: [],
+    });
+    const noOpResult = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "strict-delivery-no-op",
+      "--mode",
+      "patch-only",
+      "--approved-handoff-ref",
+      "evidence://handoff/no-op",
+      "--promotion-evidence-refs",
+      "evidence://promotion/no-op",
+    ]);
+    assert.equal(noOpResult.exitCode, 1);
+    assert.match(noOpResult.stderr, /no meaningful mission-scoped patch/u);
+
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "strict-delivery-out-of-scope",
+      overallDecision: "fail",
+      runDecision: "fail",
+      terminalStatus: "failed",
+      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+      scopeViolationPaths: ["docs/out-of-scope.md"],
+    });
+    const outOfScopeResult = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "strict-delivery-out-of-scope",
+      "--mode",
+      "patch-only",
+      "--approved-handoff-ref",
+      "evidence://handoff/out-of-scope",
+      "--promotion-evidence-refs",
+      "evidence://promotion/out-of-scope",
+    ]);
+    assert.equal(outOfScopeResult.exitCode, 1);
+    assert.match(outOfScopeResult.stderr, /out-of-scope changed paths/u);
+
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "strict-delivery-missing-handoff",
+      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+    });
+    const missingHandoffResult = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "strict-delivery-missing-handoff",
+      "--mode",
+      "patch-only",
+      "--promotion-evidence-refs",
+      "evidence://promotion/missing-handoff",
+    ]);
+    assert.equal(missingHandoffResult.exitCode, 1);
+    assert.match(missingHandoffResult.stderr, /approved-handoff-required/u);
+
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "strict-delivery-missing-promotion",
+      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+    });
+    const missingPromotionResult = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "strict-delivery-missing-promotion",
+      "--mode",
+      "patch-only",
+      "--approved-handoff-ref",
+      "evidence://handoff/missing-promotion",
+    ]);
+    assert.equal(missingPromotionResult.exitCode, 1);
+    assert.match(missingPromotionResult.stderr, /promotion-evidence-required/u);
+
+    fs.appendFileSync(path.join(projectRoot, "examples/project.aor.yaml"), "\n# strict delivery patch-only pass\n", "utf8");
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "strict-delivery-patch-pass",
+      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+    });
+    const validPatchResult = invokeCli([
+      "deliver",
+      "prepare",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      "strict-delivery-patch-pass",
+      "--mode",
+      "patch-only",
+      "--approved-handoff-ref",
+      "evidence://handoff/patch-pass",
+      "--promotion-evidence-refs",
+      "evidence://promotion/patch-pass",
+    ]);
+    assert.equal(validPatchResult.exitCode, 0, validPatchResult.stderr);
+    const validPayload = JSON.parse(validPatchResult.stdout);
+    assert.equal(validPayload.delivery_quality_gate_status, "pass");
+    assert.equal(validPayload.delivery_writeback_result, "patch-materialized");
+    assert.equal(validPayload.delivery_blocking, false);
+    const manifest = JSON.parse(fs.readFileSync(validPayload.delivery_manifest_file, "utf8"));
+    assert.equal(manifest.approval_context.runtime_harness.status, "pass");
+    assert.equal(manifest.writeback_policy.network_mode, "local");
+    assert.ok(manifest.repo_deliveries[0].changed_paths.includes("examples/project.aor.yaml"));
+
+    const artifactFiles = fs.readdirSync(path.dirname(validPayload.delivery_manifest_file));
+    assert.equal(
+      artifactFiles.some((entry) => entry.includes("strict-delivery-no-op") && entry.startsWith("delivery-manifest")),
+      false,
+    );
+    assert.equal(
+      artifactFiles.some((entry) => entry.includes("strict-delivery-out-of-scope") && entry.startsWith("delivery-manifest")),
+      false,
+    );
   });
 });
 
@@ -1501,6 +1919,11 @@ test("delivery and release outputs enforce multi-repo coordination evidence and 
       path.join(projectRoot, "examples/project.aor.yaml"),
     );
     materializeSoftNoWriteIntake({ projectRoot, missionId: "w8-delivery-coordination-soft-rehearsal" });
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "w8-release-coordination-blocked",
+      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+    });
 
     const blockedRelease = invokeCli([
       "release",
@@ -1705,6 +2128,11 @@ test("delivery and release surfaces explicit governance deny/escalation reasons 
       "utf8",
     );
     materializeSoftNoWriteIntake({ projectRoot, missionId: "w8-governance-deny-soft-rehearsal" });
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "w8-release-governance-deny",
+      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+    });
 
     const denyResult = invokeCli([
       "release",
@@ -1734,6 +2162,11 @@ test("delivery and release surfaces explicit governance deny/escalation reasons 
     const routeContent = fs.readFileSync(routePath, "utf8");
     fs.writeFileSync(routePath, routeContent.replace("risk_tier: medium", "risk_tier: high"), "utf8");
     materializeSoftNoWriteIntake({ projectRoot, missionId: "w8-governance-escalate-soft-rehearsal" });
+    seedStrictRuntimeHarnessReport({
+      projectRoot,
+      runId: "w8-release-governance-escalate",
+      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+    });
 
     const escalateResult = invokeCli([
       "release",

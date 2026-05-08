@@ -6,11 +6,11 @@ Close the production and platform maturity gaps that remain after the W19 story-
 ## Wave exit criteria
 - W20 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
 - multirepo coordination, production security, provider certification, compiler revision lifecycle, and finance monitoring gaps have explicit acceptance evidence paths
-- OpenCode has a bounded live-baseline certification path backed by contract-valid runtime evidence
+- OpenCode has bounded candidate evidence, but W22-S03 downgrades it from required baseline status until real live certification exists
 
 ## Sequencing notes
 - `W20-S01`, `W20-S02`, `W20-S04`, and `W20-S05` can proceed after W19 story evidence stabilizes and their earlier foundation slices remain done.
-- `W20-S03` must keep mock-only evidence from promoting OpenCode; live certification evidence is required for done state.
+- `W20-S03` is historical candidate evidence after W22-S03; future required-baseline promotion requires a new real live certification proof.
 
 ---
 
@@ -80,35 +80,35 @@ Close the production and platform maturity gaps that remain after the W19 story-
 
 ---
 
-## W20-S03 — OpenCode live-baseline certification
+## W20-S03 — OpenCode candidate evidence and downgrade follow-up
 - **Epic:** EPIC-3 Routed execution
 - **State:** done
-- **Outcome:** Promote OpenCode from extended/non-live-baseline coverage to a certified live baseline only after stable non-interactive runtime evidence exists.
+- **Outcome:** Exercise the OpenCode candidate path, preserve permission-policy validation, and record the evidence that later proved insufficient for required baseline status.
 - **Primary modules:** `examples/adapters/**`, `packages/adapter-sdk`, `packages/orchestrator-core`, `docs/contracts/**`, `docs/ops/**`
 - **Hard dependencies:** W16-S06, W20-S02
-- **Certification evidence:** `run_id=w20-s03.opencode-ky-regress`, `matrix_cell=ky.regress.small.open-code`, deterministic verdict `pass`; observation status is `warn` only because no agent judge file was supplied.
+- **Candidate evidence:** `run_id=w20-s03.opencode-ky-regress`, `matrix_cell=ky.regress.small.open-code`, deterministic verdict `pass`; W22-S03 treats this as candidate evidence, not required baseline certification.
 - **Primary user-story surfaces:** delivery engineer, AI platform owner, operator / SRE
 
 ### Local tasks
-1. Define OpenCode live-baseline certification criteria and required evidence.
+1. Define OpenCode candidate criteria and required evidence.
 2. Add or update adapter metadata only after permission semantics are live-runnable.
-3. Run certification through the same contract and harness paths as other live baselines.
+3. Run candidate evidence through the same contract and harness paths used for live baselines.
 4. Update provider docs to distinguish candidate, extended, and certified statuses.
 5. Keep mock-only evidence from promoting OpenCode to baseline.
 
 ### Acceptance criteria
-1. OpenCode certification evidence comes from a stable live runtime, not deterministic mocks.
+1. OpenCode candidate evidence comes from a stable live runtime, not deterministic mocks.
 2. Adapter capability metadata records permission-policy behavior through contract-valid fields.
-3. Harness/certification reports show pass decisions for required baseline scenarios.
-4. Docs no longer describe OpenCode as extended-only after certification succeeds.
+3. Harness and certification reports preserve candidate decisions without promoting OpenCode to required baseline status.
+4. Docs keep OpenCode as extended candidate coverage until a future real live certification succeeds.
 
 ### Done evidence
-- live OpenCode certification report for `run_id=w20-s03.opencode-ky-regress`
+- OpenCode candidate evidence report for `run_id=w20-s03.opencode-ky-regress`
 - updated adapter metadata and contract examples
-- provider maturity docs reflecting certified baseline status
+- provider maturity docs reflecting extended candidate status after W22-S03
 
 ### Out of scope
-- certifying OpenCode without live runtime evidence
+- promoting OpenCode to required baseline without real live runtime evidence
 - weakening permission-policy validation
 
 ---
@@ -142,7 +142,7 @@ Close the production and platform maturity gaps that remain after the W19 story-
 ### Out of scope
 - changing compiled-context output semantics without migration notes
 - provider-specific compiler behavior in orchestrator core
-- OpenCode certification
+- OpenCode candidate evidence
 
 ---
 

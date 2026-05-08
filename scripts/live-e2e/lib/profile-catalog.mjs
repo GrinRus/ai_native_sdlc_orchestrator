@@ -252,25 +252,128 @@ function isFeatureSize(value) {
 }
 
 /**
+ * @param {Record<string, unknown>} profile
+ * @returns {Record<string, unknown>}
+ */
+export function resolveProductionProofPolicy(profile) {
+  const productionProof = asRecord(profile.production_proof);
+  if (productionProof.enabled !== true) {
+    return {
+      enabled: false,
+    };
+  }
+  return {
+    enabled: true,
+    profile_status: asNonEmptyString(productionProof.profile_status) || "candidate",
+    proof_scope: asNonEmptyString(productionProof.proof_scope) || "full_code_changing_runtime_candidate",
+    external_runner_mode: asNonEmptyString(productionProof.external_runner_mode) || "real-external-process",
+    real_code_change_proof_required: productionProof.real_code_change_proof_required !== false,
+    real_code_change_proof_complete: productionProof.real_code_change_proof_complete === true,
+    mock_runner_allowed: productionProof.mock_runner_allowed === true,
+    no_upstream_write_required: productionProof.no_upstream_write_required !== false,
+    require_runner_auth: productionProof.require_runner_auth !== false,
+    require_permission_readiness: productionProof.require_permission_readiness !== false,
+    require_blocking_target_verification: productionProof.require_blocking_target_verification !== false,
+    required_failure_mode: asNonEmptyString(productionProof.required_failure_mode) || "fail-closed",
+  };
+}
+
+/**
+ * @param {unknown} value
+ */
+function hasStrings(value) {
+  return asStringArray(value).length > 0;
+}
+
+/**
+ * @param {Record<string, unknown>} resolvedProfile
+ * @param {Record<string, unknown>} proofPolicy
+ */
+function assertProductionProofReadiness(resolvedProfile, proofPolicy) {
+  if (proofPolicy.enabled !== true) {
+    return;
+  }
+
+  const profileId = asNonEmptyString(resolvedProfile.profile_id) || "production-proof-profile";
+  const verification = asRecord(resolvedProfile.verification);
+  const outputPolicy = asRecord(resolvedProfile.output_policy);
+  const baselineGateMode = asNonEmptyString(asRecord(verification.baseline_gate).mode).toLowerCase();
+  const preferredDeliveryMode = asNonEmptyString(outputPolicy.preferred_delivery_mode).toLowerCase();
+  const allowedProductionDeliveryModes = ["patch-only", "local-branch"];
+  const problems = [];
+
+  if (asNonEmptyString(proofPolicy.external_runner_mode) !== "real-external-process") {
+    problems.push("production_proof.external_runner_mode must be 'real-external-process'");
+  }
+  if (asNonEmptyString(proofPolicy.required_failure_mode) !== "fail-closed") {
+    problems.push("production_proof.required_failure_mode must be 'fail-closed'");
+  }
+  if (proofPolicy.real_code_change_proof_required !== true) {
+    problems.push("production_proof.real_code_change_proof_required must stay true for production-proof profiles");
+  }
+  if (proofPolicy.mock_runner_allowed === true) {
+    problems.push("production_proof.mock_runner_allowed must stay false for production-proof profiles");
+  }
+  if (proofPolicy.require_runner_auth !== true) {
+    problems.push("production_proof.require_runner_auth must stay true for production-proof profiles");
+  }
+  if (proofPolicy.require_runner_auth === true && resolvedProfile.live_adapter_preflight?.auth_probe_required === false) {
+    problems.push("live_adapter_preflight.auth_probe_required cannot be false for production-proof profiles");
+  }
+  if (proofPolicy.require_permission_readiness !== true) {
+    problems.push("production_proof.require_permission_readiness must stay true for production-proof profiles");
+  }
+  if (proofPolicy.no_upstream_write_required !== true) {
+    problems.push("production_proof.no_upstream_write_required must stay true for production-proof profiles");
+  }
+  if (proofPolicy.no_upstream_write_required === true && outputPolicy.write_back_to_remote !== false) {
+    problems.push("output_policy.write_back_to_remote must be false for production-proof profiles");
+  }
+  if (!allowedProductionDeliveryModes.includes(preferredDeliveryMode)) {
+    problems.push(
+      `output_policy.preferred_delivery_mode must be one of ${allowedProductionDeliveryModes.join(", ")} for production-proof profiles`,
+    );
+  }
+  if (proofPolicy.require_blocking_target_verification !== true) {
+    problems.push("production_proof.require_blocking_target_verification must stay true for production-proof profiles");
+  }
+  if (proofPolicy.require_blocking_target_verification === true && baselineGateMode !== "blocking") {
+    problems.push("verification.baseline_gate.mode must be 'blocking' for production-proof profiles");
+  }
+  if (!hasStrings(verification.setup_commands)) {
+    problems.push("verification.setup_commands must declare at least one target readiness command");
+  }
+  if (!hasStrings(verification.commands)) {
+    problems.push("verification.commands must declare at least one target verification command");
+  }
+
+  if (problems.length > 0) {
+    throw new UsageError(`Production proof profile '${profileId}' is not fail-closed: ${problems.join("; ")}.`);
+  }
+}
+
+/**
  * @param {Record<string, unknown>} catalogEntry
  * @param {string} featureMissionId
  * @param {string} scenarioFamily
  * @param {string} providerVariantId
  */
 function resolveMatrixCell(catalogEntry, featureMissionId, scenarioFamily, providerVariantId) {
-  const requiredCells = Array.isArray(catalogEntry.required_matrix_cells)
+  const trackedCells = Array.isArray(catalogEntry.required_matrix_cells)
     ? /** @type {Array<Record<string, unknown>>} */ (catalogEntry.required_matrix_cells)
     : [];
+  const requiredCells = trackedCells.filter((cell) => (asNonEmptyString(cell.coverage_tier) || "required") === "required");
   const matchingCell =
-    requiredCells.find(
+    trackedCells.find(
       (cell) =>
         asNonEmptyString(cell.feature_mission_id) === featureMissionId &&
         asNonEmptyString(cell.scenario_family) === scenarioFamily &&
         asNonEmptyString(cell.provider_variant_id) === providerVariantId,
     ) ?? null;
   const remainingRequiredCells = requiredCells.filter((cell) => cell !== matchingCell);
+  const matchingCellCoverageTier = matchingCell ? asNonEmptyString(matchingCell.coverage_tier) || "required" : "extended";
   return {
-    coverageTier: matchingCell ? asNonEmptyString(matchingCell.coverage_tier) || "required" : "extended",
+    coverageTier: matchingCellCoverageTier,
     currentCell: {
       cell_id:
         asNonEmptyString(asRecord(matchingCell ?? {}).cell_id) ||
@@ -282,10 +385,10 @@ function resolveMatrixCell(catalogEntry, featureMissionId, scenarioFamily, provi
       scenario_family: scenarioFamily,
       provider_variant_id: providerVariantId,
       feature_size: null,
-      coverage_tier: matchingCell ? asNonEmptyString(asRecord(matchingCell).coverage_tier) || "required" : "extended",
+      coverage_tier: matchingCellCoverageTier,
     },
     coverageFollowUp: {
-      current_cell_required: matchingCell !== null,
+      current_cell_required: matchingCellCoverageTier === "required",
       next_required_matrix_cell:
         remainingRequiredCells.length > 0
           ? {
@@ -409,6 +512,9 @@ export function resolveFullJourneyProfile(options) {
     ...asRecord(catalogEntry.safety_defaults),
     ...asRecord(options.profile.output_policy),
   };
+  const productionProofPolicy = resolveProductionProofPolicy(resolvedProfile);
+  resolvedProfile.production_proof = productionProofPolicy;
+  assertProductionProofReadiness(resolvedProfile, productionProofPolicy);
   resolvedProfile.target_catalog_ref = catalogTarget.filePath;
   resolvedProfile.feature_mission_ref = `${catalogTarget.filePath}#${featureMissionId}`;
   resolvedProfile.scenario_policy_ref = scenarioPolicy.filePath;
@@ -428,4 +534,3 @@ export function resolveFullJourneyProfile(options) {
     coverageTier: matrixCell.coverageTier,
   };
 }
-

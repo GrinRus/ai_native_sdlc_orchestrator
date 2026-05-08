@@ -24,6 +24,8 @@ For every routed adapter-backed step, the Runtime Harness owns:
 
 The Runtime Harness writes step-level decision evidence and a completed-run `runtime-harness-report`. It diagnoses AOR runtime quality: whether AOR prepared the right context, invoked the adapter, interpreted the result, enforced mission semantics, bounded repair, and closed or blocked the flow correctly.
 
+As of W24-S01, normal `run start` execution uses a run-level Runtime Harness controller. The controller owns the run-stage ledger (`prepare`, `execute`, `classify`, `validate`, `retry`/`repair`/`escalate`, `verify`, `close`/`block`) and delegates routed step execution to the step engine. Controller-generated reports add `run_controller`, `run_transitions`, and `run_decision` so pass, block, fail, repair, and exhausted-repair outcomes are visible at run level without provider-specific behavior entering core.
+
 Quality boundaries are explicit:
 - feature result quality is owned by review, eval, delivery, and release evidence;
 - AOR runtime quality is owned by Runtime Harness decisions and `runtime-harness-report`;
@@ -72,7 +74,7 @@ Quality boundaries are explicit:
 
 Strictness is mission-type driven. Code-changing, live, and release missions use strict semantic gates. Docs-only, no-write rehearsal, and asset-certification flows may use softer profiles, but their softness must be explicit in runtime evidence.
 
-When classification finds `interactive-question-requested`, the run is not terminal by UI decision. The Runtime Harness writes a `requested_interaction` boundary into the step result, emits query-safe live events, and waits for a control-plane-owned answer submission. After answer audit evidence is written, the runtime may resume from that boundary; if validation or policy blocks continuation, the run remains blocked with the same interaction and reason evidence.
+When classification finds `interactive-question-requested`, the run is not terminal by UI decision. The Runtime Harness writes a `requested_interaction` boundary into the step result, emits query-safe live events, and waits for a control-plane-owned answer submission. After answer audit evidence is written, the runtime may resume from that boundary; if validation, policy, or unavailable resume support blocks continuation, the run remains blocked with the same interaction, `state_history[]`, and reason evidence.
 
 ## Delivery model
 AOR should support these delivery modes:

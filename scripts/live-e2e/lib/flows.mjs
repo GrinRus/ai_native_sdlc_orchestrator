@@ -1443,6 +1443,7 @@ export function executeFullJourneyFlow(options) {
     matrix_cell: options.matrixCell,
     coverage_follow_up: options.coverageFollowUp,
     coverage_tier: options.coverageTier,
+    production_proof: asRecord(options.profile.production_proof),
   };
   const startedAt = nowIso();
   const internalTestHooks = asRecord(options.profile.internal_test_hooks);
@@ -1570,6 +1571,7 @@ export function executeFullJourneyFlow(options) {
       runnerAuthSource: proofRunnerEnvironment.runnerAuthSource,
       runtimeAgentPermissionMode: options.runtimeAgentPermissionMode,
       authProbeRequired: options.authProbeRequired,
+      permissionReadinessRequired: asRecord(options.profile.production_proof).require_permission_readiness === true,
       runId: options.runId,
       reportsRoot: options.layout.reportsRoot,
     });

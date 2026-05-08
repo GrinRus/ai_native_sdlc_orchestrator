@@ -18,6 +18,22 @@ preconditions:
     status: present
     refs:
       - .aor/projects/aor-core/reports/promotion-decision-wrapper-wrapper.runner.default-v3-1776793902247.json
+  runtime_harness:
+    required: true
+    enforced: true
+    status: pass
+    report_id: RUN-DELIVERY-004.runtime-harness-report.v1
+    report_ref: evidence://reports/runtime-harness-report-strict-delivery-pass.yaml
+    overall_decision: pass
+    run_decision: pass
+    routed_step_decision_count: 1
+    mission_scoped_changed_paths:
+      - repos/backend/src/orders.ts
+      - repos/backend/contracts/openapi.yaml
+      - repos/mobile/src/api/client.ts
+      - repos/frontend/src/api/client.ts
+    scope_violation_paths: []
+    findings: []
   coordination_evidence:
     required: true
     status: present
@@ -67,6 +83,7 @@ status: ready
 evidence_refs:
   - .aor/projects/aor-core/artifacts/aor-core.handoff.bootstrap.v1.json
   - .aor/projects/aor-core/reports/promotion-decision-wrapper-wrapper.runner.default-v3-1776793902247.json
+  - evidence://reports/runtime-harness-report-strict-delivery-pass.yaml
   - evidence://coordination/WAVE-004/backend-mobile-frontend
   - evidence://reports/multirepo-coordination-status.sample.yaml
   - validation://integration/backend-frontend/api-contract

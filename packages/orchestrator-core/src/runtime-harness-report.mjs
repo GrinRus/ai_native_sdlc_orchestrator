@@ -61,6 +61,14 @@ function asRecordArray(value) {
 
 /**
  * @param {unknown} value
+ * @returns {unknown}
+ */
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+/**
+ * @param {unknown} value
  * @returns {boolean}
  */
 function hasNonEmptyPermissionDenials(value) {
@@ -788,6 +796,9 @@ function recommendationActionForFinding(finding) {
  *   runId: string,
  *   missionType?: string,
  *   strictnessProfile?: string,
+ *   runController?: Record<string, unknown>,
+ *   runTransitions?: Array<Record<string, unknown>>,
+ *   runDecision?: Record<string, unknown>,
  * }} options
  */
 export function materializeRuntimeHarnessReport(options) {
@@ -872,6 +883,17 @@ export function materializeRuntimeHarnessReport(options) {
     ...stepDecisions.flatMap((decision) => asStringArray(decision.evidence_refs)),
   ]);
 
+  const reportPath = path.join(
+    init.runtimeLayout.reportsRoot,
+    `runtime-harness-report-${normalizeId(options.runId)}.json`,
+  );
+  const previousReport = readJsonFile(reportPath);
+  const previousRunController = asRecord(previousReport?.run_controller);
+  const previousRunTransitions = Array.isArray(previousReport?.run_transitions)
+    ? previousReport.run_transitions
+    : null;
+  const previousRunDecision = asRecord(previousReport?.run_decision);
+
   const report = {
     report_id: `${options.runId}.runtime-harness-report.v1`,
     project_id: init.projectId,
@@ -888,6 +910,21 @@ export function materializeRuntimeHarnessReport(options) {
     unresolved_gaps: unresolvedGaps,
     evidence_refs: evidenceRefs,
   };
+  if (options.runController && Object.keys(asRecord(options.runController)).length > 0) {
+    report.run_controller = cloneJson(options.runController);
+  } else if (Object.keys(previousRunController).length > 0) {
+    report.run_controller = cloneJson(previousRunController);
+  }
+  if (Array.isArray(options.runTransitions)) {
+    report.run_transitions = cloneJson(options.runTransitions);
+  } else if (previousRunTransitions) {
+    report.run_transitions = cloneJson(previousRunTransitions);
+  }
+  if (options.runDecision && Object.keys(asRecord(options.runDecision)).length > 0) {
+    report.run_decision = cloneJson(options.runDecision);
+  } else if (Object.keys(previousRunDecision).length > 0) {
+    report.run_decision = cloneJson(previousRunDecision);
+  }
 
   const validation = validateContractDocument({
     family: "runtime-harness-report",
@@ -899,10 +936,6 @@ export function materializeRuntimeHarnessReport(options) {
     throw new Error(`Generated runtime harness report failed contract validation: ${issueSummary}`);
   }
 
-  const reportPath = path.join(
-    init.runtimeLayout.reportsRoot,
-    `runtime-harness-report-${normalizeId(options.runId)}.json`,
-  );
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 

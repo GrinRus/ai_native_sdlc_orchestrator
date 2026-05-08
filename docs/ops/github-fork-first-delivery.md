@@ -26,19 +26,20 @@ Before switching from planning-only to real network write:
 ## Approval checkpoints
 1. Approved handoff packet is present.
 2. Promotion evidence is present for the impacted assets.
-3. Delivery plan status is `ready`.
-4. Security/compliance reviewer signs off when policy requires it.
-5. Operator explicitly enables `--network-write` for the command invocation.
+3. The latest run-level Runtime Harness report for the same `run_id` has `overall_decision=pass`, `run_decision.overall_decision=pass`, `run_decision.terminal_status=closed`, routed step decisions, non-empty mission-scoped changed paths, and no scope violations.
+4. Delivery plan status is `ready`.
+5. Security/compliance reviewer signs off when policy requires it.
+6. Operator explicitly enables `--network-write` for the command invocation.
 
 ## Human checkpoints before production write-back
 1. Confirm latest `delivery-manifest-*.json` captures:
    - `delivery_mode`,
    - `repo_deliveries[].changed_paths`,
    - `coordination.required`, `coordination.status`, and `coordination.evidence_refs`,
-   - `coordination.lock_evidence_refs` and `coordination.cross_repo_validation_refs` when bounded multirepo work used `aor multirepo lock`,
-   - `rerun_recovery` (`rerun_of_run_ref`, `failed_step_ref`, `packet_boundary`, `status`),
-   - `approval_context`,
-   - `source_refs.delivery_transcript_ref`.
+	   - `coordination.lock_evidence_refs` and `coordination.cross_repo_validation_refs` when bounded multirepo work used `aor multirepo lock`,
+	   - `rerun_recovery` (`rerun_of_run_ref`, `failed_step_ref`, `packet_boundary`, `status`),
+	   - `approval_context.runtime_harness.status=pass` and the linked Runtime Harness report ref,
+	   - `source_refs.delivery_transcript_ref`.
 2. Confirm latest `release-packet-*.json` captures:
    - `delivery_manifest_ref`,
    - `evidence_lineage.handoff_refs`,

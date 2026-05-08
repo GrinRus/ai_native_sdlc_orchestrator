@@ -1184,6 +1184,7 @@ export async function submitOperatorInteractionAnswer(options) {
       step_result_ref: result.stepResultRef,
       blocked: result.blocked,
       blocked_reason: result.blockedReason,
+      blocked_event_id: result.blockedEvent?.event_id ?? null,
     },
     error: result.blocked
       ? {
