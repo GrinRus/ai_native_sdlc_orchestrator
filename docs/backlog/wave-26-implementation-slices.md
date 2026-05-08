@@ -47,7 +47,7 @@ Make self-hosted production readiness repeatable, reviewable, and documented as 
 
 ## W26-S02 — Maintainability stabilization
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Decompose only the production-touched hotspots needed for maintainability: live E2E flows, step execution, API projections, and web console surfaces.
 - **Primary modules:** `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests
 - **Hard dependencies:** W26-S01

@@ -253,7 +253,7 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W26-S01 | Production readiness gate | EPIC-0 | done | `scripts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/live-e2e/**` | W25-S03, W23-S01, W23-S02, W24-S01 |
-| W26-S02 | Maintainability stabilization | EPIC-0 | ready | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests | W26-S01 |
+| W26-S02 | Maintainability stabilization | EPIC-0 | done | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests | W26-S01 |
 | W26-S03 | Self-hosted release documentation | EPIC-7 | ready | `README.md`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**` | W26-S01 |
 
 ## Planning note
