@@ -1005,6 +1005,18 @@ if (sliceCycleTestRun.status !== 0) {
 
 console.log("slice cycle tests ok: selection, state sync, and plan extraction");
 
+const productionReadinessTestsPath = path.join(root, "scripts/test/production-readiness.test.mjs");
+const productionReadinessTestRun = spawnSync(process.execPath, ["--test", productionReadinessTestsPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (productionReadinessTestRun.status !== 0) {
+  process.exit(productionReadinessTestRun.status ?? 1);
+}
+
+console.log("production readiness tests ok: gate passes only with real W25 proof evidence");
+
 const liveE2EProofRunnerTestsPath = path.join(root, "scripts/test/live-e2e-proof-runner.test.mjs");
 const liveE2EProofRunnerTestRun = spawnSync(process.execPath, ["--test", liveE2EProofRunnerTestsPath], {
   cwd: root,

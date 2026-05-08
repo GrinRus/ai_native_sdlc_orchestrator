@@ -20,15 +20,14 @@ Production readiness requires:
 - a run-level Runtime Harness controller with run-level pass/block/fail/repair decisions;
 - strict delivery gates that require current harness pass evidence and meaningful mission-scoped changed paths;
 - real non-mock full-journey proof with code-changing evidence and no upstream writes;
-- a separate production-readiness gate that cannot pass without that proof.
+- a separate production-readiness gate (`pnpm production:ready`) that cannot pass without that proof.
 
 ## Current blockers
 
 | Blocker | Owning slice | Required evidence |
 |---|---|---|
-| Strict delivery needs one consolidated code-changing gate. | `W24-S03` | Delivery tests cover no-op, out-of-scope, missing harness, missing handoff, missing promotion, and valid patch-only pass. |
-| Full-journey proof is coverage evidence, not real code-changing production proof. | `W25-S01`, `W25-S02`, `W25-S03` | `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, all required target verdicts `pass`, and no upstream write. |
-| Production readiness has no separate final gate yet. | `W26-S01` | Production gate rejects missing W25 proof and verifies story honesty, auth, nested contracts, run-level harness, and proof fixture integrity. |
+| Production-touched hotspots still need focused stabilization before release-candidate documentation. | `W26-S02` | Behavior-preserving refactors over live E2E, step execution/Runtime Harness, API projections, or web production surfaces with targeted tests. |
+| Self-hosted release documentation is not final yet. | `W26-S03` | README, roadmap, story matrix, proof docs, and ops docs agree on the supported self-hosted CLI/API mode, optional web, rollback, auth config, no-write/write-back policy, proof evidence, and non-goals. |
 
 ## Closed W23 hardening prerequisites
 
@@ -39,6 +38,10 @@ Production readiness requires:
 | CLI/API lifecycle behavior has a shared service boundary. | `W23-S03` | `scripts/lint.mjs` dependency scan rejects `apps/api -> apps/cli` and `apps/cli -> apps/api` source edges. |
 | Runtime Harness has run-level controller ownership. | `W24-S01` | Run-level controller tests prove pass, block, fail, repair, and exhausted-repair flows; controller-generated reports carry `run_controller`, `run_transitions`, and `run_decision`. |
 | Interactive continuation has audited answer/block semantics without raw-answer streaming. | `W24-S02` | `run answer`, API, SSE, and web tests prove answer audit refs, `state_history[]`, deterministic `remain_blocked` evidence, and no raw answer text in command/read/stream surfaces. |
+| Strict delivery has a consolidated code-changing gate. | `W24-S03` | Delivery tests cover no-op, out-of-scope, missing harness, missing handoff, missing promotion, and valid patch-only pass. |
+| Real external-runner full-journey proof passed with no upstream write. | `W25-S02` | Promoted run evidence records `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, all required target verdicts `pass`, and no upstream write. |
+| Sanitized production proof fixture is committed and story upgrades are evidence-backed. | `W25-S03` | `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` is the committed fixture; proof integrity rejects mock-backed production claims; only fixture-backed stories are `proof-covered`. |
+| Production readiness has a separate gate. | `W26-S01` | `pnpm production:ready` rejects missing or mock-backed W25 proof and verifies story honesty, auth, nested contracts, run-level harness, source-of-truth alignment, and proof fixture integrity. |
 
 ## Story status policy
 
@@ -48,7 +51,9 @@ Production readiness requires:
 - `partial`
 - `blocked`
 
-As of W24-S02, the matrix records `baseline-covered=79`, `proof-covered=0`, `partial=30`, and `blocked=3`. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
+As of W26-S01, the matrix records `baseline-covered=84`, `proof-covered=4`, `partial=22`, and `blocked=2`. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
+
+The current production-proof fixture is `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`. It supports only the story rows that cite the fixture with `overall_verdict=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 
 ## OpenCode status
 
@@ -60,5 +65,6 @@ The final verdict can change from "not production-ready" to "self-hosted product
 1. W23 contract, auth, and lifecycle boundary slices are accepted.
 2. W24 run-level harness, interactive continuation, and strict delivery gates are accepted.
 3. W25 real external-runner full-journey proof passes with code-changing evidence and no upstream write.
-4. W26 production-readiness gate passes.
-5. W26 release documentation states the supported mode, rollback procedure, auth configuration, no-write/write-back policy, proof evidence, and non-goals.
+4. W26 production-readiness gate (`pnpm production:ready`) passes.
+5. W26 maintainability stabilization is accepted for production-touched hotspots.
+6. W26 release documentation states the supported mode, rollback procedure, auth configuration, no-write/write-back policy, proof evidence, and non-goals.

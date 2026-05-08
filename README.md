@@ -30,7 +30,7 @@ What exists today:
 - a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
 - a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
 - implemented operator baseline surfaces: control-plane read APIs, planner metrics snapshots, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
-- expanded implementation backlog through `W26`, with W22 source-of-truth repair now closed, W23 queued for contract/auth/control-plane boundary hardening, W24-W26 tracking run-level harness, real production proof, and self-hosted production release gates while active queue tracking stays available via `pnpm slice:status` and `pnpm slice:next -- --json`.
+- expanded implementation backlog through `W26`, with W22 source-of-truth repair, W23 contract/auth/control-plane boundary hardening, W24 run-level harness and strict delivery hardening, and W25 real production proof work now represented in source-of-truth docs while active queue tracking stays available via `pnpm slice:status` and `pnpm slice:next -- --json`.
 - historical W10/W11 productionization closure for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and target-backed proof evidence.
 - stable live routed execution baseline for supported `codex-cli` adapter paths, plus live-runnable candidate `claude-code` matrix coverage and extended non-baseline `open-code` coverage with explicit delivery-guardrail blocking semantics.
 - W15 readiness-hardening work that makes source-of-truth drift, package/module-map drift, and mock-backed proof claims machine-checkable.
@@ -39,6 +39,8 @@ What exists today:
 - W18 backlog coverage for control-plane-owned web lifecycle operation, runner question/answer continuation, and bounded multirepo proof.
 - W19/W20/W21 backlog gap intake plus W22 evidence-strength repair that maps all 112 supported user stories to `baseline-covered`, `proof-covered`, `partial`, or `blocked` status with explicit follow-up slices for remaining gaps.
 - W20 production-hardening baseline for detached control-plane transport mode, bearer auth/authz scopes, redaction of configured secrets across JSON/SSE/CLI surfaces, and denied-action audit evidence.
+- a W25 sanitized real production proof fixture at `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` with `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, passing target verdicts, and no upstream write.
+- a separate W26 self-hosted production-readiness gate, `pnpm production:ready`, that validates story honesty, source-of-truth alignment, auth hardening, nested contracts, run-level harness evidence, and W25 proof integrity without changing the meaning of `pnpm check`.
 
 What does **not** exist yet:
 
@@ -46,7 +48,7 @@ What does **not** exist yet:
 - broad multi-provider production-grade adapter coverage beyond the stable `codex-cli` live baseline and candidate `claude-code` rehearsal coverage;
 - delivery write-back automation to upstream repositories;
 - enterprise identity-provider integration, hosted SaaS deployment hardening, and operator parity for every CLI/API/web control surface;
-- a real code-changing full-journey proof with `overall_verdict=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`; the current W14 matrix proof is coverage evidence with findings, and W25 owns the future production proof target.
+- final self-hosted production-candidate release documentation and focused stabilization of production-touched hotspots; W26 owns the remaining release-candidate closure.
 
 Use the backlog docs for the implementation roadmap.
 
@@ -75,6 +77,7 @@ pnpm lint
 pnpm test
 pnpm build
 pnpm check
+pnpm production:ready
 ```
 
 What these commands do today:
@@ -83,6 +86,7 @@ What these commands do today:
 - `pnpm test` checks backlog consistency and runs package/app test suites (contracts, CLI, API, web, routing, adapter SDK, harness, orchestrator core, and reference integrity).
 - `pnpm build` checks scaffold integrity for community files, workflow conventions, and root package settings.
 - `pnpm check` runs all of the above in sequence.
+- `pnpm production:ready` runs the stricter self-hosted production-readiness gate; it does not replace `pnpm check` and can pass only when W25 real proof evidence and W23-W24 hardening evidence are present.
 
 CI runs the same gate on pull requests, pushes to `main`, and manual workflow dispatch through `.github/workflows/ci.yml`.
 

@@ -17,7 +17,7 @@ Make self-hosted production readiness repeatable, reviewable, and documented as 
 
 ## W26-S01 — Production readiness gate
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** Add a separate production-readiness gate distinct from baseline `pnpm check` that cannot pass without W25 real proof evidence.
 - **Primary modules:** `scripts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/live-e2e/**`
 - **Hard dependencies:** W25-S03, W23-S01, W23-S02, W24-S01
@@ -47,7 +47,7 @@ Make self-hosted production readiness repeatable, reviewable, and documented as 
 
 ## W26-S02 — Maintainability stabilization
 - **Epic:** EPIC-0 Repository development system
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Decompose only the production-touched hotspots needed for maintainability: live E2E flows, step execution, API projections, and web console surfaces.
 - **Primary modules:** `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests
 - **Hard dependencies:** W26-S01
@@ -77,7 +77,7 @@ Make self-hosted production readiness repeatable, reviewable, and documented as 
 
 ## W26-S03 — Self-hosted release documentation
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Document the supported production mode as self-hosted CLI/API with optional web, including runbook, rollback, auth, proof evidence, and non-goals.
 - **Primary modules:** `README.md`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**`
 - **Hard dependencies:** W26-S01

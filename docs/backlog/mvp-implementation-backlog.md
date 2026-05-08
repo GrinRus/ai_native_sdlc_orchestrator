@@ -252,9 +252,9 @@ This is the master index for the implementation slices across all defined waves.
 ## W26 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W26-S01 | Production readiness gate | EPIC-0 | ready | `scripts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/live-e2e/**` | W25-S03, W23-S01, W23-S02, W24-S01 |
-| W26-S02 | Maintainability stabilization | EPIC-0 | blocked | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests | W26-S01 |
-| W26-S03 | Self-hosted release documentation | EPIC-7 | blocked | `README.md`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**` | W26-S01 |
+| W26-S01 | Production readiness gate | EPIC-0 | done | `scripts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/live-e2e/**` | W25-S03, W23-S01, W23-S02, W24-S01 |
+| W26-S02 | Maintainability stabilization | EPIC-0 | ready | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests | W26-S01 |
+| W26-S03 | Self-hosted release documentation | EPIC-7 | ready | `README.md`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**` | W26-S01 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

@@ -21,6 +21,7 @@
 - `operator-policy-troubleshooting.md` — selected-run event and policy history inspection sequence for later-stage operator triage.
 - `security-route-governance.md` — allow/deny/escalate checks for delivery/release route governance decisions.
 - `control-plane-production-hardening.md` — local-trusted versus production-hardened transport mode, bearer scopes, denied-action audit behavior, and redaction surfaces.
+- `production-readiness-gate.md` — self-hosted production-readiness gate usage, evidence checks, and failure interpretation.
 
 ## UI lifecycle
 - `ui-attach-detach.md` — how to attach or detach the optional web UI from a running AOR system.
