@@ -252,6 +252,89 @@ function isFeatureSize(value) {
 }
 
 /**
+ * @param {Record<string, unknown>} profile
+ * @returns {Record<string, unknown>}
+ */
+export function resolveProductionProofPolicy(profile) {
+  const productionProof = asRecord(profile.production_proof);
+  if (productionProof.enabled !== true) {
+    return {
+      enabled: false,
+    };
+  }
+  return {
+    enabled: true,
+    profile_status: asNonEmptyString(productionProof.profile_status) || "candidate",
+    proof_scope: asNonEmptyString(productionProof.proof_scope) || "full_code_changing_runtime_candidate",
+    external_runner_mode: asNonEmptyString(productionProof.external_runner_mode) || "real-external-process",
+    real_code_change_proof_required: productionProof.real_code_change_proof_required !== false,
+    real_code_change_proof_complete: productionProof.real_code_change_proof_complete === true,
+    mock_runner_allowed: productionProof.mock_runner_allowed === true,
+    no_upstream_write_required: productionProof.no_upstream_write_required !== false,
+    require_runner_auth: productionProof.require_runner_auth !== false,
+    require_permission_readiness: productionProof.require_permission_readiness !== false,
+    require_blocking_target_verification: productionProof.require_blocking_target_verification !== false,
+    required_failure_mode: asNonEmptyString(productionProof.required_failure_mode) || "fail-closed",
+  };
+}
+
+/**
+ * @param {unknown} value
+ */
+function hasStrings(value) {
+  return asStringArray(value).length > 0;
+}
+
+/**
+ * @param {Record<string, unknown>} resolvedProfile
+ * @param {Record<string, unknown>} proofPolicy
+ */
+function assertProductionProofReadiness(resolvedProfile, proofPolicy) {
+  if (proofPolicy.enabled !== true) {
+    return;
+  }
+
+  const profileId = asNonEmptyString(resolvedProfile.profile_id) || "production-proof-profile";
+  const verification = asRecord(resolvedProfile.verification);
+  const outputPolicy = asRecord(resolvedProfile.output_policy);
+  const baselineGateMode = asNonEmptyString(asRecord(verification.baseline_gate).mode).toLowerCase();
+  const preferredDeliveryMode = asNonEmptyString(outputPolicy.preferred_delivery_mode).toLowerCase();
+  const allowedProductionDeliveryModes = ["patch-only", "local-branch"];
+  const problems = [];
+
+  if (asNonEmptyString(proofPolicy.external_runner_mode) !== "real-external-process") {
+    problems.push("production_proof.external_runner_mode must be 'real-external-process'");
+  }
+  if (proofPolicy.mock_runner_allowed === true) {
+    problems.push("production_proof.mock_runner_allowed must stay false for production-proof profiles");
+  }
+  if (proofPolicy.require_runner_auth === true && resolvedProfile.live_adapter_preflight?.auth_probe_required === false) {
+    problems.push("live_adapter_preflight.auth_probe_required cannot be false for production-proof profiles");
+  }
+  if (proofPolicy.no_upstream_write_required === true && outputPolicy.write_back_to_remote !== false) {
+    problems.push("output_policy.write_back_to_remote must be false for production-proof profiles");
+  }
+  if (!allowedProductionDeliveryModes.includes(preferredDeliveryMode)) {
+    problems.push(
+      `output_policy.preferred_delivery_mode must be one of ${allowedProductionDeliveryModes.join(", ")} for production-proof profiles`,
+    );
+  }
+  if (proofPolicy.require_blocking_target_verification === true && baselineGateMode !== "blocking") {
+    problems.push("verification.baseline_gate.mode must be 'blocking' for production-proof profiles");
+  }
+  if (!hasStrings(verification.setup_commands)) {
+    problems.push("verification.setup_commands must declare at least one target readiness command");
+  }
+  if (!hasStrings(verification.commands)) {
+    problems.push("verification.commands must declare at least one target verification command");
+  }
+
+  if (problems.length > 0) {
+    throw new UsageError(`Production proof profile '${profileId}' is not fail-closed: ${problems.join("; ")}.`);
+  }
+}
+
+/**
  * @param {Record<string, unknown>} catalogEntry
  * @param {string} featureMissionId
  * @param {string} scenarioFamily
@@ -411,6 +494,9 @@ export function resolveFullJourneyProfile(options) {
     ...asRecord(catalogEntry.safety_defaults),
     ...asRecord(options.profile.output_policy),
   };
+  const productionProofPolicy = resolveProductionProofPolicy(resolvedProfile);
+  resolvedProfile.production_proof = productionProofPolicy;
+  assertProductionProofReadiness(resolvedProfile, productionProofPolicy);
   resolvedProfile.target_catalog_ref = catalogTarget.filePath;
   resolvedProfile.feature_mission_ref = `${catalogTarget.filePath}#${featureMissionId}`;
   resolvedProfile.scenario_policy_ref = scenarioPolicy.filePath;

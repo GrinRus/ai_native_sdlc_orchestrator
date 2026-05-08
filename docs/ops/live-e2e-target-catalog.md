@@ -45,6 +45,8 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - `full-journey-regress-ky.yaml` (`regress/small/openai-primary`)
     - `full-journey-regress-ky-medium-anthropic.yaml` (`regress/medium/anthropic-primary`)
     - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`)
+  - production-proof candidate:
+    - `full-journey-production-proof-ky-openai.yaml` (`regress/small/openai-primary`, real external process, blocking target verification)
 - Failure-safe defaults:
   - `write_back_to_remote=false`
   - preferred delivery mode: `patch-only`
@@ -151,6 +153,9 @@ Canonical matrix-cell examples:
 - `small/regress/openai-primary`: `full-journey-regress-ky.yaml`
 - `medium/repair/anthropic-primary`: `full-journey-repair-httpie-medium-anthropic.yaml`
 - `large/release/openai-primary`: `full-journey-release-nextjs.yaml`
+
+Production-proof candidate:
+- `full-journey-production-proof-ky-openai.yaml` uses the same curated `ky.regress.small.openai` cell, but enables `production_proof` fail-closed checks. It is the operator profile for W25-S01/W25-S02 real-run proof preparation and must not be counted as completed production proof until a real non-mock W25-S02 run records `real_code_change_proof_complete=true`.
 
 ## Shared no-write preflight baseline
 All targets reuse the same baseline before execution-style stages:

@@ -24,6 +24,7 @@ Bounded rehearsal profiles:
 
 Catalog-backed full-journey profiles:
 - `installed-user-guided-journey.yaml`
+- `full-journey-production-proof-ky-openai.yaml`
 - `full-journey-regress-ky.yaml`
 - `full-journey-regress-ky-anthropic.yaml`
 - `full-journey-regress-ky-medium-anthropic.yaml`
@@ -83,6 +84,24 @@ node ./scripts/live-e2e/run-profile.mjs \
 
 For full-journey acceptance, packaged bootstrap assets are used by default. `--examples-root` is an explicit internal override for proof generation and deterministic fixture-backed runs.
 
+Production-proof candidate profile:
+
+```bash
+node ./scripts/live-e2e/run-profile.mjs \
+  --project-ref . \
+  --profile ./scripts/live-e2e/profiles/full-journey-production-proof-ky-openai.yaml \
+  --runner-auth-mode host \
+  --runtime-agent-permission-mode full-bypass
+```
+
+`full-journey-production-proof-ky-openai.yaml` is stricter than the W14 coverage profiles:
+- it resolves `ky` and `ky-header-regression` from the curated target catalog;
+- it uses the packaged `codex-cli` adapter profile and `external_runner_mode=real-external-process`;
+- it rejects `--examples-root` because production proof cannot use deterministic mock adapter injection;
+- it sets `verification.baseline_gate.mode=blocking`, so target verification failures block before provider execution;
+- it keeps `output_policy.write_back_to_remote=false` and `preferred_delivery_mode=patch-only`;
+- it records `production_proof`, `proof_scope`, `external_runner_mode`, and `real_code_change_proof_complete=false` in the run summary until W25-S02 produces the real code-changing pass.
+
 Expected output includes:
 - `run_id`
 - `live_e2e_run_summary_file`
@@ -106,6 +125,14 @@ Full-journey layer:
 - writes an execution-readiness decision before `run start` so promotion evidence is based on readiness and routed dry-run proof, not on a failed baseline target check;
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
 - may still run legacy audit or learning diagnostics after delivery for compatibility, but `release` and `learning` are excluded from the v1 observation matrix.
+
+Production-proof profiles add a fail-closed layer on top of full-journey behavior:
+- runner auth probe is required;
+- edit and permission readiness are required for required provider variants;
+- target setup and verification commands must be declared;
+- baseline target verification must use blocking mode;
+- write-back must remain disabled and delivery mode must be `patch-only` or `local-branch`;
+- deterministic proof-runner `--examples-root` overrides are rejected.
 
 Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, and capture an operator-console web smoke artifact. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, web smoke output, and no-upstream-write assertions must be materialized.
 
@@ -142,6 +169,12 @@ Full-journey summaries must carry:
 - `live_e2e_observation_overall_status`
 - `agent_artifact_review_request_file`
 - `verdict_matrix` when legacy diagnostics ran
+
+Production-proof candidate summaries additionally carry:
+- `production_proof`
+- `proof_scope`
+- `external_runner_mode`
+- `real_code_change_proof_complete`
 
 Guided full-journey summaries also carry:
 - `guided_journey`

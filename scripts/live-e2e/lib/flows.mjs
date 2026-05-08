@@ -1443,6 +1443,7 @@ export function executeFullJourneyFlow(options) {
     matrix_cell: options.matrixCell,
     coverage_follow_up: options.coverageFollowUp,
     coverage_tier: options.coverageTier,
+    production_proof: asRecord(options.profile.production_proof),
   };
   const startedAt = nowIso();
   const internalTestHooks = asRecord(options.profile.internal_test_hooks);

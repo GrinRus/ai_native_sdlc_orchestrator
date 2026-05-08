@@ -245,7 +245,7 @@ This is the master index for the implementation slices across all defined waves.
 ## W25 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W25-S01 | Real external-runner proof profile | EPIC-7 | ready | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, provider catalog tests | W24-S01, W23-S02 |
+| W25-S01 | Real external-runner proof profile | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, provider catalog tests | W24-S01, W23-S02 |
 | W25-S02 | Code-changing full-journey pass | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**` | W25-S01, W24-S03 |
 | W25-S03 | Proof fixture and story upgrade | EPIC-7 | blocked | `examples/live-e2e/**`, `docs/product/**`, `scripts/test.mjs`, `docs/ops/**` | W25-S02, W22-S01 |
 

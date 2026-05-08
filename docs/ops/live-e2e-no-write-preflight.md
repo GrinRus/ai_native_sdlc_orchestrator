@@ -27,6 +27,8 @@ Cleanup policy is controlled by `runtime_defaults.workspace_cleanup`:
 5. **Verify** bounded local commands.
 6. **Stop** for bounded rehearsals when verify fails. For full-journey acceptance, continue only when setup/readiness, validation, routed dry-run, adapter readiness, and no-write safety gates pass; target verification command failures are baseline diagnostics unless the profile sets `verification.baseline_gate.mode=blocking`.
 
+Production-proof candidate profiles always set `verification.baseline_gate.mode=blocking`. They also reject proof-runner `--examples-root` overrides, require real external-process adapter preflight, and keep `output_policy.write_back_to_remote=false` with `patch-only` or `local-branch` delivery.
+
 ## Bootstrap rehearsal procedure (W1 baseline)
 Use this exact sequence when validating bootstrap flow readiness without delivery automation:
 
@@ -185,6 +187,7 @@ Abort the rehearsal when any of these conditions occur:
 - checkout, setup, or dependency installation fails;
 - required verification commands fail in bounded rehearsal or in a profile with `verification.baseline_gate.mode=blocking`;
 - a command path requires upstream write-back in a no-write rehearsal;
+- a production-proof candidate profile is run with `--examples-root`, unsafe write-back policy, missing target verification commands, missing runner auth, or failed edit/permission readiness;
 - routed dry-run step result is missing or has status `failed`;
 - budget limits are exceeded before safety gates pass.
 
