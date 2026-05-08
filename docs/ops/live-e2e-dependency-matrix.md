@@ -59,6 +59,7 @@ Proof-mode fields:
 - `external_runner_mode=real-external-process`;
 - `real_code_change_proof_complete=false` until W25-S02 captures a real code-changing pass;
 - promoted run summaries must record `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, passing required target verdicts, Runtime Harness/review/delivery evidence refs, and `no_upstream_write_assertion.status=pass`.
+- the committed W25-S03 fixture lives at `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`; it is sanitized proof evidence for the `ky.regress.small.openai` production cell only, and proof integrity rejects mock-backed `full_code_changing_runtime` claims.
 
 ## W12-S04 refreshed short-profile proof bundle (2026-04-23)
 

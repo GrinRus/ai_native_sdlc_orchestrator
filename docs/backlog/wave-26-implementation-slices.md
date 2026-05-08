@@ -17,7 +17,7 @@ Make self-hosted production readiness repeatable, reviewable, and documented as 
 
 ## W26-S01 — Production readiness gate
 - **Epic:** EPIC-0 Repository development system
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Add a separate production-readiness gate distinct from baseline `pnpm check` that cannot pass without W25 real proof evidence.
 - **Primary modules:** `scripts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/live-e2e/**`
 - **Hard dependencies:** W25-S03, W23-S01, W23-S02, W24-S01

@@ -81,7 +81,7 @@ Produce the first real non-mock full-journey production proof with code-changing
 
 ## W25-S03 — Proof fixture and story upgrade
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Commit the refreshed real proof fixture and upgrade only the stories proven by W25-S02 to proof-covered.
 - **Primary modules:** `examples/live-e2e/**`, `docs/product/**`, `scripts/test.mjs`, `docs/ops/**`
 - **Hard dependencies:** W25-S02, W22-S01

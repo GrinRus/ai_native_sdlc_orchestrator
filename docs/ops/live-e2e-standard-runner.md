@@ -182,6 +182,13 @@ Production-proof candidate summaries additionally carry:
 - `review_report_file`
 - `latest_runtime_harness_report_file`
 
+The W25-S03 committed production proof fixture is
+`examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`. It is a sanitized derivative of the real
+W25-S02 `full-journey-production-proof-ky-openai.yaml` run and records `proof_scope=full_code_changing_runtime`,
+`real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, `overall_verdict=pass`,
+mission-scoped changed paths, Runtime Harness/review/delivery evidence summaries, and a passing no-upstream-write
+assertion. It intentionally excludes runtime output paths, target checkout contents, raw transcripts, and secrets.
+
 Guided full-journey summaries also carry:
 - `guided_journey`
 - `artifacts.guided_journey_proof_file`
@@ -309,3 +316,14 @@ Evidence note:
 - the bundle proves all mandatory scenario families: `regress`, `release`, `repair`, and `governance`.
 - the bundle is explicitly classified as `proof_scope=coverage_with_findings` with `real_code_change_proof_complete=false`; it is coverage evidence, not full code-changing runtime proof.
 - `overall_verdict` remains `pass_with_findings` in the committed proof because the deterministic external runner mock does not materialize mission code changes, leaving `review-report.code_quality=warn`.
+
+## W25-S03 production proof fixture (2026-05-08)
+Canonical fixture:
+- `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`
+
+Evidence note:
+- the fixture is derived from a real `full-journey-production-proof-ky-openai.yaml` run, not from `--examples-root` or a deterministic mock runner.
+- it covers the required `ky.regress.small.openai` cell with `overall_verdict=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
+- it records mission-scoped changed paths under `source/utils/merge.ts` and `test/headers.ts`, plus pass summaries for post-run verification, Runtime Harness, review, delivery, and learning-loop closure.
+- it records `delivery_mode=patch-only`, `write_back_to_remote=false`, unchanged target `HEAD`, empty `commit_refs`, and `writeback_results=[patch-materialized]`.
+- it is sanitized for commit: no runtime output tree, target checkout, local absolute path, raw transcript, or secret material is included.

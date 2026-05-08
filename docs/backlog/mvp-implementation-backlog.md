@@ -247,12 +247,12 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W25-S01 | Real external-runner proof profile | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, provider catalog tests | W24-S01, W23-S02 |
 | W25-S02 | Code-changing full-journey pass | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**` | W25-S01, W24-S03 |
-| W25-S03 | Proof fixture and story upgrade | EPIC-7 | ready | `examples/live-e2e/**`, `docs/product/**`, `scripts/test.mjs`, `docs/ops/**` | W25-S02, W22-S01 |
+| W25-S03 | Proof fixture and story upgrade | EPIC-7 | done | `examples/live-e2e/**`, `docs/product/**`, `scripts/test.mjs`, `docs/ops/**` | W25-S02, W22-S01 |
 
 ## W26 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W26-S01 | Production readiness gate | EPIC-0 | blocked | `scripts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/live-e2e/**` | W25-S03, W23-S01, W23-S02, W24-S01 |
+| W26-S01 | Production readiness gate | EPIC-0 | ready | `scripts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/live-e2e/**` | W25-S03, W23-S01, W23-S02, W24-S01 |
 | W26-S02 | Maintainability stabilization | EPIC-0 | blocked | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests | W26-S01 |
 | W26-S03 | Self-hosted release documentation | EPIC-7 | blocked | `README.md`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**` | W26-S01 |
 
