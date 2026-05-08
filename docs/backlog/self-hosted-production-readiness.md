@@ -2,9 +2,9 @@
 
 ## Status
 
-AOR is not production-ready today. The current repository is a docs-first baseline with implemented CLI/API/web/runtime surfaces, repository-integrity checks, and installed-user rehearsal fixtures.
+AOR is a **self-hosted CLI/API production candidate** for the bounded mode documented in `docs/ops/self-hosted-release.md`. The current repository remains docs-first, but W22-W26 source-of-truth repair, hardening, real proof, production gate, stabilization, and release documentation are now closed for that self-hosted candidate mode.
 
-The current release target is a future **self-hosted CLI/API production candidate** with optional detachable web. Hosted SaaS, enterprise identity, tenant billing, and managed multi-tenant operations are not in scope for the W22-W26 plan.
+Hosted SaaS, enterprise identity, tenant billing, hosted rollback, and managed multi-tenant operations are not in scope for the W22-W26 release.
 
 ## Baseline vs production
 
@@ -26,10 +26,9 @@ Production readiness requires:
 
 | Blocker | Owning slice | Required evidence |
 |---|---|---|
-| Production-touched hotspots still need focused stabilization before release-candidate documentation. | `W26-S02` | Behavior-preserving refactors over live E2E, step execution/Runtime Harness, API projections, or web production surfaces with targeted tests. |
-| Self-hosted release documentation is not final yet. | `W26-S03` | README, roadmap, story matrix, proof docs, and ops docs agree on the supported self-hosted CLI/API mode, optional web, rollback, auth config, no-write/write-back policy, proof evidence, and non-goals. |
+| None for the W22-W26 self-hosted CLI/API production-candidate scope. | none | Remaining non-goals are outside this release mode, not blockers. |
 
-## Closed W23 hardening prerequisites
+## Closed hardening and release prerequisites
 
 | Closed prerequisite | Owning slice | Evidence |
 |---|---|---|
@@ -42,6 +41,8 @@ Production readiness requires:
 | Real external-runner full-journey proof passed with no upstream write. | `W25-S02` | Promoted run evidence records `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, all required target verdicts `pass`, and no upstream write. |
 | Sanitized production proof fixture is committed and story upgrades are evidence-backed. | `W25-S03` | `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` is the committed fixture; proof integrity rejects mock-backed production claims; only fixture-backed stories are `proof-covered`. |
 | Production readiness has a separate gate. | `W26-S01` | `pnpm production:ready` rejects missing or mock-backed W25 proof and verifies story honesty, auth, nested contracts, run-level harness, source-of-truth alignment, and proof fixture integrity. |
+| Production-touched hotspots were stabilized without redesign. | `W26-S02` | Production proof evidence assessment was extracted from the live E2E runner into `scripts/live-e2e/lib/production-proof.mjs`; live E2E proof runner tests and slice gates passed. |
+| Self-hosted release documentation is final for the bounded mode. | `W26-S03` | `docs/ops/self-hosted-release.md` documents supported mode, release gate, rollback, auth config, no-write/write-back policy, proof evidence, and non-goals. |
 
 ## Story status policy
 
@@ -51,7 +52,7 @@ Production readiness requires:
 - `partial`
 - `blocked`
 
-As of W26-S01, the matrix records `baseline-covered=84`, `proof-covered=4`, `partial=22`, and `blocked=2`. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
+As of W26-S03, the matrix records `baseline-covered=106`, `proof-covered=4`, `partial=0`, and `blocked=2`. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
 
 The current production-proof fixture is `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`. It supports only the story rows that cite the fixture with `overall_verdict=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 
@@ -61,10 +62,12 @@ OpenCode is extended candidate coverage after W22-S03. It is not a required or c
 
 ## Release criteria
 
-The final verdict can change from "not production-ready" to "self-hosted production candidate" only after:
+The final verdict is **self-hosted production candidate** for the bounded CLI/API mode because:
 1. W23 contract, auth, and lifecycle boundary slices are accepted.
 2. W24 run-level harness, interactive continuation, and strict delivery gates are accepted.
 3. W25 real external-runner full-journey proof passes with code-changing evidence and no upstream write.
 4. W26 production-readiness gate (`pnpm production:ready`) passes.
 5. W26 maintainability stabilization is accepted for production-touched hotspots.
 6. W26 release documentation states the supported mode, rollback procedure, auth configuration, no-write/write-back policy, proof evidence, and non-goals.
+
+This verdict does not extend to hosted SaaS, enterprise identity-provider integration, managed multi-tenant operations, default upstream write-back, or uncertified extended adapters such as OpenCode.

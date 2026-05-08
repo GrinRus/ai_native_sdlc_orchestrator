@@ -5,7 +5,7 @@ Repair source-of-truth claims so the repository distinguishes baseline readiness
 
 ## Wave exit criteria
 - Story coverage uses evidence-strength statuses across all 112 stories.
-- Production readiness docs state the current baseline is not production-ready.
+- Production readiness docs state that the W22 baseline is not yet production-ready and name the W23-W26 release criteria.
 - OpenCode is downgraded to extended candidate coverage until real certification exists.
 
 ## Sequencing notes
@@ -62,7 +62,7 @@ Repair source-of-truth claims so the repository distinguishes baseline readiness
 4. Keep hosted SaaS and enterprise identity explicitly out of scope.
 
 ### Acceptance criteria
-1. README, roadmap, story matrix, and readiness docs agree that the current repo is not production-ready.
+1. README, roadmap, story matrix, and readiness docs agree that the W22 baseline is not yet production-ready.
 2. The `125/125` historical baseline completion signal is no longer presented as production readiness.
 3. Production release criteria name auth, nested contracts, run-level harness, delivery gates, and real proof requirements.
 

@@ -19,7 +19,9 @@ Teams need more than code generation. They need a system that can:
 
 ## Current repository status
 
-This repository is currently a **docs-first project package with implemented CLI/API/web/runtime baselines**. It is not yet a production-ready orchestrator runtime.
+This repository is currently a **docs-first project package with implemented CLI/API/web/runtime baselines** and a **self-hosted CLI/API production candidate** for the bounded mode described in `docs/ops/self-hosted-release.md`.
+
+The production-candidate claim is intentionally narrow: it covers self-hosted CLI/API operation with optional detachable web, explicit production-readiness gating, real no-upstream-write proof evidence, and no hosted SaaS or enterprise identity-provider integration.
 
 What exists today:
 
@@ -41,14 +43,14 @@ What exists today:
 - W20 production-hardening baseline for detached control-plane transport mode, bearer auth/authz scopes, redaction of configured secrets across JSON/SSE/CLI surfaces, and denied-action audit evidence.
 - a W25 sanitized real production proof fixture at `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` with `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, passing target verdicts, and no upstream write.
 - a separate W26 self-hosted production-readiness gate, `pnpm production:ready`, that validates story honesty, source-of-truth alignment, auth hardening, nested contracts, run-level harness evidence, and W25 proof integrity without changing the meaning of `pnpm check`.
+- a self-hosted release runbook at `docs/ops/self-hosted-release.md` covering the supported CLI/API mode, optional detachable web, auth setup, rollback, no-write/write-back policy, proof evidence, and non-goals.
 
 What does **not** exist yet:
 
-- a production-ready orchestrator runtime;
 - broad multi-provider production-grade adapter coverage beyond the stable `codex-cli` live baseline and candidate `claude-code` rehearsal coverage;
 - delivery write-back automation to upstream repositories;
 - enterprise identity-provider integration, hosted SaaS deployment hardening, and operator parity for every CLI/API/web control surface;
-- final self-hosted production-candidate release documentation and focused stabilization of production-touched hotspots; W26 owns the remaining release-candidate closure.
+- managed multi-tenant operations, tenant billing, hosted rollback procedures, or enterprise identity rollout guides.
 
 Use the backlog docs for the implementation roadmap.
 

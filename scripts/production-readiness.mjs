@@ -281,6 +281,9 @@ function checkStoryHonesty(rootDir) {
     if (row.gapSlices.includes("W26-S01")) {
       findings.push(`${row.storyId} still points at W26-S01 as a future gap after the production gate exists.`);
     }
+    if (row.gapSlices.includes("W26-S03")) {
+      findings.push(`${row.storyId} still points at W26-S03 as a future gap after release documentation exists.`);
+    }
   }
   if (!documentedCounts) {
     findings.push("Story matrix status count line is missing.");
@@ -334,7 +337,7 @@ function checkStoryHonesty(rootDir) {
       "docs/product/user-story-coverage-matrix.md",
     ]);
   }
-  return pass("story-status-honesty", "Story statuses distinguish proof-covered rows from residual partial/blocked gaps.", [
+  return pass("story-status-honesty", "Story statuses distinguish proof-covered rows from baseline and external blocked rows.", [
     "docs/product/user-story-coverage-matrix.md",
   ]);
 }
@@ -344,12 +347,22 @@ function checkSourceOfTruth(rootDir) {
   const readme = readText(rootDir, "README.md");
   const readiness = readText(rootDir, "docs/backlog/self-hosted-production-readiness.md");
   const opsRunbook = readText(rootDir, "docs/ops/production-readiness-gate.md");
+  const releaseRunbook = readText(rootDir, "docs/ops/self-hosted-release.md");
 
-  if (!readme.includes("not yet a production-ready orchestrator runtime")) {
-    findings.push("README.md must continue to say the current repo is not yet a production-ready orchestrator runtime.");
+  if (!readme.includes("self-hosted CLI/API production candidate")) {
+    findings.push("README.md must state the bounded self-hosted CLI/API production-candidate status.");
   }
   if (!readme.includes("pnpm production:ready")) {
     findings.push("README.md must document the separate production-readiness gate command.");
+  }
+  if (!readme.includes("docs/ops/self-hosted-release.md")) {
+    findings.push("README.md must link the self-hosted release runbook.");
+  }
+  if (!readme.includes("hosted SaaS") || !readme.includes("enterprise identity")) {
+    findings.push("README.md must keep hosted SaaS and enterprise identity out of the supported mode.");
+  }
+  if (!readiness.includes("self-hosted CLI/API production candidate")) {
+    findings.push("self-hosted production readiness doc must state the bounded production-candidate status.");
   }
   if (!readiness.includes("pnpm production:ready")) {
     findings.push("self-hosted production readiness doc must document the production gate command.");
@@ -360,18 +373,32 @@ function checkSourceOfTruth(rootDir) {
   if (!opsRunbook.includes("pnpm production:ready") || !opsRunbook.includes(defaultProofFixturePath)) {
     findings.push("production-readiness runbook must document command usage and proof evidence.");
   }
+  for (const required of [
+    "self-hosted CLI/API production candidate",
+    "pnpm production:ready",
+    defaultProofFixturePath,
+    "hosted SaaS",
+    "enterprise identity",
+    "no-upstream-write",
+  ]) {
+    if (!releaseRunbook.includes(required)) {
+      findings.push(`self-hosted release runbook must mention '${required}'.`);
+    }
+  }
 
   if (findings.length > 0) {
     return fail("source-of-truth-alignment", "Production readiness source-of-truth docs are inconsistent.", findings, [
       "README.md",
       "docs/backlog/self-hosted-production-readiness.md",
       "docs/ops/production-readiness-gate.md",
+      "docs/ops/self-hosted-release.md",
     ]);
   }
-  return pass("source-of-truth-alignment", "README, readiness source-of-truth, and runbook align.", [
+  return pass("source-of-truth-alignment", "README, readiness source-of-truth, production gate, and release runbook align.", [
     "README.md",
     "docs/backlog/self-hosted-production-readiness.md",
     "docs/ops/production-readiness-gate.md",
+    "docs/ops/self-hosted-release.md",
   ]);
 }
 

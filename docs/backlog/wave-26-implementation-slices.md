@@ -77,7 +77,7 @@ Make self-hosted production readiness repeatable, reviewable, and documented as 
 
 ## W26-S03 — Self-hosted release documentation
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Document the supported production mode as self-hosted CLI/API with optional web, including runbook, rollback, auth, proof evidence, and non-goals.
 - **Primary modules:** `README.md`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**`
 - **Hard dependencies:** W26-S01

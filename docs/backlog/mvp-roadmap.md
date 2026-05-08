@@ -409,7 +409,7 @@ The authoritative planning model for implementation lives in:
 
 **Exit criteria:**
 - Story coverage uses evidence-strength statuses across all 112 stories.
-- Production readiness docs state the current baseline is not production-ready.
+- Production readiness docs state that the W22 baseline is not yet production-ready and name the W23-W26 release criteria.
 - OpenCode is downgraded to extended candidate coverage until real certification exists.
 
 **Detailed slices:** `docs/backlog/wave-22-implementation-slices.md`

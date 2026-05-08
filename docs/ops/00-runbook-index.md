@@ -22,6 +22,7 @@
 - `security-route-governance.md` — allow/deny/escalate checks for delivery/release route governance decisions.
 - `control-plane-production-hardening.md` — local-trusted versus production-hardened transport mode, bearer scopes, denied-action audit behavior, and redaction surfaces.
 - `production-readiness-gate.md` — self-hosted production-readiness gate usage, evidence checks, and failure interpretation.
+- `self-hosted-release.md` — supported self-hosted CLI/API production-candidate mode, release gate, rollback, auth, delivery policy, proof evidence, and non-goals.
 
 ## UI lifecycle
 - `ui-attach-detach.md` — how to attach or detach the optional web UI from a running AOR system.

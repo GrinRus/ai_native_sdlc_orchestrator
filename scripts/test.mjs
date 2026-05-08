@@ -708,6 +708,14 @@ const validStoryTiers = new Set(["MVP", "MVP+", "Later"]);
 const validCoverageStatuses = new Set(["baseline-covered", "proof-covered", "partial", "blocked"]);
 const coveredCoverageStatuses = new Set(["baseline-covered", "proof-covered"]);
 
+function hasExplicitExternalBlocker(row) {
+  return (
+    row.coverageStatus === "blocked" &&
+    row.gapSlices.length === 0 &&
+    /(outside .*scope|out of scope|future|external prerequisite|not in scope)/iu.test(row.evidence)
+  );
+}
+
 function parseUserStoryCoverageMatrixDocumentation() {
   const matrix = read("docs/product/user-story-coverage-matrix.md");
   const rows = new Map();
@@ -823,8 +831,14 @@ function assertUserStoryCoverageMatrixDocumentation() {
       process.exit(1);
     }
 
-    if (!coveredCoverageStatuses.has(row.coverageStatus) && row.gapSlices.length === 0) {
-      console.error(`Non-covered user-story ${row.storyId} must reference at least one gap slice.`);
+    if (
+      !coveredCoverageStatuses.has(row.coverageStatus) &&
+      row.gapSlices.length === 0 &&
+      !hasExplicitExternalBlocker(row)
+    ) {
+      console.error(
+        `Non-covered user-story ${row.storyId} must reference at least one gap slice or explain an external blocker.`,
+      );
       process.exit(1);
     }
 
