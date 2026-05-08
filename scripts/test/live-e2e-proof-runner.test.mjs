@@ -1948,6 +1948,64 @@ test("production proof profile fails closed when permission readiness fails", ()
   });
 });
 
+test("production proof profile promotes a complete code-changing pass from executable evidence", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const fakeCodex = createFakeCodexBinary({ tempRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "production-proof-complete.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        baseline_gate: {
+          mode: "blocking",
+        },
+      },
+      productionProof: productionProofPolicy(),
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      profilePath,
+      runId: "production-proof-complete",
+      catalogRoot,
+      omitExamplesRoot: true,
+      extraEnv: {
+        PATH: `${fakeCodex.binRoot}${path.delimiter}${process.env.PATH ?? ""}`,
+      },
+    });
+    assert.equal(result.live_e2e_run_status, "pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.verdict_matrix.overall_verdict, "pass");
+    assert.equal(summary.production_proof.external_runner_mode, "real-external-process");
+    assert.equal(summary.proof_scope, "full_code_changing_runtime");
+    assert.equal(summary.real_code_change_proof_complete, true);
+    assert.equal(summary.production_proof_evidence_status, "pass");
+    assert.equal(summary.production_proof.evidence_status, "pass");
+    assert.equal(summary.production_proof.target_verdicts.status, "pass");
+    assert.equal(summary.production_proof.runtime_harness.status, "pass");
+    assert.equal(summary.production_proof.review.status, "pass");
+    assert.equal(summary.no_upstream_write_assertion.status, "pass");
+    assert.equal(summary.no_upstream_write_assertion.target_head_unchanged, true);
+    assert.deepEqual(summary.no_upstream_write_assertion.commit_refs, []);
+    assert.deepEqual(summary.production_proof.findings, []);
+    assert.ok(summary.production_proof.changed_paths.includes("src/index.js"));
+    assert.equal(fs.existsSync(summary.delivery_manifest_file), true);
+    assert.equal(fs.existsSync(summary.review_report_file), true);
+    assert.equal(fs.existsSync(summary.latest_runtime_harness_report_file), true);
+  });
+});
+
 test("full-journey mode treats baseline target verification failure as diagnostic when post-run quality passes", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });

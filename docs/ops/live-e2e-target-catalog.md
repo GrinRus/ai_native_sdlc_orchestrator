@@ -155,7 +155,7 @@ Canonical matrix-cell examples:
 - `large/release/openai-primary`: `full-journey-release-nextjs.yaml`
 
 Production-proof candidate:
-- `full-journey-production-proof-ky-openai.yaml` uses the same curated `ky.regress.small.openai` cell, but enables `production_proof` fail-closed checks. It is the operator profile for W25-S01/W25-S02 real-run proof preparation and must not be counted as completed production proof until a real non-mock W25-S02 run records `real_code_change_proof_complete=true`.
+- `full-journey-production-proof-ky-openai.yaml` uses the same curated `ky.regress.small.openai` cell, but enables `production_proof` fail-closed checks. It is the operator profile for W25-S01/W25-S02 real-run proof preparation and must not be counted as completed production proof until a real non-mock W25-S02 run records `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, required target verdicts `pass`, and a passing no-upstream-write assertion.
 
 ## Shared no-write preflight baseline
 All targets reuse the same baseline before execution-style stages:

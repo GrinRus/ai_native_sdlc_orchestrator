@@ -100,7 +100,7 @@ node ./scripts/live-e2e/run-profile.mjs \
 - it rejects `--examples-root` because production proof cannot use deterministic mock adapter injection;
 - it sets `verification.baseline_gate.mode=blocking`, so target verification failures block before provider execution;
 - it keeps `output_policy.write_back_to_remote=false` and `preferred_delivery_mode=patch-only`;
-- it records `production_proof`, `proof_scope`, `external_runner_mode`, and `real_code_change_proof_complete=false` in the run summary until W25-S02 produces the real code-changing pass.
+- it starts from candidate profile metadata, then promotes the run summary to `proof_scope=full_code_changing_runtime` and `real_code_change_proof_complete=true` only when executable evidence proves a real code-changing pass, required target verdicts pass, Runtime Harness/review/delivery evidence exists, and the no-upstream-write assertion passes.
 
 Expected output includes:
 - `run_id`
@@ -175,6 +175,12 @@ Production-proof candidate summaries additionally carry:
 - `proof_scope`
 - `external_runner_mode`
 - `real_code_change_proof_complete`
+- `production_proof_evidence_status`
+- `production_proof_evidence_refs`
+- `no_upstream_write_assertion`
+- `delivery_manifest_file`
+- `review_report_file`
+- `latest_runtime_harness_report_file`
 
 Guided full-journey summaries also carry:
 - `guided_journey`

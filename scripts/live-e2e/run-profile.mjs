@@ -50,6 +50,28 @@ const LIVE_E2E_OBSERVATION_PRELUDE_STEPS = Object.freeze([
   "project-validate",
 ]);
 const LIVE_E2E_OBSERVATION_EXCLUDED_STEPS = Object.freeze(["release", "learning"]);
+const PRODUCTION_PROOF_REQUIRED_VERDICT_FIELDS = Object.freeze([
+  "target_selection",
+  "feature_request_quality",
+  "scenario_coverage_status",
+  "provider_execution_status",
+  "target_baseline_status",
+  "real_code_change_status",
+  "post_run_verification_status",
+  "post_run_diagnostic_status",
+  "discovery_quality",
+  "runtime_success",
+  "runtime_harness_decision",
+  "run_start_runtime_harness_decision",
+  "latest_runtime_harness_decision",
+  "artifact_quality",
+  "code_quality",
+  "feature_size_fit_status",
+  "delivery_release_quality",
+  "learning_loop_closure",
+  "quality_gate_decision",
+  "overall_verdict",
+]);
 
 /**
  * @param {unknown} value
@@ -281,6 +303,283 @@ function buildProductionProofSummary(profile) {
     require_permission_readiness: policy.require_permission_readiness === true,
     require_blocking_target_verification: policy.require_blocking_target_verification === true,
     required_failure_mode: asNonEmptyString(policy.required_failure_mode),
+  };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isPassStatus(value) {
+  return asNonEmptyString(value).toLowerCase() === "pass";
+}
+
+/**
+ * @param {string | null | undefined} filePath
+ * @returns {boolean}
+ */
+function evidenceFileExists(filePath) {
+  const resolved = asNonEmptyString(filePath);
+  return Boolean(resolved && fileExists(resolved));
+}
+
+/**
+ * @param {Record<string, unknown>} verdictMatrix
+ * @returns {{ ok: boolean, failed_fields: string[] }}
+ */
+function assessProductionProofVerdicts(verdictMatrix) {
+  const failedFields = PRODUCTION_PROOF_REQUIRED_VERDICT_FIELDS.filter(
+    (field) => !isPassStatus(verdictMatrix[field]),
+  );
+  return {
+    ok: failedFields.length === 0,
+    failed_fields: failedFields,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {{ status: "pass" | "fail", delivery_manifest_file: string | null, changed_paths: string[], writeback_results: string[], target_head_unchanged: boolean, commit_refs: string[], findings: string[] }}
+ */
+function assessNoUpstreamWrite(artifacts) {
+  const deliveryManifestFile = asNonEmptyString(artifacts.delivery_manifest_file) || null;
+  const deliveryManifest = readJsonIfPresent(deliveryManifestFile);
+  const repoDeliveries = Array.isArray(deliveryManifest.repo_deliveries) ? deliveryManifest.repo_deliveries : [];
+  const findings = [];
+  const changedPaths = [];
+  const writebackResults = [];
+  const commitRefs = [];
+  let targetHeadUnchanged = true;
+
+  if (!deliveryManifestFile || !fileExists(deliveryManifestFile)) {
+    findings.push("delivery manifest is missing");
+  }
+  if (repoDeliveries.length === 0) {
+    findings.push("delivery manifest has no repo deliveries");
+  }
+
+  for (const entry of repoDeliveries) {
+    const delivery = asRecord(entry);
+    changedPaths.push(...asStringArray(delivery.changed_paths));
+    const writebackResult = asNonEmptyString(delivery.writeback_result);
+    if (writebackResult) writebackResults.push(writebackResult);
+    commitRefs.push(...asStringArray(delivery.commit_refs));
+    const provenance = asRecord(delivery.checkout_provenance);
+    const headBeforeCommit = asNonEmptyString(asRecord(provenance.head_before).commit);
+    const headAfterCommit = asNonEmptyString(asRecord(provenance.head_after).commit);
+    if (headBeforeCommit && headAfterCommit && headBeforeCommit !== headAfterCommit) {
+      targetHeadUnchanged = false;
+    }
+  }
+
+  if (commitRefs.length > 0) {
+    findings.push("delivery manifest records commit refs");
+  }
+  if (!targetHeadUnchanged) {
+    findings.push("target HEAD changed during patch-only proof");
+  }
+  if (writebackResults.some((result) => /\b(?:push|pushed|remote|upstream)\b/iu.test(result))) {
+    findings.push("delivery manifest records a remote/upstream writeback result");
+  }
+
+  return {
+    status: findings.length === 0 ? "pass" : "fail",
+    delivery_manifest_file: deliveryManifestFile,
+    changed_paths: uniqueStrings(changedPaths),
+    writeback_results: uniqueStrings(writebackResults),
+    target_head_unchanged: targetHeadUnchanged,
+    commit_refs: uniqueStrings(commitRefs),
+    findings,
+  };
+}
+
+/**
+ * @param {string | null | undefined} runtimeHarnessReportFile
+ * @returns {{ status: "pass" | "fail", report_file: string | null, mission_scoped_changed_paths: string[], findings: string[] }}
+ */
+function assessRuntimeHarnessProof(runtimeHarnessReportFile) {
+  const reportFile = asNonEmptyString(runtimeHarnessReportFile) || null;
+  const findings = [];
+  const report = readJsonIfPresent(reportFile);
+  const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
+  const missionScopedChangedPaths = uniqueStrings(
+    stepDecisions.flatMap((entry) => asStringArray(asRecord(asRecord(entry).mission_semantics).mission_scoped_changed_paths)),
+  );
+
+  if (!reportFile || !fileExists(reportFile)) {
+    findings.push("Runtime Harness report is missing");
+  }
+  if (!isPassStatus(report.overall_decision)) {
+    findings.push("Runtime Harness overall_decision is not pass");
+  }
+  if (missionScopedChangedPaths.length === 0) {
+    findings.push("Runtime Harness has no mission-scoped changed paths");
+  }
+
+  return {
+    status: findings.length === 0 ? "pass" : "fail",
+    report_file: reportFile,
+    mission_scoped_changed_paths: missionScopedChangedPaths,
+    findings,
+  };
+}
+
+/**
+ * @param {string | null | undefined} reviewReportFile
+ * @returns {{ status: "pass" | "fail", report_file: string | null, changed_paths: string[], findings: string[] }}
+ */
+function assessReviewProof(reviewReportFile) {
+  const reportFile = asNonEmptyString(reviewReportFile) || null;
+  const findings = [];
+  const report = readJsonIfPresent(reportFile);
+  const changedPaths = asStringArray(asRecord(report.code_quality).changed_paths);
+
+  if (!reportFile || !fileExists(reportFile)) {
+    findings.push("review report is missing");
+  }
+  if (!isPassStatus(report.overall_status)) {
+    findings.push("review overall_status is not pass");
+  }
+  for (const field of ["code_quality", "provider_traceability", "feature_size_fit"]) {
+    if (!isPassStatus(asRecord(report[field]).status)) {
+      findings.push(`review ${field}.status is not pass`);
+    }
+  }
+  if (changedPaths.length === 0) {
+    findings.push("review report has no changed paths");
+  }
+
+  return {
+    status: findings.length === 0 ? "pass" : "fail",
+    report_file: reportFile,
+    changed_paths: uniqueStrings(changedPaths),
+    findings,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} productionProof
+ * @returns {{ status: "pass" | "fail", findings: string[] }}
+ */
+function assessProductionPreflight(artifacts, productionProof) {
+  const preflight = asRecord(artifacts.live_adapter_preflight);
+  const findings = [];
+  if (!isPassStatus(preflight.status)) {
+    findings.push("live adapter preflight did not pass");
+  }
+  if (productionProof.require_runner_auth === true && !isPassStatus(asRecord(preflight.auth_probe).status)) {
+    findings.push("runner auth probe did not pass");
+  }
+  if (!isPassStatus(asRecord(preflight.edit_readiness).status)) {
+    findings.push("edit readiness did not pass");
+  }
+  if (
+    productionProof.require_permission_readiness === true &&
+    !isPassStatus(asRecord(preflight.permission_readiness).status)
+  ) {
+    findings.push("permission readiness did not pass");
+  }
+  if (asNonEmptyString(productionProof.external_runner_mode) !== "real-external-process") {
+    findings.push("external runner mode is not real-external-process");
+  }
+  if (productionProof.mock_runner_allowed === true) {
+    findings.push("mock runner is allowed by production proof policy");
+  }
+
+  return {
+    status: findings.length === 0 ? "pass" : "fail",
+    findings,
+  };
+}
+
+/**
+ * @param {{
+ *   productionProof: Record<string, unknown> | null,
+ *   flowResult: {
+ *     status: string,
+ *     artifacts: Record<string, unknown>,
+ *   },
+ * }} options
+ * @returns {Record<string, unknown> | null}
+ */
+function applyProductionProofEvidence(options) {
+  if (!options.productionProof) {
+    return null;
+  }
+
+  const artifacts = options.flowResult.artifacts;
+  const verdictMatrix = asRecord(artifacts.verdict_matrix);
+  const verdicts = assessProductionProofVerdicts(verdictMatrix);
+  const runtimeHarness = assessRuntimeHarnessProof(
+    asNonEmptyString(artifacts.latest_runtime_harness_report_file) || asNonEmptyString(artifacts.runtime_harness_report_file),
+  );
+  const review = assessReviewProof(artifacts.review_report_file);
+  const noUpstreamWrite = assessNoUpstreamWrite(artifacts);
+  const preflight = assessProductionPreflight(artifacts, options.productionProof);
+  const changedPaths = uniqueStrings([
+    ...runtimeHarness.mission_scoped_changed_paths,
+    ...review.changed_paths,
+    ...noUpstreamWrite.changed_paths,
+  ]);
+  const evidenceRefs = {
+    live_adapter_preflight_file: asNonEmptyString(artifacts.live_adapter_preflight_file) || null,
+    runtime_harness_report_file: runtimeHarness.report_file,
+    review_report_file: review.report_file,
+    delivery_manifest_file: noUpstreamWrite.delivery_manifest_file,
+    post_run_verify_summary_file: asNonEmptyString(artifacts.post_run_verify_summary_file) || null,
+    post_run_diagnostic_verify_summary_file: asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file) || null,
+    adapter_raw_evidence_ref: asNonEmptyString(artifacts.adapter_raw_evidence_ref) || null,
+    learning_loop_scorecard_file: asNonEmptyString(artifacts.learning_loop_scorecard_file) || null,
+    learning_loop_handoff_file: asNonEmptyString(artifacts.learning_loop_handoff_file) || null,
+  };
+  const requiredEvidenceRefFields = [
+    "live_adapter_preflight_file",
+    "runtime_harness_report_file",
+    "review_report_file",
+    "delivery_manifest_file",
+    "post_run_verify_summary_file",
+    "learning_loop_scorecard_file",
+    "learning_loop_handoff_file",
+  ];
+  const evidenceRefsExist = requiredEvidenceRefFields.every((field) => evidenceFileExists(evidenceRefs[field]));
+  const findings = uniqueStrings([
+    ...(isPassStatus(options.flowResult.status) ? [] : ["full-journey flow status is not pass"]),
+    ...(verdicts.ok ? [] : verdicts.failed_fields.map((field) => `verdict_matrix.${field} is not pass`)),
+    ...preflight.findings,
+    ...runtimeHarness.findings,
+    ...review.findings,
+    ...noUpstreamWrite.findings,
+    ...(changedPaths.length > 0 ? [] : ["no meaningful mission-scoped changed paths were recorded"]),
+    ...(evidenceRefsExist ? [] : ["one or more required proof evidence files are missing"]),
+  ]);
+  const complete = findings.length === 0;
+
+  return {
+    ...options.productionProof,
+    proof_scope: complete ? "full_code_changing_runtime" : options.productionProof.proof_scope,
+    real_code_change_proof_complete: complete,
+    evidence_status: complete ? "pass" : "pending",
+    evidence_refs: evidenceRefs,
+    changed_paths: changedPaths,
+    target_verdicts: {
+      status: verdicts.ok ? "pass" : "fail",
+      required_fields: [...PRODUCTION_PROOF_REQUIRED_VERDICT_FIELDS],
+      failed_fields: verdicts.failed_fields,
+    },
+    runtime_harness: {
+      status: runtimeHarness.status,
+      mission_scoped_changed_paths: runtimeHarness.mission_scoped_changed_paths,
+    },
+    review: {
+      status: review.status,
+      changed_paths: review.changed_paths,
+    },
+    no_upstream_write_assertion: noUpstreamWrite,
+    preflight: {
+      status: preflight.status,
+    },
+    findings,
   };
 }
 
@@ -550,7 +849,7 @@ function writeProofRunnerArtifacts(options) {
     `live-e2e-scorecard-target-${normalizeId(options.runId)}.json`,
   );
   const agentJudgeDocument = loadAgentJudgeDocument(options.agentJudgeFile);
-  const productionProof = buildProductionProofSummary(options.profile);
+  const productionProofPolicy = buildProductionProofSummary(options.profile);
   const observationReport = buildObservationReport({
     runId: options.runId,
     profilePath: options.profilePath,
@@ -580,6 +879,13 @@ function writeProofRunnerArtifacts(options) {
   options.flowResult.artifacts.live_e2e_observation_report_file = observationReportFile;
   options.flowResult.artifacts.agent_artifact_review_request_file = agentArtifactReviewRequestFile;
   options.flowResult.artifacts.live_e2e_observation_overall_status = observationReport.overall_status;
+  const productionProof = applyProductionProofEvidence({
+    productionProof: productionProofPolicy,
+    flowResult: options.flowResult,
+  });
+  if (productionProof) {
+    options.flowResult.artifacts.production_proof = productionProof;
+  }
 
   const summary = {
     run_id: options.runId,
@@ -670,6 +976,12 @@ function writeProofRunnerArtifacts(options) {
     proof_scope: productionProof?.proof_scope ?? null,
     external_runner_mode: productionProof?.external_runner_mode ?? null,
     real_code_change_proof_complete: productionProof?.real_code_change_proof_complete ?? null,
+    production_proof_evidence_status: productionProof?.evidence_status ?? null,
+    production_proof_evidence_refs: productionProof?.evidence_refs ?? null,
+    no_upstream_write_assertion: productionProof?.no_upstream_write_assertion ?? null,
+    delivery_manifest_file: productionProof?.evidence_refs?.delivery_manifest_file ?? null,
+    review_report_file: productionProof?.evidence_refs?.review_report_file ?? null,
+    latest_runtime_harness_report_file: productionProof?.evidence_refs?.runtime_harness_report_file ?? null,
     coverage_follow_up:
       typeof options.flowResult.artifacts.coverage_follow_up === "object" && options.flowResult.artifacts.coverage_follow_up
         ? options.flowResult.artifacts.coverage_follow_up

@@ -55,9 +55,10 @@ Fail-closed prerequisites:
 
 Proof-mode fields:
 - `production_proof.enabled=true`;
-- `proof_scope=full_code_changing_runtime_candidate`;
+- `proof_scope=full_code_changing_runtime_candidate` before executable proof promotion;
 - `external_runner_mode=real-external-process`;
-- `real_code_change_proof_complete=false` until W25-S02 captures a real code-changing pass.
+- `real_code_change_proof_complete=false` until W25-S02 captures a real code-changing pass;
+- promoted run summaries must record `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, passing required target verdicts, Runtime Harness/review/delivery evidence refs, and `no_upstream_write_assertion.status=pass`.
 
 ## W12-S04 refreshed short-profile proof bundle (2026-04-23)
 
