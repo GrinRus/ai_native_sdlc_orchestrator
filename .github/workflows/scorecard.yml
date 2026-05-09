@@ -12,7 +12,6 @@ on:
 permissions:
   contents: read
   security-events: write
-  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -35,7 +34,7 @@ jobs:
         with:
           results_file: scorecard-results.sarif
           results_format: sarif
-          publish_results: ${{ github.event_name != 'pull_request' }}
+          publish_results: false
 
       - name: Upload Scorecard SARIF
         if: github.event_name != 'pull_request'

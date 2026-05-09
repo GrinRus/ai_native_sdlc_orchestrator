@@ -342,7 +342,7 @@ const workflowExpectations = new Map([
       "pull_request:",
       "workflow_dispatch:",
       "security-events: write",
-      "id-token: write",
+      "publish_results: false",
       "ossf/scorecard-action@",
       "github/codeql-action/upload-sarif@",
     ],
