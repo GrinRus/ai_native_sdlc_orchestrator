@@ -193,14 +193,22 @@ Use these surfaces as implemented baselines, not as a hosted product claim.
 | No-write mission intake | Implemented baseline | `pnpm aor mission create ... --delivery-mode no-write --json`. |
 | Next-action reporting | Implemented baseline | `pnpm aor next ... --json`. |
 | CLI/API/web baselines | Implemented baseline | See `apps/*`, `packages/*`, and the command catalog. |
-| Internal live E2E proof fixtures | Implemented for curated rehearsals | See `docs/ops/live-e2e-runbook.md` and `examples/live-e2e/`. |
 | Production-readiness gate | Implemented bounded gate | `pnpm production:ready --json`. |
 
-Readiness evidence is tracked in backlog and ops documents rather than release
-notes. The current implemented span includes W10-W26 source, runtime,
-evaluation, delivery, self-hosted, CI, and community hardening slices. Start
-with `docs/backlog/mvp-roadmap.md`, `docs/backlog/backlog-operating-model.md`,
-`docs/ops/live-e2e-runbook.md`, and `docs/ops/self-hosted-release.md`.
+## Readiness evidence
+
+Root checks prove repository integrity for this source checkout. They validate
+docs, examples, contracts, command surfaces, tests, and scaffold policy; they do
+not certify AOR as an unattended production runtime for arbitrary repositories.
+
+`pnpm production:ready --json` is a maintainer-facing gate for the bounded
+self-hosted CLI/API mode documented in this repository. Internal evaluation and
+proof fixtures exist for maintainers, but they are not a public onboarding path
+and are intentionally not part of the README workflow.
+
+The current roadmap source of truth extends through W26 in
+`docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
+without routing operators into internal evaluation material.
 
 ## When not to use AOR yet
 
@@ -228,7 +236,6 @@ Start here when you need deeper context:
   command surface.
 - `docs/backlog/backlog-operating-model.md` - planning and delivery workflow.
 - `docs/backlog/mvp-roadmap.md` - roadmap and readiness story.
-- `docs/ops/live-e2e-runbook.md` - live E2E proof runbook.
 - `docs/ops/self-hosted-release.md` - bounded self-hosted release operating
   model.
 
@@ -294,24 +301,9 @@ docs/
   contracts/           Contract source of truth and schemas.
   backlog/             Roadmap, waves, epics, and slices.
   ops/                 Runbooks and release-readiness material.
-examples/
-  live-e2e/            Curated live E2E fixtures and profiles.
 scripts/
   *.mjs                Repository-integrity checks.
 ```
-
-## Live E2E target projects
-
-Live E2E fixtures are curated proof paths, not default user onboarding. They are
-documented under `examples/live-e2e/` with runbook guidance in
-`docs/ops/live-e2e-runbook.md`.
-
-Public-repo safety rules apply:
-
-- Live E2E must default to no upstream writes unless a profile explicitly opts
-  into a guarded delivery mode.
-- Generated target checkouts and `.aor/` runtime roots must not be committed.
-- Secrets, tokens, and runner credentials must stay outside repository files.
 
 ## Roadmap
 
@@ -336,7 +328,7 @@ contract unless they intentionally update the release policy.
 
 See `SECURITY.md` for the supported pre-release branch, private vulnerability
 reporting path, and AOR-specific risks around runner orchestration, `.aor/`
-runtime state, secrets, live E2E, and upstream write-back.
+runtime state, secrets, internal evaluation artifacts, and upstream write-back.
 
 Do not publish secrets, credentials, exploit details, generated target
 checkouts, or sensitive runtime artifacts in public issues or pull requests.

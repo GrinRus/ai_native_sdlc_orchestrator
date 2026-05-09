@@ -207,11 +207,11 @@ for (const section of [
   "## Inspect artifacts",
   "## Optional API/web surfaces",
   "## What works today",
+  "## Readiness evidence",
   "## When not to use AOR yet",
   "## Docs map",
   "## Contributor quickstart",
   "## How AOR works",
-  "## Live E2E target projects",
   "## Roadmap",
   "## Contributing",
   "## License",
@@ -247,6 +247,26 @@ for (const needle of [
 }
 
 for (const { pattern, message } of [
+  {
+    pattern: /live-e2e-runbook\.md/u,
+    message: "README.md must not link to internal live E2E runbooks.",
+  },
+  {
+    pattern: /live-e2e-standard-runner\.md/u,
+    message: "README.md must not route users to internal live E2E runner docs.",
+  },
+  {
+    pattern: /scripts\/live-e2e\/run-profile\.mjs/u,
+    message: "README.md must not expose internal live E2E runner commands as a user workflow.",
+  },
+  {
+    pattern: /examples\/live-e2e\//u,
+    message: "README.md must not route users to internal live E2E fixtures.",
+  },
+  {
+    pattern: /live\s*E2E|live-e2e/iu,
+    message: "README.md must keep live E2E as internal maintainer/eval material, not user-facing README content.",
+  },
   {
     pattern: /pnpm exec aor/u,
     message: "README.md must use the root pnpm aor script instead of pnpm exec aor.",
