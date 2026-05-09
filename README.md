@@ -1,279 +1,352 @@
-# AOR — AI-native Orchestrator for Full SDLC
+# AOR - AI-native Orchestrator for Full SDLC
 
-AOR is a runner-agnostic control plane for the full software delivery lifecycle:
+AOR is an AI-native SDLC control plane and orchestrator. It coordinates
+bounded work packets, contracts, runners, evidence, reviews, and delivery
+decisions across the software lifecycle.
 
-**bootstrap → discovery → research/spec → planning/approval → execution → review/QA → delivery/release → incident/learning**
+AOR is not a coding agent, hosted SaaS, or package you install from npm today.
 
-AOR is **not** another coding agent and **not** a thin wrapper around one model or one CLI. It is the orchestration layer that turns a software project into a machine-usable target, routes work across different runners, evaluates quality by default, and leaves behind durable packets, manifests, and decision artifacts.
+## Status: source-only alpha
 
-## Why AOR
+AOR is a public source checkout for early operators, contributors, and
+researchers. The repository is docs-first and includes implemented CLI, API,
+web, and runtime baselines, but it is not a production-ready general-purpose
+orchestrator runtime.
 
-Teams need more than code generation. They need a system that can:
+The current production-candidate claim is intentionally bounded: AOR has a
+self-hosted CLI/API production candidate for the documented mode in
+`docs/ops/self-hosted-release.md`. Repository checks such as `pnpm check` and
+`pnpm production:ready` prove source integrity and documented readiness gates;
+they do not mean unattended production automation is safe for arbitrary
+projects.
 
-- bootstrap a repository into an AI-usable project target;
-- support multiple runners such as Codex CLI, Claude Code, OpenCode, and future internal adapters;
-- evolve prompts, wrappers, routes, and policies safely;
-- work across monoliths and bounded multirepo setups;
-- make validation, eval, and harness first-class from day one;
-- rehearse the entire flow on real open-source repositories before enabling production write-back.
+Packages remain `private: true` and `version: 0.0.0`. Public distribution is
+source-only until npm or GitHub Releases are explicitly added in a separate
+release decision.
 
-## Current repository status
+## Current source channel
 
-This repository is currently a **docs-first project package with implemented CLI/API/web/runtime baselines** and a **self-hosted CLI/API production candidate** for the bounded mode described in `docs/ops/self-hosted-release.md`.
+The public source-only main channel is the `main` branch on GitHub. There is no
+npm, GitHub Releases, Docker, or GHCR version channel yet.
 
-The production-candidate claim is intentionally narrow: it covers self-hosted CLI/API operation with optional detachable web, explicit production-readiness gating, real no-upstream-write proof evidence, and no hosted SaaS or enterprise identity-provider integration.
+The package state is intentionally `private:true / 0.0.0`: use the repository
+source checkout as the versioned artifact until a separate distribution policy
+changes that.
 
-What exists today:
+## What is AOR?
 
-- product, research, architecture, contract, ops, and backlog documentation;
-- example project profiles, routes, wrappers, prompt bundles, policies, packets, eval assets, and proof fixtures;
-- contributor guidance through `AGENTS.md`, nested `AGENTS.md` files, and reusable root skills;
-- root repository-integrity commands and CI for roadmap, guidance, and community-file consistency;
-- a documented internal installed-user rehearsal target catalog built around public GitHub repositories;
-- a layered live E2E model: bounded rehearsal profiles plus a curated full-journey matrix on catalog repositories across scenario family, pinned provider, and size-classed feature missions tracked through `W14`;
-- implemented operator baseline surfaces: control-plane read APIs, planner metrics snapshots, live-run event streaming, operator CLI commands, detachable web console baseline, and an installed-user black-box proof runner tracked through `W12`.
-- expanded implementation backlog through `W26`, with W22 source-of-truth repair, W23 contract/auth/control-plane boundary hardening, W24 run-level harness and strict delivery hardening, and W25 real production proof work now represented in source-of-truth docs while active queue tracking stays available via `pnpm slice:status` and `pnpm slice:next -- --json`.
-- historical W10/W11 productionization closure for external live adapter execution, networked fork-first delivery, authenticated mutation transport, and target-backed proof evidence.
-- stable live routed execution baseline for supported `codex-cli` adapter paths, plus live-runnable candidate `claude-code` matrix coverage and extended non-baseline `open-code` coverage with explicit delivery-guardrail blocking semantics.
-- W15 readiness-hardening work that makes source-of-truth drift, package/module-map drift, and mock-backed proof claims machine-checkable.
-- W16 complexity-reduction work that decomposes monolithic CLI/API/core/live-E2E surfaces and isolates adapter permission legacy cleanup.
-- W17 legacy-surface cleanup that removes public compatibility aliases from CLI incident outputs and delivery mode inputs.
-- W18 backlog coverage for control-plane-owned web lifecycle operation, runner question/answer continuation, and bounded multirepo proof.
-- W19/W20/W21 backlog gap intake plus W22 evidence-strength repair that maps all 112 supported user stories to `baseline-covered`, `proof-covered`, `partial`, or `blocked` status with explicit follow-up slices for remaining gaps.
-- W20 production-hardening baseline for detached control-plane transport mode, bearer auth/authz scopes, redaction of configured secrets across JSON/SSE/CLI surfaces, and denied-action audit evidence.
-- a W25 sanitized real production proof fixture at `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` with `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, passing target verdicts, and no upstream write.
-- a separate W26 self-hosted production-readiness gate, `pnpm production:ready`, that validates story honesty, source-of-truth alignment, auth hardening, nested contracts, run-level harness evidence, and W25 proof integrity without changing the meaning of `pnpm check`.
-- a self-hosted release runbook at `docs/ops/self-hosted-release.md` covering the supported CLI/API mode, optional detachable web, auth setup, rollback, no-write/write-back policy, proof evidence, and non-goals.
+AOR turns SDLC work into explicit packets and evidence:
 
-What does **not** exist yet:
+- It reads project profiles, contracts, and runtime state before choosing the
+  next bounded action.
+- It routes work through runner adapters while keeping the orchestrator core
+  runner-agnostic.
+- It validates deterministic artifacts before any evaluation or judgment layer.
+- It records reports, packets, scorecards, and manifests under a runtime root
+  such as `.aor/`.
+- It keeps delivery mode explicit, with no upstream writes by default for the
+  first local path.
 
-- broad multi-provider production-grade adapter coverage beyond the stable `codex-cli` live baseline and candidate `claude-code` rehearsal coverage;
-- delivery write-back automation to upstream repositories;
-- enterprise identity-provider integration, hosted SaaS deployment hardening, and operator parity for every CLI/API/web control surface;
-- managed multi-tenant operations, tenant billing, hosted rollback procedures, or enterprise identity rollout guides.
+Use AOR when you want to study or operate an SDLC control plane around existing
+repositories. Do not expect it to replace your coding agent, CI system, issue
+tracker, or release platform yet.
 
-Use the backlog docs for the implementation roadmap.
+## Requirements
 
-## Reader quickstart
+- Node.js `>=22`
+- pnpm `10.12.4`
+- Corepack enabled for the pinned pnpm version
+- A local target repository you are allowed to inspect
 
-Start here if you want to understand the project before implementing anything:
+Third-party runner binaries and authentication, such as Codex CLI, Claude Code,
+or OpenCode, are installed and configured outside AOR.
 
-1. `AGENTS.md`
-2. `docs/product/01-project-description.md`
-3. `docs/product/02-installed-user-onboarding-journey.md`
-4. `docs/architecture/12-orchestrator-operating-model.md`
-5. `docs/contracts/00-index.md`
-6. `docs/backlog/backlog-operating-model.md`
-7. `docs/backlog/mvp-roadmap.md`
-8. `docs/backlog/self-hosted-production-readiness.md`
-9. `docs/ops/live-e2e-target-catalog.md`
-10. `docs/ops/live-e2e-dependency-matrix.md`
+## Clone and install from source
+
+```bash
+git clone https://github.com/GrinRus/ai_native_sdlc_orchestrator.git
+cd ai_native_sdlc_orchestrator
+corepack enable
+pnpm install --frozen-lockfile
+pnpm aor --help
+```
+
+This installs the source checkout and exposes the local CLI through the root
+`pnpm aor` script. It does not publish or install npm packages.
+
+## Run your first no-write local mission
+
+Run AOR against a local target repository. The safest first path uses
+`delivery-mode no-write` and stores runtime state under the target repository.
+It intentionally lets AOR generate a bundled project profile under `.aor/`
+instead of copying example assets into the target repository. This path does not
+require authenticated external runners.
+
+In no-write mode, AOR still writes runtime state: it can create reports,
+packets, and the generated bundled profile under `$TARGET_REPO/.aor`, but it
+must not edit target source files or attempt upstream write-back.
+
+```bash
+export TARGET_REPO=/path/to/local-project
+export AOR_RUNTIME="$TARGET_REPO/.aor"
+
+pnpm aor doctor --project-ref "$TARGET_REPO" --runtime-root "$AOR_RUNTIME" --json
+
+pnpm aor onboard \
+  --project-ref "$TARGET_REPO" \
+  --runtime-root "$AOR_RUNTIME" \
+  --json
+
+pnpm aor mission create \
+  --project-ref "$TARGET_REPO" \
+  --runtime-root "$AOR_RUNTIME" \
+  --title "Small safe trial" \
+  --brief "Inspect the project and recommend the next no-write step" \
+  --goal "Produce bounded next-action evidence" \
+  --constraint "No upstream writes, no target file edits, and no external runner execution" \
+  --kpi "trial-ready:Trial readiness:ready:status" \
+  --dod "No upstream writes are attempted" \
+  --delivery-mode no-write \
+  --json
+
+pnpm aor next \
+  --project-ref "$TARGET_REPO" \
+  --runtime-root "$AOR_RUNTIME" \
+  --json
+```
+
+Use a disposable local checkout or branch until you understand the generated
+state. Runtime output under `.aor/` can contain project metadata, reports, and
+operational evidence; keep it out of commits.
+
+For the first run, do not pass `examples/project.aor.yaml`: that file is the AOR
+repository example profile, uses the sample `project_id` `aor-core`, and is
+useful for inspecting AOR's packaged examples rather than for the safest
+black-box target onboarding path.
+
+If you intentionally want to eject example routes, wrappers, prompts, policies,
+adapters, and context assets into a target repository, run `aor onboard` with
+`--asset-mode materialized`. That is not the default no-write quickstart because
+it creates target-repo files outside `.aor/`.
+
+## What you should see
+
+- `doctor` reports readiness or actionable blockers for the target repository.
+- `onboard` writes onboarding evidence and a generated bundled profile under
+  `$AOR_RUNTIME`.
+- `mission create` writes an intake artifact packet and request body.
+- `next` writes a next-action report and returns the relevant artifact paths in
+  JSON output.
+- `delivery_mode=no-write` and `upstream_writes_default=false` remain the safe
+  defaults for the first local workflow.
+- `.aor/` is ignored runtime state and must not be committed.
+
+If a command reports blockers, fix those blockers or choose a smaller local
+target before moving to runner-backed execution.
+
+## Choose a runner
+
+| Runner path | Current fit | Notes |
+| --- | --- | --- |
+| `codex-cli` | Stable live baseline for supported adapter paths | Preferred baseline for the documented self-hosted mode. |
+| `claude-code` | Live-runnable candidate coverage | Suitable for supported adapter experiments where the binary and auth are already configured. |
+| `open-code` | Extended non-baseline coverage with delivery guardrails | Useful for matrix coverage and guarded rehearsals, not a default public baseline. |
+| Custom adapters | SDK and contract path | The contracts exist, but turnkey public support depends on the adapter you provide. |
+
+AOR describes runner orchestration contracts. It does not install third-party
+runner binaries, manage their accounts, or hide their operational risk.
+
+## Inspect artifacts
+
+JSON command output includes report and artifact file fields when files are
+written. The common runtime layout is:
+
+- `$AOR_RUNTIME/projects/<project-id>/reports` for reports and summaries.
+- `$AOR_RUNTIME/projects/<project-id>/artifacts` for packets and generated
+  evidence.
+- `$AOR_RUNTIME/projects/<project-id>/state` for runtime state.
+
+Treat the whole runtime root as sensitive. It can include repository metadata,
+workflow decisions, local paths, and future runner output. `.gitignore` excludes
+`.aor/`; keep that policy in target repositories too.
+
+## Optional API/web surfaces
+
+AOR is headless-first. The CLI is the primary public operator path today.
+
+The repository also contains API and web baselines for the control-plane model:
+
+- `apps/api` hosts the API surface used by the documented self-hosted mode.
+- `apps/web` is optional and detachable from core orchestration.
+- `pnpm aor app --help` describes local app attachment commands.
+- API contracts are documented under `docs/contracts/control-plane-api.md`.
+
+Use these surfaces as implemented baselines, not as a hosted product claim.
+
+## What works today
+
+| Capability | Status | How to try or verify |
+| --- | --- | --- |
+| Source checkout install | Implemented | `corepack enable` and `pnpm install --frozen-lockfile`. |
+| Repository integrity checks | Implemented | `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check`. |
+| Guided target onboarding | Implemented baseline | `pnpm aor onboard ... --json`. |
+| No-write mission intake | Implemented baseline | `pnpm aor mission create ... --delivery-mode no-write --json`. |
+| Next-action reporting | Implemented baseline | `pnpm aor next ... --json`. |
+| CLI/API/web baselines | Implemented baseline | See `apps/*`, `packages/*`, and the command catalog. |
+| Internal live E2E proof fixtures | Implemented for curated rehearsals | See `docs/ops/live-e2e-runbook.md` and `examples/live-e2e/`. |
+| Production-readiness gate | Implemented bounded gate | `pnpm production:ready --json`. |
+
+Readiness evidence is tracked in backlog and ops documents rather than release
+notes. The current implemented span includes W10-W26 source, runtime,
+evaluation, delivery, self-hosted, CI, and community hardening slices. Start
+with `docs/backlog/mvp-roadmap.md`, `docs/backlog/backlog-operating-model.md`,
+`docs/ops/live-e2e-runbook.md`, and `docs/ops/self-hosted-release.md`.
+
+## When not to use AOR yet
+
+Do not use AOR yet if you need:
+
+- npm-installable public packages.
+- GitHub Releases, Docker images, or GHCR distribution.
+- Hosted SaaS, managed accounts, or enterprise identity/SSO.
+- Broad runner/provider parity across arbitrary tools.
+- Default upstream write-back automation.
+- Unattended production automation for critical repositories.
+
+These are valid future directions, but they are outside the current
+source-only alpha contract.
+
+## Docs map
+
+Start here when you need deeper context:
+
+- `docs/architecture/12-orchestrator-operating-model.md` - end-to-end runtime
+  model and boundaries.
+- `docs/contracts/00-index.md` - contract index for packets, reports, profiles,
+  wrappers, and scorecards.
+- `docs/architecture/14-cli-command-catalog.md` - implemented and planned CLI
+  command surface.
+- `docs/backlog/backlog-operating-model.md` - planning and delivery workflow.
+- `docs/backlog/mvp-roadmap.md` - roadmap and readiness story.
+- `docs/ops/live-e2e-runbook.md` - live E2E proof runbook.
+- `docs/ops/self-hosted-release.md` - bounded self-hosted release operating
+  model.
 
 ## Contributor quickstart
 
-Current repo bootstrap:
+Use this path when you want to change AOR itself rather than operate it against
+a target repository.
 
 ```bash
-pnpm install
-pnpm lint
-pnpm test
-pnpm build
+corepack enable
+pnpm install --frozen-lockfile
 pnpm check
-pnpm production:ready
+pnpm production:ready --json
 ```
 
-What these commands do today:
+Before opening a pull request:
 
-- `pnpm lint` checks contributor-guidance coverage and required repo files.
-- `pnpm test` checks backlog consistency and runs package/app test suites (contracts, CLI, API, web, routing, adapter SDK, harness, orchestrator core, and reference integrity).
-- `pnpm build` checks scaffold integrity for community files, workflow conventions, and root package settings.
-- `pnpm check` runs all of the above in sequence.
-- `pnpm production:ready` runs the stricter self-hosted production-readiness gate; it does not replace `pnpm check` and can pass only when W25 real proof evidence and W23-W24 hardening evidence are present.
-
-CI runs the same gate on pull requests, pushes to `main`, and manual workflow dispatch through `.github/workflows/ci.yml`.
-
-Suggested implementation workflow:
-
-1. Pick one `ready` slice from `docs/backlog/mvp-implementation-backlog.md`.
-2. Open the owning wave document and use the built-in local-task outline.
-3. Keep the change bounded to one slice whenever possible.
-4. Update docs, examples, contracts, and code together.
-5. Run the root checks before opening a PR.
-
-Useful helpers for the slice loop:
-
-- `pnpm slice:status`
-- `pnpm slice:next -- --json`
-- `pnpm slice:plan -- <SLICE_ID>`
-- `pnpm slice:gate`
-
-For the repo-specific rules, read `CONTRIBUTING.md` and the nearest `AGENTS.md`.
-
-For internal rehearsal dependency requirements, see `docs/ops/live-e2e-dependency-matrix.md`.
+- Keep docs, contracts, examples, and code aligned.
+- Run `pnpm check` and `pnpm production:ready`.
+- Do not commit `.aor/`, `.env`, credentials, generated target checkouts, or
+  runner output.
+- Update the relevant backlog, ops, or contract document when behavior changes.
 
 ## How AOR works
 
-At a high level, AOR is intended to work like this:
+AOR keeps orchestration state explicit and reviewable:
 
-1. **Bootstrap the target repository**
-   Load a project profile, inspect the repo, validate configuration, and verify bounded runnable prerequisites.
+1. A project profile defines repository expectations and operating defaults.
+2. Commands produce packets, reports, or state transitions under the runtime
+   root.
+3. Contract loaders validate structured inputs before evaluation.
+4. Runner adapters execute bounded work without leaking provider-specific logic
+   into orchestrator core.
+5. Review, QA, and delivery gates consume evidence before any write-back mode is
+   allowed.
 
-2. **Materialize durable artifacts**
-   Create project-analysis reports, validation reports, step results, packets, manifests, and release evidence under `.aor/`.
+Core rules:
 
-3. **Resolve and compile runtime assets**
-   For each routed adapter-backed step, resolve the route, wrapper, prompt bundle, context assets, and step policy, then persist the compiled context before adapter execution begins.
-
-4. **Execute through the Runtime Harness**
-   Send bounded work to a selected runner through the adapter SDK, classify outcomes, validate mission semantics, decide retry/repair/escalation, and preserve policy/provenance metadata.
-
-5. **Validate, evaluate, and certify separately**
-   Run deterministic validation first, then offline evals. Runtime Harness reports diagnose runs; asset certification uses capture/replay and promotion decisions for platform assets.
-
-6. **Deliver through bounded write-back modes**  
-   Start with `no-write`, `patch-only`, and `local-branch` modes; then expand to `fork-first-pr` GitHub delivery when the quality bar is met.
-
-7. **Operate through CLI, API, and detachable UI**  
-   Keep the runtime headless-first, with optional live event streams and a detachable web console.
-
-8. **Feed learning back into the platform**  
-   Turn installed-user proof output, Runtime Harness reports, review verdicts, scorecards, and incidents into new evals, recertification recommendations, and backlog work.
+- Packet-first.
+- Contract-first.
+- Runner-agnostic core.
+- Validation before evaluation.
+- Harness by default.
+- Headless-first runtime.
+- Bounded execution.
+- Public-repo safety first.
 
 ## Command surface status
 
-The CLI command surface currently includes **44 implemented** commands and **0 planned** commands (source of truth: `apps/cli/src/command-catalog.mjs` and `docs/architecture/14-cli-command-catalog.md`).
-
-Implemented command groups:
-- guided first-run: `doctor`, `onboard`, `app`, `next`;
-- project lifecycle: `project init`, `project analyze`, `project validate`, `project verify`;
-- intake/discovery/spec/wave: `intake create`, `discovery run`, `spec build`, `wave create`;
-- run control and monitoring: `run start`, `run pause`, `run resume`, `run steer`, `run cancel`, `run answer`, `run status`;
-- quality and handoff: `eval run`, `harness replay`, `harness certify`, `asset promote`, `asset freeze`, `compiler revision`, `handoff prepare`, `handoff approve`;
-- delivery/release and operator reads: `deliver prepare`, `release prepare`, `multirepo lock`, `packet show`, `evidence show`;
-- incidents and audit: `incident open`, `incident backfill`, `incident recertify`, `incident show`, `audit runs`;
-- review and learning closure: `review run`, `review decide`, `learning handoff`;
-- UI lifecycle: `ui attach`, `ui detach`.
-
-Planned commands:
-- none in the current shell baseline.
-
-For exact command inputs/outputs and contract linkage, use `docs/architecture/14-cli-command-catalog.md`.
+The CLI command surface currently includes **44 implemented** commands and **0 planned** commands. The command catalog lives in `docs/architecture/14-cli-command-catalog.md`.
 
 ## Repository map
 
-### Product and research
-- `docs/product/**` — scope, user stories, and project definition.
-- `docs/research/**` — external best practices and analytical notes.
-
-### Architecture and contracts
-- `docs/architecture/**` — target architecture, flows, runtime model, and module map.
-- `docs/contracts/**` — packet, profile, report, API, and evaluation contracts.
-
-### Backlog and roadmap
-- `docs/backlog/**` — operating model, roadmap, epic map, wave plans, and dependency graph.
-
-### Operations
-- `docs/ops/**` — installed-user rehearsal runbooks and operator procedures.
-
-### Examples
-- `examples/**` — project profiles, routes, wrappers, prompt bundles, policies, adapters, packets, eval assets, and proof fixtures.
-
-### Code scaffold
-- `apps/api/` — implemented control-plane read/event baseline with detached HTTP/SSE transport, production-hardened bearer auth/authz mode, and redacted response/event surfaces.
-- `apps/cli/` — implemented bootstrap, quality, handoff, operator-read, delivery, incident, and UI-lifecycle command baseline with secret-safe JSON output support.
-- `apps/web/` — implemented detachable operator console baseline over shared control-plane auth and mutation semantics.
-- `packages/**` — implemented shared runtime modules (contracts, orchestrator core, routing, adapter SDK, harness, observability) with roadmap extensions.
-- `packages/harness/` — asset certification capture/replay primitives used by certification and promotion decisions.
-- `scripts/live-e2e/**` — installed-user black-box proof runner and private scenario profiles.
-
-### Contributor support
-- `.agents/skills/**` — reusable repo skills for agents.
-- `.github/workflows/ci.yml` — pinned, least-privilege CI workflow for repo integrity checks.
-- `.github/ISSUE_TEMPLATE/bug-report.md` — bug-report template.
-- `.github/ISSUE_TEMPLATE/feature-request.md` — feature-request template.
-- `.github/PULL_REQUEST_TEMPLATE.md` — PR checklist template.
-- `scripts/**` — root repository-integrity checks used by local commands and CI.
+```text
+apps/
+  api/                 Control-plane API baseline.
+  cli/                 CLI executable wrapper and command entrypoint.
+  web/                 Optional web surface baseline.
+packages/
+  orchestrator-core/   Shared runtime, contracts, adapters, and command logic.
+docs/
+  architecture/        Operating model and architecture decisions.
+  contracts/           Contract source of truth and schemas.
+  backlog/             Roadmap, waves, epics, and slices.
+  ops/                 Runbooks and release-readiness material.
+examples/
+  live-e2e/            Curated live E2E fixtures and profiles.
+scripts/
+  *.mjs                Repository-integrity checks.
+```
 
 ## Live E2E target projects
 
-The repo includes a documented internal target catalog and internal runbooks for public rehearsal repositories:
+Live E2E fixtures are curated proof paths, not default user onboarding. They are
+documented under `examples/live-e2e/` with runbook guidance in
+`docs/ops/live-e2e-runbook.md`.
 
-- `sindresorhus/ky` — short TypeScript library regressions and short release rehearsals.
-- `httpie/cli` — deeper Python CLI regressions.
-- `belgattitude/nextjs-monorepo-example` — long monorepo release rehearsals.
+Public-repo safety rules apply:
 
-See:
-
-- `docs/ops/live-e2e-target-catalog.md`
-- `docs/ops/live-e2e-standard-runner.md`
-- `docs/ops/live-e2e-regress-short.md`
-- `docs/ops/live-e2e-regress-long.md`
-- `docs/ops/live-e2e-release-short.md`
-- `docs/ops/live-e2e-release-long.md`
-
-The W14 full-journey layer resolves these repositories through an internal machine-readable matrix under `scripts/live-e2e/catalog/**`. Each full-journey run now pins:
-- `target_catalog_id`
-- `feature_mission_id`
-- `scenario_family`
-- `provider_variant_id`
-
-Target catalogs carry one curated `small`, `medium`, and `large` mission per repo plus required matrix cells. `openai-primary` and `anthropic-primary` are the mandatory provider variants for W14 matrix coverage; `open-code-primary` starts as extended coverage only. Bounded `regress/release short/long` profiles remain, but they no longer claim to prove the entire installed-user journey.
-
-The current committed matrix proof bundle lives at `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json` and proves all W14 required matrix cells plus all repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs as coverage evidence. It is intentionally marked `proof_scope=coverage_with_findings` because deterministic external-runner mocks do not materialize mission code changes.
+- Live E2E must default to no upstream writes unless a profile explicitly opts
+  into a guarded delivery mode.
+- Generated target checkouts and `.aor/` runtime roots must not be committed.
+- Secrets, tokens, and runner credentials must stay outside repository files.
 
 ## Roadmap
 
-The implementation roadmap is tracked as **wave → epic → slice → local task**.
+The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
+under `docs/backlog/`. Treat those files as the planning source of truth.
 
-Start with:
+The current source-only alpha focuses on:
 
-- `docs/backlog/backlog-operating-model.md`
-- `docs/backlog/mvp-roadmap.md`
-- `docs/backlog/mvp-implementation-backlog.md`
-- `docs/backlog/orchestrator-epics.md`
-- `docs/backlog/slice-dependency-graph.md`
-- `docs/backlog/self-hosted-production-readiness.md`
-
-Detailed wave plans:
-
-- `docs/backlog/wave-0-implementation-slices.md`
-- `docs/backlog/wave-1-implementation-slices.md`
-- `docs/backlog/wave-2-implementation-slices.md`
-- `docs/backlog/wave-3-implementation-slices.md`
-- `docs/backlog/wave-4-implementation-slices.md`
-- `docs/backlog/wave-5-implementation-slices.md`
-- `docs/backlog/wave-6-implementation-slices.md`
-- `docs/backlog/wave-7-implementation-slices.md`
-- `docs/backlog/wave-8-implementation-slices.md`
-- `docs/backlog/wave-9-implementation-slices.md`
-- `docs/backlog/wave-10-implementation-slices.md`
-- `docs/backlog/wave-11-implementation-slices.md`
-- `docs/backlog/wave-12-implementation-slices.md`
-- `docs/backlog/wave-13-implementation-slices.md`
-- `docs/backlog/wave-14-implementation-slices.md`
-- `docs/backlog/wave-15-implementation-slices.md`
-- `docs/backlog/wave-16-implementation-slices.md`
-- `docs/backlog/wave-17-implementation-slices.md`
-- `docs/backlog/wave-18-implementation-slices.md`
-- `docs/backlog/wave-19-implementation-slices.md`
-- `docs/backlog/wave-20-implementation-slices.md`
-- `docs/backlog/wave-21-implementation-slices.md`
-- `docs/backlog/wave-22-implementation-slices.md`
-- `docs/backlog/wave-23-implementation-slices.md`
-- `docs/backlog/wave-24-implementation-slices.md`
-- `docs/backlog/wave-25-implementation-slices.md`
-- `docs/backlog/wave-26-implementation-slices.md`
+- Safer operator onboarding.
+- Stronger runner-adapter coverage.
+- Clearer review, QA, and delivery evidence.
+- Public-repo security posture and governance.
+- Bounded self-hosted CLI/API operation.
 
 ## Contributing
 
-Read `CONTRIBUTING.md` before opening a pull request. The short version:
+See `CONTRIBUTING.md` for the contributor workflow, local gates, PR checklist,
+and security reminders. Pull requests should preserve the source-only alpha
+contract unless they intentionally update the release policy.
 
-- work in English by default;
-- prefer one slice per PR;
-- keep contracts, examples, docs, and code aligned;
-- do not commit `.aor/`, secrets, or ad hoc scratch state;
-- use no-write safety defaults for public-repo rehearsals unless a slice explicitly expands the boundary.
+## Security and responsible disclosure
+
+See `SECURITY.md` for the supported pre-release branch, private vulnerability
+reporting path, and AOR-specific risks around runner orchestration, `.aor/`
+runtime state, secrets, live E2E, and upstream write-back.
+
+Do not publish secrets, credentials, exploit details, generated target
+checkouts, or sensitive runtime artifacts in public issues or pull requests.
+
+## Support and roadmap
+
+See `SUPPORT.md` for the alpha support policy. Use GitHub issues for bugs,
+feature requests, and documentation gaps. There is no support SLA for this
+pre-release project.
 
 ## License
 
-This repository is licensed under the Apache License 2.0. See `LICENSE`.
+Apache License 2.0. See `LICENSE`.

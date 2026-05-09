@@ -496,6 +496,15 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.match(doctorHelp.stdout, /Status: implemented in guided first-run shell \(W21-S02\)/);
     assert.match(doctorHelp.stdout, /Guided commands default to human-readable output/);
 
+    const onboardHelp = invokeCli(["onboard", "--help"]);
+    assert.equal(onboardHelp.exitCode, 0);
+    assert.match(
+      onboardHelp.stdout,
+      /--asset-mode <bundled\|materialized> \(optional, defaults to bundled, materialized copies example assets into the target repo\)/,
+    );
+    assert.match(onboardHelp.stdout, /keep generated profile state under \.aor\//);
+    assert.match(onboardHelp.stdout, /can create target-repo files outside \.aor\//);
+
     const humanDoctor = invokeCli(["doctor", "--project-ref", projectRoot]);
     assert.equal(humanDoctor.exitCode, 0, humanDoctor.stderr);
     assert.match(humanDoctor.stdout, /^aor doctor\nStatus: ready/m);

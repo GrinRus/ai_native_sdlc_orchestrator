@@ -138,11 +138,20 @@ const requiredFiles = [
   "README.md",
   "AGENTS.md",
   "CONTRIBUTING.md",
+  "CODE_OF_CONDUCT.md",
+  "SECURITY.md",
+  "SUPPORT.md",
+  "CHANGELOG.md",
   "LICENSE",
   "package.json",
   "pnpm-workspace.yaml",
   "pnpm-lock.yaml",
+  ".github/CODEOWNERS",
+  ".github/dependabot.yml",
   ".github/workflows/ci.yml",
+  ".github/workflows/dependency-review.yml",
+  ".github/workflows/codeql.yml",
+  ".github/workflows/scorecard.yml",
   "scripts/lint.mjs",
   "scripts/test.mjs",
   "scripts/build.mjs",
@@ -176,10 +185,30 @@ for (const script of ["build", "test", "lint", "check"]) {
     process.exit(1);
   }
 }
+if (packageJson.scripts?.aor !== "node ./apps/cli/bin/aor.mjs") {
+  console.error("package.json must expose the source-checkout CLI as script 'aor'.");
+  process.exit(1);
+}
+if (packageJson.scripts?.["production:ready"] !== "node ./scripts/production-readiness.mjs") {
+  console.error("package.json must expose production:ready as the separate production-readiness gate.");
+  process.exit(1);
+}
 
 const readme = read("README.md");
 for (const section of [
-  "## Why AOR",
+  "## Status: source-only alpha",
+  "## Current source channel",
+  "## What is AOR?",
+  "## Requirements",
+  "## Clone and install from source",
+  "## Run your first no-write local mission",
+  "## What you should see",
+  "## Choose a runner",
+  "## Inspect artifacts",
+  "## Optional API/web surfaces",
+  "## What works today",
+  "## When not to use AOR yet",
+  "## Docs map",
   "## Contributor quickstart",
   "## How AOR works",
   "## Live E2E target projects",
@@ -189,6 +218,46 @@ for (const section of [
 ]) {
   if (!readme.includes(section)) {
     console.error(`README.md is missing section '${section}'`);
+    process.exit(1);
+  }
+}
+
+for (const needle of [
+  "git clone https://github.com/GrinRus/ai_native_sdlc_orchestrator.git",
+  "pnpm install --frozen-lockfile",
+  "public source-only main channel",
+  "private:true / 0.0.0",
+  "pnpm aor doctor --project-ref",
+  "pnpm aor onboard",
+  "pnpm aor mission create",
+  "--constraint \"No upstream writes, no target file edits, and no external runner execution\"",
+  "--delivery-mode no-write",
+  "In no-write mode, AOR still writes runtime state",
+  "do not pass `examples/project.aor.yaml`",
+  "--asset-mode materialized",
+  "creates target-repo files outside `.aor/`",
+  "delivery_mode=no-write",
+  "upstream_writes_default=false",
+  ".aor/` is ignored runtime state",
+]) {
+  if (!readme.includes(needle)) {
+    console.error(`README.md is missing required operator quickstart detail '${needle}'`);
+    process.exit(1);
+  }
+}
+
+for (const { pattern, message } of [
+  {
+    pattern: /pnpm exec aor/u,
+    message: "README.md must use the root pnpm aor script instead of pnpm exec aor.",
+  },
+  {
+    pattern: /pnpm install(?! --frozen-lockfile)/u,
+    message: "README.md setup commands must use pnpm install --frozen-lockfile.",
+  },
+]) {
+  if (pattern.test(readme)) {
+    console.error(message);
     process.exit(1);
   }
 }
@@ -216,10 +285,9 @@ for (const needle of [
   "actions/checkout@",
   "actions/setup-node@",
   "pnpm/action-setup@",
-  "pnpm install --no-frozen-lockfile",
-  "pnpm lint",
-  "pnpm test",
-  "pnpm build",
+  "pnpm install --frozen-lockfile",
+  "pnpm check",
+  "pnpm production:ready",
 ]) {
   if (!workflow.includes(needle)) {
     console.error(`.github/workflows/ci.yml is missing '${needle}'`);
@@ -227,10 +295,65 @@ for (const needle of [
   }
 }
 
-const pinnedActions = [...workflow.matchAll(/uses:\s+[^@\s]+@([0-9a-f]{40})/g)];
-if (pinnedActions.length < 3) {
-  console.error("Expected workflow actions to be pinned to full commit SHAs.");
-  process.exit(1);
+const workflowExpectations = new Map([
+  [
+    ".github/workflows/dependency-review.yml",
+    [
+      "pull_request:",
+      "contents: read",
+      "pull-requests: read",
+      "actions/dependency-review-action@",
+    ],
+  ],
+  [
+    ".github/workflows/codeql.yml",
+    [
+      "pull_request:",
+      "push:",
+      "security-events: write",
+      "github/codeql-action/init@",
+      "github/codeql-action/analyze@",
+      "languages: javascript-typescript",
+    ],
+  ],
+  [
+    ".github/workflows/scorecard.yml",
+    [
+      "pull_request:",
+      "workflow_dispatch:",
+      "security-events: write",
+      "id-token: write",
+      "ossf/scorecard-action@",
+      "github/codeql-action/upload-sarif@",
+    ],
+  ],
+]);
+
+for (const [workflowPath, needles] of workflowExpectations) {
+  const workflowContent = read(workflowPath);
+  for (const needle of needles) {
+    if (!workflowContent.includes(needle)) {
+      console.error(`${workflowPath} is missing '${needle}'`);
+      process.exit(1);
+    }
+  }
+}
+
+const workflowDir = path.join(root, ".github/workflows");
+for (const entry of fs.readdirSync(workflowDir, { withFileTypes: true })) {
+  if (!entry.isFile() || !entry.name.endsWith(".yml")) continue;
+
+  const workflowPath = path.posix.join(".github/workflows", entry.name);
+  const workflowContent = read(workflowPath);
+  const usesLines = [...workflowContent.matchAll(/uses:\s+([^@\s]+)@([^\s#]+)/g)];
+
+  for (const match of usesLines) {
+    const actionRef = match[2];
+    if (!/^[0-9a-f]{40}$/.test(actionRef)) {
+      console.error(`${workflowPath} uses ${match[1]} without a full commit SHA pin.`);
+      process.exit(1);
+    }
+  }
 }
 
 console.log("scaffold integrity ok: community files, workflow conventions, and root package settings are present");

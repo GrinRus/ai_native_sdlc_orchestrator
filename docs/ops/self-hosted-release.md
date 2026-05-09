@@ -28,7 +28,7 @@ pnpm production:ready
 The production gate verifies the W25 proof fixture, story-status honesty, source-of-truth alignment, production auth hardening, nested contract validation, and run-level Runtime Harness evidence. Use JSON output for review packets:
 
 ```bash
-pnpm production:ready -- --json
+pnpm production:ready --json
 ```
 
 The default production proof fixture is:
@@ -37,7 +37,7 @@ The default production proof fixture is:
 
 ## Operator setup
 
-1. Install dependencies with `pnpm install`.
+1. Install dependencies with `pnpm install --frozen-lockfile`.
 2. Keep `pnpm check` green before release review.
 3. Configure the detached API in `production-hardened` mode when exposing it beyond local trusted loopback.
 4. Configure bearer principals outside committed project files.

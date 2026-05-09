@@ -40,7 +40,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-ref <path> (optional, alternative to positional repo)",
       "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
-      "--asset-mode <bundled|materialized> (optional, defaults to bundled for clean onboarding)",
+      "--asset-mode <bundled|materialized> (optional, defaults to bundled, materialized copies example assets into the target repo)",
       "--materialize-project-profile (optional)",
       "--bootstrap-template <template_id|path> (optional)",
       "--materialize-bootstrap-assets (optional)",

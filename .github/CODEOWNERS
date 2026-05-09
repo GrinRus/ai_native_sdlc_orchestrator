@@ -1,0 +1,15 @@
+# Default ownership.
+* @GrinRus
+
+# GitHub automation, community-health files, and security policy.
+/.github/** @GrinRus
+/SECURITY.md @GrinRus
+/CODE_OF_CONDUCT.md @GrinRus
+/SUPPORT.md @GrinRus
+/CHANGELOG.md @GrinRus
+
+# Contract, runtime, and rehearsal-sensitive areas.
+/docs/contracts/** @GrinRus
+/apps/** @GrinRus
+/packages/** @GrinRus
+/scripts/live-e2e/** @GrinRus

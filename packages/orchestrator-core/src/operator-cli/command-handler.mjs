@@ -282,10 +282,10 @@ export function formatCommandHelp(definition) {
       : definition.command === "onboard"
         ? [
             "- Onboard is a guided wrapper over 'aor project init'.",
-            "- Clean repositories default to bundled asset mode and write the generated profile under .aor/.",
+            "- Clean repositories default to bundled asset mode and keep generated profile state under .aor/.",
             "- Positional <repo> and --project-ref are alternatives; do not pass both.",
             "- Existing grouped commands remain available and keep their JSON output contract.",
-            "- Asset ejection remains explicit through --asset-mode materialized or --materialize-bootstrap-assets.",
+            "- Asset ejection remains explicit through --asset-mode materialized or --materialize-bootstrap-assets and can create target-repo files outside .aor/.",
             "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
           ]
         : definition.command === "app"

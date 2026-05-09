@@ -15,13 +15,13 @@ pnpm production:ready
 Machine-readable output:
 
 ```bash
-pnpm production:ready -- --json
+pnpm production:ready --json
 ```
 
 To verify another sanitized proof fixture:
 
 ```bash
-pnpm production:ready -- --proof-fixture examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json
+pnpm production:ready --proof-fixture examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json
 ```
 
 ## Evidence checked

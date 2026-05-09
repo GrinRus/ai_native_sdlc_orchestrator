@@ -4,6 +4,8 @@ Thanks for contributing to AOR.
 
 AOR is a docs-first repository with implemented CLI/API/web/runtime baselines today. The highest-value contributions are the ones that keep the roadmap, contracts, examples, command surfaces, and implementation baselines aligned while the runtime is hardened toward production readiness.
 
+The public distribution channel is currently GitHub source only. Workspace packages remain private and unpublished until the maintainers explicitly open a package release channel.
+
 ## Ways to contribute
 
 You can help by:
@@ -37,10 +39,12 @@ For live E2E dependency requirements, use `docs/ops/live-e2e-dependency-matrix.m
 5. Update docs, contracts, examples, and code together.
 6. Run the root checks:
    ```bash
-   pnpm install
+   pnpm install --frozen-lockfile
    pnpm lint
    pnpm test
    pnpm build
+   pnpm check
+   pnpm production:ready
    ```
 7. Open a focused pull request with the evidence needed to review the slice.
 
@@ -65,26 +69,32 @@ Notes:
 
 ## CI acceptance gates
 
-The repository uses a single workflow: `.github/workflows/ci.yml`.
+The repository uses a repository-integrity workflow plus focused security workflows:
 
-It runs on:
+- `.github/workflows/ci.yml`
+- `.github/workflows/dependency-review.yml`
+- `.github/workflows/codeql.yml`
+- `.github/workflows/scorecard.yml`
+
+The repository-integrity workflow runs on:
 - pull requests;
 - pushes to `main`;
 - manual `workflow_dispatch`.
 
-What it proves today:
-- `pnpm lint` validates guidance coverage and required repo files;
-- `pnpm test` validates backlog consistency, contracts loading, reference integrity, and slice-cycle behavior;
-- `pnpm build` validates scaffold integrity and workflow/community-file conventions.
+What the workflows prove today:
+- `pnpm check` runs the repository-integrity baseline (`lint`, `test`, and `build`);
+- `pnpm production:ready` runs the stricter self-hosted production-readiness gate;
+- dependency review, CodeQL, and OpenSSF Scorecard run as separate security workflows.
 
-If CI fails, the failing step maps directly to one of these root checks so the remediation path stays explicit.
+If the repository-integrity workflow fails, the failing step maps directly to one of the root checks so the remediation path stays explicit. If a security workflow fails, treat it as a supply-chain or code-scanning finding unless the workflow output clearly identifies a setup problem.
 
 ## Repo-specific rules
 
 - English is the default project language.
 - Packet-first and contract-first rules are non-negotiable.
 - Keep orchestrator core runner-agnostic.
-- Do not commit `.aor/`, secrets, personal access tokens, or machine-local scratch notes.
+- Do not commit `.aor/`, generated target checkouts, `.env` files, secrets, personal access tokens, credentials, or machine-local scratch notes.
+- Do not paste secrets, exploit details, private repository data, or credential-bearing runner transcripts into public issues, PRs, logs, or comments.
 - Public-repo rehearsals must stay no-write by default unless the selected slice explicitly expands the write-back boundary.
 - If a flow changes, update the matching runbook or live E2E profile in the same PR.
 
@@ -107,8 +117,9 @@ Before opening a PR, confirm that:
 - the change still fits one slice or one tightly related bug fix;
 - the owning wave doc still describes the work accurately;
 - examples still match the contracts they illustrate;
+- docs, contracts, examples, and command surfaces are still aligned;
 - the relevant docs were updated;
-- root checks were run;
+- root checks and the production-readiness gate were run when applicable;
 - acceptance criteria have reviewable evidence.
 
 ## Bug reports
