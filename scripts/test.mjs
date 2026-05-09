@@ -1031,6 +1031,18 @@ if (productionReadinessTestRun.status !== 0) {
 
 console.log("production readiness tests ok: gate passes only with real W25 proof evidence");
 
+const readmeBlackBoxTestsPath = path.join(root, "scripts/test/readme-black-box.test.mjs");
+const readmeBlackBoxTestRun = spawnSync(process.execPath, ["--test", readmeBlackBoxTestsPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (readmeBlackBoxTestRun.status !== 0) {
+  process.exit(readmeBlackBoxTestRun.status ?? 1);
+}
+
+console.log("README black-box tests ok: documented no-write quickstart runs on an external target repo");
+
 const liveE2EProofRunnerTestsPath = path.join(root, "scripts/test/live-e2e-proof-runner.test.mjs");
 const liveE2EProofRunnerTestRun = spawnSync(process.execPath, ["--test", liveE2EProofRunnerTestsPath], {
   cwd: root,

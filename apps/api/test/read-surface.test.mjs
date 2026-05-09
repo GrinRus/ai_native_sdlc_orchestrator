@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -946,20 +947,29 @@ test("selected-run history surfaces expose policy and event troubleshooting cont
 });
 
 test("readStrategicSnapshot reports wave progress from backlog state", () => {
-  const snapshot = readStrategicSnapshot({ projectRef: workspaceRoot, cwd: workspaceRoot });
+  const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-read-surface-runtime-"));
+  try {
+    const snapshot = readStrategicSnapshot({
+      projectRef: workspaceRoot,
+      cwd: workspaceRoot,
+      runtimeRoot,
+    });
 
-  assert.equal(typeof snapshot.generated_at, "string");
-  assert.equal(snapshot.wave_snapshot.source_backlog_ref, "docs/backlog/mvp-implementation-backlog.md");
-  assert.ok(snapshot.wave_snapshot.total_slices > 0);
-  assert.ok(Array.isArray(snapshot.wave_snapshot.waves));
-  assert.ok(snapshot.wave_snapshot.waves.some((wave) => wave.wave_id === "W8"));
-  assert.equal(typeof snapshot.risk_snapshot.level_totals.high, "number");
-  assert.deepEqual(snapshot.planner_metrics.metric_names, [
-    "clean_close_rate",
-    "retry_rate",
-    "repair_rate",
-    "blocker_rate",
-  ]);
+    assert.equal(typeof snapshot.generated_at, "string");
+    assert.equal(snapshot.wave_snapshot.source_backlog_ref, "docs/backlog/mvp-implementation-backlog.md");
+    assert.ok(snapshot.wave_snapshot.total_slices > 0);
+    assert.ok(Array.isArray(snapshot.wave_snapshot.waves));
+    assert.ok(snapshot.wave_snapshot.waves.some((wave) => wave.wave_id === "W8"));
+    assert.equal(typeof snapshot.risk_snapshot.level_totals.high, "number");
+    assert.deepEqual(snapshot.planner_metrics.metric_names, [
+      "clean_close_rate",
+      "retry_rate",
+      "repair_rate",
+      "blocker_rate",
+    ]);
+  } finally {
+    fs.rmSync(runtimeRoot, { recursive: true, force: true });
+  }
 });
 
 test("readStrategicSnapshot keeps risk reporting available when backlog file is missing", () => {

@@ -18,7 +18,7 @@ jobs:
   repo-integrity:
     name: Repo integrity (Node 22)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -34,13 +34,10 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
-      - name: Lint repo guidance
-        run: pnpm lint
+      - name: Run repository integrity gate
+        run: pnpm check
 
-      - name: Test backlog consistency
-        run: pnpm test
-
-      - name: Check scaffold integrity
-        run: pnpm build
+      - name: Run production readiness gate
+        run: pnpm production:ready

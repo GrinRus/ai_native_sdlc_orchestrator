@@ -12,7 +12,7 @@ Required for the control-plane workspace (`--project-ref`):
 Repository gate commands:
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm lint
 pnpm test
 pnpm build
