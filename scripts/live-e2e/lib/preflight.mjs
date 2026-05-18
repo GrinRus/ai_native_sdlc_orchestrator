@@ -76,6 +76,18 @@ function resolveCommandForPreflight(command, env, cwd) {
 }
 
 /**
+ * @param {Record<string, unknown>} externalRuntime
+ * @returns {string}
+ */
+function resolvePreflightRequestTransport(externalRuntime) {
+  const configuredTransport = asNonEmptyString(externalRuntime.request_transport);
+  if (configuredTransport) {
+    return configuredTransport;
+  }
+  return externalRuntime.request_via_stdin === false ? "none" : "stdin-json";
+}
+
+/**
  * @param {{
  *   targetCheckoutRoot: string,
  *   providerVariant: Record<string, unknown>,
@@ -175,6 +187,7 @@ export function runLiveAdapterPreflight(options) {
   const runtimeCommand = asNonEmptyString(externalRuntime.command);
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
   const probeTimeoutMs = asPositiveInteger(externalRuntime.preflight_timeout_ms, Math.min(timeoutMs, 120000));
+  const requestTransport = resolvePreflightRequestTransport(externalRuntime);
   const envOverrides = asStringMap(externalRuntime.env);
   const runnerEnv = {
     ...options.env,
@@ -195,6 +208,7 @@ export function runLiveAdapterPreflight(options) {
       timeout_ms: timeoutMs,
       preflight_timeout_ms: probeTimeoutMs,
       auth_probe_timeout_ms: probeTimeoutMs,
+      request_transport: requestTransport,
       permission_mode: runtimeInvocation.permissionMode,
       permission_mode_source: runtimeInvocation.source,
     },
@@ -218,6 +232,13 @@ export function runLiveAdapterPreflight(options) {
     return fail(
       runtimeInvocation.failureKind,
       `Adapter '${adapterId}' live runtime permission policy is invalid: ${runtimeInvocation.message}`,
+      runtimeReport,
+    );
+  }
+  if (!["stdin-json", "file-attachment", "argv-json", "none"].includes(requestTransport)) {
+    return fail(
+      "request-transport-invalid",
+      `Adapter '${adapterId}' live runtime request transport '${requestTransport}' is not supported.`,
       runtimeReport,
     );
   }
@@ -272,12 +293,29 @@ export function runLiveAdapterPreflight(options) {
     },
   })}\n`;
   const runProbeAttempt = (kind, attempt, objective, extraRequest = {}) => {
+    const probeInput = buildProbeInput(kind, objective, extraRequest);
+    let probeArgs = [...runtimeInvocation.args];
+    let probeStdin = undefined;
+    if (requestTransport === "stdin-json") {
+      probeStdin = probeInput;
+    } else if (requestTransport === "argv-json") {
+      probeArgs = [...probeArgs, probeInput.trim()];
+    } else if (requestTransport === "file-attachment") {
+      const requestFileProfile = asRecord(externalRuntime.request_file);
+      const requestMessage =
+        asNonEmptyString(requestFileProfile.message) ?? "Follow the attached AOR adapter request JSON.";
+      const requestFileArgument = asNonEmptyString(requestFileProfile.argument) ?? "--file";
+      fs.mkdirSync(permissionProbeRoot, { recursive: true });
+      const requestFile = path.join(permissionProbeRoot, `preflight-${normalizeId(kind)}-${attempt}-request.json`);
+      fs.writeFileSync(requestFile, probeInput, "utf8");
+      probeArgs = [...probeArgs, requestMessage, requestFileArgument, requestFile];
+    }
     const probe = runExternalRuntimeProcessSync({
       command: resolvedCommand,
-      args: runtimeInvocation.args,
+      args: probeArgs,
       cwd: options.targetCheckoutRoot,
       env: runnerEnv,
-      input: buildProbeInput(kind, objective, extraRequest),
+      input: probeStdin,
       timeout: probeTimeoutMs,
       maxBuffer: 1024 * 1024,
     });

@@ -45,6 +45,9 @@ function withTempRepo(callback) {
  *   timeoutMs?: number,
  *   handler?: string | null,
  *   permissionPolicy?: Record<string, unknown>,
+ *   requestTransport?: string,
+ *   requestFile?: Record<string, unknown>,
+ *   requestViaStdin?: boolean,
  * }} options
  */
 function buildExternalRunnerProfile(options) {
@@ -54,7 +57,7 @@ function buildExternalRunnerProfile(options) {
     evidence_namespace: "evidence://adapter-live/codex-cli",
     external_runtime: {
       command: options.command,
-      request_via_stdin: true,
+      request_via_stdin: options.requestViaStdin ?? true,
       timeout_ms: options.timeoutMs ?? 30000,
       permission_policy:
         options.permissionPolicy ??
@@ -68,6 +71,12 @@ function buildExternalRunnerProfile(options) {
         },
     },
   };
+  if (options.requestTransport) {
+    execution.external_runtime.request_transport = options.requestTransport;
+  }
+  if (options.requestFile) {
+    execution.external_runtime.request_file = options.requestFile;
+  }
   if (options.handler !== null) {
     execution.handler = options.handler ?? "codex-cli-external-runner";
   }
@@ -789,6 +798,60 @@ test("live adapter baseline accepts non-codex adapter ids when an external runne
   assert.equal(response.status, "success");
   assert.equal(response.adapter_id, "open-code");
   assert.equal(response.tool_traces[0].kind, "open-code-external-runner");
+});
+
+test("live adapter supports file-attached request transport for argv prompt runners", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const adapter = createLiveAdapter({
+      adapterId: "open-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "const fileIndex=process.argv.indexOf('--file');",
+            "const filePath=fileIndex>=0?process.argv[fileIndex+1]:'';",
+            "const request=JSON.parse(fs.readFileSync(filePath,'utf8'));",
+            "process.stdout.write(JSON.stringify({",
+            "status:'success',",
+            "summary:'file transport ok',",
+            "output:{message_seen:process.argv.includes('Follow the attached AOR adapter request JSON.'),request_id:request.request.request_id},",
+            "evidence_refs:['evidence://adapter-live/open-code/file-transport']",
+            "}));",
+          ].join(""),
+        ],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "file-attachment",
+        requestFile: {
+          message: "Follow the attached AOR adapter request JSON.",
+          argument: "--file",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-open-code-file",
+      run_id: "run-open-code-file",
+      step_id: "step-open-code-file",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.request_transport, "file-attachment");
+    assert.match(response.output.external_runner.request_file_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-request-/u);
+    assert.equal(response.output.runner_output.message_seen, true);
+    assert.equal(response.output.runner_output.request_id, "req-open-code-file");
+  });
 });
 
 test("live adapter parses JSONL runner output without requiring an AOR envelope", () => {

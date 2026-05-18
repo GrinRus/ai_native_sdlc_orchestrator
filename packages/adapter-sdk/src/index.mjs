@@ -9,6 +9,7 @@ import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs"
 export { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 
 const ADAPTER_RESPONSE_STATUSES = Object.freeze(["success", "failed", "blocked"]);
+const EXTERNAL_REQUEST_TRANSPORTS = Object.freeze(["stdin-json", "file-attachment", "argv-json", "none"]);
 
 const EXTERNAL_RUNTIME_SUPERVISOR_SOURCE = String.raw`
 const { spawn } = require("node:child_process");
@@ -194,6 +195,27 @@ function asPositiveInteger(value, fallback) {
   }
   const rounded = Math.floor(value);
   return rounded > 0 ? rounded : fallback;
+}
+
+/**
+ * @param {Record<string, unknown>} externalRuntime
+ * @param {boolean} requestViaStdin
+ * @returns {string}
+ */
+function resolveRequestTransport(externalRuntime, requestViaStdin) {
+  const configuredTransport = asOptionalString(externalRuntime.request_transport);
+  if (configuredTransport) {
+    return configuredTransport;
+  }
+  return requestViaStdin ? "stdin-json" : "none";
+}
+
+/**
+ * @param {string} requestTransport
+ * @returns {boolean}
+ */
+function isSupportedRequestTransport(requestTransport) {
+  return EXTERNAL_REQUEST_TRANSPORTS.includes(requestTransport);
 }
 
 /**
@@ -914,6 +936,7 @@ export function createLiveAdapter(options) {
   const externalRuntime = asRecord(executionProfile.external_runtime);
   const runtimeCommand = asOptionalString(externalRuntime.command);
   const requestViaStdin = externalRuntime.request_via_stdin !== false;
+  const requestTransport = resolveRequestTransport(externalRuntime, requestViaStdin);
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
   const envOverrides = asStringMap(externalRuntime.env);
   const runtimeEvidenceRoot = asOptionalString(options.runtimeEvidenceRoot);
@@ -1065,7 +1088,41 @@ export function createLiveAdapter(options) {
         });
       }
 
-      const runtimeArgs = runtimeInvocation.args;
+      if (!isSupportedRequestTransport(requestTransport)) {
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: "blocked",
+          summary: `Adapter '${adapterId}' live runtime request transport '${requestTransport}' is not supported.`,
+          output: {
+            mode: "execute",
+            blocked: true,
+            route_id: routeId,
+            provider_adapter: adapterId,
+            compiled_context_ref: compiledContextRef,
+            failure_kind: "request-transport-invalid",
+            external_runner: {
+              runtime_mode: runtimeMode,
+              command: runtimeCommand,
+              args: runtimeInvocation.args,
+              permission_mode: runtimeInvocation.permissionMode,
+              permission_mode_source: runtimeInvocation.source,
+              execution_root: executionRoot,
+              request_transport: requestTransport,
+            },
+          },
+          evidence_refs: [`${evidenceNamespace}/${normalizedEvidenceToken}`],
+          tool_traces: [
+            {
+              phase: "invoke_adapter",
+              kind: handlerKind,
+              detail: `request_transport=${requestTransport} invalid`,
+            },
+          ],
+        });
+      }
+
+      let runtimeArgs = [...runtimeInvocation.args];
       const requestTimeoutMs = resolveRequestTimeoutMs(envelope, timeoutMs);
       const startedAt = new Date().toISOString();
       const runnerInput = {
@@ -1077,13 +1134,41 @@ export function createLiveAdapter(options) {
           permission_mode: runtimeInvocation.permissionMode,
         },
       };
+      const serializedRunnerInput = `${JSON.stringify(runnerInput)}\n`;
+      const evidenceDir = runtimeEvidenceRoot
+        ? path.isAbsolute(runtimeEvidenceRoot)
+          ? runtimeEvidenceRoot
+          : path.resolve(executionRoot, runtimeEvidenceRoot)
+        : null;
+      let requestInput = undefined;
+      let requestFile = null;
+      let requestFileRef = null;
+      if (requestTransport === "stdin-json") {
+        requestInput = serializedRunnerInput;
+      } else if (requestTransport === "argv-json") {
+        runtimeArgs = [...runtimeArgs, serializedRunnerInput.trim()];
+      } else if (requestTransport === "file-attachment") {
+        const requestFileProfile = asRecord(externalRuntime.request_file);
+        const requestMessage =
+          asOptionalString(requestFileProfile.message) ?? "Follow the attached AOR adapter request JSON.";
+        const requestFileArgument = asOptionalString(requestFileProfile.argument) ?? "--file";
+        const requestDir = evidenceDir ?? path.join(executionRoot, ".aor", "adapter-requests");
+        fs.mkdirSync(requestDir, { recursive: true });
+        requestFile = path.join(
+          requestDir,
+          `adapter-live-request-${adapterId}-${normalizedEvidenceToken}-${Date.now()}.json`,
+        );
+        fs.writeFileSync(requestFile, serializedRunnerInput, "utf8");
+        requestFileRef = toEvidenceRef(projectRoot, requestFile);
+        runtimeArgs = [...runtimeArgs, requestMessage, requestFileArgument, requestFile];
+      }
 
       const invocation = runExternalRuntimeProcessSync({
         command: runtimeCommand,
         args: runtimeArgs,
         cwd: executionRoot,
         env: runnerEnv,
-        input: requestViaStdin ? `${JSON.stringify(runnerInput)}\n` : undefined,
+        input: requestInput,
         timeout: requestTimeoutMs,
         maxBuffer: 10 * 1024 * 1024,
       });
@@ -1112,6 +1197,9 @@ export function createLiveAdapter(options) {
           args: runtimeArgs,
           timeout_ms: requestTimeoutMs,
           request_via_stdin: requestViaStdin,
+          request_transport: requestTransport,
+          request_file: requestFile,
+          request_file_ref: requestFileRef,
           execution_root: executionRoot,
           permission_mode: runtimeInvocation.permissionMode,
           permission_mode_source: runtimeInvocation.source,
@@ -1131,10 +1219,7 @@ export function createLiveAdapter(options) {
 
       let rawEvidenceFile = null;
       let rawEvidenceRef = null;
-      if (runtimeEvidenceRoot) {
-        const evidenceDir = path.isAbsolute(runtimeEvidenceRoot)
-          ? runtimeEvidenceRoot
-          : path.resolve(executionRoot, runtimeEvidenceRoot);
+      if (evidenceDir) {
         fs.mkdirSync(evidenceDir, { recursive: true });
         rawEvidenceFile = path.join(
           evidenceDir,
@@ -1162,6 +1247,8 @@ export function createLiveAdapter(options) {
           exit_code: invocation.status,
           signal: invocation.signal,
           timed_out: invocationTimedOut,
+          request_transport: requestTransport,
+          request_file_ref: requestFileRef,
           raw_evidence_ref: rawEvidenceRef,
         },
         runner_output: runnerPayload,

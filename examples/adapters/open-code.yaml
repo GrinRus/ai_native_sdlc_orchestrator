@@ -37,7 +37,11 @@ execution:
             - run
             - --format
             - json
-    request_via_stdin: true
+    request_via_stdin: false
+    request_transport: file-attachment
+    request_file:
+      message: Follow the attached AOR adapter request JSON.
+      argument: --file
     preflight_timeout_ms: 120000
     timeout_ms: 600000
 sandbox_mode: local-or-container
