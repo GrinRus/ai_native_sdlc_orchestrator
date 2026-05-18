@@ -12,6 +12,14 @@ W14 extends the full-journey layer into a curated matrix across:
 - `provider_variant_id`
 - `feature_size`
 
+Current summaries also preserve `run_tier` so coverage is not confused with
+acceptance proof:
+- `readme-smoke`: installed-user no-write bootstrap path;
+- `bounded-live`: fast fail-closed provider proof;
+- `full-journey-observation`: delivery-reaching observation with findings allowed;
+- `acceptance`: required matrix closure, fail-closed for artifact and verification gates;
+- `production-proof`: real external process, no mock, no upstream write, strict evidence.
+
 ## Canonical profiles
 Use only `scripts/live-e2e/profiles/**`.
 
@@ -120,7 +128,9 @@ Full-journey layer:
 - records auth probe attempts and retries one transient auth/runtime probe failure before failing the proof;
 - splits verification into `readiness`, `baseline_diagnostic`, and `post_run_quality` phases;
 - treats full-journey baseline target verification as diagnostic by default: failed target `verification.commands` are preserved as context, but setup failures, missing prerequisites, failed validation, missing or failed routed dry-run, provider readiness failure, and unsafe write-back policy still block before execution;
+- resolves mission post-run quality into a mission-blocking primary gate plus optional full diagnostic commands; a failed diagnostic command records findings without hiding a passing primary gate unless the mission declares `diagnostic_failure_mode=fail`;
 - has the runner prepare one structured feature request input;
+- requires medium, large, and xl catalog missions to provide goals, KPIs, Definition of Done, path bounds, expected evidence, and primary post-run commands before the run can close acceptance;
 - materializes provider-pinned route overrides for the selected provider variant before execution starts;
 - writes an execution-readiness decision before `run start` so promotion evidence is based on readiness and routed dry-run proof, not on a failed baseline target check;
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
@@ -169,6 +179,17 @@ Full-journey summaries must carry:
 - `live_e2e_observation_overall_status`
 - `agent_artifact_review_request_file`
 - `verdict_matrix` when legacy diagnostics ran
+- `canonical_status`
+- `command_status`
+- `target_verification_status`
+- `artifact_quality_status`
+- `delivery_status`
+- `coverage_status`
+- `acceptance_status`
+- `run_tier`
+- `release_status`
+- `proof_eligible_tier`
+- `required_matrix_acceptance_closed`
 
 Production-proof candidate summaries additionally carry:
 - `production_proof`
@@ -262,6 +283,35 @@ Full-journey summaries may include one legacy verdict matrix with:
 
 Legacy `overall_verdict=fail` no longer forces the live E2E observation status to fail when delivery evidence materialized. Those findings downgrade the observation to `warn` unless they prevented the public flow from reaching delivery.
 
+## Canonical Status
+The run summary's canonical status block is the status source for operators.
+Legacy `verdict_matrix` remains diagnostic.
+
+Canonical fields:
+- `command_status`: public subprocesses completed and emitted parseable payloads.
+- `target_verification_status`: post-run primary verify summary result.
+- `artifact_quality_status`: intake strictness, review artifact quality, and lineage consistency.
+- `delivery_status`: `materialized`, `degraded`, `blocked`, or `not_materialized`.
+- `coverage_status`: `covered_pass`, `covered_with_findings`, `attempted_failed`, or `not_attempted`.
+- `acceptance_status`: `pass`, `warn`, or `fail`.
+- `release_status`: `pass`, `fail`, `skipped`, or `not_attempted`.
+- `proof_eligible_tier`: true only for `acceptance` and `production-proof`.
+- `required_matrix_acceptance_closed`: true only when the run actually closes required matrix acceptance.
+
+The target scorecard mirrors these canonical fields in addition to linking back
+to the summary.
+
+`command_status` is about technical command evidence, not final quality. If the
+runner intentionally accepts a non-zero command because it emitted a readable
+payload, the command diagnostic keeps the non-zero exit code while canonical
+quality is reported through the relevant delivery, release, verification, or
+artifact status.
+
+Required matrix coverage closes only when `coverage_status=covered_pass` on
+`run_tier=acceptance` or `run_tier=production-proof`. A delivery-reaching run
+with warnings is `covered_with_findings`; it is useful evidence but does not
+close required acceptance.
+
 ## Operator checks
 - Summary and scorecard files exist under `.aor/projects/<project_id>/reports/`.
 - `target_checkout_root` exists and is a cloned checkout, not the control-plane repository root.
@@ -302,9 +352,9 @@ Pass evidence requires all of the following:
 
 ## W14-S07 matrix proof bundle (2026-04-24)
 Observed curated runs:
-- `w14-s07.full-journey-regress-ky`, `w14-s07.full-journey-regress-ky-anthropic`, `w14-s07.full-journey-regress-ky-medium-anthropic-rerun`, and `w14-s07.full-journey-release-ky-medium-openai` cover all required `ky` cells.
-- `w14-s07.full-journey-regress-httpie`, `w14-s07.full-journey-regress-httpie-anthropic`, `w14-s07.full-journey-repair-httpie-medium-anthropic`, and `w14-s07.full-journey-governance-httpie-medium-openai` cover all required `httpie/cli` cells plus the repo-level provider-comparison pair.
-- `w14-s07.full-journey-release-nextjs`, `w14-s07.full-journey-release-nextjs-anthropic`, `w14-s07.full-journey-repair-nextjs-medium-anthropic`, and `w14-s07.full-journey-governance-nextjs-large-openai` cover all required `belgattitude/nextjs-monorepo-example` cells plus the repo-level provider-comparison pair.
+- `w14-s07.full-journey-regress-ky`, `w14-s07.full-journey-regress-ky-anthropic`, `w14-s07.full-journey-regress-ky-medium-anthropic-rerun`, and `w14-s07.full-journey-release-ky-medium-openai` exercise all required `ky` cells.
+- `w14-s07.full-journey-regress-httpie`, `w14-s07.full-journey-regress-httpie-anthropic`, `w14-s07.full-journey-repair-httpie-medium-anthropic`, and `w14-s07.full-journey-governance-httpie-medium-openai` exercise all required `httpie/cli` cells plus the repo-level provider-comparison pair.
+- `w14-s07.full-journey-release-nextjs`, `w14-s07.full-journey-release-nextjs-anthropic`, `w14-s07.full-journey-repair-nextjs-medium-anthropic`, and `w14-s07.full-journey-governance-nextjs-large-openai` exercise all required `belgattitude/nextjs-monorepo-example` cells plus the repo-level provider-comparison pair.
 
 Canonical fixtures:
 - `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`
@@ -312,7 +362,7 @@ Canonical fixtures:
 
 Evidence note:
 - the committed bundle preserves catalog-backed repo and mission resolution, scenario/provider/size matrix-cell validation, provider-pinned route overrides, public `project init`, mission-generated intake/discovery/spec/handoff artifacts, public `review run`, public `audit runs`, and public `learning handoff` closure artifacts.
-- the bundle proves all `9/9` repo-level required matrix cells and all `3/3` catalog provider-comparison pairs across `ky`, `httpie/cli`, and `nextjs-monorepo-example`.
+- the bundle remains historical observation evidence. Under the canonical status model, it is tracked as `coverage_with_findings`; required matrix acceptance now needs a current `covered_pass` run on `run_tier=acceptance` or `run_tier=production-proof`.
 - the bundle proves all mandatory scenario families: `regress`, `release`, `repair`, and `governance`.
 - the bundle is explicitly classified as `proof_scope=coverage_with_findings` with `real_code_change_proof_complete=false`; it is coverage evidence, not full code-changing runtime proof.
 - `overall_verdict` remains `pass_with_findings` in the committed proof because the deterministic external runner mock does not materialize mission code changes, leaving `review-report.code_quality=warn`.

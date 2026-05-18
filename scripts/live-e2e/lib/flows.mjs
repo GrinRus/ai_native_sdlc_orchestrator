@@ -205,6 +205,14 @@ function buildCommandDiagnostic(result) {
 }
 
 /**
+ * @param {Record<string, unknown>} diagnostic
+ * @returns {boolean}
+ */
+function commandCompletedForCanonicalStatus(diagnostic) {
+  return asNonEmptyString(diagnostic.status) === "pass" || diagnostic.accepted_nonzero_payload === true;
+}
+
+/**
  * @param {Record<string, unknown> | null} payload
  * @param {string} field
  * @returns {string | null}
@@ -674,6 +682,141 @@ function resolvePostRunQualityPolicy(mission, catalogVerification) {
 }
 
 /**
+ * @param {Record<string, unknown>} profile
+ * @returns {"readme-smoke" | "bounded-live" | "full-journey-observation" | "acceptance" | "production-proof"}
+ */
+function resolveRunTier(profile) {
+  const declared = asNonEmptyString(profile.run_tier);
+  if (
+    declared === "readme-smoke" ||
+    declared === "bounded-live" ||
+    declared === "full-journey-observation" ||
+    declared === "acceptance" ||
+    declared === "production-proof"
+  ) {
+    return declared;
+  }
+  if (asRecord(profile.production_proof).enabled === true) {
+    return "production-proof";
+  }
+  if (asNonEmptyString(profile.journey_mode) === "full-journey" || asNonEmptyString(profile.target_catalog_id)) {
+    return "acceptance";
+  }
+  return "bounded-live";
+}
+
+/**
+ * @param {string} featureSize
+ * @returns {boolean}
+ */
+function requiresStrictMissionIntake(featureSize) {
+  return featureSize === "medium" || featureSize === "large" || featureSize === "xl";
+}
+
+/**
+ * @param {{
+ *   mission: Record<string, unknown>,
+ *   featureSize: string,
+ *   scenarioFamily: string,
+ *   postRunQualityPolicy: ReturnType<typeof resolvePostRunQualityPolicy>,
+ * }}
+ */
+function evaluateMissionIntakeQuality(options) {
+  const strictRequired = requiresStrictMissionIntake(options.featureSize);
+  /** @type {string[]} */
+  const missingFields = [];
+  const hasKpis = normalizeMissionKpis(options.mission.kpis).length > 0;
+  const checks = [
+    ["goals", asStringArray(options.mission.goals).length > 0],
+    ["kpis", hasKpis],
+    ["definition_of_done", asStringArray(options.mission.definition_of_done).length > 0],
+    ["allowed_paths", asStringArray(options.mission.allowed_paths).length > 0],
+    ["forbidden_paths", asStringArray(options.mission.forbidden_paths).length > 0],
+    ["expected_evidence", asStringArray(options.mission.expected_evidence).length > 0],
+    ["post_run_quality.primary_commands", options.postRunQualityPolicy.primaryCommands.length > 0],
+  ];
+  for (const [field, present] of checks) {
+    if (!present) missingFields.push(String(field));
+  }
+  const findings = strictRequired
+    ? missingFields.map((field) => `Medium+ mission intake is missing '${field}'.`)
+    : [];
+  const status = strictRequired && missingFields.length > 0 ? "fail" : "pass";
+  return {
+    phase: "feature_intake",
+    scenario_family: options.scenarioFamily,
+    feature_size: options.featureSize,
+    strict_required: strictRequired,
+    status,
+    missing_fields: missingFields,
+    findings,
+    summary:
+      status === "pass"
+        ? strictRequired
+          ? "Medium+ mission intake has goals, KPIs, Definition of Done, path bounds, expected evidence, and primary verification commands."
+          : "Small mission intake strictness is not required."
+        : `Medium+ mission intake is incomplete: ${missingFields.join(", ")}.`,
+  };
+}
+
+/**
+ * @param {{ mission: Record<string, unknown>, featureRequest: ReturnType<typeof materializeFeatureRequestFile>, profile: Record<string, unknown> }}
+ * @returns {string[]}
+ */
+function buildIntakeCreateArgs(options) {
+  const missionId = asNonEmptyString(options.mission.mission_id);
+  const title = asNonEmptyString(options.featureRequest.requestDocument.title) || missionId || "Feature mission";
+  const brief =
+    asNonEmptyString(options.featureRequest.requestDocument.brief) ||
+    asNonEmptyString(options.mission.brief) ||
+    "Prepare one bounded catalog mission request.";
+  const goals = asStringArray(options.mission.goals);
+  const constraints = asStringArray(options.mission.acceptance_checks);
+  const definitionOfDone =
+    asStringArray(options.mission.definition_of_done).length > 0
+      ? asStringArray(options.mission.definition_of_done)
+      : asStringArray(options.mission.expected_evidence).map((entry) => `Materialize ${entry} evidence.`);
+  const kpis = normalizeMissionKpis(options.mission.kpis);
+  const effectiveKpis =
+    kpis.length > 0
+      ? kpis
+      : [
+          {
+            kpi_id: "mission-evidence",
+            name: "Mission evidence",
+            target: "Required mission evidence is materialized",
+            measurement: "live E2E runner summary",
+          },
+        ];
+
+  return [
+    "intake",
+    "create",
+    "--project-ref",
+    ".",
+    "--runtime-root",
+    ".aor",
+    "--request-file",
+    options.featureRequest.requestFile,
+    "--mission-id",
+    missionId,
+    "--request-title",
+    title,
+    "--request-brief",
+    brief,
+    ...constraints.flatMap((entry) => ["--request-constraints", entry]),
+    ...((goals.length > 0 ? goals : [brief]).flatMap((entry) => ["--goal", entry])),
+    ...((definitionOfDone.length > 0 ? definitionOfDone : constraints).flatMap((entry) => ["--dod", entry])),
+    ...effectiveKpis.flatMap((entry) => [
+      "--kpi",
+      `${entry.kpi_id}:${entry.name}:${entry.target}${entry.measurement ? `:${entry.measurement}` : ""}`,
+    ]),
+    ...asStringArray(options.mission.allowed_paths).flatMap((entry) => ["--allowed-path", entry]),
+    ...asStringArray(options.mission.forbidden_paths).flatMap((entry) => ["--forbidden-path", entry]),
+  ];
+}
+
+/**
  * @param {{ label: string, commands: string[] }} options
  * @returns {string[]}
  */
@@ -728,6 +871,74 @@ function writeExecutionReadinessDecision(options) {
   };
   writeJson(decisionFile, decision);
   return { decisionFile, decision };
+}
+
+/**
+ * @param {string[]} commands
+ * @returns {boolean}
+ */
+function commandsRequirePlaywrightCache(commands) {
+  return commands.some((command) => /\bplaywright\b|ms-playwright|browserType\.launch/iu.test(command));
+}
+
+/**
+ * @param {{ targetCheckoutRoot: string, reportsRoot: string, runId: string, commands: string[], env: NodeJS.ProcessEnv, forceFailure?: boolean }}
+ */
+function prepareBrowserCachePreflight(options) {
+  const reportFile = path.join(
+    options.reportsRoot,
+    `live-e2e-browser-cache-preflight-${normalizeId(options.runId)}.json`,
+  );
+  const required = commandsRequirePlaywrightCache(options.commands);
+  const cacheRoot = path.join(options.targetCheckoutRoot, ".aor", "cache", "ms-playwright");
+  if (!required) {
+    const report = {
+      run_id: options.runId,
+      status: "skipped",
+      required: false,
+      cache_root: cacheRoot,
+      env_var: "PLAYWRIGHT_BROWSERS_PATH",
+      summary: "No Playwright/browser cache preflight was required by declared target commands.",
+      checked_at: nowIso(),
+    };
+    writeJson(reportFile, report);
+    return { status: "skipped", report, reportFile };
+  }
+
+  try {
+    if (options.forceFailure === true) {
+      throw new Error("forced browser cache preflight failure");
+    }
+    fs.mkdirSync(cacheRoot, { recursive: true });
+    const markerFile = path.join(cacheRoot, `.aor-cache-write-${normalizeId(options.runId)}.txt`);
+    fs.writeFileSync(markerFile, `browser-cache-preflight:${options.runId}\n`, "utf8");
+    fs.rmSync(markerFile, { force: true });
+    options.env.PLAYWRIGHT_BROWSERS_PATH = cacheRoot;
+    const report = {
+      run_id: options.runId,
+      status: "pass",
+      required: true,
+      cache_root: cacheRoot,
+      env_var: "PLAYWRIGHT_BROWSERS_PATH",
+      summary: "Playwright/browser cache path is target-local and writable before provider execution.",
+      checked_at: nowIso(),
+    };
+    writeJson(reportFile, report);
+    return { status: "pass", report, reportFile };
+  } catch (error) {
+    const summary = `Playwright/browser cache path is not writable: ${error instanceof Error ? error.message : String(error)}`;
+    const report = {
+      run_id: options.runId,
+      status: "fail",
+      required: true,
+      cache_root: cacheRoot,
+      env_var: "PLAYWRIGHT_BROWSERS_PATH",
+      summary,
+      checked_at: nowIso(),
+    };
+    writeJson(reportFile, report);
+    return { status: "fail", report, reportFile };
+  }
 }
 
 /**
@@ -944,6 +1155,136 @@ function evaluateArtifactConsistency(options) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {"pass" | "warn" | "fail" | "not_attempted"}
+ */
+function normalizeCanonicalStatus(value) {
+  const status = asNonEmptyString(value).toLowerCase();
+  if (status === "pass" || status === "passed" || status === "success") return "pass";
+  if (status === "warn" || status === "warning" || status === "pass_with_findings") return "warn";
+  if (status === "fail" || status === "failed" || status === "not_pass") return "fail";
+  return "not_attempted";
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {"materialized" | "degraded" | "blocked" | "not_materialized"}
+ */
+function resolveDeliveryStatus(artifacts) {
+  if (!asNonEmptyString(artifacts.delivery_manifest_file)) return "not_materialized";
+  if (artifacts.delivery_blocking === true) return "blocked";
+  if (asNonEmptyString(artifacts.delivery_quality_gate_status) === "not_pass") return "degraded";
+  return "materialized";
+}
+
+/**
+ * @param {{
+ *   commandResults: Array<Record<string, unknown>>,
+ *   artifacts: Record<string, unknown>,
+ *   artifactConsistency: Record<string, unknown>,
+ *   reviewReport: Record<string, unknown>,
+ *   scenarioCoverage: Record<string, unknown>,
+ *   verdictMatrix: Record<string, unknown>,
+ *   runTier: string,
+ *   scenarioPolicy: Record<string, unknown>,
+ * }}
+ */
+function buildCanonicalRunStatus(options) {
+  const commandStatus =
+    options.commandResults.length > 0 && options.commandResults.every((entry) => commandCompletedForCanonicalStatus(entry))
+      ? "pass"
+      : "fail";
+  const targetVerificationStatus = normalizeCanonicalStatus(options.artifacts.post_run_verify_status);
+  const intakeGate = asRecord(options.artifacts.intake_quality_gate);
+  const reviewArtifactQualityStatus = normalizeCanonicalStatus(asRecord(options.reviewReport.artifact_quality).status);
+  const artifactConsistencyStatus = normalizeCanonicalStatus(options.artifactConsistency.status);
+  const artifactQualityStatus =
+    asNonEmptyString(intakeGate.status) === "fail" ||
+    reviewArtifactQualityStatus === "fail" ||
+    artifactConsistencyStatus === "fail"
+      ? "fail"
+      : reviewArtifactQualityStatus === "warn" || artifactConsistencyStatus === "warn"
+        ? "warn"
+        : "pass";
+  const deliveryStatus = resolveDeliveryStatus(options.artifacts);
+  const releaseRequired = options.scenarioPolicy.release_required === true;
+  const releaseStatus = releaseRequired
+    ? normalizeCanonicalStatus(options.artifacts.release_status)
+    : asNonEmptyString(options.artifacts.release_status)
+      ? normalizeCanonicalStatus(options.artifacts.release_status)
+      : "not_attempted";
+  const providerExecutionStatus = normalizeCanonicalStatus(options.artifacts.provider_execution_status);
+  const realCodeChangeStatus = normalizeCanonicalStatus(options.artifacts.real_code_change_status);
+  const scenarioCoverageStatus = normalizeCanonicalStatus(options.scenarioCoverage.status);
+  const qualityGateStatus = normalizeCanonicalStatus(options.artifacts.quality_gate_decision);
+  const diagnosticStatus = normalizeCanonicalStatus(options.artifacts.post_run_diagnostic_status);
+  const strictIntakeFailed = intakeGate.strict_required === true && asNonEmptyString(intakeGate.status) === "fail";
+  const releaseMissing = releaseRequired && releaseStatus !== "pass";
+  const fatalAcceptance =
+    deliveryStatus === "not_materialized" ||
+    commandStatus === "fail" ||
+    strictIntakeFailed ||
+    providerExecutionStatus === "fail" ||
+    realCodeChangeStatus === "fail" ||
+    releaseMissing;
+  const acceptanceStatus = fatalAcceptance
+    ? "fail"
+    : targetVerificationStatus === "fail" ||
+        artifactQualityStatus === "fail" ||
+        deliveryStatus === "blocked" ||
+        deliveryStatus === "degraded" ||
+        scenarioCoverageStatus === "fail" ||
+        qualityGateStatus === "fail" ||
+        diagnosticStatus === "warn" ||
+        diagnosticStatus === "fail" ||
+        asNonEmptyString(options.verdictMatrix.overall_verdict) === "pass_with_findings"
+      ? "warn"
+      : "pass";
+  const hasMatrixCell = hasObjectFields(asRecord(options.artifacts.matrix_cell));
+  const proofEligibleTier = options.runTier === "acceptance" || options.runTier === "production-proof";
+  const coverageStatus = !hasMatrixCell
+    ? "not_attempted"
+    : acceptanceStatus === "pass" && proofEligibleTier
+      ? "covered_pass"
+      : acceptanceStatus === "warn" && deliveryStatus !== "not_materialized"
+        ? "covered_with_findings"
+        : deliveryStatus !== "not_materialized" && options.runTier === "full-journey-observation"
+          ? "covered_with_findings"
+          : "attempted_failed";
+  const findings = uniqueStrings([
+    ...(commandStatus === "fail" ? ["One or more public CLI subprocesses failed."] : []),
+    ...(targetVerificationStatus === "fail" ? ["Post-run target verification failed."] : []),
+    ...asStringArray(intakeGate.findings),
+    ...(artifactConsistencyStatus === "fail" ? asStringArray(options.artifactConsistency.findings) : []),
+    ...(deliveryStatus === "blocked" ? ["Delivery evidence was materialized behind a blocking quality finding."] : []),
+    ...(deliveryStatus === "degraded" ? ["Delivery quality gate produced observed findings."] : []),
+    ...(releaseMissing ? ["Required release stage did not materialize strict release-packet evidence."] : []),
+    ...(providerExecutionStatus === "fail" ? ["Provider execution evidence was not materialized."] : []),
+    ...(realCodeChangeStatus === "fail" ? ["No mission-scoped real code change was observed."] : []),
+    ...(diagnosticStatus === "warn" || diagnosticStatus === "fail" ? ["Diagnostic post-run verification reported findings."] : []),
+  ]);
+  return {
+    command_status: commandStatus,
+    target_verification_status: targetVerificationStatus,
+    artifact_quality_status: artifactQualityStatus,
+    delivery_status: deliveryStatus,
+    coverage_status: coverageStatus,
+    acceptance_status: acceptanceStatus,
+    run_tier: options.runTier,
+    release_status: releaseStatus,
+    proof_eligible_tier: proofEligibleTier,
+    required_matrix_acceptance_closed: coverageStatus === "covered_pass" && proofEligibleTier,
+    findings,
+    summary:
+      acceptanceStatus === "pass"
+        ? "Live E2E acceptance evidence passed."
+        : acceptanceStatus === "warn"
+          ? "Live E2E reached delivery with findings; required matrix acceptance is not closed."
+          : "Live E2E did not meet acceptance requirements.",
+  };
+}
+
+/**
  * @param {{
  *   hostRoot: string,
  *   layout: ReturnType<typeof ensureRuntimeLayout>,
@@ -982,6 +1323,7 @@ export function executeInstalledUserFlow(options) {
     runner_auth_mode: proofRunnerEnvironment.runnerAuthMode,
     runner_auth_source: proofRunnerEnvironment.runnerAuthSource,
     runtime_agent_permission_mode: options.runtimeAgentPermissionMode,
+    run_tier: resolveRunTier(options.profile),
   };
   const startedAt = nowIso();
   try {
@@ -994,6 +1336,28 @@ export function executeInstalledUserFlow(options) {
     artifacts.target_checkout_root = targetCheckout.targetCheckoutRoot;
     artifacts.target_repo_ref = targetCheckout.targetRepoRef;
     artifacts.target_repo_url = targetCheckout.targetRepoUrl;
+    const installedBrowserCachePreflight = prepareBrowserCachePreflight({
+      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      reportsRoot: options.layout.reportsRoot,
+      runId: options.runId,
+      commands: uniqueStrings([
+        ...asStringArray(asRecord(options.profile.verification).setup_commands),
+        ...asStringArray(asRecord(options.profile.verification).commands),
+      ]),
+      env,
+    });
+    artifacts.browser_cache_preflight_file = installedBrowserCachePreflight.reportFile;
+    artifacts.browser_cache_preflight = installedBrowserCachePreflight.report;
+    if (installedBrowserCachePreflight.status === "fail") {
+      markStage(
+        stageMap,
+        "bootstrap",
+        "fail",
+        [installedBrowserCachePreflight.reportFile],
+        asNonEmptyString(installedBrowserCachePreflight.report.summary) || "Browser cache preflight failed.",
+      );
+      throw new Error(asNonEmptyString(installedBrowserCachePreflight.report.summary) || "Browser cache preflight failed.");
+    }
 
     const targetAssets = materializeTargetAssets({
       hostRoot: options.hostRoot,
@@ -1033,7 +1397,13 @@ export function executeInstalledUserFlow(options) {
         index: commandIndex,
       });
       commandIndex += 1;
-      commandResults.push(buildCommandDiagnostic(result));
+      const diagnostic = buildCommandDiagnostic(result);
+      if (!result.ok && runOptions.allowNonZeroWithPayload === true && result.payload) {
+        diagnostic.accepted_nonzero_payload = true;
+        diagnostic.failure_class = "nonzero-with-readable-payload";
+        diagnostic.recommendation = "inspect payload quality fields";
+      }
+      commandResults.push(diagnostic);
       if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -1440,6 +1810,7 @@ export function executeFullJourneyFlow(options) {
     scenario_family: asNonEmptyString(options.profile.scenario_family) || null,
     provider_variant_id: asNonEmptyString(options.profile.provider_variant_id) || null,
     feature_size: options.featureSize,
+    run_tier: resolveRunTier(options.profile),
     matrix_cell: options.matrixCell,
     coverage_follow_up: options.coverageFollowUp,
     coverage_tier: options.coverageTier,
@@ -1465,6 +1836,36 @@ export function executeFullJourneyFlow(options) {
       cwd: targetCheckout.targetCheckoutRoot,
       args: ["rev-parse", "HEAD"],
     });
+    const catalogVerification = asRecord(options.catalogEntry.verification);
+    const repoLintCommands = asStringArray(catalogVerification.setup_commands);
+    const repoVerificationCommands = asStringArray(catalogVerification.commands);
+    const postRunQualityPolicy = resolvePostRunQualityPolicy(options.mission, catalogVerification);
+    artifacts.post_run_quality_policy = postRunQualityPolicy;
+    const browserCachePreflight = prepareBrowserCachePreflight({
+      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      reportsRoot: options.layout.reportsRoot,
+      runId: options.runId,
+      commands: uniqueStrings([
+        ...repoLintCommands,
+        ...repoVerificationCommands,
+        ...postRunQualityPolicy.primaryCommands,
+        ...postRunQualityPolicy.diagnosticCommands,
+      ]),
+      env,
+      forceFailure: internalTestHooks.force_browser_cache_preflight_failure === true,
+    });
+    artifacts.browser_cache_preflight_file = browserCachePreflight.reportFile;
+    artifacts.browser_cache_preflight = browserCachePreflight.report;
+    if (browserCachePreflight.status === "fail") {
+      markStage(
+        stageMap,
+        "bootstrap",
+        "fail",
+        [browserCachePreflight.reportFile],
+        asNonEmptyString(browserCachePreflight.report.summary) || "Browser cache preflight failed.",
+      );
+      throw new Error(asNonEmptyString(browserCachePreflight.report.summary) || "Browser cache preflight failed.");
+    }
 
     let commandIndex = 1;
     const runCommand = (label, args, runOptions = {}) => {
@@ -1478,7 +1879,13 @@ export function executeFullJourneyFlow(options) {
         index: commandIndex,
       });
       commandIndex += 1;
-      commandResults.push(buildCommandDiagnostic(result));
+      const diagnostic = buildCommandDiagnostic(result);
+      if (!result.ok && runOptions.allowNonZeroWithPayload === true && result.payload) {
+        diagnostic.accepted_nonzero_payload = true;
+        diagnostic.failure_class = "nonzero-with-readable-payload";
+        diagnostic.recommendation = "inspect payload quality fields";
+      }
+      commandResults.push(diagnostic);
       if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -1532,9 +1939,6 @@ export function executeFullJourneyFlow(options) {
     }
 
     const bootstrapTemplate = asNonEmptyString(options.profile.bootstrap_template) || "github-default";
-    const catalogVerification = asRecord(options.catalogEntry.verification);
-    const repoLintCommands = asStringArray(catalogVerification.setup_commands);
-    const repoVerificationCommands = asStringArray(catalogVerification.commands);
     const projectInit = runCommand("project-init", [
       "project",
       "init",
@@ -1594,6 +1998,7 @@ export function executeFullJourneyFlow(options) {
       uniqueStrings([
         projectInit.transcriptFile,
         liveAdapterPreflight.reportFile,
+        browserCachePreflight.reportFile,
         ...collectStringRefs(projectInit.payload),
         ...providerRoutes.routeFiles,
       ]),
@@ -1620,25 +2025,19 @@ export function executeFullJourneyFlow(options) {
           featureRequest,
           profile: options.profile,
         }))
-      : runCommand("intake-create", [
-          "intake",
-          "create",
-          "--project-ref",
-          ".",
-          "--runtime-root",
-          ".aor",
-          "--request-file",
-          featureRequest.requestFile,
-          "--mission-id",
-          asNonEmptyString(options.mission.mission_id),
-          "--request-title",
-          asNonEmptyString(featureRequest.requestDocument.title),
-          "--request-brief",
-          asNonEmptyString(featureRequest.requestDocument.brief),
-          ...asStringArray(options.mission.acceptance_checks).flatMap((entry) => ["--request-constraints", entry]),
-        ]);
+      : runCommand("intake-create", buildIntakeCreateArgs({
+          mission: options.mission,
+          featureRequest,
+          profile: options.profile,
+        }));
     artifacts.intake_artifact_packet_file = getStringField(intakeCreate.payload, "artifact_packet_file");
     artifacts.intake_artifact_packet_body_file = getStringField(intakeCreate.payload, "artifact_packet_body_file");
+    artifacts.intake_quality_gate = evaluateMissionIntakeQuality({
+      mission: options.mission,
+      featureSize: options.featureSize,
+      scenarioFamily: asNonEmptyString(options.profile.scenario_family),
+      postRunQualityPolicy,
+    });
     if (guidedJourneyEnabled) {
       artifacts.guided_mission_create_transcript_file = intakeCreate.transcriptFile;
       const guidedNextAfterMission = runCommand("guided-next-after-mission", [
@@ -2028,8 +2427,6 @@ export function executeFullJourneyFlow(options) {
     ]);
     artifacts.run_status_snapshot_file = runStatus.transcriptFile;
 
-    const postRunQualityPolicy = resolvePostRunQualityPolicy(options.mission, catalogVerification);
-    artifacts.post_run_quality_policy = postRunQualityPolicy;
     const postRunVerify = runCommand("project-verify-post-run-primary", [
       "project",
       "verify",
@@ -2359,6 +2756,12 @@ export function executeFullJourneyFlow(options) {
       artifacts.next_action_report_file = getStringField(guidedNextAfterDelivery.payload, "next_action_report_file");
       artifacts.guided_next_after_delivery_transcript_file = guidedNextAfterDelivery.transcriptFile;
 
+      if (internalTestHooks.fail_release_prepare === true) {
+        artifacts.release_status = "fail";
+        markStage(stageMap, "release", "fail", [], "Release prepare failed before release-packet evidence materialized.");
+        throw new Error("Release prepare did not materialize release-packet evidence.");
+      }
+
       const releasePrepare = runCommand("release-prepare", [
         "release",
         "prepare",
@@ -2385,10 +2788,11 @@ export function executeFullJourneyFlow(options) {
       artifacts.release_packet_file = getStringField(releasePrepare.payload, "release_packet_file");
       artifacts.release_packet_status = getStringField(releasePrepare.payload, "release_packet_status");
       artifacts.guided_release_prepare_transcript_file = releasePrepare.transcriptFile;
+      artifacts.release_status = artifacts.release_packet_file ? "pass" : "fail";
       markStage(
         stageMap,
         "release",
-        artifacts.release_packet_file ? "pass" : "fail",
+        artifacts.release_status,
         uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
         artifacts.release_packet_file
           ? "Release prepare materialized release packet evidence under the review gate."
@@ -2397,7 +2801,50 @@ export function executeFullJourneyFlow(options) {
       if (!artifacts.release_packet_file) {
         throw new Error("Release prepare did not materialize release packet evidence.");
       }
+    } else if (options.scenarioPolicy.release_required === true && getProfileStages(options.profile).includes("release")) {
+      if (internalTestHooks.fail_release_prepare === true) {
+        artifacts.release_status = "fail";
+        markStage(stageMap, "release", "fail", [], "Release prepare failed before release-packet evidence materialized.");
+        throw new Error("Release prepare did not materialize release-packet evidence.");
+      }
+
+      const releasePrepare = runCommand("release-prepare", [
+        "release",
+        "prepare",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        "./project.aor.yaml",
+        "--runtime-root",
+        ".aor",
+        "--run-id",
+        options.runId,
+        "--step-class",
+        "implement",
+        "--mode",
+        getPreferredDeliveryMode(options.profile),
+        ...(artifacts.approved_handoff_packet_file
+          ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
+          : []),
+        ...(deliveryEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", deliveryEvidenceRefs.join(",")] : []),
+      ], { allowNonZeroWithPayload: true });
+      artifacts.release_delivery_manifest_file = getStringField(releasePrepare.payload, "delivery_manifest_file");
+      artifacts.release_delivery_transcript_file = getStringField(releasePrepare.payload, "delivery_transcript_file");
+      artifacts.release_packet_file = getStringField(releasePrepare.payload, "release_packet_file");
+      artifacts.release_packet_status = getStringField(releasePrepare.payload, "release_packet_status");
+      artifacts.release_prepare_transcript_file = releasePrepare.transcriptFile;
+      artifacts.release_status = artifacts.release_packet_file ? "pass" : "fail";
+      markStage(
+        stageMap,
+        "release",
+        artifacts.release_status,
+        uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
+        artifacts.release_packet_file
+          ? "Release prepare materialized strict release-packet evidence."
+          : "Release prepare did not materialize strict release-packet evidence.",
+      );
     } else {
+      artifacts.release_status = options.scenarioPolicy.release_required === true ? "fail" : "skipped";
       markStage(stageMap, "release", "skipped", [], "Observation v1 ends at delivery.");
     }
 
@@ -2625,16 +3072,22 @@ export function executeFullJourneyFlow(options) {
       scenarioCoverage.summary = artifactConsistency.summary;
     }
     artifacts.scenario_coverage = scenarioCoverage;
+    const intakeGateStatus = normalizeVerdictStatus(asRecord(artifacts.intake_quality_gate).status);
+    const releaseRequired = options.scenarioPolicy.release_required === true;
     const deliveryReleaseQuality =
       artifacts.delivery_blocking === true
         ? "fail"
-        : asRecord(options.profile.output_policy).materialize_release_packet === true
-        ? artifacts.release_packet_file
-          ? "pass"
-          : "fail"
-        : artifacts.delivery_manifest_file
-          ? "pass"
-          : "warn";
+        : releaseRequired
+          ? asNonEmptyString(artifacts.release_status) === "pass" && artifacts.release_packet_file
+            ? "pass"
+            : "fail"
+          : asRecord(options.profile.output_policy).materialize_release_packet === true
+            ? artifacts.release_packet_file
+              ? "pass"
+              : "fail"
+            : artifacts.delivery_manifest_file
+              ? "pass"
+              : "warn";
     const learningLoopClosure =
       artifacts.learning_loop_scorecard_file && artifacts.learning_loop_handoff_file && auditPayload.run_audit_records
         ? "pass"
@@ -2651,7 +3104,8 @@ export function executeFullJourneyFlow(options) {
       real_code_change_status: realCodeChangeStatus,
       post_run_verification_status: postRunVerificationStatus,
       post_run_diagnostic_status: postRunDiagnosticStatus,
-      discovery_quality: normalizeVerdictStatus(asRecord(reviewReport.discovery_quality).status),
+      discovery_quality:
+        intakeGateStatus === "fail" ? "fail" : normalizeVerdictStatus(asRecord(reviewReport.discovery_quality).status),
       runtime_success:
         artifacts.routed_step_result_file &&
         artifacts.runtime_harness_report_file &&
@@ -2662,7 +3116,9 @@ export function executeFullJourneyFlow(options) {
       run_start_runtime_harness_decision: runtimeHarnessDecision,
       latest_runtime_harness_decision: latestRuntimeHarnessDecision,
       artifact_quality:
-        artifactConsistency.status === "fail"
+        intakeGateStatus === "fail"
+          ? "fail"
+          : artifactConsistency.status === "fail"
           ? "fail"
           : normalizeVerdictStatus(asRecord(reviewReport.artifact_quality).status),
       code_quality: normalizeVerdictStatus(asRecord(reviewReport.code_quality).status),
@@ -2672,6 +3128,8 @@ export function executeFullJourneyFlow(options) {
       quality_gate_decision: artifacts.quality_gate_decision,
       overall_verdict: "pass",
     };
+    verdictMatrix.feature_request_quality =
+      intakeGateStatus === "fail" ? "fail" : artifacts.intake_artifact_packet_file && artifacts.feature_request_file ? "pass" : "fail";
     const verdictStatuses = [
       verdictMatrix.target_selection,
       verdictMatrix.feature_request_quality,
@@ -2696,6 +3154,22 @@ export function executeFullJourneyFlow(options) {
         ? "pass_with_findings"
         : "pass";
     artifacts.verdict_matrix = verdictMatrix;
+    artifacts.canonical_status = buildCanonicalRunStatus({
+      commandResults,
+      artifacts,
+      artifactConsistency,
+      reviewReport,
+      scenarioCoverage,
+      verdictMatrix,
+      runTier: asNonEmptyString(artifacts.run_tier) || resolveRunTier(options.profile),
+      scenarioPolicy: options.scenarioPolicy,
+    });
+    artifacts.command_status = asNonEmptyString(asRecord(artifacts.canonical_status).command_status);
+    artifacts.target_verification_status = asNonEmptyString(asRecord(artifacts.canonical_status).target_verification_status);
+    artifacts.artifact_quality_status = asNonEmptyString(asRecord(artifacts.canonical_status).artifact_quality_status);
+    artifacts.delivery_status = asNonEmptyString(asRecord(artifacts.canonical_status).delivery_status);
+    artifacts.coverage_status = asNonEmptyString(asRecord(artifacts.canonical_status).coverage_status);
+    artifacts.acceptance_status = asNonEmptyString(asRecord(artifacts.canonical_status).acceptance_status);
 
     return {
       startedAt,

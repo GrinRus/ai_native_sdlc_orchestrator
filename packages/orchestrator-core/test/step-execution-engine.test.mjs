@@ -10,6 +10,7 @@ import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 import { executeRoutedStep, executeRuntimeHarnessControlledStep } from "../src/step-execution-engine.mjs";
 import { classifyRuntimeStepOutcome, materializeRuntimeHarnessReport } from "../src/runtime-harness-report.mjs";
+import { filterNonBootstrapChangedPaths, listChangedPaths } from "../src/shared/mission-scope.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -30,6 +31,24 @@ function withTempRepo(callback) {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }
 }
+
+test("changed path parsing strips git quoting before bootstrap-owned filtering", () => {
+  withTempRepo((repoRoot) => {
+    const cachePath = path.join(
+      repoRoot,
+      ".aor/cache/ms-playwright/chromium/Google Chrome for Testing.app/Contents/Info.plist",
+    );
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    fs.writeFileSync(cachePath, "runtime cache\n", "utf8");
+
+    const changedPaths = listChangedPaths(repoRoot).changedPaths;
+    assert.ok(changedPaths.includes(".aor/cache/ms-playwright/chromium/Google Chrome for Testing.app/Contents/Info.plist"));
+    assert.equal(
+      filterNonBootstrapChangedPaths(changedPaths).some((entry) => entry.startsWith(".aor/")),
+      false,
+    );
+  });
+});
 
 /**
  * @param {string} repoRoot

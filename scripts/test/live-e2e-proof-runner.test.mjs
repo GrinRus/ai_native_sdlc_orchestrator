@@ -815,6 +815,7 @@ function writeLocalCatalogTarget(options) {
  *   guidedJourney?: Record<string, unknown>,
  *   verification?: Record<string, unknown>,
  *   productionProof?: Record<string, unknown>,
+ *   stages?: string[],
  * }} options
  */
 function writeLocalFullJourneyProfile(options) {
@@ -835,7 +836,18 @@ function writeLocalFullJourneyProfile(options) {
         mode: "ephemeral",
         runtime_root: ".aor",
       },
-      stages: ["bootstrap", "discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery", "learning"],
+      stages: options.stages ?? [
+        "bootstrap",
+        "discovery",
+        "spec",
+        "planning",
+        "handoff",
+        "execution",
+        "review",
+        "qa",
+        "delivery",
+        "learning",
+      ],
       verification: {
         eval_suites: ["suite.regress.short@v1"],
         harness: {
@@ -1400,6 +1412,23 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     assert.equal(summary.run_start_runtime_harness_decision, "pass");
     assert.equal(summary.latest_runtime_harness_decision, "pass");
     assert.equal(summary.quality_gate_decision, "pass");
+    assert.equal(summary.command_status, "pass");
+    assert.equal(summary.target_verification_status, "pass");
+    assert.equal(summary.artifact_quality_status, "pass");
+    assert.equal(summary.delivery_status, "materialized");
+    assert.equal(summary.coverage_status, "covered_pass");
+    assert.equal(summary.acceptance_status, "pass");
+    assert.equal(summary.run_tier, "acceptance");
+    assert.equal(summary.release_status, "not_attempted");
+    assert.equal(summary.proof_eligible_tier, true);
+    assert.equal(summary.required_matrix_acceptance_closed, true);
+    assert.equal(summary.canonical_status.required_matrix_acceptance_closed, true);
+    assert.equal(summary.delivery_manifest_file, summary.artifacts.delivery_manifest_file);
+    assert.equal(summary.review_report_file, summary.artifacts.review_report_file);
+    assert.equal(
+      summary.latest_runtime_harness_report_file,
+      summary.artifacts.latest_runtime_harness_report_file || summary.artifacts.runtime_harness_report_file,
+    );
     assert.equal(fs.existsSync(summary.artifacts.feature_request_file), true);
     assert.equal(summary.baseline_verify_summary_file, summary.artifacts.baseline_verify_summary_file);
     assert.equal(summary.post_run_verify_summary_file, summary.artifacts.post_run_verify_summary_file);
@@ -1449,6 +1478,11 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     assert.equal(targetScorecard.feature_mission_id, "local-mission");
     assert.equal(targetScorecard.run_start_runtime_harness_decision, "pass");
     assert.equal(targetScorecard.latest_runtime_harness_decision, "pass");
+    assert.equal(targetScorecard.coverage_status, "covered_pass");
+    assert.equal(targetScorecard.acceptance_status, "pass");
+    assert.equal(targetScorecard.release_status, "not_attempted");
+    assert.equal(targetScorecard.proof_eligible_tier, true);
+    assert.equal(targetScorecard.required_matrix_acceptance_closed, true);
     assert.deepEqual(learningScorecard.matrix_cell, summary.matrix_cell);
     assert.deepEqual(learningScorecard.coverage_follow_up, summary.coverage_follow_up);
     assert.deepEqual(learningHandoff.matrix_cell, summary.matrix_cell);
@@ -2238,8 +2272,245 @@ test("full-journey mode fails final verdict when post-run verification fails aft
     );
     assert.equal(summary.verdict_matrix.post_run_verification_status, "fail");
     assert.equal(summary.verdict_matrix.quality_gate_decision, "fail");
+    assert.equal(summary.command_status, "pass");
+    assert.equal(summary.target_verification_status, "fail");
+    assert.equal(summary.acceptance_status, "warn");
+    assert.equal(summary.coverage_status, "covered_with_findings");
     assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), true);
     assert.equal(summary.command_results.some((entry) => entry.label === "project-verify-post-run-primary"), true);
+  });
+});
+
+test("full-journey mode marks medium release intake without KPI and DoD as attempted failed", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const targetCatalogPath = path.join(catalogRoot, "targets", "local-target.yaml");
+    const targetCatalog = parseYaml(fs.readFileSync(targetCatalogPath, "utf8"));
+    targetCatalog.required_matrix_cells = [
+      {
+        cell_id: "local-target.release.medium.openai",
+        scenario_family: "release",
+        feature_size: "medium",
+        feature_mission_id: "local-mission",
+        provider_variant_id: "openai-primary",
+        coverage_tier: "required",
+      },
+    ];
+    targetCatalog.feature_missions[0].feature_size = "medium";
+    targetCatalog.feature_missions[0].supported_scenarios = ["release"];
+    targetCatalog.feature_missions[0].expected_evidence = ["review-report", "delivery-manifest", "release-packet"];
+    targetCatalog.feature_missions[0].post_run_quality = {
+      primary_commands: ['node -e "process.stdout.write(\'primary ok\\n\')"'],
+      diagnostic_commands: [],
+      diagnostic_failure_mode: "warn",
+    };
+    delete targetCatalog.feature_missions[0].goals;
+    delete targetCatalog.feature_missions[0].kpis;
+    delete targetCatalog.feature_missions[0].definition_of_done;
+    fs.writeFileSync(targetCatalogPath, stringifyYaml(targetCatalog), "utf8");
+
+    const profilePath = path.join(tempRoot, "full-journey.medium-release-incomplete-intake.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      scenarioFamily: "release",
+      outputPolicy: {
+        materialize_release_packet: true,
+      },
+      stages: [
+        "bootstrap",
+        "discovery",
+        "spec",
+        "planning",
+        "handoff",
+        "execution",
+        "review",
+        "qa",
+        "delivery",
+        "release",
+        "learning",
+      ],
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-medium-release-incomplete-intake",
+      catalogRoot,
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.artifacts.intake_quality_gate.status, "fail");
+    assert.deepEqual(summary.artifacts.intake_quality_gate.missing_fields, [
+      "goals",
+      "kpis",
+      "definition_of_done",
+    ]);
+    assert.equal(summary.artifact_quality_status, "fail");
+    assert.equal(summary.acceptance_status, "fail");
+    assert.equal(summary.coverage_status, "attempted_failed");
+    assert.equal(summary.required_matrix_acceptance_closed, false);
+    assert.equal(summary.canonical_status.required_matrix_acceptance_closed, false);
+    assert.equal(summary.command_results.some((entry) => entry.label === "release-prepare"), true);
+    assert.equal(summary.artifacts.release_status, "pass");
+    assert.equal(summary.verdict_matrix.delivery_release_quality, "pass");
+  });
+});
+
+test("full-journey mode marks failed release preparation as attempted failed after delivery", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const targetCatalogPath = path.join(catalogRoot, "targets", "local-target.yaml");
+    const targetCatalog = parseYaml(fs.readFileSync(targetCatalogPath, "utf8"));
+    targetCatalog.required_matrix_cells = [
+      {
+        cell_id: "local-target.release.medium.openai",
+        scenario_family: "release",
+        feature_size: "medium",
+        feature_mission_id: "local-mission",
+        provider_variant_id: "openai-primary",
+        coverage_tier: "required",
+      },
+    ];
+    targetCatalog.feature_missions[0] = {
+      ...targetCatalog.feature_missions[0],
+      feature_size: "medium",
+      goals: ["Prepare release-shaped evidence for one bounded local change."],
+      kpis: [
+        {
+          kpi_id: "local-release-lineage",
+          name: "Local release lineage",
+          target: "delivery and release evidence are materialized from the same target checkout",
+          measurement: "live E2E summary",
+        },
+      ],
+      definition_of_done: [
+        "Primary verification passes.",
+        "Delivery and release evidence remain target-local.",
+      ],
+      expected_evidence: ["review-report", "delivery-manifest", "release-packet"],
+      post_run_quality: {
+        primary_commands: ['node -e "process.stdout.write(\'primary ok\\n\')"'],
+        diagnostic_commands: [],
+        diagnostic_failure_mode: "warn",
+      },
+      supported_scenarios: ["release"],
+    };
+    fs.writeFileSync(targetCatalogPath, stringifyYaml(targetCatalog), "utf8");
+
+    const profilePath = path.join(tempRoot, "full-journey.medium-release-prepare-failure.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      scenarioFamily: "release",
+      outputPolicy: {
+        materialize_release_packet: true,
+      },
+      internalTestHooks: {
+        fail_release_prepare: true,
+      },
+      stages: [
+        "bootstrap",
+        "discovery",
+        "spec",
+        "planning",
+        "handoff",
+        "execution",
+        "review",
+        "qa",
+        "delivery",
+        "release",
+        "learning",
+      ],
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-medium-release-prepare-failure",
+      catalogRoot,
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "pass");
+    assert.equal(summary.artifacts.release_status, "fail");
+    assert.equal(summary.release_status, "fail");
+    assert.equal(summary.canonical_status.release_status, "fail");
+    assert.equal(summary.acceptance_status, "fail");
+    assert.equal(summary.coverage_status, "attempted_failed");
+    assert.equal(summary.required_matrix_acceptance_closed, false);
+    assert.equal(summary.canonical_status.required_matrix_acceptance_closed, false);
+    assert.equal(summary.artifacts.delivery_manifest_file, summary.delivery_manifest_file);
+    assert.equal(summary.stage_results.find((entry) => entry.stage === "release")?.status, "fail");
+  });
+});
+
+test("full-journey mode blocks Playwright cache failures before provider execution", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+      setupCommands: ["npx playwright install"],
+    });
+    const profilePath = path.join(tempRoot, "full-journey.browser-cache-failure.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      internalTestHooks: {
+        force_browser_cache_preflight_failure: true,
+      },
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-browser-cache-failure",
+      catalogRoot,
+    });
+
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(result.live_e2e_run_status, "not_pass");
+    assert.equal(summary.status, "not_pass");
+    assert.equal(summary.artifacts.browser_cache_preflight.status, "fail");
+    assert.equal(summary.command_results.some((entry) => entry.label === "project-init"), false);
+    assert.equal(summary.command_results.some((entry) => entry.label === "run-start"), false);
+    assert.equal(summary.coverage_status, "attempted_failed");
   });
 });
 
@@ -3316,6 +3587,10 @@ test("full-journey mode fails when delivery prepare is blocked", () => {
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
     assert.equal(summary.status, "warn");
     assert.equal(summary.command_results.some((entry) => entry.label === "deliver-prepare"), true);
+    assert.equal(summary.command_status, "pass");
+    assert.equal(summary.delivery_status, "blocked");
+    assert.equal(summary.acceptance_status, "warn");
+    assert.equal(summary.coverage_status, "covered_with_findings");
     assert.equal(summary.legacy_flow_status, "fail");
     assert.equal(summary.error, null);
   });

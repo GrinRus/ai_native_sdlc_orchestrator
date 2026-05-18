@@ -91,6 +91,14 @@ export function listChangedPaths(root) {
       const renameParts = candidate.split(" -> ");
       return renameParts.length > 1 ? renameParts[renameParts.length - 1] : candidate;
     })
+    .map((candidate) => {
+      if (!candidate.startsWith("\"") || !candidate.endsWith("\"")) return candidate;
+      try {
+        return /** @type {string} */ (JSON.parse(candidate));
+      } catch {
+        return candidate.slice(1, -1);
+      }
+    })
     .map((candidate) => candidate.replace(/\\/g, "/"));
   return { available: true, changedPaths };
 }

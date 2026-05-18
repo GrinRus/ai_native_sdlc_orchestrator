@@ -86,7 +86,8 @@ Canonical fixture bundle:
 Mandatory matrix axes:
 - `scenario_family`: `regress`, `release`, `repair`, `governance`
 - `provider_variant_id`: `openai-primary`, `anthropic-primary`, `open-code-primary`
-- `feature_size`: `small`, `medium`, `large`
+- `feature_size`: `small`, `medium`, `large`, with `xl` reserved for manual/overnight profiles
+- `run_tier`: `readme-smoke`, `bounded-live`, `full-journey-observation`, `acceptance`, `production-proof`
 
 Operational rules:
 - one live run proves exactly one pinned provider path;
@@ -94,6 +95,7 @@ Operational rules:
 - review and learning closure artifacts must carry `matrix_cell` and `coverage_follow_up`;
 - provider comparison coverage is required between `openai-primary` and `anthropic-primary` for at least one equivalent mission class per curated repo.
 - `openai-primary` and `anthropic-primary` are mandatory provider variants across comparison coverage; `open-code-primary` is extended candidate coverage until a future real-runner proof promotes it.
+- required matrix coverage closes only for `coverage_status=covered_pass` on `run_tier=acceptance` or `run_tier=production-proof`; warning runs remain `covered_with_findings`.
 
 ## W14-S07 refreshed matrix full-journey proof bundle (2026-04-24)
 
@@ -116,7 +118,7 @@ Observed artifact and closure guarantees:
 - review verdicts are backed by public `review-report` with `provider_traceability` and `feature_size_fit`;
 - closure is backed by public `audit runs` and `learning handoff`;
 - release-shaped proof keeps `delivery-manifest` and `release-packet` anchored to the target checkout;
-- the committed bundle proves all `9/9` required matrix cells, all `3/3` catalog provider-comparison pairs, and all mandatory scenario families.
+- the committed bundle exercises all `9/9` required matrix cells, all `3/3` catalog provider-comparison pairs, and all mandatory scenario families, but is historical `coverage_with_findings` evidence under the canonical status model. Required acceptance closure needs a current `covered_pass` run on `run_tier=acceptance` or `run_tier=production-proof`.
 
 Canonical fixture bundle:
 - `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`
