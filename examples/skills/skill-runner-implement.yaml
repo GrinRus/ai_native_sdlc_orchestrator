@@ -5,6 +5,8 @@ summary: implementation-focused runner workflow with explicit contract and verif
 activation_hints:
   - implement
 workflow:
+  - id: resolve-inputs
+    instruction: use concrete handoff and spec packet refs from request.context.required_inputs_resolved before globbing the repository
   - id: contract-first
     instruction: confirm contract and interface changes before implementation details
   - id: apply-change

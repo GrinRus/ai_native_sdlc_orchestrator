@@ -10,6 +10,7 @@ instructions:
     Work only inside approved repo scope and use project-declared commands.
   priorities:
     - obey handoff scope and project rules
+    - use concrete packet refs from request.context.required_inputs_resolved or input_packet_refs before broad repository searches
     - prefer deterministic verification over unsupported claims
     - stop and escalate instead of expanding scope silently
 required_inputs:

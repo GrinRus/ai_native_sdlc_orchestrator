@@ -88,6 +88,15 @@ function normalizeRefSuffix(value) {
   return value.replace(/[^a-zA-Z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
 }
 
+/**
+ * @param {string} packetRef
+ * @returns {string | null}
+ */
+function packetNameFromRef(packetRef) {
+  const match = /^packet:\/\/([^@\s/]+)(?:@[^\s]+)?$/u.exec(packetRef);
+  return match ? match[1] : null;
+}
+
 const STEP_RESULT_FILE_REGEX = /^step-result-.*\.json$/u;
 
 /**
@@ -162,6 +171,58 @@ function diffChangedPaths(before, after) {
  */
 function toEvidenceRef(projectRoot, filePath) {
   return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} sourceRef
+ * @returns {string}
+ */
+function normalizePacketSourceRef(projectRoot, sourceRef) {
+  if (sourceRef.startsWith("packet://")) {
+    return sourceRef;
+  }
+  if (path.isAbsolute(sourceRef)) {
+    return toEvidenceRef(projectRoot, sourceRef);
+  }
+  return sourceRef;
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} packetName
+ * @param {string | null} sourceRef
+ * @returns {string | null}
+ */
+function namedPacketRef(projectRoot, packetName, sourceRef) {
+  if (!sourceRef) {
+    return null;
+  }
+  const normalizedSourceRef = normalizePacketSourceRef(projectRoot, sourceRef);
+  return packetNameFromRef(normalizedSourceRef) === packetName
+    ? normalizedSourceRef
+    : `packet://${packetName}@${normalizedSourceRef}`;
+}
+
+/**
+ * Preserve the first ref for each packet name so concrete refs can override
+ * generic bootstrap refs such as packet://handoff.
+ *
+ * @param {string[]} packetRefs
+ * @returns {string[]}
+ */
+function uniquePacketRefsByName(packetRefs) {
+  const seenPacketNames = new Set();
+  const output = [];
+  for (const packetRef of packetRefs) {
+    const packetName = packetNameFromRef(packetRef);
+    if (!packetName || seenPacketNames.has(packetName)) {
+      continue;
+    }
+    seenPacketNames.add(packetName);
+    output.push(packetRef);
+  }
+  return output;
 }
 
 /**
@@ -327,6 +388,34 @@ function resolveSyntheticPacketRefs(assetResolution) {
   const requiredInputs = asRecord(promptProfile.required_inputs);
   const packets = asRecord(requiredInputs.packets);
   return uniqueStrings(packets.required).map((packetName) => `packet://${packetName}`);
+}
+
+/**
+ * @param {{
+ *   projectRoot: string,
+ *   assetResolution: Record<string, unknown>,
+ *   approvedHandoffRef?: string | null,
+ *   promotionEvidenceRefs?: string[],
+ *   runtimeEvidenceRefs?: string[],
+ * }} options
+ * @returns {string[]}
+ */
+function resolveStepInputPacketRefs(options) {
+  const concreteHandoffRef = namedPacketRef(
+    options.projectRoot,
+    "handoff",
+    asString(options.approvedHandoffRef),
+  );
+  const packetEvidenceRefs = uniqueStrings([
+    ...asStringArray(options.promotionEvidenceRefs),
+    ...asStringArray(options.runtimeEvidenceRefs),
+  ]).filter((entry) => packetNameFromRef(entry));
+
+  return uniquePacketRefsByName([
+    ...(concreteHandoffRef ? [concreteHandoffRef] : []),
+    ...packetEvidenceRefs,
+    ...resolveSyntheticPacketRefs(options.assetResolution),
+  ]);
 }
 
 /**
@@ -614,7 +703,11 @@ export function executeRoutedStep(options) {
   /** @type {string | null} */
   let compiledContextArtifactPath = null;
   /** @type {string[]} */
-  let evidenceRefs = uniqueStrings([init.projectProfilePath, ...asStringArray(options.runtimeEvidenceRefs)]);
+  let evidenceRefs = uniqueStrings([
+    init.projectProfilePath,
+    ...asStringArray(options.runtimeEvidenceRefs),
+    ...asStringArray(options.promotionEvidenceRefs),
+  ]);
   /** @type {"passed" | "failed"} */
   let status = "passed";
   let summary = dryRun
@@ -741,6 +834,7 @@ export function executeRoutedStep(options) {
         init.projectProfilePath,
         discoveryResult.reportPath,
         ...asStringArray(options.runtimeEvidenceRefs),
+        ...asStringArray(options.promotionEvidenceRefs),
       ]);
     }
     featureTraceability = asRecord(discoveryResult.report.feature_traceability);
@@ -798,7 +892,13 @@ export function executeRoutedStep(options) {
         adaptersRoot,
         adapterOverrides: options.adapterOverrides,
       });
-      const syntheticPacketRefs = resolveSyntheticPacketRefs(/** @type {Record<string, unknown>} */ (assetResolution));
+      const inputPacketRefs = resolveStepInputPacketRefs({
+        projectRoot: init.projectRoot,
+        assetResolution: /** @type {Record<string, unknown>} */ (assetResolution),
+        approvedHandoffRef,
+        promotionEvidenceRefs: asStringArray(options.promotionEvidenceRefs),
+        runtimeEvidenceRefs: asStringArray(options.runtimeEvidenceRefs),
+      });
       const compiled = compileStepContext({
         projectRoot: init.projectRoot,
         projectProfilePath: init.projectProfilePath,
@@ -806,7 +906,7 @@ export function executeRoutedStep(options) {
         routeResolution: /** @type {Record<string, unknown>} */ (routeResolution),
         assetResolution: /** @type {Record<string, unknown>} */ (assetResolution),
         policyResolution: /** @type {Record<string, unknown>} */ (policyResolution),
-        inputPacketRefs: syntheticPacketRefs,
+        inputPacketRefs,
         runtimeEvidenceRefs: evidenceRefs,
         skillsRoot,
       });
@@ -900,6 +1000,7 @@ export function executeRoutedStep(options) {
         ...new Set([
           init.projectProfilePath,
           ...asStringArray(options.runtimeEvidenceRefs),
+          ...asStringArray(options.promotionEvidenceRefs),
           ...(deliveryPlanResult ? [deliveryPlanResult.deliveryPlanFile] : []),
           ...(compiledContextRef ? [compiledContextRef] : []),
           ...(compiledContextArtifactPath ? [compiledContextArtifactPath] : []),

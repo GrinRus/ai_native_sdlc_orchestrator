@@ -52,6 +52,7 @@ function looksLikeEvidenceRef(value) {
   return (
     value.startsWith("evidence://") ||
     value.startsWith("compiled-context://") ||
+    value.startsWith("packet://") ||
     value.includes("/") ||
     value.includes("\\") ||
     /\.(json|jsonl|yaml|yml|patch|log)$/iu.test(value)
@@ -73,6 +74,32 @@ function collectStringRefs(value) {
     return Object.values(value).flatMap((entry) => collectStringRefs(entry));
   }
   return [];
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toProjectEvidenceRef(projectRoot, filePath) {
+  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} packetName
+ * @param {string | null | undefined} filePath
+ * @returns {string | null}
+ */
+function toPacketEvidenceRef(projectRoot, packetName, filePath) {
+  const concreteFilePath = asNonEmptyString(filePath);
+  if (!concreteFilePath) {
+    return null;
+  }
+  const sourceRef = path.isAbsolute(concreteFilePath)
+    ? toProjectEvidenceRef(projectRoot, concreteFilePath)
+    : concreteFilePath;
+  return `packet://${packetName}@${sourceRef}`;
 }
 
 /**
@@ -2351,11 +2378,17 @@ export function executeFullJourneyFlow(options) {
       "Approved handoff validated for execution start.",
     );
 
+    const specPacketEvidenceRef = toPacketEvidenceRef(
+      targetCheckout.targetCheckoutRoot,
+      "spec",
+      asNonEmptyString(artifacts.spec_step_result_file),
+    );
     const promotionEvidenceRefs = uniqueStrings([
       ...(artifacts.execution_readiness_file ? [/** @type {string} */ (artifacts.execution_readiness_file)] : []),
       ...(artifacts.baseline_routed_dry_run_step_result_file
         ? [/** @type {string} */ (artifacts.baseline_routed_dry_run_step_result_file)]
         : []),
+      ...(specPacketEvidenceRef ? [specPacketEvidenceRef] : []),
     ]);
 
     const runStart = runCommand("run-start", [
