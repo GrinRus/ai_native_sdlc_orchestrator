@@ -648,13 +648,13 @@ test("live adapter hard-kills external runners that ignore SIGTERM on timeout", 
   assert.equal(response.output.external_runner.signal, "SIGKILL");
 });
 
-test("live adapter applies resolved route timeout before adapter default timeout", () => {
+test("live adapter applies resolved route timeout when it is shorter than the adapter timeout", () => {
   const adapter = createLiveAdapter({
     adapterId: "claude-code",
     adapterProfile: buildExternalRunnerProfile({
       command: process.execPath,
-      args: ["-e", "setTimeout(() => process.stdout.write(JSON.stringify({status:'success'})), 50);"],
-      timeoutMs: 10,
+      args: ["-e", "setTimeout(() => process.stdout.write(JSON.stringify({status:'success'})), 10);"],
+      timeoutMs: 3000,
       handler: null,
     }),
   });
@@ -670,7 +670,7 @@ test("live adapter applies resolved route timeout before adapter default timeout
       policy_id: "policy.step.runner.default",
       resolved_bounds: {
         budget: {
-          timeout_sec: 3,
+          timeout_sec: 1,
         },
       },
     },
@@ -678,8 +678,43 @@ test("live adapter applies resolved route timeout before adapter default timeout
   });
 
   assert.equal(response.status, "success");
-  assert.equal(response.output.external_runner.timeout_ms, 3000);
+  assert.equal(response.output.external_runner.timeout_ms, 1000);
   assert.equal(response.output.external_runner.timed_out, false);
+});
+
+test("live adapter caps resolved route timeout at the adapter hard timeout", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "open-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "setTimeout(() => process.stdout.write(JSON.stringify({status:'success'})), 1000);"],
+      timeoutMs: 10,
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-live-route-timeout-cap",
+    run_id: "run-live-route-timeout-cap",
+    step_id: "step-live-route-timeout-cap",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: {
+      policy_id: "policy.step.runner.default",
+      resolved_bounds: {
+        budget: {
+          timeout_sec: 3,
+        },
+      },
+    },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "failed");
+  assert.equal(response.output.failure_kind, "external-runner-timeout");
+  assert.equal(response.output.external_runner.timeout_ms, 10);
+  assert.equal(response.output.external_runner.timed_out, true);
 });
 
 test("live adapter baseline accepts non-codex adapter ids when an external runner profile is supplied", () => {

@@ -83,7 +83,7 @@ function resolveRequestTimeoutMs(request, fallback) {
   if (typeof timeoutSec !== "number" || !Number.isFinite(timeoutSec) || timeoutSec <= 0) {
     return fallback;
   }
-  return Math.max(1, Math.floor(timeoutSec * 1000));
+  return Math.min(fallback, Math.max(1, Math.floor(timeoutSec * 1000)));
 }
 
 /**
