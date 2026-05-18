@@ -200,6 +200,7 @@ function buildScorecard(options) {
     typeof options.flowResult.artifacts.verdict_matrix === "object" && options.flowResult.artifacts.verdict_matrix
       ? asRecord(options.flowResult.artifacts.verdict_matrix)
       : {};
+  const canonicalStatus = asRecord(options.flowResult.artifacts.canonical_status);
   return {
     scorecard_id: `${options.runId}.scorecard.${asNonEmptyString(targetRepo.repo_id) || "target"}`,
     run_id: options.runId,
@@ -211,6 +212,7 @@ function buildScorecard(options) {
     feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
+    run_tier: asNonEmptyString(canonicalStatus.run_tier) || asNonEmptyString(options.flowResult.artifacts.run_tier) || null,
     flow_kind: options.profile.flow_kind ?? null,
     duration_class: options.profile.duration_class ?? null,
     matrix_cell:
@@ -225,6 +227,20 @@ function buildScorecard(options) {
     stage_counts: summarizeStageCounts(options.flowResult.stageResults),
     status: asNonEmptyString(options.flowResult.artifacts.live_e2e_observation_overall_status) || options.flowResult.status,
     legacy_flow_status: options.flowResult.status,
+    canonical_status: Object.keys(canonicalStatus).length > 0 ? canonicalStatus : null,
+    command_status: asNonEmptyString(canonicalStatus.command_status) || null,
+    target_verification_status: asNonEmptyString(canonicalStatus.target_verification_status) || null,
+    artifact_quality_status: asNonEmptyString(canonicalStatus.artifact_quality_status) || null,
+    delivery_status: asNonEmptyString(canonicalStatus.delivery_status) || null,
+    coverage_status: asNonEmptyString(canonicalStatus.coverage_status) || null,
+    acceptance_status: asNonEmptyString(canonicalStatus.acceptance_status) || null,
+    release_status: asNonEmptyString(canonicalStatus.release_status) || null,
+    proof_eligible_tier:
+      typeof canonicalStatus.proof_eligible_tier === "boolean" ? canonicalStatus.proof_eligible_tier : null,
+    required_matrix_acceptance_closed:
+      typeof canonicalStatus.required_matrix_acceptance_closed === "boolean"
+        ? canonicalStatus.required_matrix_acceptance_closed
+        : null,
     live_e2e_observation_report_file:
       asNonEmptyString(options.flowResult.artifacts.live_e2e_observation_report_file) || null,
     scenario_coverage_status: verdictMatrix.scenario_coverage_status ?? null,
@@ -453,6 +469,99 @@ function buildObservationReport(options) {
 }
 
 /**
+ * @param {Record<string, unknown>} profile
+ * @returns {string}
+ */
+function resolveSummaryRunTier(profile) {
+  const declared = asNonEmptyString(profile.run_tier);
+  if (declared) return declared;
+  if (asRecord(profile.production_proof).enabled === true) return "production-proof";
+  if (asNonEmptyString(profile.journey_mode) === "full-journey" || asNonEmptyString(profile.target_catalog_id)) {
+    return "acceptance";
+  }
+  return "bounded-live";
+}
+
+/**
+ * @param {Record<string, unknown>} diagnostic
+ * @returns {boolean}
+ */
+function commandCompletedForCanonicalStatus(diagnostic) {
+  return asNonEmptyString(diagnostic.status) === "pass" || diagnostic.accepted_nonzero_payload === true;
+}
+
+/**
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   flowResult: {
+ *     status: string,
+ *     commandResults: Array<Record<string, unknown>>,
+ *     artifacts: Record<string, unknown>,
+ *   },
+ *   observationStatus: string,
+ * }}
+ */
+function resolveSummaryCanonicalStatus(options) {
+  const existing = asRecord(options.flowResult.artifacts.canonical_status);
+  if (Object.keys(existing).length > 0) return existing;
+  const verdictMatrix = asRecord(options.flowResult.artifacts.verdict_matrix);
+  const commandStatus =
+    options.flowResult.commandResults.length > 0 &&
+    options.flowResult.commandResults.every((entry) => commandCompletedForCanonicalStatus(entry))
+      ? "pass"
+      : "fail";
+  const deliveryStatus = asNonEmptyString(options.flowResult.artifacts.delivery_manifest_file)
+    ? options.flowResult.artifacts.delivery_blocking === true ||
+      asNonEmptyString(options.flowResult.artifacts.delivery_quality_gate_status) === "not_pass"
+      ? "degraded"
+      : "materialized"
+    : "not_materialized";
+  const releaseRequired =
+    asNonEmptyString(options.profile.scenario_family) === "release" && asStringArray(options.profile.stages).includes("release");
+  const releaseStatus = releaseRequired
+    ? asNonEmptyString(options.flowResult.artifacts.release_status) || "fail"
+    : asNonEmptyString(options.flowResult.artifacts.release_status) || "not_attempted";
+  const releaseMissing = releaseRequired && releaseStatus !== "pass";
+  const acceptanceStatus =
+    releaseMissing
+      ? "fail"
+      : options.observationStatus === "pass"
+      ? "pass"
+      : options.observationStatus === "warn" && deliveryStatus !== "not_materialized"
+        ? "warn"
+        : "fail";
+  const runTier = resolveSummaryRunTier(options.profile);
+  const proofEligibleTier = runTier === "acceptance" || runTier === "production-proof";
+  const hasMatrixCell = Object.keys(asRecord(options.flowResult.artifacts.matrix_cell)).length > 0;
+  const coverageStatus = !hasMatrixCell
+    ? "not_attempted"
+    : acceptanceStatus === "pass" && proofEligibleTier
+      ? "covered_pass"
+      : acceptanceStatus === "warn" && deliveryStatus !== "not_materialized"
+        ? "covered_with_findings"
+        : "attempted_failed";
+  return {
+    command_status: commandStatus,
+    target_verification_status: asNonEmptyString(options.flowResult.artifacts.post_run_verify_status) || "not_attempted",
+    artifact_quality_status: asNonEmptyString(verdictMatrix.artifact_quality) || "not_attempted",
+    delivery_status: deliveryStatus,
+    coverage_status: coverageStatus,
+    acceptance_status: acceptanceStatus,
+    run_tier: runTier,
+    release_status: releaseStatus,
+    proof_eligible_tier: proofEligibleTier,
+    required_matrix_acceptance_closed: coverageStatus === "covered_pass" && proofEligibleTier,
+    findings: releaseMissing ? ["Required release stage did not materialize strict release-packet evidence."] : [],
+    summary:
+      acceptanceStatus === "pass"
+        ? "Live E2E acceptance evidence passed."
+        : acceptanceStatus === "warn"
+          ? "Live E2E reached delivery with findings; required matrix acceptance is not closed."
+          : "Live E2E did not meet acceptance requirements.",
+  };
+}
+
+/**
  * @param {{ runId: string, reportsRoot: string, stepMatrix: Array<Record<string, unknown>> }}
  */
 function writeAgentArtifactReviewRequest(options) {
@@ -562,6 +671,22 @@ function writeProofRunnerArtifacts(options) {
   if (productionProof) {
     options.flowResult.artifacts.production_proof = productionProof;
   }
+  const canonicalStatus = resolveSummaryCanonicalStatus({
+    profile: options.profile,
+    flowResult: options.flowResult,
+    observationStatus: observationReport.overall_status,
+  });
+  options.flowResult.artifacts.canonical_status = canonicalStatus;
+  options.flowResult.artifacts.command_status = canonicalStatus.command_status;
+  options.flowResult.artifacts.target_verification_status = canonicalStatus.target_verification_status;
+  options.flowResult.artifacts.artifact_quality_status = canonicalStatus.artifact_quality_status;
+  options.flowResult.artifacts.delivery_status = canonicalStatus.delivery_status;
+  options.flowResult.artifacts.coverage_status = canonicalStatus.coverage_status;
+  options.flowResult.artifacts.acceptance_status = canonicalStatus.acceptance_status;
+  options.flowResult.artifacts.run_tier = canonicalStatus.run_tier;
+  options.flowResult.artifacts.release_status = canonicalStatus.release_status;
+  options.flowResult.artifacts.proof_eligible_tier = canonicalStatus.proof_eligible_tier;
+  options.flowResult.artifacts.required_matrix_acceptance_closed = canonicalStatus.required_matrix_acceptance_closed;
 
   const summary = {
     run_id: options.runId,
@@ -574,12 +699,23 @@ function writeProofRunnerArtifacts(options) {
     feature_mission_id: options.flowResult.artifacts.feature_mission_id ?? options.profile.feature_mission_id ?? null,
     provider_variant_id: options.profile.provider_variant_id ?? null,
     feature_size: options.flowResult.artifacts.feature_size ?? null,
+    run_tier: canonicalStatus.run_tier,
     flow_kind: options.profile.flow_kind ?? null,
     duration_class: options.profile.duration_class ?? null,
     started_at: options.flowResult.startedAt,
     finished_at: options.flowResult.finishedAt,
     status: observationReport.overall_status,
     legacy_flow_status: options.flowResult.status,
+    canonical_status: canonicalStatus,
+    command_status: canonicalStatus.command_status,
+    target_verification_status: canonicalStatus.target_verification_status,
+    artifact_quality_status: canonicalStatus.artifact_quality_status,
+    delivery_status: canonicalStatus.delivery_status,
+    coverage_status: canonicalStatus.coverage_status,
+    acceptance_status: canonicalStatus.acceptance_status,
+    release_status: canonicalStatus.release_status,
+    proof_eligible_tier: canonicalStatus.proof_eligible_tier,
+    required_matrix_acceptance_closed: canonicalStatus.required_matrix_acceptance_closed,
     target_repo: asRecord(options.profile.target_repo),
     target_checkout_root:
       typeof options.flowResult.artifacts.target_checkout_root === "string"
@@ -655,9 +791,19 @@ function writeProofRunnerArtifacts(options) {
     production_proof_evidence_status: productionProof?.evidence_status ?? null,
     production_proof_evidence_refs: productionProof?.evidence_refs ?? null,
     no_upstream_write_assertion: productionProof?.no_upstream_write_assertion ?? null,
-    delivery_manifest_file: productionProof?.evidence_refs?.delivery_manifest_file ?? null,
-    review_report_file: productionProof?.evidence_refs?.review_report_file ?? null,
-    latest_runtime_harness_report_file: productionProof?.evidence_refs?.runtime_harness_report_file ?? null,
+    delivery_manifest_file:
+      productionProof?.evidence_refs?.delivery_manifest_file ??
+      asNonEmptyString(options.flowResult.artifacts.delivery_manifest_file) ??
+      null,
+    review_report_file:
+      productionProof?.evidence_refs?.review_report_file ??
+      asNonEmptyString(options.flowResult.artifacts.review_report_file) ??
+      null,
+    latest_runtime_harness_report_file:
+      productionProof?.evidence_refs?.runtime_harness_report_file ??
+      asNonEmptyString(options.flowResult.artifacts.latest_runtime_harness_report_file) ??
+      asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file) ??
+      null,
     coverage_follow_up:
       typeof options.flowResult.artifacts.coverage_follow_up === "object" && options.flowResult.artifacts.coverage_follow_up
         ? options.flowResult.artifacts.coverage_follow_up
@@ -893,6 +1039,8 @@ function runCli(rawArgs) {
         status: "ok",
         run_id: runId,
         live_e2e_run_status: written.summary.status,
+        acceptance_status: written.summary.acceptance_status,
+        coverage_status: written.summary.coverage_status,
         live_e2e_run_summary_file: written.summaryFile,
         live_e2e_observation_report_file: written.summary.live_e2e_observation_report_file,
         agent_artifact_review_request_file: written.summary.agent_artifact_review_request_file,

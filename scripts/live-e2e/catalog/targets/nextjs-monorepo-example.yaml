@@ -79,6 +79,17 @@ feature_missions:
     title: Repair one bounded workspace configuration or shared package seam
     brief: Fix one bounded monorepo breakage across a shared package and one consuming app or config boundary, with strong delivery and audit lineage.
     feature_size: medium
+    goals:
+      - Repair one bounded workspace configuration or shared package seam.
+      - Preserve monorepo lint, typecheck, and shared-package unit-smoke evidence.
+    kpis:
+      - kpi_id: nextjs-medium-repair-green
+        name: Medium monorepo repair gate
+        target: lint, typecheck, and shared-package unit smoke pass after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - The change stays inside bounded apps, packages, and tooling surfaces.
+      - Delivery and review evidence are anchored to the target checkout.
     allowed_paths:
       - apps/**
       - packages/**
@@ -98,6 +109,14 @@ feature_missions:
       - keep the change inside monorepo apps, packages, and bounded tooling surfaces
       - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
       - keep delivery evidence anchored to the target checkout
+    post_run_quality:
+      primary_commands:
+        - yarn g:lint
+        - yarn g:typecheck
+        - yarn workspace @your-org/ts-utils test-unit
+      diagnostic_commands:
+        - yarn workspace @your-org/core-lib test-unit
+      diagnostic_failure_mode: warn
     supported_scenarios:
       - repair
       - governance
@@ -115,6 +134,22 @@ feature_missions:
     title: Prepare one shared-package release-shaped change
     brief: Update one shared package and one consuming app with bounded release evidence and no upstream write-back.
     feature_size: large
+    goals:
+      - Prepare one shared-package release-shaped change across a bounded package/app boundary.
+      - Preserve release lineage without upstream write-back.
+    kpis:
+      - kpi_id: nextjs-release-lineage
+        name: Monorepo release lineage
+        target: delivery-manifest, release-packet, and review-report are materialized from the same target checkout
+        measurement: live E2E summary and delivery artifacts
+      - kpi_id: nextjs-release-quality
+        name: Monorepo release quality gate
+        target: lint, typecheck, and shared-package unit smoke pass after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - Bounded monorepo quality gates pass.
+      - Delivery and release packet evidence are anchored to the target checkout.
+      - No upstream write-back is attempted.
     allowed_paths:
       - apps/**
       - packages/**
@@ -131,6 +166,14 @@ feature_missions:
     acceptance_checks:
       - keep changes inside apps and packages only
       - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
+    post_run_quality:
+      primary_commands:
+        - yarn g:lint
+        - yarn g:typecheck
+        - yarn workspace @your-org/ts-utils test-unit
+        - yarn workspace @your-org/core-lib test-unit
+      diagnostic_commands: []
+      diagnostic_failure_mode: warn
     supported_scenarios:
       - release
       - governance

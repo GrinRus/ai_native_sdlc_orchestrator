@@ -51,6 +51,16 @@ feature_missions:
     title: Preserve narrow header-normalization regression coverage
     brief: Add or adjust one bounded regression test around header handling and the smallest source fix needed to satisfy it.
     feature_size: small
+    goals:
+      - Preserve one focused header-normalization behavior with a source or test change.
+    kpis:
+      - kpi_id: ky-header-regression-green
+        name: Header regression gate
+        target: npx ava test/headers.ts passes after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - The header regression gate, lint, and build commands pass.
+      - Review evidence links the changed paths to the catalog mission.
     allowed_paths:
       - source/**
       - test/**
@@ -93,6 +103,16 @@ feature_missions:
     title: Extend one bounded fetch-options regression across source and typings
     brief: Adjust one multi-file options-handling or retry-surface regression with matching tests and the smallest typing touch needed to keep the public API coherent.
     feature_size: medium
+    goals:
+      - Repair one bounded fetch-options or retry-surface regression across source, tests, and type surface.
+    kpis:
+      - kpi_id: ky-fetch-options-bounded-green
+        name: Bounded fetch-options gate
+        target: lint, build, and targeted AVA coverage pass after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - The change stays inside source, tests, and public type surface.
+      - Bounded primary verification passes and full npm test is recorded as diagnostic evidence.
     allowed_paths:
       - source/**
       - test/**
@@ -110,8 +130,16 @@ feature_missions:
       - delivery-manifest
     acceptance_checks:
       - keep the fix inside source, tests, and type surface only
-      - preserve npm test as the primary regression gate
+      - preserve npm test as full-suite diagnostic evidence
       - keep delivery evidence anchored to the target checkout
+    post_run_quality:
+      primary_commands:
+        - npx xo
+        - npm run build
+        - npx ava test/main.ts test/hooks.ts
+      diagnostic_commands:
+        - npm test
+      diagnostic_failure_mode: warn
     supported_scenarios:
       - regress
       - repair
@@ -129,6 +157,22 @@ feature_missions:
     title: Prepare one release-shaped typed API adjustment
     brief: Land one bounded API or typing fix with matching regression coverage and release-ready lineage.
     feature_size: medium
+    goals:
+      - Land one release-shaped API or typing adjustment with matching regression evidence.
+      - Preserve patch-only delivery and release lineage without upstream write-back.
+    kpis:
+      - kpi_id: ky-release-typing-lineage
+        name: Release typing lineage
+        target: delivery-manifest, release-packet, and review-report are materialized from the same target checkout
+        measurement: live E2E summary and delivery artifacts
+      - kpi_id: ky-release-bounded-quality
+        name: Bounded release quality gate
+        target: lint, build, and targeted AVA coverage pass after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - Bounded primary verification passes and full npm test is preserved as diagnostic evidence.
+      - Delivery and release packet evidence are anchored to the target checkout.
+      - No upstream write-back is attempted.
     allowed_paths:
       - source/**
       - test/**
@@ -146,6 +190,14 @@ feature_missions:
     acceptance_checks:
       - keep release evidence anchored to the target checkout
       - avoid any upstream write-back
+    post_run_quality:
+      primary_commands:
+        - npx xo
+        - npm run build
+        - npx ava test/hooks.ts
+      diagnostic_commands:
+        - npm test
+      diagnostic_failure_mode: warn
     supported_scenarios:
       - release
       - governance
@@ -163,6 +215,17 @@ feature_missions:
     title: Exercise one broader retry and hooks governance-safe change
     brief: Touch one broader request lifecycle surface with bounded regression coverage, stricter audit expectations, and no control-plane leakage.
     feature_size: large
+    goals:
+      - Exercise one broader retry or hooks lifecycle change with governance-safe evidence.
+      - Keep audit, review, and learning closure linked to the target checkout.
+    kpis:
+      - kpi_id: ky-governance-lineage
+        name: Governance lineage
+        target: review, delivery, audit, and learning artifacts preserve the same matrix cell
+        measurement: scenario coverage and artifact consistency checks
+    definition_of_done:
+      - Bounded primary verification passes and diagnostic full-suite output is recorded.
+      - Governance, audit, and learning evidence links back to the mission and target checkout.
     allowed_paths:
       - source/**
       - test/**
@@ -183,6 +246,14 @@ feature_missions:
       - preserve repo-local request lifecycle boundaries
       - keep governance and audit evidence linked to the target checkout
       - avoid any upstream write-back
+    post_run_quality:
+      primary_commands:
+        - npx xo
+        - npm run build
+        - npx ava test/main.ts test/hooks.ts
+      diagnostic_commands:
+        - npm test
+      diagnostic_failure_mode: warn
     supported_scenarios:
       - governance
       - repair

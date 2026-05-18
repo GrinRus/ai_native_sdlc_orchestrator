@@ -18,6 +18,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `scenario family`
   - `provider variant`
   - `feature size`
+  - `run tier`
 
 ## Target 1 — `sindresorhus/ky`
 - Catalog id: `ky`
@@ -148,6 +149,24 @@ Provider comparison rule:
 - every curated repo must prove at least one equivalent mission class on both `openai-primary` and `anthropic-primary`.
 - `openai-primary` and `anthropic-primary` are mandatory provider variants for W14 matrix coverage.
 - `open-code-primary` remains extended candidate coverage after W22-S03, including the cataloged `ky.regress.small.open-code` cell; required OpenCode baseline certification awaits a future real-runner proof.
+
+Feature-size taxonomy:
+- `small`: one focused behavior surface, usually 1-2 files and one targeted regression.
+- `medium`: bounded source plus test/type integration, usually 3-6 files.
+- `large`: cross-package or release/governance lineage with broader artifact expectations.
+- `xl`: manual or overnight rehearsal only; do not add xl cells to required coverage.
+
+Run-tier taxonomy:
+- `readme-smoke`: README-led no-write installed-user path.
+- `bounded-live`: fast fail-closed provider proof.
+- `full-journey-observation`: delivery-reaching evidence with findings allowed.
+- `acceptance`: required matrix closure when canonical status is fully passing.
+- `production-proof`: strict real-runner proof with no mock and no upstream writes.
+
+Required matrix closure rule:
+- `coverage_status=covered_pass` closes required coverage only for `run_tier=acceptance` or `run_tier=production-proof`.
+- `coverage_status=covered_with_findings` is useful evidence but must not be reported as completed acceptance.
+- `coverage_status=attempted_failed` means the matrix cell was attempted and did not close.
 
 Canonical matrix-cell examples:
 - `small/regress/openai-primary`: `full-journey-regress-ky.yaml`

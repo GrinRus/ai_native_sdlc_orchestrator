@@ -134,6 +134,35 @@ function hasNonEmptyPermissionDenials(value) {
 }
 
 /**
+ * @param {string} text
+ * @returns {string}
+ */
+function stripBenignInteractiveNegations(text) {
+  return text
+    .replace(/\bdo not ask (?:any )?(?:clarifying )?questions?\b/giu, "")
+    .replace(/\bdon't ask (?:any )?(?:clarifying )?questions?\b/giu, "")
+    .replace(/\bwithout (?:any )?(?:clarifying )?questions?\b/giu, "")
+    .replace(/\bno (?:clarifying )?questions?(?:\s+or\s+interactive prompts?)?\b/giu, "")
+    .replace(/\bno interactive prompts?\b/giu, "")
+    .replace(/\bwithout (?:any )?interactive prompts?\b/giu, "");
+}
+
+/**
+ * @param {string} combined
+ * @returns {boolean}
+ */
+function hasInteractiveQuestionRequest(combined) {
+  const normalized = stripBenignInteractiveNegations(combined);
+  return (
+    normalized.includes("askuserquestion") ||
+    normalized.includes("ask user question") ||
+    normalized.includes("clarifying question") ||
+    normalized.includes("requires user input") ||
+    normalized.includes("interactive prompt")
+  );
+}
+
+/**
  * @param {{ stdout?: string, stderr?: string, errorMessage?: string | null, defaultFailureKind: string, ignoreAuthFailure?: boolean }} options
  * @returns {string}
  */
@@ -152,13 +181,7 @@ export function classifyExternalRunnerFailure(options) {
   )) {
     return "auth-failed";
   }
-  if (
-    combined.includes("askuserquestion") ||
-    combined.includes("ask user question") ||
-    combined.includes("clarifying question") ||
-    combined.includes("requires user input") ||
-    combined.includes("interactive prompt")
-  ) {
+  if (hasInteractiveQuestionRequest(combined)) {
     return "interactive-question-requested";
   }
   if (
@@ -206,13 +229,7 @@ function classifyStructuredRunnerFailure(options) {
     runnerToolTraces: Array.isArray(options.runnerToolTraces) ? options.runnerToolTraces : [],
   }).toLowerCase();
 
-  if (
-    combined.includes("askuserquestion") ||
-    combined.includes("ask user question") ||
-    combined.includes("clarifying question") ||
-    combined.includes("requires user input") ||
-    combined.includes("interactive prompt")
-  ) {
+  if (hasInteractiveQuestionRequest(combined)) {
     return "interactive-question-requested";
   }
   if (

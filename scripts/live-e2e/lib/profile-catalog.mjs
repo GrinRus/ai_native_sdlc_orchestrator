@@ -248,7 +248,7 @@ export function loadCatalogProviderVariant(options) {
  * @returns {boolean}
  */
 function isFeatureSize(value) {
-  return value === "small" || value === "medium" || value === "large";
+  return value === "small" || value === "medium" || value === "large" || value === "xl";
 }
 
 /**
@@ -470,7 +470,7 @@ export function resolveFullJourneyProfile(options) {
   const featureSize = asNonEmptyString(asRecord(mission).feature_size);
   if (!isFeatureSize(featureSize)) {
     throw new UsageError(
-      `Feature mission '${featureMissionId}' in catalog '${targetCatalogId}' must declare feature_size as small, medium, or large.`,
+      `Feature mission '${featureMissionId}' in catalog '${targetCatalogId}' must declare feature_size as small, medium, large, or xl.`,
     );
   }
   const supportedScenarios = asStringArray(asRecord(mission).supported_scenarios);
