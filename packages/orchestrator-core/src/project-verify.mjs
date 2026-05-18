@@ -200,6 +200,16 @@ function inferMissingPrerequisites(command, commandRun) {
 }
 
 /**
+ * @returns {NodeJS.ProcessEnv}
+ */
+function buildVerificationCommandEnv() {
+  const env = { ...process.env };
+  delete env.NODE_COMPILE_CACHE;
+  env.NODE_DISABLE_COMPILE_CACHE = "1";
+  return env;
+}
+
+/**
  * @param {{
  *   runtimeLayout: { reportsRoot: string },
  *   runId: string,
@@ -369,6 +379,7 @@ export function verifyProjectRuntime(options = {}) {
         cwd: workspaceIsolation.executionRoot,
         shell: true,
         encoding: "utf8",
+        env: buildVerificationCommandEnv(),
       });
 
       const transcript = [
@@ -379,6 +390,7 @@ export function verifyProjectRuntime(options = {}) {
         `repo_scope: ${item.repoId}`,
         `execution_root: ${workspaceIsolation.executionRoot}`,
         `execution_isolation_mode: ${workspaceIsolation.mode}`,
+        "node_compile_cache: disabled",
         `exit_code: ${commandRun.status ?? -1}`,
         "stdout:",
         commandRun.stdout ?? "",

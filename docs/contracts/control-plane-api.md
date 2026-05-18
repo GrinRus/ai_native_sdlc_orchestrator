@@ -84,6 +84,7 @@ Project bootstrap baseline:
 - `project init` may materialize a clean target repo through public bootstrap flags only;
 - `project init` accepts optional repo verification overrides via repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs so curated live E2E targets can preserve required setup and verification commands without proof-runner-side profile generation.
 - `project verify` accepts `verification_label` plus repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs. Labels separate baseline diagnostics, primary post-run gates, and diagnostic full-suite evidence while preserving command source in the verify summary.
+- `project verify` disables inherited Node compile-cache state for target commands so AOR runtime/session caches cannot contaminate package-manager, lint, test, or build execution in target checkouts.
 
 ## Query families
 - projects

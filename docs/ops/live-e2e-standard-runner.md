@@ -134,6 +134,7 @@ Full-journey layer:
 - materializes provider-pinned route overrides for the selected provider variant before execution starts;
 - writes an execution-readiness decision before `run start` so promotion evidence is based on readiness and routed dry-run proof, not on a failed baseline target check;
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
+- runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - may still run legacy audit or learning diagnostics after delivery for compatibility, but `release` and `learning` are excluded from the v1 observation matrix.
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
