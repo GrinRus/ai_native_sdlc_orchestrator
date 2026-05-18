@@ -620,6 +620,34 @@ test("live adapter reports timeout distinctly from launch failures", () => {
   assert.equal(response.output.external_runner.timed_out, true);
 });
 
+test("live adapter hard-kills external runners that ignore SIGTERM on timeout", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "process.on('SIGTERM', () => {}); setTimeout(() => {}, 1000);"],
+      timeoutMs: 10,
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-live-timeout-hard-kill",
+    run_id: "run-live-timeout-hard-kill",
+    step_id: "step-live-timeout-hard-kill",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "failed");
+  assert.equal(response.output.failure_kind, "external-runner-timeout");
+  assert.equal(response.output.external_runner.timed_out, true);
+  assert.equal(response.output.external_runner.signal, "SIGKILL");
+});
+
 test("live adapter applies resolved route timeout before adapter default timeout", () => {
   const adapter = createLiveAdapter({
     adapterId: "claude-code",

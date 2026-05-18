@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -511,6 +512,37 @@ function resolveBaselineGateMode(profile) {
 }
 
 /**
+ * @param {string} value
+ * @param {number} maxLength
+ * @returns {string}
+ */
+function truncateToken(value, maxLength) {
+  return value.length <= maxLength ? value : value.slice(0, maxLength).replace(/[._-]+$/u, "");
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function shortHash(value) {
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
+}
+
+/**
+ * @param {{ sourcePath: string, runId: string, phase: string, index: number }} options
+ * @returns {string}
+ */
+function preservedRuntimeFileName(options) {
+  const extension = path.extname(options.sourcePath) || ".json";
+  const sourceBase = path.basename(options.sourcePath, extension);
+  const phaseToken = truncateToken(normalizeId(options.phase), 32) || "runtime";
+  const runToken = truncateToken(normalizeId(options.runId), 72) || "run";
+  const sourceToken = truncateToken(normalizeId(sourceBase), 96) || "artifact";
+  const digest = shortHash(`${options.runId}\n${options.sourcePath}`);
+  return `live-e2e-${phaseToken}-${runToken}-${String(options.index).padStart(2, "0")}-${sourceToken}-${digest}${extension}`;
+}
+
+/**
  * @param {{ sourcePath: string | null, destinationRoot: string, runId: string, phase: string, index: number }} options
  * @returns {string | null}
  */
@@ -519,7 +551,12 @@ function preserveRuntimeFile(options) {
   if (!sourcePath || !fileExists(sourcePath)) return null;
   const destination = path.join(
     options.destinationRoot,
-    `live-e2e-${normalizeId(options.phase)}-${normalizeId(options.runId)}-${String(options.index).padStart(2, "0")}-${path.basename(sourcePath)}`,
+    preservedRuntimeFileName({
+      sourcePath,
+      runId: options.runId,
+      phase: options.phase,
+      index: options.index,
+    }),
   );
   fs.copyFileSync(sourcePath, destination);
   return destination;

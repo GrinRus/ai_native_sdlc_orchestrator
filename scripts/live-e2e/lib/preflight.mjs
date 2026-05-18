@@ -278,11 +278,13 @@ export function runLiveAdapterPreflight(options) {
       encoding: "utf8",
       input: buildProbeInput(kind, objective, extraRequest),
       timeout: probeTimeoutMs,
+      killSignal: "SIGKILL",
       maxBuffer: 1024 * 1024,
     });
     const probeError = probe.error instanceof Error ? probe.error : null;
     const probeTimedOut =
-      probeError?.code === "ETIMEDOUT" || (probe.signal === "SIGTERM" && probe.status === null);
+      probeError?.code === "ETIMEDOUT" ||
+      ((probe.signal === "SIGTERM" || probe.signal === "SIGKILL") && probe.status === null);
     const commandFailed = probeError !== null || probeTimedOut || probe.status !== 0;
     const stdout = probe.stdout ?? "";
     const stderr = probe.stderr ?? "";

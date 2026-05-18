@@ -879,13 +879,15 @@ export function createLiveAdapter(options) {
         encoding: "utf8",
         input: requestViaStdin ? `${JSON.stringify(runnerInput)}\n` : undefined,
         timeout: requestTimeoutMs,
+        killSignal: "SIGKILL",
         maxBuffer: 10 * 1024 * 1024,
       });
       const finishedAt = new Date().toISOString();
 
       const invocationError = invocation.error instanceof Error ? invocation.error : null;
       const invocationTimedOut =
-        invocationError?.code === "ETIMEDOUT" || (invocation.signal === "SIGTERM" && invocation.status === null);
+        invocationError?.code === "ETIMEDOUT" ||
+        ((invocation.signal === "SIGTERM" || invocation.signal === "SIGKILL") && invocation.status === null);
       const invocationFailed = invocationError !== null || invocation.status !== 0;
       const stdout = typeof invocation.stdout === "string" ? invocation.stdout : "";
       const stderr = typeof invocation.stderr === "string" ? invocation.stderr : "";

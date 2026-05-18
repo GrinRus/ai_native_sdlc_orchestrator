@@ -602,6 +602,7 @@ function configureClaudeExternalRuntimePermissionMarkerTimeout(options) {
       [
         "const fs=require('node:fs');",
         "const path=require('node:path');",
+        "process.on('SIGTERM',()=>{});",
         "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
         "const request=input.request||{};",
         ...permissionProbeSnippet(),
@@ -1319,12 +1320,14 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
       catalogId: "local-target",
       missionId: "local-mission",
     });
+    const runId =
+      "live-e2e.full-journey.regress.ky.medium.anthropic.run-518072917593";
 
     const result = runProofRunner({
       runtimeRoot: path.join(tempRoot, "runtime"),
       examplesRoot,
       profilePath,
-      runId: "full-journey-local",
+      runId,
       catalogRoot,
     });
     assert.equal(
@@ -1435,6 +1438,12 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     assert.equal(fs.existsSync(summary.artifacts.baseline_verify_summary_file), true);
     assert.equal(fs.existsSync(summary.artifacts.post_run_verify_summary_file), true);
     assert.equal(fs.existsSync(summary.artifacts.execution_readiness_file), true);
+    assert.equal(
+      summary.artifacts.baseline_verify_preserved_files.every(
+        (filePath) => path.basename(filePath).length <= 240,
+      ),
+      true,
+    );
     assert.equal(fs.existsSync(summary.runtime_harness_report_file), true);
     assert.equal(summary.verdict_matrix.runtime_harness_decision, "pass");
     assert.equal(fs.existsSync(summary.learning_loop_handoff_file), true);
