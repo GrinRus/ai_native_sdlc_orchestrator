@@ -1438,6 +1438,37 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     assert.equal(fs.existsSync(summary.artifacts.baseline_verify_summary_file), true);
     assert.equal(fs.existsSync(summary.artifacts.post_run_verify_summary_file), true);
     assert.equal(fs.existsSync(summary.artifacts.execution_readiness_file), true);
+    assert.equal(fs.existsSync(summary.artifacts.spec_step_result_file), true);
+    assert.equal(fs.existsSync(summary.artifacts.approved_handoff_packet_file), true);
+    assert.equal(fs.existsSync(summary.artifacts.routed_step_result_file), true);
+    const routedStepResult = JSON.parse(fs.readFileSync(summary.artifacts.routed_step_result_file, "utf8"));
+    const targetCheckoutRoot = fs.realpathSync.native(summary.target_checkout_root);
+    const expectedSpecPacketRef =
+      `packet://spec@evidence://${path
+        .relative(targetCheckoutRoot, fs.realpathSync.native(summary.artifacts.spec_step_result_file))
+        .replace(/\\/gu, "/")}`;
+    const expectedHandoffPacketRef =
+      `packet://handoff@evidence://${path
+        .relative(targetCheckoutRoot, fs.realpathSync.native(summary.artifacts.approved_handoff_packet_file))
+        .replace(/\\/gu, "/")}`;
+    assert.equal(
+      routedStepResult.routed_execution.adapter_request.input_packet_refs.includes(expectedSpecPacketRef),
+      true,
+    );
+    assert.equal(
+      routedStepResult.routed_execution.adapter_request.input_packet_refs.includes(expectedHandoffPacketRef),
+      true,
+    );
+    const requiredPacketRefs =
+      routedStepResult.routed_execution.adapter_request.context.required_inputs_resolved.packets.required;
+    assert.equal(
+      requiredPacketRefs.find((entry) => entry.packet === "spec")?.resolved_ref,
+      expectedSpecPacketRef,
+    );
+    assert.equal(
+      requiredPacketRefs.find((entry) => entry.packet === "handoff")?.resolved_ref,
+      expectedHandoffPacketRef,
+    );
     assert.equal(
       summary.artifacts.baseline_verify_preserved_files.every(
         (filePath) => path.basename(filePath).length <= 240,

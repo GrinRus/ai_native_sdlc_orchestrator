@@ -77,12 +77,26 @@ function collectStringRefs(value) {
 }
 
 /**
+ * @param {string} filePath
+ * @returns {string}
+ */
+function canonicalEvidencePath(filePath) {
+  try {
+    return fs.realpathSync.native(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+
+/**
  * @param {string} projectRoot
  * @param {string} filePath
  * @returns {string}
  */
 function toProjectEvidenceRef(projectRoot, filePath) {
-  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+  return `evidence://${path
+    .relative(canonicalEvidencePath(projectRoot), canonicalEvidencePath(filePath))
+    .replace(/\\/g, "/")}`;
 }
 
 /**
