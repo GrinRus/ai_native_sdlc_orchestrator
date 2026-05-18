@@ -1,10 +1,10 @@
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
 import {
   classifyExternalRunnerFailure,
+  runExternalRuntimeProcessSync,
   resolveExternalRuntimePermissionPolicy,
 } from "../../../packages/adapter-sdk/src/index.mjs";
 import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
@@ -272,13 +272,13 @@ export function runLiveAdapterPreflight(options) {
     },
   })}\n`;
   const runProbeAttempt = (kind, attempt, objective, extraRequest = {}) => {
-    const probe = spawnSync(resolvedCommand, runtimeInvocation.args, {
+    const probe = runExternalRuntimeProcessSync({
+      command: resolvedCommand,
+      args: runtimeInvocation.args,
       cwd: options.targetCheckoutRoot,
       env: runnerEnv,
-      encoding: "utf8",
       input: buildProbeInput(kind, objective, extraRequest),
       timeout: probeTimeoutMs,
-      killSignal: "SIGKILL",
       maxBuffer: 1024 * 1024,
     });
     const probeError = probe.error instanceof Error ? probe.error : null;

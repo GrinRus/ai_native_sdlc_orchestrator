@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -646,6 +647,50 @@ test("live adapter hard-kills external runners that ignore SIGTERM on timeout", 
   assert.equal(response.output.failure_kind, "external-runner-timeout");
   assert.equal(response.output.external_runner.timed_out, true);
   assert.equal(response.output.external_runner.signal, "SIGKILL");
+});
+
+test("live adapter kills external runner process groups on timeout", () => {
+  const markerFile = path.join(os.tmpdir(), `aor-adapter-orphan-${process.pid}-${Date.now()}.txt`);
+  const orphanScript = [
+    "const fs = require('node:fs');",
+    `setTimeout(() => fs.writeFileSync(${JSON.stringify(markerFile)}, 'survived'), 200);`,
+    "setTimeout(() => {}, 1000);",
+  ].join("");
+  const runnerScript = [
+    "const { spawn } = require('node:child_process');",
+    `spawn(process.execPath, ['-e', ${JSON.stringify(orphanScript)}], { stdio: 'ignore' });`,
+    "setTimeout(() => {}, 1000);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "open-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", runnerScript],
+      timeoutMs: 10,
+      handler: null,
+    }),
+  });
+
+  try {
+    const response = adapter.execute({
+      request_id: "req-live-timeout-process-group",
+      run_id: "run-live-timeout-process-group",
+      step_id: "step-live-timeout-process-group",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "failed");
+    assert.equal(response.output.failure_kind, "external-runner-timeout");
+    assert.equal(response.output.external_runner.timed_out, true);
+    spawnSync(process.execPath, ["-e", "setTimeout(() => {}, 350);"]);
+    assert.equal(fs.existsSync(markerFile), false);
+  } finally {
+    fs.rmSync(markerFile, { force: true });
+  }
 });
 
 test("live adapter applies resolved route timeout when it is shorter than the adapter timeout", () => {
