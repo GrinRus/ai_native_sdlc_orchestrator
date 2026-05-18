@@ -43,7 +43,7 @@ function withTempRepo(callback) {
   try {
     callback(repoRoot);
   } finally {
-    fs.rmSync(repoRoot, { recursive: true, force: true });
+    fs.rmSync(repoRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 }
 
