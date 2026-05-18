@@ -11,7 +11,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
 - Never push to upstream public repositories by default.
 - Mandatory full-journey live E2E is allowed only on curated catalog targets and curated feature missions.
 - Full-journey runs must generate the feature request and discovery/spec/handoff during the run.
-- Always materialize review, QA, and delivery artifacts for full-journey observation runs; learning closure artifacts are legacy diagnostics outside the v1 observation matrix.
+- Always materialize review, QA, and delivery artifacts for full-journey observation runs; release and learning become observed steps when the profile declares `live_e2e.flow_range_policy=full_lifecycle`.
 - Every mandatory full-journey run must resolve one curated matrix cell:
   - `repo`
   - `feature mission`
@@ -186,6 +186,6 @@ All targets reuse the same baseline before execution-style stages:
 5. verify
 6. continue only when no-write safety gates pass
 
-For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. For bounded profiles, the default is `blocking`. Post-run verification remains mandatory quality evidence for full-journey observation, but failed post-run checks downgrade the observation to `warn` when delivery evidence materializes.
+For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. For bounded profiles, the default is `blocking`. Post-run verification remains mandatory quality evidence for full-journey observation and contributes directly to the step journal and final analysis.
 
 See `docs/ops/live-e2e-no-write-preflight.md` for the reusable bounded procedure.

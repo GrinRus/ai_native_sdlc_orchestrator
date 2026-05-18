@@ -81,7 +81,7 @@ Production-candidate proof is reviewable through:
 - `docs/backlog/self-hosted-production-readiness.md`
 - `docs/product/user-story-coverage-matrix.md`
 
-The proof must remain non-mock, code-changing, `external_runner_mode=real-external-process`, `real_code_change_proof_complete=true`, `overall_verdict=pass`, and no-upstream-write.
+The proof must remain non-mock, code-changing, `external_runner_mode=real-external-process`, `real_code_change_proof_complete=true`, `overall_status=pass`, and no-upstream-write.
 
 ## Non-goals
 

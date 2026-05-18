@@ -147,14 +147,47 @@ export function loadProofRunnerProfile(options) {
 
   for (const candidate of candidates) {
     if (fileExists(candidate)) {
+      const profile = readYamlDocument(candidate);
+      assertLiveE2ePolicy(profile, candidate);
       return {
         profilePath: candidate,
-        profile: readYamlDocument(candidate),
+        profile,
       };
     }
   }
 
   throw new UsageError(`Profile '${options.profileRef}' was not found from cwd or host project root.`);
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {string} source
+ */
+function assertLiveE2ePolicy(profile, source) {
+  const profileId = asNonEmptyString(profile.profile_id) || path.basename(source);
+  const policy = asRecord(profile.live_e2e);
+  const flowRangePolicy = asNonEmptyString(policy.flow_range_policy);
+  const interactionCapability = asNonEmptyString(policy.interaction_capability);
+  const frontendCapability = asNonEmptyString(policy.frontend_capability);
+  const safetyPolicy = asNonEmptyString(policy.safety_policy);
+  const problems = [];
+
+  if (!["delivery_default", "full_lifecycle"].includes(flowRangePolicy)) {
+    problems.push("live_e2e.flow_range_policy must be delivery_default or full_lifecycle");
+  }
+  if (!["public-control-plane"].includes(interactionCapability)) {
+    problems.push("live_e2e.interaction_capability must be public-control-plane");
+  }
+  if (!["none", "guided-web-smoke"].includes(frontendCapability)) {
+    problems.push("live_e2e.frontend_capability must be none or guided-web-smoke");
+  }
+  if (!["no-upstream-write"].includes(safetyPolicy)) {
+    problems.push("live_e2e.safety_policy must be no-upstream-write");
+  }
+
+  if (problems.length > 0) {
+    throw new UsageError(`Live E2E profile '${profileId}' is missing black-box step-loop policy: ${problems.join("; ")}.`);
+  }
 }
 
 /**

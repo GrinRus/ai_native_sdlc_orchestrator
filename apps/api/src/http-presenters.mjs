@@ -60,7 +60,7 @@ export function toLifecycleCommandResponse(result) {
 }
 
 /**
- * @param {{ runId: string, interactionId: string, interactionStatus: string, answerAccepted: boolean, answerAuditFile: string, answerAuditRef: string, stepResultFile: string, stepResultRef: string, runControlTransition: unknown, blocked: boolean, blockedReason: Record<string, unknown> | null, evidenceEvent: { event_id: string }, stepEvent: { event_id: string }, blockedEvent?: { event_id: string }, warningEvent: { event_id: string }, streamLogFile: string }} result
+ * @param {{ runId: string, interactionId: string, interactionStatus: string, answerAccepted: boolean, answerAuditFile: string, answerAuditRef: string, stepResultFile: string, stepResultRef: string, runControlTransition: unknown, blocked: boolean, blockedReason: Record<string, unknown> | null, evidenceEvent: { event_id: string }, stepEvent: { event_id: string }, resumedEvent?: { event_id: string }, blockedEvent?: { event_id: string } | null, warningEvent?: { event_id: string } | null, streamLogFile: string }} result
  * @returns {Record<string, unknown>}
  */
 export function toInteractionAnswerResponse(result) {
@@ -78,8 +78,9 @@ export function toInteractionAnswerResponse(result) {
     blocked_reason: result.blockedReason,
     evidence_event_id: result.evidenceEvent.event_id,
     step_event_id: result.stepEvent.event_id,
+    resumed_event_id: result.resumedEvent?.event_id ?? null,
     blocked_event_id: result.blockedEvent?.event_id ?? null,
-    warning_event_id: result.warningEvent.event_id,
+    warning_event_id: result.warningEvent?.event_id ?? null,
     stream_log_file: result.streamLogFile,
   };
 }

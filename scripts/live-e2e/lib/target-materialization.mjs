@@ -126,6 +126,7 @@ function backupPathIfExists(options) {
  *   layout: ReturnType<typeof ensureRuntimeLayout>,
  *   runId: string,
  *   profile: Record<string, unknown>,
+ *   reuseExistingCheckout?: boolean,
  * }}
  */
 export function materializeTargetCheckout(options) {
@@ -142,6 +143,14 @@ export function materializeTargetCheckout(options) {
     options.layout.targetCheckoutsRoot,
     `${normalizeId(targetRepoId)}-${normalizeId(options.runId)}`,
   );
+  if (options.reuseExistingCheckout === true && fileExists(path.join(targetCheckoutRoot, ".git"))) {
+    return {
+      targetCheckoutRoot,
+      targetRepoId,
+      targetRepoRef,
+      targetRepoUrl,
+    };
+  }
   fs.rmSync(targetCheckoutRoot, { recursive: true, force: true });
 
   /** @type {string[]} */

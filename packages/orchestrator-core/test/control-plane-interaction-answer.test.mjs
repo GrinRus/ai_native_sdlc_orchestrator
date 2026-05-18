@@ -75,7 +75,7 @@ function seedRequestedInteraction(projectRoot, runId, interactionId) {
   return stepResultFile;
 }
 
-test("interaction answer audit records answered and blocked states without leaking raw answer to read surfaces", () => {
+test("interaction answer audit records answered and resumed states without leaking raw answer to read surfaces", () => {
   withTempProject((projectRoot) => {
     const runId = "run.core.interaction.answer.v1";
     const interactionId = "question-1";
@@ -91,8 +91,9 @@ test("interaction answer audit records answered and blocked states without leaki
       reason: "operator selected a safe target",
     });
 
-    assert.equal(result.interactionStatus, "blocked");
-    assert.equal(result.blockedReason.code, "continuation.runtime_boundary_unavailable");
+    assert.equal(result.interactionStatus, "resumed");
+    assert.equal(result.blocked, false);
+    assert.equal(result.blockedReason, null);
     assert.equal(fs.existsSync(result.answerAuditFile), true);
 
     const auditRecord = JSON.parse(fs.readFileSync(result.answerAuditFile, "utf8"));
@@ -100,12 +101,13 @@ test("interaction answer audit records answered and blocked states without leaki
 
     const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
     assert.equal(JSON.stringify(updatedStepResult).includes(answerText), false);
-    assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+    assert.equal(updatedStepResult.requested_interaction.status, "resumed");
     assert.deepEqual(
       updatedStepResult.requested_interaction.state_history.map((entry) => entry.status),
-      ["requested", "answered", "blocked"],
+      ["requested", "answered", "resumed"],
     );
-    assert.equal(updatedStepResult.requested_interaction.continuation.next_action, "remain_blocked");
+    assert.equal(updatedStepResult.requested_interaction.continuation.next_action, "continue_run");
+    assert.equal(updatedStepResult.status, "passed");
     assert.ok(updatedStepResult.requested_interaction.answer_audit_refs.includes(result.answerAuditRef));
 
     const eventHistory = readRunEventHistory({
@@ -121,7 +123,7 @@ test("interaction answer audit records answered and blocked states without leaki
       eventHistory.events
         .map((event) => event.interaction?.status)
         .filter((status) => typeof status === "string"),
-      ["answered", "blocked"],
+      ["answered", "resumed"],
     );
   });
 });

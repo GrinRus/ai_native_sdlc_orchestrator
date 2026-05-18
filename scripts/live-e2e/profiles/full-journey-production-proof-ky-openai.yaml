@@ -3,6 +3,11 @@ version: 1
 journey_mode: full-journey
 flow_kind: regress
 duration_class: long
+live_e2e:
+  flow_range_policy: delivery_default
+  interaction_capability: public-control-plane
+  frontend_capability: none
+  safety_policy: no-upstream-write
 target_catalog_id: ky
 feature_mission_id: ky-header-regression
 scenario_family: regress

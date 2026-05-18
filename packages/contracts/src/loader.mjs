@@ -7,7 +7,7 @@ import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
-const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "blocked"];
+const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
 const VALIDATION_STATUS_VALUES = ["pass", "warn", "fail", "blocked"];
@@ -1942,41 +1942,89 @@ function validateStringArrayItems(options) {
 function validateLiveE2EObservationReport(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
-  const codeQuality = isPlainObject(document.code_quality_after_delivery)
-    ? document.code_quality_after_delivery
+  const finalAnalysis = isPlainObject(document.final_analysis)
+    ? document.final_analysis
     : {};
   validateObservationStatusField({
-    value: codeQuality.status,
+    value: finalAnalysis.status,
     source,
-    field: "code_quality_after_delivery.status",
+    field: "final_analysis.status",
     issues,
   });
-  validateObservationMatrixStatuses({
-    entries: document.step_matrix,
+  validateObservationStepJournal({
+    entries: document.step_journal,
     source,
-    field: "step_matrix",
-    issues,
-  });
-  validateObservationMatrixStatuses({
-    entries: document.artifact_quality_matrix,
-    source,
-    field: "artifact_quality_matrix",
     issues,
   });
   return issues;
 }
 
 /**
- * @param {{ entries: unknown, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ * @param {{ entries: unknown, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
  */
-function validateObservationMatrixStatuses(options) {
+function validateObservationStepJournal(options) {
   if (!Array.isArray(options.entries)) return;
   options.entries.forEach((entry, index) => {
     const record = isPlainObject(entry) ? entry : {};
+    const plan = isPlainObject(record.plan) ? record.plan : null;
+    if (!plan) {
+      options.issues.push(
+        issue({
+          code: record.plan === undefined ? "required_field_missing" : "field_type_mismatch",
+          source: options.source,
+          field: `step_journal[${index}].plan`,
+          expected: record.plan === undefined ? "present" : "object",
+          actual: record.plan === undefined ? "missing" : describeActualType(record.plan),
+          message: `Field 'step_journal[${index}].plan' is required for online live E2E step-controller reports.`,
+        }),
+      );
+    } else {
+      for (const field of [
+        "objective",
+        "public_surface",
+        "command_labels",
+        "expected_artifacts",
+        "inspection_sources",
+        "safety_constraints",
+      ]) {
+        const value = plan[field];
+        const expectedType = field === "objective" || field === "public_surface" ? "string" : "array";
+        if (!isExpectedType(value, expectedType)) {
+          options.issues.push(
+            issue({
+              code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+              source: options.source,
+              field: `step_journal[${index}].plan.${field}`,
+              expected: value === undefined ? "present" : expectedType,
+              actual: value === undefined ? "missing" : describeActualType(value),
+              message: `Field 'step_journal[${index}].plan.${field}' is required for online live E2E step planning.`,
+            }),
+          );
+        }
+      }
+    }
     validateObservationStatusField({
-      value: record.status,
+      value: record.final_step_verdict,
       source: options.source,
-      field: `${options.field}[${index}].status`,
+      field: `step_journal[${index}].final_step_verdict`,
+      issues: options.issues,
+    });
+    const deterministicAnalysis = isPlainObject(record.deterministic_analysis)
+      ? record.deterministic_analysis
+      : {};
+    validateObservationStatusField({
+      value: deterministicAnalysis.status,
+      source: options.source,
+      field: `step_journal[${index}].deterministic_analysis.status`,
+      issues: options.issues,
+    });
+    const semanticAnalysis = isPlainObject(record.semantic_analysis)
+      ? record.semantic_analysis
+      : {};
+    validateObservationStatusField({
+      value: semanticAnalysis.status,
+      source: options.source,
+      field: `step_journal[${index}].semantic_analysis.status`,
       issues: options.issues,
     });
   });
@@ -1994,7 +2042,7 @@ function validateObservationStatusField(options) {
         field: options.field,
         expected: options.value === undefined ? "present" : "string",
         actual: options.value === undefined ? "missing" : describeActualType(options.value),
-        message: `Field '${options.field}' must use live E2E observation status pass|warn|not_pass.`,
+        message: `Field '${options.field}' must use a supported live E2E observation status.`,
       }),
     );
     return;

@@ -26,7 +26,14 @@ const DELIVERY_PLAN_STATUS_VALUES = ["ready", "blocked"];
 const ASSET_MODE_VALUES = ["bundled", "materialized"];
 const ONBOARDING_STATUS_VALUES = ["ready", "blocked"];
 const NEXT_ACTION_STATUS_VALUES = ["ready", "blocked"];
-export const LIVE_E2E_OBSERVATION_STATUS_VALUES = ["pass", "warn", "not_pass"];
+export const LIVE_E2E_OBSERVATION_STATUS_VALUES = [
+  "pass",
+  "warn",
+  "not_pass",
+  "blocked",
+  "interaction_required",
+  "resumed",
+];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
 export const INTAKE_SOURCE_KIND_VALUES = ["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"];
@@ -738,26 +745,31 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       "report_id",
       "run_id",
       "profile_id",
+      "controller_state_ref",
       "flow_range",
+      "flow_range_policy",
       "overall_status",
-      "step_matrix",
-      "artifact_quality_matrix",
-      "code_quality_after_delivery",
-      "continuation_decisions",
+      "step_journal",
+      "final_analysis",
+      "interactive_decisions",
+      "frontend_interactions",
       "evidence_refs",
     ],
     fieldTypes: {
       report_id: "string",
       run_id: "string",
       profile_id: "string",
+      controller_state_ref: "string",
       flow_range: "object",
+      flow_range_policy: "string",
       overall_status: "string",
-      step_matrix: "array",
-      artifact_quality_matrix: "array",
-      code_quality_after_delivery: "object",
-      continuation_decisions: "array",
+      step_journal: "array",
+      final_analysis: "object",
+      interactive_decisions: "array",
+      frontend_interactions: "array",
       evidence_refs: "array",
     },
+    forbiddenFields: ["step_matrix", "artifact_quality_matrix", "code_quality_after_delivery", "continuation_decisions"],
     enumChecks: [{ field: "overall_status", allowedValues: LIVE_E2E_OBSERVATION_STATUS_VALUES }],
   },
   {

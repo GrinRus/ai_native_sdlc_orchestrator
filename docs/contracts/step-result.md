@@ -34,15 +34,15 @@ These fields describe AOR runtime control decisions. They do not replace review,
 When present, `requested_interaction` must stay query-safe and should carry:
 - `requested` (`true`);
 - `interaction_id` when the runtime can assign a stable run-local id;
-- `status` in `requested|answered|resumed|blocked`;
+- `status` in `requested|answered|resumed|resume_failed|blocked`;
 - `prompt_summary` or `summary` with a short sanitized question summary;
 - `question_evidence_refs` or `evidence_refs` pointing at raw runner evidence;
 - `answer_audit_refs` after an operator answer has been accepted;
-- `continuation` with the intended control-plane next action (`resume_from_boundary|remain_blocked`) and a reason code when blocked.
+- `continuation` with the intended control-plane next action (`resume_from_boundary|continue_run|remain_blocked`) and a reason code when blocked.
 - `state_history[]` when the runtime has observed more than one continuation state for the same interaction.
 
-The field must not embed sensitive answer text. Operator answers belong in durable audit evidence and may be referenced from this field after submission. Existing runtimes may still emit the minimal shape `{ requested: true, summary, evidence_refs }` while `interactive-question-requested` remains a blocking failure class; that minimal shape is the compatibility floor for W18 and must be interpreted as `status=requested` with no accepted answer yet.
-`state_history[]` is the durable query-safe ledger for interactive continuation. Each entry should include `status`, `timestamp`, optional sanitized `summary`, `evidence_refs[]`, optional `answer_audit_refs[]`, and optional `continuation`. It may record `requested`, `answered`, `resumed`, and `blocked` states for one `interaction_id`; it must never include raw operator answer text.
+The field must not embed sensitive answer text. Operator answers belong in durable audit evidence and may be referenced from this field after submission.
+`state_history[]` is the durable query-safe ledger for interactive continuation. Each entry should include `status`, `timestamp`, optional sanitized `summary`, `evidence_refs[]`, optional `answer_audit_refs[]`, and optional `continuation`. It may record `requested`, `answered`, `resumed`, `resume_failed`, and `blocked` states for one `interaction_id`; it must never include raw operator answer text.
 `repair_attempts` is the step-local Runtime Harness ledger. It should preserve the trigger, failure class, selected policy action, input evidence refs, repair route/compiled-context refs when executed, result, and budget exhaustion metadata. When repair executes, `input_evidence_refs` should include the generated repair input evidence that carries previous findings, failed step-result refs, diff status, adapter evidence, validator findings, and the current Runtime Harness report ref.
 `mission_semantics` records the semantic validation evidence used by the step controller, including changed paths and strict no-op detection inputs when available.
 For mission-scoped runs, `mission_semantics` should also preserve ignored request input files, allowed/forbidden path rules, mission-scoped changed paths, and scope violation paths so run-start decisions cannot be satisfied by control/input artifacts alone.
@@ -51,7 +51,7 @@ For mission-scoped runs, `mission_semantics` should also preserve ignored reques
 The shared contract loader validates nested step-result fields that carry runtime control evidence:
 - `evidence_refs[]` and nested evidence arrays must contain strings.
 - `runtime_harness_decision` must use `pass|retry|repair|escalate|block|fail` when present.
-- `requested_interaction` may be `null`; when present it must be an object with `requested` as a boolean, optional `status` in `requested|answered|resumed|blocked`, query-safe evidence refs, optional query-safe `state_history[]`, and no raw answer fields.
+- `requested_interaction` may be `null`; when present it must be an object with `requested` as a boolean, optional `status` in `requested|answered|resumed|resume_failed|blocked`, query-safe evidence refs, optional query-safe `state_history[]`, and no raw answer fields.
 - `external_runner` must preserve `runtime_mode` and `command` when present; `raw_evidence_ref` is validated as a string when available, and `exit_code` is numeric when available or `null` for missing-command preflight failures.
 - `repair_attempts[]` entries must be objects with `attempt`, `trigger`, `result`, and `input_evidence_refs[]`.
 - `mission_semantics` path arrays must contain strings when present.

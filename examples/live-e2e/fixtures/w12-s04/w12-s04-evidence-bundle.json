@@ -46,7 +46,7 @@
     "routed_live_adapter_evidence": true,
     "public_live_e2e_commands_removed_from_control_surfaces": true,
     "target_root_delivery_lineage": true,
-    "black_box_observation_matrix": true,
+    "black_box_step_journal": true,
     "scorecard_and_learning_loop_from_black_box_evidence": true
   }
 }

@@ -65,7 +65,7 @@ Full-journey reports must distinguish:
 `provider_execution_status=pass` requires materialized adapter raw execution evidence, not just provider route traceability. `real_code_change_status=pass` requires meaningful mission-scoped changed paths; backup/editor artifacts are not valid real-code-change evidence.
 
 Run summaries must also carry a canonical status block that is separate from the
-legacy `verdict_matrix`:
+target-level `quality_judgement`:
 - `command_status`: public AOR subprocesses completed and emitted readable payloads.
 - `target_verification_status`: post-run primary target verification result.
 - `artifact_quality_status`: intake, lineage, review, and artifact consistency result.

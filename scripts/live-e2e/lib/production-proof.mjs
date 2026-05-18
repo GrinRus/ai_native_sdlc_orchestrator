@@ -28,7 +28,7 @@ const PRODUCTION_PROOF_REQUIRED_VERDICT_FIELDS = Object.freeze([
   "delivery_release_quality",
   "learning_loop_closure",
   "quality_gate_decision",
-  "overall_verdict",
+  "overall_status",
 ]);
 
 /**
@@ -268,8 +268,8 @@ export function applyProductionProofEvidence(options) {
   }
 
   const artifacts = options.flowResult.artifacts;
-  const verdictMatrix = asRecord(artifacts.verdict_matrix);
-  const verdicts = assessProductionProofVerdicts(verdictMatrix);
+  const qualityJudgement = asRecord(artifacts.quality_judgement);
+  const verdicts = assessProductionProofVerdicts(qualityJudgement);
   const runtimeHarness = assessRuntimeHarnessProof(
     asNonEmptyString(artifacts.latest_runtime_harness_report_file) || asNonEmptyString(artifacts.runtime_harness_report_file),
   );
@@ -304,7 +304,7 @@ export function applyProductionProofEvidence(options) {
   const evidenceRefsExist = requiredEvidenceRefFields.every((field) => evidenceFileExists(evidenceRefs[field]));
   const findings = uniqueStrings([
     ...(isPassStatus(options.flowResult.status) ? [] : ["full-journey flow status is not pass"]),
-    ...(verdicts.ok ? [] : verdicts.failed_fields.map((field) => `verdict_matrix.${field} is not pass`)),
+    ...(verdicts.ok ? [] : verdicts.failed_fields.map((field) => `quality_judgement.${field} is not pass`)),
     ...preflight.findings,
     ...runtimeHarness.findings,
     ...review.findings,

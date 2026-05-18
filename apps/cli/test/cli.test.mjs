@@ -1376,9 +1376,9 @@ test("CLI run answer writes audit refs and keeps raw answer out of command and f
     assert.equal(answerResult.exitCode, 0, answerResult.stderr);
     assert.equal(answerResult.stdout.includes(answerText), false);
     const answerPayload = JSON.parse(answerResult.stdout);
-    assert.equal(answerPayload.interaction_answer.interaction_status, "blocked");
+    assert.equal(answerPayload.interaction_answer.interaction_status, "resumed");
     assert.equal(answerPayload.interaction_answer.answer_accepted, true);
-    assert.equal(answerPayload.interaction_answer.blocked_reason.code, "continuation.runtime_boundary_unavailable");
+    assert.equal(answerPayload.interaction_answer.blocked, false);
     assert.equal(fs.existsSync(answerPayload.interaction_answer.answer_audit_file), true);
 
     const auditRecord = JSON.parse(fs.readFileSync(answerPayload.interaction_answer.answer_audit_file, "utf8"));
@@ -1386,10 +1386,10 @@ test("CLI run answer writes audit refs and keeps raw answer out of command and f
 
     const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
     assert.equal(JSON.stringify(updatedStepResult).includes(answerText), false);
-    assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+    assert.equal(updatedStepResult.requested_interaction.status, "resumed");
     assert.deepEqual(
       updatedStepResult.requested_interaction.state_history.map((entry) => entry.status),
-      ["requested", "answered", "blocked"],
+      ["requested", "answered", "resumed"],
     );
 
     const followResult = invokeCli([

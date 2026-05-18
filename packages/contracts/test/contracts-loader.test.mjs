@@ -691,9 +691,10 @@ test("live E2E observation report loads and enforces status scale", () => {
   assert.ok(enumIssue, "expected enum_value_invalid for overall_status");
 
   const nestedCandidate = structuredClone(loaded.document);
-  nestedCandidate.step_matrix[0].status = "fail";
-  nestedCandidate.artifact_quality_matrix[0].status = "fail";
-  nestedCandidate.code_quality_after_delivery.status = "fail";
+  nestedCandidate.step_journal[0].final_step_verdict = "fail";
+  nestedCandidate.step_journal[0].deterministic_analysis.status = "fail";
+  nestedCandidate.step_journal[0].semantic_analysis.status = "fail";
+  nestedCandidate.final_analysis.status = "fail";
 
   const nestedValidation = validateContractDocument({
     family: "live-e2e-observation-report",
@@ -703,15 +704,50 @@ test("live E2E observation report loads and enforces status scale", () => {
 
   assert.equal(nestedValidation.ok, false);
   for (const field of [
-    "step_matrix[0].status",
-    "artifact_quality_matrix[0].status",
-    "code_quality_after_delivery.status",
+    "step_journal[0].final_step_verdict",
+    "step_journal[0].deterministic_analysis.status",
+    "step_journal[0].semantic_analysis.status",
+    "final_analysis.status",
   ]) {
     assert.ok(
       nestedValidation.issues.some((problem) => problem.code === "enum_value_invalid" && problem.field === field),
       `expected enum_value_invalid for ${field}`,
     );
   }
+
+  const missingPlanCandidate = structuredClone(loaded.document);
+  delete missingPlanCandidate.step_journal[0].plan;
+
+  const missingPlanValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: missingPlanCandidate,
+    source: "test://live-e2e-observation-missing-plan",
+  });
+
+  assert.equal(missingPlanValidation.ok, false);
+  assert.ok(
+    missingPlanValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "step_journal[0].plan",
+    ),
+    "expected step_journal entries without plan to be rejected",
+  );
+
+  const legacyCandidate = structuredClone(loaded.document);
+  legacyCandidate.step_matrix = [];
+
+  const legacyValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: legacyCandidate,
+    source: "test://live-e2e-observation-legacy-shape",
+  });
+
+  assert.equal(legacyValidation.ok, false);
+  assert.ok(
+    legacyValidation.issues.some(
+      (problem) => problem.code === "unsupported_field_present" && problem.field === "step_matrix",
+    ),
+    "expected legacy step_matrix to be rejected",
+  );
 });
 
 test("W23 nested canonical contract examples load through the shared contract path", () => {

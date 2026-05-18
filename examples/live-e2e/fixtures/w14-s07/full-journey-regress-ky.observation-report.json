@@ -1,5 +1,5 @@
 {
-  "report_id": "w14-s07.full-journey-regress-ky.live-e2e-observation.v1",
+  "report_id": "w14-s07.full-journey-regress-ky.live-e2e-observation.v2",
   "run_id": "w14-s07.full-journey-regress-ky",
   "profile_id": "live-e2e.full-journey.regress.ky",
   "flow_range": {
@@ -16,6 +16,7 @@
       "delivery"
     ],
     "prelude_steps": [
+      "bootstrap",
       "project-init",
       "intake-create",
       "project-analyze",
@@ -26,109 +27,111 @@
       "learning"
     ]
   },
+  "flow_range_policy": "delivery_default",
   "overall_status": "warn",
-  "step_matrix": [
+  "step_journal": [
     {
-      "step": "discovery",
-      "status": "pass",
-      "command_label": "discovery-run",
-      "artifact_refs": [
-        "full-journey-regress-ky.analysis-report.json"
-      ],
-      "findings": []
-    },
-    {
-      "step": "spec",
-      "status": "pass",
-      "command_label": "spec-build",
-      "artifact_refs": [
-        "full-journey-regress-ky.spec-step-result.json"
-      ],
-      "findings": []
-    },
-    {
-      "step": "planning",
-      "status": "pass",
-      "command_label": "wave-create",
-      "artifact_refs": [
-        "full-journey-regress-ky.handoff-packet.json"
-      ],
-      "findings": []
-    },
-    {
-      "step": "handoff",
-      "status": "pass",
-      "command_label": "handoff-approve",
-      "artifact_refs": [
-        "full-journey-regress-ky.handoff-packet.json"
-      ],
-      "findings": []
-    },
-    {
-      "step": "execution",
-      "status": "pass",
-      "command_label": "run-start",
+      "sequence": 1,
+      "step_id": "execution",
+      "flow_stage": "execution",
+      "public_surface": "aor run start",
+      "transcript_ref": "full-journey-regress-ky.run-summary.json",
       "artifact_refs": [
         "full-journey-regress-ky.routed-step-result.json"
       ],
-      "findings": []
-    },
-    {
-      "step": "review",
-      "status": "pass",
-      "command_label": "review-run",
-      "artifact_refs": [
-        "full-journey-regress-ky.review-report.json"
-      ],
-      "findings": []
-    },
-    {
-      "step": "qa",
-      "status": "pass",
-      "command_label": "eval-run",
-      "artifact_refs": [
+      "started_at": "2026-04-24T12:22:00.000Z",
+      "finished_at": "2026-04-24T12:22:01.000Z",
+      "duration_sec": 1,
+      "deterministic_analysis": {
+        "status": "pass",
+        "exit_code": 0,
+        "failure_class": null,
+        "missing_evidence": [],
+        "recommendation": "continue"
+      },
+      "semantic_analysis": {
+        "status": "warn",
+        "judge_source": "historical-fixture",
+        "findings": [
+          "deterministic mock evidence did not prove a real code-changing runtime"
+        ]
+      },
+      "requested_interaction": null,
+      "decision": {
+        "action": "continue",
+        "reason": "Historical matrix proof is retained as coverage-with-findings evidence.",
+        "next_step": "review"
+      },
+      "resume_result": null,
+      "frontend_interaction_refs": [],
+      "final_step_verdict": "warn",
+      "plan": {
+        "objective": "Observe routed live execution and runtime evidence through the public control plane.",
+        "public_surface": "aor run start",
+        "command_labels": [
+          "run-start",
+          "project-verify-routed-live"
+        ],
+        "expected_artifacts": [
+          "routed_step_result_file",
+          "runtime_harness_report_file",
+          "adapter_raw_evidence_ref"
+        ],
+        "inspection_sources": [
+          "command_transcript",
+          "stage_result",
+          "artifact_refs",
+          "api_output",
+          "logs_or_ui_when_available"
+        ],
+        "safety_constraints": [
+          "black-box-public-surfaces-only",
+          "no-runtime-internal-imports",
+          "no-upstream-write-by-default",
+          "persist-observation-before-next-step"
+        ]
+      }
+    }
+  ],
+  "final_analysis": {
+    "status": "warn",
+    "summary": "Historical W14 proof remains coverage-with-findings evidence under the step-journal contract.",
+    "findings": [
+      "mock external runner evidence does not close production proof"
+    ],
+    "code_quality": {
+      "status": "warn",
+      "changed_paths": [],
+      "evidence_refs": [
         "full-journey-regress-ky.run-summary.json"
       ],
-      "findings": []
-    },
-    {
-      "step": "delivery",
-      "status": "pass",
-      "command_label": "deliver-prepare",
-      "artifact_refs": [
-        "full-journey-regress-ky.delivery-manifest.json",
-        "full-journey-regress-ky.delivery-transcript.json"
-      ],
-      "findings": []
-    }
-  ],
-  "artifact_quality_matrix": [
-    {
-      "step": "discovery",
-      "status": "warn",
-      "judge_source": "agent-missing",
-      "artifact_refs": [
-        "full-journey-regress-ky.analysis-report.json"
-      ],
       "findings": [
-        "agent-judge-not-provided"
+        "review-report.code_quality was warn in the historical fixture"
+      ]
+    },
+    "delivery": {
+      "status": "pass",
+      "evidence_refs": [
+        "full-journey-regress-ky.run-summary.json"
+      ]
+    },
+    "release": {
+      "status": "not_pass",
+      "evidence_refs": []
+    },
+    "learning": {
+      "status": "pass",
+      "evidence_refs": [
+        "full-journey-regress-ky.run-summary.json"
       ]
     }
-  ],
-  "code_quality_after_delivery": {
-    "status": "not_pass",
-    "delivery_manifest_ref": "full-journey-regress-ky.delivery-manifest.json",
-    "review_report_ref": "full-journey-regress-ky.review-report.json",
-    "post_delivery_check_refs": [],
-    "changed_paths": [],
-    "findings": [
-      "deterministic W14 external runner mock did not prove mission-scoped code changes"
-    ]
   },
-  "continuation_decisions": [],
+  "interactive_decisions": [],
+  "frontend_interactions": [],
   "evidence_refs": [
     "full-journey-regress-ky.run-summary.json",
-    "full-journey-regress-ky.delivery-manifest.json",
-    "full-journey-regress-ky.review-report.json"
-  ]
+    "full-journey-regress-ky.routed-step-result.json",
+    "runtime://reports/live-e2e-controller-state-w14-s07.full-journey-regress-ky.json"
+  ],
+  "controller_state_ref": "runtime://reports/live-e2e-controller-state-w14-s07.full-journey-regress-ky.json"
 }

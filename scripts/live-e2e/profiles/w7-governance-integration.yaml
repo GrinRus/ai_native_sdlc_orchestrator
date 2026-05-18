@@ -2,6 +2,11 @@ profile_id: live-e2e.w7.governance.integration
 version: 1
 flow_kind: governance
 duration_class: short
+live_e2e:
+  flow_range_policy: full_lifecycle
+  interaction_capability: public-control-plane
+  frontend_capability: none
+  safety_policy: no-upstream-write
 project_profile_template_ref: examples/project.github.aor.yaml
 scenario_id: w7-governance-closure
 target_repo:

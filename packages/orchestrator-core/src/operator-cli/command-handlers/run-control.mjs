@@ -320,8 +320,9 @@ export function handleRunControlCommand(context) {
         blocked_reason: answerResult.blockedReason,
         evidence_event_id: answerResult.evidenceEvent.event_id,
         step_event_id: answerResult.stepEvent.event_id,
+        resumed_event_id: answerResult.resumedEvent?.event_id ?? null,
         blocked_event_id: answerResult.blockedEvent?.event_id ?? null,
-        warning_event_id: answerResult.warningEvent.event_id,
+        warning_event_id: answerResult.warningEvent?.event_id ?? null,
         stream_log_file: answerResult.streamLogFile,
       };
       outputState.streamLogFile = answerResult.streamLogFile;

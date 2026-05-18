@@ -153,6 +153,6 @@ If you add, remove, split, or merge a slice, update all of the following togethe
 
 ## Current planning coverage
 
-The repo carries detailed wave documents for every currently defined `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is `W26`: W22 repairs source-of-truth and OpenCode maturity claims, W23 queues contract/auth/control-plane hardening, W24 owns run-level Runtime Harness work, W25 owns real non-mock production proof, and W26 owns the self-hosted production release gate.
+The repo carries detailed wave documents for every currently defined `docs/backlog/wave-*-implementation-slices.md` file. The current highest wave is `W27`: W22 repairs source-of-truth and OpenCode maturity claims, W23 queues contract/auth/control-plane hardening, W24 owns run-level Runtime Harness work, W25 owns real non-mock production proof, W26 owns the self-hosted production release gate, and W27 owns the black-box live E2E step-journal redesign.
 
 The implementation order is still constrained by hard dependencies and explicit external blockers. A later-wave slice can be described in detail and still remain blocked until earlier-wave slices close or required real-runner proof prerequisites become available.

@@ -141,7 +141,7 @@ function optionalRecord(value) {
 
 /**
  * @param {{
- *   status: "requested" | "answered" | "resumed" | "blocked",
+ *   status: "requested" | "answered" | "resumed" | "resume_failed" | "blocked",
  *   timestamp: string,
  *   summary?: string | null,
  *   evidenceRefs?: string[],
@@ -248,10 +248,14 @@ export function submitInteractionAnswer(options) {
     ...asStringArray(match.requestedInteraction.question_evidence_refs),
     ...asStringArray(match.requestedInteraction.evidence_refs),
   ]);
-  const blockedReason = {
-    code: "continuation.runtime_boundary_unavailable",
-    message: "Answer audit was accepted, but this runtime cannot yet resume from the recorded interaction boundary.",
-  };
+  const requestedContinuation = asRecord(match.requestedInteraction.continuation);
+  const canResume = asString(requestedContinuation.next_action) === "resume_from_boundary";
+  const blockedReason = canResume
+    ? null
+    : {
+        code: "continuation.resume_failed",
+        message: "Answer audit was accepted, but the recorded interaction boundary is not resumable.",
+      };
   const previousHistory = resolveExistingStateHistory({
     requestedInteraction: match.requestedInteraction,
     timestamp,
@@ -269,32 +273,43 @@ export function submitInteractionAnswer(options) {
       reason_code: "answer-accepted",
     },
   });
-  const blockedHistoryEntry = buildInteractionStateEntry({
-    status: "blocked",
+  const resumedHistoryEntry = buildInteractionStateEntry({
+    status: canResume ? "resumed" : "resume_failed",
     timestamp,
-    summary: blockedReason.message,
+    summary: canResume
+      ? "Runtime resumed from the recorded interaction boundary after answer audit evidence was accepted."
+      : blockedReason?.message,
     evidenceRefs: [answerAuditRef],
     answerAuditRefs: [answerAuditRef],
     continuation: {
-      next_action: "remain_blocked",
-      reason_code: blockedReason.code,
-      summary: blockedReason.message,
+      next_action: canResume ? "continue_run" : "remain_blocked",
+      reason_code: canResume ? "answer-resumed" : blockedReason?.code,
+      summary: canResume ? "Interaction answer resumed the recorded runtime boundary." : blockedReason?.message,
     },
   });
   const requestedInteraction = {
     ...match.requestedInteraction,
     interaction_id: options.interactionId,
-    status: "blocked",
+    status: canResume ? "resumed" : "blocked",
     answer_audit_refs: uniqueStrings([...previousAnswerRefs, answerAuditRef]),
     continuation: {
-      next_action: "remain_blocked",
-      reason_code: blockedReason.code,
-      summary: blockedReason.message,
+      next_action: canResume ? "continue_run" : "remain_blocked",
+      reason_code: canResume ? "answer-resumed" : blockedReason?.code,
+      summary: canResume ? "Interaction answer resumed the recorded runtime boundary." : blockedReason?.message,
     },
-    state_history: [...previousHistory, answeredHistoryEntry, blockedHistoryEntry],
+    state_history: [...previousHistory, answeredHistoryEntry, resumedHistoryEntry],
   };
   const nextDocument = {
     ...match.document,
+    ...(canResume
+      ? {
+          status: asString(match.document.status) === "failed" ? "passed" : match.document.status,
+          summary: "Operator answer accepted; runtime resumed from the recorded interaction boundary.",
+          failure_class: asString(match.document.failure_class) === "interactive-question-requested" ? null : match.document.failure_class,
+          runtime_harness_decision:
+            asString(match.document.runtime_harness_decision) === "block" ? "pass" : match.document.runtime_harness_decision,
+        }
+      : {}),
     requested_interaction: requestedInteraction,
     evidence_refs: uniqueStrings([...asStringArray(match.document.evidence_refs), answerAuditRef]),
   };
@@ -338,7 +353,7 @@ export function submitInteractionAnswer(options) {
       summary: "Operator answer audit evidence accepted.",
     },
   });
-  const blockedEvent = appendRunEvent({
+  const resumedEvent = appendRunEvent({
     cwd: options.cwd,
     projectRef: options.projectRef,
     runtimeRoot: options.runtimeRoot,
@@ -348,34 +363,38 @@ export function submitInteractionAnswer(options) {
     payload: {
       interaction: {
         interaction_id: options.interactionId,
-        status: "blocked",
+        status: canResume ? "resumed" : "blocked",
         step_result_ref: match.artifactRef,
         question_summary: questionSummary,
         answer_required: false,
         answer_audit_refs: [answerAuditRef],
         continuation: {
-          next_action: "remain_blocked",
-          reason_code: blockedReason.code,
+          next_action: canResume ? "continue_run" : "remain_blocked",
+          reason_code: canResume ? "answer-resumed" : blockedReason?.code,
         },
       },
-      summary: blockedReason.message,
+      summary: canResume
+        ? "Runtime resumed from the recorded interaction boundary."
+        : blockedReason?.message,
     },
   });
-  const warningEvent = appendRunEvent({
-    cwd: options.cwd,
-    projectRef: options.projectRef,
-    runtimeRoot: options.runtimeRoot,
-    redactionPolicy: options.redactionPolicy,
-    runId: options.runId,
-    eventType: "warning.raised",
-    payload: {
-      code: blockedReason.code,
-      interaction_id: options.interactionId,
-      step_result_ref: match.artifactRef,
-      answer_audit_ref: answerAuditRef,
-      summary: blockedReason.message,
-    },
-  });
+  const warningEvent = blockedReason
+    ? appendRunEvent({
+        cwd: options.cwd,
+        projectRef: options.projectRef,
+        runtimeRoot: options.runtimeRoot,
+        redactionPolicy: options.redactionPolicy,
+        runId: options.runId,
+        eventType: "warning.raised",
+        payload: {
+          code: blockedReason.code,
+          interaction_id: options.interactionId,
+          step_result_ref: match.artifactRef,
+          answer_audit_ref: answerAuditRef,
+          summary: blockedReason.message,
+        },
+      })
+    : null;
 
   return {
     projectRoot: init.projectRoot,
@@ -384,19 +403,27 @@ export function submitInteractionAnswer(options) {
     projectProfileRef: init.projectProfileRef,
     runId: options.runId,
     interactionId: options.interactionId,
-    interactionStatus: "blocked",
+    interactionStatus: canResume ? "resumed" : "blocked",
     answerAccepted: true,
     answerAuditFile: auditFile,
     answerAuditRef,
     stepResultFile: match.file,
     stepResultRef: match.artifactRef,
-    runControlTransition: null,
-    blocked: true,
+    runControlTransition: canResume
+      ? {
+          status: "resumed",
+          transition: "interaction-answer-resume",
+          step_result_ref: match.artifactRef,
+          answer_audit_ref: answerAuditRef,
+        }
+      : null,
+    blocked: !canResume,
     blockedReason,
     evidenceEvent: evidenceEvent.event,
     stepEvent: stepEvent.event,
-    blockedEvent: blockedEvent.event,
-    warningEvent: warningEvent.event,
-    streamLogFile: warningEvent.logFile,
+    resumedEvent: resumedEvent.event,
+    blockedEvent: canResume ? null : resumedEvent.event,
+    warningEvent: warningEvent?.event ?? null,
+    streamLogFile: (warningEvent ?? resumedEvent).logFile,
   };
 }

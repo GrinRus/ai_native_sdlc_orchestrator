@@ -16,7 +16,8 @@ import {
   uniqueStrings,
   writeJson,
 } from "./common.mjs";
-import { createStageMap, flattenStageMap, getProfileStages, markStage } from "./stages.mjs";
+import { createStageMap, flattenStageMap, getProfileStages, markStage as markStageRaw } from "./stages.mjs";
+import { isLiveE2eControllerStop } from "./step-controller.mjs";
 import { DEFAULT_BACKLOG_REFS, createProofRunnerEnvironment, createSessionRoots } from "./profile-catalog.mjs";
 import {
   buildGuidedJourneyProof,
@@ -230,6 +231,17 @@ function resolveDurationSeconds(startedAt, finishedAt) {
  * @returns {Record<string, unknown>}
  */
 function buildCommandDiagnostic(result) {
+  const payload = asRecord(result.payload);
+  const lifecycleCommand = asRecord(payload.lifecycle_command);
+  const commandOutput = asRecord(lifecycleCommand.command_output);
+  const interactiveContinuation =
+    asRecord(payload.interactive_continuation).requested === true
+      ? asRecord(payload.interactive_continuation)
+      : asRecord(lifecycleCommand.interactive_continuation).requested === true
+        ? asRecord(lifecycleCommand.interactive_continuation)
+        : asRecord(commandOutput.interactive_continuation).requested === true
+          ? asRecord(commandOutput.interactive_continuation)
+          : null;
   return {
     label: result.label,
     command_surface: result.commandSurface,
@@ -243,7 +255,43 @@ function buildCommandDiagnostic(result) {
     failure_class: result.ok ? null : "command-failed",
     missing_evidence: [],
     recommendation: result.ok ? "continue" : "inspect transcript and command stderr",
+    interactive_continuation: interactiveContinuation,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} diagnostic
+ * @returns {ReturnType<typeof runAorCommand> | null}
+ */
+function buildCachedCommandResult(diagnostic) {
+  const transcriptFile = asNonEmptyString(diagnostic.transcript_file);
+  if (!transcriptFile || !fileExists(transcriptFile)) return null;
+  const transcript = asRecord(readJson(transcriptFile));
+  return {
+    label: asNonEmptyString(diagnostic.label),
+    ok: commandCompletedForCanonicalStatus(diagnostic),
+    exitCode: typeof diagnostic.exit_code === "number" ? diagnostic.exit_code : 0,
+    stdout: asNonEmptyString(transcript.stdout),
+    stderr: asNonEmptyString(transcript.stderr),
+    payload: asRecord(transcript.parsed_json),
+    transcriptFile,
+    startedAt: asNonEmptyString(diagnostic.started_at) || asNonEmptyString(transcript.started_at) || nowIso(),
+    finishedAt: asNonEmptyString(diagnostic.finished_at) || asNonEmptyString(transcript.finished_at) || nowIso(),
+    durationSec:
+      typeof diagnostic.duration_sec === "number"
+        ? diagnostic.duration_sec
+        : resolveDurationSeconds(asNonEmptyString(transcript.started_at), asNonEmptyString(transcript.finished_at)),
+    commandSurface: asNonEmptyString(diagnostic.command_surface) || "cached public AOR command",
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {unknown} stepController
+ */
+function hydrateControllerArtifacts(artifacts, stepController) {
+  const snapshot = asRecord(asRecord(stepController?.getState?.()).artifacts_snapshot);
+  Object.assign(artifacts, snapshot);
 }
 
 /**
@@ -1262,7 +1310,7 @@ function resolveDeliveryStatus(artifacts) {
  *   artifactConsistency: Record<string, unknown>,
  *   reviewReport: Record<string, unknown>,
  *   scenarioCoverage: Record<string, unknown>,
- *   verdictMatrix: Record<string, unknown>,
+ *   qualityJudgement: Record<string, unknown>,
  *   runTier: string,
  *   scenarioPolicy: Record<string, unknown>,
  * }}
@@ -1300,22 +1348,22 @@ function buildCanonicalRunStatus(options) {
   const releaseMissing = releaseRequired && releaseStatus !== "pass";
   const fatalAcceptance =
     deliveryStatus === "not_materialized" ||
+    deliveryStatus === "blocked" ||
+    deliveryStatus === "degraded" ||
     commandStatus === "fail" ||
+    targetVerificationStatus === "fail" ||
     strictIntakeFailed ||
+    artifactQualityStatus === "fail" ||
     providerExecutionStatus === "fail" ||
     realCodeChangeStatus === "fail" ||
+    scenarioCoverageStatus === "fail" ||
+    qualityGateStatus === "fail" ||
     releaseMissing;
   const acceptanceStatus = fatalAcceptance
     ? "fail"
-    : targetVerificationStatus === "fail" ||
-        artifactQualityStatus === "fail" ||
-        deliveryStatus === "blocked" ||
-        deliveryStatus === "degraded" ||
-        scenarioCoverageStatus === "fail" ||
-        qualityGateStatus === "fail" ||
-        diagnosticStatus === "warn" ||
+    : diagnosticStatus === "warn" ||
         diagnosticStatus === "fail" ||
-        asNonEmptyString(options.verdictMatrix.overall_verdict) === "pass_with_findings"
+        asNonEmptyString(options.qualityJudgement.overall_status) === "pass_with_findings"
       ? "warn"
       : "pass";
   const hasMatrixCell = hasObjectFields(asRecord(options.artifacts.matrix_cell));
@@ -1324,11 +1372,9 @@ function buildCanonicalRunStatus(options) {
     ? "not_attempted"
     : acceptanceStatus === "pass" && proofEligibleTier
       ? "covered_pass"
-      : acceptanceStatus === "warn" && deliveryStatus !== "not_materialized"
-        ? "covered_with_findings"
-        : deliveryStatus !== "not_materialized" && options.runTier === "full-journey-observation"
-          ? "covered_with_findings"
-          : "attempted_failed";
+    : acceptanceStatus === "warn" && deliveryStatus !== "not_materialized"
+      ? "covered_with_findings"
+      : "attempted_failed";
   const findings = uniqueStrings([
     ...(commandStatus === "fail" ? ["One or more public CLI subprocesses failed."] : []),
     ...(targetVerificationStatus === "fail" ? ["Post-run target verification failed."] : []),
@@ -1373,6 +1419,7 @@ function buildCanonicalRunStatus(options) {
  *   examplesRoot: string,
  *   runnerAuthMode: "host" | "isolated",
  *   runtimeAgentPermissionMode: "full-bypass" | "restricted",
+ *   stepController?: ReturnType<import("./step-controller.mjs").createLiveE2eStepController>,
  * }}
  */
 export function executeInstalledUserFlow(options) {
@@ -1403,6 +1450,18 @@ export function executeInstalledUserFlow(options) {
     runtime_agent_permission_mode: options.runtimeAgentPermissionMode,
     run_tier: resolveRunTier(options.profile),
   };
+  hydrateControllerArtifacts(artifacts, options.stepController);
+  const markStage = (currentStageMap, stage, status, evidenceRefs = [], summary = null) => {
+    markStageRaw(currentStageMap, stage, status, evidenceRefs, summary);
+    if (currentStageMap === stageMap) {
+      options.stepController?.observeStage({
+        stage,
+        stageResult: currentStageMap[stage],
+        commandResults,
+        artifacts,
+      });
+    }
+  };
   const startedAt = nowIso();
   try {
     const targetCheckout = materializeTargetCheckout({
@@ -1410,6 +1469,7 @@ export function executeInstalledUserFlow(options) {
       layout: options.layout,
       runId: options.runId,
       profile: options.profile,
+      reuseExistingCheckout: options.stepController?.hasPersistedProgress?.() === true,
     });
     artifacts.target_checkout_root = targetCheckout.targetCheckoutRoot;
     artifacts.target_repo_ref = targetCheckout.targetRepoRef;
@@ -1465,6 +1525,17 @@ export function executeInstalledUserFlow(options) {
     const commandBaseArgs = ["--project-ref", ".", "--project-profile", "./project.aor.yaml"];
     let commandIndex = 1;
     const runCommand = (label, args, runOptions = {}) => {
+      if (options.stepController?.shouldUseCachedCommand?.(label) === true) {
+        const cachedDiagnostic = asRecord(options.stepController.getCachedCommandResult(label));
+        const cachedResult = buildCachedCommandResult(cachedDiagnostic);
+        if (cachedResult) {
+          commandIndex += 1;
+          if (!commandResults.some((entry) => asNonEmptyString(entry.label) === label)) {
+            commandResults.push(cachedDiagnostic);
+          }
+          return cachedResult;
+        }
+      }
       const result = runAorCommand({
         launch: options.aorLaunch,
         cwd: targetCheckout.targetCheckoutRoot,
@@ -1796,7 +1867,7 @@ export function executeInstalledUserFlow(options) {
         ? "Delivery evidence materialized with observed quality findings."
         : "Delivery prepare materialized delivery evidence.",
     );
-    markStage(stageMap, "release", "skipped", [], "Observation v1 ends at delivery.");
+    markStage(stageMap, "release", "skipped", [], "Delivery-default flow range excludes release.");
 
     return {
       startedAt,
@@ -1808,10 +1879,36 @@ export function executeInstalledUserFlow(options) {
       sessionRoots,
     };
   } catch (error) {
+    if (isLiveE2eControllerStop(error)) {
+      artifacts.live_e2e_controller_stop = {
+        reason: error.message,
+        decision: asRecord(error.decision),
+        state: asRecord(error.state),
+      };
+      return {
+        startedAt,
+        finishedAt: nowIso(),
+        status: asNonEmptyString(asRecord(error.decision).action) === "continue" ? "pass" : "fail",
+        stageResults: flattenStageMap(stageMap),
+        commandResults,
+        artifacts,
+        sessionRoots,
+      };
+    }
     const summary = error instanceof Error ? error.message : String(error);
     if (!flattenStageMap(stageMap).some((stage) => stage.status === "fail")) {
       const fallbackStage = flattenStageMap(stageMap).find((stage) => stage.status === "pending")?.stage ?? "bootstrap";
-      markStage(stageMap, fallbackStage, "fail", [], summary);
+      markStageRaw(stageMap, fallbackStage, "fail", [], summary);
+      try {
+        options.stepController?.observeStage({
+          stage: fallbackStage,
+          stageResult: stageMap[fallbackStage],
+          commandResults,
+          artifacts,
+        });
+      } catch (controllerError) {
+        if (!isLiveE2eControllerStop(controllerError)) throw controllerError;
+      }
     }
     return {
       startedAt,
@@ -1849,6 +1946,7 @@ export function executeInstalledUserFlow(options) {
  *   runnerAuthMode: "host" | "isolated",
  *   runtimeAgentPermissionMode: "full-bypass" | "restricted",
  *   authProbeRequired: boolean,
+ *   stepController?: ReturnType<import("./step-controller.mjs").createLiveE2eStepController>,
  * }} options
  */
 export function executeFullJourneyFlow(options) {
@@ -1894,6 +1992,18 @@ export function executeFullJourneyFlow(options) {
     coverage_tier: options.coverageTier,
     production_proof: asRecord(options.profile.production_proof),
   };
+  hydrateControllerArtifacts(artifacts, options.stepController);
+  const markStage = (currentStageMap, stage, status, evidenceRefs = [], summary = null) => {
+    markStageRaw(currentStageMap, stage, status, evidenceRefs, summary);
+    if (currentStageMap === stageMap) {
+      options.stepController?.observeStage({
+        stage,
+        stageResult: currentStageMap[stage],
+        commandResults,
+        artifacts,
+      });
+    }
+  };
   const startedAt = nowIso();
   const internalTestHooks = asRecord(options.profile.internal_test_hooks);
   const guidedJourneyEnabled = isGuidedJourneyEnabled(options.profile);
@@ -1905,6 +2015,7 @@ export function executeFullJourneyFlow(options) {
       layout: options.layout,
       runId: options.runId,
       profile: options.profile,
+      reuseExistingCheckout: options.stepController?.hasPersistedProgress?.() === true,
     });
     artifacts.target_checkout_root = targetCheckout.targetCheckoutRoot;
     artifacts.target_repo_ref = targetCheckout.targetRepoRef;
@@ -1947,6 +2058,17 @@ export function executeFullJourneyFlow(options) {
 
     let commandIndex = 1;
     const runCommand = (label, args, runOptions = {}) => {
+      if (options.stepController?.shouldUseCachedCommand?.(label) === true) {
+        const cachedDiagnostic = asRecord(options.stepController.getCachedCommandResult(label));
+        const cachedResult = buildCachedCommandResult(cachedDiagnostic);
+        if (cachedResult) {
+          commandIndex += 1;
+          if (!commandResults.some((entry) => asNonEmptyString(entry.label) === label)) {
+            commandResults.push(cachedDiagnostic);
+          }
+          return cachedResult;
+        }
+      }
       const result = runAorCommand({
         launch: options.aorLaunch,
         cwd: targetCheckout.targetCheckoutRoot,
@@ -2929,7 +3051,7 @@ export function executeFullJourneyFlow(options) {
       );
     } else {
       artifacts.release_status = options.scenarioPolicy.release_required === true ? "fail" : "skipped";
-      markStage(stageMap, "release", "skipped", [], "Observation v1 ends at delivery.");
+      markStage(stageMap, "release", "skipped", [], "Delivery-default flow range excludes release.");
     }
 
     const auditRuns = runCommand("audit-runs", [
@@ -3176,7 +3298,7 @@ export function executeFullJourneyFlow(options) {
       artifacts.learning_loop_scorecard_file && artifacts.learning_loop_handoff_file && auditPayload.run_audit_records
         ? "pass"
         : "fail";
-    const verdictMatrix = {
+    const qualityJudgement = {
       scenario_family: asNonEmptyString(options.profile.scenario_family) || null,
       provider_variant_id: asNonEmptyString(options.profile.provider_variant_id) || null,
       feature_size: options.featureSize,
@@ -3210,41 +3332,41 @@ export function executeFullJourneyFlow(options) {
       delivery_release_quality: deliveryReleaseQuality,
       learning_loop_closure: learningLoopClosure,
       quality_gate_decision: artifacts.quality_gate_decision,
-      overall_verdict: "pass",
+      overall_status: "pass",
     };
-    verdictMatrix.feature_request_quality =
+    qualityJudgement.feature_request_quality =
       intakeGateStatus === "fail" ? "fail" : artifacts.intake_artifact_packet_file && artifacts.feature_request_file ? "pass" : "fail";
     const verdictStatuses = [
-      verdictMatrix.target_selection,
-      verdictMatrix.feature_request_quality,
-      verdictMatrix.scenario_coverage_status,
-      verdictMatrix.discovery_quality,
-      verdictMatrix.runtime_success,
-      verdictMatrix.target_baseline_status,
-      verdictMatrix.real_code_change_status,
-      verdictMatrix.post_run_verification_status,
-      verdictMatrix.post_run_diagnostic_status,
-      verdictMatrix.artifact_quality,
-      verdictMatrix.code_quality,
-      verdictMatrix.provider_execution_status,
-      verdictMatrix.feature_size_fit_status,
-      verdictMatrix.delivery_release_quality,
-      verdictMatrix.learning_loop_closure,
-      verdictMatrix.quality_gate_decision,
+      qualityJudgement.target_selection,
+      qualityJudgement.feature_request_quality,
+      qualityJudgement.scenario_coverage_status,
+      qualityJudgement.discovery_quality,
+      qualityJudgement.runtime_success,
+      qualityJudgement.target_baseline_status,
+      qualityJudgement.real_code_change_status,
+      qualityJudgement.post_run_verification_status,
+      qualityJudgement.post_run_diagnostic_status,
+      qualityJudgement.artifact_quality,
+      qualityJudgement.code_quality,
+      qualityJudgement.provider_execution_status,
+      qualityJudgement.feature_size_fit_status,
+      qualityJudgement.delivery_release_quality,
+      qualityJudgement.learning_loop_closure,
+      qualityJudgement.quality_gate_decision,
     ];
-    verdictMatrix.overall_verdict = verdictStatuses.includes("fail")
+    qualityJudgement.overall_status = verdictStatuses.includes("fail")
       ? "fail"
       : verdictStatuses.includes("warn")
         ? "pass_with_findings"
         : "pass";
-    artifacts.verdict_matrix = verdictMatrix;
+    artifacts.quality_judgement = qualityJudgement;
     artifacts.canonical_status = buildCanonicalRunStatus({
       commandResults,
       artifacts,
       artifactConsistency,
       reviewReport,
       scenarioCoverage,
-      verdictMatrix,
+      qualityJudgement,
       runTier: asNonEmptyString(artifacts.run_tier) || resolveRunTier(options.profile),
       scenarioPolicy: options.scenarioPolicy,
     });
@@ -3258,17 +3380,43 @@ export function executeFullJourneyFlow(options) {
     return {
       startedAt,
       finishedAt: nowIso(),
-      status: verdictMatrix.overall_verdict === "fail" ? "fail" : "pass",
+      status: qualityJudgement.overall_status === "fail" ? "fail" : "pass",
       stageResults: flattenStageMap(stageMap),
       commandResults,
       artifacts,
       sessionRoots,
     };
   } catch (error) {
+    if (isLiveE2eControllerStop(error)) {
+      artifacts.live_e2e_controller_stop = {
+        reason: error.message,
+        decision: asRecord(error.decision),
+        state: asRecord(error.state),
+      };
+      return {
+        startedAt,
+        finishedAt: nowIso(),
+        status: asNonEmptyString(asRecord(error.decision).action) === "continue" ? "pass" : "fail",
+        stageResults: flattenStageMap(stageMap),
+        commandResults,
+        artifacts,
+        sessionRoots,
+      };
+    }
     const summary = error instanceof Error ? error.message : String(error);
     if (!flattenStageMap(stageMap).some((stage) => stage.status === "fail")) {
       const fallbackStage = flattenStageMap(stageMap).find((stage) => stage.status === "pending")?.stage ?? "bootstrap";
-      markStage(stageMap, fallbackStage, "fail", [], summary);
+      markStageRaw(stageMap, fallbackStage, "fail", [], summary);
+      try {
+        options.stepController?.observeStage({
+          stage: fallbackStage,
+          stageResult: stageMap[fallbackStage],
+          commandResults,
+          artifacts,
+        });
+      } catch (controllerError) {
+        if (!isLiveE2eControllerStop(controllerError)) throw controllerError;
+      }
     }
     return {
       startedAt,

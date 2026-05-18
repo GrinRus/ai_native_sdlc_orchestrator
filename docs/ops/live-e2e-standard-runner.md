@@ -7,6 +7,8 @@ Provide one installed-user black-box proof runner for both live E2E layers:
 
 Live E2E simulates a user who has installed AOR, initializes or attaches a target repository, walks the public SDLC flow through CLI/API surfaces, and then emits a per-step black-box observation summary. It must not call private runtime internals to repair the run. It proves whether AOR works as a product from the public surface and whether produced artifacts explain each `pass`, `warn`, `not_pass`, block, and missing-evidence gap.
 
+The runner invokes the installed project flow step by step. Each step follows `plan -> execute -> inspect -> classify -> decide -> persist`; the next public command is allowed only after the current step decision is `continue` or after a requested interaction/frontend/manual action is completed through a public surface.
+
 W14 extends the full-journey layer into a curated matrix across:
 - `scenario_family`
 - `provider_variant_id`
@@ -115,7 +117,31 @@ node ./scripts/live-e2e/run-profile.mjs \
 Expected output includes:
 - `run_id`
 - `live_e2e_run_summary_file`
+- `live_e2e_controller_state_file`
 - `live_e2e_scorecard_files`
+
+## Manual step workflow
+Use the manual entrypoint when a maintainer wants to inspect or answer one controller decision at a time:
+
+```bash
+node ./scripts/live-e2e/manual-live-e2e.mjs \
+  --project-ref . \
+  --profile ./scripts/live-e2e/profiles/full-journey-regress-ky.yaml \
+  --run-id <stable-run-id>
+```
+
+One invocation runs only the next pending controller step, writes `live_e2e_controller_state_file` plus a `live-e2e-step-observation-*` artifact, and prints the current decision. Re-run the same command with the same `--run-id` after completing any required public action.
+
+## Harness evaluator
+Use the harness evaluator when the run must fail closed if any controller phase evidence is missing:
+
+```bash
+node ./scripts/live-e2e/harness-evaluator.mjs \
+  --project-ref . \
+  --profile ./scripts/live-e2e/profiles/full-journey-regress-ky.yaml
+```
+
+The evaluator uses the same controller as `run-profile.mjs`, runs in automatic mode until terminal success or an unresolved action, and rejects reports where any observed step lacks `plan`, execution, inspection, classification, or decision evidence.
 
 ## Layer behavior
 Bounded rehearsal layer:
@@ -138,7 +164,8 @@ Full-journey layer:
 - includes the materialized spec step-result as a concrete `packet://spec@evidence://...` promotion ref for adapter context, while `run start` binds the approved handoff ref into the compiled context.
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
-- may still run legacy audit or learning diagnostics after delivery for compatibility, but `release` and `learning` are excluded from the v1 observation matrix.
+- gates continuation after every observed public step by the online live E2E controller decision.
+- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles must execute them as ordinary observed steps.
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
 - runner auth probe is required;
@@ -153,12 +180,14 @@ Guided full-journey profiles set `guided_journey.enabled=true`. They still use t
 No proof-runner-side `examples/context/project profile` injection is allowed on the full-journey path.
 
 ## Inspect
-The proof runner is a one-shot command. Inspect `live_e2e_run_summary_file` directly:
+The proof runner is a black-box step controller. Inspect `live_e2e_run_summary_file` directly:
 - read `status`, `stage_results`, and `command_results`;
-- inspect `live_e2e_observation_report_file` first; it is the durable product-flow verdict for `discovery -> delivery`;
-- inspect `agent_artifact_review_request_file` when no `--agent-judge-file` was supplied;
+- inspect `live_e2e_observation_report_file` first; it is the durable ordered step journal;
+- inspect `live_e2e_controller_state_file` to see the current step, completed steps, phase history, pending decision, retry counters, and evidence refs;
+- inspect `live_e2e_step_observation_files[]` for per-step plan, public transcript, artifact refs, analysis, interaction decisions, and resume results;
+- inspect `agent_artifact_review_request_file` when an operator or agent needs to add semantic findings;
 - inspect `artifacts.routed_step_result_file`, `artifacts.review_report_file`, delivery artifacts, and public closure artifacts when present;
-- inspect `artifacts.verdict_matrix` only as a legacy diagnostic matrix.
+- inspect `quality_judgement` for target acceptance dimensions that are not already obvious from one step.
 
 Full-journey summaries must carry:
 - `target_catalog_id`
@@ -180,9 +209,11 @@ Full-journey summaries must carry:
 - `quality_gate_decision`
 - `review_report_file`
 - `live_e2e_observation_report_file`
+- `live_e2e_controller_state_file`
+- `live_e2e_step_observation_files`
 - `live_e2e_observation_overall_status`
 - `agent_artifact_review_request_file`
-- `verdict_matrix` when legacy diagnostics ran
+- `quality_judgement`
 - `canonical_status`
 - `command_status`
 - `target_verification_status`
@@ -210,7 +241,7 @@ Production-proof candidate summaries additionally carry:
 The W25-S03 committed production proof fixture is
 `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`. It is a sanitized derivative of the real
 W25-S02 `full-journey-production-proof-ky-openai.yaml` run and records `proof_scope=full_code_changing_runtime`,
-`real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, `overall_verdict=pass`,
+`real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, `overall_status=pass`,
 mission-scoped changed paths, Runtime Harness/review/delivery evidence summaries, and a passing no-upstream-write
 assertion. It intentionally excludes runtime output paths, target checkout contents, raw transcripts, and secrets.
 
@@ -234,21 +265,32 @@ Bounded summaries continue to carry:
 - `adapter_raw_evidence_ref`
 
 ## Observation Report
-The runner writes `live-e2e-observation-report` for every profile. The canonical v1 range is:
+The runner writes `live-e2e-observation-report` for every profile. The report is an ordered `step_journal`, not a post-run matrix.
+
+Default profiles use `live_e2e.flow_range_policy=delivery_default`:
 
 `discovery -> spec -> planning -> handoff -> execution -> review -> qa -> delivery`
 
-`project init`, `intake create`, `project analyze`, and readiness validation are prelude/readiness evidence. `release` and `learning` are not part of the v1 matrix.
+Guided or release profiles use `live_e2e.flow_range_policy=full_lifecycle`:
+
+`discovery -> spec -> planning -> handoff -> execution -> review -> qa -> delivery -> release -> learning`
+
+`project init`, `intake create`, `project analyze`, and readiness validation are prelude/readiness evidence.
 
 `overall_status` uses:
-- `pass`: the public flow reached delivery and all observed step, artifact, and post-delivery code dimensions passed.
-- `warn`: delivery evidence materialized, but code quality, no-op, Runtime Harness, review, post-delivery checks, legacy diagnostics, or artifact judge findings degraded the run.
-- `not_pass`: the black-box flow could not reach delivery or delivery evidence did not materialize.
+- `pass`: every observed public step and final analysis passed.
+- `warn`: the flow completed with non-terminal findings.
+- `not_pass`: the black-box flow failed.
+- `blocked`: execution reached a non-resumable control-plane boundary.
+- `interaction_required`: a step produced an unresolved `requested_interaction`.
+- `resumed`: an interaction answer resumed a recorded checkpoint.
+
+Delivery evidence no longer downgrades `not_pass` to `warn`.
 
 `deliver prepare` must be invoked with `--quality-gate-mode observe` by the live E2E runner. In observe mode Runtime Harness failures, no meaningful patch, and quality findings are copied into delivery output instead of preventing delivery evidence materialization.
 
-## Artifact Judge
-The runner does not call an in-product LLM route for artifact judging. The agent running live E2E reviews `agent_artifact_review_request_file` and may pass `--agent-judge-file <json>` on a subsequent run. The file should provide `artifact_quality_matrix[]` entries with `step`, `status`, `judge_source`, `artifact_refs`, and `findings`.
+## Step Analysis
+The runner performs deterministic analysis for every step from public command transcripts and artifact refs. The live E2E skill or operator may add semantic analysis by reviewing `agent_artifact_review_request_file` and passing `--agent-judge-file <json>` on a subsequent run. The file should provide `step_journal[]` entries with `step_id` and `semantic_analysis.status`, `semantic_analysis.judge_source`, and `semantic_analysis.findings`.
 
 Judge criteria:
 - traceability to feature request, mission, and previous step;
@@ -257,10 +299,10 @@ Judge criteria:
 - consistency with neighboring artifacts;
 - absence of synthetic or no-op explanations that hide failure.
 
-If no judge file is provided, the runner still writes the objective step/code matrix and sets each artifact-quality entry to `warn` with `agent-judge-not-provided`.
+If no judge file is provided, the runner still writes deterministic semantic analysis with `judge_source=deterministic-runner`.
 
-## Legacy Verdict Matrix
-Full-journey summaries may include one legacy verdict matrix with:
+## Quality Judgement
+Full-journey summaries may include `quality_judgement` with target acceptance dimensions:
 - `scenario_family`
 - `provider_variant_id`
 - `feature_size`
@@ -283,13 +325,10 @@ Full-journey summaries may include one legacy verdict matrix with:
 - `delivery_release_quality`
 - `learning_loop_closure`
 - `quality_gate_decision`
-- `overall_verdict`
-
-Legacy `overall_verdict=fail` no longer forces the live E2E observation status to fail when delivery evidence materialized. Those findings downgrade the observation to `warn` unless they prevented the public flow from reaching delivery.
+- `overall_status`
 
 ## Canonical Status
 The run summary's canonical status block is the status source for operators.
-Legacy `verdict_matrix` remains diagnostic.
 
 Canonical fields:
 - `command_status`: public subprocesses completed and emitted parseable payloads.
@@ -327,7 +366,7 @@ close required acceptance.
 - `review-report.provider_traceability` matches the requested provider variant and adapter path.
 - `review-report.feature_size_fit` stays inside the declared size budget for the mission.
 - `review-report.artifact_quality.verify_summary_ref` points at the post-run `project verify` summary.
-- `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and `runtime_harness_decision` are observed post-delivery dimensions. Failures downgrade observation to `warn` when delivery evidence exists.
+- `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and `runtime_harness_decision` are observed post-delivery dimensions. Failures remain terminal `not_pass` findings even when delivery evidence exists.
 - `delivery_manifest_file` exists and is anchored to the target checkout.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.
 - Guided proof execution starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; the target repository HEAD must remain unchanged and no remote write commands may be recorded unless an explicit future profile opts into network write-back.
@@ -369,7 +408,7 @@ Evidence note:
 - the bundle remains historical observation evidence. Under the canonical status model, it is tracked as `coverage_with_findings`; required matrix acceptance now needs a current `covered_pass` run on `run_tier=acceptance` or `run_tier=production-proof`.
 - the bundle proves all mandatory scenario families: `regress`, `release`, `repair`, and `governance`.
 - the bundle is explicitly classified as `proof_scope=coverage_with_findings` with `real_code_change_proof_complete=false`; it is coverage evidence, not full code-changing runtime proof.
-- `overall_verdict` remains `pass_with_findings` in the committed proof because the deterministic external runner mock does not materialize mission code changes, leaving `review-report.code_quality=warn`.
+- `quality_judgement.overall_status` remains `pass_with_findings` in the committed proof because the deterministic external runner mock does not materialize mission code changes, leaving `review-report.code_quality=warn`.
 
 ## W25-S03 production proof fixture (2026-05-08)
 Canonical fixture:
@@ -377,7 +416,7 @@ Canonical fixture:
 
 Evidence note:
 - the fixture is derived from a real `full-journey-production-proof-ky-openai.yaml` run, not from `--examples-root` or a deterministic mock runner.
-- it covers the required `ky.regress.small.openai` cell with `overall_verdict=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
+- it covers the required `ky.regress.small.openai` cell with `quality_judgement.overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 - it records mission-scoped changed paths under `source/utils/merge.ts` and `test/headers.ts`, plus pass summaries for post-run verification, Runtime Harness, review, delivery, and learning-loop closure.
 - it records `delivery_mode=patch-only`, `write_back_to_remote=false`, unchanged target `HEAD`, empty `commit_refs`, and `writeback_results=[patch-materialized]`.
 - it is sanitized for commit: no runtime output tree, target checkout, local absolute path, raw transcript, or secret material is included.

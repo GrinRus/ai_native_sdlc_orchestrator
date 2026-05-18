@@ -574,7 +574,7 @@
     "learning_loop_scorecard_file": "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/learning-loop-scorecard-cli-learning-handoff-w14-s07.full-journey-release-ky-medium-openai.json",
     "learning_loop_handoff_file": "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/.aor/projects/sindresorhus-ky-w14-s07.full-journey-release-ky-medium-openai/reports/learning-loop-handoff-w14-s07.full-journey-release-ky-medium-openai.json",
     "incident_report_file": null,
-    "verdict_matrix": {
+    "quality_judgement": {
       "scenario_family": "release",
       "provider_variant_id": "openai-primary",
       "feature_size": "medium",
@@ -589,7 +589,7 @@
       "feature_size_fit_status": "pass",
       "delivery_release_quality": "pass",
       "learning_loop_closure": "pass",
-      "overall_verdict": "pass_with_findings"
+      "overall_status": "pass_with_findings"
     }
   },
   "matrix_cell": {
@@ -627,7 +627,7 @@
       }
     ]
   },
-  "verdict_matrix": {
+  "quality_judgement": {
     "scenario_family": "release",
     "provider_variant_id": "openai-primary",
     "feature_size": "medium",
@@ -642,7 +642,7 @@
     "feature_size_fit_status": "pass",
     "delivery_release_quality": "pass",
     "learning_loop_closure": "pass",
-    "overall_verdict": "pass_with_findings"
+    "overall_status": "pass_with_findings"
   },
   "scorecard_files": [
     "./.aor/w14-s07-proof/runtime-ky-release-openai/projects/aor-core/reports/live-e2e-scorecard-target-w14-s07.full-journey-release-ky-medium-openai.json"

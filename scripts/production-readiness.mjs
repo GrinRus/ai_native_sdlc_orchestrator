@@ -145,7 +145,7 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
 
   const externalRunnerMode = String(proof.proof_method?.external_runner_mode ?? "");
   const targetVerdicts = Array.isArray(proof.targets)
-    ? proof.targets.map((target) => target.overall_verdict).filter(Boolean)
+    ? proof.targets.map((target) => target.overall_status).filter(Boolean)
     : [];
   const changedPaths = [
     ...(Array.isArray(proof.changed_paths) ? proof.changed_paths : []),
@@ -175,15 +175,15 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
   if (targetVerdicts.length === 0 || targetVerdicts.some((verdict) => verdict !== "pass")) {
     findings.push(`${proofFixturePath} must record pass target verdicts.`);
   }
-  if (proof.verdict_matrix?.overall_verdict !== "pass") {
-    findings.push(`${proofFixturePath} must record verdict_matrix.overall_verdict=pass.`);
+  if (proof.quality_judgement?.overall_status !== "pass") {
+    findings.push(`${proofFixturePath} must record quality_judgement.overall_status=pass.`);
   }
 
   const requiredTargetVerdicts = Array.isArray(proof.production_proof?.required_target_verdicts)
     ? proof.production_proof.required_target_verdicts
     : [];
   for (const field of requiredTargetVerdicts) {
-    if (proof.verdict_matrix?.[field] !== "pass") {
+    if (proof.quality_judgement?.[field] !== "pass") {
       findings.push(`${proofFixturePath} required target verdict '${field}' is not pass.`);
     }
   }
@@ -308,7 +308,7 @@ function checkStoryHonesty(rootDir) {
     const evidence = row.evidence;
     for (const requiredEvidence of [
       "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json",
-      "overall_verdict=pass",
+      "overall_status=pass",
       "real_code_change_proof_complete=true",
       "external_runner_mode=real-external-process",
     ]) {
