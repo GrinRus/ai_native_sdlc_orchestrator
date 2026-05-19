@@ -124,6 +124,31 @@ test("compileStepContext preserves explicit packet refs beyond prompt required_i
   });
 });
 
+test("compileStepContext resolves concrete named packet refs for adapter input", () => {
+  withTempRepo((repoRoot) => {
+    const resolved = resolveExecutionArtifacts(repoRoot, "implement");
+    const handoffRef = "packet://handoff@evidence://.aor/projects/demo/artifacts/handoff.json";
+    const specRef = "packet://spec@evidence://.aor/projects/demo/reports/spec-step-result.json";
+    const compiled = compileStepContext({
+      projectRoot: repoRoot,
+      projectProfilePath: resolved.projectProfilePath,
+      stepClass: "implement",
+      routeResolution: resolved.routeResolution,
+      assetResolution: resolved.assetResolution,
+      policyResolution: resolved.policyResolution,
+      inputPacketRefs: [handoffRef, specRef],
+      runtimeEvidenceRefs: [],
+      skillsRoot: path.join(repoRoot, "examples/skills"),
+    });
+
+    const requiredPackets = compiled.compiled_context.required_inputs_resolved.packets.required;
+    assert.equal(requiredPackets.find((entry) => entry.packet === "handoff")?.resolved_ref, handoffRef);
+    assert.equal(requiredPackets.find((entry) => entry.packet === "spec")?.resolved_ref, specRef);
+    assert.ok(compiled.context_compilation.resolved_input_packet_refs.includes(handoffRef));
+    assert.ok(compiled.context_compilation.resolved_input_packet_refs.includes(specRef));
+  });
+});
+
 test("compileStepContext fails deterministically when required inputs are missing", () => {
   withTempRepo((repoRoot) => {
     const promptPath = path.join(repoRoot, "examples/prompts/runner-default.yaml");

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -44,6 +45,9 @@ function withTempRepo(callback) {
  *   timeoutMs?: number,
  *   handler?: string | null,
  *   permissionPolicy?: Record<string, unknown>,
+ *   requestTransport?: string,
+ *   requestFile?: Record<string, unknown>,
+ *   requestViaStdin?: boolean,
  * }} options
  */
 function buildExternalRunnerProfile(options) {
@@ -53,7 +57,7 @@ function buildExternalRunnerProfile(options) {
     evidence_namespace: "evidence://adapter-live/codex-cli",
     external_runtime: {
       command: options.command,
-      request_via_stdin: true,
+      request_via_stdin: options.requestViaStdin ?? true,
       timeout_ms: options.timeoutMs ?? 30000,
       permission_policy:
         options.permissionPolicy ??
@@ -67,6 +71,12 @@ function buildExternalRunnerProfile(options) {
         },
     },
   };
+  if (options.requestTransport) {
+    execution.external_runtime.request_transport = options.requestTransport;
+  }
+  if (options.requestFile) {
+    execution.external_runtime.request_file = options.requestFile;
+  }
   if (options.handler !== null) {
     execution.handler = options.handler ?? "codex-cli-external-runner";
   }
@@ -620,13 +630,85 @@ test("live adapter reports timeout distinctly from launch failures", () => {
   assert.equal(response.output.external_runner.timed_out, true);
 });
 
-test("live adapter applies resolved route timeout before adapter default timeout", () => {
+test("live adapter hard-kills external runners that ignore SIGTERM on timeout", () => {
   const adapter = createLiveAdapter({
     adapterId: "claude-code",
     adapterProfile: buildExternalRunnerProfile({
       command: process.execPath,
-      args: ["-e", "setTimeout(() => process.stdout.write(JSON.stringify({status:'success'})), 50);"],
+      args: ["-e", "process.on('SIGTERM', () => {}); setTimeout(() => {}, 1000);"],
       timeoutMs: 10,
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-live-timeout-hard-kill",
+    run_id: "run-live-timeout-hard-kill",
+    step_id: "step-live-timeout-hard-kill",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "failed");
+  assert.equal(response.output.failure_kind, "external-runner-timeout");
+  assert.equal(response.output.external_runner.timed_out, true);
+  assert.equal(response.output.external_runner.signal, "SIGKILL");
+});
+
+test("live adapter kills external runner process groups on timeout", () => {
+  const markerFile = path.join(os.tmpdir(), `aor-adapter-orphan-${process.pid}-${Date.now()}.txt`);
+  const orphanScript = [
+    "const fs = require('node:fs');",
+    `setTimeout(() => fs.writeFileSync(${JSON.stringify(markerFile)}, 'survived'), 200);`,
+    "setTimeout(() => {}, 1000);",
+  ].join("");
+  const runnerScript = [
+    "const { spawn } = require('node:child_process');",
+    `spawn(process.execPath, ['-e', ${JSON.stringify(orphanScript)}], { stdio: 'ignore' });`,
+    "setTimeout(() => {}, 1000);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "open-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", runnerScript],
+      timeoutMs: 10,
+      handler: null,
+    }),
+  });
+
+  try {
+    const response = adapter.execute({
+      request_id: "req-live-timeout-process-group",
+      run_id: "run-live-timeout-process-group",
+      step_id: "step-live-timeout-process-group",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "failed");
+    assert.equal(response.output.failure_kind, "external-runner-timeout");
+    assert.equal(response.output.external_runner.timed_out, true);
+    spawnSync(process.execPath, ["-e", "setTimeout(() => {}, 350);"]);
+    assert.equal(fs.existsSync(markerFile), false);
+  } finally {
+    fs.rmSync(markerFile, { force: true });
+  }
+});
+
+test("live adapter applies resolved route timeout when it is shorter than the adapter timeout", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "claude-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "setTimeout(() => process.stdout.write(JSON.stringify({status:'success'})), 10);"],
+      timeoutMs: 3000,
       handler: null,
     }),
   });
@@ -642,7 +724,7 @@ test("live adapter applies resolved route timeout before adapter default timeout
       policy_id: "policy.step.runner.default",
       resolved_bounds: {
         budget: {
-          timeout_sec: 3,
+          timeout_sec: 1,
         },
       },
     },
@@ -650,8 +732,43 @@ test("live adapter applies resolved route timeout before adapter default timeout
   });
 
   assert.equal(response.status, "success");
-  assert.equal(response.output.external_runner.timeout_ms, 3000);
+  assert.equal(response.output.external_runner.timeout_ms, 1000);
   assert.equal(response.output.external_runner.timed_out, false);
+});
+
+test("live adapter caps resolved route timeout at the adapter hard timeout", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "open-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", "setTimeout(() => process.stdout.write(JSON.stringify({status:'success'})), 1000);"],
+      timeoutMs: 10,
+      handler: null,
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-live-route-timeout-cap",
+    run_id: "run-live-route-timeout-cap",
+    step_id: "step-live-route-timeout-cap",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: {
+      policy_id: "policy.step.runner.default",
+      resolved_bounds: {
+        budget: {
+          timeout_sec: 3,
+        },
+      },
+    },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "failed");
+  assert.equal(response.output.failure_kind, "external-runner-timeout");
+  assert.equal(response.output.external_runner.timeout_ms, 10);
+  assert.equal(response.output.external_runner.timed_out, true);
 });
 
 test("live adapter baseline accepts non-codex adapter ids when an external runner profile is supplied", () => {
@@ -681,6 +798,60 @@ test("live adapter baseline accepts non-codex adapter ids when an external runne
   assert.equal(response.status, "success");
   assert.equal(response.adapter_id, "open-code");
   assert.equal(response.tool_traces[0].kind, "open-code-external-runner");
+});
+
+test("live adapter supports file-attached request transport for argv prompt runners", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const adapter = createLiveAdapter({
+      adapterId: "open-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "const fileIndex=process.argv.indexOf('--file');",
+            "const filePath=fileIndex>=0?process.argv[fileIndex+1]:'';",
+            "const request=JSON.parse(fs.readFileSync(filePath,'utf8'));",
+            "process.stdout.write(JSON.stringify({",
+            "status:'success',",
+            "summary:'file transport ok',",
+            "output:{message_seen:process.argv.includes('Follow the attached AOR adapter request JSON.'),request_id:request.request.request_id},",
+            "evidence_refs:['evidence://adapter-live/open-code/file-transport']",
+            "}));",
+          ].join(""),
+        ],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "file-attachment",
+        requestFile: {
+          message: "Follow the attached AOR adapter request JSON.",
+          argument: "--file",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-open-code-file",
+      run_id: "run-open-code-file",
+      step_id: "step-open-code-file",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.request_transport, "file-attachment");
+    assert.match(response.output.external_runner.request_file_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-request-/u);
+    assert.equal(response.output.runner_output.message_seen, true);
+    assert.equal(response.output.runner_output.request_id, "req-open-code-file");
+  });
 });
 
 test("live adapter parses JSONL runner output without requiring an AOR envelope", () => {

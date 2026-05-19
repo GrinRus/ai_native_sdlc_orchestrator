@@ -560,7 +560,10 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
       stepClass: "implement",
       dryRun: false,
       approvedHandoffRef: "evidence://handoff/approved-1",
-      promotionEvidenceRefs: ["evidence://promotion/pass-1"],
+      promotionEvidenceRefs: [
+        "evidence://promotion/pass-1",
+        "packet://spec@evidence://reports/spec-step-result.json",
+      ],
       executionRoot,
     });
 
@@ -575,6 +578,22 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
     assert.equal(result.stepResult.routed_execution.adapter_response.status, "success");
     assert.equal(result.stepResult.routed_execution.adapter_response.output.mode, "execute");
     assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.command, process.execPath);
+    assert.ok(
+      result.stepResult.routed_execution.adapter_request.input_packet_refs.includes(
+        "packet://handoff@evidence://handoff/approved-1",
+      ),
+    );
+    assert.ok(
+      result.stepResult.routed_execution.adapter_request.input_packet_refs.includes(
+        "packet://spec@evidence://reports/spec-step-result.json",
+      ),
+    );
+    assert.equal(
+      result.stepResult.routed_execution.adapter_request.context.required_inputs_resolved.packets.required.find(
+        (entry) => entry.packet === "handoff",
+      )?.resolved_ref,
+      "packet://handoff@evidence://handoff/approved-1",
+    );
     assert.equal(result.stepResult.external_runner.command, process.execPath);
     assert.equal(result.stepResult.external_runner.permission_mode, "full-bypass");
     assert.equal(

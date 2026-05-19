@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -51,6 +52,7 @@ function looksLikeEvidenceRef(value) {
   return (
     value.startsWith("evidence://") ||
     value.startsWith("compiled-context://") ||
+    value.startsWith("packet://") ||
     value.includes("/") ||
     value.includes("\\") ||
     /\.(json|jsonl|yaml|yml|patch|log)$/iu.test(value)
@@ -72,6 +74,46 @@ function collectStringRefs(value) {
     return Object.values(value).flatMap((entry) => collectStringRefs(entry));
   }
   return [];
+}
+
+/**
+ * @param {string} filePath
+ * @returns {string}
+ */
+function canonicalEvidencePath(filePath) {
+  try {
+    return fs.realpathSync.native(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toProjectEvidenceRef(projectRoot, filePath) {
+  return `evidence://${path
+    .relative(canonicalEvidencePath(projectRoot), canonicalEvidencePath(filePath))
+    .replace(/\\/g, "/")}`;
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} packetName
+ * @param {string | null | undefined} filePath
+ * @returns {string | null}
+ */
+function toPacketEvidenceRef(projectRoot, packetName, filePath) {
+  const concreteFilePath = asNonEmptyString(filePath);
+  if (!concreteFilePath) {
+    return null;
+  }
+  const sourceRef = path.isAbsolute(concreteFilePath)
+    ? toProjectEvidenceRef(projectRoot, concreteFilePath)
+    : concreteFilePath;
+  return `packet://${packetName}@${sourceRef}`;
 }
 
 /**
@@ -511,6 +553,37 @@ function resolveBaselineGateMode(profile) {
 }
 
 /**
+ * @param {string} value
+ * @param {number} maxLength
+ * @returns {string}
+ */
+function truncateToken(value, maxLength) {
+  return value.length <= maxLength ? value : value.slice(0, maxLength).replace(/[._-]+$/u, "");
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function shortHash(value) {
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
+}
+
+/**
+ * @param {{ sourcePath: string, runId: string, phase: string, index: number }} options
+ * @returns {string}
+ */
+function preservedRuntimeFileName(options) {
+  const extension = path.extname(options.sourcePath) || ".json";
+  const sourceBase = path.basename(options.sourcePath, extension);
+  const phaseToken = truncateToken(normalizeId(options.phase), 32) || "runtime";
+  const runToken = truncateToken(normalizeId(options.runId), 72) || "run";
+  const sourceToken = truncateToken(normalizeId(sourceBase), 96) || "artifact";
+  const digest = shortHash(`${options.runId}\n${options.sourcePath}`);
+  return `live-e2e-${phaseToken}-${runToken}-${String(options.index).padStart(2, "0")}-${sourceToken}-${digest}${extension}`;
+}
+
+/**
  * @param {{ sourcePath: string | null, destinationRoot: string, runId: string, phase: string, index: number }} options
  * @returns {string | null}
  */
@@ -519,7 +592,12 @@ function preserveRuntimeFile(options) {
   if (!sourcePath || !fileExists(sourcePath)) return null;
   const destination = path.join(
     options.destinationRoot,
-    `live-e2e-${normalizeId(options.phase)}-${normalizeId(options.runId)}-${String(options.index).padStart(2, "0")}-${path.basename(sourcePath)}`,
+    preservedRuntimeFileName({
+      sourcePath,
+      runId: options.runId,
+      phase: options.phase,
+      index: options.index,
+    }),
   );
   fs.copyFileSync(sourcePath, destination);
   return destination;
@@ -2314,11 +2392,17 @@ export function executeFullJourneyFlow(options) {
       "Approved handoff validated for execution start.",
     );
 
+    const specPacketEvidenceRef = toPacketEvidenceRef(
+      targetCheckout.targetCheckoutRoot,
+      "spec",
+      asNonEmptyString(artifacts.spec_step_result_file),
+    );
     const promotionEvidenceRefs = uniqueStrings([
       ...(artifacts.execution_readiness_file ? [/** @type {string} */ (artifacts.execution_readiness_file)] : []),
       ...(artifacts.baseline_routed_dry_run_step_result_file
         ? [/** @type {string} */ (artifacts.baseline_routed_dry_run_step_result_file)]
         : []),
+      ...(specPacketEvidenceRef ? [specPacketEvidenceRef] : []),
     ]);
 
     const runStart = runCommand("run-start", [

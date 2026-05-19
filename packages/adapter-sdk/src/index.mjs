@@ -9,6 +9,133 @@ import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs"
 export { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 
 const ADAPTER_RESPONSE_STATUSES = Object.freeze(["success", "failed", "blocked"]);
+const EXTERNAL_REQUEST_TRANSPORTS = Object.freeze(["stdin-json", "file-attachment", "argv-json", "none"]);
+
+const EXTERNAL_RUNTIME_SUPERVISOR_SOURCE = String.raw`
+const { spawn } = require("node:child_process");
+const fs = require("node:fs");
+
+function emit(result) {
+  process.stdout.write(JSON.stringify(result) + "\n");
+}
+
+function readOptions() {
+  try {
+    return JSON.parse(fs.readFileSync(0, "utf8"));
+  } catch (error) {
+    emit({
+      status: null,
+      signal: null,
+      stdout: "",
+      stderr: "",
+      error_code: "SUPERVISOR_INPUT_INVALID",
+      error_message: error instanceof Error ? error.message : String(error),
+      timed_out: false,
+    });
+    process.exit(0);
+  }
+}
+
+function appendBounded(current, chunk, maxBuffer) {
+  const next = current + chunk;
+  return next.length > maxBuffer ? next.slice(0, maxBuffer) : next;
+}
+
+function killProcessTree(child, signal) {
+  if (!child || typeof child.pid !== "number") {
+    return;
+  }
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-child.pid, signal);
+    } catch {}
+  }
+  try {
+    child.kill(signal);
+  } catch {}
+}
+
+const options = readOptions();
+const timeoutMs = Number.isFinite(options.timeout_ms) && options.timeout_ms > 0 ? Math.floor(options.timeout_ms) : 30000;
+const maxBuffer = Number.isFinite(options.max_buffer) && options.max_buffer > 0 ? Math.floor(options.max_buffer) : 10 * 1024 * 1024;
+let stdout = "";
+let stderr = "";
+let timedOut = false;
+let emitted = false;
+
+function finish(result) {
+  if (emitted) {
+    return;
+  }
+  emitted = true;
+  emit(result);
+}
+
+let child;
+try {
+  child = spawn(options.command, Array.isArray(options.args) ? options.args : [], {
+    cwd: options.cwd,
+    env: options.env,
+    detached: process.platform !== "win32",
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+} catch (error) {
+  finish({
+    status: null,
+    signal: null,
+    stdout,
+    stderr,
+    error_code: error && typeof error.code === "string" ? error.code : "EXTERNAL_RUNTIME_SPAWN_FAILED",
+    error_message: error instanceof Error ? error.message : String(error),
+    timed_out: false,
+  });
+  process.exit(0);
+}
+
+const timer = setTimeout(() => {
+  timedOut = true;
+  killProcessTree(child, "SIGKILL");
+}, timeoutMs);
+
+child.stdout.setEncoding("utf8");
+child.stderr.setEncoding("utf8");
+child.stdout.on("data", (chunk) => {
+  stdout = appendBounded(stdout, chunk, maxBuffer);
+});
+child.stderr.on("data", (chunk) => {
+  stderr = appendBounded(stderr, chunk, maxBuffer);
+});
+child.on("error", (error) => {
+  clearTimeout(timer);
+  finish({
+    status: null,
+    signal: null,
+    stdout,
+    stderr,
+    error_code: error && typeof error.code === "string" ? error.code : "EXTERNAL_RUNTIME_SPAWN_FAILED",
+    error_message: error instanceof Error ? error.message : String(error),
+    timed_out: timedOut,
+  });
+});
+child.on("close", (status, signal) => {
+  clearTimeout(timer);
+  finish({
+    status,
+    signal,
+    stdout,
+    stderr,
+    error_code: timedOut ? "ETIMEDOUT" : null,
+    error_message: timedOut ? "External runtime timed out after " + timeoutMs + "ms." : null,
+    timed_out: timedOut,
+  });
+});
+
+if (typeof options.input === "string") {
+  child.stdin.end(options.input);
+} else {
+  child.stdin.end();
+}
+`;
 
 export const STEP_LIFECYCLE_HOOKS = Object.freeze([
   "before_step",
@@ -71,6 +198,27 @@ function asPositiveInteger(value, fallback) {
 }
 
 /**
+ * @param {Record<string, unknown>} externalRuntime
+ * @param {boolean} requestViaStdin
+ * @returns {string}
+ */
+function resolveRequestTransport(externalRuntime, requestViaStdin) {
+  const configuredTransport = asOptionalString(externalRuntime.request_transport);
+  if (configuredTransport) {
+    return configuredTransport;
+  }
+  return requestViaStdin ? "stdin-json" : "none";
+}
+
+/**
+ * @param {string} requestTransport
+ * @returns {boolean}
+ */
+function isSupportedRequestTransport(requestTransport) {
+  return EXTERNAL_REQUEST_TRANSPORTS.includes(requestTransport);
+}
+
+/**
  * @param {Record<string, unknown>} request
  * @param {number} fallback
  * @returns {number}
@@ -83,7 +231,86 @@ function resolveRequestTimeoutMs(request, fallback) {
   if (typeof timeoutSec !== "number" || !Number.isFinite(timeoutSec) || timeoutSec <= 0) {
     return fallback;
   }
-  return Math.max(1, Math.floor(timeoutSec * 1000));
+  return Math.min(fallback, Math.max(1, Math.floor(timeoutSec * 1000)));
+}
+
+/**
+ * @param {{
+ *   command: string,
+ *   args?: string[],
+ *   cwd: string,
+ *   env: NodeJS.ProcessEnv,
+ *   input?: string,
+ *   timeout: number,
+ *   maxBuffer: number,
+ * }} options
+ * @returns {{
+ *   status: number | null,
+ *   signal: string | null,
+ *   stdout: string,
+ *   stderr: string,
+ *   error: Error | null,
+ * }}
+ */
+export function runExternalRuntimeProcessSync(options) {
+  const timeoutMs = asPositiveInteger(options.timeout, 30000);
+  const maxBuffer = asPositiveInteger(options.maxBuffer, 10 * 1024 * 1024);
+  const supervisorPayload = {
+    command: options.command,
+    args: Array.isArray(options.args) ? options.args : [],
+    cwd: options.cwd,
+    env: options.env,
+    input: options.input,
+    timeout_ms: timeoutMs,
+    max_buffer: maxBuffer,
+  };
+  const supervisor = spawnSync(process.execPath, ["-e", EXTERNAL_RUNTIME_SUPERVISOR_SOURCE], {
+    cwd: options.cwd,
+    env: process.env,
+    encoding: "utf8",
+    input: JSON.stringify(supervisorPayload),
+    timeout: timeoutMs + 5000,
+    killSignal: "SIGKILL",
+    maxBuffer: Math.max(maxBuffer * 2 + 1024 * 1024, 1024 * 1024),
+  });
+
+  if (supervisor.error instanceof Error) {
+    return {
+      status: supervisor.status,
+      signal: supervisor.signal,
+      stdout: "",
+      stderr: typeof supervisor.stderr === "string" ? supervisor.stderr : "",
+      error: supervisor.error,
+    };
+  }
+
+  const supervisorStdout = typeof supervisor.stdout === "string" ? supervisor.stdout.trim() : "";
+  try {
+    const parsed = asRecord(JSON.parse(supervisorStdout));
+    const errorCode = asOptionalString(parsed.error_code);
+    const errorMessage = asOptionalString(parsed.error_message);
+    const error = errorCode || errorMessage ? new Error(errorMessage ?? errorCode ?? "External runtime failed.") : null;
+    if (error && errorCode) {
+      Object.assign(error, { code: errorCode });
+    }
+    return {
+      status: typeof parsed.status === "number" ? parsed.status : null,
+      signal: asOptionalString(parsed.signal),
+      stdout: typeof parsed.stdout === "string" ? parsed.stdout : "",
+      stderr: typeof parsed.stderr === "string" ? parsed.stderr : "",
+      error,
+    };
+  } catch (error) {
+    const parseError = error instanceof Error ? error : new Error(String(error));
+    Object.assign(parseError, { code: "SUPERVISOR_RESULT_INVALID" });
+    return {
+      status: supervisor.status,
+      signal: supervisor.signal,
+      stdout: "",
+      stderr: [typeof supervisor.stderr === "string" ? supervisor.stderr : "", supervisorStdout].filter(Boolean).join("\n"),
+      error: parseError,
+    };
+  }
 }
 
 /**
@@ -709,6 +936,7 @@ export function createLiveAdapter(options) {
   const externalRuntime = asRecord(executionProfile.external_runtime);
   const runtimeCommand = asOptionalString(externalRuntime.command);
   const requestViaStdin = externalRuntime.request_via_stdin !== false;
+  const requestTransport = resolveRequestTransport(externalRuntime, requestViaStdin);
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
   const envOverrides = asStringMap(externalRuntime.env);
   const runtimeEvidenceRoot = asOptionalString(options.runtimeEvidenceRoot);
@@ -860,7 +1088,41 @@ export function createLiveAdapter(options) {
         });
       }
 
-      const runtimeArgs = runtimeInvocation.args;
+      if (!isSupportedRequestTransport(requestTransport)) {
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: "blocked",
+          summary: `Adapter '${adapterId}' live runtime request transport '${requestTransport}' is not supported.`,
+          output: {
+            mode: "execute",
+            blocked: true,
+            route_id: routeId,
+            provider_adapter: adapterId,
+            compiled_context_ref: compiledContextRef,
+            failure_kind: "request-transport-invalid",
+            external_runner: {
+              runtime_mode: runtimeMode,
+              command: runtimeCommand,
+              args: runtimeInvocation.args,
+              permission_mode: runtimeInvocation.permissionMode,
+              permission_mode_source: runtimeInvocation.source,
+              execution_root: executionRoot,
+              request_transport: requestTransport,
+            },
+          },
+          evidence_refs: [`${evidenceNamespace}/${normalizedEvidenceToken}`],
+          tool_traces: [
+            {
+              phase: "invoke_adapter",
+              kind: handlerKind,
+              detail: `request_transport=${requestTransport} invalid`,
+            },
+          ],
+        });
+      }
+
+      let runtimeArgs = [...runtimeInvocation.args];
       const requestTimeoutMs = resolveRequestTimeoutMs(envelope, timeoutMs);
       const startedAt = new Date().toISOString();
       const runnerInput = {
@@ -872,12 +1134,41 @@ export function createLiveAdapter(options) {
           permission_mode: runtimeInvocation.permissionMode,
         },
       };
+      const serializedRunnerInput = `${JSON.stringify(runnerInput)}\n`;
+      const evidenceDir = runtimeEvidenceRoot
+        ? path.isAbsolute(runtimeEvidenceRoot)
+          ? runtimeEvidenceRoot
+          : path.resolve(executionRoot, runtimeEvidenceRoot)
+        : null;
+      let requestInput = undefined;
+      let requestFile = null;
+      let requestFileRef = null;
+      if (requestTransport === "stdin-json") {
+        requestInput = serializedRunnerInput;
+      } else if (requestTransport === "argv-json") {
+        runtimeArgs = [...runtimeArgs, serializedRunnerInput.trim()];
+      } else if (requestTransport === "file-attachment") {
+        const requestFileProfile = asRecord(externalRuntime.request_file);
+        const requestMessage =
+          asOptionalString(requestFileProfile.message) ?? "Follow the attached AOR adapter request JSON.";
+        const requestFileArgument = asOptionalString(requestFileProfile.argument) ?? "--file";
+        const requestDir = evidenceDir ?? path.join(executionRoot, ".aor", "adapter-requests");
+        fs.mkdirSync(requestDir, { recursive: true });
+        requestFile = path.join(
+          requestDir,
+          `adapter-live-request-${adapterId}-${normalizedEvidenceToken}-${Date.now()}.json`,
+        );
+        fs.writeFileSync(requestFile, serializedRunnerInput, "utf8");
+        requestFileRef = toEvidenceRef(projectRoot, requestFile);
+        runtimeArgs = [...runtimeArgs, requestMessage, requestFileArgument, requestFile];
+      }
 
-      const invocation = spawnSync(runtimeCommand, runtimeArgs, {
+      const invocation = runExternalRuntimeProcessSync({
+        command: runtimeCommand,
+        args: runtimeArgs,
         cwd: executionRoot,
         env: runnerEnv,
-        encoding: "utf8",
-        input: requestViaStdin ? `${JSON.stringify(runnerInput)}\n` : undefined,
+        input: requestInput,
         timeout: requestTimeoutMs,
         maxBuffer: 10 * 1024 * 1024,
       });
@@ -885,7 +1176,8 @@ export function createLiveAdapter(options) {
 
       const invocationError = invocation.error instanceof Error ? invocation.error : null;
       const invocationTimedOut =
-        invocationError?.code === "ETIMEDOUT" || (invocation.signal === "SIGTERM" && invocation.status === null);
+        invocationError?.code === "ETIMEDOUT" ||
+        ((invocation.signal === "SIGTERM" || invocation.signal === "SIGKILL") && invocation.status === null);
       const invocationFailed = invocationError !== null || invocation.status !== 0;
       const stdout = typeof invocation.stdout === "string" ? invocation.stdout : "";
       const stderr = typeof invocation.stderr === "string" ? invocation.stderr : "";
@@ -905,6 +1197,9 @@ export function createLiveAdapter(options) {
           args: runtimeArgs,
           timeout_ms: requestTimeoutMs,
           request_via_stdin: requestViaStdin,
+          request_transport: requestTransport,
+          request_file: requestFile,
+          request_file_ref: requestFileRef,
           execution_root: executionRoot,
           permission_mode: runtimeInvocation.permissionMode,
           permission_mode_source: runtimeInvocation.source,
@@ -924,10 +1219,7 @@ export function createLiveAdapter(options) {
 
       let rawEvidenceFile = null;
       let rawEvidenceRef = null;
-      if (runtimeEvidenceRoot) {
-        const evidenceDir = path.isAbsolute(runtimeEvidenceRoot)
-          ? runtimeEvidenceRoot
-          : path.resolve(executionRoot, runtimeEvidenceRoot);
+      if (evidenceDir) {
         fs.mkdirSync(evidenceDir, { recursive: true });
         rawEvidenceFile = path.join(
           evidenceDir,
@@ -955,6 +1247,8 @@ export function createLiveAdapter(options) {
           exit_code: invocation.status,
           signal: invocation.signal,
           timed_out: invocationTimedOut,
+          request_transport: requestTransport,
+          request_file_ref: requestFileRef,
           raw_evidence_ref: rawEvidenceRef,
         },
         runner_output: runnerPayload,

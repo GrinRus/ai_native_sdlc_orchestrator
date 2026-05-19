@@ -1,10 +1,10 @@
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
 import {
   classifyExternalRunnerFailure,
+  runExternalRuntimeProcessSync,
   resolveExternalRuntimePermissionPolicy,
 } from "../../../packages/adapter-sdk/src/index.mjs";
 import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
@@ -73,6 +73,18 @@ function resolveCommandForPreflight(command, env, cwd) {
     }
   }
   return null;
+}
+
+/**
+ * @param {Record<string, unknown>} externalRuntime
+ * @returns {string}
+ */
+function resolvePreflightRequestTransport(externalRuntime) {
+  const configuredTransport = asNonEmptyString(externalRuntime.request_transport);
+  if (configuredTransport) {
+    return configuredTransport;
+  }
+  return externalRuntime.request_via_stdin === false ? "none" : "stdin-json";
 }
 
 /**
@@ -175,6 +187,7 @@ export function runLiveAdapterPreflight(options) {
   const runtimeCommand = asNonEmptyString(externalRuntime.command);
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
   const probeTimeoutMs = asPositiveInteger(externalRuntime.preflight_timeout_ms, Math.min(timeoutMs, 120000));
+  const requestTransport = resolvePreflightRequestTransport(externalRuntime);
   const envOverrides = asStringMap(externalRuntime.env);
   const runnerEnv = {
     ...options.env,
@@ -195,6 +208,7 @@ export function runLiveAdapterPreflight(options) {
       timeout_ms: timeoutMs,
       preflight_timeout_ms: probeTimeoutMs,
       auth_probe_timeout_ms: probeTimeoutMs,
+      request_transport: requestTransport,
       permission_mode: runtimeInvocation.permissionMode,
       permission_mode_source: runtimeInvocation.source,
     },
@@ -218,6 +232,13 @@ export function runLiveAdapterPreflight(options) {
     return fail(
       runtimeInvocation.failureKind,
       `Adapter '${adapterId}' live runtime permission policy is invalid: ${runtimeInvocation.message}`,
+      runtimeReport,
+    );
+  }
+  if (!["stdin-json", "file-attachment", "argv-json", "none"].includes(requestTransport)) {
+    return fail(
+      "request-transport-invalid",
+      `Adapter '${adapterId}' live runtime request transport '${requestTransport}' is not supported.`,
       runtimeReport,
     );
   }
@@ -272,17 +293,36 @@ export function runLiveAdapterPreflight(options) {
     },
   })}\n`;
   const runProbeAttempt = (kind, attempt, objective, extraRequest = {}) => {
-    const probe = spawnSync(resolvedCommand, runtimeInvocation.args, {
+    const probeInput = buildProbeInput(kind, objective, extraRequest);
+    let probeArgs = [...runtimeInvocation.args];
+    let probeStdin = undefined;
+    if (requestTransport === "stdin-json") {
+      probeStdin = probeInput;
+    } else if (requestTransport === "argv-json") {
+      probeArgs = [...probeArgs, probeInput.trim()];
+    } else if (requestTransport === "file-attachment") {
+      const requestFileProfile = asRecord(externalRuntime.request_file);
+      const requestMessage =
+        asNonEmptyString(requestFileProfile.message) ?? "Follow the attached AOR adapter request JSON.";
+      const requestFileArgument = asNonEmptyString(requestFileProfile.argument) ?? "--file";
+      fs.mkdirSync(permissionProbeRoot, { recursive: true });
+      const requestFile = path.join(permissionProbeRoot, `preflight-${normalizeId(kind)}-${attempt}-request.json`);
+      fs.writeFileSync(requestFile, probeInput, "utf8");
+      probeArgs = [...probeArgs, requestMessage, requestFileArgument, requestFile];
+    }
+    const probe = runExternalRuntimeProcessSync({
+      command: resolvedCommand,
+      args: probeArgs,
       cwd: options.targetCheckoutRoot,
       env: runnerEnv,
-      encoding: "utf8",
-      input: buildProbeInput(kind, objective, extraRequest),
+      input: probeStdin,
       timeout: probeTimeoutMs,
       maxBuffer: 1024 * 1024,
     });
     const probeError = probe.error instanceof Error ? probe.error : null;
     const probeTimedOut =
-      probeError?.code === "ETIMEDOUT" || (probe.signal === "SIGTERM" && probe.status === null);
+      probeError?.code === "ETIMEDOUT" ||
+      ((probe.signal === "SIGTERM" || probe.signal === "SIGKILL") && probe.status === null);
     const commandFailed = probeError !== null || probeTimedOut || probe.status !== 0;
     const stdout = probe.stdout ?? "";
     const stderr = probe.stderr ?? "";

@@ -207,3 +207,46 @@ test("verifyProjectRuntime reports missing prerequisites when command is unavail
     );
   });
 });
+
+test("verifyProjectRuntime disables inherited Node compile cache for target commands", () => {
+  withTempRepo((repoRoot) => {
+    const previousCompileCache = process.env.NODE_COMPILE_CACHE;
+    const previousDisableCompileCache = process.env.NODE_DISABLE_COMPILE_CACHE;
+    process.env.NODE_COMPILE_CACHE = path.join(repoRoot, ".aor", "node-compile-cache");
+    delete process.env.NODE_DISABLE_COMPILE_CACHE;
+
+    try {
+      const result = verifyProjectRuntime({
+        projectRef: repoRoot,
+        cwd: repoRoot,
+        repoTestCommands: [
+          [
+            "node -e",
+            JSON.stringify(
+              [
+                "if (process.env.NODE_COMPILE_CACHE) process.exit(3);",
+                "if (process.env.NODE_DISABLE_COMPILE_CACHE !== '1') process.exit(4);",
+              ].join(""),
+            ),
+          ].join(" "),
+        ],
+      });
+
+      assert.equal(result.verifySummary.status, "passed");
+      const transcript = fs.readFileSync(result.stepResults[0].evidence_refs[0], "utf8");
+      assert.match(transcript, /node_compile_cache: disabled/);
+    } finally {
+      if (previousCompileCache === undefined) {
+        delete process.env.NODE_COMPILE_CACHE;
+      } else {
+        process.env.NODE_COMPILE_CACHE = previousCompileCache;
+      }
+
+      if (previousDisableCompileCache === undefined) {
+        delete process.env.NODE_DISABLE_COMPILE_CACHE;
+      } else {
+        process.env.NODE_DISABLE_COMPILE_CACHE = previousDisableCompileCache;
+      }
+    }
+  });
+});
