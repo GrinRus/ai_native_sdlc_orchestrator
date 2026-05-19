@@ -54,6 +54,11 @@ function runCli(rawArgs) {
   const pendingDecision = asRecord(state.pending_decision);
   const action = asNonEmptyString(pendingDecision.action) || "unknown";
   const requiredPublicAction = action === "continue" ? null : action;
+  const stepObservations = Array.isArray(runProfileOutput.live_e2e_step_observation_files)
+    ? runProfileOutput.live_e2e_step_observation_files
+    : [];
+  const latestObservationFile = stepObservations.at(-1);
+  const latestObservation = latestObservationFile ? asRecord(readJson(latestObservationFile)) : {};
   process.stdout.write(
     `${JSON.stringify(
       {
@@ -64,12 +69,13 @@ function runCli(rawArgs) {
         completed_steps: Array.isArray(state.completed_steps) ? state.completed_steps : [],
         decision: Object.keys(pendingDecision).length > 0 ? pendingDecision : null,
         required_public_action: requiredPublicAction,
+        agent_decision_request_ref: asNonEmptyString(latestObservation.agent_decision_request_ref) || null,
+        operator_decision_ref: asNonEmptyString(latestObservation.operator_decision_ref) || null,
+        operator_decision_status: asNonEmptyString(latestObservation.operator_decision_status) || null,
         aor_installation_proof_file: asNonEmptyString(runProfileOutput.aor_installation_proof_file) || null,
         live_e2e_controller_state_file: controllerStateFile || null,
         live_e2e_observation_report_file: asNonEmptyString(runProfileOutput.live_e2e_observation_report_file) || null,
-        live_e2e_step_observation_files: Array.isArray(runProfileOutput.live_e2e_step_observation_files)
-          ? runProfileOutput.live_e2e_step_observation_files
-          : [],
+        live_e2e_step_observation_files: stepObservations,
       },
       null,
       2,

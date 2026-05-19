@@ -28,5 +28,4 @@ escalation:
     - business-ambiguity
     - security-boundary
 blocking_rules:
-  - repo-scope-violation
   - frozen-route

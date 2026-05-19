@@ -1125,13 +1125,8 @@ export function executeRoutedStep(options) {
       non_bootstrap_changed_paths: nonBootstrapChangedPaths,
       non_bootstrap_changed_paths_during_step: nonBootstrapChangedPathsDuringStep,
       non_input_changed_paths: missionScopedChanges.nonInputChangedPaths,
-      mission_scoped_changed_paths: missionScopedChanges.missionScopedChangedPaths,
+      meaningful_changed_paths: missionScopedChanges.meaningfulChangedPaths,
       ignored_input_files: missionScopedChanges.ignoredInputFiles,
-      allowed_paths: missionScopedChanges.allowedPaths,
-      forbidden_paths: missionScopedChanges.forbiddenPaths,
-      forbidden_changed_paths: missionScopedChanges.forbiddenChangedPaths,
-      out_of_scope_changed_paths: missionScopedChanges.outOfScopeChangedPaths,
-      scope_violation_paths: missionScopedChanges.scopeViolationPaths,
       strict_code_changing_noop: strictCodeChangingNoop,
       mission_type: missionProfile.missionType,
       strictness_profile: missionProfile.strictnessProfile,
@@ -1144,8 +1139,7 @@ export function executeRoutedStep(options) {
     gitStatusAvailable: changedPathStatusBefore.available && changedPathStatusAfter.available,
     strictCodeChangingNoop,
     nonBootstrapChangedPaths,
-    missionScopedChangedPaths: missionScopedChanges.missionScopedChangedPaths,
-    scopeViolationPaths: missionScopedChanges.scopeViolationPaths,
+    meaningfulChangedPaths: missionScopedChanges.meaningfulChangedPaths,
   });
   stepResult.mission_outcome = runtimeOutcome.missionOutcome;
   stepResult.failure_class = runtimeOutcome.failureClass;

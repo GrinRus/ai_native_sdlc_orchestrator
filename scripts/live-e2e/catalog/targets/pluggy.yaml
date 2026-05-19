@@ -42,19 +42,10 @@ provider_comparison_pairs:
 feature_missions:
   - mission_id: pluggy-hook-order-regression
     title: Preserve hook ordering regression behavior
-    brief: Add or adjust one focused hook ordering or call result regression with targeted test coverage.
+    brief: Add or adjust one focused hook ordering or call result regression with
+      targeted test coverage.
     feature_size: small
-    allowed_paths:
-      - src/**
-      - testing/**
-      - pyproject.toml
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a1
       - verify-summary
       - routed-step-result
       - review-report
@@ -78,12 +69,15 @@ feature_missions:
     change_budget:
       max_changed_files: 5
       max_added_lines: 200
+    quality_evidence: *a1
   - mission_id: pluggy-diagnostics-repair
     title: Repair one diagnostics or error-message seam
-    brief: Fix one bounded diagnostics, warning, or error-message behavior with regression coverage.
+    brief: Fix one bounded diagnostics, warning, or error-message behavior with
+      regression coverage.
     feature_size: medium
     goals:
-      - Repair one diagnostics behavior without changing unrelated hook execution semantics.
+      - Repair one diagnostics behavior without changing unrelated hook
+        execution semantics.
     kpis:
       - kpi_id: pluggy-diagnostics-green
         name: Pluggy diagnostics gate
@@ -92,17 +86,7 @@ feature_missions:
     definition_of_done:
       - Regression tests cover the repaired diagnostic.
       - Review and delivery evidence stay anchored to the target checkout.
-    allowed_paths:
-      - src/**
-      - testing/**
-      - pyproject.toml
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a2
       - verify-summary
       - routed-step-result
       - review-report
@@ -124,13 +108,16 @@ feature_missions:
     size_budget:
       max_changed_files: 8
       max_added_lines: 300
-    size_rationale: Medium pluggy repair may touch runtime and tests but should remain inside one diagnostic seam.
+    size_rationale: Medium pluggy repair may touch runtime and tests but should
+      remain inside one diagnostic seam.
     change_budget:
       max_changed_files: 8
       max_added_lines: 300
+    quality_evidence: *a2
   - mission_id: pluggy-typing-governance
     title: Govern one typing and hook-contract change
-    brief: Exercise one broader typing or hook contract adjustment with strict audit and learning closure.
+    brief: Exercise one broader typing or hook contract adjustment with strict audit
+      and learning closure.
     feature_size: medium
     goals:
       - Preserve type/hook contract lineage for one bounded governance change.
@@ -138,22 +125,14 @@ feature_missions:
     kpis:
       - kpi_id: pluggy-governance-lineage
         name: Pluggy governance lineage
-        target: review, delivery, audit, and learning artifacts preserve the same matrix cell
+        target: review, delivery, audit, and learning artifacts preserve the same matrix
+          cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
       - python -m pytest testing passes.
-      - Governance and learning artifacts link to the same mission and target checkout.
-    allowed_paths:
-      - src/**
-      - testing/**
-      - pyproject.toml
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+      - Governance and learning artifacts link to the same mission and target
+        checkout.
+    expected_evidence: &a3
       - verify-summary
       - review-report
       - delivery-manifest
@@ -176,7 +155,9 @@ feature_missions:
     size_budget:
       max_changed_files: 10
       max_added_lines: 360
-    size_rationale: Governance changes may touch hook contract and tests, but should remain bounded to pluggy package behavior.
+    size_rationale: Governance changes may touch hook contract and tests, but should
+      remain bounded to pluggy package behavior.
     change_budget:
       max_changed_files: 10
       max_added_lines: 360
+    quality_evidence: *a3

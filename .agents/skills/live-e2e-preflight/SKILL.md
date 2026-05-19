@@ -12,7 +12,11 @@ description: Use when you need to prepare, review, or update a live E2E rehearsa
    - `live_e2e.installation_policy=source-install-required` unless a reviewed installed binary path is passed through `--aor-bin`;
    - `live_e2e.interaction_capability=public-control-plane`;
    - `live_e2e.frontend_capability=none` or `guided-web-smoke`;
-   - `live_e2e.safety_policy=no-upstream-write`.
-6. Confirm the target repo shape, setup commands, verification commands, safety defaults, and mission scope (`allowed_paths`, `forbidden_paths`, expected evidence, change budget).
+   - `live_e2e.safety_policy=no-upstream-write`;
+   - `live_e2e.operator_mode=skill-agent` for acceptance/production-proof or `deterministic-fixture` for synthetic smoke;
+   - `live_e2e.agent_decision_policy=required` for acceptance/production-proof;
+   - `live_e2e.interaction_answer_policy=agent-required` for acceptance/production-proof;
+   - `live_e2e.target_write_policy=aor-runtime-only-before-execution`.
+6. Confirm the target repo shape, setup commands, verification commands, safety defaults, expected result evidence, and change budget. Do not require `allowed_paths` or `forbidden_paths`; they are not live E2E acceptance gates.
 7. Ensure the runner will prepare the feature request input during the run instead of skipping directly to execution.
 8. Keep upstream write-back disabled unless a fork is explicitly configured and the profile really needs release-shaped delivery evidence.

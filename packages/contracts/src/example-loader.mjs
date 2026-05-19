@@ -15,7 +15,8 @@ export function loadExampleContracts(options = {}) {
   /** @type {import("./index.d.ts").LoadedContractFile[]} */
   const results = [];
   for (const filePath of files) {
-    const family = inferFamilyFromExamplePath(filePath);
+    const relativeExamplePath = path.join("examples", path.relative(examplesRoot, filePath));
+    const family = inferFamilyFromExamplePath(filePath) ?? inferFamilyFromExamplePath(relativeExamplePath);
     results.push(loadContractFile({ filePath, family: family ?? undefined }));
   }
 

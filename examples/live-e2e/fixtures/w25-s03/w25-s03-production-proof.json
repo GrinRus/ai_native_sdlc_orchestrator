@@ -124,7 +124,7 @@
       "status": "pass",
       "overall_decision": "pass",
       "run_start_decision": "pass",
-      "mission_scoped_changed_paths": [
+      "meaningful_changed_paths": [
         "source/utils/merge.ts",
         "test/headers.ts"
       ]

@@ -9,6 +9,10 @@ live_e2e:
   interaction_capability: public-control-plane
   frontend_capability: guided-web-smoke
   safety_policy: no-upstream-write
+  operator_mode: skill-agent
+  agent_decision_policy: required
+  interaction_answer_policy: agent-required
+  target_write_policy: aor-runtime-only-before-execution
 target_catalog_id: ky
 feature_mission_id: ky-header-regression
 scenario_family: regress

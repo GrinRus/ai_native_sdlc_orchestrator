@@ -152,6 +152,7 @@ export function applyRunControlAction(options) {
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
+ *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   runId: string,
  * }} options

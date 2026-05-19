@@ -215,8 +215,7 @@ test("runtime harness classifies structured permission denials before strict no-
     {
       gitStatusAvailable: true,
       strictCodeChangingNoop: true,
-      missionScopedChangedPaths: [],
-      scopeViolationPaths: [],
+      meaningfulChangedPaths: [],
     },
   );
 
@@ -262,8 +261,7 @@ test("runtime harness classifies structured permission denials before strict no-
     {
       gitStatusAvailable: true,
       strictCodeChangingNoop: true,
-      missionScopedChangedPaths: [],
-      scopeViolationPaths: [],
+      meaningfulChangedPaths: [],
     },
   );
 
@@ -307,8 +305,7 @@ test("runtime harness ignores target Permission denied diagnostics when mission 
     {
       gitStatusAvailable: true,
       strictCodeChangingNoop: true,
-      missionScopedChangedPaths: ["source/utils/merge.ts", "test/headers.ts"],
-      scopeViolationPaths: [],
+      meaningfulChangedPaths: ["source/utils/merge.ts", "test/headers.ts"],
     },
   );
 
@@ -821,8 +818,7 @@ test("Runtime Harness applies soft mission strictness for docs-only no-op runs",
       `${JSON.stringify(
         {
           mission_type: "docs-only",
-          allowed_paths: ["docs/**"],
-          forbidden_paths: ["src/**"],
+          goals: ["Refresh docs-only proof content."],
         },
         null,
         2,
@@ -885,20 +881,13 @@ test("Runtime Harness applies soft mission strictness for docs-only no-op runs",
   });
 });
 
-test("Runtime Harness no-op detection ignores mission input files and enforces allowed scope", () => {
+test("Runtime Harness no-op detection ignores mission input files and tracks meaningful changes", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
     const requestFile = path.join(repoRoot, "feature-request.json");
     fs.writeFileSync(
       requestFile,
-      `${JSON.stringify(
-        {
-          allowed_paths: ["src/**", "test/**"],
-          forbidden_paths: ["docs/**"],
-        },
-        null,
-        2,
-      )}\n`,
+      `${JSON.stringify({ goals: ["Implement the requested feature change."] }, null, 2)}\n`,
       "utf8",
     );
     materializeIntakeArtifactPacket({
@@ -943,8 +932,7 @@ test("Runtime Harness no-op detection ignores mission input files and enforces a
 
     assert.equal(step.stepResult.failure_class, "no-op");
     assert.deepEqual(step.stepResult.mission_semantics.ignored_input_files, ["feature-request.json"]);
-    assert.deepEqual(step.stepResult.mission_semantics.mission_scoped_changed_paths, []);
-    assert.deepEqual(step.stepResult.mission_semantics.scope_violation_paths, []);
+    assert.deepEqual(step.stepResult.mission_semantics.meaningful_changed_paths, []);
 
     const report = materializeRuntimeHarnessReport({
       projectRef: repoRoot,
@@ -954,7 +942,7 @@ test("Runtime Harness no-op detection ignores mission input files and enforces a
 
     assert.equal(report.report.overall_decision, "repair");
     assert.deepEqual(report.report.step_decisions[0].mission_semantics.ignored_input_files, ["feature-request.json"]);
-    assert.deepEqual(report.report.step_decisions[0].mission_semantics.mission_scoped_changed_paths, []);
+    assert.deepEqual(report.report.step_decisions[0].mission_semantics.meaningful_changed_paths, []);
   });
 });
 
@@ -962,11 +950,7 @@ test("Runtime Harness ignores backup artifacts as real code-changing evidence", 
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
     const requestFile = path.join(repoRoot, "feature-request.json");
-    fs.writeFileSync(
-      requestFile,
-      `${JSON.stringify({ allowed_paths: ["src/**"], forbidden_paths: ["docs/**"] }, null, 2)}\n`,
-      "utf8",
-    );
+    fs.writeFileSync(requestFile, `${JSON.stringify({ goals: ["Implement the requested feature change."] }, null, 2)}\n`, "utf8");
     materializeIntakeArtifactPacket({
       projectId: init.projectId,
       projectRoot: init.projectRoot,
@@ -1011,7 +995,7 @@ test("Runtime Harness ignores backup artifacts as real code-changing evidence", 
     });
 
     assert.equal(step.stepResult.failure_class, "no-op");
-    assert.deepEqual(step.stepResult.mission_semantics.mission_scoped_changed_paths, []);
+    assert.deepEqual(step.stepResult.mission_semantics.meaningful_changed_paths, []);
     assert.ok(step.stepResult.mission_semantics.non_bootstrap_changed_paths.includes("src/index.js.bak"));
 
     const report = materializeRuntimeHarnessReport({
@@ -1021,26 +1005,22 @@ test("Runtime Harness ignores backup artifacts as real code-changing evidence", 
     });
 
     assert.equal(report.report.overall_decision, "repair");
-    assert.deepEqual(report.report.step_decisions[0].mission_semantics.mission_scoped_changed_paths, []);
+    assert.deepEqual(report.report.step_decisions[0].mission_semantics.meaningful_changed_paths, []);
   });
 });
 
-test("Runtime Harness fails strict runs with forbidden mission-scope changes", () => {
+test("Runtime Harness does not fail strict runs by path alone", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
     const requestFile = path.join(repoRoot, "feature-request.json");
-    fs.writeFileSync(
-      requestFile,
-      `${JSON.stringify({ allowed_paths: ["src/**"], forbidden_paths: ["docs/**"] }, null, 2)}\n`,
-      "utf8",
-    );
+    fs.writeFileSync(requestFile, `${JSON.stringify({ goals: ["Implement the requested feature change."] }, null, 2)}\n`, "utf8");
     materializeIntakeArtifactPacket({
       projectId: init.projectId,
       projectRoot: init.projectRoot,
       projectProfileRef: init.projectProfileRef,
       runtimeLayout: init.runtimeLayout,
       command: "aor intake create",
-      missionId: "scope-violation",
+      missionId: "path-only-quality",
       requestFile,
     });
     configureCodexExternalRuntime(repoRoot, {
@@ -1055,10 +1035,10 @@ test("Runtime Harness fails strict runs with forbidden mission-scope changes", (
           "fs.writeFileSync('docs/out-of-scope.md','forbidden change\\n');",
           "process.stdout.write(JSON.stringify({",
           "status:'success',",
-          "summary:'external runner wrote forbidden scope',",
+          "summary:'external runner wrote a docs file',",
           "output:{runner:'node-inline',step_class:request.step_class||null,cwd:process.cwd()},",
-          "evidence_refs:['evidence://external-runner/forbidden-scope'],",
-          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline-forbidden-scope'}]",
+          "evidence_refs:['evidence://external-runner/path-only-quality'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline-path-only-quality'}]",
           "}));",
         ].join(""),
       ],
@@ -1069,25 +1049,25 @@ test("Runtime Harness fails strict runs with forbidden mission-scope changes", (
       cwd: repoRoot,
       stepClass: "implement",
       dryRun: false,
-      runId: "runtime-harness-scope-violation",
+      runId: "runtime-harness-path-only-quality",
       stepId: "run.start.implement",
-      approvedHandoffRef: "evidence://handoff/approved-scope-violation",
-      promotionEvidenceRefs: ["evidence://promotion/pass-scope-violation"],
+      approvedHandoffRef: "evidence://handoff/approved-path-only-quality",
+      promotionEvidenceRefs: ["evidence://promotion/pass-path-only-quality"],
       executionRoot: repoRoot,
     });
 
-    assert.equal(step.stepResult.failure_class, "repo-scope-violation");
-    assert.equal(step.stepResult.runtime_harness_decision, "fail");
-    assert.deepEqual(step.stepResult.mission_semantics.scope_violation_paths, ["docs/out-of-scope.md"]);
+    assert.equal(step.stepResult.failure_class, "none");
+    assert.equal(step.stepResult.runtime_harness_decision, "pass");
+    assert.deepEqual(step.stepResult.mission_semantics.meaningful_changed_paths, ["docs/out-of-scope.md"]);
 
     const report = materializeRuntimeHarnessReport({
       projectRef: repoRoot,
       cwd: repoRoot,
-      runId: "runtime-harness-scope-violation",
+      runId: "runtime-harness-path-only-quality",
     });
 
-    assert.equal(report.report.overall_decision, "fail");
-    assert.equal(report.report.step_decisions[0].failure_class, "repo-scope-violation");
+    assert.equal(report.report.overall_decision, "pass");
+    assert.equal(report.report.step_decisions[0].failure_class, "none");
   });
 });
 

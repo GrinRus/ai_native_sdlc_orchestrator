@@ -531,6 +531,7 @@ export function applyRunControlAction(options) {
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
+ *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   runId: string,
  * }} options
@@ -540,6 +541,7 @@ export function readRunControlState(options) {
   const init = initializeProjectRuntime({
     cwd,
     projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
   });
   const runId = options.runId;

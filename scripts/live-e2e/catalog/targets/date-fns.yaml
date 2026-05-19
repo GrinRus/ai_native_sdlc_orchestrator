@@ -25,19 +25,10 @@ provider_comparison_pairs: []
 feature_missions:
   - mission_id: date-fns-utility-regression
     title: Preserve one date utility regression
-    brief: Add or adjust one focused date utility regression while preserving lint, type, and test evidence.
+    brief: Add or adjust one focused date utility regression while preserving lint,
+      type, and test evidence.
     feature_size: small
-    allowed_paths:
-      - src/**
-      - test/**
-      - package.json
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a1
       - verify-summary
       - review-report
     acceptance_checks:
@@ -50,7 +41,9 @@ feature_missions:
     size_budget:
       max_changed_files: 6
       max_added_lines: 220
-    size_rationale: Extended date-fns coverage should start with one narrow utility behavior seam.
+    size_rationale: Extended date-fns coverage should start with one narrow utility
+      behavior seam.
     change_budget:
       max_changed_files: 6
       max_added_lines: 220
+    quality_evidence: *a1

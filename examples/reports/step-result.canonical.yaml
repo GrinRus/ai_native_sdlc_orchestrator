@@ -27,14 +27,14 @@ requested_interaction:
     reason_code: answer-accepted
   state_history:
     - status: requested
-      timestamp: "2026-05-07T00:00:00.000Z"
+      timestamp: 2026-05-07T00:00:00.000Z
       summary: Operator input was requested at the bounded runner boundary.
       evidence_refs:
         - evidence://contracts/w23-s01/interaction-question
       continuation:
         next_action: resume_from_boundary
     - status: answered
-      timestamp: "2026-05-07T00:01:00.000Z"
+      timestamp: 2026-05-07T00:01:00.000Z
       summary: Operator answer audit evidence was accepted.
       evidence_refs:
         - evidence://contracts/w23-s01/interaction-answer-audit
@@ -44,7 +44,7 @@ requested_interaction:
         next_action: resume_from_boundary
         reason_code: answer-accepted
     - status: resumed
-      timestamp: "2026-05-07T00:02:00.000Z"
+      timestamp: 2026-05-07T00:02:00.000Z
       summary: Runtime resumed from the recorded interaction boundary.
       evidence_refs:
         - evidence://contracts/w23-s01/interaction-answer-audit
@@ -62,11 +62,6 @@ repair_attempts:
 mission_semantics:
   changed_paths:
     - packages/example/src/index.ts
-  allowed_paths:
-    - packages/example/**
-  forbidden_paths:
-    - docs/**
-  mission_scoped_changed_paths:
-    - packages/example/src/index.ts
-  scope_violation_paths: []
   ignored_request_input_files: []
+  meaningful_changed_paths:
+    - packages/example/src/index.ts

@@ -121,12 +121,11 @@ approval_context:
     overall_decision: pass
     run_decision: pass
     routed_step_decision_count: 1
-    mission_scoped_changed_paths:
+    meaningful_changed_paths:
       - repos/backend/src/orders.ts
       - repos/backend/contracts/openapi.yaml
       - repos/mobile/src/api/client.ts
       - repos/frontend/src/api/client.ts
-    scope_violation_paths: []
     findings: []
   coordination_evidence:
     status: present
@@ -154,4 +153,4 @@ source_refs:
   delivery_plan_ref: evidence://packets/delivery-plan-implement-fork-first-pr.yaml
   delivery_transcript_ref: evidence://reports/delivery-transcript-fork-first-pr-run-101.json
 status: submitted
-created_at: '2026-04-21T14:20:00.000Z'
+created_at: 2026-04-21T14:20:00.000Z

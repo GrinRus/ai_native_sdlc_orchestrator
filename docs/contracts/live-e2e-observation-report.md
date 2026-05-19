@@ -13,6 +13,7 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `report_id`
 - `run_id`
 - `profile_id`
+- `operator_context`
 - `controller_state_ref`
 - `flow_range`
 - `flow_range_policy`
@@ -82,6 +83,9 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `duration_sec`
 - `deterministic_analysis`
 - `semantic_analysis`
+- `agent_decision_request_ref`
+- `operator_decision_ref`
+- `operator_decision_status`
 - `requested_interaction`
 - `decision`
 - `resume_result`
@@ -105,8 +109,21 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 
 `semantic_analysis` should preserve:
 - `status`
-- `judge_source`
+- `judge_source` (`skill-agent` for acceptance and production proof; deterministic fixture sources are allowed only for smoke/synthetic profiles)
 - `findings`
+
+`operator_context` should preserve:
+- `operator_kind` (`skill-agent|deterministic-fixture`)
+- `operator_ref`
+- `decision_policy` (`required|optional`)
+- `answer_policy` (`agent-public-control-plane|deterministic-fixture-only`)
+- `target_write_policy`
+
+`operator_decision_status` must be one of:
+- `accepted`
+- `missing`
+- `rejected`
+- `not_required`
 
 `interactive_decisions[]` should preserve:
 - `step_id`

@@ -225,8 +225,8 @@ function collectProofChangedPaths(proof) {
     ...(Array.isArray(proof.no_upstream_write_assertion?.changed_paths)
       ? proof.no_upstream_write_assertion.changed_paths
       : []),
-    ...(Array.isArray(proof.evidence?.runtime_harness?.mission_scoped_changed_paths)
-      ? proof.evidence.runtime_harness.mission_scoped_changed_paths
+    ...(Array.isArray(proof.evidence?.runtime_harness?.meaningful_changed_paths)
+      ? proof.evidence.runtime_harness.meaningful_changed_paths
       : []),
   ];
 }
@@ -294,7 +294,7 @@ function validateProofBundleIntegrity(proof, bundlePath) {
 
     const changedPaths = collectProofChangedPaths(proof);
     if (changedPaths.length === 0) {
-      errors.push(`${bundlePath} claims full_code_changing_runtime without mission-scoped changed paths.`);
+      errors.push(`${bundlePath} claims full_code_changing_runtime without meaningful implementation changed paths.`);
     }
     for (const changedPath of changedPaths) {
       if (path.isAbsolute(changedPath) || changedPath.startsWith(".aor/") || changedPath.includes("/.aor/")) {

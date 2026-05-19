@@ -94,8 +94,7 @@ function writeRuntimeJson(filePath, document) {
  *   overallDecision?: "pass" | "retry" | "repair" | "escalate" | "block" | "fail",
  *   runDecision?: "pass" | "retry" | "repair" | "escalate" | "block" | "fail",
  *   terminalStatus?: "closed" | "blocked" | "failed",
- *   missionScopedChangedPaths?: string[],
- *   scopeViolationPaths?: string[],
+ *   meaningfulChangedPaths?: string[],
  *   includeRunLevel?: boolean,
  * }} options
  * @returns {{ reportFile: string, reportRef: string, initPayload: Record<string, unknown> }}
@@ -109,8 +108,7 @@ function seedStrictRuntimeHarnessReport(options) {
   const overallDecision = options.overallDecision ?? "pass";
   const runDecision = options.runDecision ?? overallDecision;
   const terminalStatus = options.terminalStatus ?? (runDecision === "pass" ? "closed" : "blocked");
-  const missionScopedChangedPaths = options.missionScopedChangedPaths ?? ["examples/project.aor.yaml"];
-  const scopeViolationPaths = options.scopeViolationPaths ?? [];
+  const meaningfulChangedPaths = options.meaningfulChangedPaths ?? ["examples/project.aor.yaml"];
   const reportFile = path.join(reportsRoot, `runtime-harness-report-${options.runId}.json`);
   const reportRef = `evidence://${path.relative(options.projectRoot, reportFile).replace(/\\/g, "/")}`;
   const generatedAt = new Date().toISOString();
@@ -203,17 +201,12 @@ function seedStrictRuntimeHarnessReport(options) {
         },
         mission_semantics: {
           git_status_available: true,
-          changed_paths: [...missionScopedChangedPaths, ...scopeViolationPaths],
-          non_bootstrap_changed_paths: [...missionScopedChangedPaths, ...scopeViolationPaths],
-          non_input_changed_paths: [...missionScopedChangedPaths, ...scopeViolationPaths],
-          mission_scoped_changed_paths: missionScopedChangedPaths,
+          changed_paths: [...meaningfulChangedPaths],
+          non_bootstrap_changed_paths: [...meaningfulChangedPaths],
+          non_input_changed_paths: [...meaningfulChangedPaths],
+          meaningful_changed_paths: meaningfulChangedPaths,
           ignored_input_files: [],
-          allowed_paths: ["examples/**", "source/**"],
-          forbidden_paths: ["docs/**"],
-          forbidden_changed_paths: scopeViolationPaths.filter((entry) => entry.startsWith("docs/")),
-          out_of_scope_changed_paths: scopeViolationPaths,
-          scope_violation_paths: scopeViolationPaths,
-          strict_code_changing_noop: missionScopedChangedPaths.length === 0,
+          strict_code_changing_noop: meaningfulChangedPaths.length === 0,
         },
         evidence_refs: [`evidence://reports/step-result-${options.runId}.json`],
       },
@@ -224,7 +217,7 @@ function seedStrictRuntimeHarnessReport(options) {
         severity: "fail",
         category: "runtime",
         failure_class: "no-op",
-        summary: "Runtime Harness found no meaningful mission-scoped patch.",
+        summary: "Runtime Harness found no meaningful implementation patch.",
         evidence_refs: [`evidence://reports/step-result-${options.runId}.json`],
       },
     ],
@@ -1587,7 +1580,7 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
     seedStrictRuntimeHarnessReport({
       projectRoot,
       runId: "w6-deliver-local-branch",
-      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+      meaningfulChangedPaths: ["examples/project.aor.yaml"],
     });
     const branchResult = invokeCli([
       "deliver",
@@ -1626,7 +1619,7 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
     seedStrictRuntimeHarnessReport({
       projectRoot,
       runId: "w6-deliver-fork-first",
-      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+      meaningfulChangedPaths: ["examples/project.aor.yaml"],
     });
     const forkResult = invokeCli([
       "deliver",
@@ -1661,7 +1654,7 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
     seedStrictRuntimeHarnessReport({
       projectRoot,
       runId: "w6-release-blocked",
-      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+      meaningfulChangedPaths: ["examples/project.aor.yaml"],
     });
     const releaseBlockedResult = invokeCli([
       "release",
@@ -1709,7 +1702,7 @@ test("W6 delivery/release prepare command pack enforces policy guardrails and em
   });
 });
 
-test("strict delivery prepare blocks without latest run-level Runtime Harness report", () => {
+test("strict delivery prepare blocks without Runtime Harness execution evidence", () => {
   withTempProject((projectRoot) => {
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
     runGitChecked({ cwd: projectRoot, args: ["init"] });
@@ -1735,7 +1728,7 @@ test("strict delivery prepare blocks without latest run-level Runtime Harness re
 
     assert.equal(result.exitCode, 1);
     assert.equal(result.stdout, "");
-    assert.match(result.stderr, /requires a latest run-level Runtime Harness report/u);
+    assert.match(result.stderr, /requires Runtime Harness execution evidence/u);
   });
 });
 
@@ -1769,13 +1762,13 @@ test("delivery prepare observe mode materializes evidence with Runtime Harness f
     const payload = JSON.parse(result.stdout);
     assert.equal(payload.delivery_quality_gate_mode, "observe");
     assert.equal(payload.delivery_quality_gate_status, "not_pass");
-    assert.match(payload.delivery_quality_gate_findings.join("\n"), /not run-level controller evidence/u);
+    assert.match(payload.delivery_quality_gate_findings.join("\n"), /has no routed step decisions/u);
     assert.equal(fs.existsSync(payload.delivery_manifest_file), true);
     assert.equal(fs.existsSync(payload.runtime_harness_report_file), true);
   });
 });
 
-test("strict delivery prepare blocks no-op, out-of-scope, missing handoff, missing promotion, and allows patch-only pass", () => {
+test("strict delivery prepare blocks no-op, failed Runtime Harness, missing handoff, missing promotion, and allows patch-only pass", () => {
   withTempProject((projectRoot) => {
     fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
     runGitChecked({ cwd: projectRoot, args: ["init"] });
@@ -1787,7 +1780,7 @@ test("strict delivery prepare blocks no-op, out-of-scope, missing handoff, missi
     seedStrictRuntimeHarnessReport({
       projectRoot,
       runId: "strict-delivery-no-op",
-      missionScopedChangedPaths: [],
+      meaningfulChangedPaths: [],
     });
     const noOpResult = invokeCli([
       "deliver",
@@ -1804,38 +1797,37 @@ test("strict delivery prepare blocks no-op, out-of-scope, missing handoff, missi
       "evidence://promotion/no-op",
     ]);
     assert.equal(noOpResult.exitCode, 1);
-    assert.match(noOpResult.stderr, /no meaningful mission-scoped patch/u);
+    assert.match(noOpResult.stderr, /no meaningful implementation patch/u);
 
     seedStrictRuntimeHarnessReport({
       projectRoot,
-      runId: "strict-delivery-out-of-scope",
+      runId: "strict-delivery-runtime-fail",
       overallDecision: "fail",
       runDecision: "fail",
       terminalStatus: "failed",
-      missionScopedChangedPaths: ["examples/project.aor.yaml"],
-      scopeViolationPaths: ["docs/out-of-scope.md"],
+      meaningfulChangedPaths: ["examples/project.aor.yaml"],
     });
-    const outOfScopeResult = invokeCli([
+    const runtimeFailResult = invokeCli([
       "deliver",
       "prepare",
       "--project-ref",
       projectRoot,
       "--run-id",
-      "strict-delivery-out-of-scope",
+      "strict-delivery-runtime-fail",
       "--mode",
       "patch-only",
       "--approved-handoff-ref",
-      "evidence://handoff/out-of-scope",
+      "evidence://handoff/runtime-fail",
       "--promotion-evidence-refs",
-      "evidence://promotion/out-of-scope",
+      "evidence://promotion/runtime-fail",
     ]);
-    assert.equal(outOfScopeResult.exitCode, 1);
-    assert.match(outOfScopeResult.stderr, /out-of-scope changed paths/u);
+    assert.equal(runtimeFailResult.exitCode, 1);
+    assert.match(runtimeFailResult.stderr, /Runtime Harness decision 'fail'/u);
 
     seedStrictRuntimeHarnessReport({
       projectRoot,
       runId: "strict-delivery-missing-handoff",
-      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+      meaningfulChangedPaths: ["examples/project.aor.yaml"],
     });
     const missingHandoffResult = invokeCli([
       "deliver",
@@ -1855,7 +1847,7 @@ test("strict delivery prepare blocks no-op, out-of-scope, missing handoff, missi
     seedStrictRuntimeHarnessReport({
       projectRoot,
       runId: "strict-delivery-missing-promotion",
-      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+      meaningfulChangedPaths: ["examples/project.aor.yaml"],
     });
     const missingPromotionResult = invokeCli([
       "deliver",
@@ -1876,7 +1868,7 @@ test("strict delivery prepare blocks no-op, out-of-scope, missing handoff, missi
     seedStrictRuntimeHarnessReport({
       projectRoot,
       runId: "strict-delivery-patch-pass",
-      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+      meaningfulChangedPaths: ["examples/project.aor.yaml"],
     });
     const validPatchResult = invokeCli([
       "deliver",
@@ -1908,7 +1900,7 @@ test("strict delivery prepare blocks no-op, out-of-scope, missing handoff, missi
       false,
     );
     assert.equal(
-      artifactFiles.some((entry) => entry.includes("strict-delivery-out-of-scope") && entry.startsWith("delivery-manifest")),
+      artifactFiles.some((entry) => entry.includes("strict-delivery-runtime-fail") && entry.startsWith("delivery-manifest")),
       false,
     );
   });
@@ -1931,7 +1923,7 @@ test("delivery and release outputs enforce multi-repo coordination evidence and 
     seedStrictRuntimeHarnessReport({
       projectRoot,
       runId: "w8-release-coordination-blocked",
-      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+      meaningfulChangedPaths: ["examples/project.aor.yaml"],
     });
 
     const blockedRelease = invokeCli([
@@ -2140,7 +2132,7 @@ test("delivery and release surfaces explicit governance deny/escalation reasons 
     seedStrictRuntimeHarnessReport({
       projectRoot,
       runId: "w8-release-governance-deny",
-      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+      meaningfulChangedPaths: ["examples/project.aor.yaml"],
     });
 
     const denyResult = invokeCli([
@@ -2174,7 +2166,7 @@ test("delivery and release surfaces explicit governance deny/escalation reasons 
     seedStrictRuntimeHarnessReport({
       projectRoot,
       runId: "w8-release-governance-escalate",
-      missionScopedChangedPaths: ["examples/project.aor.yaml"],
+      meaningfulChangedPaths: ["examples/project.aor.yaml"],
     });
 
     const escalateResult = invokeCli([

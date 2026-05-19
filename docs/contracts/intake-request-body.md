@@ -34,15 +34,13 @@ External SaaS ingestion such as live Jira, GitHub Issues, Gmail, or Outlook conn
 `product_intake_completeness.status` is `complete` when goals, constraints, KPIs, Definition of Done, and source refs are present; otherwise it is `incomplete` and `missing_fields` names the absent evidence groups.
 
 ## Mission scope fields
-`mission_scope` records execution boundaries used by Runtime Harness and guided next-action resolution:
-- `allowed_paths` - path globs that count as mission-scoped changes.
-- `forbidden_paths` - path globs that must not be changed.
+`mission_scope` records delivery and write-back intent used by guided next-action resolution:
 - `delivery_mode` - one of `no-write`, `patch-only`, `local-branch`, or `fork-first-pr`.
 - `writeback_policy` - explicit write-back defaults. `upstream_writes_default` must remain false for installed-user guided flows, and delivery-capable modes require review before write-back.
 
-`feature_request` should mirror `allowed_paths`, `forbidden_paths`, and `delivery_mode` so older Runtime Harness scope readers that inspect the request document can still explain why a change is in or out of mission scope.
+`allowed_paths` and `forbidden_paths` are legacy path-scope hints and must not be used by Runtime Harness or live E2E acceptance logic. Product acceptance should be expressed through goals, constraints, KPIs, Definition of Done, expected evidence, and verification commands.
 
 ## Notes
 The artifact packet owns packet identity and lifecycle status. This body owns product acceptance evidence and source-material traceability.
 
-Guided mission intake in W21 must populate these same product-intake fields instead of creating a parallel mission schema. Missing goals, constraints, KPIs, Definition of Done, or source refs should remain explicit through `product_intake_completeness` so `aor next` and guided web stages can report blockers deterministically. Allowed paths and delivery mode are mission execution boundaries, not product acceptance substitutes.
+Guided mission intake in W21 must populate these same product-intake fields instead of creating a parallel mission schema. Missing goals, constraints, KPIs, Definition of Done, or source refs should remain explicit through `product_intake_completeness` so `aor next` and guided web stages can report blockers deterministically. Delivery mode is an execution boundary, not a product acceptance substitute.

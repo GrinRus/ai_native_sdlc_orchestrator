@@ -8,6 +8,10 @@ live_e2e:
   interaction_capability: public-control-plane
   frontend_capability: none
   safety_policy: no-upstream-write
+  operator_mode: deterministic-fixture
+  agent_decision_policy: optional
+  interaction_answer_policy: deterministic-fixture
+  target_write_policy: aor-runtime-only-before-execution
 project_profile_template_ref: examples/project.github.aor.yaml
 scenario_id: nextjs-monorepo-release-long
 target_repo:
@@ -35,7 +39,8 @@ preflight:
     - keep delivery mode in fork-first-pr for long public-target rehearsals
   abort_conditions:
     - repository clone fails or ref cannot be resolved
-    - workspace lint, typecheck, or shared-package unit smoke fails during preflight verification
+    - workspace lint, typecheck, or shared-package unit smoke fails during
+      preflight verification
     - release mode requires upstream writes
   reusable_assumptions:
     bootstrap: workspace bootstrap remains no-write

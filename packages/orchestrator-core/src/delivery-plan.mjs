@@ -151,8 +151,7 @@ function resolveGovernanceSource(policyResolution) {
  *     overallDecision?: string | null,
  *     runDecision?: string | null,
  *     routedStepDecisionCount?: number,
- *     missionScopedChangedPaths?: string[],
- *     scopeViolationPaths?: string[],
+ *     meaningfulChangedPaths?: string[],
  *     findings?: string[],
  *   },
  *   rerunOfRunRef?: string,
@@ -190,8 +189,7 @@ export function materializeDeliveryPlan(options) {
     overall_decision: asString(runtimeHarnessGate.overallDecision),
     run_decision: asString(runtimeHarnessGate.runDecision),
     routed_step_decision_count: asNumber(runtimeHarnessGate.routedStepDecisionCount) ?? 0,
-    mission_scoped_changed_paths: uniqueStrings(asStringArray(runtimeHarnessGate.missionScopedChangedPaths)),
-    scope_violation_paths: uniqueStrings(asStringArray(runtimeHarnessGate.scopeViolationPaths)),
+    meaningful_changed_paths: uniqueStrings(asStringArray(runtimeHarnessGate.meaningfulChangedPaths)),
     findings: uniqueStrings(asStringArray(runtimeHarnessGate.findings)),
   };
   const coordinationRepos = Array.isArray(options.coordinationRepos)

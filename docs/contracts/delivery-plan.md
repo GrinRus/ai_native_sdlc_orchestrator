@@ -32,8 +32,9 @@ Durable pre-write artifact that makes delivery intent explicit before any write-
   - `required=true`;
   - `enforced=true` for strict gates and `enforced=false` only for observe-mode diagnostics;
   - `status=pass` before write-back can start;
-  - `report_ref` pointing to the latest run-level Runtime Harness report for the same `run_id`;
-  - `overall_decision=pass`, `run_decision=pass`, non-empty `mission_scoped_changed_paths[]`, and empty `scope_violation_paths[]`.
+  - `report_ref` pointing to Runtime Harness execution evidence for the same `run_id`;
+  - `overall_decision=pass`, routed step decisions, and meaningful changed-path evidence when the mission requires code changes;
+  - `run_decision=pass` when run-level controller evidence is present.
 - `status=blocked` means write-back is not allowed for the planned mode yet.
 - `governance` should expose route-governance decision semantics (`allow|deny|escalate`) with explicit reason codes for security/compliance review.
 - `coordination` should preserve repo-level coordination requirements:

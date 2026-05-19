@@ -749,6 +749,58 @@ test("live E2E observation report loads and enforces status scale", () => {
     "expected step_journal entries without plan to be rejected",
   );
 
+  const missingOperatorCandidate = structuredClone(loaded.document);
+  delete missingOperatorCandidate.operator_context;
+
+  const missingOperatorValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: missingOperatorCandidate,
+    source: "test://live-e2e-observation-missing-operator-context",
+  });
+
+  assert.equal(missingOperatorValidation.ok, false);
+  assert.ok(
+    missingOperatorValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "operator_context.operator_kind",
+    ),
+    "expected live E2E reports without operator context to be rejected",
+  );
+
+  const skillAgentDecisionCandidate = structuredClone(loaded.document);
+  skillAgentDecisionCandidate.operator_context = {
+    operator_kind: "skill-agent",
+    operator_ref: "skill://live-e2e-runner",
+    decision_policy: "required",
+    answer_policy: "agent-public-control-plane",
+    target_write_policy: "aor-runtime-only-before-execution",
+  };
+  skillAgentDecisionCandidate.step_journal[0].operator_decision_status = "missing";
+  skillAgentDecisionCandidate.step_journal[0].semantic_analysis.judge_source = "deterministic-runner";
+
+  const skillAgentDecisionValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: skillAgentDecisionCandidate,
+    source: "test://live-e2e-observation-missing-skill-agent-decision",
+  });
+
+  assert.equal(skillAgentDecisionValidation.ok, false);
+  assert.ok(
+    skillAgentDecisionValidation.issues.some(
+      (problem) =>
+        problem.code === "enum_value_invalid" &&
+        problem.field === "step_journal[0].operator_decision_status",
+    ),
+    "expected acceptance reports without accepted skill-agent decisions to be rejected",
+  );
+  assert.ok(
+    skillAgentDecisionValidation.issues.some(
+      (problem) =>
+        problem.code === "enum_value_invalid" &&
+        problem.field === "step_journal[0].semantic_analysis.judge_source",
+    ),
+    "expected deterministic semantic analysis to be rejected for skill-agent reports",
+  );
+
   const missingInstallCandidate = structuredClone(loaded.document);
   delete missingInstallCandidate.aor_installation_proof_file;
 

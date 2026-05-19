@@ -18,7 +18,7 @@ Production readiness requires:
 - production-hardened auth scopes that fail closed without explicit permissions;
 - nested contract validation for production-critical packets, reports, and events;
 - a run-level Runtime Harness controller with run-level pass/block/fail/repair decisions;
-- strict delivery gates that require current harness pass evidence and meaningful mission-scoped changed paths;
+- strict delivery gates that require current harness pass evidence and meaningful implementation changed paths;
 - real non-mock full-journey proof with code-changing evidence and no upstream writes;
 - a separate production-readiness gate (`pnpm production:ready`) that cannot pass without that proof.
 

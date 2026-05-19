@@ -38,5 +38,4 @@ escalation:
       message: escalate when high-risk route requires human approval
 blocking_rules:
   - approval-missing
-  - repo-scope-violation
   - frozen-route

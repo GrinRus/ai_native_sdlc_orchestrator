@@ -171,6 +171,15 @@ function assertLiveE2ePolicy(profile, source) {
   const interactionCapability = asNonEmptyString(policy.interaction_capability);
   const frontendCapability = asNonEmptyString(policy.frontend_capability);
   const safetyPolicy = asNonEmptyString(policy.safety_policy);
+  const operatorMode = asNonEmptyString(policy.operator_mode);
+  const agentDecisionPolicy = asNonEmptyString(policy.agent_decision_policy);
+  const interactionAnswerPolicy = asNonEmptyString(policy.interaction_answer_policy);
+  const targetWritePolicy = asNonEmptyString(policy.target_write_policy);
+  const internalTestHooks = asRecord(profile.internal_test_hooks);
+  const acceptanceLike =
+    internalTestHooks.allow_deterministic_operator_for_test !== true &&
+    (["acceptance", "production-proof"].includes(asNonEmptyString(profile.run_tier)) ||
+      asRecord(profile.production_proof).enabled === true);
   const problems = [];
 
   if (!["delivery_default", "full_lifecycle"].includes(flowRangePolicy)) {
@@ -187,6 +196,29 @@ function assertLiveE2ePolicy(profile, source) {
   }
   if (!["no-upstream-write"].includes(safetyPolicy)) {
     problems.push("live_e2e.safety_policy must be no-upstream-write");
+  }
+  if (!["skill-agent", "deterministic-fixture"].includes(operatorMode)) {
+    problems.push("live_e2e.operator_mode must be skill-agent or deterministic-fixture");
+  }
+  if (!["required", "optional"].includes(agentDecisionPolicy)) {
+    problems.push("live_e2e.agent_decision_policy must be required or optional");
+  }
+  if (!["agent-required", "deterministic-fixture"].includes(interactionAnswerPolicy)) {
+    problems.push("live_e2e.interaction_answer_policy must be agent-required or deterministic-fixture");
+  }
+  if (targetWritePolicy !== "aor-runtime-only-before-execution") {
+    problems.push("live_e2e.target_write_policy must be aor-runtime-only-before-execution");
+  }
+  if (acceptanceLike) {
+    if (operatorMode !== "skill-agent") {
+      problems.push("acceptance/production-proof profiles must use live_e2e.operator_mode=skill-agent");
+    }
+    if (agentDecisionPolicy !== "required") {
+      problems.push("acceptance/production-proof profiles must use live_e2e.agent_decision_policy=required");
+    }
+    if (interactionAnswerPolicy !== "agent-required") {
+      problems.push("acceptance/production-proof profiles must use live_e2e.interaction_answer_policy=agent-required");
+    }
   }
 
   if (problems.length > 0) {

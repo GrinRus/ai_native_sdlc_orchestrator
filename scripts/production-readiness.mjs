@@ -152,8 +152,8 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
     ...(Array.isArray(proof.no_upstream_write_assertion?.changed_paths)
       ? proof.no_upstream_write_assertion.changed_paths
       : []),
-    ...(Array.isArray(proof.evidence?.runtime_harness?.mission_scoped_changed_paths)
-      ? proof.evidence.runtime_harness.mission_scoped_changed_paths
+    ...(Array.isArray(proof.evidence?.runtime_harness?.meaningful_changed_paths)
+      ? proof.evidence.runtime_harness.meaningful_changed_paths
       : []),
   ];
 
@@ -205,7 +205,7 @@ function validateProductionProofFixture(rootDir, proofFixturePath = defaultProof
     findings.push(`${proofFixturePath} must not record upstream commit refs.`);
   }
   if (changedPaths.length === 0) {
-    findings.push(`${proofFixturePath} must record mission-scoped changed paths.`);
+    findings.push(`${proofFixturePath} must record meaningful implementation changed paths.`);
   }
   for (const changedPath of changedPaths) {
     if (path.isAbsolute(changedPath) || changedPath.startsWith(".aor/") || changedPath.includes("/.aor/")) {
@@ -466,7 +466,12 @@ function checkContractAndHarnessEvidence(rootDir) {
       findings.push(`Runtime Harness contract and strict-delivery example must include ${required}.`);
     }
   }
-  for (const required of ["overall_decision, \"pass\"", "overall_decision, \"block\"", "overall_decision, \"fail\"", "repair_status, \"exhausted\""]) {
+  for (const required of [
+    "overall_decision, \"pass\"",
+    "overall_decision, \"block\"",
+    "does not fail run-level closure by path alone",
+    "repair_status, \"exhausted\"",
+  ]) {
     if (!controllerTests.includes(required)) {
       findings.push(`Runtime Harness controller tests must cover ${required}.`);
     }

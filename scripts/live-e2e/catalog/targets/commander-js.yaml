@@ -43,19 +43,10 @@ provider_comparison_pairs:
 feature_missions:
   - mission_id: commander-option-suggestion-regression
     title: Preserve option suggestion regression behavior
-    brief: Add or adjust one focused regression around option parsing, suggestions, or error text while keeping the change inside the CLI parser surface.
+    brief: Add or adjust one focused regression around option parsing, suggestions,
+      or error text while keeping the change inside the CLI parser surface.
     feature_size: small
-    allowed_paths:
-      - lib/**
-      - tests/**
-      - package.json
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a1
       - verify-summary
       - routed-step-result
       - review-report
@@ -76,16 +67,20 @@ feature_missions:
     size_budget:
       max_changed_files: 6
       max_added_lines: 220
-    size_rationale: Small Commander regressions should stay inside one parser behavior and one test seam.
+    size_rationale: Small Commander regressions should stay inside one parser
+      behavior and one test seam.
     change_budget:
       max_changed_files: 6
       max_added_lines: 220
+    quality_evidence: *a1
   - mission_id: commander-help-typing-repair
     title: Repair one help or typing consistency seam
-    brief: Fix one bounded help output, TypeScript declaration, or option metadata inconsistency with matching regression coverage.
+    brief: Fix one bounded help output, TypeScript declaration, or option metadata
+      inconsistency with matching regression coverage.
     feature_size: medium
     goals:
-      - Repair one help or typing consistency issue without changing unrelated CLI behavior.
+      - Repair one help or typing consistency issue without changing unrelated
+        CLI behavior.
     kpis:
       - kpi_id: commander-help-typing-green
         name: Commander help typing gate
@@ -94,18 +89,7 @@ feature_missions:
     definition_of_done:
       - Tests cover the repaired help or typing behavior.
       - Review and delivery evidence remain anchored to the target checkout.
-    allowed_paths:
-      - lib/**
-      - typings/**
-      - tests/**
-      - package.json
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a2
       - verify-summary
       - routed-step-result
       - review-report
@@ -128,37 +112,32 @@ feature_missions:
     size_budget:
       max_changed_files: 8
       max_added_lines: 320
-    size_rationale: Medium Commander repair may touch runtime and types but should remain inside one user-facing command surface.
+    size_rationale: Medium Commander repair may touch runtime and types but should
+      remain inside one user-facing command surface.
     change_budget:
       max_changed_files: 8
       max_added_lines: 320
+    quality_evidence: *a2
   - mission_id: commander-cli-governance-lineage
     title: Govern one CLI behavior lineage change
-    brief: Exercise a broader CLI behavior change with strict review, delivery, audit, and learning evidence.
+    brief: Exercise a broader CLI behavior change with strict review, delivery,
+      audit, and learning evidence.
     feature_size: medium
     goals:
       - Preserve governance lineage for one CLI behavior change.
-      - Avoid upstream write-back while materializing delivery and learning artifacts.
+      - Avoid upstream write-back while materializing delivery and learning
+        artifacts.
     kpis:
       - kpi_id: commander-governance-lineage
         name: Commander governance lineage
-        target: review, delivery, audit, and learning artifacts preserve the same matrix cell
+        target: review, delivery, audit, and learning artifacts preserve the same matrix
+          cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
       - npm run test and npm run check pass.
-      - Governance and learning artifacts link to the same mission and target checkout.
-    allowed_paths:
-      - lib/**
-      - typings/**
-      - tests/**
-      - package.json
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+      - Governance and learning artifacts link to the same mission and target
+        checkout.
+    expected_evidence: &a3
       - verify-summary
       - review-report
       - delivery-manifest
@@ -181,7 +160,9 @@ feature_missions:
     size_budget:
       max_changed_files: 10
       max_added_lines: 420
-    size_rationale: Governance changes may touch runtime, types, and tests, but should remain bounded to Commander command behavior.
+    size_rationale: Governance changes may touch runtime, types, and tests, but
+      should remain bounded to Commander command behavior.
     change_budget:
       max_changed_files: 10
       max_added_lines: 420
+    quality_evidence: *a3

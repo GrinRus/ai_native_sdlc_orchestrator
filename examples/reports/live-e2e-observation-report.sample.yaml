@@ -1,6 +1,12 @@
 report_id: live-e2e.sample.observation.v2
 run_id: live-e2e.sample.run
 profile_id: live-e2e.full-journey.regress.ky
+operator_context:
+  operator_kind: deterministic-fixture
+  operator_ref: fixture://live-e2e-deterministic-runner
+  decision_policy: optional
+  answer_policy: deterministic-fixture-only
+  target_write_policy: aor-runtime-only-before-execution
 controller_state_ref: runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
 flow_range:
   start_step: discovery
@@ -114,8 +120,11 @@ step_journal:
       recommendation: continue
     semantic_analysis:
       status: pass
-      judge_source: deterministic-runner
+      judge_source: deterministic-fixture
       findings: []
+    agent_decision_request_ref: runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-01-discovery.json
+    operator_decision_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-01-discovery.json
+    operator_decision_status: accepted
     requested_interaction: null
     decision:
       action: continue

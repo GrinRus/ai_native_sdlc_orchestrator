@@ -26,6 +26,10 @@ const REQUIRED_PHASES = Object.freeze(["plan", "execute", "inspect", "classify",
 function validateControllerEvidence(report, state) {
   const issues = [];
   const stepJournal = Array.isArray(report.step_journal) ? report.step_journal.map((entry) => asRecord(entry)) : [];
+  const operatorContext = asRecord(report.operator_context);
+  const requiresOperatorDecision =
+    asNonEmptyString(operatorContext.operator_kind) === "skill-agent" &&
+    asNonEmptyString(operatorContext.decision_policy) === "required";
   if (stepJournal.length === 0) {
     issues.push("step_journal must contain at least one online controller observation");
   }
@@ -40,6 +44,15 @@ function validateControllerEvidence(report, state) {
       if (Object.keys(asRecord(entry[field])).length === 0) {
         issues.push(`${stepId} missing ${field}`);
       }
+    }
+    if (!asNonEmptyString(entry.agent_decision_request_ref)) {
+      issues.push(`${stepId} missing agent_decision_request_ref`);
+    }
+    if (requiresOperatorDecision && asNonEmptyString(entry.operator_decision_status) !== "accepted") {
+      issues.push(`${stepId} missing accepted skill-agent operator decision`);
+    }
+    if (requiresOperatorDecision && !asNonEmptyString(entry.operator_decision_ref)) {
+      issues.push(`${stepId} missing operator_decision_ref`);
     }
     for (const phase of REQUIRED_PHASES) {
       const phaseFound = phaseHistory.some(

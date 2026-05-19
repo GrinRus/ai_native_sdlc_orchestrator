@@ -730,14 +730,21 @@ function validateStepResult(document, source) {
     issues,
   });
   if (missionSemantics) {
-    for (const field of [
-      "changed_paths",
-      "allowed_paths",
-      "forbidden_paths",
-      "mission_scoped_changed_paths",
-      "scope_violation_paths",
-      "ignored_request_input_files",
-    ]) {
+    for (const legacyField of ["allowed_paths", "forbidden_paths", "mission_scoped_changed_paths", "scope_violation_paths"]) {
+      if (Object.prototype.hasOwnProperty.call(missionSemantics, legacyField)) {
+        issues.push(
+          issue({
+            code: "forbidden_field_present",
+            source,
+            field: `mission_semantics.${legacyField}`,
+            expected: "absent",
+            actual: "present",
+            message: `Field 'mission_semantics.${legacyField}' is legacy path-scope evidence and must not be emitted.`,
+          }),
+        );
+      }
+    }
+    for (const field of ["changed_paths", "meaningful_changed_paths", "non_bootstrap_changed_paths", "ignored_request_input_files"]) {
       validateOptionalStringArrayField({
         record: missionSemantics,
         source,
@@ -956,7 +963,21 @@ function validateReviewCodeQuality(value, source, issues) {
   if (!isPlainObject(value)) return;
 
   validateReviewQualitySection(value, source, "code_quality", issues);
-  for (const field of ["changed_paths", "allowed_paths", "forbidden_paths"]) {
+  for (const legacyField of ["allowed_paths", "forbidden_paths"]) {
+    if (Object.prototype.hasOwnProperty.call(value, legacyField)) {
+      issues.push(
+        issue({
+          code: "forbidden_field_present",
+          source,
+          field: `code_quality.${legacyField}`,
+          expected: "absent",
+          actual: "present",
+          message: `Field 'code_quality.${legacyField}' is legacy path-scope evidence and must not be emitted.`,
+        }),
+      );
+    }
+  }
+  for (const field of ["changed_paths"]) {
     validateOptionalStringArrayField({
       record: value,
       source,
@@ -1968,6 +1989,39 @@ function validateLiveE2EObservationReport(document, source) {
       }),
     );
   }
+  const operatorContext = isPlainObject(document.operator_context) ? document.operator_context : {};
+  for (const [field, expectedValues] of [
+    ["operator_kind", ["skill-agent", "deterministic-fixture"]],
+    ["decision_policy", ["required", "optional"]],
+    ["answer_policy", ["agent-public-control-plane", "deterministic-fixture-only"]],
+    ["target_write_policy", ["aor-runtime-only-before-execution"]],
+  ]) {
+    const value = operatorContext[field];
+    if (typeof value !== "string" || !expectedValues.includes(value)) {
+      issues.push(
+        issue({
+          code: value === undefined ? "required_field_missing" : "enum_value_invalid",
+          source,
+          field: `operator_context.${field}`,
+          expected: expectedValues.join("|"),
+          actual: value === undefined ? "missing" : String(value),
+          message: `Field 'operator_context.${field}' must declare the live E2E operator policy.`,
+        }),
+      );
+    }
+  }
+  if (typeof operatorContext.operator_ref !== "string" || operatorContext.operator_ref.length === 0) {
+    issues.push(
+      issue({
+        code: operatorContext.operator_ref === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "operator_context.operator_ref",
+        expected: "non-empty string",
+        actual: operatorContext.operator_ref === undefined ? "missing" : describeActualType(operatorContext.operator_ref),
+        message: "Field 'operator_context.operator_ref' must identify the live E2E operator.",
+      }),
+    );
+  }
   const finalAnalysis = isPlainObject(document.final_analysis)
     ? document.final_analysis
     : {};
@@ -1979,6 +2033,7 @@ function validateLiveE2EObservationReport(document, source) {
   });
   validateObservationStepJournal({
     entries: document.step_journal,
+    operatorContext,
     source,
     issues,
   });
@@ -2116,10 +2171,12 @@ function validateObservationSetupJournal(options) {
 }
 
 /**
- * @param {{ entries: unknown, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ * @param {{ entries: unknown, operatorContext?: Record<string, unknown>, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
  */
 function validateObservationStepJournal(options) {
   if (!Array.isArray(options.entries)) return;
+  const operatorKind = typeof options.operatorContext?.operator_kind === "string" ? options.operatorContext.operator_kind : null;
+  const decisionPolicy = typeof options.operatorContext?.decision_policy === "string" ? options.operatorContext.decision_policy : null;
   options.entries.forEach((entry, index) => {
     const record = isPlainObject(entry) ? entry : {};
     const plan = isPlainObject(record.plan) ? record.plan : null;
@@ -2183,6 +2240,75 @@ function validateObservationStepJournal(options) {
       field: `step_journal[${index}].semantic_analysis.status`,
       issues: options.issues,
     });
+    for (const field of ["agent_decision_request_ref", "operator_decision_status"]) {
+      const value = record[field];
+      if (typeof value !== "string" || value.length === 0) {
+        options.issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source: options.source,
+            field: `step_journal[${index}].${field}`,
+            expected: "non-empty string",
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Field 'step_journal[${index}].${field}' is required for agent-operated live E2E decisions.`,
+          }),
+        );
+      }
+    }
+    const decisionStatus = record.operator_decision_status;
+    if (
+      typeof decisionStatus === "string" &&
+      !["accepted", "missing", "rejected", "not_required"].includes(decisionStatus)
+    ) {
+      options.issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source: options.source,
+          field: `step_journal[${index}].operator_decision_status`,
+          expected: "accepted|missing|rejected|not_required",
+          actual: decisionStatus,
+          message: "Field 'operator_decision_status' must describe the operator decision state.",
+        }),
+      );
+    }
+    if (decisionStatus === "accepted" && typeof record.operator_decision_ref !== "string") {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: `step_journal[${index}].operator_decision_ref`,
+          expected: "string",
+          actual: record.operator_decision_ref === undefined ? "missing" : describeActualType(record.operator_decision_ref),
+          message: "Accepted live E2E operator decisions must carry 'operator_decision_ref'.",
+        }),
+      );
+    }
+    if (operatorKind === "skill-agent" && decisionPolicy === "required") {
+      if (decisionStatus !== "accepted") {
+        options.issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source: options.source,
+            field: `step_journal[${index}].operator_decision_status`,
+            expected: "accepted",
+            actual: decisionStatus === undefined ? "missing" : String(decisionStatus),
+            message: "Skill-agent live E2E reports require accepted operator decisions for each step.",
+          }),
+        );
+      }
+      if (semanticAnalysis.judge_source !== "skill-agent") {
+        options.issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source: options.source,
+            field: `step_journal[${index}].semantic_analysis.judge_source`,
+            expected: "skill-agent",
+            actual: semanticAnalysis.judge_source === undefined ? "missing" : String(semanticAnalysis.judge_source),
+            message: "Acceptance live E2E semantic analysis must come from the skill-agent operator.",
+          }),
+        );
+      }
+    }
   });
 }
 

@@ -90,6 +90,7 @@ function resolvePreflightRequestTransport(externalRuntime) {
 /**
  * @param {{
  *   targetCheckoutRoot: string,
+ *   adapterProfileRoot?: string,
  *   providerVariant: Record<string, unknown>,
  *   providerVariantId: string,
  *   coverageTier: string,
@@ -110,7 +111,9 @@ export function runLiveAdapterPreflight(options) {
   const providerCoverageTier = asNonEmptyString(options.providerVariant.coverage_tier);
   const requiredProvider = options.coverageTier === "required" || providerCoverageTier === "required";
   const editAndPermissionReadinessRequired = requiredProvider || options.permissionReadinessRequired === true;
-  const adapterProfileFile = path.join(options.targetCheckoutRoot, "examples", "adapters", `${normalizeId(adapterId)}.yaml`);
+  const adapterProfileRoot =
+    asNonEmptyString(options.adapterProfileRoot) || path.join(options.targetCheckoutRoot, "examples", "adapters");
+  const adapterProfileFile = path.join(adapterProfileRoot, `${normalizeId(adapterId)}.yaml`);
   const reportFile = path.join(
     options.reportsRoot,
     `live-adapter-preflight-${normalizeId(options.runId)}-${normalizeId(options.providerVariantId)}.json`,

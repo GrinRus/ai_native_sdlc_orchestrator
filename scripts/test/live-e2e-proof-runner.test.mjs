@@ -612,11 +612,11 @@ function configureCodexExternalRuntimeForbiddenWrite(options) {
         "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
         "const request=input.request||{};",
         ...permissionProbeSnippet(),
-        "fs.mkdirSync('docs',{recursive:true});",
-        "fs.writeFileSync('docs/control-plane-leak.md','# leaked from target run\\n');",
+        "fs.mkdirSync('scripts/live-e2e',{recursive:true});",
+        "fs.writeFileSync('scripts/live-e2e/control-plane-leak.md','# leaked from target run\\n');",
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
-        "summary:'external runner wrote forbidden docs path',",
+        "summary:'external runner wrote control-plane path',",
         "output:{runner:'node-inline',step_class:request.step_class||null,execution_root:process.cwd()},",
         "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-forbidden-write'],",
         "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'forbidden-write'}]",
@@ -935,9 +935,8 @@ function writeLocalCatalogTarget(options) {
           title: "Local full-journey mission",
           brief: "Use one bounded local mission for proof runner coverage.",
           feature_size: "small",
-          allowed_paths: ["src/**", "test/**", "package.json"],
-          forbidden_paths: ["docs/**", ".github/**", "scripts/**", "examples/**", "context/**"],
           expected_evidence: ["review-report", "learning-loop-handoff"],
+          quality_evidence: ["review-report", "post-run-primary-verification", "delivery-manifest"],
           acceptance_checks: ["keep changes inside src and test only"],
           supported_scenarios: ["regress", "repair", "governance", "release"],
           recommended_provider_variants: ["openai-primary", "anthropic-primary", "open-code-primary"],
@@ -989,6 +988,10 @@ function writeLocalFullJourneyProfile(options) {
         interaction_capability: "public-control-plane",
         frontend_capability: options.guidedJourney ? "guided-web-smoke" : "none",
         safety_policy: "no-upstream-write",
+        operator_mode: "deterministic-fixture",
+        agent_decision_policy: "optional",
+        interaction_answer_policy: "deterministic-fixture",
+        target_write_policy: "aor-runtime-only-before-execution",
       },
       target_catalog_id: options.catalogId,
       feature_mission_id: options.missionId,
@@ -1027,7 +1030,14 @@ function writeLocalFullJourneyProfile(options) {
       ...(options.productionProof ? { production_proof: options.productionProof } : {}),
       ...(options.guidedJourney ? { guided_journey: options.guidedJourney } : {}),
       ...(options.liveAdapterPreflight ? { live_adapter_preflight: options.liveAdapterPreflight } : {}),
-      ...(options.internalTestHooks ? { internal_test_hooks: options.internalTestHooks } : {}),
+      ...(options.internalTestHooks || options.productionProof
+        ? {
+            internal_test_hooks: {
+              ...(options.productionProof ? { allow_deterministic_operator_for_test: true } : {}),
+              ...(options.internalTestHooks ?? {}),
+            },
+          }
+        : {}),
     }),
     "utf8",
   );
@@ -1309,7 +1319,7 @@ test("installed-user proof runner records deterministic semantic analysis withou
       true,
     );
     assert.equal(
-      observation.step_journal.every((entry) => entry.semantic_analysis.judge_source === "deterministic-runner"),
+      observation.step_journal.every((entry) => entry.semantic_analysis.judge_source === "deterministic-fixture"),
       true,
     );
     assert.equal(Object.hasOwn(observation, "artifact_quality_matrix"), false);
@@ -1866,7 +1876,9 @@ test("full-journey mode defaults to packaged bootstrap assets when --examples-ro
     assert.equal(summary.status, "pass");
     assert.equal(summary.control_surfaces.examples_root, null);
     assert.equal(fs.existsSync(summary.generated_project_profile_file), true);
-    assert.equal(fs.existsSync(summary.artifacts.target_examples_root), true);
+    assert.equal(fs.existsSync(summary.artifacts.host_live_e2e_assets_root), true);
+    assert.equal(summary.generated_project_profile_file.startsWith(summary.target_checkout_root), false);
+    assert.equal(fs.existsSync(path.join(summary.target_checkout_root, "project.aor.yaml")), false);
   });
 });
 
@@ -3573,7 +3585,7 @@ test("full-journey mode fails when approved handoff validation is blocked", () =
   });
 });
 
-test("full-journey mode stops at execution when runtime harness detects control-plane leakage", () => {
+test("full-journey mode fails result quality when review detects control-plane leakage", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
     const examplesRoot = createExamplesRoot({ tempRoot });
@@ -3604,16 +3616,21 @@ test("full-journey mode stops at execution when runtime harness detects control-
     assert.equal(result.live_e2e_run_status, "not_pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
     assert.equal(summary.status, "not_pass");
-    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "fail");
+    assert.notEqual(summary.stage_results.find((entry) => entry.stage === "execution").status, "fail");
     assert.equal(fs.existsSync(summary.runtime_harness_report_file), true);
     const runtimeHarnessReport = JSON.parse(fs.readFileSync(summary.runtime_harness_report_file, "utf8"));
-    assert.equal(runtimeHarnessReport.overall_decision, "fail");
+    assert.equal(runtimeHarnessReport.overall_decision, "pass");
     assert.equal(
-      runtimeHarnessReport.step_decisions.some((decision) => decision.failure_class === "repo-scope-violation"),
+      runtimeHarnessReport.step_decisions.every((decision) => {
+        const failureClass = decision.failure_class;
+        return failureClass === null || failureClass === undefined || failureClass === "none";
+      }),
       true,
     );
-    assert.equal(summary.artifacts.live_e2e_controller_stop.decision.action, "diagnose");
-    assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), false);
+    assert.equal(JSON.stringify(runtimeHarnessReport).includes("repo-scope-violation"), false);
+    assert.equal(summary.quality_gate_decision, null);
+    assert.equal(JSON.parse(fs.readFileSync(summary.review_report_file, "utf8")).overall_status, "fail");
+    assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), true);
   });
 });
 
@@ -3648,25 +3665,30 @@ test("full-journey mode fails when runtime harness detects code-changing no-op",
     assert.equal(result.live_e2e_run_status, "not_pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
     assert.equal(summary.status, "not_pass");
-    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "fail");
+    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "pass");
+    assert.equal(summary.stage_results.find((entry) => entry.stage === "review").status, "fail");
     assert.equal(fs.existsSync(summary.runtime_harness_report_file), true);
     const runtimeHarnessReport = JSON.parse(fs.readFileSync(summary.runtime_harness_report_file, "utf8"));
-    assert.equal(runtimeHarnessReport.overall_decision, "fail");
+    assert.equal(runtimeHarnessReport.overall_decision, "pass");
     assert.equal(
-      runtimeHarnessReport.step_decisions.some((decision) => decision.failure_class === "no-op"),
+      runtimeHarnessReport.step_decisions.every((decision) => {
+        const failureClass = decision.failure_class;
+        return failureClass === null || failureClass === undefined || failureClass === "none";
+      }),
       true,
     );
-    assert.equal(summary.artifacts.live_e2e_controller_stop.decision.action, "diagnose");
+    assert.equal(JSON.stringify(runtimeHarnessReport).includes("repo-scope-violation"), false);
+    assert.equal(summary.quality_judgement, null);
+    assert.equal(JSON.parse(fs.readFileSync(summary.review_report_file, "utf8")).overall_status, "fail");
     const observation = JSON.parse(fs.readFileSync(summary.live_e2e_observation_report_file, "utf8"));
     assert.equal(observation.overall_status, "not_pass");
     assert.equal(
-      observation.step_journal.some((entry) => entry.step_id === "execution" && entry.decision.action === "diagnose"),
-      true,
+      observation.step_journal.some((entry) => entry.step_id === "delivery"),
+      false,
     );
-    assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), false);
+    assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), true);
+    assert.equal(summary.command_results.some((entry) => entry.label === "eval-run"), false);
     assert.equal(summary.command_results.some((entry) => entry.label === "learning-handoff"), false);
-    assert.equal(Array.isArray(summary.scorecard_files), true);
-    assert.equal(fs.existsSync(summary.scorecard_files[0]), true);
   });
 });
 

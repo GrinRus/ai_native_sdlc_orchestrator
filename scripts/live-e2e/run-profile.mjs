@@ -32,7 +32,11 @@ import {
 import { executeFullJourneyFlow, executeInstalledUserFlow, prepareAorInstallationProof } from "./lib/flows.mjs";
 import { resolveAuthProbeRequired } from "./lib/preflight.mjs";
 import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib/production-proof.mjs";
-import { buildLiveE2eStepPlan, createLiveE2eStepController } from "./lib/step-controller.mjs";
+import {
+  buildLiveE2eStepPlan,
+  createLiveE2eStepController,
+  resolveLiveE2eOperatorContext,
+} from "./lib/step-controller.mjs";
 
 const LIVE_E2E_DELIVERY_STEPS = Object.freeze([
   "discovery",
@@ -161,7 +165,7 @@ function buildCodeQualityObservation(artifacts) {
     ...(asNonEmptyString(artifacts.provider_execution_status) === "fail"
       ? ["provider execution evidence was not materialized"]
       : []),
-    ...(asNonEmptyString(artifacts.real_code_change_status) === "fail" ? ["no mission-scoped code change observed"] : []),
+    ...(asNonEmptyString(artifacts.real_code_change_status) === "fail" ? ["no meaningful code change observed"] : []),
     ...(asNonEmptyString(artifacts.post_run_verify_status) === "fail" ? ["post-delivery verification failed"] : []),
     ...(asNonEmptyString(artifacts.quality_gate_decision) === "fail" ? ["quality gate decision failed"] : []),
     ...(deliveryBlocked ? ["delivery prepare was blocked"] : []),
@@ -396,6 +400,14 @@ function observationSeverity(status) {
  * @returns {string}
  */
 function resolveStepDecisionAction(stepEntry) {
+  const operatorDecisionStatus = asNonEmptyString(stepEntry.operator_decision_status);
+  const declaredAction = asNonEmptyString(asRecord(stepEntry.decision).action);
+  if (
+    (operatorDecisionStatus === "accepted" || operatorDecisionStatus === "missing" || operatorDecisionStatus === "rejected") &&
+    ["continue", "answer", "frontend_interact", "retry_public_step", "diagnose", "block"].includes(declaredAction)
+  ) {
+    return declaredAction;
+  }
   if (stepEntry.requested_interaction) {
     const requestedInteraction = asRecord(stepEntry.requested_interaction);
     const interactionStatus =
@@ -778,10 +790,13 @@ function buildObservationReport(options) {
   const includedSteps = getIncludedStepsForPolicy(flowRangePolicy);
   const excludedSteps = flowRangePolicy === "full_lifecycle" ? [] : ["release", "learning"];
   const setupJournal = buildSetupJournal(options.flowResult.artifacts);
+  const operatorContext = resolveLiveE2eOperatorContext(options.profile);
+  const agentJudgeDocument =
+    asNonEmptyString(operatorContext.operator_kind) === "skill-agent" ? {} : options.agentJudgeDocument;
   const stepJournal = buildStepJournal({
     profile: options.profile,
     flowResult: options.flowResult,
-    agentJudgeDocument: options.agentJudgeDocument,
+    agentJudgeDocument,
   });
   const finalAnalysis = buildFinalAnalysis({
     stepJournal,
@@ -791,6 +806,7 @@ function buildObservationReport(options) {
     report_id: `${options.runId}.live-e2e-observation.v2`,
     run_id: options.runId,
     profile_id: asNonEmptyString(options.profile.profile_id) || "unknown-profile",
+    operator_context: operatorContext,
     controller_state_ref: asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file),
     flow_range: {
       start_step: includedSteps[0],
@@ -1179,6 +1195,7 @@ function writeProofRunnerArtifacts(options) {
     live_e2e_controller_state_file: asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file) || null,
     live_e2e_step_observation_files: stepObservationFiles,
     live_e2e_observation_overall_status: observationReport.overall_status,
+    operator_context: observationReport.operator_context,
     agent_artifact_review_request_file: agentArtifactReviewRequestFile,
     matrix_cell:
       typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
@@ -1187,6 +1204,11 @@ function writeProofRunnerArtifacts(options) {
     quality_judgement:
       typeof options.flowResult.artifacts.quality_judgement === "object" && options.flowResult.artifacts.quality_judgement
         ? options.flowResult.artifacts.quality_judgement
+        : null,
+    agent_operator_assessment:
+      typeof options.flowResult.artifacts.agent_operator_assessment === "object" &&
+      options.flowResult.artifacts.agent_operator_assessment
+        ? options.flowResult.artifacts.agent_operator_assessment
         : null,
     production_proof: productionProof,
     proof_scope: productionProof?.proof_scope ?? null,

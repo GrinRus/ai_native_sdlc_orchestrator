@@ -123,7 +123,7 @@
         "non_bootstrap_changed_paths": [
           "src/implemented.js"
         ],
-        "mission_scoped_changed_paths": [
+        "meaningful_changed_paths": [
           "src/implemented.js"
         ],
         "strict_code_changing_noop": true

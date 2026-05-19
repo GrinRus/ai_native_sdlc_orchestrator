@@ -27,8 +27,8 @@ import {
 import {
   materializeFeatureRequestFile,
   materializeGeneratedProjectProfile,
+  materializeHostLiveE2eAssets,
   materializeProviderPinnedRouteOverrides,
-  materializeTargetAssets,
   materializeTargetCheckout,
   normalizeDeliveryMode,
 } from "./target-materialization.mjs";
@@ -123,6 +123,23 @@ function toPacketEvidenceRef(projectRoot, packetName, filePath) {
  */
 function normalizeLabel(label) {
   return label.replace(/[^a-z0-9]+/giu, "-").replace(/^-+|-+$/g, "").toLowerCase();
+}
+
+/**
+ * @param {string[]} args
+ * @returns {string[]}
+ */
+function redactSensitiveCommandArgs(args) {
+  const redacted = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    redacted.push(arg);
+    if (arg === "--answer" && index + 1 < args.length) {
+      redacted.push("[redacted-live-e2e-answer]");
+      index += 1;
+    }
+  }
+  return redacted;
 }
 
 /**
@@ -322,8 +339,9 @@ export function prepareAorInstallationProof(options) {
  * }}
  */
 function runAorCommand(options) {
+  const rawArgs = [...options.launch.argsPrefix, ...options.args];
   const startedAt = nowIso();
-  const run = spawnSync(options.launch.command, [...options.launch.argsPrefix, ...options.args], {
+  const run = spawnSync(options.launch.command, rawArgs, {
     cwd: options.cwd,
     env: options.env,
     encoding: "utf8",
@@ -346,7 +364,7 @@ function runAorCommand(options) {
     label: options.label,
     cwd: options.cwd,
     command: options.launch.command,
-    args: [...options.launch.argsPrefix, ...options.args],
+    args: redactSensitiveCommandArgs(rawArgs),
     exit_code: run.status ?? -1,
     stdout: run.stdout ?? "",
     stderr: run.stderr ?? "",
@@ -427,6 +445,9 @@ function buildCommandDiagnostic(result) {
  */
 function resolveDeterministicInteractionAnswer(profile, requestedInteraction) {
   if (!requestedInteraction) return null;
+  if (asNonEmptyString(asRecord(profile.live_e2e).interaction_answer_policy) !== "deterministic-fixture") {
+    return null;
+  }
   const policy = asRecord(profile.interaction_answer_policy);
   if (asNonEmptyString(policy.mode) !== "deterministic") return null;
   const interactionId = asNonEmptyString(requestedInteraction.interaction_id);
@@ -625,8 +646,6 @@ function collectTargetGitStatusWithoutRuntime(targetCheckoutRoot) {
       ".",
       ":(exclude).aor",
       ":(exclude).aor/**",
-      ":(exclude).aor-live-e2e",
-      ":(exclude).aor-live-e2e/**",
     ],
     {
       cwd: targetCheckoutRoot,
@@ -640,6 +659,40 @@ function collectTargetGitStatusWithoutRuntime(targetCheckoutRoot) {
     .split(/\r?\n/u)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+}
+
+/**
+ * @param {string[]} statusLines
+ * @returns {string[]}
+ */
+function trackedTargetStatusLines(statusLines) {
+  return statusLines.filter((line) => !line.startsWith("?? "));
+}
+
+/**
+ * @param {{ targetCheckoutRoot: string, reportsRoot: string, runId: string, phase: string }} options
+ */
+function writeTargetCleanlinessReport(options) {
+  const statusLines = collectTargetGitStatusWithoutRuntime(options.targetCheckoutRoot);
+  const trackedLines = trackedTargetStatusLines(statusLines);
+  const report = {
+    run_id: options.runId,
+    phase: options.phase,
+    status: trackedLines.length === 0 ? "pass" : "fail",
+    target_git_status_without_runtime: statusLines,
+    tracked_status_without_runtime: trackedLines,
+    summary:
+      trackedLines.length === 0
+        ? "Target checkout has no tracked setup changes outside .aor."
+        : "Target setup changed tracked files outside .aor before agent execution.",
+    checked_at: nowIso(),
+  };
+  const reportFile = path.join(
+    options.reportsRoot,
+    `live-e2e-target-cleanliness-${normalizeId(options.runId)}-${normalizeId(options.phase)}.json`,
+  );
+  writeJson(reportFile, report);
+  return { report, reportFile };
 }
 
 /**
@@ -667,7 +720,7 @@ function normalizeMissionKpis(value) {
 }
 
 /**
- * @param {{ mission: Record<string, unknown>, featureRequest: ReturnType<typeof materializeFeatureRequestFile>, profile: Record<string, unknown> }}
+ * @param {{ mission: Record<string, unknown>, featureRequest: ReturnType<typeof materializeFeatureRequestFile>, profile: Record<string, unknown>, projectProfileFile: string }}
  * @returns {string[]}
  */
 function buildGuidedMissionCreateArgs(options) {
@@ -701,6 +754,8 @@ function buildGuidedMissionCreateArgs(options) {
     "create",
     "--project-ref",
     ".",
+    "--project-profile",
+    options.projectProfileFile,
     "--runtime-root",
     ".aor",
     "--request-file",
@@ -723,8 +778,6 @@ function buildGuidedMissionCreateArgs(options) {
       "--kpi",
       `${entry.kpi_id}:${entry.name}:${entry.target}${entry.measurement ? `:${entry.measurement}` : ""}`,
     ]),
-    ...asStringArray(options.mission.allowed_paths).flatMap((entry) => ["--allowed-path", entry]),
-    ...asStringArray(options.mission.forbidden_paths).flatMap((entry) => ["--forbidden-path", entry]),
   ];
 }
 
@@ -1075,8 +1128,6 @@ function evaluateMissionIntakeQuality(options) {
     ["goals", asStringArray(options.mission.goals).length > 0],
     ["kpis", hasKpis],
     ["definition_of_done", asStringArray(options.mission.definition_of_done).length > 0],
-    ["allowed_paths", asStringArray(options.mission.allowed_paths).length > 0],
-    ["forbidden_paths", asStringArray(options.mission.forbidden_paths).length > 0],
     ["expected_evidence", asStringArray(options.mission.expected_evidence).length > 0],
     ["post_run_quality.primary_commands", options.postRunQualityPolicy.primaryCommands.length > 0],
   ];
@@ -1098,14 +1149,14 @@ function evaluateMissionIntakeQuality(options) {
     summary:
       status === "pass"
         ? strictRequired
-          ? "Medium+ mission intake has goals, KPIs, Definition of Done, path bounds, expected evidence, and primary verification commands."
+          ? "Medium+ mission intake has goals, KPIs, Definition of Done, expected evidence, and primary verification commands."
           : "Small mission intake strictness is not required."
         : `Medium+ mission intake is incomplete: ${missingFields.join(", ")}.`,
   };
 }
 
 /**
- * @param {{ mission: Record<string, unknown>, featureRequest: ReturnType<typeof materializeFeatureRequestFile>, profile: Record<string, unknown> }}
+ * @param {{ mission: Record<string, unknown>, featureRequest: ReturnType<typeof materializeFeatureRequestFile>, profile: Record<string, unknown>, projectProfileFile: string }}
  * @returns {string[]}
  */
 function buildIntakeCreateArgs(options) {
@@ -1139,6 +1190,8 @@ function buildIntakeCreateArgs(options) {
     "create",
     "--project-ref",
     ".",
+    "--project-profile",
+    options.projectProfileFile,
     "--runtime-root",
     ".aor",
     "--request-file",
@@ -1156,8 +1209,6 @@ function buildIntakeCreateArgs(options) {
       "--kpi",
       `${entry.kpi_id}:${entry.name}:${entry.target}${entry.measurement ? `:${entry.measurement}` : ""}`,
     ]),
-    ...asStringArray(options.mission.allowed_paths).flatMap((entry) => ["--allowed-path", entry]),
-    ...asStringArray(options.mission.forbidden_paths).flatMap((entry) => ["--forbidden-path", entry]),
   ];
 }
 
@@ -1182,7 +1233,7 @@ function buildVerifyOverrideArgs(options) {
  * @param {string | null | undefined} reportFile
  * @returns {boolean}
  */
-function runtimeHarnessReportHasMissionScopedChanges(reportFile) {
+function runtimeHarnessReportHasMeaningfulChanges(reportFile) {
   const resolvedReportFile = asNonEmptyString(reportFile);
   if (!resolvedReportFile || !fileExists(resolvedReportFile)) {
     return false;
@@ -1191,7 +1242,10 @@ function runtimeHarnessReportHasMissionScopedChanges(reportFile) {
   const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
   return stepDecisions.some((entry) => {
     const semantics = asRecord(asRecord(entry).mission_semantics);
-    return asStringArray(semantics.mission_scoped_changed_paths).length > 0;
+    return (
+      asStringArray(semantics.meaningful_changed_paths).length > 0 ||
+      asStringArray(semantics.non_bootstrap_changed_paths).length > 0
+    );
   });
 }
 
@@ -1603,7 +1657,7 @@ function buildCanonicalRunStatus(options) {
     ...(deliveryStatus === "degraded" ? ["Delivery quality gate produced observed findings."] : []),
     ...(releaseMissing ? ["Required release stage did not materialize strict release-packet evidence."] : []),
     ...(providerExecutionStatus === "fail" ? ["Provider execution evidence was not materialized."] : []),
-    ...(realCodeChangeStatus === "fail" ? ["No mission-scoped real code change was observed."] : []),
+    ...(realCodeChangeStatus === "fail" ? ["No meaningful real code change was observed."] : []),
     ...(diagnosticStatus === "warn" || diagnosticStatus === "fail" ? ["Diagnostic post-run verification reported findings."] : []),
   ]);
   return {
@@ -1716,20 +1770,20 @@ export function executeInstalledUserFlow(options) {
       throw new Error(asNonEmptyString(installedBrowserCachePreflight.report.summary) || "Browser cache preflight failed.");
     }
 
-    const targetAssets = materializeTargetAssets({
-      hostRoot: options.hostRoot,
+    const hostAssets = materializeHostLiveE2eAssets({
       examplesRoot: options.examplesRoot,
-      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      generatedAssetsRoot: path.join(options.layout.stateRoot, "live-e2e-assets", normalizeId(options.runId)),
     });
-    artifacts.target_examples_root = targetAssets.copiedExamplesRoot;
-    artifacts.target_context_root = targetAssets.copiedContextRoot;
+    artifacts.host_live_e2e_assets_root = hostAssets.assetsRoot;
 
     const generatedProfile = materializeGeneratedProjectProfile({
       hostRoot: options.hostRoot,
       profilePath: options.profilePath,
       profile: options.profile,
+      catalogEntry: options.catalogEntry,
       runId: options.runId,
       targetCheckout,
+      generatedAssetsRoot: hostAssets.assetsRoot,
     });
     artifacts.generated_project_profile_file = generatedProfile.generatedProjectProfileFile;
     artifacts.project_profile_template_file = generatedProfile.templateProjectProfilePath;
@@ -1738,10 +1792,17 @@ export function executeInstalledUserFlow(options) {
       "bootstrap",
       "pass",
       [generatedProfile.generatedProjectProfileFile],
-      "Target checkout cloned and AOR assets materialized.",
+      "Target checkout cloned and host-side live E2E project profile prepared.",
     );
 
-    const commandBaseArgs = ["--project-ref", ".", "--project-profile", "./project.aor.yaml"];
+    const commandBaseArgs = [
+      "--project-ref",
+      ".",
+      "--project-profile",
+      generatedProfile.generatedProjectProfileFile,
+      "--runtime-root",
+      ".aor",
+    ];
     let commandIndex = 1;
     const runCommand = (label, args, runOptions = {}) => {
       if (options.stepController?.shouldUseCachedCommand?.(label) === true) {
@@ -1916,6 +1977,24 @@ export function executeInstalledUserFlow(options) {
         "Preflight verify failed before live execution.",
       );
       throw new Error("Preflight verify failed before live execution.");
+    }
+    const targetCleanliness = writeTargetCleanlinessReport({
+      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      reportsRoot: options.layout.reportsRoot,
+      runId: options.runId,
+      phase: "before-execution",
+    });
+    artifacts.target_cleanliness_before_execution_file = targetCleanliness.reportFile;
+    artifacts.target_cleanliness_before_execution = targetCleanliness.report;
+    if (targetCleanliness.report.status !== "pass") {
+      markStage(
+        stageMap,
+        "execution",
+        "fail",
+        [targetCleanliness.reportFile],
+        asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.",
+      );
+      throw new Error(asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.");
     }
 
     const promotionRefsForLiveExecution = shouldIncludePromotionEvidence(options.profile)
@@ -2167,6 +2246,10 @@ export function executeInstalledUserFlow(options) {
         "runs",
         "--project-ref",
         ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
+        "--runtime-root",
+        ".aor",
         "--run-id",
         options.runId,
       ]);
@@ -2177,6 +2260,10 @@ export function executeInstalledUserFlow(options) {
         "handoff",
         "--project-ref",
         ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
+        "--runtime-root",
+        ".aor",
         "--run-id",
         options.runId,
       ]);
@@ -2524,27 +2611,40 @@ export function executeFullJourneyFlow(options) {
       artifacts.guided_next_before_mission_transcript_file = guidedNextBeforeMission.transcriptFile;
     }
 
-    const bootstrapTemplate = asNonEmptyString(options.profile.bootstrap_template) || "github-default";
+    const hostAssets = materializeHostLiveE2eAssets({
+      examplesRoot: options.examplesRoot,
+      generatedAssetsRoot: path.join(options.layout.stateRoot, "live-e2e-assets", normalizeId(options.runId)),
+    });
+    artifacts.host_live_e2e_assets_root = hostAssets.assetsRoot;
+
+    const generatedProfile = materializeGeneratedProjectProfile({
+      hostRoot: options.hostRoot,
+      profilePath: options.profilePath,
+      profile: options.profile,
+      catalogEntry: options.catalogEntry,
+      runId: options.runId,
+      targetCheckout,
+      generatedAssetsRoot: hostAssets.assetsRoot,
+    });
+    artifacts.generated_project_profile_file = generatedProfile.generatedProjectProfileFile;
+    artifacts.project_profile_template_file = generatedProfile.templateProjectProfilePath;
+
     const projectInit = runCommand("project-init", [
       "project",
       "init",
       "--project-ref",
       ".",
+      "--project-profile",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
-      "--materialize-project-profile",
-      "--bootstrap-template",
-      bootstrapTemplate,
-      "--materialize-bootstrap-assets",
       ...repoVerificationCommands.flatMap((entry) => ["--repo-build-command", entry]),
       ...repoLintCommands.flatMap((entry) => ["--repo-lint-command", entry]),
       ...repoVerificationCommands.flatMap((entry) => ["--repo-test-command", entry]),
     ]);
-    artifacts.generated_project_profile_file = getStringField(projectInit.payload, "materialized_project_profile_file");
-    artifacts.target_examples_root = getStringField(projectInit.payload, "materialized_bootstrap_assets_root");
     artifacts.bootstrap_artifact_packet_file = getStringField(projectInit.payload, "artifact_packet_file");
     const providerRoutes = materializeProviderPinnedRouteOverrides({
-      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      routesRoot: hostAssets.routesRoot,
       providerVariant: options.providerVariant,
       providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
     });
@@ -2553,6 +2653,7 @@ export function executeFullJourneyFlow(options) {
     const routeOverridesFlag = serializeRouteOverrides(providerRoutes.routeOverrides);
     const liveAdapterPreflight = runLiveAdapterPreflight({
       targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      adapterProfileRoot: path.join(hostAssets.assetsRoot, "adapters"),
       providerVariant: options.providerVariant,
       providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
       coverageTier: options.coverageTier,
@@ -2588,7 +2689,7 @@ export function executeFullJourneyFlow(options) {
         ...collectStringRefs(projectInit.payload),
         ...providerRoutes.routeFiles,
       ]),
-      "Public bootstrap materialized project profile, packaged bootstrap assets, provider-pinned route overrides, and live adapter preflight.",
+      "Public bootstrap initialized target .aor while live E2E assets and provider-pinned routes stayed in host runtime state.",
     );
 
     const featureRequest = materializeFeatureRequestFile({
@@ -2610,11 +2711,13 @@ export function executeFullJourneyFlow(options) {
           mission: options.mission,
           featureRequest,
           profile: options.profile,
+          projectProfileFile: generatedProfile.generatedProjectProfileFile,
         }))
       : runCommand("intake-create", buildIntakeCreateArgs({
           mission: options.mission,
           featureRequest,
           profile: options.profile,
+          projectProfileFile: generatedProfile.generatedProjectProfileFile,
         }));
     artifacts.intake_artifact_packet_file = getStringField(intakeCreate.payload, "artifact_packet_file");
     artifacts.intake_artifact_packet_body_file = getStringField(intakeCreate.payload, "artifact_packet_body_file");
@@ -2644,7 +2747,7 @@ export function executeFullJourneyFlow(options) {
       "--project-ref",
       ".",
       "--project-profile",
-      "./project.aor.yaml",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
       ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
@@ -2657,7 +2760,7 @@ export function executeFullJourneyFlow(options) {
       "--project-ref",
       ".",
       "--project-profile",
-      "./project.aor.yaml",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
     ]);
@@ -2669,7 +2772,7 @@ export function executeFullJourneyFlow(options) {
       "--project-ref",
       ".",
       "--project-profile",
-      "./project.aor.yaml",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
       "--require-validation-pass",
@@ -2747,6 +2850,24 @@ export function executeFullJourneyFlow(options) {
       );
       throw new Error(asNonEmptyString(baselineGateDecision.summary) || "Baseline readiness failed before provider execution.");
     }
+    const targetCleanliness = writeTargetCleanlinessReport({
+      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+      reportsRoot: options.layout.reportsRoot,
+      runId: options.runId,
+      phase: "before-execution",
+    });
+    artifacts.target_cleanliness_before_execution_file = targetCleanliness.reportFile;
+    artifacts.target_cleanliness_before_execution = targetCleanliness.report;
+    if (targetCleanliness.report.status !== "pass") {
+      markStage(
+        stageMap,
+        "execution",
+        "fail",
+        [targetCleanliness.reportFile],
+        asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.",
+      );
+      throw new Error(asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.");
+    }
     const executionReadiness = writeExecutionReadinessDecision({
       runId: options.runId,
       reportsRoot: options.layout.reportsRoot,
@@ -2764,7 +2885,7 @@ export function executeFullJourneyFlow(options) {
       "--project-ref",
       ".",
       "--project-profile",
-      "./project.aor.yaml",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
       "--input-packet",
@@ -2791,7 +2912,7 @@ export function executeFullJourneyFlow(options) {
       "--project-ref",
       ".",
       "--project-profile",
-      "./project.aor.yaml",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
       ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
@@ -2828,7 +2949,7 @@ export function executeFullJourneyFlow(options) {
       "--project-ref",
       ".",
       "--project-profile",
-      "./project.aor.yaml",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
     ]);
@@ -2873,7 +2994,7 @@ export function executeFullJourneyFlow(options) {
         "--project-ref",
         ".",
         "--project-profile",
-        "./project.aor.yaml",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--require-approved-handoff",
@@ -2919,7 +3040,7 @@ export function executeFullJourneyFlow(options) {
       "--project-ref",
       ".",
       "--project-profile",
-      "./project.aor.yaml",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
       "--run-id",
@@ -3012,7 +3133,7 @@ export function executeFullJourneyFlow(options) {
       "--project-ref",
       ".",
       "--project-profile",
-      "./project.aor.yaml",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
       "--require-validation-pass",
@@ -3046,16 +3167,14 @@ export function executeFullJourneyFlow(options) {
     const executionStageStatus =
       stageMap.execution?.status === "fail"
         ? "fail"
-        : runtimeHarnessStageStatus === "fail"
-          ? "fail"
-          : runtimeHarnessStageStatus === "warn"
-            ? "warn"
-            : "pass";
+        : runtimeHarnessStageStatus === "pass"
+          ? "pass"
+          : "warn";
     const executionStageSummary =
       executionStageStatus === "fail"
-        ? `Runtime Harness blocked execution with decision '${asNonEmptyString(artifacts.run_start_runtime_harness_decision) || "unknown"}'.`
+        ? "Execution health evidence failed before post-run quality could be judged."
         : executionStageStatus === "warn"
-          ? "Provider execution materialized degraded evidence; post-run verification completed for black-box quality reporting."
+          ? "Runtime Harness recorded execution findings; final quality is judged from agent assessment, review, and post-run verification."
           : "Baseline diagnostics, run start, run status, and post-run verification completed through public execution lifecycle.";
     markStage(
       stageMap,
@@ -3079,7 +3198,7 @@ export function executeFullJourneyFlow(options) {
       "--project-ref",
       ".",
       "--project-profile",
-      "./project.aor.yaml",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
       "--run-id",
@@ -3122,7 +3241,7 @@ export function executeFullJourneyFlow(options) {
         "--project-ref",
         ".",
         "--project-profile",
-        "./project.aor.yaml",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",
@@ -3146,7 +3265,7 @@ export function executeFullJourneyFlow(options) {
         "--project-ref",
         ".",
         "--project-profile",
-        "./project.aor.yaml",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
       "--suite-ref",
@@ -3173,7 +3292,7 @@ export function executeFullJourneyFlow(options) {
         "--project-ref",
         ".",
         "--project-profile",
-        "./project.aor.yaml",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--require-validation-pass",
@@ -3229,7 +3348,7 @@ export function executeFullJourneyFlow(options) {
         "--project-ref",
         ".",
         "--project-profile",
-        "./project.aor.yaml",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--asset-ref",
@@ -3258,7 +3377,7 @@ export function executeFullJourneyFlow(options) {
         "--project-ref",
         ".",
         "--project-profile",
-        "./project.aor.yaml",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",
@@ -3360,7 +3479,7 @@ export function executeFullJourneyFlow(options) {
         "--project-ref",
         ".",
         "--project-profile",
-        "./project.aor.yaml",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",
@@ -3406,7 +3525,7 @@ export function executeFullJourneyFlow(options) {
         "--project-ref",
         ".",
         "--project-profile",
-        "./project.aor.yaml",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",
@@ -3445,6 +3564,8 @@ export function executeFullJourneyFlow(options) {
       "runs",
       "--project-ref",
       ".",
+      "--project-profile",
+      generatedProfile.generatedProjectProfileFile,
       "--runtime-root",
       ".aor",
       "--run-id",
@@ -3472,6 +3593,8 @@ export function executeFullJourneyFlow(options) {
         "open",
         "--project-ref",
         ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",
@@ -3489,6 +3612,8 @@ export function executeFullJourneyFlow(options) {
         "handoff",
         "--project-ref",
         ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--run-id",
@@ -3575,6 +3700,9 @@ export function executeFullJourneyFlow(options) {
       }
       artifacts.runtime_harness_report_file = null;
       artifacts.runtime_harness_overall_decision = null;
+      artifacts.latest_runtime_harness_report_file = null;
+      artifacts.latest_runtime_harness_decision = null;
+      artifacts.delivery_runtime_harness_report_file = null;
       artifacts.run_start_runtime_harness_report_file = null;
       artifacts.run_start_runtime_harness_decision = null;
     }
@@ -3618,10 +3746,12 @@ export function executeFullJourneyFlow(options) {
       "unknown";
     const latestRuntimeHarnessDecision =
       asNonEmptyString(artifacts.latest_runtime_harness_decision) || runtimeHarnessDecision;
-    const realCodeChangeStatus = runtimeHarnessReportHasMissionScopedChanges(
-      asNonEmptyString(artifacts.run_start_runtime_harness_report_file) ||
-        asNonEmptyString(artifacts.runtime_harness_report_file),
-    )
+    const realCodeChangeStatus = [
+      asNonEmptyString(artifacts.latest_runtime_harness_report_file),
+      asNonEmptyString(artifacts.delivery_runtime_harness_report_file),
+      asNonEmptyString(artifacts.runtime_harness_report_file),
+      asNonEmptyString(artifacts.run_start_runtime_harness_report_file),
+    ].some((reportFile) => reportFile && runtimeHarnessReportHasMeaningfulChanges(reportFile))
       ? "pass"
       : "fail";
     const providerExecutionProofStatus = evidenceRefMaterialized(
@@ -3635,11 +3765,38 @@ export function executeFullJourneyFlow(options) {
     artifacts.run_start_runtime_harness_decision = runtimeHarnessDecision;
     artifacts.latest_runtime_harness_decision = latestRuntimeHarnessDecision;
     artifacts.provider_execution_status = providerExecutionProofStatus;
+    const artifactConsistency = evaluateArtifactConsistency({
+      artifacts,
+      reviewReport,
+      auditPayload,
+      runId: options.runId,
+    });
+    artifacts.artifact_consistency = artifactConsistency;
+    const agentOperatorAssessment = {
+      mission_satisfaction:
+        postRunVerificationStatus === "pass" && realCodeChangeStatus === "pass" && reviewOverallStatus !== "fail"
+          ? "pass"
+          : "not_pass",
+      implementation_relevance: realCodeChangeStatus,
+      diff_quality: normalizeVerdictStatus(asRecord(reviewReport.code_quality).status),
+      verification_interpretation: postRunVerificationStatus,
+      artifact_consistency: artifactConsistency.status,
+      risk_findings: uniqueStrings([
+        ...asStringArray(asRecord(reviewReport.code_quality).findings).map((entry) => asNonEmptyString(asRecord(entry).summary) || entry),
+        ...asStringArray(artifactConsistency.findings),
+      ]),
+      final_recommendation:
+        postRunVerificationStatus === "pass" && realCodeChangeStatus === "pass" && reviewOverallStatus !== "fail"
+          ? "accept"
+          : "reject",
+    };
+    artifacts.agent_operator_assessment = agentOperatorAssessment;
     artifacts.quality_gate_decision =
       postRunVerificationStatus === "pass" &&
       postRunDiagnosticStatus !== "fail" &&
       realCodeChangeStatus === "pass" &&
-      reviewOverallStatus !== "fail"
+      reviewOverallStatus !== "fail" &&
+      agentOperatorAssessment.mission_satisfaction === "pass"
         ? "pass"
         : "fail";
 
@@ -3649,13 +3806,6 @@ export function executeFullJourneyFlow(options) {
       artifacts,
       auditPayload,
     });
-    const artifactConsistency = evaluateArtifactConsistency({
-      artifacts,
-      reviewReport,
-      auditPayload,
-      runId: options.runId,
-    });
-    artifacts.artifact_consistency = artifactConsistency;
     if (artifactConsistency.status === "fail") {
       scenarioCoverage.status = "fail";
       scenarioCoverage.findings = uniqueStrings([
@@ -3695,6 +3845,7 @@ export function executeFullJourneyFlow(options) {
       provider_execution_status: providerExecutionProofStatus,
       target_baseline_status: targetBaselineStatus,
       real_code_change_status: realCodeChangeStatus,
+      agent_operator_assessment: agentOperatorAssessment,
       post_run_verification_status: postRunVerificationStatus,
       post_run_diagnostic_status: postRunDiagnosticStatus,
       discovery_quality:
@@ -3702,7 +3853,7 @@ export function executeFullJourneyFlow(options) {
       runtime_success:
         artifacts.routed_step_result_file &&
         artifacts.runtime_harness_report_file &&
-        runtimeHarnessDecision === "pass"
+        providerExecutionProofStatus === "pass"
           ? "pass"
           : "fail",
       runtime_harness_decision: runtimeHarnessDecision,

@@ -70,6 +70,45 @@ test("live E2E step controller persists observation and state before next step",
   });
 });
 
+test("live E2E step controller blocks skill-agent profiles until operator decision is accepted", () => {
+  withTempRoot((reportsRoot) => {
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-skill-agent-required",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      mode: "auto",
+    });
+
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "discovery",
+          stageResult: { stage: "discovery", status: "pass", evidence_refs: [], summary: "ok" },
+          commandResults: [{ label: "discovery-run", command_surface: "aor discovery run", status: "pass" }],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "diagnose");
+        return true;
+      },
+    );
+
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.operator_decision_status, "missing");
+    assert.equal(typeof entry.agent_decision_request_ref, "string");
+    assert.equal(fs.existsSync(entry.agent_decision_request_ref), true);
+  });
+});
+
 test("live E2E step controller gates manual mode after one completed step", () => {
   withTempRoot((reportsRoot) => {
     const controller = createLiveE2eStepController({

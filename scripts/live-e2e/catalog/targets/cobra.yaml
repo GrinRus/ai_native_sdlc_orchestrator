@@ -23,16 +23,10 @@ provider_comparison_pairs: []
 feature_missions:
   - mission_id: cobra-command-regression
     title: Preserve one command parsing regression
-    brief: Add one bounded command parsing or help behavior regression with Go test evidence.
+    brief: Add one bounded command parsing or help behavior regression with Go test
+      evidence.
     feature_size: small
-    allowed_paths:
-      - "*.go"
-      - "**/*.go"
-    forbidden_paths:
-      - docs/**
-      - site/**
-      - .github/**
-    expected_evidence:
+    expected_evidence: &a1
       - verify-summary
       - review-report
     acceptance_checks:
@@ -49,3 +43,4 @@ feature_missions:
     change_budget:
       max_changed_files: 6
       max_added_lines: 220
+    quality_evidence: *a1

@@ -6,7 +6,7 @@ Move from step-level harness strength to run-level Runtime Harness ownership for
 ## Wave exit criteria
 - A run-level Runtime Harness controller owns run transitions and closure decisions.
 - Interactive continuation has audited requested, answered, resumed, and blocked states.
-- Strict code-changing delivery requires current run-level pass evidence and mission-scoped changes.
+- Strict code-changing delivery requires current run-level pass evidence and meaningful implementation changes.
 
 ## Sequencing notes
 - `W24-S01` depends on nested contract validation and the shared lifecycle service boundary.
@@ -78,7 +78,7 @@ Move from step-level harness strength to run-level Runtime Harness ownership for
 ## W24-S03 — Strict delivery gate consolidation
 - **Epic:** EPIC-5 Delivery and release
 - **State:** done
-- **Outcome:** Consolidate strict delivery gates so code-changing delivery requires current run-level harness pass evidence and meaningful mission-scoped changed paths.
+- **Outcome:** Consolidate strict delivery gates so code-changing delivery requires current run-level harness pass evidence and meaningful implementation changed paths.
 - **Primary modules:** `packages/orchestrator-core/**`, `apps/cli/**`, `docs/contracts/**`, delivery tests
 - **Hard dependencies:** W24-S01, W23-S01
 - **Primary user-story surfaces:** PSO-05, DEV-05, DTX-01, DTX-02, DTX-03, DTX-04

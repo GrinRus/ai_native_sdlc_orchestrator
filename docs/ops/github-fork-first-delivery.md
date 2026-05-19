@@ -26,7 +26,7 @@ Before switching from planning-only to real network write:
 ## Approval checkpoints
 1. Approved handoff packet is present.
 2. Promotion evidence is present for the impacted assets.
-3. The latest run-level Runtime Harness report for the same `run_id` has `overall_decision=pass`, `run_decision.overall_decision=pass`, `run_decision.terminal_status=closed`, routed step decisions, non-empty mission-scoped changed paths, and no scope violations.
+3. Runtime Harness evidence for the same `run_id` has `overall_decision=pass`, routed step decisions, and non-empty meaningful implementation changed paths; if run-level controller evidence is present, its `run_decision` must also be passing and closed.
 4. Delivery plan status is `ready`.
 5. Security/compliance reviewer signs off when policy requires it.
 6. Operator explicitly enables `--network-write` for the command invocation.

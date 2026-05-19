@@ -3,7 +3,7 @@
 ## Purpose
 Completed-run diagnosis artifact for the AOR Runtime Harness.
 
-The report records how AOR controlled the run, not the feature result by itself. It aggregates routed step decisions, failure classes, mission semantics, repair attempts, verification status, unresolved gaps, and follow-up recommendations. Feature quality remains owned by `review-report`, suite quality remains owned by `evaluation-report`, delivery lineage remains owned by delivery/release artifacts, learning closure remains owned by learning-loop artifacts, and platform asset lifecycle decisions remain owned by `promotion-decision`.
+The report records how AOR controlled the run, not the feature result by itself. It aggregates routed step decisions, failure classes, changed-path semantics, repair attempts, verification status, unresolved gaps, and follow-up recommendations. Feature quality remains owned by `review-report`, suite quality remains owned by `evaluation-report`, delivery lineage remains owned by delivery/release artifacts, learning closure remains owned by learning-loop artifacts, live E2E result quality remains owned by the skill-agent operator assessment, and platform asset lifecycle decisions remain owned by `promotion-decision`.
 
 ## Required fields
 - `report_id`
@@ -108,22 +108,20 @@ Each `step_decisions[]` entry should preserve:
 - `schema-mismatch`
 - `missing-evidence`
 - `validation-failed`
-- `repo-scope-violation`
 - `eval-failed`
 - `review-failed`
 - `delivery-empty-patch`
 - `runtime-failed`
 - `unknown`
 
-`mission_semantics` records the run-level semantic evidence used by the Runtime Harness for the step decision, including `changed_paths`, `non_bootstrap_changed_paths`, and whether strict code-changing no-op detection was applied.
-When an intake request declares `allowed_paths` or `forbidden_paths`, semantic validation must ignore the request input file itself, derive `mission_scoped_changed_paths`, and record `scope_violation_paths` for changed paths outside the allowed scope or inside forbidden scope.
+`mission_semantics` records the run-level semantic evidence used by the Runtime Harness for the step decision, including `changed_paths`, `non_bootstrap_changed_paths`, `meaningful_changed_paths`, ignored request input files, and whether strict code-changing no-op detection was applied. Runtime Harness must not emit path whitelist/blacklist verdicts such as legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, or `scope_violation_paths`.
 
 ## Boundary rules
 - Runtime Harness reports diagnose AOR runtime behavior and may recommend recertification, but they do not promote or freeze assets.
 - Strict production run closure must prefer `run_decision` when present; older step-only reports remain diagnostic evidence but not run-level ownership proof.
 - Strict delivery and release commands must treat an empty `step_decisions[]` set as missing Runtime Harness execution evidence, not as a pass.
 - Strict non-`no-write` delivery and release commands must use the latest existing run-level report for the same `run_id`; they must not create a fresh empty report to satisfy the gate.
-- Strict delivery and release gates require top-level `overall_decision=pass`, `run_decision.overall_decision=pass`, `run_decision.terminal_status=closed`, non-empty `mission_semantics.mission_scoped_changed_paths[]`, and empty scope-violation fields.
+- Strict delivery and release gates require top-level `overall_decision=pass`, `run_decision.overall_decision=pass`, `run_decision.terminal_status=closed`, and non-empty meaningful changed-path evidence when the mission requires code changes.
 - Learning handoff may link a Runtime Harness report and carry next actions, but it does not replace this report.
 - Asset certification commands may link a run for provenance, but certification evidence remains fresh and separate from run diagnosis.
 - Live E2E summaries should reference this report when proving the installed-user journey.
