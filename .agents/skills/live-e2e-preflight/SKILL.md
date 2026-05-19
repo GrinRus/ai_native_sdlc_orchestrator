@@ -17,6 +17,8 @@ description: Use when you need to prepare, review, or update a live E2E rehearsa
    - `live_e2e.agent_decision_policy=required` for acceptance/production-proof;
    - `live_e2e.interaction_answer_policy=agent-required` for acceptance/production-proof;
    - `live_e2e.target_write_policy=aor-runtime-only-before-execution`.
-6. Confirm the target repo shape, setup commands, verification commands, safety defaults, expected result evidence, and change budget. Do not require `allowed_paths` or `forbidden_paths`; they are not live E2E acceptance gates.
-7. Ensure the runner will prepare the feature request input during the run instead of skipping directly to execution.
-8. Keep upstream write-back disabled unless a fork is explicitly configured and the profile really needs release-shaped delivery evidence.
+6. For acceptance/production-proof profiles, confirm `implementation_loop.enabled=true`, `implementation_loop.max_iterations >= 1`, repair actions include `request-repair`, and blocking review/runtime failures do not silently continue.
+7. Confirm the target repo shape, setup commands, verification commands, safety defaults, expected result evidence, and change budget. Do not require `allowed_paths` or `forbidden_paths`; they are not live E2E acceptance gates.
+8. Ensure the runner will use isolated AOR source install by default. `--runtime-root` or `--aor-install-mode repo-local` is a dev/debug override, not acceptance proof.
+9. Ensure the runner will prepare the feature request input during the run instead of skipping directly to execution.
+10. Keep upstream write-back disabled unless a fork is explicitly configured and the profile really needs release-shaped delivery evidence.

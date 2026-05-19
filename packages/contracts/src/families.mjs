@@ -745,6 +745,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       "report_id",
       "run_id",
       "profile_id",
+      "report_status",
       "operator_context",
       "controller_state_ref",
       "flow_range",
@@ -763,6 +764,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       report_id: "string",
       run_id: "string",
       profile_id: "string",
+      report_status: "string",
       operator_context: "object",
       controller_state_ref: "string",
       flow_range: "object",
@@ -786,6 +788,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
     ],
     enumChecks: [
       { field: "overall_status", allowedValues: LIVE_E2E_OBSERVATION_STATUS_VALUES },
+      { field: "report_status", allowedValues: ["final", "in_progress"] },
       { field: "flow_range_policy", allowedValues: ["delivery_default", "full_lifecycle"] },
     ],
   },

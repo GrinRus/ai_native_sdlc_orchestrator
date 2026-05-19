@@ -176,10 +176,13 @@ function assertLiveE2ePolicy(profile, source) {
   const interactionAnswerPolicy = asNonEmptyString(policy.interaction_answer_policy);
   const targetWritePolicy = asNonEmptyString(policy.target_write_policy);
   const internalTestHooks = asRecord(profile.internal_test_hooks);
+  const implementationLoop = asRecord(profile.implementation_loop);
   const acceptanceLike =
     internalTestHooks.allow_deterministic_operator_for_test !== true &&
     (["acceptance", "production-proof"].includes(asNonEmptyString(profile.run_tier)) ||
-      asRecord(profile.production_proof).enabled === true);
+      asRecord(profile.production_proof).enabled === true ||
+      asNonEmptyString(profile.journey_mode) === "full-journey" ||
+      Boolean(asNonEmptyString(profile.target_catalog_id)));
   const problems = [];
 
   if (!["delivery_default", "full_lifecycle"].includes(flowRangePolicy)) {
@@ -218,6 +221,12 @@ function assertLiveE2ePolicy(profile, source) {
     }
     if (interactionAnswerPolicy !== "agent-required") {
       problems.push("acceptance/production-proof profiles must use live_e2e.interaction_answer_policy=agent-required");
+    }
+    if (implementationLoop.enabled !== true) {
+      problems.push("acceptance/production-proof profiles must enable implementation_loop.enabled=true");
+    }
+    if (!Number.isInteger(implementationLoop.max_iterations) || Number(implementationLoop.max_iterations) < 1) {
+      problems.push("acceptance/production-proof profiles must declare implementation_loop.max_iterations >= 1");
     }
   }
 

@@ -45,6 +45,14 @@ function validateControllerEvidence(report, state) {
         issues.push(`${stepId} missing ${field}`);
       }
     }
+    if (typeof entry.iteration !== "number" || entry.iteration < 1) {
+      issues.push(`${stepId} missing positive iteration`);
+    }
+    for (const field of ["plan_ref", "execution_ref", "inspection_ref", "classification_ref"]) {
+      if (!asNonEmptyString(entry[field])) {
+        issues.push(`${stepId} missing ${field}`);
+      }
+    }
     if (!asNonEmptyString(entry.agent_decision_request_ref)) {
       issues.push(`${stepId} missing agent_decision_request_ref`);
     }

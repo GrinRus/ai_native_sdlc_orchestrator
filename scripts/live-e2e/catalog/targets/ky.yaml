@@ -38,6 +38,12 @@ required_matrix_cells:
     feature_mission_id: ky-header-regression
     provider_variant_id: open-code-primary
     coverage_tier: extended
+  - cell_id: ky.regress.medium.open-code
+    scenario_family: regress
+    feature_size: medium
+    feature_mission_id: ky-fetch-options-regression
+    provider_variant_id: open-code-primary
+    coverage_tier: extended
   - cell_id: ky.governance.large.openai
     scenario_family: governance
     feature_size: large
@@ -90,6 +96,7 @@ feature_missions:
     recommended_provider_variants:
       - openai-primary
       - anthropic-primary
+      - open-code-primary
       - open-code-primary
     size_budget:
       max_changed_files: 6

@@ -14,6 +14,7 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `run_id`
 - `profile_id`
 - `operator_context`
+- `report_status`
 - `controller_state_ref`
 - `flow_range`
 - `flow_range_policy`
@@ -54,7 +55,12 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `status`
 - `declared_policy`
 - `effective_policy`
+- `install_mode`
 - `source_channel`
+- `workspace_root`
+- `runtime_root`
+- `original_source_root`
+- `installed_source_root`
 - `launcher_ref`
 - `command_transcripts`
 
@@ -73,10 +79,16 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 `step_journal[]` should preserve:
 - `sequence`
 - `step_id`
+- `step_instance_id`
+- `iteration`
 - `flow_stage`
 - `plan`
+- `plan_ref`
 - `public_surface`
 - `transcript_ref`
+- `execution_ref`
+- `inspection_ref`
+- `classification_ref`
 - `artifact_refs`
 - `started_at`
 - `finished_at`
@@ -118,6 +130,8 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `decision_policy` (`required|optional`)
 - `answer_policy` (`agent-public-control-plane|deterministic-fixture-only`)
 - `target_write_policy`
+
+`report_status` must be `final` or `in_progress`. `in_progress` is only for resumable controller artifacts waiting for an operator decision; it is not an acceptance report and cannot close qualification.
 
 `operator_decision_status` must be one of:
 - `accepted`

@@ -801,6 +801,17 @@ test("live E2E observation report loads and enforces status scale", () => {
     "expected deterministic semantic analysis to be rejected for skill-agent reports",
   );
 
+  const inProgressSkillAgentCandidate = structuredClone(skillAgentDecisionCandidate);
+  inProgressSkillAgentCandidate.report_status = "in_progress";
+
+  const inProgressSkillAgentValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: inProgressSkillAgentCandidate,
+    source: "test://live-e2e-observation-in-progress-skill-agent-decision",
+  });
+
+  assert.equal(inProgressSkillAgentValidation.ok, true);
+
   const missingInstallCandidate = structuredClone(loaded.document);
   delete missingInstallCandidate.aor_installation_proof_file;
 

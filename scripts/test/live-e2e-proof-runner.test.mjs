@@ -17,6 +17,7 @@ import { validateGuidedJourneyProof } from "../live-e2e/lib/guided-proof.mjs";
 const currentFilePath = fileURLToPath(import.meta.url);
 const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../..");
 const proofRunnerScriptPath = path.join(workspaceRoot, "scripts/live-e2e/run-profile.mjs");
+const qualificationLoopScriptPath = path.join(workspaceRoot, "scripts/live-e2e/qualification-loop.mjs");
 const defaultProofRunnerTimeoutMs = Number(process.env.AOR_PROOF_RUNNER_TEST_TIMEOUT_MS ?? 120000);
 
 /**
@@ -299,6 +300,10 @@ function createFakeSourceInstallTools(options) {
       "  process.stdout.write('pnpm install --frozen-lockfile ok\\n');",
       "  process.exit(0);",
       "}",
+      "if (args.length === 1 && args[0] === 'build') {",
+      "  process.stdout.write('pnpm build ok\\n');",
+      "  process.exit(0);",
+      "}",
       "if (args.length === 2 && args[0] === 'aor' && args[1] === '--help') {",
       `  const run = spawnSync(process.execPath, [${JSON.stringify(
         path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
@@ -365,6 +370,42 @@ test("AOR installation proof writes failure artifact before failing provided bin
   });
 });
 
+test("AOR installation proof can use an isolated copied source workspace", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const isolatedWorkspaceRoot = path.join(tempRoot, "isolated-workspace");
+    const fakeSourceInstallTools = createFakeSourceInstallTools({ tempRoot });
+    const originalPath = process.env.PATH;
+    process.env.PATH = [fakeSourceInstallTools.binRoot, originalPath].filter(Boolean).join(path.delimiter);
+    try {
+      const result = prepareAorInstallationProof({
+        hostRoot: workspaceRoot,
+        reportsRoot,
+        runId: "install-proof-isolated",
+        profile: {
+          live_e2e: {
+            installation_policy: "source-install-required",
+          },
+        },
+        aorBinOverride: null,
+        installMode: "isolated",
+        isolatedWorkspaceRoot,
+        isolatedSourceRoot: path.join(isolatedWorkspaceRoot, "aor-source"),
+        runtimeRoot: path.join(isolatedWorkspaceRoot, "runtime"),
+      });
+      assert.equal(result.proof.status, "pass");
+      assert.equal(result.proof.install_mode, "isolated");
+      assert.equal(result.proof.workspace_root, isolatedWorkspaceRoot);
+      assert.equal(result.proof.installed_source_root, path.join(isolatedWorkspaceRoot, "aor-source"));
+      assert.equal(fs.existsSync(path.join(isolatedWorkspaceRoot, "aor-source", "apps/cli/bin/aor.mjs")), true);
+      assert.equal(result.proof.commands.some((entry) => entry.label === "pnpm-build"), true);
+      assert.equal(result.launch.binaryRef, result.proof.launcher_ref);
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+});
+
 test("installed-user proof runner emits structured report when installation proof fails", () => {
   withTempRoot((tempRoot) => {
     const fakeAorPath = path.join(tempRoot, "fake-aor");
@@ -415,6 +456,47 @@ test("installed-user proof runner emits structured report when installation proo
     assert.equal(report.setup_journal[0].status, "not_pass");
     assert.match(report.setup_journal[0].summary, /failed before public project flow execution/);
   });
+});
+
+test("qualification loop rejects small profiles before running live E2E", () => {
+  const run = spawnSync(
+    process.execPath,
+    [
+      qualificationLoopScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--profile",
+      path.join(workspaceRoot, "scripts/live-e2e/profiles/regress-short.yaml"),
+      "--run-id",
+      "qualification-small-rejected",
+    ],
+    {
+      cwd: workspaceRoot,
+      encoding: "utf8",
+    },
+  );
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /requires feature_size medium, large, or xl/);
+});
+
+test("qualification loop owns controller mode for inline flags", () => {
+  const run = spawnSync(
+    process.execPath,
+    [
+      qualificationLoopScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--profile",
+      path.join(workspaceRoot, "scripts/live-e2e/profiles/regress-short.yaml"),
+      "--controller-mode=auto",
+    ],
+    {
+      cwd: workspaceRoot,
+      encoding: "utf8",
+    },
+  );
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /qualification-loop owns controller mode/);
 });
 
 /**
@@ -527,6 +609,37 @@ function configureCodexExternalRuntimeNoop(options) {
         "output:{runner:'node-inline-noop',step_class:request.step_class||null,execution_root:process.cwd()},",
         "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-noop'],",
         "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline-noop'}]",
+        "}));",
+      ].join(""),
+    ],
+  });
+}
+
+/**
+ * @param {{ examplesRoot: string }} options
+ */
+function configureCodexExternalRuntimeRepairOnSecondAttempt(options) {
+  configureAdapterExternalRuntime({
+    examplesRoot: options.examplesRoot,
+    adapterFileName: "codex-cli.yaml",
+    command: process.execPath,
+    args: [
+      "-e",
+      [
+        "const fs=require('node:fs');",
+        "const path=require('node:path');",
+        "const input=JSON.parse(fs.readFileSync(0,'utf8'));",
+        "const request=input.request||{};",
+        ...permissionProbeSnippet(),
+        "if(request.step_class==='implement'){",
+        "if(String(request.run_id||'').includes('.repair-')&&fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eRepairLoopPatch = true;\\n');}",
+        "}",
+        "process.stdout.write(JSON.stringify({",
+        "status:'success',",
+        "summary:'external runner repairs on second public implementation iteration',",
+        "output:{runner:'node-inline-repair-second-attempt',step_class:request.step_class||null,execution_root:process.cwd()},",
+        "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-repair-second-attempt'],",
+        "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'repair-second-attempt'}]",
         "}));",
       ].join(""),
     ],
@@ -997,6 +1110,12 @@ function writeLocalFullJourneyProfile(options) {
       feature_mission_id: options.missionId,
       scenario_family: options.scenarioFamily ?? "regress",
       provider_variant_id: options.providerVariantId ?? "openai-primary",
+      implementation_loop: {
+        enabled: true,
+        max_iterations: 3,
+        review_repair_actions: ["request-repair", "failed-quality-findings"],
+        stop_on_blocking_review: true,
+      },
       bootstrap_template: "github-default",
       runtime: {
         mode: "ephemeral",
@@ -1030,14 +1149,11 @@ function writeLocalFullJourneyProfile(options) {
       ...(options.productionProof ? { production_proof: options.productionProof } : {}),
       ...(options.guidedJourney ? { guided_journey: options.guidedJourney } : {}),
       ...(options.liveAdapterPreflight ? { live_adapter_preflight: options.liveAdapterPreflight } : {}),
-      ...(options.internalTestHooks || options.productionProof
-        ? {
-            internal_test_hooks: {
-              ...(options.productionProof ? { allow_deterministic_operator_for_test: true } : {}),
-              ...(options.internalTestHooks ?? {}),
-            },
-          }
-        : {}),
+      internal_test_hooks: {
+        allow_repo_local_install_for_test: true,
+        allow_deterministic_operator_for_test: true,
+        ...(options.internalTestHooks ?? {}),
+      },
     }),
     "utf8",
   );
@@ -1057,6 +1173,7 @@ function writeLocalFullJourneyProfile(options) {
  *   agentJudgeFile?: string | null,
  *   skipAgentJudge?: boolean,
  *   timeoutMs?: number,
+ *   aorInstallMode?: string,
  * }} options
  */
 function runProofRunner(options) {
@@ -1071,6 +1188,7 @@ function runProofRunner(options) {
     "--run-id",
     options.runId,
   ];
+  args.push("--aor-install-mode", options.aorInstallMode ?? "repo-local");
   if (!options.omitExamplesRoot) {
     assert.ok(options.examplesRoot, "examplesRoot is required unless omitExamplesRoot=true");
     args.push("--examples-root", options.examplesRoot);
@@ -3689,6 +3807,59 @@ test("full-journey mode fails when runtime harness detects code-changing no-op",
     assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), true);
     assert.equal(summary.command_results.some((entry) => entry.label === "eval-run"), false);
     assert.equal(summary.command_results.some((entry) => entry.label === "learning-handoff"), false);
+  });
+});
+
+test("full-journey mode can pass after a public implementation repair iteration", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeRepairOnSecondAttempt({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.repair-loop.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-repair-loop",
+      catalogRoot,
+    });
+    assert.equal(result.live_e2e_run_status, "pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    assert.equal(summary.status, "pass");
+    assert.equal(summary.quality_judgement.overall_status, "pass");
+    assert.equal(summary.command_results.filter((entry) => entry.label === "run-start").length, 2);
+    assert.equal(summary.command_results.filter((entry) => entry.label === "review-run").length, 2);
+    assert.equal(summary.command_results.some((entry) => entry.label === "review-decide-request-repair"), true);
+
+    const observation = JSON.parse(fs.readFileSync(summary.live_e2e_observation_report_file, "utf8"));
+    assert.equal(observation.overall_status, "pass");
+    assert.equal(observation.final_analysis.status, "pass");
+    assert.deepEqual(
+      observation.step_journal
+        .filter((entry) => entry.step_id === "execution" || entry.step_id === "review")
+        .map((entry) => [entry.step_id, entry.iteration, entry.decision.action]),
+      [
+        ["execution", 1, "continue"],
+        ["review", 1, "retry_public_step"],
+        ["execution", 2, "continue"],
+        ["review", 2, "continue"],
+      ],
+    );
   });
 });
 

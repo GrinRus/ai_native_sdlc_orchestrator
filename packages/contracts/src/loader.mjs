@@ -1964,6 +1964,19 @@ function validateStringArrayItems(options) {
 function validateLiveE2EObservationReport(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  const reportStatus = typeof document.report_status === "string" ? document.report_status : "final";
+  if (!["final", "in_progress"].includes(reportStatus)) {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "report_status",
+        expected: "final|in_progress",
+        actual: String(reportStatus),
+        message: "Field 'report_status' must describe whether the live E2E report is final or waiting for operator resume.",
+      }),
+    );
+  }
   const installation = isPlainObject(document.aor_installation) ? document.aor_installation : {};
   if (Object.keys(installation).length === 0) {
     issues.push(
@@ -2034,6 +2047,7 @@ function validateLiveE2EObservationReport(document, source) {
   validateObservationStepJournal({
     entries: document.step_journal,
     operatorContext,
+    reportStatus,
     source,
     issues,
   });
@@ -2171,15 +2185,43 @@ function validateObservationSetupJournal(options) {
 }
 
 /**
- * @param {{ entries: unknown, operatorContext?: Record<string, unknown>, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ * @param {{ entries: unknown, operatorContext?: Record<string, unknown>, reportStatus?: string, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
  */
 function validateObservationStepJournal(options) {
   if (!Array.isArray(options.entries)) return;
   const operatorKind = typeof options.operatorContext?.operator_kind === "string" ? options.operatorContext.operator_kind : null;
   const decisionPolicy = typeof options.operatorContext?.decision_policy === "string" ? options.operatorContext.decision_policy : null;
+  const finalReport = options.reportStatus !== "in_progress";
   options.entries.forEach((entry, index) => {
     const record = isPlainObject(entry) ? entry : {};
     const plan = isPlainObject(record.plan) ? record.plan : null;
+    if (typeof record.iteration !== "number" || !Number.isInteger(record.iteration) || record.iteration < 1) {
+      options.issues.push(
+        issue({
+          code: record.iteration === undefined ? "required_field_missing" : "field_type_mismatch",
+          source: options.source,
+          field: `step_journal[${index}].iteration`,
+          expected: record.iteration === undefined ? "present" : "positive integer",
+          actual: record.iteration === undefined ? "missing" : describeActualType(record.iteration),
+          message: `Field 'step_journal[${index}].iteration' is required for repeated online live E2E step observations.`,
+        }),
+      );
+    }
+    for (const field of ["plan_ref", "execution_ref", "inspection_ref", "classification_ref"]) {
+      const value = record[field];
+      if (typeof value !== "string" || value.length === 0) {
+        options.issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source: options.source,
+            field: `step_journal[${index}].${field}`,
+            expected: "non-empty string",
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Field 'step_journal[${index}].${field}' is required for online live E2E step evidence references.`,
+          }),
+        );
+      }
+    }
     if (!plan) {
       options.issues.push(
         issue({
@@ -2283,7 +2325,7 @@ function validateObservationStepJournal(options) {
         }),
       );
     }
-    if (operatorKind === "skill-agent" && decisionPolicy === "required") {
+    if (operatorKind === "skill-agent" && decisionPolicy === "required" && finalReport) {
       if (decisionStatus !== "accepted") {
         options.issues.push(
           issue({

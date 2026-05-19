@@ -221,6 +221,26 @@ function isOperatorAction(action) {
 }
 
 /**
+ * @param {Record<string, unknown>} decision
+ * @param {string} action
+ * @param {Record<string, unknown>} operatorContext
+ * @returns {string | null}
+ */
+function rejectInconsistentSkillAgentDecision(decision, action, operatorContext) {
+  if (asNonEmptyString(operatorContext.operator_kind) !== "skill-agent") return null;
+  const semantic = asRecord(decision.semantic_analysis);
+  const judgeSource = asNonEmptyString(semantic.judge_source) || asNonEmptyString(decision.judge_source);
+  if (judgeSource !== "skill-agent") {
+    return "Skill-agent operator decisions must declare semantic_analysis.judge_source=skill-agent.";
+  }
+  const semanticStatus = toLiveE2eObservationStatus(asNonEmptyString(semantic.status));
+  if (action === "continue" && !["pass", "warn", "resumed"].includes(semanticStatus)) {
+    return `Skill-agent operator decision cannot continue with semantic status '${semanticStatus}'.`;
+  }
+  return null;
+}
+
+/**
  * @param {{ reportsRoot: string, runId: string, sequence: number, step: string }}
  */
 function operatorFilePaths(options) {
@@ -232,6 +252,14 @@ function operatorFilePaths(options) {
 }
 
 /**
+ * @param {string} step
+ * @param {number} iteration
+ */
+function buildStepInstanceId(step, iteration) {
+  return iteration > 1 ? `${step}#${iteration}` : step;
+}
+
+/**
  * @param {{ profile: Record<string, unknown>, entry: Record<string, unknown>, decisionFile: string, operatorContext: Record<string, unknown> }}
  */
 function resolveOperatorDecision(options) {
@@ -240,8 +268,13 @@ function resolveOperatorDecision(options) {
     const decision = asRecord(readJson(options.decisionFile));
     const action = asNonEmptyString(decision.action) || asNonEmptyString(asRecord(decision.decision).action);
     const status = asNonEmptyString(decision.status) || "accepted";
-    const stepMatches = !asNonEmptyString(decision.step_id) || asNonEmptyString(decision.step_id) === asNonEmptyString(options.entry.step_id);
-    if (status === "accepted" && stepMatches && isOperatorAction(action)) {
+    const rejectionReason = rejectInconsistentSkillAgentDecision(decision, action, options.operatorContext);
+    const stepMatches =
+      !asNonEmptyString(decision.step_id) ||
+      asNonEmptyString(decision.step_id) === asNonEmptyString(options.entry.step_id) ||
+      asNonEmptyString(decision.step_id) === asNonEmptyString(options.entry.step_instance_id) ||
+      asNonEmptyString(decision.step_instance_id) === asNonEmptyString(options.entry.step_instance_id);
+    if (status === "accepted" && stepMatches && isOperatorAction(action) && !rejectionReason) {
       return {
         status: "accepted",
         decision,
@@ -251,22 +284,31 @@ function resolveOperatorDecision(options) {
     }
     return {
       status: "rejected",
-      decision,
+      decision: {
+        ...decision,
+        rejection_reason: rejectionReason || null,
+      },
       action: isOperatorAction(action) ? action : "diagnose",
       ref: options.decisionFile,
     };
   }
 
   if (asNonEmptyString(options.operatorContext.operator_kind) === "deterministic-fixture") {
-    const action = resolveDecisionAction(options.entry);
+    const overrideAction = asNonEmptyString(asRecord(options.entry.decision_override).action);
+    const action = isOperatorAction(overrideAction) ? overrideAction : resolveDecisionAction(options.entry);
     const decision = {
       decision_id: `${asNonEmptyString(options.entry.step_id)}.deterministic-fixture-decision`,
       run_id: asNonEmptyString(options.entry.run_id) || null,
       step_id: asNonEmptyString(options.entry.step_id),
+      step_instance_id: asNonEmptyString(options.entry.step_instance_id) || null,
+      iteration: Number(options.entry.iteration) || 1,
       status: "accepted",
       operator_ref: asNonEmptyString(options.operatorContext.operator_ref),
       action,
-      reason: asNonEmptyString(asRecord(options.entry.decision).reason) || "Deterministic fixture accepted controller evidence.",
+      reason:
+        asNonEmptyString(asRecord(options.entry.decision_override).reason) ||
+        asNonEmptyString(asRecord(options.entry.decision).reason) ||
+        "Deterministic fixture accepted controller evidence.",
       semantic_analysis: {
         status: asNonEmptyString(asRecord(options.entry.semantic_analysis).status) || "pass",
         judge_source: "deterministic-fixture",
@@ -345,6 +387,8 @@ export function createLiveE2eStepController(options) {
   const stateFile = path.join(options.reportsRoot, `live-e2e-controller-state-${normalizedRunId}.json`);
   /** @type {Record<string, Record<string, unknown>>} */
   const entryByStep = {};
+  /** @type {Record<string, Record<string, unknown>>} */
+  const planByStep = {};
   /** @type {Record<string, unknown>} */
   const loadedState = fileExists(stateFile) ? asRecord(readJson(stateFile)) : {};
   /** @type {Record<string, number>} */
@@ -373,28 +417,49 @@ export function createLiveE2eStepController(options) {
     retry_counters: retryCounters,
   };
 
-  for (const step of asStringArray(state.completed_steps)) {
-    const sequence = includedSteps.indexOf(step) + 1;
-    const expectedFile =
-      sequence > 0
-        ? path.join(
-            options.reportsRoot,
-            `live-e2e-step-observation-${normalizedRunId}-${String(sequence).padStart(2, "0")}-${normalizeId(step)}.json`,
-          )
-        : "";
-    const evidenceFile =
-      asStringArray(state.evidence_refs).find((ref) => ref.includes(`-${normalizeId(step)}.json`)) || expectedFile;
-    if (evidenceFile && fileExists(evidenceFile)) {
-      entryByStep[step] = readJson(evidenceFile);
+  for (const evidenceFile of asStringArray(state.evidence_refs)) {
+    if (!evidenceFile || !fileExists(evidenceFile)) continue;
+    const basename = path.basename(evidenceFile);
+    if (basename.startsWith("live-e2e-step-plan-")) {
+      const planDocument = asRecord(readJson(evidenceFile));
+      const step = asNonEmptyString(planDocument.step_id);
+      const iteration = Number(planDocument.iteration) || 1;
+      if (step) {
+        planByStep[buildStepInstanceId(step, iteration)] = {
+          plan_ref: evidenceFile,
+          plan: asRecord(planDocument.plan),
+          sequence: Number(planDocument.sequence) || 0,
+        };
+      }
+      continue;
     }
+    if (!basename.startsWith("live-e2e-step-observation-")) continue;
+    const entry = asRecord(readJson(evidenceFile));
+    const step = asNonEmptyString(entry.step_id);
+    const iteration = Number(entry.iteration) || 1;
+    if (!step) continue;
+    entryByStep[asNonEmptyString(entry.step_instance_id) || buildStepInstanceId(step, iteration)] = entry;
   }
   const resolveCurrentStep = () =>
     includedSteps.find(
-      (step) => entryByStep[step] && asNonEmptyString(asRecord(entryByStep[step]?.decision).action) !== "continue",
+      (step) =>
+        Object.values(entryByStep).some(
+          (entry) =>
+            asNonEmptyString(entry.step_id) === step &&
+            !["continue", "retry_public_step"].includes(asNonEmptyString(asRecord(entry.decision).action)),
+        ),
     ) ??
-    includedSteps.find((step) => !entryByStep[step]) ??
+    includedSteps.find(
+      (step) =>
+        !Object.values(entryByStep).some(
+          (entry) => asNonEmptyString(entry.step_id) === step && (Number(entry.iteration) || 1) === 1,
+        ),
+    ) ??
     null;
-  state.completed_steps = includedSteps.filter((step) => entryByStep[step]);
+  state.completed_steps = Object.values(entryByStep)
+    .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
+    .map((entry) => asNonEmptyString(entry.step_instance_id) || asNonEmptyString(entry.step_id))
+    .filter(Boolean);
   state.current_step = resolveCurrentStep();
 
   /**
@@ -418,22 +483,35 @@ export function createLiveE2eStepController(options) {
    * @param {Record<string, unknown>} entry
    */
   function persistStep(step, entry) {
-    const sequence = Number(entry.sequence) || includedSteps.indexOf(step) + 1;
+    const iteration = Number(entry.iteration) || 1;
+    const stepInstanceId = asNonEmptyString(entry.step_instance_id) || buildStepInstanceId(step, iteration);
+    const sequence = Number(entry.sequence) || Object.keys(entryByStep).length + 1;
     const observationFile = path.join(
       options.reportsRoot,
-      `live-e2e-step-observation-${normalizedRunId}-${String(sequence).padStart(2, "0")}-${normalizeId(step)}.json`,
+      `live-e2e-step-observation-${normalizedRunId}-${String(sequence).padStart(2, "0")}-${normalizeId(stepInstanceId)}.json`,
     );
+    entry.sequence = sequence;
+    entry.iteration = iteration;
+    entry.step_instance_id = stepInstanceId;
     entry.observation_ref = observationFile;
     writeJson(observationFile, entry);
-    entryByStep[step] = entry;
+    entryByStep[stepInstanceId] = entry;
 
-    const completed = includedSteps.filter((candidate) => entryByStep[candidate]);
-    state.completed_steps = completed;
+    state.completed_steps = Object.values(entryByStep)
+      .sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0))
+      .map((stepEntry) => asNonEmptyString(stepEntry.step_instance_id) || asNonEmptyString(stepEntry.step_id))
+      .filter(Boolean);
     state.current_step = resolveCurrentStep();
     state.pending_decision = entry.decision ?? null;
     state.evidence_refs = uniqueStrings([
       ...asStringArray(state.evidence_refs),
       observationFile,
+      asNonEmptyString(entry.plan_ref),
+      asNonEmptyString(entry.execution_ref),
+      asNonEmptyString(entry.inspection_ref),
+      asNonEmptyString(entry.classification_ref),
+      asNonEmptyString(entry.agent_decision_request_ref),
+      asNonEmptyString(entry.operator_decision_ref),
       ...asStringArray(entry.artifact_refs),
       asNonEmptyString(entry.transcript_ref),
     ]);
@@ -458,7 +536,49 @@ export function createLiveE2eStepController(options) {
   }
 
   /**
-   * @param {{ stage: string, stageResult?: Record<string, unknown>, commandResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }} input
+   * @param {{ label: string, commandSurface?: string | null, iteration?: number }} input
+   * @returns {Record<string, unknown> | null}
+   */
+  function planCommand(input) {
+    const step = COMMAND_LABEL_STEP[asNonEmptyString(input.label)];
+    if (!step || !includedSteps.includes(step)) return null;
+    const iteration = Number(input.iteration) || 1;
+    const stepInstanceId = buildStepInstanceId(step, iteration);
+    if (planByStep[stepInstanceId]) return planByStep[stepInstanceId];
+    const sequence = Object.keys(entryByStep).length + Object.keys(planByStep).length + 1;
+    const plan = buildLiveE2eStepPlan(step, {
+      command_surface: asNonEmptyString(input.commandSurface) || null,
+    });
+    const planFile = path.join(
+      options.reportsRoot,
+      `live-e2e-step-plan-${normalizedRunId}-${String(sequence).padStart(2, "0")}-${normalizeId(stepInstanceId)}.json`,
+    );
+    const document = {
+      run_id: options.runId,
+      sequence,
+      step_id: step,
+      step_instance_id: stepInstanceId,
+      iteration,
+      plan,
+      planned_command_label: asNonEmptyString(input.label),
+      created_at: nowIso(),
+    };
+    writeJson(planFile, document);
+    planByStep[stepInstanceId] = {
+      plan_ref: planFile,
+      plan,
+      sequence,
+    };
+    state.current_step = step;
+    state.evidence_refs = uniqueStrings([...asStringArray(state.evidence_refs), planFile]);
+    recordPhase(step, "plan", [planFile]);
+    state.updated_at = nowIso();
+    writeJson(stateFile, state);
+    return planByStep[stepInstanceId];
+  }
+
+  /**
+   * @param {{ stage: string, stageResult?: Record<string, unknown>, commandResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown>, iteration?: number, decisionOverride?: Record<string, unknown> }} input
    * @returns {{ action: string, decision: Record<string, unknown> | null }}
    */
   function observeStage(input) {
@@ -466,14 +586,30 @@ export function createLiveE2eStepController(options) {
     if (!includedSteps.includes(step)) {
       return { action: "continue", decision: null };
     }
-    if (entryByStep[step] && asNonEmptyString(asRecord(entryByStep[step].decision).action) === "continue") {
-      return { action: "continue", decision: asRecord(entryByStep[step].decision) };
+    const iteration = Number(input.iteration) || 1;
+    const stepInstanceId = buildStepInstanceId(step, iteration);
+    if (
+      entryByStep[stepInstanceId] &&
+      ["continue", "retry_public_step"].includes(asNonEmptyString(asRecord(entryByStep[stepInstanceId].decision).action))
+    ) {
+      return { action: "continue", decision: asRecord(entryByStep[stepInstanceId].decision) };
     }
 
     const stage = asRecord(input.stageResult);
     const command = findLiveE2eCommandByPreferredLabel(input.commandResults, getLiveE2eCommandLabelPriority(step)) ?? {};
     const artifactRefs = collectArtifactRefs(command, stage);
-    const plan = buildLiveE2eStepPlan(step, command);
+    const planned = planByStep[stepInstanceId] ?? planCommand({
+      label: asNonEmptyString(command.label) || getLiveE2eCommandLabelPriority(step)[0] || step,
+      commandSurface: asNonEmptyString(command.command_surface) || null,
+      iteration,
+    });
+    const plan = asRecord(planned?.plan) || buildLiveE2eStepPlan(step, command);
+    const executionRef =
+      asNonEmptyString(command.transcript_file) ||
+      asStringArray(stage.evidence_refs)[0] ||
+      artifactRefs[0] ||
+      asNonEmptyString(planned?.plan_ref) ||
+      null;
     const deterministicStatus =
       step === "delivery" &&
       (input.artifacts.delivery_blocking === true ||
@@ -497,12 +633,16 @@ export function createLiveE2eStepController(options) {
         : [];
     const entry = {
       run_id: options.runId,
-      sequence: includedSteps.indexOf(step) + 1,
+      sequence: Number(planned?.sequence) || Object.keys(entryByStep).length + 1,
       step_id: step,
+      step_instance_id: stepInstanceId,
+      iteration,
       flow_stage: step,
       plan,
+      plan_ref: asNonEmptyString(planned?.plan_ref) || null,
       public_surface: asNonEmptyString(command.command_surface) || plan.public_surface,
-      transcript_ref: asNonEmptyString(command.transcript_file) || null,
+      transcript_ref: asNonEmptyString(command.transcript_file) || executionRef,
+      execution_ref: executionRef,
       artifact_refs: artifactRefs,
       started_at: asNonEmptyString(stage.started_at) || asNonEmptyString(command.started_at) || null,
       finished_at: asNonEmptyString(stage.finished_at) || asNonEmptyString(command.finished_at) || null,
@@ -523,6 +663,8 @@ export function createLiveE2eStepController(options) {
         ]),
         recommendation: asNonEmptyString(stage.recommendation) || asNonEmptyString(command.recommendation) || "continue",
       },
+      inspection_ref: null,
+      classification_ref: null,
       semantic_analysis: {
         status: analysisStatus,
         judge_source: "deterministic-runner",
@@ -545,6 +687,7 @@ export function createLiveE2eStepController(options) {
             : asNonEmptyString(stage.summary) || `${step} completed with observed findings.`,
         next_step: includedSteps[includedSteps.indexOf(step) + 1] ?? null,
       },
+      decision_override: asRecord(input.decisionOverride),
       resume_result: requestedInteraction
         ? {
             status:
@@ -557,25 +700,65 @@ export function createLiveE2eStepController(options) {
       frontend_interaction_refs: frontendInteractionRefs,
       final_step_verdict: finalStepVerdict,
     };
+    const inspectionFile = path.join(
+      options.reportsRoot,
+      `live-e2e-step-inspection-${normalizedRunId}-${String(Number(entry.sequence)).padStart(2, "0")}-${normalizeId(stepInstanceId)}.json`,
+    );
+    writeJson(inspectionFile, {
+      run_id: options.runId,
+      step_id: step,
+      step_instance_id: stepInstanceId,
+      iteration,
+      transcript_ref: entry.transcript_ref,
+      artifact_refs: artifactRefs,
+      stage_result: stage,
+      command_diagnostic: command,
+      inspected_at: nowIso(),
+    });
+    entry.inspection_ref = inspectionFile;
+    const classificationFile = path.join(
+      options.reportsRoot,
+      `live-e2e-step-classification-${normalizedRunId}-${String(Number(entry.sequence)).padStart(2, "0")}-${normalizeId(stepInstanceId)}.json`,
+    );
+    writeJson(classificationFile, {
+      run_id: options.runId,
+      step_id: step,
+      step_instance_id: stepInstanceId,
+      iteration,
+      deterministic_analysis: entry.deterministic_analysis,
+      requested_interaction: entry.requested_interaction,
+      final_step_verdict: entry.final_step_verdict,
+      classified_at: nowIso(),
+    });
+    entry.classification_ref = classificationFile;
     const files = operatorFilePaths({
       reportsRoot: options.reportsRoot,
       runId: options.runId,
       sequence: Number(entry.sequence),
-      step,
+      step: stepInstanceId,
     });
     const decisionRequest = {
       request_id: `${options.runId}.${step}.operator-decision-request`,
       run_id: options.runId,
       step_id: step,
+      step_instance_id: stepInstanceId,
+      iteration,
       operator_context: operatorContext,
       plan: entry.plan,
+      plan_ref: entry.plan_ref,
       public_surface: entry.public_surface,
       transcript_ref: entry.transcript_ref,
       artifact_refs: entry.artifact_refs,
+      inspection_ref: entry.inspection_ref,
+      classification_ref: entry.classification_ref,
       deterministic_analysis: entry.deterministic_analysis,
       requested_interaction: entry.requested_interaction,
+      decision_hint: asRecord(input.decisionOverride),
+      operator_decision_expected_ref: files.decisionFile,
       expected_response_shape: {
         step_id: step,
+        step_instance_id: stepInstanceId,
+        iteration,
         status: "accepted",
         operator_ref: asNonEmptyString(operatorContext.operator_ref),
         action: OPERATOR_ACTIONS.join("|"),
@@ -678,12 +861,17 @@ export function createLiveE2eStepController(options) {
     input.artifacts.live_e2e_step_observation_files = Object.values(entryByStep).map((stepEntry) =>
       asNonEmptyString(stepEntry.observation_ref),
     );
-    input.artifacts.live_e2e_step_journal_entries = includedSteps
-      .filter((candidate) => entryByStep[candidate])
-      .map((candidate) => entryByStep[candidate]);
+    input.artifacts.live_e2e_step_journal_entries = Object.values(entryByStep).sort(
+      (left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0),
+    );
 
     const action = asNonEmptyString(asRecord(entry.decision).action) || "continue";
-    if (mode === "manual" || (mode === "evaluator" && action !== "continue") || (mode === "auto" && action !== "continue")) {
+    const actionContinuesController = action === "continue" || (mode === "auto" && action === "retry_public_step");
+    if (
+      mode === "manual" ||
+      (mode === "evaluator" && !actionContinuesController) ||
+      (mode === "auto" && !actionContinuesController)
+    ) {
       throw new LiveE2eControllerStop({
         reason: `Live E2E controller stopped at '${step}' with decision '${action}'.`,
         state: cloneState(),
@@ -697,13 +885,17 @@ export function createLiveE2eStepController(options) {
   writeJson(stateFile, state);
 
   const completedContinueSteps = () =>
-    includedSteps.filter((step) => asNonEmptyString(asRecord(entryByStep[step]?.decision).action) === "continue");
+    Object.values(entryByStep)
+      .filter((entry) => asNonEmptyString(asRecord(entry.decision).action) === "continue")
+      .map((entry) => asNonEmptyString(entry.step_id))
+      .filter(Boolean);
 
   return {
     mode,
     policy,
     includedSteps,
     stateFile,
+    planCommand,
     observeStage,
     getState: cloneState,
     hasPersistedProgress: () => asStringArray(state.completed_steps).length > 0,
@@ -715,10 +907,12 @@ export function createLiveE2eStepController(options) {
         : [];
       return commandResults.find((entry) => asNonEmptyString(entry.label) === normalizedLabel) ?? null;
     },
-    shouldUseCachedCommand: (label) => {
+    shouldUseCachedCommand: (label, iteration = 1) => {
+      if ((Number(iteration) || 1) > 1) return false;
       const step = COMMAND_LABEL_STEP[asNonEmptyString(label)];
       return step ? completedContinueSteps().includes(step) : false;
     },
-    getStepJournal: () => includedSteps.filter((step) => entryByStep[step]).map((step) => entryByStep[step]),
+    getStepJournal: () =>
+      Object.values(entryByStep).sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0)),
   };
 }

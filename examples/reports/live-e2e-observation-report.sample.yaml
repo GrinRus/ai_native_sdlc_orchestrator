@@ -1,6 +1,7 @@
 report_id: live-e2e.sample.observation.v2
 run_id: live-e2e.sample.run
 profile_id: live-e2e.full-journey.regress.ky
+report_status: final
 operator_context:
   operator_kind: deterministic-fixture
   operator_ref: fixture://live-e2e-deterministic-runner
@@ -35,12 +36,18 @@ aor_installation:
   status: pass
   declared_policy: source-install-required
   effective_policy: source-install-required
+  install_mode: isolated
   source_channel: source-only-alpha
+  workspace_root: /tmp/aor-live-e2e/live-e2e.sample.run
+  runtime_root: /tmp/aor-live-e2e/live-e2e.sample.run/runtime
+  original_source_root: /repo/aor
+  installed_source_root: /tmp/aor-live-e2e/live-e2e.sample.run/aor-source
   launcher_ref: runtime://reports/live-e2e-aor-install/aor-session-launcher.sh
   command_transcripts:
     - runtime://reports/live-e2e-aor-install/01-corepack-enable.json
     - runtime://reports/live-e2e-aor-install/02-pnpm-install-frozen-lockfile.json
-    - runtime://reports/live-e2e-aor-install/03-pnpm-aor-help.json
+    - runtime://reports/live-e2e-aor-install/03-pnpm-build.json
+    - runtime://reports/live-e2e-aor-install/04-pnpm-aor-help.json
 aor_installation_proof_file: runtime://reports/live-e2e-aor-installation-proof-live-e2e.sample.run.json
 setup_journal:
   - sequence: 1
@@ -84,6 +91,8 @@ setup_journal:
 step_journal:
   - sequence: 1
     step_id: discovery
+    step_instance_id: discovery
+    iteration: 1
     flow_stage: discovery
     plan:
       objective: Observe project analysis and discovery evidence through installed public flow surfaces.
@@ -105,8 +114,12 @@ step_journal:
         - no-runtime-internal-imports
         - no-upstream-write-by-default
         - persist-observation-before-next-step
+    plan_ref: runtime://reports/live-e2e-step-plan-live-e2e.sample.run-01-discovery.json
     public_surface: aor discovery run
     transcript_ref: runtime://reports/live-e2e-command-traces/01-discovery-run.json
+    execution_ref: runtime://reports/live-e2e-command-traces/01-discovery-run.json
+    inspection_ref: runtime://reports/live-e2e-step-inspection-live-e2e.sample.run-01-discovery.json
+    classification_ref: runtime://reports/live-e2e-step-classification-live-e2e.sample.run-01-discovery.json
     artifact_refs:
       - runtime://reports/project-analysis-report.json
     started_at: "2026-05-18T00:00:00.000Z"

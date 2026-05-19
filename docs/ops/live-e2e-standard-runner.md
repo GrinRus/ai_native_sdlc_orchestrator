@@ -7,9 +7,11 @@ Provide one installed-user black-box proof runner for both live E2E layers:
 
 Live E2E simulates a user who has installed AOR, initializes or attaches a target repository, walks the public SDLC flow through CLI/API surfaces, and then emits a per-step black-box observation summary. It must not call private runtime internals to repair the run. It proves whether AOR works as a product from the public surface and whether produced artifacts explain each `pass`, `warn`, `not_pass`, block, and missing-evidence gap.
 
-Every run starts by proving the AOR launcher before target execution. Source-channel profiles run the source-only install proof (`corepack enable`, `pnpm install --frozen-lockfile`, `pnpm aor --help`) and then use a run-scoped session launcher. Profiles that use `--aor-bin` must still prove the provided binary with `aor --help`.
+Every run starts by proving the AOR launcher before target execution. Source-channel acceptance and production-proof profiles create `${TMPDIR:-/tmp}/aor-live-e2e/<run-id>/`, copy the current AOR source into `aor-source`, run the source-only install proof (`corepack enable`, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm aor --help`), and then use a run-scoped session launcher from that isolated source install. Runtime state is stored under `<workspace>/runtime`; target checkouts live under `<workspace>/runtime/projects/<id>/target-checkouts`. `--runtime-root` and `--aor-install-mode repo-local` are explicit dev/debug overrides, not acceptance defaults. Profiles that use `--aor-bin` must still prove the provided binary with `aor --help`.
 
 The runner invokes the installed project flow step by step. Each step follows `plan -> execute -> inspect -> classify -> decide -> persist`; the next public command is allowed only after the current step decision is `continue` or after a requested interaction/frontend/manual action is completed through a public surface.
+
+Full-journey implementation is iterative. Acceptance profiles declare `implementation_loop.enabled=true`, `max_iterations`, `review_repair_actions`, and `stop_on_blocking_review`. The public lifecycle may repeat `execution#N -> review#N` until review and verification pass or the iteration budget is exhausted. Runtime Harness internal repair remains execution-health evidence only; it does not replace the public `run start` / `review run` / `review decide --decision request-repair` loop.
 
 W14 extends the full-journey layer into a curated matrix across:
 - `scenario_family`
@@ -40,6 +42,7 @@ Catalog-backed full-journey profiles:
 - `full-journey-regress-ky.yaml`
 - `full-journey-regress-ky-anthropic.yaml`
 - `full-journey-regress-ky-medium-anthropic.yaml`
+- `full-journey-regress-ky-medium-open-code.yaml`
 - `full-journey-release-ky-medium-openai.yaml`
 - `full-journey-regress-httpie.yaml`
 - `full-journey-regress-httpie-anthropic.yaml`
@@ -71,7 +74,7 @@ node ./scripts/live-e2e/run-profile.mjs \
   --profile ./scripts/live-e2e/profiles/full-journey-regress-ky.yaml
 ```
 
-By default, live E2E uses `--runner-auth-mode host`: AOR runtime state remains isolated under `.aor/`, while external runners reuse the operator's local CLI authentication. This means `codex` uses the normal `~/.codex` or caller-provided `CODEX_HOME`, and `claude` uses the normal local Claude Code auth/config sources. Use `--runner-auth-mode isolated` only for CI, proof, or fixture runs that deliberately need a session-scoped runner home.
+By default, live E2E uses `--runner-auth-mode host`: AOR runtime state remains isolated under the run workspace/runtime root, while external runners reuse the operator's local CLI authentication. This means `codex` uses the normal `~/.codex` or caller-provided `CODEX_HOME`, and `claude` uses the normal local Claude Code auth/config sources. Use `--runner-auth-mode isolated` only for CI, proof, or fixture runs that deliberately need a session-scoped runner home.
 
 By default, live E2E also uses `--runtime-agent-permission-mode full-bypass` so non-interactive acceptance runs do not pause on runner-native tool approval prompts inside isolated checkouts. Use `--runtime-agent-permission-mode restricted` when diagnosing adapter-native permission behavior. The selected mode is passed to public `aor` subprocesses through `AOR_RUNTIME_AGENT_PERMISSION_MODE` and is recorded in live adapter preflight, raw adapter evidence, routed step results, and the run summary.
 
@@ -144,6 +147,18 @@ node ./scripts/live-e2e/manual-live-e2e.mjs \
 
 One invocation runs only the next pending controller step, writes `live_e2e_controller_state_file` plus a `live-e2e-step-observation-*` artifact, and prints the current decision. Re-run the same command with the same `--run-id` after completing any required public action.
 
+When the step stops for a required skill-agent decision, write the decision JSON from the request's expected response shape and install it before resuming:
+
+```bash
+node ./scripts/live-e2e/manual-live-e2e.mjs \
+  --project-ref . \
+  --profile ./scripts/live-e2e/profiles/full-journey-regress-ky.yaml \
+  --run-id <stable-run-id> \
+  --operator-decision-file <decision.json>
+```
+
+Interaction answers must still go through `aor run answer` or the HTTP answer route; a local operator decision file cannot substitute for answer audit evidence.
+
 ## Step evaluator
 Use the step evaluator when the run must fail closed if any controller phase evidence is missing:
 
@@ -154,6 +169,22 @@ node ./scripts/live-e2e/step-evaluator.mjs \
 ```
 
 The evaluator uses the same controller as `run-profile.mjs`, runs in automatic mode until terminal success or an unresolved action, and rejects reports where any observed step lacks `plan`, execution, inspection, classification, or decision evidence. `aor harness certify` remains the public replay/certification command inside the SDLC flow; the step evaluator is the live E2E decision-loop wrapper.
+
+## Qualification loop
+Use the qualification loop helper for the outer fix-and-rerun workflow:
+
+```bash
+node ./scripts/live-e2e/qualification-loop.mjs \
+  --project-ref . \
+  --profile ./scripts/live-e2e/profiles/full-journey-regress-ky-medium-open-code.yaml
+```
+
+The helper accepts only medium, large, or xl profiles. It runs one fresh live E2E, writes `live-e2e-qualification-analysis-*`, and exits as:
+- `0` / `passed`: full flow and quality passed;
+- `2` / `needs_fix`: AOR code or live E2E flow likely needs a patch before rerun;
+- `3` / `blocked`: environment, provider, auth, permission, or safety setup prevented a valid evaluation.
+
+The launching agent performs the fix and commit. Final qualification requires at least five full positive medium-or-larger runs across provider variants: at least two `openai-primary`, at least two `anthropic-primary`, and at least one `open-code-primary`.
 
 ## Layer behavior
 Bounded rehearsal layer:
@@ -175,6 +206,7 @@ Full-journey layer:
 - writes an execution-readiness decision before `run start` so promotion evidence is based on readiness and routed dry-run proof, not on a failed baseline target check;
 - includes the materialized spec step-result as a concrete `packet://spec@evidence://...` promotion ref for adapter context, while `run start` binds the approved handoff ref into the compiled context.
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
+- repeats public `run start` / `review run` iterations with iteration-specific run ids when review or primary verification requests repair, and records each repeated step as `execution#N` and `review#N` in the step journal.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - gates continuation after every observed public step by the online live E2E controller decision.
 - keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, must execute them as ordinary observed steps.
@@ -198,6 +230,7 @@ The proof runner is a black-box step controller. Inspect `live_e2e_run_summary_f
 - inspect `live_e2e_observation_report_file` first; it is the durable ordered step journal;
 - inspect `live_e2e_controller_state_file` to see the current step, completed steps, phase history, pending decision, retry counters, and evidence refs;
 - inspect `live_e2e_step_observation_files[]` for per-step plan, public transcript, artifact refs, analysis, interaction decisions, and resume results;
+- inspect `implementation_loop.iterations[]` when a run repaired through repeated `execution` / `review` steps;
 - inspect `agent_decision_request_ref` and the matching `operator_decision_ref` for each step; acceptance profiles require accepted skill-agent decisions before continuation;
 - inspect `artifacts.routed_step_result_file`, `artifacts.review_report_file`, delivery artifacts, and public closure artifacts when present;
 - inspect `quality_judgement` for target acceptance dimensions that are not already obvious from one step.

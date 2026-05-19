@@ -11,6 +11,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
 - Never push to upstream public repositories by default.
 - Mandatory full-journey live E2E is allowed only on curated catalog targets and curated feature missions.
 - Full-journey runs must generate the feature request and discovery/spec/handoff during the run.
+- Acceptance and production-proof full-journey runs must use isolated AOR source install by default and support the public `execution#N -> review#N` repair loop.
 - Always materialize review, QA, and delivery artifacts for full-journey observation runs; release and learning become observed steps when the profile declares `live_e2e.flow_range_policy=full_lifecycle`.
 - Every mandatory full-journey run must resolve one curated matrix cell:
   - `repo`
@@ -45,6 +46,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - full-journey required cells:
     - `full-journey-regress-ky.yaml` (`regress/small/openai-primary`)
     - `full-journey-regress-ky-medium-anthropic.yaml` (`regress/medium/anthropic-primary`)
+    - `full-journey-regress-ky-medium-open-code.yaml` (`regress/medium/open-code-primary`)
     - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`)
   - production-proof candidate:
     - `full-journey-production-proof-ky-openai.yaml` (`regress/small/openai-primary`, real external process, blocking target verification)

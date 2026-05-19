@@ -109,6 +109,138 @@ test("live E2E step controller blocks skill-agent profiles until operator decisi
   });
 });
 
+test("live E2E step controller rejects inconsistent skill-agent continue decisions", () => {
+  withTempRoot((reportsRoot) => {
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-skill-agent-inconsistent",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      mode: "auto",
+    });
+    controller.planCommand({ label: "discovery-run", commandSurface: "aor discovery run" });
+    const decisionFile = path.join(
+      reportsRoot,
+      "live-e2e-operator-decision-controller-skill-agent-inconsistent-01-discovery.json",
+    );
+    fs.writeFileSync(
+      decisionFile,
+      `${JSON.stringify(
+        {
+          step_id: "discovery",
+          status: "accepted",
+          operator_ref: "skill://live-e2e-runner",
+          action: "continue",
+          semantic_analysis: {
+            status: "not_pass",
+            judge_source: "skill-agent",
+            findings: ["Discovery evidence is incomplete."],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "discovery",
+          stageResult: { stage: "discovery", status: "pass", evidence_refs: [], summary: "ok" },
+          commandResults: [{ label: "discovery-run", command_surface: "aor discovery run", status: "pass" }],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "block");
+        return true;
+      },
+    );
+
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.operator_decision_status, "rejected");
+    assert.equal(entry.decision.action, "block");
+    assert.equal(entry.final_step_verdict, "blocked");
+  });
+});
+
+test("live E2E step controller preserves repeated execution and review iterations", () => {
+  withTempRoot((reportsRoot) => {
+    const reviewTranscript = path.join(reportsRoot, "01-review-run.json");
+    const executionTranscript = path.join(reportsRoot, "02-run-start.json");
+    fs.writeFileSync(reviewTranscript, "{}\n", "utf8");
+    fs.writeFileSync(executionTranscript, "{}\n", "utf8");
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-repair-loop",
+      profile: { live_e2e: { flow_range_policy: "delivery_default" } },
+      mode: "auto",
+    });
+
+    controller.planCommand({ label: "review-run", commandSurface: "aor review run", iteration: 1 });
+    const reviewResult = controller.observeStage({
+      stage: "review",
+      iteration: 1,
+      stageResult: { stage: "review", status: "warn", evidence_refs: [reviewTranscript], summary: "repair" },
+      commandResults: [
+        {
+          label: "review-run",
+          command_surface: "aor review run",
+          status: "warn",
+          transcript_file: reviewTranscript,
+          artifact_refs: [reviewTranscript],
+          exit_code: 0,
+        },
+      ],
+      artifacts: {},
+      decisionOverride: {
+        action: "retry_public_step",
+        reason: "repair iteration requested",
+        next_step: "execution",
+      },
+    });
+    assert.equal(reviewResult.action, "retry_public_step");
+
+    controller.planCommand({ label: "run-start", commandSurface: "aor run start", iteration: 2 });
+    controller.observeStage({
+      stage: "execution",
+      iteration: 2,
+      stageResult: { stage: "execution", status: "pass", evidence_refs: [executionTranscript], summary: "repaired" },
+      commandResults: [
+        {
+          label: "run-start",
+          command_surface: "aor run start",
+          status: "pass",
+          transcript_file: executionTranscript,
+          artifact_refs: [executionTranscript],
+          exit_code: 0,
+        },
+      ],
+      artifacts: {},
+    });
+
+    const journal = controller.getStepJournal();
+    assert.deepEqual(
+      journal.map((entry) => [entry.step_id, entry.step_instance_id, entry.iteration]),
+      [
+        ["review", "review", 1],
+        ["execution", "execution#2", 2],
+      ],
+    );
+    assert.equal(journal.every((entry) => fs.existsSync(entry.plan_ref)), true);
+    assert.equal(journal.every((entry) => fs.existsSync(entry.inspection_ref)), true);
+    assert.equal(journal.every((entry) => fs.existsSync(entry.classification_ref)), true);
+  });
+});
+
 test("live E2E step controller gates manual mode after one completed step", () => {
   withTempRoot((reportsRoot) => {
     const controller = createLiveE2eStepController({

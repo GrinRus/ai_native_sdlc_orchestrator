@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
@@ -60,6 +61,14 @@ const LIVE_E2E_OBSERVATION_PRELUDE_STEPS = Object.freeze([
   "intake",
   "readiness",
 ]);
+const LIVE_E2E_OPERATOR_ACTIONS = Object.freeze([
+  "continue",
+  "answer",
+  "frontend_interact",
+  "retry_public_step",
+  "diagnose",
+  "block",
+]);
 /**
  * @param {unknown} value
  * @returns {string[]}
@@ -109,6 +118,32 @@ function worstObservationStatus(left, right) {
   if (statuses.includes("warn")) return "warn";
   if (statuses.includes("resumed")) return "resumed";
   return "pass";
+}
+
+/**
+ * Public implementation repair loops preserve every execution/review iteration
+ * in the step journal. Final quality is judged from the latest observed loop
+ * iteration so a repaired earlier review finding does not poison the final run.
+ *
+ * @param {Array<Record<string, unknown>>} stepJournal
+ * @returns {Array<Record<string, unknown>>}
+ */
+function getQualityRelevantStepJournal(stepJournal) {
+  const loopSteps = new Set(["execution", "review"]);
+  const latestIterationByStep = new Map();
+  for (const rawEntry of stepJournal) {
+    const entry = asRecord(rawEntry);
+    const step = asNonEmptyString(entry.step_id);
+    if (!loopSteps.has(step)) continue;
+    const iteration = Number(entry.iteration) || 1;
+    latestIterationByStep.set(step, Math.max(latestIterationByStep.get(step) ?? 0, iteration));
+  }
+  return stepJournal.filter((rawEntry) => {
+    const entry = asRecord(rawEntry);
+    const step = asNonEmptyString(entry.step_id);
+    if (!loopSteps.has(step)) return true;
+    return (Number(entry.iteration) || 1) === (latestIterationByStep.get(step) ?? 1);
+  });
 }
 
 /**
@@ -342,6 +377,53 @@ function resolveLiveE2eControllerMode(value) {
 }
 
 /**
+ * @param {string | null} value
+ * @param {{ aorBin: string | null, profile: Record<string, unknown>, fullJourney: boolean }} options
+ * @returns {"isolated" | "repo-local" | "provided-binary"}
+ */
+function resolveAorInstallMode(value, options) {
+  if (options.aorBin) return "provided-binary";
+  const explicit = asNonEmptyString(value);
+  if (explicit) {
+    if (explicit === "isolated" || explicit === "repo-local") return explicit;
+    throw new UsageError(`Unsupported --aor-install-mode '${explicit}'. Expected isolated or repo-local.`);
+  }
+  const runTier = resolveSummaryRunTier(options.profile);
+  const productionProofEnabled = asRecord(options.profile.production_proof).enabled === true;
+  return options.fullJourney || runTier === "acceptance" || runTier === "production-proof" || productionProofEnabled
+    ? "isolated"
+    : "repo-local";
+}
+
+/**
+ * @param {{ runId: string }} options
+ */
+function resolveDefaultIsolatedWorkspace(options) {
+  return path.join(os.tmpdir(), "aor-live-e2e", normalizeId(options.runId));
+}
+
+/**
+ * @param {{ mode: "isolated" | "repo-local" | "provided-binary", profile: Record<string, unknown> }} options
+ */
+function assertInstallModeAllowed(options) {
+  if (options.mode !== "repo-local") return;
+  const runTier = resolveSummaryRunTier(options.profile);
+  const productionProofEnabled = asRecord(options.profile.production_proof).enabled === true;
+  const internalTestHooks = asRecord(options.profile.internal_test_hooks);
+  if (
+    internalTestHooks.allow_repo_local_install_for_test === true ||
+    (internalTestHooks.allow_deterministic_operator_for_test === true && runTier !== "production-proof")
+  ) {
+    return;
+  }
+  if (runTier === "acceptance" || runTier === "production-proof" || productionProofEnabled) {
+    throw new UsageError(
+      "Acceptance and production-proof live E2E runs require --aor-install-mode isolated unless an internal test hook explicitly allows repo-local install.",
+    );
+  }
+}
+
+/**
  * @param {string} step
  * @returns {string[]}
  */
@@ -404,7 +486,7 @@ function resolveStepDecisionAction(stepEntry) {
   const declaredAction = asNonEmptyString(asRecord(stepEntry.decision).action);
   if (
     (operatorDecisionStatus === "accepted" || operatorDecisionStatus === "missing" || operatorDecisionStatus === "rejected") &&
-    ["continue", "answer", "frontend_interact", "retry_public_step", "diagnose", "block"].includes(declaredAction)
+    LIVE_E2E_OPERATOR_ACTIONS.includes(declaredAction)
   ) {
     return declaredAction;
   }
@@ -569,6 +651,12 @@ function buildStepJournal(options) {
     const stage = options.flowResult.stageResults.find((entry) => asNonEmptyString(entry.stage) === step) ?? {};
     const command = findCommandByPreferredLabel(options.flowResult.commandResults, getObservationCommandLabelPriority(step));
     const artifactRefs = uniqueStrings([...asStringArray(rawEntry.artifact_refs), ...asStringArray(stage.evidence_refs)]);
+    const rawDecision = asRecord(rawEntry.decision);
+    const rawOperatorAction = asNonEmptyString(rawDecision.action);
+    const rawOperatorDecisionStatus = asNonEmptyString(rawEntry.operator_decision_status);
+    const shouldPreserveOperatorAction =
+      ["accepted", "missing", "rejected"].includes(rawOperatorDecisionStatus) &&
+      LIVE_E2E_OPERATOR_ACTIONS.includes(rawOperatorAction);
     const deterministicAnalysis = asRecord(rawEntry.deterministic_analysis);
     const deterministicStatus = toObservationStatus(asNonEmptyString(deterministicAnalysis.status) || "not_pass");
     const judgeEntry = judgeEntries.get(step) ?? judgeEntries.get(asNonEmptyString(command?.label));
@@ -667,8 +755,14 @@ function buildStepJournal(options) {
       },
       requested_interaction: normalizedRequestedInteraction,
       decision: {
-        ...asRecord(rawEntry.decision),
-        action: normalizedRequestedInteraction ? "answer" : finalStepVerdict === "not_pass" ? "diagnose" : "continue",
+        ...rawDecision,
+        action: shouldPreserveOperatorAction
+          ? rawOperatorAction
+          : normalizedRequestedInteraction
+            ? "answer"
+            : finalStepVerdict === "not_pass"
+              ? "diagnose"
+              : "continue",
         reason:
           missingResumeAudit
             ? "Interaction resume is missing answer audit evidence."
@@ -704,6 +798,7 @@ function buildStepJournal(options) {
  */
 function buildFinalAnalysis(options) {
   const codeQuality = buildCodeQualityObservation(options.artifacts);
+  const qualityRelevantStepJournal = getQualityRelevantStepJournal(options.stepJournal);
   const deliveryStatus = asNonEmptyString(options.artifacts.delivery_manifest_file)
     ? options.artifacts.delivery_blocking === true ||
       ["fail", "not_pass"].includes(asNonEmptyString(options.artifacts.delivery_quality_gate_status))
@@ -721,12 +816,12 @@ function buildFinalAnalysis(options) {
       ? "pass"
       : "not_pass";
   let status = codeQuality.status;
-  for (const step of options.stepJournal) {
+  for (const step of qualityRelevantStepJournal) {
     status = worstObservationStatus(status, asNonEmptyString(step.final_step_verdict) || "not_pass");
   }
   const findings = uniqueStrings([
     ...asStringArray(codeQuality.findings),
-    ...options.stepJournal.flatMap((entry) => asStringArray(asRecord(entry.semantic_analysis).findings)),
+    ...qualityRelevantStepJournal.flatMap((entry) => asStringArray(asRecord(entry.semantic_analysis).findings)),
   ]);
   return {
     status,
@@ -791,6 +886,8 @@ function buildObservationReport(options) {
   const excludedSteps = flowRangePolicy === "full_lifecycle" ? [] : ["release", "learning"];
   const setupJournal = buildSetupJournal(options.flowResult.artifacts);
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
+  const controllerStop = asRecord(options.flowResult.artifacts.live_e2e_controller_stop);
+  const reportStatus = Object.keys(controllerStop).length > 0 ? "in_progress" : "final";
   const agentJudgeDocument =
     asNonEmptyString(operatorContext.operator_kind) === "skill-agent" ? {} : options.agentJudgeDocument;
   const stepJournal = buildStepJournal({
@@ -805,6 +902,7 @@ function buildObservationReport(options) {
   return {
     report_id: `${options.runId}.live-e2e-observation.v2`,
     run_id: options.runId,
+    report_status: reportStatus,
     profile_id: asNonEmptyString(options.profile.profile_id) || "unknown-profile",
     operator_context: operatorContext,
     controller_state_ref: asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file),
@@ -1237,11 +1335,13 @@ function writeProofRunnerArtifacts(options) {
     scorecard_files: [scorecardFile],
     control_surfaces: {
       installed_user_proof_runner:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
       manual_live_e2e:
         "node ./scripts/live-e2e/manual-live-e2e.mjs --project-ref <path> --profile <path> --run-id <id>",
       step_evaluator:
         "node ./scripts/live-e2e/step-evaluator.mjs --project-ref <path> --profile <path>",
+      qualification_loop:
+        "node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path>",
       public_cli_sequence: options.flowResult.commandResults.map((result) => result.command_surface).filter(Boolean),
       aor_bin: options.aorLaunch.binaryRef,
       examples_root: options.examplesRoot,
@@ -1300,7 +1400,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
         "",
         "Installed-user black-box proof runner with online step-controller evaluation.",
       ].join("\n"),
@@ -1322,6 +1422,7 @@ function runCli(rawArgs) {
     })();
   const runtimeRoot = resolveOptionalStringFlag(flags["runtime-root"], "runtime-root");
   const aorBin = resolveOptionalStringFlag(flags["aor-bin"], "aor-bin");
+  const requestedAorInstallMode = resolveOptionalStringFlag(flags["aor-install-mode"], "aor-install-mode");
   const agentJudgeFile = resolveOptionalStringFlag(flags["agent-judge-file"], "agent-judge-file");
   const catalogRootOverride = resolveOptionalStringFlag(flags["catalog-root"], "catalog-root");
   const runnerAuthMode = resolveRunnerAuthMode(resolveOptionalStringFlag(flags["runner-auth-mode"], "runner-auth-mode"));
@@ -1359,15 +1460,27 @@ function runCli(rawArgs) {
     : fullJourneyResolution
       ? null
       : requireDirectory(path.join(hostRoot, "examples"));
-  const hostProjectId = discoverHostProjectId(hostRoot);
-  const layout = ensureRuntimeLayout({
-    hostRoot,
-    runtimeRootOverride: runtimeRoot,
-    hostProjectId,
-  });
   const runId =
     resolveOptionalStringFlag(flags["run-id"], "run-id") ??
     `${asNonEmptyString(profile.profile_id) || "live-e2e"}.run-${nowIso().replace(/[^0-9]/g, "").slice(-12)}`;
+  const aorInstallMode = resolveAorInstallMode(requestedAorInstallMode, {
+    aorBin,
+    profile,
+    fullJourney: fullJourneyResolution !== null,
+  });
+  assertInstallModeAllowed({
+    mode: aorInstallMode,
+    profile,
+  });
+  const isolatedWorkspaceRoot = aorInstallMode === "isolated" ? resolveDefaultIsolatedWorkspace({ runId }) : null;
+  const effectiveRuntimeRoot =
+    runtimeRoot ?? (isolatedWorkspaceRoot ? path.join(isolatedWorkspaceRoot, "runtime") : null);
+  const hostProjectId = discoverHostProjectId(hostRoot);
+  const layout = ensureRuntimeLayout({
+    hostRoot,
+    runtimeRootOverride: effectiveRuntimeRoot,
+    hostProjectId,
+  });
   let aorInstallation;
   let installationFailure = null;
   try {
@@ -1377,6 +1490,10 @@ function runCli(rawArgs) {
       runId,
       profile,
       aorBinOverride: aorBin,
+      installMode: aorInstallMode,
+      isolatedWorkspaceRoot,
+      isolatedSourceRoot: isolatedWorkspaceRoot ? path.join(isolatedWorkspaceRoot, "aor-source") : null,
+      runtimeRoot: layout.runtimeRoot,
     });
   } catch (error) {
     const failedInstallation = asRecord(asRecord(error).aorInstallation);
