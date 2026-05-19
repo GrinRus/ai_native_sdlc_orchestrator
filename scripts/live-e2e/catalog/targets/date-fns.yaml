@@ -1,0 +1,56 @@
+catalog_id: date-fns
+repo:
+  repo_id: date-fns/date-fns
+  repo_url: https://github.com/date-fns/date-fns.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - pnpm install
+  commands:
+    - pnpm vitest run
+    - pnpm run lint
+    - pnpm run types
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: date-fns.regress.small.openai
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: date-fns-utility-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
+provider_comparison_pairs: []
+feature_missions:
+  - mission_id: date-fns-utility-regression
+    title: Preserve one date utility regression
+    brief: Add or adjust one focused date utility regression while preserving lint, type, and test evidence.
+    feature_size: small
+    allowed_paths:
+      - src/**
+      - test/**
+      - package.json
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - review-report
+    acceptance_checks:
+      - keep the change inside one utility behavior and its tests
+      - preserve vitest, lint, and type evidence
+    supported_scenarios:
+      - regress
+    recommended_provider_variants:
+      - openai-primary
+    size_budget:
+      max_changed_files: 6
+      max_added_lines: 220
+    size_rationale: Extended date-fns coverage should start with one narrow utility behavior seam.
+    change_budget:
+      max_changed_files: 6
+      max_added_lines: 220

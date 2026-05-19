@@ -32,9 +32,37 @@ function parsePnpmJsonOutput(stdout) {
   return JSON.parse(stdout.slice(jsonStart));
 }
 
-function runAorJson(args) {
-  const run = runChecked("pnpm", ["aor", ...args, "--json"]);
+function runAorJson(args, env = {}) {
+  const run = runChecked("pnpm", ["aor", ...args, "--json"], { env });
   return parsePnpmJsonOutput(run.stdout);
+}
+
+function createFakePnpmBin(tempRoot) {
+  const binRoot = path.join(tempRoot, "fake-pnpm-bin");
+  fs.mkdirSync(binRoot, { recursive: true });
+  const pnpmPath = path.join(binRoot, "pnpm");
+  fs.writeFileSync(
+    pnpmPath,
+    [
+      "#!/usr/bin/env node",
+      "const { spawnSync } = require('node:child_process');",
+      "const args = process.argv.slice(2);",
+      "if (args[0] === 'aor') {",
+      `  const run = spawnSync(process.execPath, [${JSON.stringify(
+        path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      )}, ...args.slice(1)], { cwd: ${JSON.stringify(workspaceRoot)}, encoding: 'utf8' });`,
+      "  process.stdout.write(run.stdout || '');",
+      "  process.stderr.write(run.stderr || '');",
+      "  process.exit(run.status ?? 1);",
+      "}",
+      "process.stderr.write(`unsupported fake pnpm invocation: ${args.join(' ')}\\n`);",
+      "process.exit(1);",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  fs.chmodSync(pnpmPath, 0o755);
+  return binRoot;
 }
 
 function createTargetRepo(tempRoot) {
@@ -85,12 +113,16 @@ test("README black-box quickstart runs no-write against an external local target
     const targetRepo = createTargetRepo(tempRoot);
     const runtimeRoot = path.join(targetRepo, ".aor");
     const baseArgs = ["--project-ref", targetRepo, "--runtime-root", runtimeRoot];
+    const fakePnpmBin = createFakePnpmBin(tempRoot);
+    const env = {
+      PATH: [fakePnpmBin, process.env.PATH].filter(Boolean).join(path.delimiter),
+    };
 
-    const doctor = runAorJson(["doctor", ...baseArgs]);
+    const doctor = runAorJson(["doctor", ...baseArgs], env);
     assert.equal(doctor.command, "doctor");
     assert.equal(doctor.guided_status, "ready");
 
-    const onboard = runAorJson(["onboard", ...baseArgs]);
+    const onboard = runAorJson(["onboard", ...baseArgs], env);
     assert.equal(onboard.command, "onboard");
     assert.equal(onboard.guided_status, "ready");
     assert.equal(onboard.asset_mode, "bundled");
@@ -99,32 +131,35 @@ test("README black-box quickstart runs no-write against an external local target
     assert.ok(fs.existsSync(onboard.runtime_state_file));
     assert.match(onboard.project_profile_ref, /^\.aor\/projects\/local-project\/state\/project\.aor\.yaml$/u);
 
-    const mission = runAorJson([
-      "mission",
-      "create",
-      ...baseArgs,
-      "--title",
-      "Small safe trial",
-      "--brief",
-      "Inspect the project and recommend the next no-write step",
-      "--goal",
-      "Produce bounded next-action evidence",
-      "--constraint",
-      "No upstream writes, no target file edits, and no external runner execution",
-      "--kpi",
-      "trial-ready:Trial readiness:ready:status",
-      "--dod",
-      "No upstream writes are attempted",
-      "--delivery-mode",
-      "no-write",
-    ]);
+    const mission = runAorJson(
+      [
+        "mission",
+        "create",
+        ...baseArgs,
+        "--title",
+        "Small safe trial",
+        "--brief",
+        "Inspect the project and recommend the next no-write step",
+        "--goal",
+        "Produce bounded next-action evidence",
+        "--constraint",
+        "No upstream writes, no target file edits, and no external runner execution",
+        "--kpi",
+        "trial-ready:Trial readiness:ready:status",
+        "--dod",
+        "No upstream writes are attempted",
+        "--delivery-mode",
+        "no-write",
+      ],
+      env,
+    );
     assert.equal(mission.command, "mission create");
     assert.equal(mission.guided_status, "ready");
     assert.equal(mission.delivery_mode, "no-write");
     assert.ok(fs.existsSync(mission.artifact_packet_file));
     assert.ok(fs.existsSync(mission.artifact_packet_body_file));
 
-    const next = runAorJson(["next", ...baseArgs]);
+    const next = runAorJson(["next", ...baseArgs], env);
     assert.equal(next.command, "next");
     assert.equal(next.guided_status, "ready");
     assert.equal(next.next_action_status, "ready");

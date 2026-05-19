@@ -167,6 +167,7 @@ function assertLiveE2ePolicy(profile, source) {
   const profileId = asNonEmptyString(profile.profile_id) || path.basename(source);
   const policy = asRecord(profile.live_e2e);
   const flowRangePolicy = asNonEmptyString(policy.flow_range_policy);
+  const installationPolicy = asNonEmptyString(policy.installation_policy);
   const interactionCapability = asNonEmptyString(policy.interaction_capability);
   const frontendCapability = asNonEmptyString(policy.frontend_capability);
   const safetyPolicy = asNonEmptyString(policy.safety_policy);
@@ -174,6 +175,9 @@ function assertLiveE2ePolicy(profile, source) {
 
   if (!["delivery_default", "full_lifecycle"].includes(flowRangePolicy)) {
     problems.push("live_e2e.flow_range_policy must be delivery_default or full_lifecycle");
+  }
+  if (!["source-install-required", "provided-binary-required"].includes(installationPolicy)) {
+    problems.push("live_e2e.installation_policy must be source-install-required or provided-binary-required");
   }
   if (!["public-control-plane"].includes(interactionCapability)) {
     problems.push("live_e2e.interaction_capability must be public-control-plane");

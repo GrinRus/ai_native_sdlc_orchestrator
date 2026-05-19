@@ -60,9 +60,9 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/harness-evaluator.mjs --project-ref <path> --profile <path> [run-profile flags...]",
+        "Usage: node ./scripts/live-e2e/step-evaluator.mjs --project-ref <path> --profile <path> [run-profile flags...]",
         "",
-        "Runs the live E2E step controller in harness mode and fails closed on missing phase evidence.",
+        "Runs the live E2E step controller in evaluator mode and fails closed on missing phase evidence.",
       ].join("\n"),
     );
     return 0;
@@ -76,10 +76,10 @@ function runCli(rawArgs) {
     throw new UsageError("Flag '--profile' is required.");
   }
   if (Object.prototype.hasOwnProperty.call(flags, "controller-mode")) {
-    throw new UsageError("harness-evaluator owns --controller-mode; omit it from harness invocations.");
+    throw new UsageError("step-evaluator owns --controller-mode; omit it from evaluator invocations.");
   }
 
-  const child = spawnSync(process.execPath, [RUN_PROFILE_SCRIPT, ...rawArgs, "--controller-mode", "harness"], {
+  const child = spawnSync(process.execPath, [RUN_PROFILE_SCRIPT, ...rawArgs, "--controller-mode", "evaluator"], {
     cwd: process.cwd(),
     encoding: "utf8",
   });
@@ -96,7 +96,7 @@ function runCli(rawArgs) {
   const state = controllerStateFile ? readJson(controllerStateFile) : {};
   const issues = validateControllerEvidence(report, state);
   if (issues.length > 0) {
-    process.stderr.write(`Harness evaluator failed closed: ${issues.join("; ")}\n`);
+    process.stderr.write(`Step evaluator failed closed: ${issues.join("; ")}\n`);
     return 1;
   }
 
@@ -108,12 +108,13 @@ function runCli(rawArgs) {
   process.stdout.write(
     `${JSON.stringify(
       {
-        command: "scripts live-e2e harness-evaluator",
+        command: "scripts live-e2e step-evaluator",
         status: terminalFailure ? "failed" : unresolvedAction ? "stopped" : "ok",
         run_id: runProfileOutput.run_id,
         overall_status: overallStatus,
         unresolved_action: unresolvedAction,
         controller_completed_steps: asStringArray(state.completed_steps),
+        aor_installation_proof_file: asNonEmptyString(runProfileOutput.aor_installation_proof_file) || null,
         live_e2e_controller_state_file: controllerStateFile || null,
         live_e2e_observation_report_file: observationReportFile || null,
         live_e2e_step_observation_files: Array.isArray(runProfileOutput.live_e2e_step_observation_files)

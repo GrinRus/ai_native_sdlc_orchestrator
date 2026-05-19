@@ -15,16 +15,66 @@ flow_range:
     - qa
     - delivery
   prelude_steps:
-    - bootstrap
-    - project-init
-    - intake-create
-    - project-analyze
-    - project-validate
+    - install
+    - target_checkout
+    - project_bootstrap
+    - intake
+    - readiness
   excluded_steps:
     - release
     - learning
 flow_range_policy: delivery_default
 overall_status: warn
+aor_installation:
+  status: pass
+  declared_policy: source-install-required
+  effective_policy: source-install-required
+  source_channel: source-only-alpha
+  launcher_ref: runtime://reports/live-e2e-aor-install/aor-session-launcher.sh
+  command_transcripts:
+    - runtime://reports/live-e2e-aor-install/01-corepack-enable.json
+    - runtime://reports/live-e2e-aor-install/02-pnpm-install-frozen-lockfile.json
+    - runtime://reports/live-e2e-aor-install/03-pnpm-aor-help.json
+aor_installation_proof_file: runtime://reports/live-e2e-aor-installation-proof-live-e2e.sample.run.json
+setup_journal:
+  - sequence: 1
+    step_id: install
+    status: pass
+    public_surface: pnpm source install
+    evidence_refs:
+      - runtime://reports/live-e2e-aor-installation-proof-live-e2e.sample.run.json
+    summary: AOR installation proof completed before public project flow execution.
+  - sequence: 2
+    step_id: target_checkout
+    status: pass
+    public_surface: git clone or local target checkout materialization
+    evidence_refs:
+      - runtime://targets/ky
+    summary: Target checkout was prepared for black-box execution.
+  - sequence: 3
+    step_id: project_bootstrap
+    status: pass
+    public_surface: aor project init or bundled profile materialization
+    evidence_refs:
+      - runtime://reports/generated-project-profile-live-e2e.sample.run.yaml
+      - runtime://reports/bootstrap-artifact-packet-live-e2e.sample.run.yaml
+    summary: AOR project bootstrap evidence was materialized.
+  - sequence: 4
+    step_id: intake
+    status: pass
+    public_surface: aor intake create or aor mission create
+    evidence_refs:
+      - runtime://reports/intake-artifact-packet-live-e2e.sample.run.yaml
+      - runtime://reports/feature-request-live-e2e.sample.run.yaml
+    summary: Feature request or intake evidence was materialized.
+  - sequence: 5
+    step_id: readiness
+    status: pass
+    public_surface: aor project validate and readiness verify
+    evidence_refs:
+      - runtime://reports/project-validation-live-e2e.sample.run.json
+      - runtime://reports/execution-readiness-live-e2e.sample.run.json
+    summary: Readiness validation evidence was materialized.
 step_journal:
   - sequence: 1
     step_id: discovery

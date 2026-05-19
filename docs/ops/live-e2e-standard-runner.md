@@ -7,6 +7,8 @@ Provide one installed-user black-box proof runner for both live E2E layers:
 
 Live E2E simulates a user who has installed AOR, initializes or attaches a target repository, walks the public SDLC flow through CLI/API surfaces, and then emits a per-step black-box observation summary. It must not call private runtime internals to repair the run. It proves whether AOR works as a product from the public surface and whether produced artifacts explain each `pass`, `warn`, `not_pass`, block, and missing-evidence gap.
 
+Every run starts by proving the AOR launcher before target execution. Source-channel profiles run the source-only install proof (`corepack enable`, `pnpm install --frozen-lockfile`, `pnpm aor --help`) and then use a run-scoped session launcher. Profiles that use `--aor-bin` must still prove the provided binary with `aor --help`.
+
 The runner invokes the installed project flow step by step. Each step follows `plan -> execute -> inspect -> classify -> decide -> persist`; the next public command is allowed only after the current step decision is `continue` or after a requested interaction/frontend/manual action is completed through a public surface.
 
 W14 extends the full-journey layer into a curated matrix across:
@@ -43,10 +45,19 @@ Catalog-backed full-journey profiles:
 - `full-journey-regress-httpie-anthropic.yaml`
 - `full-journey-repair-httpie-medium-anthropic.yaml`
 - `full-journey-governance-httpie-medium-openai.yaml`
+- `full-journey-governance-httpie-large-openai.yaml`
+- `full-journey-regress-commander-js.yaml`
+- `full-journey-repair-commander-js-medium-anthropic.yaml`
+- `full-journey-governance-commander-js-medium-openai.yaml`
+- `full-journey-regress-pluggy.yaml`
+- `full-journey-repair-pluggy-medium-anthropic.yaml`
+- `full-journey-governance-pluggy-medium-openai.yaml`
+- `full-journey-governance-ky-large-openai.yaml`
 - `full-journey-release-nextjs.yaml`
 - `full-journey-release-nextjs-anthropic.yaml`
 - `full-journey-repair-nextjs-medium-anthropic.yaml`
 - `full-journey-governance-nextjs-large-openai.yaml`
+- `full-journey-regress-nextjs-small-openai.yaml`
 
 The human catalog stays in `docs/ops/live-e2e-target-catalog.md`; machine-readable matrix definitions live under:
 - `scripts/live-e2e/catalog/targets/*.yaml`
@@ -117,6 +128,7 @@ node ./scripts/live-e2e/run-profile.mjs \
 Expected output includes:
 - `run_id`
 - `live_e2e_run_summary_file`
+- `aor_installation_proof_file`
 - `live_e2e_controller_state_file`
 - `live_e2e_scorecard_files`
 
@@ -132,16 +144,16 @@ node ./scripts/live-e2e/manual-live-e2e.mjs \
 
 One invocation runs only the next pending controller step, writes `live_e2e_controller_state_file` plus a `live-e2e-step-observation-*` artifact, and prints the current decision. Re-run the same command with the same `--run-id` after completing any required public action.
 
-## Harness evaluator
-Use the harness evaluator when the run must fail closed if any controller phase evidence is missing:
+## Step evaluator
+Use the step evaluator when the run must fail closed if any controller phase evidence is missing:
 
 ```bash
-node ./scripts/live-e2e/harness-evaluator.mjs \
+node ./scripts/live-e2e/step-evaluator.mjs \
   --project-ref . \
   --profile ./scripts/live-e2e/profiles/full-journey-regress-ky.yaml
 ```
 
-The evaluator uses the same controller as `run-profile.mjs`, runs in automatic mode until terminal success or an unresolved action, and rejects reports where any observed step lacks `plan`, execution, inspection, classification, or decision evidence.
+The evaluator uses the same controller as `run-profile.mjs`, runs in automatic mode until terminal success or an unresolved action, and rejects reports where any observed step lacks `plan`, execution, inspection, classification, or decision evidence. `aor harness certify` remains the public replay/certification command inside the SDLC flow; the step evaluator is the live E2E decision-loop wrapper.
 
 ## Layer behavior
 Bounded rehearsal layer:
@@ -165,7 +177,7 @@ Full-journey layer:
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - gates continuation after every observed public step by the online live E2E controller decision.
-- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles must execute them as ordinary observed steps.
+- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, must execute them as ordinary observed steps.
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
 - runner auth probe is required;
@@ -182,6 +194,7 @@ No proof-runner-side `examples/context/project profile` injection is allowed on 
 ## Inspect
 The proof runner is a black-box step controller. Inspect `live_e2e_run_summary_file` directly:
 - read `status`, `stage_results`, and `command_results`;
+- inspect `aor_installation_proof_file` and `setup_journal[]` before trusting SDLC step evidence;
 - inspect `live_e2e_observation_report_file` first; it is the durable ordered step journal;
 - inspect `live_e2e_controller_state_file` to see the current step, completed steps, phase history, pending decision, retry counters, and evidence refs;
 - inspect `live_e2e_step_observation_files[]` for per-step plan, public transcript, artifact refs, analysis, interaction decisions, and resume results;
@@ -275,7 +288,7 @@ Guided or release profiles use `live_e2e.flow_range_policy=full_lifecycle`:
 
 `discovery -> spec -> planning -> handoff -> execution -> review -> qa -> delivery -> release -> learning`
 
-`project init`, `intake create`, `project analyze`, and readiness validation are prelude/readiness evidence.
+Installation proof, target checkout, `project init`, `intake create`, `project analyze`, and readiness validation are setup/prelude evidence captured in `setup_journal[]`. The SDLC `step_journal[]` starts at `discovery`.
 
 `overall_status` uses:
 - `pass`: every observed public step and final analysis passed.

@@ -32,6 +32,12 @@ required_matrix_cells:
     feature_mission_id: httpie-cli-repair-exit-codes
     provider_variant_id: openai-primary
     coverage_tier: required
+  - cell_id: httpie-cli.governance.large.openai
+    scenario_family: governance
+    feature_size: large
+    feature_mission_id: httpie-cli-config-surface-hardening
+    provider_variant_id: openai-primary
+    coverage_tier: extended
 provider_comparison_pairs:
   - pair_id: httpie-cli.regress.small
     scenario_family: regress

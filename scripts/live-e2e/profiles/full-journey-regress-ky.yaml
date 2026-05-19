@@ -5,6 +5,7 @@ flow_kind: regress
 duration_class: long
 live_e2e:
   flow_range_policy: delivery_default
+  installation_policy: source-install-required
   interaction_capability: public-control-plane
   frontend_capability: none
   safety_policy: no-upstream-write

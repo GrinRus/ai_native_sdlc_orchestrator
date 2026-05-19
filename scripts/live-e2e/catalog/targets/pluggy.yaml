@@ -1,0 +1,182 @@
+catalog_id: pluggy
+repo:
+  repo_id: pytest-dev/pluggy
+  repo_url: https://github.com/pytest-dev/pluggy.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - python -m pip install -e . pytest
+  commands:
+    - python -m pytest testing
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: pluggy.regress.small.openai
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: pluggy-hook-order-regression
+    provider_variant_id: openai-primary
+    coverage_tier: required
+  - cell_id: pluggy.repair.medium.anthropic
+    scenario_family: repair
+    feature_size: medium
+    feature_mission_id: pluggy-diagnostics-repair
+    provider_variant_id: anthropic-primary
+    coverage_tier: required
+  - cell_id: pluggy.governance.medium.openai
+    scenario_family: governance
+    feature_size: medium
+    feature_mission_id: pluggy-typing-governance
+    provider_variant_id: openai-primary
+    coverage_tier: required
+provider_comparison_pairs:
+  - pair_id: pluggy.regress.small
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: pluggy-hook-order-regression
+    provider_variants:
+      - openai-primary
+      - anthropic-primary
+feature_missions:
+  - mission_id: pluggy-hook-order-regression
+    title: Preserve hook ordering regression behavior
+    brief: Add or adjust one focused hook ordering or call result regression with targeted test coverage.
+    feature_size: small
+    allowed_paths:
+      - src/**
+      - testing/**
+      - pyproject.toml
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+    acceptance_checks:
+      - keep the change inside hook behavior and tests
+      - preserve python -m pytest testing evidence
+    post_run_quality:
+      primary_commands:
+        - python -m pytest testing
+      diagnostic_commands: []
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - regress
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 5
+      max_added_lines: 200
+    size_rationale: Small pluggy regressions should stay inside one hook behavior seam.
+    change_budget:
+      max_changed_files: 5
+      max_added_lines: 200
+  - mission_id: pluggy-diagnostics-repair
+    title: Repair one diagnostics or error-message seam
+    brief: Fix one bounded diagnostics, warning, or error-message behavior with regression coverage.
+    feature_size: medium
+    goals:
+      - Repair one diagnostics behavior without changing unrelated hook execution semantics.
+    kpis:
+      - kpi_id: pluggy-diagnostics-green
+        name: Pluggy diagnostics gate
+        target: python -m pytest testing passes after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - Regression tests cover the repaired diagnostic.
+      - Review and delivery evidence stay anchored to the target checkout.
+    allowed_paths:
+      - src/**
+      - testing/**
+      - pyproject.toml
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the fix inside pluggy runtime/tests
+      - preserve bounded pytest evidence
+    post_run_quality:
+      primary_commands:
+        - python -m pytest testing
+      diagnostic_commands: []
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - repair
+      - regress
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 8
+      max_added_lines: 300
+    size_rationale: Medium pluggy repair may touch runtime and tests but should remain inside one diagnostic seam.
+    change_budget:
+      max_changed_files: 8
+      max_added_lines: 300
+  - mission_id: pluggy-typing-governance
+    title: Govern one typing and hook-contract change
+    brief: Exercise one broader typing or hook contract adjustment with strict audit and learning closure.
+    feature_size: medium
+    goals:
+      - Preserve type/hook contract lineage for one bounded governance change.
+      - Keep public-repo write-back disabled.
+    kpis:
+      - kpi_id: pluggy-governance-lineage
+        name: Pluggy governance lineage
+        target: review, delivery, audit, and learning artifacts preserve the same matrix cell
+        measurement: scenario coverage and artifact consistency checks
+    definition_of_done:
+      - python -m pytest testing passes.
+      - Governance and learning artifacts link to the same mission and target checkout.
+    allowed_paths:
+      - src/**
+      - testing/**
+      - pyproject.toml
+    forbidden_paths:
+      - docs/**
+      - .github/**
+      - scripts/**
+      - examples/**
+      - context/**
+    expected_evidence:
+      - verify-summary
+      - review-report
+      - delivery-manifest
+      - learning-loop-handoff
+    acceptance_checks:
+      - keep governance evidence tied to the target checkout
+      - avoid any upstream write-back
+    post_run_quality:
+      primary_commands:
+        - python -m pytest testing
+      diagnostic_commands: []
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - governance
+      - repair
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+      - open-code-primary
+    size_budget:
+      max_changed_files: 10
+      max_added_lines: 360
+    size_rationale: Governance changes may touch hook contract and tests, but should remain bounded to pluggy package behavior.
+    change_budget:
+      max_changed_files: 10
+      max_added_lines: 360

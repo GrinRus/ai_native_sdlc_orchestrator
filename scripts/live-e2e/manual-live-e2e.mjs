@@ -64,6 +64,7 @@ function runCli(rawArgs) {
         completed_steps: Array.isArray(state.completed_steps) ? state.completed_steps : [],
         decision: Object.keys(pendingDecision).length > 0 ? pendingDecision : null,
         required_public_action: requiredPublicAction,
+        aor_installation_proof_file: asNonEmptyString(runProfileOutput.aor_installation_proof_file) || null,
         live_e2e_controller_state_file: controllerStateFile || null,
         live_e2e_observation_report_file: asNonEmptyString(runProfileOutput.live_e2e_observation_report_file) || null,
         live_e2e_step_observation_files: Array.isArray(runProfileOutput.live_e2e_step_observation_files)

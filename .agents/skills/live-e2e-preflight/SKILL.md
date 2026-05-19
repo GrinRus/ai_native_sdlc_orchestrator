@@ -9,6 +9,7 @@ description: Use when you need to prepare, review, or update a live E2E rehearsa
 4. For full-journey acceptance, require both `target_catalog_id` and `feature_mission_id`; do not allow raw `repo_url` plus free-form objective text.
 5. Confirm the profile declares:
    - `live_e2e.flow_range_policy` as `delivery_default` or `full_lifecycle`;
+   - `live_e2e.installation_policy=source-install-required` unless a reviewed installed binary path is passed through `--aor-bin`;
    - `live_e2e.interaction_capability=public-control-plane`;
    - `live_e2e.frontend_capability=none` or `guided-web-smoke`;
    - `live_e2e.safety_policy=no-upstream-write`.

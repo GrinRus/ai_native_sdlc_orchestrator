@@ -29,7 +29,7 @@ import {
   resolveCatalogRoot,
   resolveFullJourneyProfile,
 } from "./lib/profile-catalog.mjs";
-import { executeFullJourneyFlow, executeInstalledUserFlow, resolveAorLaunch } from "./lib/flows.mjs";
+import { executeFullJourneyFlow, executeInstalledUserFlow, prepareAorInstallationProof } from "./lib/flows.mjs";
 import { resolveAuthProbeRequired } from "./lib/preflight.mjs";
 import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib/production-proof.mjs";
 import { buildLiveE2eStepPlan, createLiveE2eStepController } from "./lib/step-controller.mjs";
@@ -50,11 +50,11 @@ const LIVE_E2E_FULL_LIFECYCLE_STEPS = Object.freeze([
   "learning",
 ]);
 const LIVE_E2E_OBSERVATION_PRELUDE_STEPS = Object.freeze([
-  "bootstrap",
-  "project-init",
-  "intake-create",
-  "project-analyze",
-  "project-validate",
+  "install",
+  "target_checkout",
+  "project_bootstrap",
+  "intake",
+  "readiness",
 ]);
 /**
  * @param {unknown} value
@@ -329,12 +329,12 @@ function getIncludedStepsForPolicy(policy) {
 
 /**
  * @param {string | null} value
- * @returns {"auto" | "manual" | "harness"}
+ * @returns {"auto" | "manual" | "evaluator"}
  */
 function resolveLiveE2eControllerMode(value) {
   const normalized = asNonEmptyString(value) || "auto";
-  if (normalized === "auto" || normalized === "manual" || normalized === "harness") return normalized;
-  throw new UsageError(`Unsupported --controller-mode '${normalized}'. Expected auto, manual, or harness.`);
+  if (normalized === "auto" || normalized === "manual" || normalized === "evaluator") return normalized;
+  throw new UsageError(`Unsupported --controller-mode '${normalized}'. Expected auto, manual, or evaluator.`);
 }
 
 /**
@@ -397,10 +397,12 @@ function observationSeverity(status) {
  */
 function resolveStepDecisionAction(stepEntry) {
   if (stepEntry.requested_interaction) {
+    const requestedInteraction = asRecord(stepEntry.requested_interaction);
     const interactionStatus =
-      asNonEmptyString(asRecord(stepEntry.requested_interaction).interaction_status) ||
-      asNonEmptyString(asRecord(stepEntry.requested_interaction).status);
-    if (interactionStatus === "resumed") return "continue";
+      asNonEmptyString(requestedInteraction.interaction_status) || asNonEmptyString(requestedInteraction.status);
+    if (interactionStatus === "resumed") {
+      return asStringArray(requestedInteraction.answer_audit_refs).length > 0 ? "continue" : "block";
+    }
     if (interactionStatus === "blocked" || interactionStatus === "resume_failed") return "block";
     return "answer";
   }
@@ -421,7 +423,9 @@ function resolveInteractiveFinalStepVerdict(requestedInteraction, deterministicF
   if (!requestedInteraction) return toObservationStatus(deterministicFinalVerdict);
   const interactionStatus =
     asNonEmptyString(requestedInteraction.interaction_status) || asNonEmptyString(requestedInteraction.status);
-  if (interactionStatus === "resumed") return "resumed";
+  if (interactionStatus === "resumed") {
+    return asStringArray(requestedInteraction.answer_audit_refs).length > 0 ? "resumed" : "blocked";
+  }
   if (interactionStatus === "blocked" || interactionStatus === "resume_failed") return "blocked";
   return "interaction_required";
 }
@@ -436,13 +440,106 @@ function buildFrontendInteractions(artifacts) {
   if (!summaryFile && !htmlFile) return [];
   return [
     {
-      step_id: "guided-web-smoke",
+      step_id: "learning",
+      interaction_id: "guided-web-smoke",
       surface: "web",
       evidence_refs: uniqueStrings([summaryFile, htmlFile]),
       status: "pass",
       summary: "Guided frontend smoke interaction completed through the installed-user web surface.",
     },
   ];
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {Array<Record<string, unknown>>}
+ */
+function buildSetupJournal(artifacts) {
+  const installation = asRecord(artifacts.aor_installation);
+  const installationProofFile = asNonEmptyString(artifacts.aor_installation_proof_file);
+  const installationStatus = toObservationStatus(asNonEmptyString(installation.status) || (installationProofFile ? "pass" : "not_pass"));
+  const setupEntries = [
+    {
+      sequence: 1,
+      step_id: "install",
+      status: installationStatus,
+      public_surface: asNonEmptyString(installation.source_channel) || "aor installation proof",
+      evidence_refs: uniqueStrings([installationProofFile, ...asStringArray(installation.command_transcripts)]),
+      summary: installationStatus === "pass"
+        ? "AOR installation proof completed before public project flow execution."
+        : installationProofFile
+          ? "AOR installation proof failed before public project flow execution."
+          : "AOR installation proof is missing.",
+    },
+    {
+      sequence: 2,
+      step_id: "target_checkout",
+      status: asNonEmptyString(artifacts.target_checkout_root) ? "pass" : "not_pass",
+      public_surface: "git clone or local target checkout materialization",
+      evidence_refs: uniqueStrings([asNonEmptyString(artifacts.target_checkout_root), asNonEmptyString(artifacts.target_repo_ref)]),
+      summary: asNonEmptyString(artifacts.target_checkout_root)
+        ? "Target checkout was prepared for black-box execution."
+        : "Target checkout evidence is missing.",
+    },
+    {
+      sequence: 3,
+      step_id: "project_bootstrap",
+      status: asNonEmptyString(artifacts.generated_project_profile_file) ? "pass" : "not_pass",
+      public_surface: "aor project init or bundled profile materialization",
+      evidence_refs: uniqueStrings([
+        asNonEmptyString(artifacts.generated_project_profile_file),
+        asNonEmptyString(artifacts.bootstrap_artifact_packet_file),
+        asNonEmptyString(artifacts.onboarding_report_file),
+      ]),
+      summary: asNonEmptyString(artifacts.generated_project_profile_file)
+        ? "AOR project bootstrap evidence was materialized."
+        : "AOR project bootstrap evidence is missing.",
+    },
+    {
+      sequence: 4,
+      step_id: "intake",
+      status:
+        asNonEmptyString(artifacts.intake_artifact_packet_file) || asNonEmptyString(artifacts.feature_request_file)
+          ? "pass"
+          : "warn",
+      public_surface: "aor intake create or aor mission create",
+      evidence_refs: uniqueStrings([
+        asNonEmptyString(artifacts.feature_request_file),
+        asNonEmptyString(artifacts.intake_artifact_packet_file),
+        asNonEmptyString(artifacts.intake_artifact_packet_body_file),
+      ]),
+      summary:
+        asNonEmptyString(artifacts.intake_artifact_packet_file) || asNonEmptyString(artifacts.feature_request_file)
+          ? "Feature request or intake evidence was materialized."
+          : "Bounded rehearsal did not use a catalog intake packet.",
+    },
+    {
+      sequence: 5,
+      step_id: "readiness",
+      status:
+        asNonEmptyString(artifacts.validation_report_file) ||
+        asNonEmptyString(artifacts.baseline_verify_summary_file) ||
+        asNonEmptyString(artifacts.verify_summary_file)
+          ? "pass"
+          : "not_pass",
+      public_surface: "aor project validate and readiness verify",
+      evidence_refs: uniqueStrings([
+        asNonEmptyString(artifacts.validation_report_file),
+        asNonEmptyString(artifacts.baseline_verify_summary_file),
+        asNonEmptyString(artifacts.verify_summary_file),
+        asNonEmptyString(artifacts.execution_readiness_file),
+        asNonEmptyString(artifacts.live_adapter_preflight_file),
+      ]),
+      summary:
+        asNonEmptyString(artifacts.validation_report_file) ||
+        asNonEmptyString(artifacts.baseline_verify_summary_file) ||
+        asNonEmptyString(artifacts.verify_summary_file)
+          ? "Readiness validation evidence was materialized."
+          : "Readiness validation evidence is missing.",
+    },
+  ];
+
+  return setupEntries;
 }
 
 /**
@@ -469,11 +566,25 @@ function buildStepJournal(options) {
     const finalStepVerdict =
       observationSeverity(semanticStatus) > observationSeverity(deterministicStatus) ? semanticStatus : deterministicStatus;
     const requestedInteraction = asRecord(rawEntry.requested_interaction);
-    const normalizedRequestedInteraction = Object.keys(requestedInteraction).length > 0
+    const baseRequestedInteraction = Object.keys(requestedInteraction).length > 0
       ? requestedInteraction
       : command
         ? extractRequestedInteraction(command)
         : null;
+    const normalizedRequestedInteraction = baseRequestedInteraction
+      ? {
+          ...baseRequestedInteraction,
+          answer_audit_refs: uniqueStrings([
+            ...asStringArray(baseRequestedInteraction.answer_audit_refs),
+            ...asStringArray(asRecord(rawEntry.resume_result).evidence_refs),
+          ]),
+        }
+      : null;
+    const missingResumeAudit =
+      normalizedRequestedInteraction &&
+      (asNonEmptyString(normalizedRequestedInteraction.interaction_status) ||
+        asNonEmptyString(normalizedRequestedInteraction.status)) === "resumed" &&
+      asStringArray(normalizedRequestedInteraction.answer_audit_refs).length === 0;
     const frontendInteractionRefs =
       step === "learning"
         ? uniqueStrings([
@@ -547,7 +658,9 @@ function buildStepJournal(options) {
         ...asRecord(rawEntry.decision),
         action: normalizedRequestedInteraction ? "answer" : finalStepVerdict === "not_pass" ? "diagnose" : "continue",
         reason:
-          normalizedRequestedInteraction
+          missingResumeAudit
+            ? "Interaction resume is missing answer audit evidence."
+            : normalizedRequestedInteraction
             ? "Public step requested operator or agent input through the control plane."
             : finalStepVerdict === "pass"
               ? "Public step completed with required evidence."
@@ -664,6 +777,7 @@ function buildObservationReport(options) {
   const flowRangePolicy = resolveFlowRangePolicy(options.profile);
   const includedSteps = getIncludedStepsForPolicy(flowRangePolicy);
   const excludedSteps = flowRangePolicy === "full_lifecycle" ? [] : ["release", "learning"];
+  const setupJournal = buildSetupJournal(options.flowResult.artifacts);
   const stepJournal = buildStepJournal({
     profile: options.profile,
     flowResult: options.flowResult,
@@ -687,6 +801,9 @@ function buildObservationReport(options) {
     },
     flow_range_policy: flowRangePolicy,
     overall_status: asNonEmptyString(finalAnalysis.status) || "not_pass",
+    aor_installation: asRecord(options.flowResult.artifacts.aor_installation),
+    aor_installation_proof_file: asNonEmptyString(options.flowResult.artifacts.aor_installation_proof_file),
+    setup_journal: setupJournal,
     step_journal: stepJournal,
     final_analysis: finalAnalysis,
     interactive_decisions: buildInteractiveDecisions(stepJournal),
@@ -694,6 +811,7 @@ function buildObservationReport(options) {
     evidence_refs: uniqueStrings([
       options.summaryFile,
       asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file),
+      asNonEmptyString(options.flowResult.artifacts.aor_installation_proof_file),
       asNonEmptyString(options.flowResult.artifacts.delivery_manifest_file),
       asNonEmptyString(options.flowResult.artifacts.release_packet_file),
       asNonEmptyString(options.flowResult.artifacts.learning_loop_scorecard_file),
@@ -1046,6 +1164,12 @@ function writeProofRunnerArtifacts(options) {
     stage_results: options.flowResult.stageResults,
     command_results: options.flowResult.commandResults,
     artifacts: options.flowResult.artifacts,
+    aor_installation:
+      typeof options.flowResult.artifacts.aor_installation === "object" && options.flowResult.artifacts.aor_installation
+        ? options.flowResult.artifacts.aor_installation
+        : null,
+    aor_installation_proof_file: asNonEmptyString(options.flowResult.artifacts.aor_installation_proof_file) || null,
+    setup_journal: observationReport.setup_journal,
     guided_journey:
       typeof options.flowResult.artifacts.guided_journey_proof === "object" &&
       options.flowResult.artifacts.guided_journey_proof
@@ -1091,11 +1215,11 @@ function writeProofRunnerArtifacts(options) {
     scorecard_files: [scorecardFile],
     control_surfaces: {
       installed_user_proof_runner:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>] [--controller-mode auto|manual|harness]",
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
       manual_live_e2e:
         "node ./scripts/live-e2e/manual-live-e2e.mjs --project-ref <path> --profile <path> --run-id <id>",
-      harness_evaluator:
-        "node ./scripts/live-e2e/harness-evaluator.mjs --project-ref <path> --profile <path>",
+      step_evaluator:
+        "node ./scripts/live-e2e/step-evaluator.mjs --project-ref <path> --profile <path>",
       public_cli_sequence: options.flowResult.commandResults.map((result) => result.command_surface).filter(Boolean),
       aor_bin: options.aorLaunch.binaryRef,
       examples_root: options.examplesRoot,
@@ -1154,7 +1278,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>] [--controller-mode auto|manual|harness]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
         "",
         "Installed-user black-box proof runner with online step-controller evaluation.",
       ].join("\n"),
@@ -1222,10 +1346,25 @@ function runCli(rawArgs) {
   const runId =
     resolveOptionalStringFlag(flags["run-id"], "run-id") ??
     `${asNonEmptyString(profile.profile_id) || "live-e2e"}.run-${nowIso().replace(/[^0-9]/g, "").slice(-12)}`;
-  const aorLaunch = resolveAorLaunch({
-    hostRoot,
-    aorBinOverride: aorBin,
-  });
+  let aorInstallation;
+  let installationFailure = null;
+  try {
+    aorInstallation = prepareAorInstallationProof({
+      hostRoot,
+      reportsRoot: layout.reportsRoot,
+      runId,
+      profile,
+      aorBinOverride: aorBin,
+    });
+  } catch (error) {
+    const failedInstallation = asRecord(asRecord(error).aorInstallation);
+    if (Object.keys(failedInstallation).length === 0) {
+      throw error;
+    }
+    aorInstallation = failedInstallation;
+    installationFailure = error;
+  }
+  const aorLaunch = aorInstallation.launch;
   const stepController = createLiveE2eStepController({
     reportsRoot: layout.reportsRoot,
     runId,
@@ -1243,60 +1382,20 @@ function runCli(rawArgs) {
    * }} */
   let flowResult;
 
-  try {
-    flowResult = fullJourneyResolution
-      ? executeFullJourneyFlow({
-          hostRoot,
-          layout,
-          runId,
-          profilePath,
-          profile,
-          aorLaunch,
-          examplesRoot: examplesRoot ?? path.join(hostRoot, "examples"),
-          examplesRootOverride: explicitExamplesRoot && examplesRoot ? examplesRoot : null,
-          catalogTargetPath: fullJourneyResolution.catalogTargetPath,
-          catalogEntry: fullJourneyResolution.catalogEntry,
-          mission: fullJourneyResolution.mission,
-          scenarioPolicyPath: fullJourneyResolution.scenarioPolicyPath,
-          scenarioPolicy: fullJourneyResolution.scenarioPolicy,
-          providerVariantPath: fullJourneyResolution.providerVariantPath,
-          providerVariant: fullJourneyResolution.providerVariant,
-          featureSize: fullJourneyResolution.featureSize,
-          matrixCell: fullJourneyResolution.matrixCell,
-          coverageFollowUp: fullJourneyResolution.coverageFollowUp,
-          coverageTier: fullJourneyResolution.coverageTier,
-          runnerAuthMode,
-          runtimeAgentPermissionMode,
-          authProbeRequired: resolveAuthProbeRequired(profile),
-          stepController,
-        })
-      : executeInstalledUserFlow({
-          hostRoot,
-          layout,
-          runId,
-          profilePath,
-          profile,
-          aorLaunch,
-          runnerAuthMode,
-          runtimeAgentPermissionMode,
-          stepController,
-          examplesRoot:
-            examplesRoot ??
-            (() => {
-              throw new UsageError("Bounded rehearsal requires bootstrap assets under '--examples-root' or '<project-ref>/examples'.");
-            })(),
-        });
-  } catch (error) {
+  if (installationFailure) {
     flowResult = {
       startedAt: nowIso(),
       finishedAt: nowIso(),
       status: "fail",
       stageResults: [
         {
-          stage: "bootstrap",
+          stage: "install",
           status: "fail",
-          evidence_refs: [],
-          summary: error instanceof Error ? error.message : String(error),
+          evidence_refs: uniqueStrings([
+            asNonEmptyString(aorInstallation.proofFile),
+            ...asStringArray(asRecord(aorInstallation.proof).command_transcripts),
+          ]),
+          summary: installationFailure instanceof Error ? installationFailure.message : String(installationFailure),
         },
       ],
       commandResults: [],
@@ -1305,10 +1404,86 @@ function runCli(rawArgs) {
         host_reports_root: layout.reportsRoot,
         live_e2e_controller_state_file: stepController.stateFile,
         live_e2e_step_journal_entries: stepController.getStepJournal(),
+        aor_installation: asRecord(aorInstallation.proof),
+        aor_installation_proof_file: asNonEmptyString(aorInstallation.proofFile),
+        live_e2e_setup_journal_entries: [asRecord(aorInstallation.setupEntry)],
         runtime_agent_permission_mode: runtimeAgentPermissionMode,
       },
     };
+  } else {
+    try {
+      flowResult = fullJourneyResolution
+        ? executeFullJourneyFlow({
+            hostRoot,
+            layout,
+            runId,
+            profilePath,
+            profile,
+            aorLaunch,
+            examplesRoot: examplesRoot ?? path.join(hostRoot, "examples"),
+            examplesRootOverride: explicitExamplesRoot && examplesRoot ? examplesRoot : null,
+            catalogTargetPath: fullJourneyResolution.catalogTargetPath,
+            catalogEntry: fullJourneyResolution.catalogEntry,
+            mission: fullJourneyResolution.mission,
+            scenarioPolicyPath: fullJourneyResolution.scenarioPolicyPath,
+            scenarioPolicy: fullJourneyResolution.scenarioPolicy,
+            providerVariantPath: fullJourneyResolution.providerVariantPath,
+            providerVariant: fullJourneyResolution.providerVariant,
+            featureSize: fullJourneyResolution.featureSize,
+            matrixCell: fullJourneyResolution.matrixCell,
+            coverageFollowUp: fullJourneyResolution.coverageFollowUp,
+            coverageTier: fullJourneyResolution.coverageTier,
+            runnerAuthMode,
+            runtimeAgentPermissionMode,
+            authProbeRequired: resolveAuthProbeRequired(profile),
+            stepController,
+          })
+        : executeInstalledUserFlow({
+            hostRoot,
+            layout,
+            runId,
+            profilePath,
+            profile,
+            aorLaunch,
+            runnerAuthMode,
+            runtimeAgentPermissionMode,
+            stepController,
+            examplesRoot:
+              examplesRoot ??
+              (() => {
+                throw new UsageError("Bounded rehearsal requires bootstrap assets under '--examples-root' or '<project-ref>/examples'.");
+              })(),
+          });
+    } catch (error) {
+      flowResult = {
+        startedAt: nowIso(),
+        finishedAt: nowIso(),
+        status: "fail",
+        stageResults: [
+          {
+            stage: "bootstrap",
+            status: "fail",
+            evidence_refs: [],
+            summary: error instanceof Error ? error.message : String(error),
+          },
+        ],
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: layout.runtimeRoot,
+          host_reports_root: layout.reportsRoot,
+          live_e2e_controller_state_file: stepController.stateFile,
+          live_e2e_step_journal_entries: stepController.getStepJournal(),
+          aor_installation: aorInstallation.proof,
+          aor_installation_proof_file: aorInstallation.proofFile,
+          live_e2e_setup_journal_entries: [aorInstallation.setupEntry],
+          runtime_agent_permission_mode: runtimeAgentPermissionMode,
+        },
+      };
+    }
   }
+  flowResult.artifacts.aor_installation = aorInstallation.proof;
+  flowResult.artifacts.aor_installation_proof_file = aorInstallation.proofFile;
+  flowResult.artifacts.live_e2e_setup_journal_entries = [aorInstallation.setupEntry];
   flowResult.artifacts.live_e2e_controller_state_file =
     asNonEmptyString(flowResult.artifacts.live_e2e_controller_state_file) || stepController.stateFile;
   if (!Array.isArray(flowResult.artifacts.live_e2e_step_journal_entries)) {
@@ -1339,6 +1514,7 @@ function runCli(rawArgs) {
         coverage_status: written.summary.coverage_status,
         live_e2e_run_summary_file: written.summaryFile,
         live_e2e_observation_report_file: written.summary.live_e2e_observation_report_file,
+        aor_installation_proof_file: written.summary.aor_installation_proof_file,
         live_e2e_controller_state_file: written.summary.live_e2e_controller_state_file,
         live_e2e_step_observation_files: written.summary.live_e2e_step_observation_files,
         agent_artifact_review_request_file: written.summary.agent_artifact_review_request_file,

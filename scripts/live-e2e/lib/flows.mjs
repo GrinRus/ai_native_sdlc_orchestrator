@@ -150,6 +150,167 @@ export function resolveAorLaunch(options) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function shellSingleQuote(value) {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+/**
+ * @param {{
+ *   cwd: string,
+ *   command: string,
+ *   args: string[],
+ *   transcriptFile: string,
+ * }} options
+ */
+function runInstallProofCommand(options) {
+  const startedAt = nowIso();
+  const run = spawnSync(options.command, options.args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+  });
+  const transcript = {
+    command: options.command,
+    args: options.args,
+    cwd: options.cwd,
+    status: run.status === 0 ? "pass" : "fail",
+    exit_code: run.status ?? -1,
+    stdout: run.stdout ?? "",
+    stderr: run.stderr ?? (run.error instanceof Error ? run.error.message : ""),
+    started_at: startedAt,
+    finished_at: nowIso(),
+  };
+  writeJson(options.transcriptFile, transcript);
+  return transcript;
+}
+
+/**
+ * @param {{
+ *   hostRoot: string,
+ *   reportsRoot: string,
+ *   runId: string,
+ *   profile: Record<string, unknown>,
+ *   aorBinOverride: string | null,
+ * }}
+ */
+export function prepareAorInstallationProof(options) {
+  const policy = asRecord(options.profile.live_e2e);
+  const declaredPolicy = asNonEmptyString(policy.installation_policy);
+  const effectivePolicy = options.aorBinOverride ? "provided-binary-required" : declaredPolicy || "source-install-required";
+  if (!["source-install-required", "provided-binary-required"].includes(effectivePolicy)) {
+    throw new Error(
+      `Unsupported live_e2e.installation_policy '${declaredPolicy}'. Expected source-install-required or provided-binary-required.`,
+    );
+  }
+  if (effectivePolicy === "provided-binary-required" && !options.aorBinOverride) {
+    throw new Error("live_e2e.installation_policy=provided-binary-required requires --aor-bin.");
+  }
+
+  const normalizedRunId = normalizeId(options.runId);
+  const installRoot = path.join(options.reportsRoot, `live-e2e-aor-install-${normalizedRunId}`);
+  fs.mkdirSync(installRoot, { recursive: true });
+  const commandTranscripts = [];
+  const commandSummaries = [];
+  const addCommand = (label, command, args) => {
+    const transcriptFile = path.join(installRoot, `${String(commandTranscripts.length + 1).padStart(2, "0")}-${label}.json`);
+    const transcript = runInstallProofCommand({
+      cwd: options.hostRoot,
+      command,
+      args,
+      transcriptFile,
+    });
+    commandTranscripts.push(transcriptFile);
+    commandSummaries.push({
+      label,
+      command,
+      args,
+      status: asNonEmptyString(transcript.status),
+      exit_code: typeof transcript.exit_code === "number" ? transcript.exit_code : null,
+      started_at: asNonEmptyString(transcript.started_at) || null,
+      finished_at: asNonEmptyString(transcript.finished_at) || null,
+      transcript_file: transcriptFile,
+    });
+    return transcript;
+  };
+
+  /** @type {ReturnType<typeof resolveAorLaunch>} */
+  let launch;
+  let launcherRef = null;
+
+  if (effectivePolicy === "source-install-required") {
+    addCommand("corepack-enable", "corepack", ["enable"]);
+    addCommand("pnpm-install-frozen-lockfile", "pnpm", ["install", "--frozen-lockfile"]);
+    addCommand("pnpm-aor-help", "pnpm", ["aor", "--help"]);
+    const launcherScript = path.join(installRoot, "aor-session-launcher.sh");
+    fs.writeFileSync(
+      launcherScript,
+      [
+        "#!/bin/sh",
+        `exec ${shellSingleQuote(process.execPath)} ${shellSingleQuote(path.join(options.hostRoot, "apps/cli/bin/aor.mjs"))} "$@"`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    fs.chmodSync(launcherScript, 0o755);
+    launcherRef = launcherScript;
+    launch = {
+      command: launcherScript,
+      argsPrefix: [],
+      binaryRef: launcherScript,
+    };
+  } else {
+    launch = resolveAorLaunch({
+      hostRoot: options.hostRoot,
+      aorBinOverride: options.aorBinOverride,
+    });
+    addCommand("provided-aor-help", launch.command, [...launch.argsPrefix, "--help"]);
+    launcherRef = launch.binaryRef;
+  }
+
+  const failedCommands = commandSummaries.filter((entry) => asNonEmptyString(entry.status) === "fail");
+  const proof = {
+    status: failedCommands.length === 0 ? "pass" : "fail",
+    declared_policy: declaredPolicy || null,
+    effective_policy: effectivePolicy,
+    source_channel: effectivePolicy === "source-install-required" ? "source-only-alpha" : "provided-binary",
+    launcher_ref: launcherRef,
+    command_transcripts: commandTranscripts,
+    commands: commandSummaries,
+    started_at: asNonEmptyString(asRecord(commandSummaries[0]).started_at) || null,
+    finished_at: nowIso(),
+  };
+  const proofFile = path.join(options.reportsRoot, `live-e2e-aor-installation-proof-${normalizedRunId}.json`);
+  writeJson(proofFile, proof);
+  const setupEntry = {
+    sequence: 1,
+    step_id: "install",
+    status: proof.status,
+    public_surface: effectivePolicy === "source-install-required" ? "pnpm source install" : "provided aor binary",
+    evidence_refs: uniqueStrings([proofFile, ...commandTranscripts]),
+    summary:
+      proof.status !== "pass"
+        ? "AOR installation proof failed before live E2E execution."
+        : effectivePolicy === "source-install-required"
+        ? "AOR source-only install channel was verified before live E2E execution."
+        : "Provided AOR binary was verified before live E2E execution.",
+  };
+  const installationResult = {
+    launch,
+    proof,
+    proofFile,
+    setupEntry,
+  };
+  if (proof.status !== "pass") {
+    const failure = new Error(`AOR installation proof failed; inspect ${proofFile}.`);
+    failure.aorInstallation = installationResult;
+    throw failure;
+  }
+  return installationResult;
+}
+
+/**
  * @param {{
  *   launch: ReturnType<typeof resolveAorLaunch>,
  *   cwd: string,
@@ -257,6 +418,53 @@ function buildCommandDiagnostic(result) {
     recommendation: result.ok ? "continue" : "inspect transcript and command stderr",
     interactive_continuation: interactiveContinuation,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {Record<string, unknown> | null} requestedInteraction
+ * @returns {{ answer: string, reason: string | null } | null}
+ */
+function resolveDeterministicInteractionAnswer(profile, requestedInteraction) {
+  if (!requestedInteraction) return null;
+  const policy = asRecord(profile.interaction_answer_policy);
+  if (asNonEmptyString(policy.mode) !== "deterministic") return null;
+  const interactionId = asNonEmptyString(requestedInteraction.interaction_id);
+  const answers = Array.isArray(policy.answers) ? policy.answers.map((entry) => asRecord(entry)) : [];
+  const matched = answers.find((entry) => asNonEmptyString(entry.interaction_id) === interactionId) ?? {};
+  const answer = asNonEmptyString(matched.answer) || asNonEmptyString(policy.default_answer);
+  if (!answer) return null;
+  return {
+    answer,
+    reason:
+      asNonEmptyString(matched.reason) ||
+      asNonEmptyString(policy.reason) ||
+      "Live E2E deterministic interaction answer policy.",
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} diagnostic
+ * @param {ReturnType<typeof runAorCommand>} answerResult
+ */
+function updateDiagnosticWithInteractionAnswer(diagnostic, answerResult) {
+  const payload = asRecord(answerResult.payload);
+  const interactionAnswer = Object.keys(asRecord(payload.interaction_answer)).length > 0
+    ? asRecord(payload.interaction_answer)
+    : asRecord(payload.interactionAnswer);
+  const continuation = asRecord(diagnostic.interactive_continuation);
+  if (Object.keys(continuation).length === 0 || Object.keys(interactionAnswer).length === 0) return;
+  const answerAuditRef = asNonEmptyString(interactionAnswer.answer_audit_ref);
+  continuation.status = asNonEmptyString(interactionAnswer.interaction_status) || asNonEmptyString(continuation.status);
+  continuation.interaction_status = continuation.status;
+  continuation.answer_audit_refs = uniqueStrings([...asStringArray(continuation.answer_audit_refs), answerAuditRef]);
+  continuation.continuation = {
+    ...asRecord(continuation.continuation),
+    next_action: asNonEmptyString(interactionAnswer.run_control_transition) || "continue_run",
+  };
+  diagnostic.interactive_continuation = continuation;
+  diagnostic.artifact_refs = uniqueStrings([...asStringArray(diagnostic.artifact_refs), answerAuditRef, answerResult.transcriptFile]);
+  diagnostic.recommendation = continuation.status === "resumed" ? "continue" : diagnostic.recommendation;
 }
 
 /**
@@ -1553,6 +1761,47 @@ export function executeInstalledUserFlow(options) {
         diagnostic.recommendation = "inspect payload quality fields";
       }
       commandResults.push(diagnostic);
+      const requestedInteraction = asRecord(diagnostic.interactive_continuation);
+      const deterministicAnswer =
+        options.stepController?.mode === "manual"
+          ? null
+          : resolveDeterministicInteractionAnswer(options.profile, requestedInteraction);
+      if (result.ok && deterministicAnswer) {
+        const interactionId = asNonEmptyString(requestedInteraction.interaction_id);
+        if (!interactionId) {
+          throw new Error(`Public CLI command '${label}' requested interaction without interaction_id.`);
+        }
+        const answerResult = runAorCommand({
+          launch: options.aorLaunch,
+          cwd: targetCheckout.targetCheckoutRoot,
+          args: [
+            "run",
+            "answer",
+            "--project-ref",
+            ".",
+            "--run-id",
+            options.runId,
+            "--interaction-id",
+            interactionId,
+            "--answer",
+            deterministicAnswer.answer,
+            "--reason",
+            deterministicAnswer.reason ?? "Live E2E deterministic interaction answer policy.",
+          ],
+          env,
+          transcriptsRoot,
+          label: `${label}-interaction-answer`,
+          index: commandIndex,
+        });
+        commandIndex += 1;
+        const answerDiagnostic = buildCommandDiagnostic(answerResult);
+        commandResults.push(answerDiagnostic);
+        if (!answerResult.ok) {
+          const stderr = answerResult.stderr.trim() || answerResult.stdout.trim() || "interaction answer command failed";
+          throw new Error(`Public CLI interaction answer for '${label}' failed: ${stderr}`);
+        }
+        updateDiagnosticWithInteractionAnswer(diagnostic, answerResult);
+      }
       if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -1867,7 +2116,90 @@ export function executeInstalledUserFlow(options) {
         ? "Delivery evidence materialized with observed quality findings."
         : "Delivery prepare materialized delivery evidence.",
     );
-    markStage(stageMap, "release", "skipped", [], "Delivery-default flow range excludes release.");
+    if (asNonEmptyString(asRecord(options.profile.live_e2e).flow_range_policy) === "full_lifecycle") {
+      const releasePrepare = runCommand("release-prepare", [
+        "release",
+        "prepare",
+        ...commandBaseArgs,
+        "--run-id",
+        options.runId,
+        "--step-class",
+        "implement",
+        "--mode",
+        getPreferredDeliveryMode(options.profile),
+        ...(artifacts.approved_handoff_packet_file
+          ? ["--approved-handoff-ref", /** @type {string} */ (artifacts.approved_handoff_packet_file)]
+          : []),
+        ...(promotionEvidenceRefs.length > 0 ? ["--promotion-evidence-refs", uniqueStrings(promotionEvidenceRefs).join(",")] : []),
+      ], { allowNonZeroWithPayload: true });
+      artifacts.release_delivery_manifest_file = getStringField(releasePrepare.payload, "delivery_manifest_file");
+      artifacts.release_delivery_transcript_file = getStringField(releasePrepare.payload, "delivery_transcript_file");
+      artifacts.release_packet_file = getStringField(releasePrepare.payload, "release_packet_file");
+      artifacts.release_packet_status = getStringField(releasePrepare.payload, "release_packet_status");
+      artifacts.release_prepare_transcript_file = releasePrepare.transcriptFile;
+      artifacts.release_status = artifacts.release_packet_file ? "pass" : "fail";
+      markStage(
+        stageMap,
+        "release",
+        artifacts.release_status,
+        uniqueStrings([releasePrepare.transcriptFile, ...collectStringRefs(releasePrepare.payload)]),
+        artifacts.release_packet_file
+          ? "Release prepare materialized release packet evidence for the bounded full-lifecycle profile."
+          : "Release prepare did not materialize release packet evidence.",
+      );
+      if (!artifacts.release_packet_file) {
+        throw new Error("Release prepare did not materialize release packet evidence.");
+      }
+
+      const auditRuns = runCommand("audit-runs", [
+        "audit",
+        "runs",
+        "--project-ref",
+        ".",
+        "--run-id",
+        options.runId,
+      ]);
+      artifacts.run_audit_file = auditRuns.transcriptFile;
+
+      const learningHandoff = runCommand("learning-handoff", [
+        "learning",
+        "handoff",
+        "--project-ref",
+        ".",
+        "--run-id",
+        options.runId,
+      ]);
+      artifacts.learning_loop_scorecard_file = getStringField(learningHandoff.payload, "learning_loop_scorecard_file");
+      artifacts.learning_loop_handoff_file = getStringField(learningHandoff.payload, "learning_loop_handoff_file");
+      artifacts.latest_runtime_harness_report_file =
+        getStringField(learningHandoff.payload, "runtime_harness_report_file") ||
+        artifacts.latest_runtime_harness_report_file ||
+        artifacts.runtime_harness_report_file;
+      artifacts.latest_runtime_harness_decision =
+        getStringField(learningHandoff.payload, "runtime_harness_overall_decision") ||
+        artifacts.latest_runtime_harness_decision ||
+        artifacts.runtime_harness_overall_decision;
+      if (!artifacts.learning_loop_scorecard_file || !artifacts.learning_loop_handoff_file) {
+        markStage(
+          stageMap,
+          "learning",
+          "fail",
+          uniqueStrings([learningHandoff.transcriptFile, ...collectStringRefs(learningHandoff.payload)]),
+          "Learning handoff did not materialize the required public closure artifacts.",
+        );
+        throw new Error("Learning handoff did not materialize the required public closure artifacts.");
+      }
+      markStage(
+        stageMap,
+        "learning",
+        "pass",
+        uniqueStrings([auditRuns.transcriptFile, learningHandoff.transcriptFile, ...collectStringRefs(learningHandoff.payload)]),
+        "Public audit and learning-loop closure artifacts materialized for the bounded full-lifecycle profile.",
+      );
+    } else {
+      artifacts.release_status = "skipped";
+      markStage(stageMap, "release", "skipped", [], "Delivery-default flow range excludes release.");
+    }
 
     return {
       startedAt,
@@ -2086,6 +2418,49 @@ export function executeFullJourneyFlow(options) {
         diagnostic.recommendation = "inspect payload quality fields";
       }
       commandResults.push(diagnostic);
+      const requestedInteraction = asRecord(diagnostic.interactive_continuation);
+      const deterministicAnswer =
+        options.stepController?.mode === "manual"
+          ? null
+          : resolveDeterministicInteractionAnswer(options.profile, requestedInteraction);
+      if (result.ok && deterministicAnswer) {
+        const interactionId = asNonEmptyString(requestedInteraction.interaction_id);
+        if (!interactionId) {
+          throw new Error(`Public CLI command '${label}' requested interaction without interaction_id.`);
+        }
+        const answerResult = runAorCommand({
+          launch: options.aorLaunch,
+          cwd: targetCheckout.targetCheckoutRoot,
+          args: [
+            "run",
+            "answer",
+            "--project-ref",
+            ".",
+            "--runtime-root",
+            ".aor",
+            "--run-id",
+            options.runId,
+            "--interaction-id",
+            interactionId,
+            "--answer",
+            deterministicAnswer.answer,
+            "--reason",
+            deterministicAnswer.reason ?? "Live E2E deterministic interaction answer policy.",
+          ],
+          env,
+          transcriptsRoot,
+          label: `${label}-interaction-answer`,
+          index: commandIndex,
+        });
+        commandIndex += 1;
+        const answerDiagnostic = buildCommandDiagnostic(answerResult);
+        commandResults.push(answerDiagnostic);
+        if (!answerResult.ok) {
+          const stderr = answerResult.stderr.trim() || answerResult.stdout.trim() || "interaction answer command failed";
+          throw new Error(`Public CLI interaction answer for '${label}' failed: ${stderr}`);
+        }
+        updateDiagnosticWithInteractionAnswer(diagnostic, answerResult);
+      }
       if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -3149,6 +3524,28 @@ export function executeFullJourneyFlow(options) {
       };
       writeJson(artifacts.learning_loop_scorecard_file, learningScorecard);
     }
+    if (guidedJourneyEnabled) {
+      const guidedNextAfterLearning = runCommand("guided-next-after-learning", [
+        "next",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--json",
+      ]);
+      artifacts.next_action_report_file = getStringField(guidedNextAfterLearning.payload, "next_action_report_file");
+      artifacts.guided_next_after_learning_transcript_file = guidedNextAfterLearning.transcriptFile;
+
+      const webSmoke = runGuidedWebSmoke({
+        hostRoot: options.hostRoot,
+        targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+        runId: options.runId,
+        reportsRoot: options.layout.reportsRoot,
+      });
+      artifacts.guided_web_smoke_summary_file = webSmoke.summaryFile;
+      artifacts.guided_web_smoke_html_file = webSmoke.htmlFile;
+      artifacts.guided_web_smoke = webSmoke.summary;
+    }
     markStage(
       stageMap,
       "learning",
@@ -3172,27 +3569,6 @@ export function executeFullJourneyFlow(options) {
     }
 
     if (guidedJourneyEnabled) {
-      const guidedNextAfterLearning = runCommand("guided-next-after-learning", [
-        "next",
-        "--project-ref",
-        ".",
-        "--runtime-root",
-        ".aor",
-        "--json",
-      ]);
-      artifacts.next_action_report_file = getStringField(guidedNextAfterLearning.payload, "next_action_report_file");
-      artifacts.guided_next_after_learning_transcript_file = guidedNextAfterLearning.transcriptFile;
-
-      const webSmoke = runGuidedWebSmoke({
-        hostRoot: options.hostRoot,
-        targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
-        runId: options.runId,
-        reportsRoot: options.layout.reportsRoot,
-      });
-      artifacts.guided_web_smoke_summary_file = webSmoke.summaryFile;
-      artifacts.guided_web_smoke_html_file = webSmoke.htmlFile;
-      artifacts.guided_web_smoke = webSmoke.summary;
-
       const targetHeadAfter = runGitOutput({
         cwd: targetCheckout.targetCheckoutRoot,
         args: ["rev-parse", "HEAD"],

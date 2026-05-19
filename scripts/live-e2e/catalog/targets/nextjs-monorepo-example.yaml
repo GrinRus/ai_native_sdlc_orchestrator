@@ -34,6 +34,12 @@ required_matrix_cells:
     feature_mission_id: nextjs-shared-package-release
     provider_variant_id: openai-primary
     coverage_tier: required
+  - cell_id: nextjs.regress.small.openai
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: nextjs-shared-util-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
 provider_comparison_pairs:
   - pair_id: nextjs.release.large
     scenario_family: release

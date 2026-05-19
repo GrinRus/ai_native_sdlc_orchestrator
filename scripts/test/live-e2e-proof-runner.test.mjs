@@ -10,6 +10,8 @@ import {
   parse as parseYaml,
   stringify as stringifyYaml,
 } from "../../packages/contracts/node_modules/yaml/dist/index.js";
+import { validateContractDocument } from "../../packages/contracts/src/index.mjs";
+import { prepareAorInstallationProof } from "../live-e2e/lib/flows.mjs";
 import { validateGuidedJourneyProof } from "../live-e2e/lib/guided-proof.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -261,6 +263,159 @@ function createFakeClaudeBinary(options) {
     claudePath,
   };
 }
+
+/**
+ * @param {{ tempRoot: string }} options
+ */
+function createFakeSourceInstallTools(options) {
+  const binRoot = path.join(options.tempRoot, "fake-source-install-bin");
+  fs.mkdirSync(binRoot, { recursive: true });
+  const corepackPath = path.join(binRoot, "corepack");
+  fs.writeFileSync(
+    corepackPath,
+    [
+      "#!/usr/bin/env node",
+      "const args = process.argv.slice(2);",
+      "if (args.length === 1 && args[0] === 'enable') {",
+      "  process.stdout.write('corepack enable ok\\n');",
+      "  process.exit(0);",
+      "}",
+      "process.stderr.write(`unsupported fake corepack invocation: ${args.join(' ')}\\n`);",
+      "process.exit(1);",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  fs.chmodSync(corepackPath, 0o755);
+
+  const pnpmPath = path.join(binRoot, "pnpm");
+  fs.writeFileSync(
+    pnpmPath,
+    [
+      "#!/usr/bin/env node",
+      "const { spawnSync } = require('node:child_process');",
+      "const args = process.argv.slice(2);",
+      "if (args.length === 2 && args[0] === 'install' && args[1] === '--frozen-lockfile') {",
+      "  process.stdout.write('pnpm install --frozen-lockfile ok\\n');",
+      "  process.exit(0);",
+      "}",
+      "if (args.length === 2 && args[0] === 'aor' && args[1] === '--help') {",
+      `  const run = spawnSync(process.execPath, [${JSON.stringify(
+        path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      )}, '--help'], { cwd: ${JSON.stringify(workspaceRoot)}, encoding: 'utf8' });`,
+      "  process.stdout.write(run.stdout || '');",
+      "  process.stderr.write(run.stderr || '');",
+      "  process.exit(run.status ?? 1);",
+      "}",
+      "process.stderr.write(`unsupported fake pnpm invocation: ${args.join(' ')}\\n`);",
+      "process.exit(1);",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  fs.chmodSync(pnpmPath, 0o755);
+  return {
+    binRoot,
+    corepackPath,
+    pnpmPath,
+  };
+}
+
+test("AOR installation proof writes failure artifact before failing provided binary proof", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const fakeAorPath = path.join(tempRoot, "fake-aor");
+    fs.writeFileSync(
+      fakeAorPath,
+      [
+        "#!/usr/bin/env node",
+        "process.stderr.write('fake aor help failed\\n');",
+        "process.exit(1);",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    fs.chmodSync(fakeAorPath, 0o755);
+
+    assert.throws(
+      () =>
+        prepareAorInstallationProof({
+          hostRoot: workspaceRoot,
+          reportsRoot,
+          runId: "install-proof-fails",
+          profile: {
+            live_e2e: {
+              installation_policy: "provided-binary-required",
+            },
+          },
+          aorBinOverride: fakeAorPath,
+        }),
+      /AOR installation proof failed; inspect/,
+    );
+
+    const proofFile = path.join(reportsRoot, "live-e2e-aor-installation-proof-install-proof-fails.json");
+    assert.equal(fs.existsSync(proofFile), true, "expected failing installation proof to write summary artifact");
+    const proof = JSON.parse(fs.readFileSync(proofFile, "utf8"));
+    assert.equal(proof.status, "fail");
+    assert.equal(proof.effective_policy, "provided-binary-required");
+    assert.equal(proof.commands[0].label, "provided-aor-help");
+    assert.equal(proof.commands[0].status, "fail");
+    assert.equal(fs.existsSync(proof.commands[0].transcript_file), true);
+  });
+});
+
+test("installed-user proof runner emits structured report when installation proof fails", () => {
+  withTempRoot((tempRoot) => {
+    const fakeAorPath = path.join(tempRoot, "fake-aor");
+    fs.writeFileSync(
+      fakeAorPath,
+      [
+        "#!/usr/bin/env node",
+        "process.stderr.write('fake aor help failed\\n');",
+        "process.exit(1);",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    fs.chmodSync(fakeAorPath, 0o755);
+
+    const run = spawnProofRunnerProcess([
+      proofRunnerScriptPath,
+      "--project-ref",
+      workspaceRoot,
+      "--runtime-root",
+      path.join(tempRoot, "runtime"),
+      "--profile",
+      path.join(workspaceRoot, "scripts/live-e2e/profiles/regress-short.yaml"),
+      "--run-id",
+      "install-failure-structured",
+      "--examples-root",
+      path.join(workspaceRoot, "examples"),
+      "--aor-bin",
+      fakeAorPath,
+    ]);
+
+    assert.equal(run.status, 0, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
+    const output = JSON.parse(run.stdout);
+    assert.equal(output.live_e2e_run_status, "not_pass");
+    assert.equal(fs.existsSync(output.aor_installation_proof_file), true);
+    assert.equal(fs.existsSync(output.live_e2e_observation_report_file), true);
+
+    const report = JSON.parse(fs.readFileSync(output.live_e2e_observation_report_file, "utf8"));
+    const validation = validateContractDocument({
+      family: "live-e2e-observation-report",
+      document: report,
+      source: "test://live-e2e-install-failure-structured",
+    });
+    assert.equal(validation.ok, true, validation.issues.map((issue) => issue.message).join("; "));
+    assert.equal(report.overall_status, "not_pass");
+    assert.equal(report.step_journal.length, 0);
+    assert.equal(report.setup_journal[0].step_id, "install");
+    assert.equal(report.setup_journal[0].status, "not_pass");
+    assert.match(report.setup_journal[0].summary, /failed before public project flow execution/);
+  });
+});
 
 /**
  * @param {{
@@ -830,6 +985,7 @@ function writeLocalFullJourneyProfile(options) {
       duration_class: "short",
       live_e2e: {
         flow_range_policy: options.guidedJourney || options.scenarioFamily === "release" ? "full_lifecycle" : "delivery_default",
+        installation_policy: "source-install-required",
         interaction_capability: "public-control-plane",
         frontend_capability: options.guidedJourney ? "guided-web-smoke" : "none",
         safety_policy: "no-upstream-write",
@@ -954,9 +1110,14 @@ function runProofRunner(options) {
     );
     args.push("--agent-judge-file", judgeFile);
   }
+  const fakeSourceInstallTools = createFakeSourceInstallTools({
+    tempRoot: path.dirname(options.runtimeRoot),
+  });
+  const extraEnv = { ...(options.extraEnv ?? {}) };
+  extraEnv.PATH = [fakeSourceInstallTools.binRoot, extraEnv.PATH ?? process.env.PATH].filter(Boolean).join(path.delimiter);
   const run = spawnProofRunnerProcess(args, {
     timeoutMs: options.timeoutMs,
-    extraEnv: options.extraEnv,
+    extraEnv,
   });
   assert.equal(run.status, 0, formatProofRunnerFailure(run, proofRunnerTimeoutMs(run)));
   return JSON.parse(run.stdout);
@@ -1153,6 +1314,8 @@ test("installed-user proof runner records deterministic semantic analysis withou
     );
     assert.equal(Object.hasOwn(observation, "artifact_quality_matrix"), false);
     assert.equal(Object.hasOwn(observation, "step_matrix"), false);
+    assert.equal(Object.hasOwn(observation, "verdict_matrix"), false);
+    assert.equal(Object.hasOwn(observation, "continuation_decisions"), false);
     assert.equal(fs.existsSync(summary.agent_artifact_review_request_file), true);
   });
 });

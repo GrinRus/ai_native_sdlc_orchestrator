@@ -690,6 +690,23 @@ test("live E2E observation report loads and enforces status scale", () => {
   );
   assert.ok(enumIssue, "expected enum_value_invalid for overall_status");
 
+  const invalidFlowRangePolicyCandidate = structuredClone(loaded.document);
+  invalidFlowRangePolicyCandidate.flow_range_policy = "report_first";
+
+  const invalidFlowRangePolicyValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: invalidFlowRangePolicyCandidate,
+    source: "test://live-e2e-observation-invalid-flow-range-policy",
+  });
+
+  assert.equal(invalidFlowRangePolicyValidation.ok, false);
+  assert.ok(
+    invalidFlowRangePolicyValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "flow_range_policy",
+    ),
+    "expected flow_range_policy to use the supported live E2E policy set",
+  );
+
   const nestedCandidate = structuredClone(loaded.document);
   nestedCandidate.step_journal[0].final_step_verdict = "fail";
   nestedCandidate.step_journal[0].deterministic_analysis.status = "fail";
@@ -732,22 +749,113 @@ test("live E2E observation report loads and enforces status scale", () => {
     "expected step_journal entries without plan to be rejected",
   );
 
-  const legacyCandidate = structuredClone(loaded.document);
-  legacyCandidate.step_matrix = [];
+  const missingInstallCandidate = structuredClone(loaded.document);
+  delete missingInstallCandidate.aor_installation_proof_file;
 
-  const legacyValidation = validateContractDocument({
+  const missingInstallValidation = validateContractDocument({
     family: "live-e2e-observation-report",
-    document: legacyCandidate,
-    source: "test://live-e2e-observation-legacy-shape",
+    document: missingInstallCandidate,
+    source: "test://live-e2e-observation-missing-install-proof",
   });
 
-  assert.equal(legacyValidation.ok, false);
+  assert.equal(missingInstallValidation.ok, false);
   assert.ok(
-    legacyValidation.issues.some(
-      (problem) => problem.code === "unsupported_field_present" && problem.field === "step_matrix",
+    missingInstallValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "aor_installation_proof_file",
     ),
-    "expected legacy step_matrix to be rejected",
+    "expected live E2E reports without installation proof to be rejected",
   );
+
+  const missingSetupCandidate = structuredClone(loaded.document);
+  missingSetupCandidate.setup_journal = [];
+
+  const missingSetupValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: missingSetupCandidate,
+    source: "test://live-e2e-observation-missing-setup-journal",
+  });
+
+  assert.equal(missingSetupValidation.ok, false);
+  assert.ok(
+    missingSetupValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "setup_journal",
+    ),
+    "expected live E2E reports without setup evidence to be rejected",
+  );
+
+  const invalidPreludeCandidate = structuredClone(loaded.document);
+  invalidPreludeCandidate.flow_range.prelude_steps = invalidPreludeCandidate.flow_range.prelude_steps.filter(
+    (step) => step !== "install",
+  );
+
+  const invalidPreludeValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: invalidPreludeCandidate,
+    source: "test://live-e2e-observation-invalid-prelude-steps",
+  });
+
+  assert.equal(invalidPreludeValidation.ok, false);
+  assert.ok(
+    invalidPreludeValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "flow_range.prelude_steps[0]",
+    ),
+    "expected flow_range.prelude_steps to start with install",
+  );
+
+  const reorderedSetupCandidate = structuredClone(loaded.document);
+  reorderedSetupCandidate.setup_journal = reorderedSetupCandidate.setup_journal.filter(
+    (entry) => entry.step_id !== "install",
+  );
+
+  const reorderedSetupValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: reorderedSetupCandidate,
+    source: "test://live-e2e-observation-reordered-setup-journal",
+  });
+
+  assert.equal(reorderedSetupValidation.ok, false);
+  assert.ok(
+    reorderedSetupValidation.issues.some(
+      (problem) => problem.code === "enum_value_invalid" && problem.field === "setup_journal[0].step_id",
+    ),
+    "expected live E2E setup evidence to require the install prelude first",
+  );
+
+  const malformedSetupEvidenceCandidate = structuredClone(loaded.document);
+  malformedSetupEvidenceCandidate.setup_journal[0].evidence_refs = [123];
+
+  const malformedSetupEvidenceValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: malformedSetupEvidenceCandidate,
+    source: "test://live-e2e-observation-malformed-setup-evidence",
+  });
+
+  assert.equal(malformedSetupEvidenceValidation.ok, false);
+  assert.ok(
+    malformedSetupEvidenceValidation.issues.some(
+      (problem) => problem.code === "field_type_mismatch" && problem.field === "setup_journal[0].evidence_refs[0]",
+    ),
+    "expected setup evidence refs to contain strings only",
+  );
+
+  for (const legacyField of ["step_matrix", "verdict_matrix", "artifact_quality_matrix", "continuation_decisions"]) {
+    const legacyCandidate = structuredClone(loaded.document);
+    legacyCandidate[legacyField] = [];
+
+    const legacyValidation = validateContractDocument({
+      family: "live-e2e-observation-report",
+      document: legacyCandidate,
+      source: `test://live-e2e-observation-legacy-${legacyField}`,
+    });
+
+    assert.equal(legacyValidation.ok, false);
+    assert.ok(
+      legacyValidation.issues.some(
+        (problem) => problem.code === "unsupported_field_present" && problem.field === legacyField,
+      ),
+      `expected legacy ${legacyField} to be rejected`,
+    );
+  }
 });
 
 test("W23 nested canonical contract examples load through the shared contract path", () => {

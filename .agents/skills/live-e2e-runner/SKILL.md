@@ -5,18 +5,19 @@ description: Use when you need to run or assess AOR live E2E profiles through th
 
 1. Start with `docs/ops/live-e2e-standard-runner.md` and `docs/ops/live-e2e-target-catalog.md`.
 2. Decide whether the run is bounded rehearsal, full-journey acceptance, guided installed-user proof, or production proof.
-3. Confirm the profile declares `live_e2e.flow_range_policy`, `live_e2e.interaction_capability`, `live_e2e.frontend_capability`, and `live_e2e.safety_policy`.
+3. Confirm the profile declares `live_e2e.flow_range_policy`, `live_e2e.installation_policy`, `live_e2e.interaction_capability`, `live_e2e.frontend_capability`, and `live_e2e.safety_policy`.
 4. Use the installed-user proof runner entrypoint for automatic runs:
    - `node ./scripts/live-e2e/run-profile.mjs --project-ref . --profile <profile>`
 5. Use the manual loop when a human or agent must gate each step:
    - `node ./scripts/live-e2e/manual-live-e2e.mjs --project-ref . --profile <profile> --run-id <id>`
    - rerun the same command with the same `run-id` after completing any required public action.
-6. Use the harness evaluator when proof must fail closed on missing controller evidence:
-   - `node ./scripts/live-e2e/harness-evaluator.mjs --project-ref . --profile <profile>`
+6. Use the step evaluator when proof must fail closed on missing controller evidence:
+   - `node ./scripts/live-e2e/step-evaluator.mjs --project-ref . --profile <profile>`
 7. Treat every path as the same online black-box step controller:
    - plan the next step from `step_journal[].plan`;
    - execute only the installed project flow through public CLI/API/web surfaces;
    - inspect `live_e2e_step_observation_files[]`, command transcripts, artifact refs, UI/API/log output, and `live_e2e_controller_state_file`;
+   - inspect `aor_installation_proof_file` and `setup_journal[]` before trusting SDLC step evidence;
    - classify deterministic and semantic evidence before deciding;
    - let the step decision gate continuation;
    - do not import private runtime internals to repair or explain target execution.

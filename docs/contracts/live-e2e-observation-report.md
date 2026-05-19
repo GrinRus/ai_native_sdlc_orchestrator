@@ -5,7 +5,9 @@ Black-box step journal for one live E2E run.
 
 The report records each public CLI/API/web step as an ordered observation written by the online step controller. Each entry carries the step plan, transcript, materialized artifact refs, deterministic command analysis, semantic operator/agent analysis, interactive decisions, resume results, and the final step verdict.
 
-This contract intentionally replaces the legacy post-run `step_matrix`, `artifact_quality_matrix`, and synthetic `continuation_decisions` model. Producers must not emit those fields.
+Before the SDLC journal starts, the report must also preserve installed-user setup evidence. AOR installation/source-channel proof, target checkout, project bootstrap, intake, and readiness are setup/prelude observations, not SDLC step verdicts.
+
+This contract intentionally replaces the legacy post-run `step_matrix`, `verdict_matrix`, `artifact_quality_matrix`, and synthetic `continuation_decisions` model. Producers must not emit those fields.
 
 ## Required fields
 - `report_id`
@@ -15,6 +17,9 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `artifac
 - `flow_range`
 - `flow_range_policy`
 - `overall_status`
+- `aor_installation`
+- `aor_installation_proof_file`
+- `setup_journal`
 - `step_journal`
 - `final_analysis`
 - `interactive_decisions`
@@ -43,6 +48,22 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `artifac
 - `included_steps`
 - `prelude_steps`
 - `excluded_steps`
+
+`aor_installation` should preserve:
+- `status`
+- `declared_policy`
+- `effective_policy`
+- `source_channel`
+- `launcher_ref`
+- `command_transcripts`
+
+`setup_journal[]` should preserve:
+- `sequence`
+- `step_id`
+- `status`
+- `public_surface`
+- `evidence_refs`
+- `summary`
 
 `flow_range_policy` must be one of:
 - `delivery_default`

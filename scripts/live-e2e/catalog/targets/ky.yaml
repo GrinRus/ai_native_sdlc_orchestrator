@@ -38,6 +38,12 @@ required_matrix_cells:
     feature_mission_id: ky-header-regression
     provider_variant_id: open-code-primary
     coverage_tier: extended
+  - cell_id: ky.governance.large.openai
+    scenario_family: governance
+    feature_size: large
+    feature_mission_id: ky-retry-hooks-governance
+    provider_variant_id: openai-primary
+    coverage_tier: extended
 provider_comparison_pairs:
   - pair_id: ky.regress.small
     scenario_family: regress

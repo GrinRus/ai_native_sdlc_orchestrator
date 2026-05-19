@@ -321,6 +321,53 @@ test("live E2E step controller continues after a persisted interaction resumes",
   });
 });
 
+test("live E2E step controller blocks resumed interactions without answer audit evidence", () => {
+  withTempRoot((reportsRoot) => {
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-interaction-resumed-missing-audit",
+      profile: { live_e2e: { flow_range_policy: "delivery_default" } },
+      mode: "auto",
+    });
+
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "spec",
+          stageResult: {
+            stage: "spec",
+            status: "pass",
+            evidence_refs: [],
+            summary: "Spec answer resumed without audit evidence.",
+          },
+          commandResults: [
+            {
+              label: "spec-build",
+              command_surface: "aor spec build",
+              status: "pass",
+              interactive_continuation: {
+                requested: true,
+                status: "resumed",
+                interaction_id: "question-1",
+                answer_audit_refs: [],
+              },
+            },
+          ],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "block");
+        return true;
+      },
+    );
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.decision.action, "block");
+    assert.equal(entry.final_step_verdict, "blocked");
+    assert.deepEqual(entry.deterministic_analysis.missing_evidence, ["answer_audit_refs"]);
+  });
+});
+
 test("live E2E step controller stops on diagnose decisions", () => {
   withTempRoot((reportsRoot) => {
     const controller = createLiveE2eStepController({

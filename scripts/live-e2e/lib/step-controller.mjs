@@ -154,7 +154,9 @@ function resolveDecisionAction(entry) {
   const requestedInteraction = asRecord(entry.requested_interaction);
   if (Object.keys(requestedInteraction).length > 0) {
     const interactionStatus = asNonEmptyString(requestedInteraction.interaction_status) || asNonEmptyString(requestedInteraction.status);
-    if (interactionStatus === "resumed") return "continue";
+    if (interactionStatus === "resumed") {
+      return asStringArray(requestedInteraction.answer_audit_refs).length > 0 ? "continue" : "block";
+    }
     if (interactionStatus === "blocked" || interactionStatus === "resume_failed") return "block";
     return "answer";
   }
@@ -180,7 +182,9 @@ function resolveFinalStepVerdict(requestedInteraction, deterministicStatus) {
   if (!requestedInteraction) return toLiveE2eObservationStatus(deterministicStatus);
   const interactionStatus =
     asNonEmptyString(requestedInteraction.interaction_status) || asNonEmptyString(requestedInteraction.status);
-  if (interactionStatus === "resumed") return "resumed";
+  if (interactionStatus === "resumed") {
+    return asStringArray(requestedInteraction.answer_audit_refs).length > 0 ? "resumed" : "blocked";
+  }
   if (interactionStatus === "blocked" || interactionStatus === "resume_failed") return "blocked";
   return "interaction_required";
 }
@@ -210,11 +214,11 @@ export function isLiveE2eControllerStop(error) {
  *   reportsRoot: string,
  *   runId: string,
  *   profile: Record<string, unknown>,
- *   mode?: "auto" | "manual" | "harness",
+ *   mode?: "auto" | "manual" | "evaluator",
  * }} options
  */
 export function createLiveE2eStepController(options) {
-  const mode = options.mode === "manual" || options.mode === "harness" ? options.mode : "auto";
+  const mode = options.mode === "manual" || options.mode === "evaluator" ? options.mode : "auto";
   const policy = resolveLiveE2eFlowRangePolicy(options.profile);
   const includedSteps = getLiveE2eIncludedSteps(policy);
   const normalizedRunId = normalizeId(options.runId);
@@ -356,6 +360,12 @@ export function createLiveE2eStepController(options) {
         : toLiveE2eObservationStatus(asNonEmptyString(stage.status) || asNonEmptyString(command.status) || "not_pass");
     const requestedInteraction = Object.keys(command).length > 0 ? extractRequestedInteraction(command) : null;
     const finalStepVerdict = resolveFinalStepVerdict(requestedInteraction, deterministicStatus);
+    const missingResumeAudit =
+      requestedInteraction &&
+      (asNonEmptyString(requestedInteraction.interaction_status) || asNonEmptyString(requestedInteraction.status)) ===
+        "resumed" &&
+      asStringArray(requestedInteraction.answer_audit_refs).length === 0;
+    const analysisStatus = missingResumeAudit ? "blocked" : deterministicStatus;
     const frontendInteractionRefs =
       step === "learning"
         ? uniqueStrings([
@@ -380,22 +390,34 @@ export function createLiveE2eStepController(options) {
             ? command.duration_sec
             : null,
       deterministic_analysis: {
-        status: deterministicStatus,
+        status: analysisStatus,
         exit_code: typeof command.exit_code === "number" ? command.exit_code : null,
         failure_class: asNonEmptyString(stage.failure_class) || asNonEmptyString(command.failure_class) || null,
-        missing_evidence: uniqueStrings([...asStringArray(stage.missing_evidence), ...asStringArray(command.missing_evidence)]),
+        missing_evidence: uniqueStrings([
+          ...asStringArray(stage.missing_evidence),
+          ...asStringArray(command.missing_evidence),
+          ...(missingResumeAudit ? ["answer_audit_refs"] : []),
+        ]),
         recommendation: asNonEmptyString(stage.recommendation) || asNonEmptyString(command.recommendation) || "continue",
       },
       semantic_analysis: {
-        status: deterministicStatus,
+        status: analysisStatus,
         judge_source: "deterministic-runner",
-        findings: deterministicStatus === "pass" ? [] : uniqueStrings([asNonEmptyString(stage.summary) || `${step} requires inspection`]),
+        findings:
+          analysisStatus === "pass"
+            ? []
+            : uniqueStrings([
+                missingResumeAudit ? "Interaction resume is missing answer audit evidence." : "",
+                asNonEmptyString(stage.summary) || `${step} requires inspection`,
+              ]),
       },
       requested_interaction: requestedInteraction,
       decision: {
         action: "continue",
         reason:
-          deterministicStatus === "pass"
+          missingResumeAudit
+            ? "Interaction resume is missing answer audit evidence."
+            : deterministicStatus === "pass"
             ? "Public step completed with required evidence."
             : asNonEmptyString(stage.summary) || `${step} completed with observed findings.`,
         next_step: includedSteps[includedSteps.indexOf(step) + 1] ?? null,
@@ -434,7 +456,7 @@ export function createLiveE2eStepController(options) {
       .map((candidate) => entryByStep[candidate]);
 
     const action = asNonEmptyString(asRecord(entry.decision).action) || "continue";
-    if (mode === "manual" || (mode === "harness" && action !== "continue") || (mode === "auto" && action !== "continue")) {
+    if (mode === "manual" || (mode === "evaluator" && action !== "continue") || (mode === "auto" && action !== "continue")) {
       throw new LiveE2eControllerStop({
         reason: `Live E2E controller stopped at '${step}' with decision '${action}'.`,
         state: cloneState(),

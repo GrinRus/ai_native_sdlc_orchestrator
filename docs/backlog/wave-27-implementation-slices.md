@@ -27,7 +27,7 @@ Replace legacy live E2E post-run matrices with an online black-box step-controll
 
 ### Local tasks
 1. Replace the legacy observation contract with `step_journal`, `final_analysis`, interaction decisions, frontend interactions, and evidence refs.
-2. Reject legacy report fields such as `step_matrix`, `artifact_quality_matrix`, `code_quality_after_delivery`, and synthetic continuation decisions.
+2. Reject legacy report fields such as `step_matrix`, `verdict_matrix`, `artifact_quality_matrix`, `code_quality_after_delivery`, and synthetic continuation decisions.
 3. Update contract loader tests and sample reports to the breaking format.
 
 ### Acceptance criteria
@@ -89,14 +89,14 @@ Replace legacy live E2E post-run matrices with an online black-box step-controll
 2. Persist step observation artifacts and controller state after each included step, before the next public step.
 3. Represent deterministic analysis, semantic analysis, interaction requests, decisions, resume results, and frontend interaction refs per step.
 4. Enforce profile-controlled delivery-default versus full-lifecycle flow ranges.
-5. Add shared controller entrypoints for automatic `run-profile`, `manual-live-e2e`, and fail-closed `harness-evaluator` workflows.
+5. Add shared controller entrypoints for automatic `run-profile`, `manual-live-e2e`, and fail-closed step evaluator workflows.
 
 ### Acceptance criteria
 1. Delivery-default profiles observe through delivery.
 2. Guided and full-lifecycle profiles include release and learning as ordinary observed steps.
 3. Step observation files and `live_e2e_controller_state_file` are linked from run summaries and reports.
 4. Manual workflow executes one pending step per invocation and resumes by `run-id`.
-5. Harness evaluator fails closed when plan/execution/inspection/classification/decision/persist evidence is missing.
+5. Step evaluator fails closed when plan/execution/inspection/classification/decision/persist evidence is missing.
 6. Runner output no longer emits legacy matrix fields.
 
 ### Done evidence
@@ -127,7 +127,7 @@ Replace legacy live E2E post-run matrices with an online black-box step-controll
 ### Acceptance criteria
 1. Profile catalog loading rejects profiles without live E2E policy metadata.
 2. Skills describe step-journal reporting and no legacy verdict matrix.
-3. Runbooks describe manual and harness evaluator entrypoints.
+3. Runbooks describe manual and step evaluator entrypoints.
 4. Runbooks describe frontend interaction evidence as step-bound proof.
 
 ### Done evidence

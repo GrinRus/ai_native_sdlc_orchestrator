@@ -4,6 +4,7 @@ flow_kind: governance
 duration_class: short
 live_e2e:
   flow_range_policy: full_lifecycle
+  installation_policy: source-install-required
   interaction_capability: public-control-plane
   frontend_capability: none
   safety_policy: no-upstream-write
@@ -65,6 +66,7 @@ stages:
   - qa
   - delivery
   - release
+  - learning
 verification:
   build: true
   lint: true

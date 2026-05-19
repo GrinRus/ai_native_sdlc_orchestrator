@@ -10,6 +10,7 @@ const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-fi
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
+const LIVE_E2E_REQUIRED_SETUP_STEPS = ["install", "target_checkout", "project_bootstrap", "intake", "readiness"];
 const VALIDATION_STATUS_VALUES = ["pass", "warn", "fail", "blocked"];
 const REVIEW_STATUS_VALUES = ["pass", "warn", "fail"];
 const RUNTIME_HARNESS_DECISION_VALUES = ["pass", "retry", "repair", "escalate", "block", "fail"];
@@ -1942,6 +1943,31 @@ function validateStringArrayItems(options) {
 function validateLiveE2EObservationReport(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
+  const installation = isPlainObject(document.aor_installation) ? document.aor_installation : {};
+  if (Object.keys(installation).length === 0) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "aor_installation",
+        expected: "non-empty object",
+        actual: "missing",
+        message: "Field 'aor_installation' is required for installed-user live E2E reports.",
+      }),
+    );
+  }
+  if (typeof document.aor_installation_proof_file !== "string" || document.aor_installation_proof_file.length === 0) {
+    issues.push(
+      issue({
+        code: document.aor_installation_proof_file === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "aor_installation_proof_file",
+        expected: document.aor_installation_proof_file === undefined ? "present" : "string",
+        actual: document.aor_installation_proof_file === undefined ? "missing" : describeActualType(document.aor_installation_proof_file),
+        message: "Field 'aor_installation_proof_file' is required for installed-user live E2E reports.",
+      }),
+    );
+  }
   const finalAnalysis = isPlainObject(document.final_analysis)
     ? document.final_analysis
     : {};
@@ -1956,7 +1982,137 @@ function validateLiveE2EObservationReport(document, source) {
     source,
     issues,
   });
+  validateObservationFlowRange({
+    value: document.flow_range,
+    source,
+    issues,
+  });
+  validateObservationSetupJournal({
+    entries: document.setup_journal,
+    source,
+    issues,
+  });
   return issues;
+}
+
+/**
+ * @param {{ value: unknown, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateObservationFlowRange(options) {
+  const flowRange = isPlainObject(options.value) ? options.value : {};
+  const preludeSteps = flowRange.prelude_steps;
+  if (!Array.isArray(preludeSteps)) {
+    options.issues.push(
+      issue({
+        code: preludeSteps === undefined ? "required_field_missing" : "field_type_mismatch",
+        source: options.source,
+        field: "flow_range.prelude_steps",
+        expected: preludeSteps === undefined ? "present" : "array",
+        actual: preludeSteps === undefined ? "missing" : describeActualType(preludeSteps),
+        message: "Field 'flow_range.prelude_steps' must include the ordered live E2E setup prelude.",
+      }),
+    );
+    return;
+  }
+  LIVE_E2E_REQUIRED_SETUP_STEPS.forEach((expectedStepId, index) => {
+    const actualStepId = preludeSteps[index];
+    if (actualStepId !== expectedStepId) {
+      options.issues.push(
+        issue({
+          code: actualStepId === undefined ? "required_field_missing" : "enum_value_invalid",
+          source: options.source,
+          field: `flow_range.prelude_steps[${index}]`,
+          expected: expectedStepId,
+          actual: actualStepId === undefined ? "missing" : String(actualStepId),
+          message: `Field 'flow_range.prelude_steps[${index}]' must be '${expectedStepId}'.`,
+        }),
+      );
+    }
+  });
+}
+
+/**
+ * @param {{ entries: unknown, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateObservationSetupJournal(options) {
+  if (!Array.isArray(options.entries)) return;
+  if (options.entries.length === 0) {
+    options.issues.push(
+      issue({
+        code: "required_field_missing",
+        source: options.source,
+        field: "setup_journal",
+        expected: "at least one setup observation",
+        actual: "empty array",
+        message: "Field 'setup_journal' must include installed-user setup/prelude evidence.",
+      }),
+    );
+    return;
+  }
+  LIVE_E2E_REQUIRED_SETUP_STEPS.forEach((expectedStepId, index) => {
+    const entry = options.entries[index];
+    if (entry === undefined) {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: `setup_journal[${index}]`,
+          expected: expectedStepId,
+          actual: "missing",
+          message: `Field 'setup_journal[${index}]' must include required live E2E setup step '${expectedStepId}'.`,
+        }),
+      );
+      return;
+    }
+    const record = isPlainObject(entry) ? entry : {};
+    if (record.step_id !== expectedStepId) {
+      options.issues.push(
+        issue({
+          code: typeof record.step_id === "string" ? "enum_value_invalid" : "field_type_mismatch",
+          source: options.source,
+          field: `setup_journal[${index}].step_id`,
+          expected: expectedStepId,
+          actual: record.step_id === undefined ? "missing" : String(record.step_id),
+          message: `Field 'setup_journal[${index}].step_id' must be '${expectedStepId}'.`,
+        }),
+      );
+    }
+  });
+  options.entries.forEach((entry, index) => {
+    const record = isPlainObject(entry) ? entry : {};
+    for (const [field, expectedType] of [
+      ["step_id", "string"],
+      ["status", "string"],
+      ["evidence_refs", "array"],
+      ["summary", "string"],
+    ]) {
+      const value = record[field];
+      if (!isExpectedType(value, expectedType)) {
+        options.issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source: options.source,
+            field: `setup_journal[${index}].${field}`,
+            expected: value === undefined ? "present" : expectedType,
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Field 'setup_journal[${index}].${field}' is required for live E2E setup evidence.`,
+          }),
+        );
+      }
+    }
+    validateStringArrayItems({
+      values: record.evidence_refs,
+      source: options.source,
+      field: `setup_journal[${index}].evidence_refs`,
+      issues: options.issues,
+    });
+    validateObservationStatusField({
+      value: record.status,
+      source: options.source,
+      field: `setup_journal[${index}].status`,
+      issues: options.issues,
+    });
+  });
 }
 
 /**
