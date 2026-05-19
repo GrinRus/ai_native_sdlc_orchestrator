@@ -798,6 +798,17 @@ function normalizeVerdictStatus(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {"pass" | "warn" | "fail"}
+ */
+function normalizeRuntimeHarnessDecisionStatus(value) {
+  const normalized = asNonEmptyString(value).toLowerCase();
+  if (normalized === "pass" || normalized === "passed" || normalized === "success") return "pass";
+  if (normalized === "warn" || normalized === "warning" || normalized === "pass_with_findings") return "warn";
+  return "fail";
+}
+
+/**
  * @param {Record<string, unknown>} profile
  * @returns {"diagnostic" | "blocking"}
  */
@@ -2972,19 +2983,6 @@ export function executeFullJourneyFlow(options) {
       if (asNonEmptyString(stepResult.status) !== "passed") {
         artifacts.execution_degraded = true;
         artifacts.execution_degraded_reason = asNonEmptyString(stepResult.summary) || "Run start routed execution failed.";
-        markStage(
-          stageMap,
-          "execution",
-          "warn",
-          uniqueStrings([
-            verifyPreflight.transcriptFile,
-            asNonEmptyString(artifacts.baseline_verify_summary_file),
-            runStart.transcriptFile,
-            artifacts.routed_step_result_file,
-            ...collectStringRefs(stepResult),
-          ]),
-          asNonEmptyString(stepResult.summary) || "Run start routed execution failed.",
-        );
       }
     } else {
       markStage(
@@ -3042,8 +3040,23 @@ export function executeFullJourneyFlow(options) {
     }
     const postRunVerifySummary = readJson(postRunVerifySummaryPath);
     artifacts.post_run_verify_status = asNonEmptyString(postRunVerifySummary.status) === "passed" ? "pass" : "fail";
+    const runtimeHarnessStageStatus = normalizeRuntimeHarnessDecisionStatus(
+      artifacts.run_start_runtime_harness_decision,
+    );
     const executionStageStatus =
-      stageMap.execution?.status === "fail" ? "fail" : artifacts.execution_degraded === true ? "warn" : "pass";
+      stageMap.execution?.status === "fail"
+        ? "fail"
+        : runtimeHarnessStageStatus === "fail"
+          ? "fail"
+          : runtimeHarnessStageStatus === "warn"
+            ? "warn"
+            : "pass";
+    const executionStageSummary =
+      executionStageStatus === "fail"
+        ? `Runtime Harness blocked execution with decision '${asNonEmptyString(artifacts.run_start_runtime_harness_decision) || "unknown"}'.`
+        : executionStageStatus === "warn"
+          ? "Provider execution materialized degraded evidence; post-run verification completed for black-box quality reporting."
+          : "Baseline diagnostics, run start, run status, and post-run verification completed through public execution lifecycle.";
     markStage(
       stageMap,
       "execution",
@@ -3057,9 +3070,7 @@ export function executeFullJourneyFlow(options) {
         postRunVerifySummaryPath,
         ...collectStringRefs(runStart.payload),
       ]),
-      executionStageStatus === "warn"
-        ? "Provider execution materialized degraded evidence; post-run verification completed for black-box quality reporting."
-        : "Baseline diagnostics, run start, run status, and post-run verification completed through public execution lifecycle.",
+      executionStageSummary,
     );
 
     const reviewRun = runCommand("review-run", [

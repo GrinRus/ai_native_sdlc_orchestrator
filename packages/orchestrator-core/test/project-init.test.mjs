@@ -160,6 +160,33 @@ test("initializeProjectRuntime materializes profile and assets only when materia
   }
 });
 
+test("initializeProjectRuntime merges bundled bootstrap assets when a target examples directory already exists", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s03-existing-examples-"));
+  fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });
+  fs.mkdirSync(path.join(tempRoot, "examples"), { recursive: true });
+  fs.writeFileSync(path.join(tempRoot, "examples", "README.md"), "target examples stay intact\n", "utf8");
+
+  try {
+    const result = initializeProjectRuntime({
+      cwd: tempRoot,
+      projectRef: tempRoot,
+      assetMode: "materialized",
+    });
+
+    assert.equal(result.assetMode, "materialized");
+    assert.equal(fs.readFileSync(path.join(tempRoot, "examples", "README.md"), "utf8"), "target examples stay intact\n");
+    assert.equal(fs.existsSync(path.join(tempRoot, "examples/routes")), true);
+    assert.equal(fs.existsSync(path.join(tempRoot, "examples/wrappers")), true);
+    assert.equal(result.registryRoots.routes, path.join(tempRoot, "examples/routes"));
+
+    const report = JSON.parse(fs.readFileSync(result.onboardingReportFile, "utf8"));
+    assert.equal(report.write_effects.copied_example_registries, true);
+    assert.ok(report.write_effects.target_repo_writes.includes("examples"));
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("initializeProjectRuntime blocks invalid explicit profile references before writing runtime state", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s03-missing-profile-"));
   fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });

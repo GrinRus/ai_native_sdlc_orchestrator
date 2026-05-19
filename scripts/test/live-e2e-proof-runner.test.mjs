@@ -3573,7 +3573,7 @@ test("full-journey mode fails when approved handoff validation is blocked", () =
   });
 });
 
-test("full-journey mode fails when review detects control-plane leakage", () => {
+test("full-journey mode stops at execution when runtime harness detects control-plane leakage", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
     const examplesRoot = createExamplesRoot({ tempRoot });
@@ -3604,7 +3604,7 @@ test("full-journey mode fails when review detects control-plane leakage", () => 
     assert.equal(result.live_e2e_run_status, "not_pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
     assert.equal(summary.status, "not_pass");
-    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "warn");
+    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "fail");
     assert.equal(fs.existsSync(summary.runtime_harness_report_file), true);
     const runtimeHarnessReport = JSON.parse(fs.readFileSync(summary.runtime_harness_report_file, "utf8"));
     assert.equal(runtimeHarnessReport.overall_decision, "fail");
@@ -3612,6 +3612,8 @@ test("full-journey mode fails when review detects control-plane leakage", () => 
       runtimeHarnessReport.step_decisions.some((decision) => decision.failure_class === "repo-scope-violation"),
       true,
     );
+    assert.equal(summary.artifacts.live_e2e_controller_stop.decision.action, "diagnose");
+    assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), false);
   });
 });
 
@@ -3646,7 +3648,7 @@ test("full-journey mode fails when runtime harness detects code-changing no-op",
     assert.equal(result.live_e2e_run_status, "not_pass");
     const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
     assert.equal(summary.status, "not_pass");
-    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "warn");
+    assert.equal(summary.stage_results.find((entry) => entry.stage === "execution").status, "fail");
     assert.equal(fs.existsSync(summary.runtime_harness_report_file), true);
     const runtimeHarnessReport = JSON.parse(fs.readFileSync(summary.runtime_harness_report_file, "utf8"));
     assert.equal(runtimeHarnessReport.overall_decision, "fail");
@@ -3657,8 +3659,11 @@ test("full-journey mode fails when runtime harness detects code-changing no-op",
     assert.equal(summary.artifacts.live_e2e_controller_stop.decision.action, "diagnose");
     const observation = JSON.parse(fs.readFileSync(summary.live_e2e_observation_report_file, "utf8"));
     assert.equal(observation.overall_status, "not_pass");
-    assert.equal(observation.final_analysis.code_quality.status, "not_pass");
-    assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), true);
+    assert.equal(
+      observation.step_journal.some((entry) => entry.step_id === "execution" && entry.decision.action === "diagnose"),
+      true,
+    );
+    assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), false);
     assert.equal(summary.command_results.some((entry) => entry.label === "learning-handoff"), false);
     assert.equal(Array.isArray(summary.scorecard_files), true);
     assert.equal(fs.existsSync(summary.scorecard_files[0]), true);
