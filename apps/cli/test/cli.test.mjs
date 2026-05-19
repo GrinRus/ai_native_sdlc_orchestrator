@@ -25,7 +25,7 @@ function withTempProject(callback) {
   try {
     callback(tempRoot);
   } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true });
+    fs.rmSync(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 }
 
