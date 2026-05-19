@@ -74,7 +74,7 @@ Quality boundaries are explicit:
 
 Strictness is mission-type driven. Code-changing, live, and release missions use strict semantic gates. Docs-only, no-write rehearsal, and asset-certification flows may use softer profiles, but their softness must be explicit in runtime evidence.
 
-When classification finds `interactive-question-requested`, the run is not terminal by UI decision. The Runtime Harness writes a `requested_interaction` boundary into the step result, emits query-safe live events, and waits for a control-plane-owned answer submission. After answer audit evidence is written, the runtime may resume from that boundary; if validation, policy, or unavailable resume support blocks continuation, the run remains blocked with the same interaction, `state_history[]`, and reason evidence.
+When classification finds `interactive-question-requested`, the run is not terminal by UI decision. The Runtime Harness writes a resumable `requested_interaction` boundary into the step result, emits query-safe live events, and waits for a control-plane-owned answer submission. After answer audit evidence is written, the runtime resumes from that boundary when `continuation.next_action=resume_from_boundary`; if validation, policy, or an unsupported boundary blocks continuation, the run remains blocked with the same interaction, `state_history[]`, and reason evidence.
 
 ## Delivery model
 AOR should support these delivery modes:
@@ -89,7 +89,7 @@ Delivery-capable runs should execute from an isolated root (`workspace-clone` or
 Policy boundary between rehearsal and delivery:
 - rehearsal can proceed in `no-write` mode without handoff/promotion gates;
 - non-`no-write` delivery modes must be blocked unless approved handoff evidence and promotion evidence are both present;
-- strict code-changing and release delivery must be blocked unless the latest Runtime Harness report contains routed step decisions, `overall_decision=pass`, and at least one meaningful mission-scoped changed path;
+- strict code-changing and release delivery must be blocked unless the latest Runtime Harness report contains routed step decisions, `overall_decision=pass`, and at least one meaningful implementation changed path;
 - write-back is allowed only when the delivery plan status is `ready`.
 
 ## Asset evolution model

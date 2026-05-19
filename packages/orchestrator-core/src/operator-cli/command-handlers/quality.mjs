@@ -475,10 +475,12 @@ export function handleQualityCommand(context) {
     if (!runId) {
       throw new CliUsageError("Missing required flag '--run-id' for 'aor learning handoff'.");
     }
+    const projectProfile = resolveOptionalStringFlag("project-profile", flags["project-profile"]);
 
     const projectState = readProjectState({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
     outputState.resolvedProjectRef = projectState.project_root;
@@ -490,12 +492,14 @@ export function handleQualityCommand(context) {
     const runState = readRunControlState({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       runId,
     });
     const runs = listRuns({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
     let runSummary = runs.find((entry) => entry.run_id === runId);
@@ -505,6 +509,7 @@ export function handleQualityCommand(context) {
     const runtimeHarness = materializeRuntimeHarnessReport({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       runId,
     });
@@ -515,12 +520,14 @@ export function handleQualityCommand(context) {
       listRuns({
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile,
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       }).find((entry) => entry.run_id === runId) ?? runSummary;
 
     const qualityForRun = listQualityArtifacts({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     }).filter((artifact) => runSummary.quality_refs.includes(artifact.artifact_ref));
     const existingIncident =

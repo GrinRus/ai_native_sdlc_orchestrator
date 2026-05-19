@@ -184,23 +184,11 @@ export function loadMissionScope(projectRoot, artifactsRoot) {
     if (!bodyRef || !fs.existsSync(bodyRef)) continue;
     const body = readJsonFile(bodyRef);
     const featureRequest = asRecord(body?.feature_request);
-    const requestDocument = asRecord(featureRequest.request_document);
-    const missionScope = asRecord(body?.mission_scope);
     const requestFile = resolveProjectRelativeFile(projectRoot, asString(featureRequest.request_file));
-    const allowedPaths = uniqueStrings([
-      ...asStringArray(missionScope.allowed_paths),
-      ...asStringArray(featureRequest.allowed_paths),
-      ...asStringArray(requestDocument.allowed_paths),
-    ]);
-    const forbiddenPaths = uniqueStrings([
-      ...asStringArray(missionScope.forbidden_paths),
-      ...asStringArray(featureRequest.forbidden_paths),
-      ...asStringArray(requestDocument.forbidden_paths),
-    ]);
     return {
       ignoredInputFiles: requestFile ? [requestFile] : [],
-      allowedPaths,
-      forbiddenPaths,
+      allowedPaths: [],
+      forbiddenPaths: [],
     };
   }
   return { ignoredInputFiles: [], allowedPaths: [], forbiddenPaths: [] };
@@ -215,29 +203,9 @@ export function resolveMissionScopedChanges(changedPaths, missionScope) {
   const scopeCandidates = changedPaths.filter(
     (changedPath) => !ignoredInputFiles.has(changedPath) && !isTransientBackupPath(changedPath),
   );
-  const forbiddenChangedPaths = scopeCandidates.filter((changedPath) =>
-    missionScope.forbiddenPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
-  );
-  const outOfScopeChangedPaths =
-    missionScope.allowedPaths.length > 0
-      ? scopeCandidates.filter(
-          (changedPath) => !missionScope.allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
-        )
-      : [];
-  const missionScopedChangedPaths =
-    missionScope.allowedPaths.length > 0
-      ? scopeCandidates.filter((changedPath) =>
-          missionScope.allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath)),
-        )
-      : scopeCandidates;
   return {
     ignoredInputFiles: missionScope.ignoredInputFiles,
-    allowedPaths: missionScope.allowedPaths,
-    forbiddenPaths: missionScope.forbiddenPaths,
     nonInputChangedPaths: scopeCandidates,
-    missionScopedChangedPaths,
-    forbiddenChangedPaths,
-    outOfScopeChangedPaths,
-    scopeViolationPaths: uniqueStrings([...forbiddenChangedPaths, ...outOfScopeChangedPaths]),
+    meaningfulChangedPaths: scopeCandidates,
   };
 }

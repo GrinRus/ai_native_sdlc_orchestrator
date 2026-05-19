@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-26-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-28-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -37,6 +37,8 @@ The authoritative planning model for implementation lives in:
 | W24 | Move from step-level harness strength to run-level Runtime Harness ownership for production-grade orchestration decisions. | 3 | EPIC-4, EPIC-5, EPIC-6 | `docs/backlog/wave-24-implementation-slices.md` |
 | W25 | Produce the first real non-mock full-journey production proof with code-changing evidence and no upstream writes. | 3 | EPIC-7 | `docs/backlog/wave-25-implementation-slices.md` |
 | W26 | Make self-hosted production readiness repeatable, reviewable, and documented as a CLI/API production candidate with optional web. | 3 | EPIC-0, EPIC-7 | `docs/backlog/wave-26-implementation-slices.md` |
+| W27 | Replace legacy live E2E matrices with a black-box step journal and resumable interaction answers. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-27-implementation-slices.md` |
+| W28 | Close installed-user live E2E gaps with install proof, evaluator naming cleanup, and expanded target coverage. | 3 | EPIC-7 | `docs/backlog/wave-28-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -453,6 +455,29 @@ The authoritative planning model for implementation lives in:
 - Self-hosted CLI/API production candidate docs are complete and bounded to declared non-goals.
 
 **Detailed slices:** `docs/backlog/wave-26-implementation-slices.md`
+
+## W27 — black-box live E2E step journal
+**Goal:** Replace legacy live E2E post-run matrices with a black-box step journal, resumable interaction answers, explicit profile policies, and updated runner skills.
+
+**Exit criteria:**
+- Live E2E observation reports use ordered `step_journal` entries and reject legacy matrix fields.
+- `run answer`, API, and web paths resume recorded interaction boundaries when possible.
+- Profiles declare flow range, interaction, frontend, and safety policy.
+- Runner summaries use `quality_judgement` instead of legacy verdict matrices.
+- Skills, runbooks, proof fixtures, and production-readiness checks align with the new model.
+
+**Detailed slices:** `docs/backlog/wave-27-implementation-slices.md`
+
+## W28 — installed-user live E2E gap closure and matrix expansion
+**Goal:** Add explicit AOR install proof, setup/prelude evidence, full-lifecycle bounded execution, deterministic interaction answer support, evaluator naming cleanup, and expanded curated target coverage.
+
+**Exit criteria:**
+- Live E2E reports include `aor_installation_proof_file` and `setup_journal[]`.
+- Full-lifecycle profiles execute release and learning rather than skipping them.
+- Step evaluator terminology is separated from Runtime Harness certification.
+- Commander.js and pluggy are required matrix targets, while Cobra and date-fns are extended candidates.
+
+**Detailed slices:** `docs/backlog/wave-28-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

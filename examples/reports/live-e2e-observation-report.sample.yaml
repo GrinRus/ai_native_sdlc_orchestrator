@@ -1,6 +1,14 @@
-report_id: live-e2e.sample.observation.v1
+report_id: live-e2e.sample.observation.v2
 run_id: live-e2e.sample.run
 profile_id: live-e2e.full-journey.regress.ky
+report_status: final
+operator_context:
+  operator_kind: deterministic-fixture
+  operator_ref: fixture://live-e2e-deterministic-runner
+  decision_policy: optional
+  answer_policy: deterministic-fixture-only
+  target_write_policy: aor-runtime-only-before-execution
+controller_state_ref: runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
 flow_range:
   start_step: discovery
   end_step: delivery
@@ -14,44 +22,153 @@ flow_range:
     - qa
     - delivery
   prelude_steps:
-    - project-init
-    - intake-create
-    - project-analyze
-    - project-validate
+    - install
+    - target_checkout
+    - project_bootstrap
+    - intake
+    - readiness
   excluded_steps:
     - release
     - learning
+flow_range_policy: delivery_default
 overall_status: warn
-step_matrix:
-  - step: discovery
+aor_installation:
+  status: pass
+  declared_policy: source-install-required
+  effective_policy: source-install-required
+  install_mode: isolated
+  source_channel: source-only-alpha
+  workspace_root: /tmp/aor-live-e2e/live-e2e.sample.run
+  runtime_root: /tmp/aor-live-e2e/live-e2e.sample.run/runtime
+  original_source_root: /repo/aor
+  installed_source_root: /tmp/aor-live-e2e/live-e2e.sample.run/aor-source
+  launcher_ref: runtime://reports/live-e2e-aor-install/aor-session-launcher.sh
+  command_transcripts:
+    - runtime://reports/live-e2e-aor-install/01-corepack-enable.json
+    - runtime://reports/live-e2e-aor-install/02-pnpm-install-frozen-lockfile.json
+    - runtime://reports/live-e2e-aor-install/03-pnpm-build.json
+    - runtime://reports/live-e2e-aor-install/04-pnpm-aor-help.json
+aor_installation_proof_file: runtime://reports/live-e2e-aor-installation-proof-live-e2e.sample.run.json
+setup_journal:
+  - sequence: 1
+    step_id: install
     status: pass
-    command_label: discovery-run
-    command_surface: aor discovery run
+    public_surface: pnpm source install
+    evidence_refs:
+      - runtime://reports/live-e2e-aor-installation-proof-live-e2e.sample.run.json
+    summary: AOR installation proof completed before public project flow execution.
+  - sequence: 2
+    step_id: target_checkout
+    status: pass
+    public_surface: git clone or local target checkout materialization
+    evidence_refs:
+      - runtime://targets/ky
+    summary: Target checkout was prepared for black-box execution.
+  - sequence: 3
+    step_id: project_bootstrap
+    status: pass
+    public_surface: aor project init or bundled profile materialization
+    evidence_refs:
+      - runtime://reports/generated-project-profile-live-e2e.sample.run.yaml
+      - runtime://reports/bootstrap-artifact-packet-live-e2e.sample.run.yaml
+    summary: AOR project bootstrap evidence was materialized.
+  - sequence: 4
+    step_id: intake
+    status: pass
+    public_surface: aor intake create or aor mission create
+    evidence_refs:
+      - runtime://reports/intake-artifact-packet-live-e2e.sample.run.yaml
+      - runtime://reports/feature-request-live-e2e.sample.run.yaml
+    summary: Feature request or intake evidence was materialized.
+  - sequence: 5
+    step_id: readiness
+    status: pass
+    public_surface: aor project validate and readiness verify
+    evidence_refs:
+      - runtime://reports/project-validation-live-e2e.sample.run.json
+      - runtime://reports/execution-readiness-live-e2e.sample.run.json
+    summary: Readiness validation evidence was materialized.
+step_journal:
+  - sequence: 1
+    step_id: discovery
+    step_instance_id: discovery
+    iteration: 1
+    flow_stage: discovery
+    plan:
+      objective: Observe project analysis and discovery evidence through installed public flow surfaces.
+      public_surface: aor discovery run
+      command_labels:
+        - discovery-run
+        - project-analyze
+      expected_artifacts:
+        - analysis_report_file
+        - discovery_analysis_report_file
+      inspection_sources:
+        - command_transcript
+        - stage_result
+        - artifact_refs
+        - api_output
+        - logs_or_ui_when_available
+      safety_constraints:
+        - black-box-public-surfaces-only
+        - no-runtime-internal-imports
+        - no-upstream-write-by-default
+        - persist-observation-before-next-step
+    plan_ref: runtime://reports/live-e2e-step-plan-live-e2e.sample.run-01-discovery.json
+    public_surface: aor discovery run
+    transcript_ref: runtime://reports/live-e2e-command-traces/01-discovery-run.json
+    execution_ref: runtime://reports/live-e2e-command-traces/01-discovery-run.json
+    inspection_ref: runtime://reports/live-e2e-step-inspection-live-e2e.sample.run-01-discovery.json
+    classification_ref: runtime://reports/live-e2e-step-classification-live-e2e.sample.run-01-discovery.json
     artifact_refs:
       - runtime://reports/project-analysis-report.json
-    findings: []
-artifact_quality_matrix:
-  - step: discovery
-    status: warn
-    judge_source: agent-missing
-    artifact_refs:
-      - runtime://reports/project-analysis-report.json
-    findings:
-      - agent-judge-not-provided
-code_quality_after_delivery:
+    started_at: "2026-05-18T00:00:00.000Z"
+    finished_at: "2026-05-18T00:00:02.000Z"
+    duration_sec: 2
+    deterministic_analysis:
+      status: pass
+      exit_code: 0
+      failure_class: null
+      missing_evidence: []
+      recommendation: continue
+    semantic_analysis:
+      status: pass
+      judge_source: deterministic-fixture
+      findings: []
+    agent_decision_request_ref: runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-01-discovery.json
+    operator_decision_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-01-discovery.json
+    operator_decision_status: accepted
+    requested_interaction: null
+    decision:
+      action: continue
+      reason: Public step completed with required evidence.
+      next_step: spec
+    resume_result: null
+    frontend_interaction_refs: []
+    final_step_verdict: pass
+final_analysis:
   status: warn
-  delivery_manifest_ref: runtime://artifacts/delivery-manifest-live-e2e.json
-  review_report_ref: runtime://reports/review-report-live-e2e.json
-  post_delivery_check_refs:
-    - runtime://reports/verify-summary-post-delivery.json
-  changed_paths:
-    - source/index.ts
+  summary: Live E2E completed with observed quality findings.
   findings:
-    - post-delivery quality checks were observed but not used as hard runner gates
-continuation_decisions:
-  - step: execution
-    decision: continue_with_findings
-    reason: runtime harness reported degraded code quality, but delivery observation remained possible
-    next_step: review
+    - post-delivery quality checks produced findings
+  code_quality:
+    status: warn
+    changed_paths:
+      - source/index.ts
+    evidence_refs:
+      - runtime://reports/review-report-live-e2e.json
+  delivery:
+    status: pass
+    evidence_refs:
+      - runtime://artifacts/delivery-manifest-live-e2e.json
+  release:
+    status: not_pass
+    evidence_refs: []
+  learning:
+    status: not_pass
+    evidence_refs: []
+interactive_decisions: []
+frontend_interactions: []
 evidence_refs:
   - runtime://reports/live-e2e-run-summary.json
+  - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json

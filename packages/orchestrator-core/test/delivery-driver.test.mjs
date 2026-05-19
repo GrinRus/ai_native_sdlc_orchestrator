@@ -29,6 +29,17 @@ function runGitChecked(options) {
 }
 
 /**
+ * @param {string} repoRoot
+ */
+function removeTempRepo(repoRoot) {
+  try {
+    fs.rmSync(repoRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  } catch {
+    spawnSync("rm", ["-rf", repoRoot], { encoding: "utf8" });
+  }
+}
+
+/**
  * @param {(repoRoot: string) => void} callback
  */
 function withTempRepo(callback) {
@@ -43,7 +54,7 @@ function withTempRepo(callback) {
   try {
     callback(repoRoot);
   } finally {
-    fs.rmSync(repoRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    removeTempRepo(repoRoot);
   }
 }
 

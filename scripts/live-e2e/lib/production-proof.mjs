@@ -28,7 +28,7 @@ const PRODUCTION_PROOF_REQUIRED_VERDICT_FIELDS = Object.freeze([
   "delivery_release_quality",
   "learning_loop_closure",
   "quality_gate_decision",
-  "overall_verdict",
+  "overall_status",
 ]);
 
 /**
@@ -154,15 +154,15 @@ function assessNoUpstreamWrite(artifacts) {
 
 /**
  * @param {string | null | undefined} runtimeHarnessReportFile
- * @returns {{ status: "pass" | "fail", report_file: string | null, mission_scoped_changed_paths: string[], findings: string[] }}
+ * @returns {{ status: "pass" | "fail", report_file: string | null, meaningful_changed_paths: string[], findings: string[] }}
  */
 function assessRuntimeHarnessProof(runtimeHarnessReportFile) {
   const reportFile = asNonEmptyString(runtimeHarnessReportFile) || null;
   const findings = [];
   const report = readJsonIfPresent(reportFile);
   const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
-  const missionScopedChangedPaths = uniqueStrings(
-    stepDecisions.flatMap((entry) => asStringArray(asRecord(asRecord(entry).mission_semantics).mission_scoped_changed_paths)),
+  const meaningfulChangedPaths = uniqueStrings(
+    stepDecisions.flatMap((entry) => asStringArray(asRecord(asRecord(entry).mission_semantics).meaningful_changed_paths)),
   );
 
   if (!reportFile || !fileExists(reportFile)) {
@@ -171,14 +171,14 @@ function assessRuntimeHarnessProof(runtimeHarnessReportFile) {
   if (!isPassStatus(report.overall_decision)) {
     findings.push("Runtime Harness overall_decision is not pass");
   }
-  if (missionScopedChangedPaths.length === 0) {
-    findings.push("Runtime Harness has no mission-scoped changed paths");
+  if (meaningfulChangedPaths.length === 0) {
+    findings.push("Runtime Harness has no meaningful changed paths");
   }
 
   return {
     status: findings.length === 0 ? "pass" : "fail",
     report_file: reportFile,
-    mission_scoped_changed_paths: missionScopedChangedPaths,
+    meaningful_changed_paths: meaningfulChangedPaths,
     findings,
   };
 }
@@ -268,8 +268,8 @@ export function applyProductionProofEvidence(options) {
   }
 
   const artifacts = options.flowResult.artifacts;
-  const verdictMatrix = asRecord(artifacts.verdict_matrix);
-  const verdicts = assessProductionProofVerdicts(verdictMatrix);
+  const qualityJudgement = asRecord(artifacts.quality_judgement);
+  const verdicts = assessProductionProofVerdicts(qualityJudgement);
   const runtimeHarness = assessRuntimeHarnessProof(
     asNonEmptyString(artifacts.latest_runtime_harness_report_file) || asNonEmptyString(artifacts.runtime_harness_report_file),
   );
@@ -277,7 +277,7 @@ export function applyProductionProofEvidence(options) {
   const noUpstreamWrite = assessNoUpstreamWrite(artifacts);
   const preflight = assessProductionPreflight(artifacts, options.productionProof);
   const changedPaths = uniqueStrings([
-    ...runtimeHarness.mission_scoped_changed_paths,
+    ...runtimeHarness.meaningful_changed_paths,
     ...review.changed_paths,
     ...noUpstreamWrite.changed_paths,
   ]);
@@ -304,12 +304,12 @@ export function applyProductionProofEvidence(options) {
   const evidenceRefsExist = requiredEvidenceRefFields.every((field) => evidenceFileExists(evidenceRefs[field]));
   const findings = uniqueStrings([
     ...(isPassStatus(options.flowResult.status) ? [] : ["full-journey flow status is not pass"]),
-    ...(verdicts.ok ? [] : verdicts.failed_fields.map((field) => `verdict_matrix.${field} is not pass`)),
+    ...(verdicts.ok ? [] : verdicts.failed_fields.map((field) => `quality_judgement.${field} is not pass`)),
     ...preflight.findings,
     ...runtimeHarness.findings,
     ...review.findings,
     ...noUpstreamWrite.findings,
-    ...(changedPaths.length > 0 ? [] : ["no meaningful mission-scoped changed paths were recorded"]),
+    ...(changedPaths.length > 0 ? [] : ["no meaningful changed paths were recorded"]),
     ...(evidenceRefsExist ? [] : ["one or more required proof evidence files are missing"]),
   ]);
   const complete = findings.length === 0;
@@ -328,7 +328,7 @@ export function applyProductionProofEvidence(options) {
     },
     runtime_harness: {
       status: runtimeHarness.status,
-      mission_scoped_changed_paths: runtimeHarness.mission_scoped_changed_paths,
+      meaningful_changed_paths: runtimeHarness.meaningful_changed_paths,
     },
     review: {
       status: review.status,

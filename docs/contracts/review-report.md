@@ -61,11 +61,9 @@ Durable report-only quality verdict for one run after execution evidence, delive
 `code_quality` should preserve:
 - `status`
 - `changed_paths`
-- `allowed_paths`
-- `forbidden_paths`
 - `findings`
 
-For test files, `code_quality.findings` should flag likely coverage weakening, including lowered `t.plan(...)` counts or removed assertions without an equivalent replacement. Source-tree backup or editor artifacts such as `.bak`, `.orig`, `.rej`, `.tmp`, `.swp`, and `~` files should also be flagged because they are not valid implementation deliverables. These findings are review signals; they do not replace deterministic post-run verification.
+For test files, `code_quality.findings` should flag likely coverage weakening, including lowered `t.plan(...)` counts or removed assertions without an equivalent replacement. Source-tree backup or editor artifacts such as `.bak`, `.orig`, `.rej`, `.tmp`, `.swp`, and `~` files should also be flagged because they are not valid implementation deliverables. Review no longer fails implementation quality from legacy allowed/forbidden path lists; it judges whether the final diff satisfies the mission and verification evidence. These findings are review signals; they do not replace deterministic post-run verification.
 
 `feature_size_fit` should preserve:
 - `status`

@@ -34,6 +34,12 @@ required_matrix_cells:
     feature_mission_id: nextjs-shared-package-release
     provider_variant_id: openai-primary
     coverage_tier: required
+  - cell_id: nextjs.regress.small.openai
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: nextjs-shared-util-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
 provider_comparison_pairs:
   - pair_id: nextjs.release.large
     scenario_family: release
@@ -45,18 +51,10 @@ provider_comparison_pairs:
 feature_missions:
   - mission_id: nextjs-shared-util-regression
     title: Preserve one narrow shared-package regression
-    brief: Fix one narrowly scoped shared-package regression with the smallest app or package touch needed to keep the monorepo green.
+    brief: Fix one narrowly scoped shared-package regression with the smallest app
+      or package touch needed to keep the monorepo green.
     feature_size: small
-    allowed_paths:
-      - apps/**
-      - packages/**
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a1
       - verify-summary
       - routed-step-result
       - review-report
@@ -71,17 +69,21 @@ feature_missions:
     size_budget:
       max_changed_files: 8
       max_added_lines: 260
-    size_rationale: Small monorepo missions should stay inside one package or one consumer boundary with limited diff size.
+    size_rationale: Small monorepo missions should stay inside one package or one
+      consumer boundary with limited diff size.
     change_budget:
       max_changed_files: 8
       max_added_lines: 260
+    quality_evidence: *a1
   - mission_id: nextjs-workspace-repair-shared-config
     title: Repair one bounded workspace configuration or shared package seam
-    brief: Fix one bounded monorepo breakage across a shared package and one consuming app or config boundary, with strong delivery and audit lineage.
+    brief: Fix one bounded monorepo breakage across a shared package and one
+      consuming app or config boundary, with strong delivery and audit lineage.
     feature_size: medium
     goals:
       - Repair one bounded workspace configuration or shared package seam.
-      - Preserve monorepo lint, typecheck, and shared-package unit-smoke evidence.
+      - Preserve monorepo lint, typecheck, and shared-package unit-smoke
+        evidence.
     kpis:
       - kpi_id: nextjs-medium-repair-green
         name: Medium monorepo repair gate
@@ -90,23 +92,14 @@ feature_missions:
     definition_of_done:
       - The change stays inside bounded apps, packages, and tooling surfaces.
       - Delivery and review evidence are anchored to the target checkout.
-    allowed_paths:
-      - apps/**
-      - packages/**
-      - tooling/**
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a2
       - verify-summary
       - routed-step-result
       - review-report
       - delivery-manifest
     acceptance_checks:
-      - keep the change inside monorepo apps, packages, and bounded tooling surfaces
+      - keep the change inside monorepo apps, packages, and bounded tooling
+        surfaces
       - preserve monorepo lint/typecheck plus shared-package unit smoke linkage
       - keep delivery evidence anchored to the target checkout
     post_run_quality:
@@ -126,21 +119,26 @@ feature_missions:
     size_budget:
       max_changed_files: 12
       max_added_lines: 360
-    size_rationale: Medium monorepo missions may cross one package-to-app or package-to-tooling boundary, but should remain explicitly bounded.
+    size_rationale: Medium monorepo missions may cross one package-to-app or
+      package-to-tooling boundary, but should remain explicitly bounded.
     change_budget:
       max_changed_files: 12
       max_added_lines: 360
+    quality_evidence: *a2
   - mission_id: nextjs-shared-package-release
     title: Prepare one shared-package release-shaped change
-    brief: Update one shared package and one consuming app with bounded release evidence and no upstream write-back.
+    brief: Update one shared package and one consuming app with bounded release
+      evidence and no upstream write-back.
     feature_size: large
     goals:
-      - Prepare one shared-package release-shaped change across a bounded package/app boundary.
+      - Prepare one shared-package release-shaped change across a bounded
+        package/app boundary.
       - Preserve release lineage without upstream write-back.
     kpis:
       - kpi_id: nextjs-release-lineage
         name: Monorepo release lineage
-        target: delivery-manifest, release-packet, and review-report are materialized from the same target checkout
+        target: delivery-manifest, release-packet, and review-report are materialized
+          from the same target checkout
         measurement: live E2E summary and delivery artifacts
       - kpi_id: nextjs-release-quality
         name: Monorepo release quality gate
@@ -150,16 +148,7 @@ feature_missions:
       - Bounded monorepo quality gates pass.
       - Delivery and release packet evidence are anchored to the target checkout.
       - No upstream write-back is attempted.
-    allowed_paths:
-      - apps/**
-      - packages/**
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a3
       - delivery-manifest
       - release-packet
       - review-report
@@ -184,7 +173,10 @@ feature_missions:
     size_budget:
       max_changed_files: 14
       max_added_lines: 420
-    size_rationale: Large monorepo release missions may cross multiple packages and one consuming app, but must remain bounded to apps/packages and strict release evidence.
+    size_rationale: Large monorepo release missions may cross multiple packages and
+      one consuming app, but must remain bounded to apps/packages and strict
+      release evidence.
     change_budget:
       max_changed_files: 14
       max_added_lines: 420
+    quality_evidence: *a3

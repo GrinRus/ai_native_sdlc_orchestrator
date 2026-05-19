@@ -726,12 +726,11 @@ test("detached control-plane transport records interactive continuation answers 
           reason: "operator selected a safe target",
         },
       );
-      assert.equal(answerResponse.status, 409);
+      assert.equal(answerResponse.status, 200);
       const answerPayload = await answerResponse.json();
-      assert.equal(answerPayload.error.code, "interaction.continuation_blocked");
       assert.equal(answerPayload.interaction_answer.interaction_id, interactionId);
       assert.equal(answerPayload.interaction_answer.answer_accepted, true);
-      assert.equal(answerPayload.interaction_answer.interaction_status, "blocked");
+      assert.equal(answerPayload.interaction_answer.interaction_status, "resumed");
       assert.equal(fs.existsSync(answerPayload.interaction_answer.answer_audit_file), true);
 
       const auditRecord = JSON.parse(fs.readFileSync(answerPayload.interaction_answer.answer_audit_file, "utf8"));
@@ -739,12 +738,12 @@ test("detached control-plane transport records interactive continuation answers 
 
       const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
       assert.equal(JSON.stringify(updatedStepResult).includes(answerText), false);
-      assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+      assert.equal(updatedStepResult.requested_interaction.status, "resumed");
       assert.deepEqual(
         updatedStepResult.requested_interaction.state_history.map((entry) => entry.status),
-        ["requested", "answered", "blocked"],
+        ["requested", "answered", "resumed"],
       );
-      assert.equal(updatedStepResult.requested_interaction.continuation.next_action, "remain_blocked");
+      assert.equal(updatedStepResult.requested_interaction.continuation.next_action, "continue_run");
       assert.ok(updatedStepResult.requested_interaction.answer_audit_refs.includes(answerPayload.interaction_answer.answer_audit_ref));
       assert.ok(updatedStepResult.evidence_refs.includes(answerPayload.interaction_answer.answer_audit_ref));
 
@@ -771,7 +770,7 @@ test("detached control-plane transport records interactive continuation answers 
         streamedEvents
           .map((event) => event.interaction?.status)
           .filter((status) => typeof status === "string"),
-        ["answered", "blocked"],
+        ["answered", "resumed"],
       );
     } finally {
       await transport.close();

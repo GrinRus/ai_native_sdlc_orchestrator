@@ -555,7 +555,7 @@
     "learning_loop_scorecard_file": "./.aor/w14-s07-proof/runtime-ky-anthropic/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic/reports/learning-loop-scorecard-cli-learning-handoff-w14-s07.full-journey-regress-ky-anthropic.json",
     "learning_loop_handoff_file": "./.aor/w14-s07-proof/runtime-ky-anthropic/projects/aor-core/target-checkouts/sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic/.aor/projects/sindresorhus-ky-w14-s07.full-journey-regress-ky-anthropic/reports/learning-loop-handoff-w14-s07.full-journey-regress-ky-anthropic.json",
     "incident_report_file": null,
-    "verdict_matrix": {
+    "quality_judgement": {
       "scenario_family": "regress",
       "provider_variant_id": "anthropic-primary",
       "feature_size": "small",
@@ -570,7 +570,7 @@
       "feature_size_fit_status": "pass",
       "delivery_release_quality": "pass",
       "learning_loop_closure": "pass",
-      "overall_verdict": "pass_with_findings"
+      "overall_status": "pass_with_findings"
     }
   },
   "matrix_cell": {
@@ -615,7 +615,7 @@
       }
     ]
   },
-  "verdict_matrix": {
+  "quality_judgement": {
     "scenario_family": "regress",
     "provider_variant_id": "anthropic-primary",
     "feature_size": "small",
@@ -630,7 +630,7 @@
     "feature_size_fit_status": "pass",
     "delivery_release_quality": "pass",
     "learning_loop_closure": "pass",
-    "overall_verdict": "pass_with_findings"
+    "overall_status": "pass_with_findings"
   },
   "scorecard_files": [
     "./.aor/w14-s07-proof/runtime-ky-anthropic/projects/aor-core/reports/live-e2e-scorecard-target-w14-s07.full-journey-regress-ky-anthropic.json"

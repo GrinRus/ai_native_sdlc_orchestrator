@@ -11,7 +11,8 @@ For canonical setup and verification dependency details per profile, use `docs/o
 - Never push to upstream public repositories by default.
 - Mandatory full-journey live E2E is allowed only on curated catalog targets and curated feature missions.
 - Full-journey runs must generate the feature request and discovery/spec/handoff during the run.
-- Always materialize review, QA, and delivery artifacts for full-journey observation runs; learning closure artifacts are legacy diagnostics outside the v1 observation matrix.
+- Acceptance and production-proof full-journey runs must use isolated AOR source install by default and support the public `execution#N -> review#N` repair loop.
+- Always materialize review, QA, and delivery artifacts for full-journey observation runs; release and learning become observed steps when the profile declares `live_e2e.flow_range_policy=full_lifecycle`.
 - Every mandatory full-journey run must resolve one curated matrix cell:
   - `repo`
   - `feature mission`
@@ -45,6 +46,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - full-journey required cells:
     - `full-journey-regress-ky.yaml` (`regress/small/openai-primary`)
     - `full-journey-regress-ky-medium-anthropic.yaml` (`regress/medium/anthropic-primary`)
+    - `full-journey-regress-ky-medium-open-code.yaml` (`regress/medium/open-code-primary`)
     - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`)
   - production-proof candidate:
     - `full-journey-production-proof-ky-openai.yaml` (`regress/small/openai-primary`, real external process, blocking target verification)
@@ -108,6 +110,38 @@ For canonical setup and verification dependency details per profile, use `docs/o
 - Full-journey verification baseline:
   - use monorepo-wide lint and typecheck plus shared-package unit smoke, not the entire repo-wide `g:test-unit` matrix
 
+## Target 4 — `tj/commander.js`
+- Catalog id: `commander-js`
+- Shape: Node CLI framework.
+- Why it is useful: mature command-line parsing surface, tight tests, and clear help/typing regressions.
+- Curated missions:
+  - `commander-option-suggestion-regression` (`small`, `regress`)
+  - `commander-help-typing-repair` (`medium`, `repair|regress`)
+  - `commander-cli-governance-lineage` (`medium`, `governance`)
+- Best profiles:
+  - `full-journey-regress-commander-js.yaml`
+  - `full-journey-repair-commander-js-medium-anthropic.yaml`
+  - `full-journey-governance-commander-js-medium-openai.yaml`
+- Verification baseline: `npm install`, `npm run test`, `npm run check`.
+
+## Target 5 — `pytest-dev/pluggy`
+- Catalog id: `pluggy`
+- Shape: Python plugin/hook framework.
+- Why it is useful: compact Python runtime with order-sensitive hook semantics and diagnostic surfaces.
+- Curated missions:
+  - `pluggy-hook-order-regression` (`small`, `regress`)
+  - `pluggy-diagnostics-repair` (`medium`, `repair|regress`)
+  - `pluggy-typing-governance` (`medium`, `governance|repair`)
+- Best profiles:
+  - `full-journey-regress-pluggy.yaml`
+  - `full-journey-repair-pluggy-medium-anthropic.yaml`
+  - `full-journey-governance-pluggy-medium-openai.yaml`
+- Verification baseline: `python -m pip install -e . pytest`, `python -m pytest testing`.
+
+## Extended candidate targets
+- `spf13/cobra` (`cobra`): Go CLI framework, extended small regress cell, `go mod download`, `go test ./...`.
+- `date-fns/date-fns` (`date-fns`): TypeScript utility library, extended small regress cell, `pnpm install`, `pnpm vitest run`, `pnpm run lint`, `pnpm run types`.
+
 ## Why these targets
 Together these targets cover:
 - small library workflows;
@@ -144,6 +178,21 @@ Required coverage matrix:
   - `release/large/openai-primary`
   - `repair/medium/anthropic-primary`
   - `governance/large/openai-primary`
+- `commander-js`
+  - `regress/small/openai-primary`
+  - `repair/medium/anthropic-primary`
+  - `governance/medium/openai-primary`
+- `pluggy`
+  - `regress/small/openai-primary`
+  - `repair/medium/anthropic-primary`
+  - `governance/medium/openai-primary`
+
+Extended candidate cells:
+- `ky.governance.large.openai` (`ky-retry-hooks-governance`)
+- `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)
+- `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)
+- `cobra.regress.small.openai`
+- `date-fns.regress.small.openai`
 
 Provider comparison rule:
 - every curated repo must prove at least one equivalent mission class on both `openai-primary` and `anthropic-primary`.
@@ -186,6 +235,6 @@ All targets reuse the same baseline before execution-style stages:
 5. verify
 6. continue only when no-write safety gates pass
 
-For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. For bounded profiles, the default is `blocking`. Post-run verification remains mandatory quality evidence for full-journey observation, but failed post-run checks downgrade the observation to `warn` when delivery evidence materializes.
+For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. For bounded profiles, the default is `blocking`. Post-run verification remains mandatory quality evidence for full-journey observation and contributes directly to the step journal and final analysis.
 
 See `docs/ops/live-e2e-no-write-preflight.md` for the reusable bounded procedure.

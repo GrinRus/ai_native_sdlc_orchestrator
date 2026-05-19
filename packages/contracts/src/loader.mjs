@@ -7,9 +7,10 @@ import { inferFamilyFromExamplePath } from "./example-paths.mjs";
 import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } from "./utils.mjs";
 
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
-const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "blocked"];
+const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
+const LIVE_E2E_REQUIRED_SETUP_STEPS = ["install", "target_checkout", "project_bootstrap", "intake", "readiness"];
 const VALIDATION_STATUS_VALUES = ["pass", "warn", "fail", "blocked"];
 const REVIEW_STATUS_VALUES = ["pass", "warn", "fail"];
 const RUNTIME_HARNESS_DECISION_VALUES = ["pass", "retry", "repair", "escalate", "block", "fail"];
@@ -729,14 +730,21 @@ function validateStepResult(document, source) {
     issues,
   });
   if (missionSemantics) {
-    for (const field of [
-      "changed_paths",
-      "allowed_paths",
-      "forbidden_paths",
-      "mission_scoped_changed_paths",
-      "scope_violation_paths",
-      "ignored_request_input_files",
-    ]) {
+    for (const legacyField of ["allowed_paths", "forbidden_paths", "mission_scoped_changed_paths", "scope_violation_paths"]) {
+      if (Object.prototype.hasOwnProperty.call(missionSemantics, legacyField)) {
+        issues.push(
+          issue({
+            code: "forbidden_field_present",
+            source,
+            field: `mission_semantics.${legacyField}`,
+            expected: "absent",
+            actual: "present",
+            message: `Field 'mission_semantics.${legacyField}' is legacy path-scope evidence and must not be emitted.`,
+          }),
+        );
+      }
+    }
+    for (const field of ["changed_paths", "meaningful_changed_paths", "non_bootstrap_changed_paths", "ignored_request_input_files"]) {
       validateOptionalStringArrayField({
         record: missionSemantics,
         source,
@@ -955,7 +963,21 @@ function validateReviewCodeQuality(value, source, issues) {
   if (!isPlainObject(value)) return;
 
   validateReviewQualitySection(value, source, "code_quality", issues);
-  for (const field of ["changed_paths", "allowed_paths", "forbidden_paths"]) {
+  for (const legacyField of ["allowed_paths", "forbidden_paths"]) {
+    if (Object.prototype.hasOwnProperty.call(value, legacyField)) {
+      issues.push(
+        issue({
+          code: "forbidden_field_present",
+          source,
+          field: `code_quality.${legacyField}`,
+          expected: "absent",
+          actual: "present",
+          message: `Field 'code_quality.${legacyField}' is legacy path-scope evidence and must not be emitted.`,
+        }),
+      );
+    }
+  }
+  for (const field of ["changed_paths"]) {
     validateOptionalStringArrayField({
       record: value,
       source,
@@ -1942,43 +1964,393 @@ function validateStringArrayItems(options) {
 function validateLiveE2EObservationReport(document, source) {
   /** @type {import("./index.d.ts").ContractValidationIssue[]} */
   const issues = [];
-  const codeQuality = isPlainObject(document.code_quality_after_delivery)
-    ? document.code_quality_after_delivery
+  const reportStatus = typeof document.report_status === "string" ? document.report_status : "final";
+  if (!["final", "in_progress"].includes(reportStatus)) {
+    issues.push(
+      issue({
+        code: "enum_value_invalid",
+        source,
+        field: "report_status",
+        expected: "final|in_progress",
+        actual: String(reportStatus),
+        message: "Field 'report_status' must describe whether the live E2E report is final or waiting for operator resume.",
+      }),
+    );
+  }
+  const installation = isPlainObject(document.aor_installation) ? document.aor_installation : {};
+  if (Object.keys(installation).length === 0) {
+    issues.push(
+      issue({
+        code: "required_field_missing",
+        source,
+        field: "aor_installation",
+        expected: "non-empty object",
+        actual: "missing",
+        message: "Field 'aor_installation' is required for installed-user live E2E reports.",
+      }),
+    );
+  }
+  if (typeof document.aor_installation_proof_file !== "string" || document.aor_installation_proof_file.length === 0) {
+    issues.push(
+      issue({
+        code: document.aor_installation_proof_file === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "aor_installation_proof_file",
+        expected: document.aor_installation_proof_file === undefined ? "present" : "string",
+        actual: document.aor_installation_proof_file === undefined ? "missing" : describeActualType(document.aor_installation_proof_file),
+        message: "Field 'aor_installation_proof_file' is required for installed-user live E2E reports.",
+      }),
+    );
+  }
+  const operatorContext = isPlainObject(document.operator_context) ? document.operator_context : {};
+  for (const [field, expectedValues] of [
+    ["operator_kind", ["skill-agent", "deterministic-fixture"]],
+    ["decision_policy", ["required", "optional"]],
+    ["answer_policy", ["agent-public-control-plane", "deterministic-fixture-only"]],
+    ["target_write_policy", ["aor-runtime-only-before-execution"]],
+  ]) {
+    const value = operatorContext[field];
+    if (typeof value !== "string" || !expectedValues.includes(value)) {
+      issues.push(
+        issue({
+          code: value === undefined ? "required_field_missing" : "enum_value_invalid",
+          source,
+          field: `operator_context.${field}`,
+          expected: expectedValues.join("|"),
+          actual: value === undefined ? "missing" : String(value),
+          message: `Field 'operator_context.${field}' must declare the live E2E operator policy.`,
+        }),
+      );
+    }
+  }
+  if (typeof operatorContext.operator_ref !== "string" || operatorContext.operator_ref.length === 0) {
+    issues.push(
+      issue({
+        code: operatorContext.operator_ref === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "operator_context.operator_ref",
+        expected: "non-empty string",
+        actual: operatorContext.operator_ref === undefined ? "missing" : describeActualType(operatorContext.operator_ref),
+        message: "Field 'operator_context.operator_ref' must identify the live E2E operator.",
+      }),
+    );
+  }
+  const finalAnalysis = isPlainObject(document.final_analysis)
+    ? document.final_analysis
     : {};
   validateObservationStatusField({
-    value: codeQuality.status,
+    value: finalAnalysis.status,
     source,
-    field: "code_quality_after_delivery.status",
+    field: "final_analysis.status",
     issues,
   });
-  validateObservationMatrixStatuses({
-    entries: document.step_matrix,
+  validateObservationStepJournal({
+    entries: document.step_journal,
+    operatorContext,
+    reportStatus,
     source,
-    field: "step_matrix",
     issues,
   });
-  validateObservationMatrixStatuses({
-    entries: document.artifact_quality_matrix,
+  validateObservationFlowRange({
+    value: document.flow_range,
     source,
-    field: "artifact_quality_matrix",
+    issues,
+  });
+  validateObservationSetupJournal({
+    entries: document.setup_journal,
+    source,
     issues,
   });
   return issues;
 }
 
 /**
- * @param {{ entries: unknown, source: string, field: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ * @param {{ value: unknown, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
  */
-function validateObservationMatrixStatuses(options) {
+function validateObservationFlowRange(options) {
+  const flowRange = isPlainObject(options.value) ? options.value : {};
+  const preludeSteps = flowRange.prelude_steps;
+  if (!Array.isArray(preludeSteps)) {
+    options.issues.push(
+      issue({
+        code: preludeSteps === undefined ? "required_field_missing" : "field_type_mismatch",
+        source: options.source,
+        field: "flow_range.prelude_steps",
+        expected: preludeSteps === undefined ? "present" : "array",
+        actual: preludeSteps === undefined ? "missing" : describeActualType(preludeSteps),
+        message: "Field 'flow_range.prelude_steps' must include the ordered live E2E setup prelude.",
+      }),
+    );
+    return;
+  }
+  LIVE_E2E_REQUIRED_SETUP_STEPS.forEach((expectedStepId, index) => {
+    const actualStepId = preludeSteps[index];
+    if (actualStepId !== expectedStepId) {
+      options.issues.push(
+        issue({
+          code: actualStepId === undefined ? "required_field_missing" : "enum_value_invalid",
+          source: options.source,
+          field: `flow_range.prelude_steps[${index}]`,
+          expected: expectedStepId,
+          actual: actualStepId === undefined ? "missing" : String(actualStepId),
+          message: `Field 'flow_range.prelude_steps[${index}]' must be '${expectedStepId}'.`,
+        }),
+      );
+    }
+  });
+}
+
+/**
+ * @param {{ entries: unknown, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateObservationSetupJournal(options) {
   if (!Array.isArray(options.entries)) return;
+  if (options.entries.length === 0) {
+    options.issues.push(
+      issue({
+        code: "required_field_missing",
+        source: options.source,
+        field: "setup_journal",
+        expected: "at least one setup observation",
+        actual: "empty array",
+        message: "Field 'setup_journal' must include installed-user setup/prelude evidence.",
+      }),
+    );
+    return;
+  }
+  LIVE_E2E_REQUIRED_SETUP_STEPS.forEach((expectedStepId, index) => {
+    const entry = options.entries[index];
+    if (entry === undefined) {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: `setup_journal[${index}]`,
+          expected: expectedStepId,
+          actual: "missing",
+          message: `Field 'setup_journal[${index}]' must include required live E2E setup step '${expectedStepId}'.`,
+        }),
+      );
+      return;
+    }
+    const record = isPlainObject(entry) ? entry : {};
+    if (record.step_id !== expectedStepId) {
+      options.issues.push(
+        issue({
+          code: typeof record.step_id === "string" ? "enum_value_invalid" : "field_type_mismatch",
+          source: options.source,
+          field: `setup_journal[${index}].step_id`,
+          expected: expectedStepId,
+          actual: record.step_id === undefined ? "missing" : String(record.step_id),
+          message: `Field 'setup_journal[${index}].step_id' must be '${expectedStepId}'.`,
+        }),
+      );
+    }
+  });
   options.entries.forEach((entry, index) => {
     const record = isPlainObject(entry) ? entry : {};
+    for (const [field, expectedType] of [
+      ["step_id", "string"],
+      ["status", "string"],
+      ["evidence_refs", "array"],
+      ["summary", "string"],
+    ]) {
+      const value = record[field];
+      if (!isExpectedType(value, expectedType)) {
+        options.issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source: options.source,
+            field: `setup_journal[${index}].${field}`,
+            expected: value === undefined ? "present" : expectedType,
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Field 'setup_journal[${index}].${field}' is required for live E2E setup evidence.`,
+          }),
+        );
+      }
+    }
+    validateStringArrayItems({
+      values: record.evidence_refs,
+      source: options.source,
+      field: `setup_journal[${index}].evidence_refs`,
+      issues: options.issues,
+    });
     validateObservationStatusField({
       value: record.status,
       source: options.source,
-      field: `${options.field}[${index}].status`,
+      field: `setup_journal[${index}].status`,
       issues: options.issues,
     });
+  });
+}
+
+/**
+ * @param {{ entries: unknown, operatorContext?: Record<string, unknown>, reportStatus?: string, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateObservationStepJournal(options) {
+  if (!Array.isArray(options.entries)) return;
+  const operatorKind = typeof options.operatorContext?.operator_kind === "string" ? options.operatorContext.operator_kind : null;
+  const decisionPolicy = typeof options.operatorContext?.decision_policy === "string" ? options.operatorContext.decision_policy : null;
+  const finalReport = options.reportStatus !== "in_progress";
+  options.entries.forEach((entry, index) => {
+    const record = isPlainObject(entry) ? entry : {};
+    const plan = isPlainObject(record.plan) ? record.plan : null;
+    if (typeof record.iteration !== "number" || !Number.isInteger(record.iteration) || record.iteration < 1) {
+      options.issues.push(
+        issue({
+          code: record.iteration === undefined ? "required_field_missing" : "field_type_mismatch",
+          source: options.source,
+          field: `step_journal[${index}].iteration`,
+          expected: record.iteration === undefined ? "present" : "positive integer",
+          actual: record.iteration === undefined ? "missing" : describeActualType(record.iteration),
+          message: `Field 'step_journal[${index}].iteration' is required for repeated online live E2E step observations.`,
+        }),
+      );
+    }
+    for (const field of ["plan_ref", "execution_ref", "inspection_ref", "classification_ref"]) {
+      const value = record[field];
+      if (typeof value !== "string" || value.length === 0) {
+        options.issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source: options.source,
+            field: `step_journal[${index}].${field}`,
+            expected: "non-empty string",
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Field 'step_journal[${index}].${field}' is required for online live E2E step evidence references.`,
+          }),
+        );
+      }
+    }
+    if (!plan) {
+      options.issues.push(
+        issue({
+          code: record.plan === undefined ? "required_field_missing" : "field_type_mismatch",
+          source: options.source,
+          field: `step_journal[${index}].plan`,
+          expected: record.plan === undefined ? "present" : "object",
+          actual: record.plan === undefined ? "missing" : describeActualType(record.plan),
+          message: `Field 'step_journal[${index}].plan' is required for online live E2E step-controller reports.`,
+        }),
+      );
+    } else {
+      for (const field of [
+        "objective",
+        "public_surface",
+        "command_labels",
+        "expected_artifacts",
+        "inspection_sources",
+        "safety_constraints",
+      ]) {
+        const value = plan[field];
+        const expectedType = field === "objective" || field === "public_surface" ? "string" : "array";
+        if (!isExpectedType(value, expectedType)) {
+          options.issues.push(
+            issue({
+              code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+              source: options.source,
+              field: `step_journal[${index}].plan.${field}`,
+              expected: value === undefined ? "present" : expectedType,
+              actual: value === undefined ? "missing" : describeActualType(value),
+              message: `Field 'step_journal[${index}].plan.${field}' is required for online live E2E step planning.`,
+            }),
+          );
+        }
+      }
+    }
+    validateObservationStatusField({
+      value: record.final_step_verdict,
+      source: options.source,
+      field: `step_journal[${index}].final_step_verdict`,
+      issues: options.issues,
+    });
+    const deterministicAnalysis = isPlainObject(record.deterministic_analysis)
+      ? record.deterministic_analysis
+      : {};
+    validateObservationStatusField({
+      value: deterministicAnalysis.status,
+      source: options.source,
+      field: `step_journal[${index}].deterministic_analysis.status`,
+      issues: options.issues,
+    });
+    const semanticAnalysis = isPlainObject(record.semantic_analysis)
+      ? record.semantic_analysis
+      : {};
+    validateObservationStatusField({
+      value: semanticAnalysis.status,
+      source: options.source,
+      field: `step_journal[${index}].semantic_analysis.status`,
+      issues: options.issues,
+    });
+    for (const field of ["agent_decision_request_ref", "operator_decision_status"]) {
+      const value = record[field];
+      if (typeof value !== "string" || value.length === 0) {
+        options.issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source: options.source,
+            field: `step_journal[${index}].${field}`,
+            expected: "non-empty string",
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Field 'step_journal[${index}].${field}' is required for agent-operated live E2E decisions.`,
+          }),
+        );
+      }
+    }
+    const decisionStatus = record.operator_decision_status;
+    if (
+      typeof decisionStatus === "string" &&
+      !["accepted", "missing", "rejected", "not_required"].includes(decisionStatus)
+    ) {
+      options.issues.push(
+        issue({
+          code: "enum_value_invalid",
+          source: options.source,
+          field: `step_journal[${index}].operator_decision_status`,
+          expected: "accepted|missing|rejected|not_required",
+          actual: decisionStatus,
+          message: "Field 'operator_decision_status' must describe the operator decision state.",
+        }),
+      );
+    }
+    if (decisionStatus === "accepted" && typeof record.operator_decision_ref !== "string") {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: `step_journal[${index}].operator_decision_ref`,
+          expected: "string",
+          actual: record.operator_decision_ref === undefined ? "missing" : describeActualType(record.operator_decision_ref),
+          message: "Accepted live E2E operator decisions must carry 'operator_decision_ref'.",
+        }),
+      );
+    }
+    if (operatorKind === "skill-agent" && decisionPolicy === "required" && finalReport) {
+      if (decisionStatus !== "accepted") {
+        options.issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source: options.source,
+            field: `step_journal[${index}].operator_decision_status`,
+            expected: "accepted",
+            actual: decisionStatus === undefined ? "missing" : String(decisionStatus),
+            message: "Skill-agent live E2E reports require accepted operator decisions for each step.",
+          }),
+        );
+      }
+      if (semanticAnalysis.judge_source !== "skill-agent") {
+        options.issues.push(
+          issue({
+            code: "enum_value_invalid",
+            source: options.source,
+            field: `step_journal[${index}].semantic_analysis.judge_source`,
+            expected: "skill-agent",
+            actual: semanticAnalysis.judge_source === undefined ? "missing" : String(semanticAnalysis.judge_source),
+            message: "Acceptance live E2E semantic analysis must come from the skill-agent operator.",
+          }),
+        );
+      }
+    }
   });
 }
 
@@ -1994,7 +2366,7 @@ function validateObservationStatusField(options) {
         field: options.field,
         expected: options.value === undefined ? "present" : "string",
         actual: options.value === undefined ? "missing" : describeActualType(options.value),
-        message: `Field '${options.field}' must use live E2E observation status pass|warn|not_pass.`,
+        message: `Field '${options.field}' must use a supported live E2E observation status.`,
       }),
     );
     return;

@@ -256,5 +256,21 @@ This is the master index for the implementation slices across all defined waves.
 | W26-S02 | Maintainability stabilization | EPIC-0 | done | `scripts/live-e2e/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, tests | W26-S01 |
 | W26-S03 | Self-hosted release documentation | EPIC-7 | done | `README.md`, `docs/ops/**`, `docs/backlog/**`, `docs/product/**` | W26-S01 |
 
+## W27 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W27-S01 | Step-journal observation contract | EPIC-7 | done | `docs/contracts/**`, `packages/contracts/**`, `examples/reports/**` | W26-S03 |
+| W27-S02 | Runtime interaction resume | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, `apps/web/**`, tests | W27-S01 |
+| W27-S03 | Live E2E step controller output | EPIC-7 | done | `scripts/live-e2e/**`, `scripts/test/**` | W27-S01, W27-S02 |
+| W27-S04 | Profile and skill migration | EPIC-7 | done | `.agents/skills/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**` | W27-S03 |
+| W27-S05 | Legacy cleanup and proof alignment | EPIC-7 | done | `examples/live-e2e/**`, `scripts/**`, `docs/product/**`, `docs/backlog/**` | W27-S04 |
+
+## W28 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W28-S01 | AOR install proof and setup journal | EPIC-7 | done | `docs/contracts/**`, `packages/contracts`, `scripts/live-e2e/**`, `examples/reports/**` | W27-S05 |
+| W28-S02 | Full-lifecycle and interaction gap closure | EPIC-7 | done | `scripts/live-e2e/**`, `.agents/skills/**`, `docs/ops/**`, tests | W28-S01 |
+| W28-S03 | Matrix target expansion | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**` | W28-S01 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

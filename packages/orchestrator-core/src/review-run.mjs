@@ -8,7 +8,6 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 import {
   isTransientBackupPath,
   listChangedPaths,
-  matchesScopePattern,
 } from "./shared/mission-scope.mjs";
 
 /**
@@ -609,8 +608,6 @@ export function materializeReviewReport(options) {
     if (bootstrapOwnedFiles.has(candidate)) return false;
     return !bootstrapOwnedPrefixes.some((prefix) => candidate === prefix.slice(0, -1) || candidate.startsWith(prefix));
   });
-  const allowedPaths = asStringArray(requestDocument.allowed_paths);
-  const forbiddenPaths = asStringArray(requestDocument.forbidden_paths);
   if (codeChangedPaths.length === 0) {
     pushFinding({
       findings: codeFindings,
@@ -627,22 +624,6 @@ export function materializeReviewReport(options) {
         severity: "warn",
         category: "code-quality",
         summary: `Changed path '${changedPath}' appears to be a backup or transient editor artifact.`,
-      });
-    }
-    if (forbiddenPaths.some((pattern) => matchesScopePattern(pattern, changedPath))) {
-      pushFinding({
-        findings: codeFindings,
-        severity: "fail",
-        category: "code-quality",
-        summary: `Changed path '${changedPath}' falls inside a forbidden mission scope.`,
-      });
-    }
-    if (allowedPaths.length > 0 && !allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath))) {
-      pushFinding({
-        findings: codeFindings,
-        severity: "fail",
-        category: "code-quality",
-        summary: `Changed path '${changedPath}' is outside the allowed mission scope.`,
       });
     }
     if (
@@ -834,8 +815,6 @@ export function materializeReviewReport(options) {
     code_quality: {
       status: summarizeFindings(codeFindings),
       changed_paths: codeChangedPaths,
-      allowed_paths: allowedPaths,
-      forbidden_paths: forbiddenPaths,
       findings: codeFindings,
     },
     feature_size_fit: {

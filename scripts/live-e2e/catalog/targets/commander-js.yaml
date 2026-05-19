@@ -1,0 +1,168 @@
+catalog_id: commander-js
+repo:
+  repo_id: tj/commander.js
+  repo_url: https://github.com/tj/commander.js.git
+  ref: master
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - npm install
+  commands:
+    - npm run test
+    - npm run check
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: commander-js.regress.small.openai
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: commander-option-suggestion-regression
+    provider_variant_id: openai-primary
+    coverage_tier: required
+  - cell_id: commander-js.repair.medium.anthropic
+    scenario_family: repair
+    feature_size: medium
+    feature_mission_id: commander-help-typing-repair
+    provider_variant_id: anthropic-primary
+    coverage_tier: required
+  - cell_id: commander-js.governance.medium.openai
+    scenario_family: governance
+    feature_size: medium
+    feature_mission_id: commander-cli-governance-lineage
+    provider_variant_id: openai-primary
+    coverage_tier: required
+provider_comparison_pairs:
+  - pair_id: commander-js.regress.small
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: commander-option-suggestion-regression
+    provider_variants:
+      - openai-primary
+      - anthropic-primary
+feature_missions:
+  - mission_id: commander-option-suggestion-regression
+    title: Preserve option suggestion regression behavior
+    brief: Add or adjust one focused regression around option parsing, suggestions,
+      or error text while keeping the change inside the CLI parser surface.
+    feature_size: small
+    expected_evidence: &a1
+      - verify-summary
+      - routed-step-result
+      - review-report
+    acceptance_checks:
+      - keep the change inside parser behavior and tests
+      - preserve npm run test and npm run check evidence
+    post_run_quality:
+      primary_commands:
+        - npm run test
+        - npm run check
+      diagnostic_commands: []
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - regress
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 6
+      max_added_lines: 220
+    size_rationale: Small Commander regressions should stay inside one parser
+      behavior and one test seam.
+    change_budget:
+      max_changed_files: 6
+      max_added_lines: 220
+    quality_evidence: *a1
+  - mission_id: commander-help-typing-repair
+    title: Repair one help or typing consistency seam
+    brief: Fix one bounded help output, TypeScript declaration, or option metadata
+      inconsistency with matching regression coverage.
+    feature_size: medium
+    goals:
+      - Repair one help or typing consistency issue without changing unrelated
+        CLI behavior.
+    kpis:
+      - kpi_id: commander-help-typing-green
+        name: Commander help typing gate
+        target: npm run test and npm run check pass after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - Tests cover the repaired help or typing behavior.
+      - Review and delivery evidence remain anchored to the target checkout.
+    expected_evidence: &a2
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - preserve public API compatibility for untouched parser surfaces
+      - keep delivery evidence anchored to the target checkout
+    post_run_quality:
+      primary_commands:
+        - npm run test
+        - npm run check
+      diagnostic_commands: []
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - repair
+      - regress
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 8
+      max_added_lines: 320
+    size_rationale: Medium Commander repair may touch runtime and types but should
+      remain inside one user-facing command surface.
+    change_budget:
+      max_changed_files: 8
+      max_added_lines: 320
+    quality_evidence: *a2
+  - mission_id: commander-cli-governance-lineage
+    title: Govern one CLI behavior lineage change
+    brief: Exercise a broader CLI behavior change with strict review, delivery,
+      audit, and learning evidence.
+    feature_size: medium
+    goals:
+      - Preserve governance lineage for one CLI behavior change.
+      - Avoid upstream write-back while materializing delivery and learning
+        artifacts.
+    kpis:
+      - kpi_id: commander-governance-lineage
+        name: Commander governance lineage
+        target: review, delivery, audit, and learning artifacts preserve the same matrix
+          cell
+        measurement: scenario coverage and artifact consistency checks
+    definition_of_done:
+      - npm run test and npm run check pass.
+      - Governance and learning artifacts link to the same mission and target
+        checkout.
+    expected_evidence: &a3
+      - verify-summary
+      - review-report
+      - delivery-manifest
+      - learning-loop-handoff
+    acceptance_checks:
+      - keep governance evidence tied to the target checkout
+      - avoid any upstream write-back
+    post_run_quality:
+      primary_commands:
+        - npm run test
+        - npm run check
+      diagnostic_commands: []
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - governance
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+      - open-code-primary
+    size_budget:
+      max_changed_files: 10
+      max_added_lines: 420
+    size_rationale: Governance changes may touch runtime, types, and tests, but
+      should remain bounded to Commander command behavior.
+    change_budget:
+      max_changed_files: 10
+      max_added_lines: 420
+    quality_evidence: *a3

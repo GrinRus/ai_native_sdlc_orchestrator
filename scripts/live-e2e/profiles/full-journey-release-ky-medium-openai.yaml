@@ -3,6 +3,23 @@ version: 1
 journey_mode: full-journey
 flow_kind: release
 duration_class: long
+live_e2e:
+  flow_range_policy: full_lifecycle
+  installation_policy: source-install-required
+  interaction_capability: public-control-plane
+  frontend_capability: none
+  safety_policy: no-upstream-write
+  operator_mode: skill-agent
+  agent_decision_policy: required
+  interaction_answer_policy: agent-required
+  target_write_policy: aor-runtime-only-before-execution
+implementation_loop:
+  enabled: true
+  max_iterations: 3
+  review_repair_actions:
+    - request-repair
+    - failed-quality-findings
+  stop_on_blocking_review: true
 target_catalog_id: ky
 feature_mission_id: ky-release-doc-typing
 scenario_family: release

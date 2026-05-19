@@ -172,11 +172,12 @@ export function handleDeliveryCommand(context) {
     if (command === "release prepare" && flags["quality-gate-mode"] !== undefined) {
       throw new CliUsageError("Flag '--quality-gate-mode' is only valid for 'aor deliver prepare'.");
     }
+    const projectProfile = resolveOptionalStringFlag("project-profile", flags["project-profile"]);
 
     const init = initializeProjectRuntime({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
-      projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+      projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
     outputState.resolvedProjectRef = init.projectRoot;
@@ -223,7 +224,7 @@ export function handleDeliveryCommand(context) {
       const latestRuntimeHarness = findLatestRuntimeHarnessReportForRun({
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
-        projectProfile: resolveOptionalStringFlag("project-profile", flags["project-profile"]),
+        projectProfile,
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
         runId,
       });
@@ -235,7 +236,7 @@ export function handleDeliveryCommand(context) {
         };
       } else if (deliveryQualityGateMode === "strict") {
         throw new CliUsageError(
-          `${command} requires a latest run-level Runtime Harness report for run '${runId}' before strict '${deliveryModeForGate}' delivery. Run 'aor run start --run-id ${runId}' and close Runtime Harness findings before delivery or release.`,
+          `${command} requires Runtime Harness execution evidence for run '${runId}' before strict '${deliveryModeForGate}' delivery. Run 'aor run start --run-id ${runId}' and close Runtime Harness findings before delivery or release.`,
         );
       }
     }
@@ -275,6 +276,7 @@ export function handleDeliveryCommand(context) {
       const reviewDecisions = listQualityArtifacts({
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
+        projectProfile,
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
       })
         .filter((artifact) => artifact.family === "review-decision" && artifact.document.run_id === runId)
@@ -408,8 +410,7 @@ export function handleDeliveryCommand(context) {
         routedStepDecisionCount: Array.isArray(runtimeHarness.report.step_decisions)
           ? runtimeHarness.report.step_decisions.length
           : 0,
-        missionScopedChangedPaths: runtimeHarnessDeliveryGate.missionScopedChangedPaths,
-        scopeViolationPaths: runtimeHarnessDeliveryGate.scopeViolationPaths,
+        meaningfulChangedPaths: runtimeHarnessDeliveryGate.meaningfulChangedPaths,
         findings: runtimeHarnessDeliveryGate.findings,
       },
       rerunOfRunRef: rerunOfRunId ? toRunRef(rerunOfRunId) : undefined,

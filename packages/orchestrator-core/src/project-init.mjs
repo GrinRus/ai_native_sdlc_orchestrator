@@ -489,6 +489,50 @@ function ensureMaterializedProjectProfile(options) {
 }
 
 /**
+ * @param {{ sourceRoot: string, targetRoot: string }} options
+ * @returns {string[]}
+ */
+function collectMissingBundledAssetPaths(options) {
+  if (!fs.existsSync(options.sourceRoot)) {
+    return [];
+  }
+  const missing = [];
+  const visit = (sourcePath, relativePath) => {
+    const targetPath = path.join(options.targetRoot, relativePath);
+    if (!fs.existsSync(targetPath)) {
+      missing.push(relativePath || ".");
+      return;
+    }
+    const sourceStat = fs.statSync(sourcePath);
+    if (!sourceStat.isDirectory()) {
+      return;
+    }
+    for (const entry of fs.readdirSync(sourcePath)) {
+      visit(path.join(sourcePath, entry), path.join(relativePath, entry));
+    }
+  };
+  visit(options.sourceRoot, "");
+  return missing;
+}
+
+/**
+ * @param {{ sourceRoot: string, targetRoot: string }} options
+ * @returns {boolean}
+ */
+function materializeBundledAssetTree(options) {
+  const missingPaths = collectMissingBundledAssetPaths(options);
+  if (missingPaths.length === 0) {
+    return false;
+  }
+  fs.cpSync(options.sourceRoot, options.targetRoot, {
+    recursive: true,
+    force: false,
+    errorOnExist: false,
+  });
+  return true;
+}
+
+/**
  * @param {{ projectRoot: string }} options
  * @returns {{ materializedRoot: string | null, materialized: boolean, idempotent: boolean, materializedPaths: string[] }}
  */
@@ -499,15 +543,13 @@ function ensureBootstrapAssets(options) {
   let materialized = false;
   const materializedPaths = [];
 
-  if (!fs.existsSync(targetExamplesRoot)) {
-    fs.cpSync(bundledExamplesRoot, targetExamplesRoot, { recursive: true });
+  if (materializeBundledAssetTree({ sourceRoot: bundledExamplesRoot, targetRoot: targetExamplesRoot })) {
     materialized = true;
     materializedPaths.push(targetExamplesRoot);
   }
 
   const bundledContextRoot = path.join(bundledExamplesRoot, "context");
-  if (fs.existsSync(bundledContextRoot) && !fs.existsSync(targetContextRoot)) {
-    fs.cpSync(bundledContextRoot, targetContextRoot, { recursive: true });
+  if (materializeBundledAssetTree({ sourceRoot: bundledContextRoot, targetRoot: targetContextRoot })) {
     materialized = true;
     materializedPaths.push(targetContextRoot);
   }

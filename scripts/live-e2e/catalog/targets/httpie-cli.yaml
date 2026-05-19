@@ -8,7 +8,8 @@ verification:
   setup_commands:
     - make install
   commands:
-    - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py
+    - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py
+      tests/test_regressions.py tests/test_httpie_cli.py
     - make codestyle
 safety_defaults:
   write_back_to_remote: false
@@ -32,6 +33,12 @@ required_matrix_cells:
     feature_mission_id: httpie-cli-repair-exit-codes
     provider_variant_id: openai-primary
     coverage_tier: required
+  - cell_id: httpie-cli.governance.large.openai
+    scenario_family: governance
+    feature_size: large
+    feature_mission_id: httpie-cli-config-surface-hardening
+    provider_variant_id: openai-primary
+    coverage_tier: extended
 provider_comparison_pairs:
   - pair_id: httpie-cli.regress.small
     scenario_family: regress
@@ -43,18 +50,10 @@ provider_comparison_pairs:
 feature_missions:
   - mission_id: httpie-cli-output-regression
     title: Preserve one bounded CLI output regression
-    brief: Implement one narrow CLI behavior fix with matching regression coverage and keep the blast radius inside the relevant command surface.
+    brief: Implement one narrow CLI behavior fix with matching regression coverage
+      and keep the blast radius inside the relevant command surface.
     feature_size: small
-    allowed_paths:
-      - httpie/**
-      - tests/**
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a1
       - verify-summary
       - routed-step-result
       - review-report
@@ -69,24 +68,27 @@ feature_missions:
     size_budget:
       max_changed_files: 10
       max_added_lines: 320
-    size_rationale: Small httpie missions should remain inside one CLI surface with one focused regression slice.
+    size_rationale: Small httpie missions should remain inside one CLI surface with
+      one focused regression slice.
     change_budget:
       max_changed_files: 10
       max_added_lines: 320
+    quality_evidence: *a1
   - mission_id: httpie-cli-repair-exit-codes
     title: Repair one bounded CLI exit-code and formatting seam
-    brief: >-
-      Fix the plugin upgrade failure propagation and debug formatting seam in
-      `httpie/manager/tasks/plugins.py`: `PluginInstaller.upgrade()` must return the
-      `_install()` exit status after handling pip stdout so failed installs are not
-      coerced to success, and debug pip stderr must use
-      `textwrap.indent(stderr, '  ')` so every stderr line is indented correctly.
-      Add focused regression coverage in `tests/test_httpie_cli.py` for failed
-      upgrade propagation, successful upgrade return, and debug stderr indentation
-      while preserving the bounded pytest and codestyle slice.
+    brief: "Fix the plugin upgrade failure propagation and debug formatting seam in
+      `httpie/manager/tasks/plugins.py`: `PluginInstaller.upgrade()` must return
+      the `_install()` exit status after handling pip stdout so failed installs
+      are not coerced to success, and debug pip stderr must use
+      `textwrap.indent(stderr, '  ')` so every stderr line is indented
+      correctly. Add focused regression coverage in `tests/test_httpie_cli.py`
+      for failed upgrade propagation, successful upgrade return, and debug
+      stderr indentation while preserving the bounded pytest and codestyle
+      slice."
     feature_size: medium
     goals:
-      - Repair failed plugin upgrade exit status propagation and debug stderr indentation.
+      - Repair failed plugin upgrade exit status propagation and debug stderr
+        indentation.
       - Keep the bounded CLI pytest and codestyle evidence green.
     kpis:
       - kpi_id: httpie-exit-code-repair-green
@@ -97,23 +99,15 @@ feature_missions:
       - Failed plugin upgrade installs return the failing install status.
       - Debug pip stderr lines are indented consistently.
       - Delivery and review evidence are anchored to the target checkout.
-    allowed_paths:
-      - httpie/**
-      - tests/**
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a2
       - verify-summary
       - routed-step-result
       - review-report
       - delivery-manifest
     acceptance_checks:
       - keep the fix inside the CLI/runtime surface and its tests
-      - preserve failed plugin upgrade exit status instead of falling through to implicit success
+      - preserve failed plugin upgrade exit status instead of falling through to
+        implicit success
       - indent every debug pip stderr line with two spaces
       - preserve bounded pytest smoke plus codestyle linkage
       - keep delivery evidence anchored to the target checkout
@@ -122,7 +116,8 @@ feature_missions:
         - venv/bin/python -m pytest tests/test_httpie_cli.py
         - make codestyle
       diagnostic_commands:
-        - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py
+        - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py
+          tests/test_regressions.py tests/test_httpie_cli.py
       diagnostic_failure_mode: warn
     supported_scenarios:
       - repair
@@ -133,13 +128,17 @@ feature_missions:
     size_budget:
       max_changed_files: 12
       max_added_lines: 420
-    size_rationale: Medium httpie missions can cross one producer-consumer CLI boundary but should remain inside one subsystem and test slice.
+    size_rationale: Medium httpie missions can cross one producer-consumer CLI
+      boundary but should remain inside one subsystem and test slice.
     change_budget:
       max_changed_files: 12
       max_added_lines: 420
+    quality_evidence: *a2
   - mission_id: httpie-cli-config-surface-hardening
     title: Govern one broader CLI config and request-surface hardening change
-    brief: Touch a broader CLI configuration or request-handling surface with strict audit and learning closure, but keep the scope bounded to the runtime package and tests.
+    brief: Touch a broader CLI configuration or request-handling surface with strict
+      audit and learning closure, but keep the scope bounded to the runtime
+      package and tests.
     feature_size: large
     goals:
       - Harden one bounded CLI config or request-handling surface.
@@ -147,22 +146,15 @@ feature_missions:
     kpis:
       - kpi_id: httpie-governance-lineage
         name: HTTPie governance lineage
-        target: review, delivery, audit, and learning artifacts preserve the same matrix cell
+        target: review, delivery, audit, and learning artifacts preserve the same matrix
+          cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
       - Bounded pytest and codestyle gates pass.
-      - Governance and learning artifacts trace back to the mission and target checkout.
+      - Governance and learning artifacts trace back to the mission and target
+        checkout.
       - No upstream write-back is attempted.
-    allowed_paths:
-      - httpie/**
-      - tests/**
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a3
       - verify-summary
       - routed-step-result
       - review-report
@@ -174,10 +166,12 @@ feature_missions:
       - avoid any upstream write-back
     post_run_quality:
       primary_commands:
-        - venv/bin/python -m pytest tests/test_httpie_cli.py tests/test_regressions.py
+        - venv/bin/python -m pytest tests/test_httpie_cli.py
+          tests/test_regressions.py
         - make codestyle
       diagnostic_commands:
-        - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py tests/test_regressions.py tests/test_httpie_cli.py
+        - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py
+          tests/test_regressions.py tests/test_httpie_cli.py
       diagnostic_failure_mode: warn
     supported_scenarios:
       - governance
@@ -189,7 +183,9 @@ feature_missions:
     size_budget:
       max_changed_files: 16
       max_added_lines: 620
-    size_rationale: Large httpie missions may cross several CLI/config seams, but must remain inside the application package and explicit test boundaries.
+    size_rationale: Large httpie missions may cross several CLI/config seams, but
+      must remain inside the application package and explicit test boundaries.
     change_budget:
       max_changed_files: 16
       max_added_lines: 620
+    quality_evidence: *a3

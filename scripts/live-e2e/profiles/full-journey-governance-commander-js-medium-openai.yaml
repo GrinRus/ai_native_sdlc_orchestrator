@@ -1,0 +1,58 @@
+profile_id: live-e2e.full-journey.governance.commander-js.medium.openai
+version: 1
+journey_mode: full-journey
+flow_kind: governance
+duration_class: long
+live_e2e:
+  flow_range_policy: delivery_default
+  installation_policy: source-install-required
+  interaction_capability: public-control-plane
+  frontend_capability: none
+  safety_policy: no-upstream-write
+  operator_mode: skill-agent
+  agent_decision_policy: required
+  interaction_answer_policy: agent-required
+  target_write_policy: aor-runtime-only-before-execution
+implementation_loop:
+  enabled: true
+  max_iterations: 3
+  review_repair_actions:
+    - request-repair
+    - failed-quality-findings
+  stop_on_blocking_review: true
+target_catalog_id: commander-js
+feature_mission_id: commander-cli-governance-lineage
+scenario_family: governance
+provider_variant_id: openai-primary
+bootstrap_template: github-default
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - learning
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  eval_suites:
+    - suite.governance.integration@v1
+  harness:
+    enabled: true
+    asset_ref: wrapper://wrapper.eval.default@v1
+    subject_ref: wrapper://wrapper.eval.default@v1
+    suite_ref: suite.cert.core@v4
+    step_class: implement
+output_policy:
+  materialize_release_packet: false
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only

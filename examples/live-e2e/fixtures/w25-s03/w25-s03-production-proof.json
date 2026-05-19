@@ -43,7 +43,7 @@
     "feature_size": "small",
     "coverage_tier": "required"
   },
-  "verdict_matrix": {
+  "quality_judgement": {
     "scenario_family": "regress",
     "provider_variant_id": "openai-primary",
     "feature_size": "small",
@@ -66,7 +66,7 @@
     "delivery_release_quality": "pass",
     "learning_loop_closure": "pass",
     "quality_gate_decision": "pass",
-    "overall_verdict": "pass"
+    "overall_status": "pass"
   },
   "targets": [
     {
@@ -77,7 +77,7 @@
       "provider_variant_id": "openai-primary",
       "feature_size": "small",
       "proved_by_run": "w25-s02-real-proof-20260508095950",
-      "overall_verdict": "pass",
+      "overall_status": "pass",
       "changed_paths": [
         "source/utils/merge.ts",
         "test/headers.ts"
@@ -107,7 +107,7 @@
       "delivery_release_quality",
       "learning_loop_closure",
       "quality_gate_decision",
-      "overall_verdict"
+      "overall_status"
     ],
     "failed_target_verdicts": [],
     "findings": []
@@ -124,7 +124,7 @@
       "status": "pass",
       "overall_decision": "pass",
       "run_start_decision": "pass",
-      "mission_scoped_changed_paths": [
+      "meaningful_changed_paths": [
         "source/utils/merge.ts",
         "test/headers.ts"
       ]

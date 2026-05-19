@@ -191,7 +191,7 @@ Abort the rehearsal when any of these conditions occur:
 - routed dry-run step result is missing or has status `failed`;
 - budget limits are exceeded before safety gates pass.
 
-Full-journey observation additionally runs target verification again after provider execution. A post-run verification failure is recorded in `code_quality_after_delivery` and downgrades the observation to `warn` when delivery evidence still materializes.
+Full-journey observation additionally runs target verification again after provider execution. A post-run verification failure is recorded in `final_analysis.code_quality` and in the relevant step journal entries; delivery evidence no longer downgrades terminal failures to `warn`.
 
 ## Reuse map for later waves
 - **Bootstrap rehearsals:** reuse clone/inspect/analyze/validate/verify gating before packet materialization.

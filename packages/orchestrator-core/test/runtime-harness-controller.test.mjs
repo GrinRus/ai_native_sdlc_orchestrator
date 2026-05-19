@@ -125,13 +125,13 @@ test("run-level Runtime Harness controller blocks interactive continuation evide
   });
 });
 
-test("run-level Runtime Harness controller fails run-level closure for mission scope violations", () => {
+test("run-level Runtime Harness controller does not fail run-level closure by path alone", () => {
   withTempRepo((repoRoot) => {
     const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
     const requestFile = path.join(repoRoot, "feature-request.json");
     fs.writeFileSync(
       requestFile,
-      `${JSON.stringify({ allowed_paths: ["src/**"], forbidden_paths: ["docs/**"] }, null, 2)}\n`,
+      `${JSON.stringify({ goals: ["Implement a result-quality proof change."] }, null, 2)}\n`,
       "utf8",
     );
     materializeIntakeArtifactPacket({
@@ -140,7 +140,7 @@ test("run-level Runtime Harness controller fails run-level closure for mission s
       projectProfileRef: init.projectProfileRef,
       runtimeLayout: init.runtimeLayout,
       command: "aor intake create",
-      missionId: "controller-scope-violation",
+      missionId: "controller-path-only-quality",
       requestFile,
     });
     configureCodexExternalRuntime(repoRoot, [
@@ -149,17 +149,19 @@ test("run-level Runtime Harness controller fails run-level closure for mission s
         "const fs=require('node:fs');",
         "fs.mkdirSync('docs',{recursive:true});",
         "fs.writeFileSync('docs/out-of-scope.md','forbidden change\\n');",
-        "process.stdout.write(JSON.stringify({summary:'scope fail',output:{result:'scope-fail'},evidence_refs:['evidence://runner/scope-fail']}));",
+        "process.stdout.write(JSON.stringify({summary:'docs change',output:{result:'docs-change'},evidence_refs:['evidence://runner/docs-change']}));",
       ].join(""),
     ]);
 
-    const result = executeController(repoRoot, "runtime-harness-run-fail");
+    const result = executeController(repoRoot, "runtime-harness-run-path-quality");
 
-    assert.equal(result.stepResult.failure_class, "repo-scope-violation");
-    assert.equal(result.runController.runDecision.terminal_status, "failed");
-    assert.equal(result.runController.runDecision.overall_decision, "fail");
-    assert.equal(result.runtimeHarness.report.overall_decision, "fail");
-    assert.equal(result.runtimeHarness.report.run_controller.status, "failed");
+    assert.equal(result.stepResult.failure_class, "none");
+    assert.equal(result.stepResult.runtime_harness_decision, "pass");
+    assert.equal(result.runController.runDecision.terminal_status, "closed");
+    assert.equal(result.runController.runDecision.overall_decision, "pass");
+    assert.equal(result.runtimeHarness.report.overall_decision, "pass");
+    assert.equal(result.runtimeHarness.report.run_controller.status, "closed");
+    assert.deepEqual(result.stepResult.mission_semantics.meaningful_changed_paths, ["docs/out-of-scope.md"]);
   });
 });
 

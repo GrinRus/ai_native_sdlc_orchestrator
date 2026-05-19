@@ -56,7 +56,7 @@ Default production-candidate operation is no-upstream-write:
 - Use `local-branch` only for isolated local branch materialization.
 - Use `fork-first-pr` only when the operator explicitly enables the networked flow and credentials are present.
 
-Strict code-changing delivery must have latest run-level Runtime Harness pass evidence, review pass evidence, approved handoff/promotion evidence where required, and meaningful mission-scoped changed paths.
+Strict code-changing delivery must have Runtime Harness execution evidence with routed step decisions, review pass evidence, approved handoff/promotion evidence where required, and meaningful implementation changed paths. Run-level Runtime Harness evidence is preserved when available, but delivery quality is judged from execution health, review, verification, and final result evidence rather than run-level ownership alone.
 
 The W25 proof fixture demonstrates `patch-only` delivery with no upstream write.
 
@@ -81,7 +81,7 @@ Production-candidate proof is reviewable through:
 - `docs/backlog/self-hosted-production-readiness.md`
 - `docs/product/user-story-coverage-matrix.md`
 
-The proof must remain non-mock, code-changing, `external_runner_mode=real-external-process`, `real_code_change_proof_complete=true`, `overall_verdict=pass`, and no-upstream-write.
+The proof must remain non-mock, code-changing, `external_runner_mode=real-external-process`, `real_code_change_proof_complete=true`, `overall_status=pass`, and no-upstream-write.
 
 ## Non-goals
 

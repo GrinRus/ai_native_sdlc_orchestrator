@@ -38,6 +38,18 @@ required_matrix_cells:
     feature_mission_id: ky-header-regression
     provider_variant_id: open-code-primary
     coverage_tier: extended
+  - cell_id: ky.regress.medium.open-code
+    scenario_family: regress
+    feature_size: medium
+    feature_mission_id: ky-fetch-options-regression
+    provider_variant_id: open-code-primary
+    coverage_tier: extended
+  - cell_id: ky.governance.large.openai
+    scenario_family: governance
+    feature_size: large
+    feature_mission_id: ky-retry-hooks-governance
+    provider_variant_id: openai-primary
+    coverage_tier: extended
 provider_comparison_pairs:
   - pair_id: ky.regress.small
     scenario_family: regress
@@ -49,10 +61,12 @@ provider_comparison_pairs:
 feature_missions:
   - mission_id: ky-header-regression
     title: Preserve narrow header-normalization regression coverage
-    brief: Add or adjust one bounded regression test around header handling and the smallest source fix needed to satisfy it.
+    brief: Add or adjust one bounded regression test around header handling and the
+      smallest source fix needed to satisfy it.
     feature_size: small
     goals:
-      - Preserve one focused header-normalization behavior with a source or test change.
+      - Preserve one focused header-normalization behavior with a source or test
+        change.
     kpis:
       - kpi_id: ky-header-regression-green
         name: Header regression gate
@@ -61,16 +75,7 @@ feature_missions:
     definition_of_done:
       - The header regression gate, lint, and build commands pass.
       - Review evidence links the changed paths to the catalog mission.
-    allowed_paths:
-      - source/**
-      - test/**
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a1
       - verify-summary
       - routed-step-result
       - review-report
@@ -92,19 +97,25 @@ feature_missions:
       - openai-primary
       - anthropic-primary
       - open-code-primary
+      - open-code-primary
     size_budget:
       max_changed_files: 6
       max_added_lines: 220
-    size_rationale: One narrow library regression should stay inside one behavior surface and one test seam.
+    size_rationale: One narrow library regression should stay inside one behavior
+      surface and one test seam.
     change_budget:
       max_changed_files: 6
       max_added_lines: 220
+    quality_evidence: *a1
   - mission_id: ky-fetch-options-regression
     title: Extend one bounded fetch-options regression across source and typings
-    brief: Adjust one multi-file options-handling or retry-surface regression with matching tests and the smallest typing touch needed to keep the public API coherent.
+    brief: Adjust one multi-file options-handling or retry-surface regression with
+      matching tests and the smallest typing touch needed to keep the public API
+      coherent.
     feature_size: medium
     goals:
-      - Repair one bounded fetch-options or retry-surface regression across source, tests, and type surface.
+      - Repair one bounded fetch-options or retry-surface regression across
+        source, tests, and type surface.
     kpis:
       - kpi_id: ky-fetch-options-bounded-green
         name: Bounded fetch-options gate
@@ -112,18 +123,9 @@ feature_missions:
         measurement: post-run primary verification
     definition_of_done:
       - The change stays inside source, tests, and public type surface.
-      - Bounded primary verification passes and full npm test is recorded as diagnostic evidence.
-    allowed_paths:
-      - source/**
-      - test/**
-      - index.d.ts
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+      - Bounded primary verification passes and full npm test is recorded as
+        diagnostic evidence.
+    expected_evidence: &a2
       - verify-summary
       - routed-step-result
       - review-report
@@ -149,41 +151,38 @@ feature_missions:
     size_budget:
       max_changed_files: 8
       max_added_lines: 300
-    size_rationale: Medium ky missions may cross one behavior seam plus one type boundary, but should remain bounded to one package.
+    size_rationale: Medium ky missions may cross one behavior seam plus one type
+      boundary, but should remain bounded to one package.
     change_budget:
       max_changed_files: 8
       max_added_lines: 300
+    quality_evidence: *a2
   - mission_id: ky-release-doc-typing
     title: Prepare one release-shaped typed API adjustment
-    brief: Land one bounded API or typing fix with matching regression coverage and release-ready lineage.
+    brief: Land one bounded API or typing fix with matching regression coverage and
+      release-ready lineage.
     feature_size: medium
     goals:
-      - Land one release-shaped API or typing adjustment with matching regression evidence.
-      - Preserve patch-only delivery and release lineage without upstream write-back.
+      - Land one release-shaped API or typing adjustment with matching
+        regression evidence.
+      - Preserve patch-only delivery and release lineage without upstream
+        write-back.
     kpis:
       - kpi_id: ky-release-typing-lineage
         name: Release typing lineage
-        target: delivery-manifest, release-packet, and review-report are materialized from the same target checkout
+        target: delivery-manifest, release-packet, and review-report are materialized
+          from the same target checkout
         measurement: live E2E summary and delivery artifacts
       - kpi_id: ky-release-bounded-quality
         name: Bounded release quality gate
         target: lint, build, and targeted AVA coverage pass after the change
         measurement: post-run primary verification
     definition_of_done:
-      - Bounded primary verification passes and full npm test is preserved as diagnostic evidence.
+      - Bounded primary verification passes and full npm test is preserved as
+        diagnostic evidence.
       - Delivery and release packet evidence are anchored to the target checkout.
       - No upstream write-back is attempted.
-    allowed_paths:
-      - source/**
-      - test/**
-      - index.d.ts
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+    expected_evidence: &a3
       - delivery-manifest
       - release-packet
       - review-report
@@ -207,36 +206,33 @@ feature_missions:
     size_budget:
       max_changed_files: 8
       max_added_lines: 260
-    size_rationale: Release-shaped ky work can span code, tests, and typings, but should still stay within one bounded public API adjustment.
+    size_rationale: Release-shaped ky work can span code, tests, and typings, but
+      should still stay within one bounded public API adjustment.
     change_budget:
       max_changed_files: 8
       max_added_lines: 260
+    quality_evidence: *a3
   - mission_id: ky-retry-hooks-governance
     title: Exercise one broader retry and hooks governance-safe change
-    brief: Touch one broader request lifecycle surface with bounded regression coverage, stricter audit expectations, and no control-plane leakage.
+    brief: Touch one broader request lifecycle surface with bounded regression
+      coverage, stricter audit expectations, and no control-plane leakage.
     feature_size: large
     goals:
-      - Exercise one broader retry or hooks lifecycle change with governance-safe evidence.
+      - Exercise one broader retry or hooks lifecycle change with
+        governance-safe evidence.
       - Keep audit, review, and learning closure linked to the target checkout.
     kpis:
       - kpi_id: ky-governance-lineage
         name: Governance lineage
-        target: review, delivery, audit, and learning artifacts preserve the same matrix cell
+        target: review, delivery, audit, and learning artifacts preserve the same matrix
+          cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
-      - Bounded primary verification passes and diagnostic full-suite output is recorded.
-      - Governance, audit, and learning evidence links back to the mission and target checkout.
-    allowed_paths:
-      - source/**
-      - test/**
-      - index.d.ts
-    forbidden_paths:
-      - docs/**
-      - .github/**
-      - scripts/**
-      - examples/**
-      - context/**
-    expected_evidence:
+      - Bounded primary verification passes and diagnostic full-suite output is
+        recorded.
+      - Governance, audit, and learning evidence links back to the mission and
+        target checkout.
+    expected_evidence: &a4
       - verify-summary
       - routed-step-result
       - review-report
@@ -264,7 +260,9 @@ feature_missions:
     size_budget:
       max_changed_files: 12
       max_added_lines: 460
-    size_rationale: Large ky missions can cross multiple request lifecycle seams, but must still remain inside one repository package and explicit bounds.
+    size_rationale: Large ky missions can cross multiple request lifecycle seams,
+      but must still remain inside one repository package and explicit bounds.
     change_budget:
       max_changed_files: 12
       max_added_lines: 460
+    quality_evidence: *a4

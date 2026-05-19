@@ -306,7 +306,7 @@ function permissionFailureKindFromAdapterOutput(adapterOutput) {
 
 /**
  * @param {Record<string, unknown>} stepResult
- * @param {{ gitStatusAvailable?: boolean, strictCodeChangingNoop?: boolean, nonBootstrapChangedPaths?: string[], missionScopedChangedPaths?: string[], scopeViolationPaths?: string[] }} [options]
+ * @param {{ gitStatusAvailable?: boolean, strictCodeChangingNoop?: boolean, nonBootstrapChangedPaths?: string[], meaningfulChangedPaths?: string[] }} [options]
  * @returns {{ failureClass: string, decision: "pass" | "retry" | "repair" | "escalate" | "block" | "fail", missionOutcome: string }}
  */
 export function classifyRuntimeStepOutcome(stepResult, options = {}) {
@@ -321,8 +321,8 @@ export function classifyRuntimeStepOutcome(stepResult, options = {}) {
   const existingOutcome = asString(stepResult.mission_outcome);
   const stepClass = asString(stepResult.step_class);
   const executionMode = asString(routedExecution.mode);
-  const meaningfulChangedPaths = Array.isArray(options.missionScopedChangedPaths)
-    ? options.missionScopedChangedPaths
+  const meaningfulChangedPaths = Array.isArray(options.meaningfulChangedPaths)
+    ? options.meaningfulChangedPaths
     : options.nonBootstrapChangedPaths;
 
   if (permissionFailureKind === "permission-mode-blocked") {
@@ -330,17 +330,6 @@ export function classifyRuntimeStepOutcome(stepResult, options = {}) {
   }
   if (permissionFailureKind === "edit-denied") {
     return { failureClass: "edit-denied", decision: "repair", missionOutcome: "not_satisfied" };
-  }
-
-  if (
-    stepClass === "runner" &&
-    executionMode === "execute" &&
-    stepStatus === "passed" &&
-    adapterStatus === "success" &&
-    Array.isArray(options.scopeViolationPaths) &&
-    options.scopeViolationPaths.length > 0
-  ) {
-    return { failureClass: "repo-scope-violation", decision: "fail", missionOutcome: "not_satisfied" };
   }
 
   if (
@@ -495,7 +484,7 @@ export function synthesizeRepairAttempts(stepResult, classification, artifactRef
 /**
  * @param {Record<string, unknown>} stepResult
  * @param {string} artifactRef
- * @param {{ gitStatusAvailable: boolean, changedPaths: string[], nonBootstrapChangedPaths: string[], missionScopedChangedPaths: string[], nonInputChangedPaths: string[], ignoredInputFiles: string[], allowedPaths: string[], forbiddenPaths: string[], forbiddenChangedPaths: string[], outOfScopeChangedPaths: string[], scopeViolationPaths: string[], strictCodeChangingNoop: boolean }} missionSemantics
+ * @param {{ gitStatusAvailable: boolean, changedPaths: string[], nonBootstrapChangedPaths: string[], meaningfulChangedPaths: string[], nonInputChangedPaths: string[], ignoredInputFiles: string[], strictCodeChangingNoop: boolean }} missionSemantics
  */
 function buildStepDecision(stepResult, artifactRef, missionSemantics) {
   const routedExecution = asRecord(stepResult.routed_execution);
@@ -505,8 +494,7 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
     gitStatusAvailable: missionSemantics.gitStatusAvailable,
     strictCodeChangingNoop: missionSemantics.strictCodeChangingNoop,
     nonBootstrapChangedPaths: missionSemantics.nonBootstrapChangedPaths,
-    missionScopedChangedPaths: missionSemantics.missionScopedChangedPaths,
-    scopeViolationPaths: missionSemantics.scopeViolationPaths,
+    meaningfulChangedPaths: missionSemantics.meaningfulChangedPaths,
   });
   const startedAt = asString(routedExecution.started_at);
   const finishedAt = asString(routedExecution.finished_at);
@@ -531,13 +519,8 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
       changed_paths: missionSemantics.changedPaths,
       non_bootstrap_changed_paths: missionSemantics.nonBootstrapChangedPaths,
       non_input_changed_paths: missionSemantics.nonInputChangedPaths,
-      mission_scoped_changed_paths: missionSemantics.missionScopedChangedPaths,
+      meaningful_changed_paths: missionSemantics.meaningfulChangedPaths,
       ignored_input_files: missionSemantics.ignoredInputFiles,
-      allowed_paths: missionSemantics.allowedPaths,
-      forbidden_paths: missionSemantics.forbiddenPaths,
-      forbidden_changed_paths: missionSemantics.forbiddenChangedPaths,
-      out_of_scope_changed_paths: missionSemantics.outOfScopeChangedPaths,
-      scope_violation_paths: missionSemantics.scopeViolationPaths,
       strict_code_changing_noop: missionSemantics.strictCodeChangingNoop,
     },
     evidence_refs: uniqueStrings([artifactRef, ...asStringArray(stepResult.evidence_refs)]),
@@ -777,7 +760,6 @@ function recommendationActionForFinding(finding) {
     failureClass === "edit-denied" ||
     failureClass === "permission-mode-blocked" ||
     failureClass === "missing-evidence" ||
-    failureClass === "repo-scope-violation" ||
     failureClass === "review-failed" ||
     failureClass === "eval-failed" ||
     failureClass === "delivery-empty-patch"
@@ -816,13 +798,8 @@ export function materializeRuntimeHarnessReport(options) {
     changedPaths: changedPathStatus.changedPaths,
     nonBootstrapChangedPaths,
     nonInputChangedPaths: missionScopedChanges.nonInputChangedPaths,
-    missionScopedChangedPaths: missionScopedChanges.missionScopedChangedPaths,
+    meaningfulChangedPaths: missionScopedChanges.meaningfulChangedPaths,
     ignoredInputFiles: missionScopedChanges.ignoredInputFiles,
-    allowedPaths: missionScopedChanges.allowedPaths,
-    forbiddenPaths: missionScopedChanges.forbiddenPaths,
-    forbiddenChangedPaths: missionScopedChanges.forbiddenChangedPaths,
-    outOfScopeChangedPaths: missionScopedChanges.outOfScopeChangedPaths,
-    scopeViolationPaths: missionScopedChanges.scopeViolationPaths,
     strictCodeChangingNoop,
   };
   const stepArtifacts = loadRunStepArtifacts({ init, runId: options.runId });
@@ -851,8 +828,7 @@ export function materializeRuntimeHarnessReport(options) {
         gitStatusAvailable: missionSemantics.gitStatusAvailable,
         strictCodeChangingNoop: missionSemantics.strictCodeChangingNoop,
         nonBootstrapChangedPaths: missionSemantics.nonBootstrapChangedPaths,
-        missionScopedChangedPaths: missionSemantics.missionScopedChangedPaths,
-        scopeViolationPaths: missionSemantics.scopeViolationPaths,
+        meaningfulChangedPaths: missionSemantics.meaningfulChangedPaths,
       }).decision === "pass"
         ? []
         : extractImpactedAssetRefs(artifact.document),

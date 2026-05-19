@@ -18,7 +18,7 @@ Production readiness requires:
 - production-hardened auth scopes that fail closed without explicit permissions;
 - nested contract validation for production-critical packets, reports, and events;
 - a run-level Runtime Harness controller with run-level pass/block/fail/repair decisions;
-- strict delivery gates that require current harness pass evidence and meaningful mission-scoped changed paths;
+- strict delivery gates that require current harness pass evidence and meaningful implementation changed paths;
 - real non-mock full-journey proof with code-changing evidence and no upstream writes;
 - a separate production-readiness gate (`pnpm production:ready`) that cannot pass without that proof.
 
@@ -36,7 +36,7 @@ Production readiness requires:
 | `production-hardened` auth fails closed without explicit permissions. | `W23-S02` | API tests cover missing, read-only, mutate-only, read+mutate, wrong-project, and redacted denial paths. |
 | CLI/API lifecycle behavior has a shared service boundary. | `W23-S03` | `scripts/lint.mjs` dependency scan rejects `apps/api -> apps/cli` and `apps/cli -> apps/api` source edges. |
 | Runtime Harness has run-level controller ownership. | `W24-S01` | Run-level controller tests prove pass, block, fail, repair, and exhausted-repair flows; controller-generated reports carry `run_controller`, `run_transitions`, and `run_decision`. |
-| Interactive continuation has audited answer/block semantics without raw-answer streaming. | `W24-S02` | `run answer`, API, SSE, and web tests prove answer audit refs, `state_history[]`, deterministic `remain_blocked` evidence, and no raw answer text in command/read/stream surfaces. |
+| Interactive continuation has audited answer/resume/block semantics without raw-answer streaming. | `W24-S02`, `W27-S02` | `run answer`, API, SSE, and web tests prove answer audit refs, `state_history[]`, resumable `continue_run` evidence, deterministic blocked evidence for unsupported boundaries, and no raw answer text in command/read/stream surfaces. |
 | Strict delivery has a consolidated code-changing gate. | `W24-S03` | Delivery tests cover no-op, out-of-scope, missing harness, missing handoff, missing promotion, and valid patch-only pass. |
 | Real external-runner full-journey proof passed with no upstream write. | `W25-S02` | Promoted run evidence records `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, all required target verdicts `pass`, and no upstream write. |
 | Sanitized production proof fixture is committed and story upgrades are evidence-backed. | `W25-S03` | `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` is the committed fixture; proof integrity rejects mock-backed production claims; only fixture-backed stories are `proof-covered`. |
@@ -54,7 +54,7 @@ Production readiness requires:
 
 As of W26-S03, the matrix records `baseline-covered=106`, `proof-covered=4`, `partial=0`, and `blocked=2`. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
 
-The current production-proof fixture is `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`. It supports only the story rows that cite the fixture with `overall_verdict=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
+The current production-proof fixture is `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`. It supports only the story rows that cite the fixture with `overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 
 ## OpenCode status
 

@@ -57,10 +57,6 @@ code_quality:
   status: pass
   changed_paths:
     - packages/example/src/index.ts
-  allowed_paths:
-    - packages/example/**
-  forbidden_paths:
-    - docs/**
   findings: []
 feature_size_fit:
   status: pass

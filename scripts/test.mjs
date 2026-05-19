@@ -225,8 +225,8 @@ function collectProofChangedPaths(proof) {
     ...(Array.isArray(proof.no_upstream_write_assertion?.changed_paths)
       ? proof.no_upstream_write_assertion.changed_paths
       : []),
-    ...(Array.isArray(proof.evidence?.runtime_harness?.mission_scoped_changed_paths)
-      ? proof.evidence.runtime_harness.mission_scoped_changed_paths
+    ...(Array.isArray(proof.evidence?.runtime_harness?.meaningful_changed_paths)
+      ? proof.evidence.runtime_harness.meaningful_changed_paths
       : []),
   ];
 }
@@ -234,7 +234,7 @@ function collectProofChangedPaths(proof) {
 function validateProofBundleIntegrity(proof, bundlePath) {
   const errors = [];
   const targetVerdicts = Array.isArray(proof.targets)
-    ? proof.targets.map((target) => target.overall_verdict).filter(Boolean)
+    ? proof.targets.map((target) => target.overall_status).filter(Boolean)
     : [];
   const hasPassWithFindings = targetVerdicts.includes("pass_with_findings");
   const externalRunnerMode = String(proof.proof_method?.external_runner_mode ?? "");
@@ -262,8 +262,8 @@ function validateProofBundleIntegrity(proof, bundlePath) {
     if (targetVerdicts.some((verdict) => verdict !== "pass")) {
       errors.push(`${bundlePath} claims full_code_changing_runtime but not all target verdicts are pass.`);
     }
-    if (proof.verdict_matrix?.overall_verdict && proof.verdict_matrix.overall_verdict !== "pass") {
-      errors.push(`${bundlePath} claims full_code_changing_runtime without verdict_matrix.overall_verdict=pass.`);
+    if (proof.quality_judgement?.overall_status && proof.quality_judgement.overall_status !== "pass") {
+      errors.push(`${bundlePath} claims full_code_changing_runtime without quality_judgement.overall_status=pass.`);
     }
     if (externalRunnerMode.includes("mock")) {
       errors.push(`${bundlePath} claims full_code_changing_runtime but records a mock external runner mode.`);
@@ -294,7 +294,7 @@ function validateProofBundleIntegrity(proof, bundlePath) {
 
     const changedPaths = collectProofChangedPaths(proof);
     if (changedPaths.length === 0) {
-      errors.push(`${bundlePath} claims full_code_changing_runtime without mission-scoped changed paths.`);
+      errors.push(`${bundlePath} claims full_code_changing_runtime without meaningful implementation changed paths.`);
     }
     for (const changedPath of changedPaths) {
       if (path.isAbsolute(changedPath) || changedPath.startsWith(".aor/") || changedPath.includes("/.aor/")) {
@@ -369,7 +369,7 @@ function assertProofBundleIntegrity() {
     },
     targets: [
       {
-        overall_verdict: "pass",
+        overall_status: "pass",
       },
     ],
     changed_paths: ["source/utils/merge.ts"],
@@ -823,7 +823,7 @@ function assertUserStoryCoverageMatrixDocumentation() {
 
     if (
       row.coverageStatus === "proof-covered" &&
-      !/(proof|overall_verdict=pass|real_code_change_proof_complete=true|external_runner_mode=real-external-process|examples\/live-e2e\/fixtures)/iu.test(row.evidence)
+      !/(proof|overall_status=pass|real_code_change_proof_complete=true|external_runner_mode=real-external-process|examples\/live-e2e\/fixtures)/iu.test(row.evidence)
     ) {
       console.error(
         `Proof-covered user-story ${row.storyId} must cite executable proof evidence, not only baseline implementation evidence.`,
@@ -1044,7 +1044,8 @@ if (readmeBlackBoxTestRun.status !== 0) {
 console.log("README black-box tests ok: documented no-write quickstart runs on an external target repo");
 
 const liveE2EProofRunnerTestsPath = path.join(root, "scripts/test/live-e2e-proof-runner.test.mjs");
-const liveE2EProofRunnerTestRun = spawnSync(process.execPath, ["--test", liveE2EProofRunnerTestsPath], {
+const liveE2EStepControllerTestsPath = path.join(root, "scripts/test/live-e2e-step-controller.test.mjs");
+const liveE2EProofRunnerTestRun = spawnSync(process.execPath, ["--test", liveE2EStepControllerTestsPath, liveE2EProofRunnerTestsPath], {
   cwd: root,
   stdio: "inherit",
 });
@@ -1053,7 +1054,7 @@ if (liveE2EProofRunnerTestRun.status !== 0) {
   process.exit(liveE2EProofRunnerTestRun.status ?? 1);
 }
 
-console.log("live-e2e proof runner tests ok: installed-user black-box proof flow");
+console.log("live-e2e tests ok: online step controller and installed-user black-box proof flow");
 
 const cliTestsPath = path.join(root, "apps/cli/test/cli.test.mjs");
 const cliTestRun = spawnSync(process.execPath, ["--test", cliTestsPath], {

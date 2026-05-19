@@ -2,6 +2,16 @@ profile_id: live-e2e.release.short
 version: 1
 flow_kind: release
 duration_class: short
+live_e2e:
+  flow_range_policy: full_lifecycle
+  installation_policy: source-install-required
+  interaction_capability: public-control-plane
+  frontend_capability: none
+  safety_policy: no-upstream-write
+  operator_mode: deterministic-fixture
+  agent_decision_policy: optional
+  interaction_answer_policy: deterministic-fixture
+  target_write_policy: aor-runtime-only-before-execution
 project_profile_template_ref: examples/project.github.aor.yaml
 scenario_id: ky-release-short
 target_repo:
@@ -61,6 +71,7 @@ stages:
   - qa
   - delivery
   - release
+  - learning
 verification:
   build: true
   lint: true

@@ -144,6 +144,14 @@ graph TD
   W26S01[W26-S01 Production readiness gate]
   W26S02[W26-S02 Maintainability stabilization]
   W26S03[W26-S03 Self-hosted release documentation]
+  W27S01[W27-S01 Step-journal observation contract]
+  W27S02[W27-S02 Runtime interaction resume]
+  W27S03[W27-S03 Live E2E step controller output]
+  W27S04[W27-S04 Profile and skill migration]
+  W27S05[W27-S05 Legacy cleanup and proof alignment]
+  W28S01[W28-S01 AOR install proof and setup journal]
+  W28S02[W28-S02 Full-lifecycle and interaction gap closure]
+  W28S03[W28-S03 Matrix target expansion]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -375,6 +383,15 @@ graph TD
   W24S01 --> W26S01
   W26S01 --> W26S02
   W26S01 --> W26S03
+  W26S03 --> W27S01
+  W27S01 --> W27S02
+  W27S01 --> W27S03
+  W27S02 --> W27S03
+  W27S03 --> W27S04
+  W27S04 --> W27S05
+  W27S05 --> W28S01
+  W28S01 --> W28S02
+  W28S01 --> W28S03
 ```
 
 ## W0 hard dependencies
@@ -625,6 +642,22 @@ graph TD
 | W26-S02 | W26-S01 |
 | W26-S03 | W26-S01 |
 
+## W27 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W27-S01 | W26-S03 |
+| W27-S02 | W27-S01 |
+| W27-S03 | W27-S01, W27-S02 |
+| W27-S04 | W27-S03 |
+| W27-S05 | W27-S04 |
+
+## W28 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W28-S01 | W27-S05 |
+| W28-S02 | W28-S01 |
+| W28-S03 | W28-S01 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -766,6 +799,14 @@ graph TD
 138. W26-S01
 139. W26-S02
 140. W26-S03
+141. W27-S01
+142. W27-S02
+143. W27-S03
+144. W27-S04
+145. W27-S05
+146. W28-S01
+147. W28-S02
+148. W28-S03
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

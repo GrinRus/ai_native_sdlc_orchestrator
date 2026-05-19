@@ -147,14 +147,92 @@ export function loadProofRunnerProfile(options) {
 
   for (const candidate of candidates) {
     if (fileExists(candidate)) {
+      const profile = readYamlDocument(candidate);
+      assertLiveE2ePolicy(profile, candidate);
       return {
         profilePath: candidate,
-        profile: readYamlDocument(candidate),
+        profile,
       };
     }
   }
 
   throw new UsageError(`Profile '${options.profileRef}' was not found from cwd or host project root.`);
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {string} source
+ */
+function assertLiveE2ePolicy(profile, source) {
+  const profileId = asNonEmptyString(profile.profile_id) || path.basename(source);
+  const policy = asRecord(profile.live_e2e);
+  const flowRangePolicy = asNonEmptyString(policy.flow_range_policy);
+  const installationPolicy = asNonEmptyString(policy.installation_policy);
+  const interactionCapability = asNonEmptyString(policy.interaction_capability);
+  const frontendCapability = asNonEmptyString(policy.frontend_capability);
+  const safetyPolicy = asNonEmptyString(policy.safety_policy);
+  const operatorMode = asNonEmptyString(policy.operator_mode);
+  const agentDecisionPolicy = asNonEmptyString(policy.agent_decision_policy);
+  const interactionAnswerPolicy = asNonEmptyString(policy.interaction_answer_policy);
+  const targetWritePolicy = asNonEmptyString(policy.target_write_policy);
+  const internalTestHooks = asRecord(profile.internal_test_hooks);
+  const implementationLoop = asRecord(profile.implementation_loop);
+  const acceptanceLike =
+    internalTestHooks.allow_deterministic_operator_for_test !== true &&
+    (["acceptance", "production-proof"].includes(asNonEmptyString(profile.run_tier)) ||
+      asRecord(profile.production_proof).enabled === true ||
+      asNonEmptyString(profile.journey_mode) === "full-journey" ||
+      Boolean(asNonEmptyString(profile.target_catalog_id)));
+  const problems = [];
+
+  if (!["delivery_default", "full_lifecycle"].includes(flowRangePolicy)) {
+    problems.push("live_e2e.flow_range_policy must be delivery_default or full_lifecycle");
+  }
+  if (!["source-install-required", "provided-binary-required"].includes(installationPolicy)) {
+    problems.push("live_e2e.installation_policy must be source-install-required or provided-binary-required");
+  }
+  if (!["public-control-plane"].includes(interactionCapability)) {
+    problems.push("live_e2e.interaction_capability must be public-control-plane");
+  }
+  if (!["none", "guided-web-smoke"].includes(frontendCapability)) {
+    problems.push("live_e2e.frontend_capability must be none or guided-web-smoke");
+  }
+  if (!["no-upstream-write"].includes(safetyPolicy)) {
+    problems.push("live_e2e.safety_policy must be no-upstream-write");
+  }
+  if (!["skill-agent", "deterministic-fixture"].includes(operatorMode)) {
+    problems.push("live_e2e.operator_mode must be skill-agent or deterministic-fixture");
+  }
+  if (!["required", "optional"].includes(agentDecisionPolicy)) {
+    problems.push("live_e2e.agent_decision_policy must be required or optional");
+  }
+  if (!["agent-required", "deterministic-fixture"].includes(interactionAnswerPolicy)) {
+    problems.push("live_e2e.interaction_answer_policy must be agent-required or deterministic-fixture");
+  }
+  if (targetWritePolicy !== "aor-runtime-only-before-execution") {
+    problems.push("live_e2e.target_write_policy must be aor-runtime-only-before-execution");
+  }
+  if (acceptanceLike) {
+    if (operatorMode !== "skill-agent") {
+      problems.push("acceptance/production-proof profiles must use live_e2e.operator_mode=skill-agent");
+    }
+    if (agentDecisionPolicy !== "required") {
+      problems.push("acceptance/production-proof profiles must use live_e2e.agent_decision_policy=required");
+    }
+    if (interactionAnswerPolicy !== "agent-required") {
+      problems.push("acceptance/production-proof profiles must use live_e2e.interaction_answer_policy=agent-required");
+    }
+    if (implementationLoop.enabled !== true) {
+      problems.push("acceptance/production-proof profiles must enable implementation_loop.enabled=true");
+    }
+    if (!Number.isInteger(implementationLoop.max_iterations) || Number(implementationLoop.max_iterations) < 1) {
+      problems.push("acceptance/production-proof profiles must declare implementation_loop.max_iterations >= 1");
+    }
+  }
+
+  if (problems.length > 0) {
+    throw new UsageError(`Live E2E profile '${profileId}' is missing black-box step-loop policy: ${problems.join("; ")}.`);
+  }
 }
 
 /**

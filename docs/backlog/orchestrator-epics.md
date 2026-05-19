@@ -98,6 +98,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W21:** `W21-S02` Installable CLI and first-run entrypoints; `W21-S05` Guided web app full-flow console
 - **W23:** `W23-S02` Explicit production auth scopes; `W23-S03` Shared lifecycle service boundary
 - **W24:** `W24-S02` Interactive continuation hardening
+- **W27:** `W27-S02` Runtime interaction resume
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -123,3 +124,5 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W21:** `W21-S07` Installed-user guided journey proof
 - **W25:** `W25-S01` Real external-runner proof profile; `W25-S02` Code-changing full-journey pass; `W25-S03` Proof fixture and story upgrade
 - **W26:** `W26-S03` Self-hosted release documentation
+- **W27:** `W27-S01` Step-journal observation contract; `W27-S03` Live E2E step controller output; `W27-S04` Profile and skill migration; `W27-S05` Legacy cleanup and proof alignment
+- **W28:** `W28-S01` AOR install proof and setup journal; `W28-S02` Full-lifecycle and interaction gap closure; `W28-S03` Matrix target expansion

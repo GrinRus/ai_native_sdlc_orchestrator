@@ -105,7 +105,7 @@ Mutation error-shape checks:
 - missing lifecycle command flags return `error.code: "invalid_lifecycle_flags"`;
 - policy/transition block returns HTTP `409` with `error.code` in the `run_control.blocked` family and a durable `run_control.audit_file`.
 - lifecycle policy/validation blocks return HTTP `409` with `error.code` in the `lifecycle_command.*` family and the original CLI `command_output` preserved.
-- accepted interaction answers that cannot resume yet return HTTP `409` with `error.code: "interaction.continuation_blocked"` plus `interaction_answer.answer_audit_ref`.
+- accepted interaction answers with resumable checkpoints return HTTP `200` and `interaction_answer.interaction_status="resumed"`; non-resumable boundaries return HTTP `409` with `error.code: "interaction.continuation_blocked"` plus `interaction_answer.answer_audit_ref`.
 
 ## Full-flow console checks
 The detachable operator console must drive connected lifecycle actions through the control plane. Smoke the web module paths with:

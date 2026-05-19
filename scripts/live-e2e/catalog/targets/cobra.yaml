@@ -1,0 +1,46 @@
+catalog_id: cobra
+repo:
+  repo_id: spf13/cobra
+  repo_url: https://github.com/spf13/cobra.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - go mod download
+  commands:
+    - go test ./...
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: cobra.regress.small.openai
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: cobra-command-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
+provider_comparison_pairs: []
+feature_missions:
+  - mission_id: cobra-command-regression
+    title: Preserve one command parsing regression
+    brief: Add one bounded command parsing or help behavior regression with Go test
+      evidence.
+    feature_size: small
+    expected_evidence: &a1
+      - verify-summary
+      - review-report
+    acceptance_checks:
+      - keep the change inside Cobra source/tests
+      - preserve go test ./... evidence
+    supported_scenarios:
+      - regress
+    recommended_provider_variants:
+      - openai-primary
+    size_budget:
+      max_changed_files: 6
+      max_added_lines: 220
+    size_rationale: Extended Cobra coverage should start with one narrow command behavior seam.
+    change_budget:
+      max_changed_files: 6
+      max_added_lines: 220
+    quality_evidence: *a1

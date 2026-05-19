@@ -20,9 +20,8 @@ Each mission should carry:
 - `feature_size`
 - `supported_scenarios`
 - `recommended_provider_variants`
-- `allowed_paths`
-- `forbidden_paths`
 - `expected_evidence`
+- `quality_evidence`
 - `acceptance_checks`
 - `size_budget`
 - `size_rationale`
@@ -37,6 +36,8 @@ release-quality live E2E run:
 Small regression missions may omit those fields when the bounded command gate is
 otherwise explicit, but the runner reports medium+ omissions as failed artifact
 quality and does not close required matrix acceptance.
+
+Missions must not use `allowed_paths` or `forbidden_paths` as Runtime Harness or live E2E acceptance gates. The catalog describes expected behavior, verification commands, quality evidence, feature size, and risks; final implementation quality is judged from the target result, skill-agent operator assessment, review, delivery, and post-run verification evidence.
 
 ## Verification policy
 Catalog target `verification` keeps the existing command shape:
@@ -62,10 +63,10 @@ Full-journey reports must distinguish:
 - `post_run_diagnostic_verify_summary_file` and `post_run_diagnostic_status` when mission diagnostics are configured
 - `provider_execution_status`, `real_code_change_status`, `run_start_runtime_harness_decision`, `latest_runtime_harness_decision`, and `quality_gate_decision`
 
-`provider_execution_status=pass` requires materialized adapter raw execution evidence, not just provider route traceability. `real_code_change_status=pass` requires meaningful mission-scoped changed paths; backup/editor artifacts are not valid real-code-change evidence.
+`provider_execution_status=pass` requires materialized adapter raw execution evidence, not just provider route traceability. `real_code_change_status=pass` requires meaningful changed paths after setup baseline; backup/editor artifacts and `.aor/` runtime artifacts are not valid real-code-change evidence.
 
 Run summaries must also carry a canonical status block that is separate from the
-legacy `verdict_matrix`:
+target-level `quality_judgement`:
 - `command_status`: public AOR subprocesses completed and emitted readable payloads.
 - `target_verification_status`: post-run primary target verification result.
 - `artifact_quality_status`: intake, lineage, review, and artifact consistency result.

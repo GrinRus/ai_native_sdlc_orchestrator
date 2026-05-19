@@ -975,7 +975,7 @@ test("guided web lifecycle renders blocked and read-only states without losing e
   });
 });
 
-test("web connected mode surfaces runner questions and submits blocked interaction answers", async () => {
+test("web connected mode surfaces runner questions and submits resumable interaction answers", async () => {
   await withTempProject(async (projectRoot) => {
     const runId = seedOperatorArtifacts(projectRoot);
     const interactionId = "web-question-1";
@@ -1023,16 +1023,15 @@ test("web connected mode surfaces runner questions and submits blocked interacti
         reason: "operator selected safe target",
       });
       assert.equal(answer.binding_mode, "detached-http-mutation");
-      assert.equal(answer.error.code, "interaction.continuation_blocked");
       assert.equal(answer.interaction_answer.answer_accepted, true);
-      assert.equal(answer.interaction_answer.interaction_status, "blocked");
+      assert.equal(answer.interaction_answer.interaction_status, "resumed");
 
       const updatedStepResult = JSON.parse(fs.readFileSync(stepResultFile, "utf8"));
       assert.equal(JSON.stringify(updatedStepResult).includes(answerText), false);
-      assert.equal(updatedStepResult.requested_interaction.status, "blocked");
+      assert.equal(updatedStepResult.requested_interaction.status, "resumed");
       assert.deepEqual(
         updatedStepResult.requested_interaction.state_history.map((entry) => entry.status),
-        ["requested", "answered", "blocked"],
+        ["requested", "answered", "resumed"],
       );
       assert.ok(updatedStepResult.requested_interaction.answer_audit_refs.includes(answer.interaction_answer.answer_audit_ref));
 
@@ -1044,7 +1043,7 @@ test("web connected mode surfaces runner questions and submits blocked interacti
       const updatedInteraction = afterSnapshot.run_detail.interactions.find(
         (entry) => entry.interaction_id === interactionId,
       );
-      assert.equal(updatedInteraction?.interaction_status, "blocked");
+      assert.equal(updatedInteraction?.interaction_status, "resumed");
       assert.equal(updatedInteraction?.answer_required, false);
       assert.equal(JSON.stringify(afterSnapshot).includes(answerText), false);
       assert.equal(renderOperatorConsoleHtml(afterSnapshot).includes(answerText), false);

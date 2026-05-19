@@ -732,10 +732,12 @@ export function handleOperationsCommand(context) {
     ensureRequiredFlags(command, flags);
     const runIdFilter = resolveOptionalStringFlag("run-id", flags["run-id"]);
     const limit = resolveOptionalIntegerFlag("limit", flags.limit, { min: 1 });
+    const projectProfile = resolveOptionalStringFlag("project-profile", flags["project-profile"]);
 
     const projectState = readProjectState({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
     outputState.resolvedProjectRef = projectState.project_root;
@@ -747,6 +749,7 @@ export function handleOperationsCommand(context) {
     const runsForAudit = listRuns({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
     const scopedRuns = runIdFilter
@@ -760,11 +763,13 @@ export function handleOperationsCommand(context) {
     const qualityArtifactList = listQualityArtifacts({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
     const stepArtifacts = listStepResults({
       cwd,
       projectRef: /** @type {string} */ (flags["project-ref"]),
+      projectProfile,
       runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
     });
     const incidents = qualityArtifactList.filter((artifact) => artifact.family === "incident-report");

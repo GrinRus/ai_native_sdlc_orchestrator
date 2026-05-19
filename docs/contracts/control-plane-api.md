@@ -130,7 +130,8 @@ HTTP interactive answer mutation baseline:
 - the referenced interaction must match the latest unresolved run-linked `step-result.requested_interaction`;
 - accepted answers write one durable `interaction-answer-*.json` audit artifact under the runtime reports root before any continuation state changes;
 - response payloads return `{ interaction_answer }` with `interaction_id`, `interaction_status`, `answer_audit_ref`, `step_result_ref`, `run_control_transition`, `blocked_reason`, and live event ids;
-- when the current runtime cannot resume from the recorded interaction boundary, the transport returns HTTP `409` with `error.code=interaction.continuation_blocked` and keeps the run blocked with evidence refs;
+- resumable checkpoints return HTTP `200` with `interaction_status=resumed`, a `run_control_transition`, and query-safe live event ids;
+- non-resumable boundaries return HTTP `409` with `error.code=interaction.continuation_blocked` and keep the run blocked with evidence refs;
 - live events and query payloads must reference `answer_audit_ref` and must not include the raw answer text.
 - CLI, API, and web surfaces expose the same query-safe answer result; raw answer text is allowed only in the durable answer audit artifact, never in command output, read models, SSE payloads, or web snapshots.
 
@@ -187,7 +188,7 @@ Interactive continuation target (W18-S01):
 - operator answers should be submitted through a control-plane command path that records answer audit evidence before any continuation attempt;
 - answer submission payloads should include `run_id`, `interaction_id`, `answer`, and optional `reason`, `approval_ref`, or `answer_evidence_ref`;
 - answer submission responses should include `interaction_id`, `interaction_status`, `answer_audit_ref`, `step_result_ref`, `run_control_transition`, and `blocked_reason` when continuation cannot proceed;
-- continuation should either resume the bounded run from the recorded interaction boundary or remain blocked with explicit evidence refs and reason codes;
+- continuation should resume the bounded run from the recorded interaction boundary when the checkpoint declares `resume_from_boundary`; non-resumable boundaries remain blocked with explicit evidence refs and reason codes;
 - live event payloads should reference `requested_interaction` and `answer_audit_ref` without exposing raw answer text;
 - web clients may present and submit the interaction, but the control plane remains responsible for validation, audit, and run-state transitions.
 - the persisted `requested_interaction.state_history[]` ledger should preserve requested, answered, resumed, and blocked transitions with audit refs so clients can render the latest state without replaying raw logs.
@@ -352,7 +353,7 @@ Detached mutation error-shape baseline:
 - `invalid_run_control_action`, `invalid_ui_lifecycle_action`, and `invalid_lifecycle_command` for unsupported actions;
 - `invalid_lifecycle_flags` and `interaction_answer.invalid_answer` for malformed mutation inputs;
 - `run_control.blocked` family codes for policy or transition blocking branches.
-- `lifecycle_command.blocked`, `lifecycle_command.interaction_required`, and `interaction.continuation_blocked` for bounded command and continuation blocking branches.
+- `lifecycle_command.blocked`, `lifecycle_command.interaction_required`, and `interaction.continuation_blocked` for bounded command and non-resumable continuation branches.
 
 Detached authn/authz baseline (W10-S04):
 - auth mode is optional and disabled by default for local trusted operator rehearsals;

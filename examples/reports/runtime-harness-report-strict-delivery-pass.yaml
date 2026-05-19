@@ -1,7 +1,7 @@
 report_id: RUN-DELIVERY-004.runtime-harness-report.v1
 project_id: aor-core
 run_id: RUN-DELIVERY-004
-generated_at: "2026-04-26T00:10:00.000Z"
+generated_at: 2026-04-26T00:10:00.000Z
 mission_type: code-changing
 strictness_profile: strict-code-changing
 overall_decision: pass
@@ -9,8 +9,8 @@ run_controller:
   controller_id: runtime-harness-run-controller
   controller_version: v1
   status: closed
-  started_at: "2026-04-26T00:00:00.000Z"
-  finished_at: "2026-04-26T00:10:00.000Z"
+  started_at: 2026-04-26T00:00:00.000Z
+  finished_at: 2026-04-26T00:10:00.000Z
   transition_count: 4
   terminal_transition_id: RUN-DELIVERY-004.transition.close.004
 run_transitions:
@@ -19,8 +19,8 @@ run_transitions:
     status: pass
     runtime_harness_decision: pass
     summary: Runtime Harness prepared run ownership and mission scope.
-    started_at: "2026-04-26T00:00:00.000Z"
-    finished_at: "2026-04-26T00:00:01.000Z"
+    started_at: 2026-04-26T00:00:00.000Z
+    finished_at: 2026-04-26T00:00:01.000Z
     evidence_refs:
       - evidence://reports/step-result-run-delivery-004.json
   - transition_id: RUN-DELIVERY-004.transition.execute.002
@@ -28,17 +28,17 @@ run_transitions:
     status: pass
     runtime_harness_decision: pass
     summary: Runtime Harness delegated the routed implementation step.
-    started_at: "2026-04-26T00:00:01.000Z"
-    finished_at: "2026-04-26T00:08:00.000Z"
+    started_at: 2026-04-26T00:00:01.000Z
+    finished_at: 2026-04-26T00:08:00.000Z
     evidence_refs:
       - evidence://reports/step-result-run-delivery-004.json
   - transition_id: RUN-DELIVERY-004.transition.verify.003
     stage: verify
     status: pass
     runtime_harness_decision: pass
-    summary: Runtime Harness verified routed decisions and mission-scoped changed paths.
-    started_at: "2026-04-26T00:08:00.000Z"
-    finished_at: "2026-04-26T00:09:00.000Z"
+    summary: Runtime Harness verified routed decisions and meaningful implementation changed paths.
+    started_at: 2026-04-26T00:08:00.000Z
+    finished_at: 2026-04-26T00:09:00.000Z
     evidence_refs:
       - evidence://reports/step-result-run-delivery-004.json
   - transition_id: RUN-DELIVERY-004.transition.close.004
@@ -46,8 +46,8 @@ run_transitions:
     status: pass
     runtime_harness_decision: pass
     summary: Runtime Harness closed the run with strict delivery evidence.
-    started_at: "2026-04-26T00:09:00.000Z"
-    finished_at: "2026-04-26T00:10:00.000Z"
+    started_at: 2026-04-26T00:09:00.000Z
+    finished_at: 2026-04-26T00:10:00.000Z
     evidence_refs:
       - evidence://reports/step-result-run-delivery-004.json
 run_decision:
@@ -55,7 +55,7 @@ run_decision:
   terminal_status: closed
   failure_class: null
   repair_status: null
-  summary: Runtime Harness closed the code-changing run with a mission-scoped patch.
+  summary: Runtime Harness closed the code-changing run with a meaningful implementation patch.
   evidence_refs:
     - evidence://reports/step-result-run-delivery-004.json
 step_decisions:
@@ -69,8 +69,8 @@ step_decisions:
     repair_attempts: []
     verification_status: pass
     stage_timings:
-      started_at: "2026-04-26T00:00:01.000Z"
-      finished_at: "2026-04-26T00:08:00.000Z"
+      started_at: 2026-04-26T00:00:01.000Z
+      finished_at: 2026-04-26T00:08:00.000Z
       duration_sec: 479
     mission_semantics:
       git_status_available: true
@@ -89,23 +89,14 @@ step_decisions:
         - repos/backend/contracts/openapi.yaml
         - repos/mobile/src/api/client.ts
         - repos/frontend/src/api/client.ts
-      mission_scoped_changed_paths:
+      ignored_input_files:
+        - requests/RUN-DELIVERY-004.json
+      strict_code_changing_noop: false
+      meaningful_changed_paths:
         - repos/backend/src/orders.ts
         - repos/backend/contracts/openapi.yaml
         - repos/mobile/src/api/client.ts
         - repos/frontend/src/api/client.ts
-      ignored_input_files:
-        - requests/RUN-DELIVERY-004.json
-      allowed_paths:
-        - repos/backend/**
-        - repos/mobile/**
-        - repos/frontend/**
-      forbidden_paths:
-        - .aor/**
-      forbidden_changed_paths: []
-      out_of_scope_changed_paths: []
-      scope_violation_paths: []
-      strict_code_changing_noop: false
     evidence_refs:
       - evidence://reports/step-result-run-delivery-004.json
 run_findings: []

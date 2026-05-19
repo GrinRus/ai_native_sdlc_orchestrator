@@ -500,7 +500,7 @@
     "learning_loop_scorecard_file": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/learning-loop-scorecard-cli-learning-handoff-w13-s06.full-journey-release-nextjs.json",
     "learning_loop_handoff_file": "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/target-checkouts/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/.aor/projects/belgattitude-nextjs-monorepo-example-w13-s06.full-journey-release-nextjs/reports/learning-loop-handoff-w13-s06.full-journey-release-nextjs.json",
     "incident_report_file": null,
-    "verdict_matrix": {
+    "quality_judgement": {
       "target_selection": "pass",
       "feature_request_quality": "pass",
       "discovery_quality": "pass",
@@ -509,10 +509,10 @@
       "code_quality": "warn",
       "delivery_release_quality": "pass",
       "learning_loop_closure": "pass",
-      "overall_verdict": "pass_with_findings"
+      "overall_status": "pass_with_findings"
     }
   },
-  "verdict_matrix": {
+  "quality_judgement": {
     "target_selection": "pass",
     "feature_request_quality": "pass",
     "discovery_quality": "pass",
@@ -521,7 +521,7 @@
     "code_quality": "warn",
     "delivery_release_quality": "pass",
     "learning_loop_closure": "pass",
-    "overall_verdict": "pass_with_findings"
+    "overall_status": "pass_with_findings"
   },
   "scorecard_files": [
     "./.aor/w13-s06-proof/runtime-nextjs/projects/aor-core/reports/live-e2e-scorecard-target-w13-s06.full-journey-release-nextjs.json"

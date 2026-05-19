@@ -1,10 +1,10 @@
 {
-  "report_id": "w12-s04.release-short.live-e2e-observation.v1",
+  "report_id": "w12-s04.release-short.live-e2e-observation.v2",
   "run_id": "w12-s04.release-short",
   "profile_id": "live-e2e.release.short",
   "flow_range": {
     "start_step": "discovery",
-    "end_step": "delivery",
+    "end_step": "learning",
     "included_steps": [
       "discovery",
       "spec",
@@ -13,129 +13,125 @@
       "execution",
       "review",
       "qa",
-      "delivery"
+      "delivery",
+      "release",
+      "learning"
     ],
     "prelude_steps": [
+      "bootstrap",
       "project-init",
       "intake-create",
       "project-analyze",
       "project-validate"
     ],
-    "excluded_steps": [
-      "release",
-      "learning"
-    ]
+    "excluded_steps": []
   },
+  "flow_range_policy": "full_lifecycle",
   "overall_status": "warn",
-  "step_matrix": [
+  "step_journal": [
     {
-      "step": "discovery",
-      "status": "pass",
-      "command_label": "project-analyze",
+      "sequence": 1,
+      "step_id": "delivery",
+      "flow_stage": "delivery",
+      "public_surface": "aor deliver prepare",
+      "transcript_ref": "release-short.delivery-transcript.json",
       "artifact_refs": [
-        "release-short.run-summary.json"
+        "release-short.delivery-manifest.json"
       ],
-      "findings": []
-    },
-    {
-      "step": "spec",
-      "status": "pass",
-      "command_label": "project-validate",
-      "artifact_refs": [
-        "release-short.run-summary.json"
-      ],
-      "findings": []
-    },
-    {
-      "step": "planning",
-      "status": "pass",
-      "command_label": "handoff-prepare",
-      "artifact_refs": [
-        "release-short.run-summary.json"
-      ],
-      "findings": []
-    },
-    {
-      "step": "handoff",
-      "status": "pass",
-      "command_label": "handoff-approve",
-      "artifact_refs": [
-        "release-short.run-summary.json"
-      ],
-      "findings": []
-    },
-    {
-      "step": "execution",
-      "status": "pass",
-      "command_label": "project-verify-routed-live",
-      "artifact_refs": [
-        "release-short.routed-step-result.json"
-      ],
-      "findings": []
-    },
-    {
-      "step": "review",
-      "status": "warn",
-      "command_label": null,
-      "artifact_refs": [],
-      "findings": [
-        "legacy W12 fixture predates public review-run evidence"
-      ]
-    },
-    {
-      "step": "qa",
-      "status": "pass",
-      "command_label": "eval-run",
-      "artifact_refs": [
-        "release-short.run-summary.json"
-      ],
-      "findings": []
-    },
-    {
-      "step": "delivery",
-      "status": "pass",
-      "command_label": "deliver-prepare",
-      "artifact_refs": [
-        "release-short.delivery-manifest.json",
-        "release-short.delivery-transcript.json"
-      ],
-      "findings": []
+      "started_at": "2026-04-23T18:28:00.000Z",
+      "finished_at": "2026-04-23T18:28:01.000Z",
+      "duration_sec": 1,
+      "deterministic_analysis": {
+        "status": "pass",
+        "exit_code": 0,
+        "failure_class": null,
+        "missing_evidence": [],
+        "recommendation": "continue"
+      },
+      "semantic_analysis": {
+        "status": "warn",
+        "judge_source": "historical-fixture",
+        "findings": [
+          "historical fixture predates full per-step transcript capture"
+        ]
+      },
+      "requested_interaction": null,
+      "decision": {
+        "action": "continue",
+        "reason": "Historical delivery evidence materialized with fixture limitations.",
+        "next_step": "release"
+      },
+      "resume_result": null,
+      "frontend_interaction_refs": [],
+      "final_step_verdict": "warn",
+      "plan": {
+        "objective": "Observe delivery preparation and delivery evidence materialization.",
+        "public_surface": "aor deliver prepare",
+        "command_labels": [
+          "deliver-prepare"
+        ],
+        "expected_artifacts": [
+          "delivery_manifest_file",
+          "delivery_transcript_file",
+          "delivery_plan_file"
+        ],
+        "inspection_sources": [
+          "command_transcript",
+          "stage_result",
+          "artifact_refs",
+          "api_output",
+          "logs_or_ui_when_available"
+        ],
+        "safety_constraints": [
+          "black-box-public-surfaces-only",
+          "no-runtime-internal-imports",
+          "no-upstream-write-by-default",
+          "persist-observation-before-next-step"
+        ]
+      }
     }
   ],
-  "artifact_quality_matrix": [
-    {
-      "step": "discovery",
-      "status": "warn",
-      "judge_source": "agent-missing",
-      "artifact_refs": [
-        "release-short.run-summary.json"
-      ],
-      "findings": [
-        "agent-judge-not-provided"
-      ]
-    }
-  ],
-  "code_quality_after_delivery": {
+  "final_analysis": {
     "status": "warn",
-    "delivery_manifest_ref": "release-short.delivery-manifest.json",
-    "review_report_ref": null,
-    "post_delivery_check_refs": [],
-    "changed_paths": [],
+    "summary": "Historical W12 release-short proof has delivery, release, and learning evidence with limited per-step transcript coverage.",
     "findings": [
-      "legacy fixture has delivery evidence but no post-delivery code quality matrix"
-    ]
-  },
-  "continuation_decisions": [
-    {
-      "step": "review",
-      "decision": "continue_with_findings",
-      "reason": "legacy W12 fixture predates public review-run evidence",
-      "next_step": "qa"
+      "historical fixture predates full step-journal capture"
+    ],
+    "code_quality": {
+      "status": "warn",
+      "changed_paths": [],
+      "evidence_refs": [],
+      "findings": [
+        "historical fixture has no post-delivery code quality journal"
+      ]
+    },
+    "delivery": {
+      "status": "pass",
+      "evidence_refs": [
+        "release-short.delivery-manifest.json"
+      ]
+    },
+    "release": {
+      "status": "pass",
+      "evidence_refs": [
+        "release-short.release-packet.json"
+      ]
+    },
+    "learning": {
+      "status": "pass",
+      "evidence_refs": [
+        "release-short.learning-loop-scorecard.json",
+        "release-short.learning-loop-handoff.json"
+      ]
     }
-  ],
+  },
+  "interactive_decisions": [],
+  "frontend_interactions": [],
   "evidence_refs": [
     "release-short.run-summary.json",
     "release-short.delivery-manifest.json",
-    "release-short.delivery-transcript.json"
-  ]
+    "release-short.release-packet.json",
+    "runtime://reports/live-e2e-controller-state-w12-s04.release-short.json"
+  ],
+  "controller_state_ref": "runtime://reports/live-e2e-controller-state-w12-s04.release-short.json"
 }

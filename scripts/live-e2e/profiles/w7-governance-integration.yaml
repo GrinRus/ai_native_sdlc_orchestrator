@@ -2,6 +2,16 @@ profile_id: live-e2e.w7.governance.integration
 version: 1
 flow_kind: governance
 duration_class: short
+live_e2e:
+  flow_range_policy: full_lifecycle
+  installation_policy: source-install-required
+  interaction_capability: public-control-plane
+  frontend_capability: none
+  safety_policy: no-upstream-write
+  operator_mode: deterministic-fixture
+  agent_decision_policy: optional
+  interaction_answer_policy: deterministic-fixture
+  target_write_policy: aor-runtime-only-before-execution
 project_profile_template_ref: examples/project.github.aor.yaml
 scenario_id: w7-governance-closure
 target_repo:
@@ -23,7 +33,8 @@ preflight:
     - node >=22 with npm available
     - network access for shallow clone and npm install
   repo_shape_notes:
-    - single-package TypeScript library with fast feedback loops for governance rehearsal
+    - single-package TypeScript library with fast feedback loops for governance
+      rehearsal
   failure_safe_defaults:
     - keep output_policy.write_back_to_remote set to false
     - keep delivery mode in patch-only for public-target rehearsal safety
@@ -42,12 +53,14 @@ runtime:
 objective:
   title: W7 governance integration rehearsal on sindresorhus/ky
   task_brief:
-    - execute one bounded run that emits evaluation, harness, and promotion evidence
+    - execute one bounded run that emits evaluation, harness, and promotion
+      evidence
     - force learning-loop incident materialization for closure audit linkage
     - materialize delivery and release artifacts without upstream write-back
   success_definition:
     - quality evidence and promotion decision are durable
-    - incident and learning-loop handoff files are durable and linked to the same run
+    - incident and learning-loop handoff files are durable and linked to the
+      same run
     - delivery manifest and release packet are materialized in no-write mode
 stages:
   - bootstrap
@@ -60,6 +73,7 @@ stages:
   - qa
   - delivery
   - release
+  - learning
 verification:
   build: true
   lint: true

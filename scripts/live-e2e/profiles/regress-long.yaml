@@ -2,6 +2,16 @@ profile_id: live-e2e.regress.long
 version: 1
 flow_kind: regress
 duration_class: long
+live_e2e:
+  flow_range_policy: delivery_default
+  installation_policy: source-install-required
+  interaction_capability: public-control-plane
+  frontend_capability: none
+  safety_policy: no-upstream-write
+  operator_mode: deterministic-fixture
+  agent_decision_policy: optional
+  interaction_answer_policy: deterministic-fixture
+  target_write_policy: aor-runtime-only-before-execution
 project_profile_template_ref: examples/project.github.aor.yaml
 scenario_id: httpie-regression-deep
 target_repo:
@@ -34,7 +44,8 @@ preflight:
   reusable_assumptions:
     bootstrap: clone and profile loading can run without write-back credentials
     quality: bounded regression verification uses make targets as preflight gates
-    delivery: patch-only or fork-first-pr artifacts remain sufficient for rehearsal completion
+    delivery: patch-only or fork-first-pr artifacts remain sufficient for rehearsal
+      completion
 runtime:
   mode: ephemeral
   runtime_root: .aor

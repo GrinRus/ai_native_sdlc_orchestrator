@@ -1,0 +1,51 @@
+step_result_id: step-result.resumed-interaction.runner
+run_id: run.resumed-interaction
+step_id: step.runner.resumed-interaction
+step_class: runner
+status: passed
+summary: Operator answer audit was accepted and the runtime resumed from the recorded interaction boundary.
+evidence_refs:
+  - evidence://contracts/w27/interaction-question
+  - evidence://contracts/w27/interaction-answer-audit
+runtime_harness_decision: pass
+requested_interaction:
+  requested: true
+  interaction_id: interaction.resumed.1
+  status: resumed
+  prompt_summary: Operator selected the bounded target for continuation.
+  question_evidence_refs:
+    - evidence://contracts/w27/interaction-question
+  answer_audit_refs:
+    - evidence://contracts/w27/interaction-answer-audit
+  continuation:
+    next_action: continue_run
+    reason_code: answer-resumed
+  state_history:
+    - status: requested
+      timestamp: "2026-05-18T00:00:00.000Z"
+      summary: Operator input was requested at the bounded runner boundary.
+      evidence_refs:
+        - evidence://contracts/w27/interaction-question
+      continuation:
+        next_action: resume_from_boundary
+        reason_code: operator-answer-required
+    - status: answered
+      timestamp: "2026-05-18T00:01:00.000Z"
+      summary: Operator answer audit evidence was accepted.
+      evidence_refs:
+        - evidence://contracts/w27/interaction-answer-audit
+      answer_audit_refs:
+        - evidence://contracts/w27/interaction-answer-audit
+      continuation:
+        next_action: resume_from_boundary
+        reason_code: answer-accepted
+    - status: resumed
+      timestamp: "2026-05-18T00:01:01.000Z"
+      summary: Runtime resumed from the recorded interaction boundary.
+      evidence_refs:
+        - evidence://contracts/w27/interaction-answer-audit
+      answer_audit_refs:
+        - evidence://contracts/w27/interaction-answer-audit
+      continuation:
+        next_action: continue_run
+        reason_code: answer-resumed

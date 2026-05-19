@@ -39,8 +39,6 @@ export function materializeFeatureRequestFile(options) {
     mission_id: missionId,
     title: asNonEmptyString(options.mission.title) || missionId,
     brief: asNonEmptyString(options.mission.brief) || "Catalog-backed full-journey feature request.",
-    allowed_paths: asStringArray(options.mission.allowed_paths),
-    forbidden_paths: asStringArray(options.mission.forbidden_paths),
     expected_evidence: asStringArray(options.mission.expected_evidence),
     acceptance_checks: asStringArray(options.mission.acceptance_checks),
     scenario_family: options.scenarioFamily,
@@ -76,7 +74,6 @@ export function materializeFeatureRequestFile(options) {
   };
 }
 
-
 /**
  * @param {string} value
  * @returns {boolean}
@@ -109,23 +106,13 @@ function runGitChecked(options) {
  *   relativePath: string,
  * }} options
  */
-function backupPathIfExists(options) {
-  const candidate = path.join(options.targetRoot, options.relativePath);
-  if (!fileExists(candidate)) {
-    return null;
-  }
-  const backupPath = path.join(options.liveRoot, options.relativePath.replace(/[\\/]/g, "-"));
-  fs.mkdirSync(path.dirname(backupPath), { recursive: true });
-  fs.renameSync(candidate, backupPath);
-  return backupPath;
-}
-
 /**
  * @param {{
  *   hostRoot: string,
  *   layout: ReturnType<typeof ensureRuntimeLayout>,
  *   runId: string,
  *   profile: Record<string, unknown>,
+ *   reuseExistingCheckout?: boolean,
  * }}
  */
 export function materializeTargetCheckout(options) {
@@ -142,6 +129,14 @@ export function materializeTargetCheckout(options) {
     options.layout.targetCheckoutsRoot,
     `${normalizeId(targetRepoId)}-${normalizeId(options.runId)}`,
   );
+  if (options.reuseExistingCheckout === true && fileExists(path.join(targetCheckoutRoot, ".git"))) {
+    return {
+      targetCheckoutRoot,
+      targetRepoId,
+      targetRepoRef,
+      targetRepoUrl,
+    };
+  }
   fs.rmSync(targetCheckoutRoot, { recursive: true, force: true });
 
   /** @type {string[]} */
@@ -171,38 +166,19 @@ export function materializeTargetCheckout(options) {
 
 /**
  * @param {{
- *   hostRoot: string,
  *   examplesRoot: string,
- *   targetCheckoutRoot: string,
+ *   generatedAssetsRoot: string,
  * }} options
  */
-export function materializeTargetAssets(options) {
-  const liveRoot = path.join(options.targetCheckoutRoot, ".aor-live-e2e");
-  fs.mkdirSync(liveRoot, { recursive: true });
-  backupPathIfExists({
-    targetRoot: options.targetCheckoutRoot,
-    liveRoot,
-    relativePath: "examples",
-  });
-  backupPathIfExists({
-    targetRoot: options.targetCheckoutRoot,
-    liveRoot,
-    relativePath: "project.aor.yaml",
-  });
-  backupPathIfExists({
-    targetRoot: options.targetCheckoutRoot,
-    liveRoot,
-    relativePath: "context",
-  });
-  fs.cpSync(options.examplesRoot, path.join(options.targetCheckoutRoot, "examples"), { recursive: true });
-  const examplesContextRoot = path.join(options.examplesRoot, "context");
-  if (fileExists(examplesContextRoot)) {
-    fs.cpSync(examplesContextRoot, path.join(options.targetCheckoutRoot, "context"), { recursive: true });
-  }
+export function materializeHostLiveE2eAssets(options) {
+  const assetsRoot = options.generatedAssetsRoot;
+  fs.rmSync(assetsRoot, { recursive: true, force: true });
+  fs.mkdirSync(assetsRoot, { recursive: true });
+  fs.cpSync(options.examplesRoot, assetsRoot, { recursive: true });
   return {
-    liveRoot,
-    copiedExamplesRoot: path.join(options.targetCheckoutRoot, "examples"),
-    copiedContextRoot: fileExists(examplesContextRoot) ? path.join(options.targetCheckoutRoot, "context") : null,
+    assetsRoot,
+    routesRoot: path.join(assetsRoot, "routes"),
+    contextRoot: path.join(assetsRoot, "context"),
   };
 }
 
@@ -214,11 +190,10 @@ function hydrateRepoVerificationCommands(repoRecord, verification) {
   const setupCommands = asStringArray(verification.setup_commands);
   const verificationCommands = asStringArray(verification.commands);
   const buildEnabled = verification.build === true;
-  const lintEnabled = verification.lint === true;
   const testsEnabled = verification.tests !== false;
 
   repoRecord.build_commands = buildEnabled ? verificationCommands : [];
-  repoRecord.lint_commands = lintEnabled ? setupCommands : [];
+  repoRecord.lint_commands = setupCommands;
   repoRecord.test_commands = testsEnabled ? verificationCommands : [];
 }
 
@@ -238,15 +213,14 @@ export function normalizeDeliveryMode(value) {
  *   hostRoot: string,
  *   profilePath: string,
  *   profile: Record<string, unknown>,
+ *   catalogEntry?: Record<string, unknown>,
  *   runId: string,
  *   targetCheckout: ReturnType<typeof materializeTargetCheckout>,
+ *   generatedAssetsRoot: string,
  * }} options
  */
 export function materializeGeneratedProjectProfile(options) {
-  const templateRef = asNonEmptyString(options.profile.project_profile_template_ref);
-  if (!templateRef) {
-    throw new Error("Proof runner profile must declare project_profile_template_ref.");
-  }
+  const templateRef = asNonEmptyString(options.profile.project_profile_template_ref) || "examples/project.github.aor.yaml";
 
   const candidates = [
     path.resolve(path.dirname(options.profilePath), templateRef),
@@ -286,7 +260,10 @@ export function materializeGeneratedProjectProfile(options) {
     kind: "local",
     root: ".",
   };
-  hydrateRepoVerificationCommands(selectedRepo, asRecord(options.profile.verification));
+  hydrateRepoVerificationCommands(selectedRepo, {
+    ...asRecord(asRecord(options.catalogEntry).verification),
+    ...asRecord(options.profile.verification),
+  });
   generatedProjectProfile.repos = [selectedRepo];
 
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);
@@ -294,13 +271,23 @@ export function materializeGeneratedProjectProfile(options) {
   runtimeDefaults.workspace_mode = asNonEmptyString(asRecord(options.profile.runtime).mode) || "ephemeral";
   generatedProjectProfile.runtime_defaults = runtimeDefaults;
 
+  const registryRoots = asRecord(generatedProjectProfile.registry_roots);
+  for (const [key, value] of Object.entries(registryRoots)) {
+    if (typeof value !== "string" || value.trim().length === 0) {
+      continue;
+    }
+    const relative = value.replace(/^examples\/?/u, "");
+    registryRoots[key] = path.join(options.generatedAssetsRoot, relative);
+  }
+  generatedProjectProfile.registry_roots = registryRoots;
+
   const writebackPolicy = asRecord(generatedProjectProfile.writeback_policy);
   writebackPolicy.default_delivery_mode = normalizeDeliveryMode(
     asNonEmptyString(asRecord(options.profile.output_policy).preferred_delivery_mode) || "patch-only",
   );
   generatedProjectProfile.writeback_policy = writebackPolicy;
 
-  const generatedProjectProfileFile = path.join(options.targetCheckout.targetCheckoutRoot, "project.aor.yaml");
+  const generatedProjectProfileFile = path.join(options.generatedAssetsRoot, `project-${normalizeId(options.runId)}.aor.yaml`);
   const validation = validateContractDocument({
     family: "project-profile",
     document: generatedProjectProfile,
@@ -329,13 +316,13 @@ function cloneRouteDocument(route) {
 
 /**
  * @param {{
- *   targetCheckoutRoot: string,
+ *   routesRoot: string,
  *   providerVariant: Record<string, unknown>,
  *   providerVariantId: string,
  * }} options
  */
 export function materializeProviderPinnedRouteOverrides(options) {
-  const routesRoot = path.join(options.targetCheckoutRoot, "examples", "routes");
+  const routesRoot = options.routesRoot;
   if (!fileExists(routesRoot) || !fs.statSync(routesRoot).isDirectory()) {
     throw new Error(`Routes root '${routesRoot}' was not found for provider override materialization.`);
   }
