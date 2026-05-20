@@ -520,6 +520,45 @@ test("live adapter executes external runner path for supported codex-cli request
   }
 });
 
+test("live adapter keeps raw evidence filenames bounded for long live run ids", () => {
+  const evidenceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-long-evidence-"));
+  const executionRoot = path.join(evidenceRoot, "execution-root");
+  fs.mkdirSync(executionRoot, { recursive: true });
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", "process.stdout.write(JSON.stringify({status:'success',summary:'ok'}));"],
+      }),
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: evidenceRoot,
+      executionRoot,
+    });
+
+    const longRunId = `live-e2e.${"very-long-segment.".repeat(18)}repair-2`;
+    const response = adapter.execute({
+      request_id: `${longRunId}.run-start-implement.${"request.".repeat(8)}`,
+      run_id: longRunId,
+      step_id: `${longRunId}.step.implement`,
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    const rawEvidenceRef = response.output.external_runner.raw_evidence_ref;
+    const rawEvidenceFile = path.join(evidenceRoot, rawEvidenceRef.replace(/^evidence:\/\//u, ""));
+    assert.equal(response.status, "success");
+    assert.match(path.basename(rawEvidenceFile), /^adapter-live-raw-claude-code-/u);
+    assert.equal(path.basename(rawEvidenceFile).length < 255, true);
+    assert.equal(fs.existsSync(rawEvidenceFile), true);
+  } finally {
+    fs.rmSync(evidenceRoot, { recursive: true, force: true });
+  }
+});
+
 test("live adapter reports blocked when external runner command is missing", () => {
   const adapter = createLiveAdapter({
     adapterId: "codex-cli",

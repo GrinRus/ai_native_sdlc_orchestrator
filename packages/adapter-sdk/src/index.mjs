@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
 import { loadContractFile } from "../../contracts/src/index.mjs";
@@ -581,6 +582,25 @@ function toEvidenceRef(projectRoot, filePath) {
 }
 
 /**
+ * @param {string} value
+ * @param {number} maxLength
+ */
+function boundedEvidenceSegment(value, maxLength) {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return (normalized || "unknown").slice(0, maxLength);
+}
+
+/**
+ * @param {{ kind: "request" | "raw", adapterId: string, evidenceToken: string, timestamp: number }} options
+ */
+function buildLiveAdapterEvidenceFileName(options) {
+  const adapterSegment = boundedEvidenceSegment(options.adapterId, 40);
+  const tokenSegment = boundedEvidenceSegment(options.evidenceToken, 32);
+  const tokenHash = createHash("sha256").update(options.evidenceToken).digest("hex").slice(0, 16);
+  return `adapter-live-${options.kind}-${adapterSegment}-${tokenSegment}-${tokenHash}-${options.timestamp}.json`;
+}
+
+/**
  * @param {{
  *   adaptersRoot: string,
  * }} options
@@ -1156,7 +1176,12 @@ export function createLiveAdapter(options) {
         fs.mkdirSync(requestDir, { recursive: true });
         requestFile = path.join(
           requestDir,
-          `adapter-live-request-${adapterId}-${normalizedEvidenceToken}-${Date.now()}.json`,
+          buildLiveAdapterEvidenceFileName({
+            kind: "request",
+            adapterId,
+            evidenceToken: normalizedEvidenceToken,
+            timestamp: Date.now(),
+          }),
         );
         fs.writeFileSync(requestFile, serializedRunnerInput, "utf8");
         requestFileRef = toEvidenceRef(projectRoot, requestFile);
@@ -1223,7 +1248,12 @@ export function createLiveAdapter(options) {
         fs.mkdirSync(evidenceDir, { recursive: true });
         rawEvidenceFile = path.join(
           evidenceDir,
-          `adapter-live-raw-${adapterId}-${normalizedEvidenceToken}-${Date.now()}.json`,
+          buildLiveAdapterEvidenceFileName({
+            kind: "raw",
+            adapterId,
+            evidenceToken: normalizedEvidenceToken,
+            timestamp: Date.now(),
+          }),
         );
         fs.writeFileSync(rawEvidenceFile, `${JSON.stringify(rawEvidenceRecord, null, 2)}\n`, "utf8");
         rawEvidenceRef = toEvidenceRef(projectRoot, rawEvidenceFile);

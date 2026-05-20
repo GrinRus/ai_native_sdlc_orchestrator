@@ -90,6 +90,8 @@ Provider permission-mode analogues:
 
 Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. Preflight and full external runner execution are hard local subprocess bounds: a runner that exceeds them has its local process group killed and is reported as timeout evidence instead of leaving the public lifecycle waiting indefinitely. Per-step policy budgets may shorten an external runner request, but they must not extend it beyond the adapter profile timeout. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
 
+Live adapter request and raw-output evidence files must use bounded filenames. Full-journey run ids, repair suffixes, step ids, and request ids can be long, so the persisted file name keeps the adapter prefix for operator readability and uses a short token plus hash for uniqueness. The evidence ref remains the durable contract; consumers must not depend on the full run id being embedded in the basename.
+
 `run start` passes concrete packet refs into the adapter request when the public lifecycle has materialized them. Full-journey execution binds the approved handoff and spec result as refs such as `packet://handoff@evidence://...` and `packet://spec@evidence://...`, while preserving abstract fallback refs when no concrete artifact exists. Runners should use those refs before broad repository searches so runtime harness evidence is tied to the intended packet artifacts.
 
 Optional override for local catalog experiments:
