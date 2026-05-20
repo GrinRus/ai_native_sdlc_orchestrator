@@ -145,7 +145,7 @@ node ./scripts/live-e2e/manual-live-e2e.mjs \
   --run-id <stable-run-id>
 ```
 
-One invocation runs only the next pending controller step, writes `live_e2e_controller_state_file` plus a `live-e2e-step-observation-*` artifact, and prints the current decision. Re-run the same command with the same `--run-id` after completing any required public action.
+One invocation runs only the next pending controller step, writes `live_e2e_controller_state_file` plus a `live-e2e-step-observation-*` artifact, and prints the current decision. Re-run the same command with the same `--run-id` after completing any required public action. After the execution step has an accepted `continue` decision, manual resume reuses the preserved pre-execution baseline and target-cleanliness evidence instead of re-checking the already-mutated target checkout as if execution had not run.
 
 When the step stops for a required skill-agent decision, write the decision JSON from the request's expected response shape and install it before resuming:
 

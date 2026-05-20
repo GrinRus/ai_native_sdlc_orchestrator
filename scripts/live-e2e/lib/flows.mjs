@@ -583,6 +583,25 @@ function hydrateControllerArtifacts(artifacts, stepController) {
 }
 
 /**
+ * @param {unknown} stepController
+ * @param {string} step
+ * @param {number} [iteration]
+ * @returns {boolean}
+ */
+function controllerAcceptedStep(stepController, step, iteration = 1) {
+  const journal =
+    typeof stepController?.getStepJournal === "function"
+      ? stepController.getStepJournal().map((entry) => asRecord(entry))
+      : [];
+  return journal.some(
+    (entry) =>
+      asNonEmptyString(entry.step_id) === step &&
+      (Number(entry.iteration) || 1) === iteration &&
+      asNonEmptyString(asRecord(entry.decision).action) === "continue",
+  );
+}
+
+/**
  * @param {Record<string, unknown>} diagnostic
  * @returns {boolean}
  */
@@ -2050,47 +2069,72 @@ export function executeInstalledUserFlow(options) {
       "Handoff packet approved.",
     );
 
-    const verifyPreflight = runCommand("project-verify-preflight", [
-      "project",
-      "verify",
-      ...commandBaseArgs,
-      "--require-validation-pass",
-      "true",
+    const executionAlreadyAccepted = controllerAcceptedStep(options.stepController, "execution");
+    const cachedPreflightSummaryPath = asNonEmptyString(artifacts.verify_summary_file);
+    const canReusePreExecutionReadiness =
+      executionAlreadyAccepted &&
+      cachedPreflightSummaryPath &&
+      fileExists(cachedPreflightSummaryPath) &&
+      asNonEmptyString(artifacts.target_cleanliness_before_execution_file) &&
+      fileExists(asNonEmptyString(artifacts.target_cleanliness_before_execution_file));
+    let verifySummaryPath = /** @type {string | null} */ (cachedPreflightSummaryPath || null);
+    /** @type {string[]} */
+    let preflightEvidenceRefs = uniqueStrings([
+      verifySummaryPath,
+      ...asStringArray(artifacts.preflight_step_result_files),
+      asNonEmptyString(artifacts.target_cleanliness_before_execution_file),
     ]);
-    artifacts.verify_summary_file = getStringField(verifyPreflight.payload, "verify_summary_file");
-    artifacts.preflight_step_result_files = getStringArrayField(verifyPreflight.payload, "step_result_files");
-    const verifySummaryPath = /** @type {string} */ (artifacts.verify_summary_file);
-    if (!verifySummaryPath || !fileExists(verifySummaryPath)) {
-      throw new Error("Preflight verify summary was not materialized.");
-    }
-    const verifySummary = readJson(verifySummaryPath);
-    if (verifySummary.status === "failed") {
-      markStage(
-        stageMap,
-        "execution",
-        "fail",
-        uniqueStrings([verifyPreflight.transcriptFile, verifySummaryPath, ...collectStringRefs(verifyPreflight.payload)]),
-        "Preflight verify failed before live execution.",
-      );
-      throw new Error("Preflight verify failed before live execution.");
-    }
-    const targetCleanliness = writeTargetCleanlinessReport({
-      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
-      reportsRoot: options.layout.reportsRoot,
-      runId: options.runId,
-      phase: "before-execution",
-    });
-    artifacts.target_cleanliness_before_execution_file = targetCleanliness.reportFile;
-    artifacts.target_cleanliness_before_execution = targetCleanliness.report;
-    if (targetCleanliness.report.status !== "pass") {
-      markStage(
-        stageMap,
-        "execution",
-        "fail",
-        [targetCleanliness.reportFile],
-        asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.",
-      );
-      throw new Error(asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.");
+    if (!canReusePreExecutionReadiness) {
+      const verifyPreflight = runCommand("project-verify-preflight", [
+        "project",
+        "verify",
+        ...commandBaseArgs,
+        "--require-validation-pass",
+        "true",
+      ]);
+      artifacts.verify_summary_file = getStringField(verifyPreflight.payload, "verify_summary_file");
+      artifacts.preflight_step_result_files = getStringArrayField(verifyPreflight.payload, "step_result_files");
+      verifySummaryPath = /** @type {string} */ (artifacts.verify_summary_file);
+      if (!verifySummaryPath || !fileExists(verifySummaryPath)) {
+        throw new Error("Preflight verify summary was not materialized.");
+      }
+      const verifySummary = readJson(verifySummaryPath);
+      if (verifySummary.status === "failed") {
+        markStage(
+          stageMap,
+          "execution",
+          "fail",
+          uniqueStrings([verifyPreflight.transcriptFile, verifySummaryPath, ...collectStringRefs(verifyPreflight.payload)]),
+          "Preflight verify failed before live execution.",
+        );
+        throw new Error("Preflight verify failed before live execution.");
+      }
+      const targetCleanliness = writeTargetCleanlinessReport({
+        targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+        reportsRoot: options.layout.reportsRoot,
+        runId: options.runId,
+        phase: "before-execution",
+      });
+      artifacts.target_cleanliness_before_execution_file = targetCleanliness.reportFile;
+      artifacts.target_cleanliness_before_execution = targetCleanliness.report;
+      if (targetCleanliness.report.status !== "pass") {
+        markStage(
+          stageMap,
+          "execution",
+          "fail",
+          [targetCleanliness.reportFile],
+          asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.",
+        );
+        throw new Error(asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.");
+      }
+      preflightEvidenceRefs = uniqueStrings([
+        verifyPreflight.transcriptFile,
+        verifySummaryPath,
+        ...collectStringRefs(verifyPreflight.payload),
+        targetCleanliness.reportFile,
+      ]);
+    } else {
+      artifacts.pre_execution_readiness_reused_after_resume = true;
     }
 
     const promotionRefsForLiveExecution = shouldIncludePromotionEvidence(options.profile)
@@ -2146,8 +2190,7 @@ export function executeInstalledUserFlow(options) {
       "execution",
       artifacts.execution_degraded === true ? "fail" : "pass",
       uniqueStrings([
-        verifyPreflight.transcriptFile,
-        verifySummaryPath,
+        ...preflightEvidenceRefs,
         routedLive.transcriptFile,
         routedStepResultPath,
         ...collectStringRefs(routedStepResult),
@@ -2871,118 +2914,153 @@ export function executeFullJourneyFlow(options) {
     ]);
     artifacts.validation_report_file = getStringField(validate.payload, "validation_report_file");
 
-    const verifyPreflight = runCommand("project-verify-preflight", [
-      "project",
-      "verify",
-      "--project-ref",
-      ".",
-      "--project-profile",
-      generatedProfile.generatedProjectProfileFile,
-      "--runtime-root",
-      ".aor",
-      "--require-validation-pass",
-      "true",
-      "--verification-label",
-      "baseline-diagnostic",
-      "--routed-dry-run-step",
-      "implement",
-      ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
+    const executionAlreadyAccepted = controllerAcceptedStep(options.stepController, "execution");
+    const cachedBaselineVerifySummaryPath = asNonEmptyString(artifacts.baseline_verify_summary_file);
+    const cachedTargetCleanlinessFile = asNonEmptyString(artifacts.target_cleanliness_before_execution_file);
+    const cachedExecutionReadinessFile = asNonEmptyString(artifacts.execution_readiness_file);
+    let baselineVerifySummaryPath = /** @type {string | null} */ (cachedBaselineVerifySummaryPath || null);
+    let baselineGateDecision = asRecord(artifacts.baseline_verify_gate_decision);
+    /** @type {string[]} */
+    let baselineEvidenceRefs = uniqueStrings([
+      baselineVerifySummaryPath,
+      ...asStringArray(artifacts.baseline_verify_preserved_files),
+      ...asStringArray(artifacts.baseline_verify_step_result_files),
+      cachedTargetCleanlinessFile,
+      cachedExecutionReadinessFile,
     ]);
-    const baselineVerifySummaryPath = getStringField(verifyPreflight.payload, "verify_summary_file");
-    artifacts.baseline_verify_summary_file = baselineVerifySummaryPath;
-    artifacts.verify_summary_file = baselineVerifySummaryPath;
-    artifacts.baseline_verify_step_result_files = getStringArrayField(verifyPreflight.payload, "step_result_files");
-    artifacts.preflight_step_result_files = artifacts.baseline_verify_step_result_files;
-    artifacts.baseline_routed_dry_run_step_result_file = getStringField(
-      verifyPreflight.payload,
-      "routed_step_result_file",
-    );
-    if (
-      internalTestHooks.drop_baseline_routed_dry_run_after_preflight === true &&
-      typeof artifacts.baseline_routed_dry_run_step_result_file === "string"
-    ) {
-      fs.rmSync(artifacts.baseline_routed_dry_run_step_result_file, { force: true });
-    }
-    if (!baselineVerifySummaryPath || !fileExists(baselineVerifySummaryPath)) {
-      markStage(
-        stageMap,
-        "execution",
-        "fail",
-        uniqueStrings([verifyPreflight.transcriptFile, ...collectStringRefs(verifyPreflight.payload)]),
-        "Dry-run verify summary was not materialized.",
+    const canReusePreExecutionReadiness =
+      executionAlreadyAccepted &&
+      baselineVerifySummaryPath &&
+      fileExists(baselineVerifySummaryPath) &&
+      Object.keys(baselineGateDecision).length > 0 &&
+      cachedTargetCleanlinessFile &&
+      fileExists(cachedTargetCleanlinessFile) &&
+      cachedExecutionReadinessFile &&
+      fileExists(cachedExecutionReadinessFile);
+    if (!canReusePreExecutionReadiness) {
+      const verifyPreflight = runCommand("project-verify-preflight", [
+        "project",
+        "verify",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
+        "--runtime-root",
+        ".aor",
+        "--require-validation-pass",
+        "true",
+        "--verification-label",
+        "baseline-diagnostic",
+        "--routed-dry-run-step",
+        "implement",
+        ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
+      ]);
+      baselineVerifySummaryPath = getStringField(verifyPreflight.payload, "verify_summary_file");
+      artifacts.baseline_verify_summary_file = baselineVerifySummaryPath;
+      artifacts.verify_summary_file = baselineVerifySummaryPath;
+      artifacts.baseline_verify_step_result_files = getStringArrayField(verifyPreflight.payload, "step_result_files");
+      artifacts.preflight_step_result_files = artifacts.baseline_verify_step_result_files;
+      artifacts.baseline_routed_dry_run_step_result_file = getStringField(
+        verifyPreflight.payload,
+        "routed_step_result_file",
       );
-      throw new Error("Dry-run verify summary was not materialized.");
+      if (
+        internalTestHooks.drop_baseline_routed_dry_run_after_preflight === true &&
+        typeof artifacts.baseline_routed_dry_run_step_result_file === "string"
+      ) {
+        fs.rmSync(artifacts.baseline_routed_dry_run_step_result_file, { force: true });
+      }
+      if (!baselineVerifySummaryPath || !fileExists(baselineVerifySummaryPath)) {
+        markStage(
+          stageMap,
+          "execution",
+          "fail",
+          uniqueStrings([verifyPreflight.transcriptFile, ...collectStringRefs(verifyPreflight.payload)]),
+          "Dry-run verify summary was not materialized.",
+        );
+        throw new Error("Dry-run verify summary was not materialized.");
+      }
+      const baselineVerifySummary = readJson(baselineVerifySummaryPath);
+      const preservedBaseline = preserveVerifyArtifacts({
+        verifyPayload: asRecord(verifyPreflight.payload),
+        summaryFile: baselineVerifySummaryPath,
+        reportsRoot: options.layout.reportsRoot,
+        runId: options.runId,
+        phase: "baseline-verify",
+      });
+      artifacts.baseline_verify_preserved_files = preservedBaseline.preserved_files;
+      if (preservedBaseline.preserved_summary_file) {
+        artifacts.baseline_verify_summary_file = preservedBaseline.preserved_summary_file;
+      }
+      if (preservedBaseline.preserved_step_result_files.length > 0) {
+        artifacts.baseline_verify_step_result_files = preservedBaseline.preserved_step_result_files;
+        artifacts.preflight_step_result_files = preservedBaseline.preserved_step_result_files;
+      }
+      const baselineGateMode = resolveBaselineGateMode(options.profile);
+      baselineGateDecision = evaluateBaselineVerifyGate({
+        verifySummary: asRecord(baselineVerifySummary),
+        verifyPayload: asRecord(verifyPreflight.payload),
+        stepResultFiles: getStringArrayField(verifyPreflight.payload, "step_result_files"),
+        setupCommands: repoLintCommands,
+        verificationCommands: repoVerificationCommands,
+        mode: baselineGateMode,
+      });
+      artifacts.baseline_verify_status = baselineGateDecision.status;
+      artifacts.baseline_verify_gate_decision = baselineGateDecision;
+      if (baselineGateDecision.decision === "block") {
+        markStage(
+          stageMap,
+          "execution",
+          "fail",
+          uniqueStrings([
+            verifyPreflight.transcriptFile,
+            baselineVerifySummaryPath,
+            ...asStringArray(artifacts.baseline_verify_preserved_files),
+            ...collectStringRefs(verifyPreflight.payload),
+          ]),
+          asNonEmptyString(baselineGateDecision.summary) || "Baseline readiness failed before provider execution.",
+        );
+        throw new Error(asNonEmptyString(baselineGateDecision.summary) || "Baseline readiness failed before provider execution.");
+      }
+      const targetCleanliness = writeTargetCleanlinessReport({
+        targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+        reportsRoot: options.layout.reportsRoot,
+        runId: options.runId,
+        phase: "before-execution",
+      });
+      artifacts.target_cleanliness_before_execution_file = targetCleanliness.reportFile;
+      artifacts.target_cleanliness_before_execution = targetCleanliness.report;
+      if (targetCleanliness.report.status !== "pass") {
+        markStage(
+          stageMap,
+          "execution",
+          "fail",
+          [targetCleanliness.reportFile],
+          asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.",
+        );
+        throw new Error(asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.");
+      }
+      const executionReadiness = writeExecutionReadinessDecision({
+        runId: options.runId,
+        reportsRoot: options.layout.reportsRoot,
+        liveAdapterPreflightFile: asNonEmptyString(artifacts.live_adapter_preflight_file),
+        validationReportFile: asNonEmptyString(artifacts.validation_report_file),
+        baselineGateDecision,
+        baselineRoutedStepResultFile: asNonEmptyString(artifacts.baseline_routed_dry_run_step_result_file),
+      });
+      artifacts.execution_readiness_file = executionReadiness.decisionFile;
+      artifacts.execution_readiness = executionReadiness.decision;
+      baselineEvidenceRefs = uniqueStrings([
+        verifyPreflight.transcriptFile,
+        baselineVerifySummaryPath,
+        ...asStringArray(artifacts.baseline_verify_preserved_files),
+        ...collectStringRefs(verifyPreflight.payload),
+        targetCleanliness.reportFile,
+        executionReadiness.decisionFile,
+      ]);
+    } else {
+      artifacts.pre_execution_readiness_reused_after_resume = true;
     }
-    const baselineVerifySummary = readJson(baselineVerifySummaryPath);
-    const preservedBaseline = preserveVerifyArtifacts({
-      verifyPayload: asRecord(verifyPreflight.payload),
-      summaryFile: baselineVerifySummaryPath,
-      reportsRoot: options.layout.reportsRoot,
-      runId: options.runId,
-      phase: "baseline-verify",
-    });
-    artifacts.baseline_verify_preserved_files = preservedBaseline.preserved_files;
-    if (preservedBaseline.preserved_summary_file) {
-      artifacts.baseline_verify_summary_file = preservedBaseline.preserved_summary_file;
-    }
-    if (preservedBaseline.preserved_step_result_files.length > 0) {
-      artifacts.baseline_verify_step_result_files = preservedBaseline.preserved_step_result_files;
-      artifacts.preflight_step_result_files = preservedBaseline.preserved_step_result_files;
-    }
-    const baselineGateMode = resolveBaselineGateMode(options.profile);
-    const baselineGateDecision = evaluateBaselineVerifyGate({
-      verifySummary: asRecord(baselineVerifySummary),
-      verifyPayload: asRecord(verifyPreflight.payload),
-      stepResultFiles: getStringArrayField(verifyPreflight.payload, "step_result_files"),
-      setupCommands: repoLintCommands,
-      verificationCommands: repoVerificationCommands,
-      mode: baselineGateMode,
-    });
-    artifacts.baseline_verify_status = baselineGateDecision.status;
-    artifacts.baseline_verify_gate_decision = baselineGateDecision;
-    if (baselineGateDecision.decision === "block") {
-      markStage(
-        stageMap,
-        "execution",
-        "fail",
-        uniqueStrings([
-          verifyPreflight.transcriptFile,
-          baselineVerifySummaryPath,
-          ...asStringArray(artifacts.baseline_verify_preserved_files),
-          ...collectStringRefs(verifyPreflight.payload),
-        ]),
-        asNonEmptyString(baselineGateDecision.summary) || "Baseline readiness failed before provider execution.",
-      );
-      throw new Error(asNonEmptyString(baselineGateDecision.summary) || "Baseline readiness failed before provider execution.");
-    }
-    const targetCleanliness = writeTargetCleanlinessReport({
-      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
-      reportsRoot: options.layout.reportsRoot,
-      runId: options.runId,
-      phase: "before-execution",
-    });
-    artifacts.target_cleanliness_before_execution_file = targetCleanliness.reportFile;
-    artifacts.target_cleanliness_before_execution = targetCleanliness.report;
-    if (targetCleanliness.report.status !== "pass") {
-      markStage(
-        stageMap,
-        "execution",
-        "fail",
-        [targetCleanliness.reportFile],
-        asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.",
-      );
-      throw new Error(asNonEmptyString(targetCleanliness.report.summary) || "Target setup changed tracked files before execution.");
-    }
-    const executionReadiness = writeExecutionReadinessDecision({
-      runId: options.runId,
-      reportsRoot: options.layout.reportsRoot,
-      liveAdapterPreflightFile: asNonEmptyString(artifacts.live_adapter_preflight_file),
-      validationReportFile: asNonEmptyString(artifacts.validation_report_file),
-      baselineGateDecision,
-      baselineRoutedStepResultFile: asNonEmptyString(artifacts.baseline_routed_dry_run_step_result_file),
-    });
-    artifacts.execution_readiness_file = executionReadiness.decisionFile;
-    artifacts.execution_readiness = executionReadiness.decision;
 
     const discovery = runCommand("discovery-run", [
       "discovery",
@@ -3301,7 +3379,7 @@ export function executeFullJourneyFlow(options) {
         "execution",
         executionStageStatus,
         uniqueStrings([
-          verifyPreflight.transcriptFile,
+          ...baselineEvidenceRefs,
           asNonEmptyString(artifacts.baseline_verify_summary_file),
           runStart.transcriptFile,
           runStatus.transcriptFile,
