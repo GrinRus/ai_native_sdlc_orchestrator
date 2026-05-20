@@ -197,7 +197,7 @@ Extended candidate cells:
 Provider comparison rule:
 - every curated repo must prove at least one equivalent mission class on both `openai-primary` and `anthropic-primary`.
 - `openai-primary` and `anthropic-primary` are mandatory provider variants for W14 matrix coverage.
-- `open-code-primary` remains extended candidate coverage after W22-S03, including the cataloged `ky.regress.small.open-code` cell; required OpenCode baseline certification awaits a future real-runner proof.
+- `open-code-primary` remains extended candidate coverage after W22-S03, including the cataloged `ky.regress.small.open-code` and `ky.regress.medium.open-code` cells; required OpenCode baseline certification awaits a future real-runner proof.
 
 Feature-size taxonomy:
 - `small`: one focused behavior surface, usually 1-2 files and one targeted regression.
