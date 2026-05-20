@@ -92,6 +92,8 @@ Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` wh
 
 Live adapter request and raw-output evidence files must use bounded filenames. Full-journey run ids, repair suffixes, step ids, and request ids can be long, so the persisted file name keeps the adapter prefix for operator readability and uses a short token plus hash for uniqueness. The evidence ref remains the durable contract; consumers must not depend on the full run id being embedded in the basename.
 
+Skill-agent operator decisions cannot override deterministic validation. A `continue` decision is accepted only when the step's deterministic analysis is `pass`, `warn`, or `resumed` and the decision declares `semantic_analysis.judge_source=skill-agent`; deterministic `not_pass`, `blocked`, or `interaction_required` evidence must be diagnosed, answered, retried through public surfaces, or blocked instead of continued.
+
 `run start` passes concrete packet refs into the adapter request when the public lifecycle has materialized them. Full-journey execution binds the approved handoff and spec result as refs such as `packet://handoff@evidence://...` and `packet://spec@evidence://...`, while preserving abstract fallback refs when no concrete artifact exists. Runners should use those refs before broad repository searches so runtime harness evidence is tied to the intended packet artifacts.
 
 Optional override for local catalog experiments:

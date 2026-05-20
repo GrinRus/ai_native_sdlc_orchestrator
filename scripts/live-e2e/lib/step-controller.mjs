@@ -224,14 +224,21 @@ function isOperatorAction(action) {
  * @param {Record<string, unknown>} decision
  * @param {string} action
  * @param {Record<string, unknown>} operatorContext
+ * @param {Record<string, unknown>} entry
  * @returns {string | null}
  */
-function rejectInconsistentSkillAgentDecision(decision, action, operatorContext) {
+function rejectInconsistentSkillAgentDecision(decision, action, operatorContext, entry) {
   if (asNonEmptyString(operatorContext.operator_kind) !== "skill-agent") return null;
   const semantic = asRecord(decision.semantic_analysis);
   const judgeSource = asNonEmptyString(semantic.judge_source) || asNonEmptyString(decision.judge_source);
   if (judgeSource !== "skill-agent") {
     return "Skill-agent operator decisions must declare semantic_analysis.judge_source=skill-agent.";
+  }
+  const deterministicStatus = toLiveE2eObservationStatus(
+    asNonEmptyString(asRecord(entry.deterministic_analysis).status) || asNonEmptyString(entry.final_step_verdict),
+  );
+  if (action === "continue" && !["pass", "warn", "resumed"].includes(deterministicStatus)) {
+    return `Skill-agent operator decision cannot continue with deterministic status '${deterministicStatus}'.`;
   }
   const semanticStatus = toLiveE2eObservationStatus(asNonEmptyString(semantic.status));
   if (action === "continue" && !["pass", "warn", "resumed"].includes(semanticStatus)) {
@@ -268,7 +275,12 @@ function resolveOperatorDecision(options) {
     const decision = asRecord(readJson(options.decisionFile));
     const action = asNonEmptyString(decision.action) || asNonEmptyString(asRecord(decision.decision).action);
     const status = asNonEmptyString(decision.status) || "accepted";
-    const rejectionReason = rejectInconsistentSkillAgentDecision(decision, action, options.operatorContext);
+    const rejectionReason = rejectInconsistentSkillAgentDecision(
+      decision,
+      action,
+      options.operatorContext,
+      options.entry,
+    );
     const stepMatches =
       !asNonEmptyString(decision.step_id) ||
       asNonEmptyString(decision.step_id) === asNonEmptyString(options.entry.step_id) ||

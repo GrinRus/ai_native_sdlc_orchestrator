@@ -172,6 +172,74 @@ test("live E2E step controller rejects inconsistent skill-agent continue decisio
   });
 });
 
+test("live E2E step controller rejects skill-agent continue when deterministic checks fail", () => {
+  withTempRoot((reportsRoot) => {
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-skill-agent-deterministic-fail",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      mode: "auto",
+    });
+    controller.planCommand({ label: "run-start", commandSurface: "aor run start" });
+    const decisionFile = path.join(
+      reportsRoot,
+      "live-e2e-operator-decision-controller-skill-agent-deterministic-fail-01-execution.json",
+    );
+    fs.writeFileSync(
+      decisionFile,
+      `${JSON.stringify(
+        {
+          step_id: "execution",
+          status: "accepted",
+          operator_ref: "skill://live-e2e-runner",
+          action: "continue",
+          semantic_analysis: {
+            status: "pass",
+            judge_source: "skill-agent",
+            findings: [],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "execution",
+          stageResult: {
+            stage: "execution",
+            status: "not_pass",
+            evidence_refs: [],
+            summary: "Run start did not materialize routed execution evidence.",
+          },
+          commandResults: [{ label: "run-start", command_surface: "aor run start", status: "pass" }],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "block");
+        return true;
+      },
+    );
+
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.operator_decision_status, "rejected");
+    assert.equal(entry.decision.action, "block");
+    assert.equal(entry.final_step_verdict, "blocked");
+  });
+});
+
 test("live E2E step controller preserves repeated execution and review iterations", () => {
   withTempRoot((reportsRoot) => {
     const reviewTranscript = path.join(reportsRoot, "01-review-run.json");
