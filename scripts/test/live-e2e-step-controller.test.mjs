@@ -7,6 +7,7 @@ import test from "node:test";
 import {
   LiveE2eControllerStop,
   createLiveE2eStepController,
+  findLiveE2eCommandByPreferredLabel,
   isLiveE2eControllerStop,
 } from "../live-e2e/lib/step-controller.mjs";
 
@@ -306,6 +307,137 @@ test("live E2E step controller preserves repeated execution and review iteration
     assert.equal(journal.every((entry) => fs.existsSync(entry.plan_ref)), true);
     assert.equal(journal.every((entry) => fs.existsSync(entry.inspection_ref)), true);
     assert.equal(journal.every((entry) => fs.existsSync(entry.classification_ref)), true);
+  });
+});
+
+test("live E2E command selection prefers latest repeated label", () => {
+  const firstRunStart = { label: "run-start", transcript_file: "11-run-start.json" };
+  const secondRunStart = { label: "run-start", transcript_file: "15-run-start.json" };
+  const selected = findLiveE2eCommandByPreferredLabel(
+    [firstRunStart, { label: "run-status", transcript_file: "12-run-status.json" }, secondRunStart],
+    ["run-start"],
+  );
+
+  assert.equal(selected.transcript_file, "15-run-start.json");
+});
+
+test("live E2E manual resume applies operator decision to observed repair iteration", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "15-run-start.json");
+    const staleTranscriptFile = path.join(reportsRoot, "11-run-start.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    fs.writeFileSync(staleTranscriptFile, "{}\n", "utf8");
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+      },
+    };
+    const first = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-repair-decision-resume",
+      profile,
+      mode: "manual",
+    });
+    first.planCommand({ label: "run-start", commandSurface: "aor run start", iteration: 2 });
+    assert.throws(
+      () =>
+        first.observeStage({
+          stage: "execution",
+          iteration: 2,
+          stageResult: {
+            stage: "execution",
+            status: "pass",
+            evidence_refs: [transcriptFile],
+            summary: "repair execution passed",
+          },
+          commandResults: [
+            {
+              label: "run-start",
+              command_surface: "aor run start",
+              status: "pass",
+              transcript_file: staleTranscriptFile,
+              artifact_refs: ["step-result-initial.json"],
+              exit_code: 0,
+            },
+            {
+              label: "run-start",
+              command_surface: "aor run start",
+              status: "pass",
+              transcript_file: transcriptFile,
+              artifact_refs: ["step-result-repair-2.json"],
+              exit_code: 0,
+            },
+          ],
+          artifacts: { routed_step_result_file: "step-result-repair-2.json" },
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "diagnose");
+        return true;
+      },
+    );
+
+    const [pendingEntry] = first.getStepJournal();
+    const decisionRequest = JSON.parse(fs.readFileSync(pendingEntry.agent_decision_request_ref, "utf8"));
+    fs.writeFileSync(
+      decisionRequest.operator_decision_expected_ref,
+      `${JSON.stringify(
+        {
+          step_id: "execution",
+          step_instance_id: "execution#2",
+          iteration: 2,
+          status: "accepted",
+          operator_ref: "skill://live-e2e-runner",
+          action: "continue",
+          semantic_analysis: {
+            status: "pass",
+            judge_source: "skill-agent",
+            findings: ["Repair execution evidence accepted."],
+          },
+          evidence_refs: [transcriptFile],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const second = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-repair-decision-resume",
+      profile,
+      mode: "manual",
+    });
+    assert.equal(second.shouldUseCachedCommand("run-start", 2), true);
+    assert.equal(second.getCachedCommandResult("run-start").transcript_file, transcriptFile);
+    assert.throws(
+      () =>
+        second.observeStage({
+          stage: "execution",
+          iteration: 2,
+          stageResult: {
+            stage: "execution",
+            status: "not_pass",
+            evidence_refs: [],
+            summary: "This recomputed status must not overwrite persisted repair evidence.",
+          },
+          commandResults: [{ label: "run-start", command_surface: "aor run start", status: "pass" }],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "continue");
+        return true;
+      },
+    );
+
+    const [acceptedEntry] = second.getStepJournal();
+    assert.equal(acceptedEntry.operator_decision_status, "accepted");
+    assert.equal(acceptedEntry.deterministic_analysis.status, "pass");
+    assert.equal(acceptedEntry.decision.action, "continue");
   });
 });
 

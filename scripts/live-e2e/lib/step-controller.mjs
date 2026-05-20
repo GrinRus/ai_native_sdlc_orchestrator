@@ -171,7 +171,7 @@ export function buildLiveE2eStepPlan(step, command = null) {
  */
 export function findLiveE2eCommandByPreferredLabel(commandResults, labels) {
   for (const label of labels) {
-    const command = commandResults.find((entry) => asNonEmptyString(entry.label) === label);
+    const command = commandResults.findLast((entry) => asNonEmptyString(entry.label) === label);
     if (command) return command;
   }
   return undefined;
@@ -600,11 +600,91 @@ export function createLiveE2eStepController(options) {
     }
     const iteration = Number(input.iteration) || 1;
     const stepInstanceId = buildStepInstanceId(step, iteration);
-    if (
-      entryByStep[stepInstanceId] &&
-      ["continue", "retry_public_step"].includes(asNonEmptyString(asRecord(entryByStep[stepInstanceId].decision).action))
-    ) {
-      return { action: "continue", decision: asRecord(entryByStep[stepInstanceId].decision) };
+    const persistedEntry = entryByStep[stepInstanceId];
+    if (persistedEntry) {
+      const persistedAction = asNonEmptyString(asRecord(persistedEntry.decision).action);
+      if (["continue", "retry_public_step"].includes(persistedAction)) {
+        return { action: "continue", decision: asRecord(persistedEntry.decision) };
+      }
+      if (mode === "manual" && asNonEmptyString(persistedEntry.operator_decision_status) === "missing") {
+        const persistedSequence = Number(persistedEntry.sequence) || 1;
+        const files = operatorFilePaths({
+          reportsRoot: options.reportsRoot,
+          runId: options.runId,
+          sequence: persistedSequence,
+          step: stepInstanceId,
+        });
+        const operatorDecision = resolveOperatorDecision({
+          profile: options.profile,
+          entry: persistedEntry,
+          decisionFile: files.decisionFile,
+          operatorContext,
+        });
+        const entry = { ...persistedEntry };
+        entry.operator_decision_ref = operatorDecision.ref;
+        entry.operator_decision_status = operatorDecision.status;
+        if (operatorDecision.status === "accepted") {
+          const semantic = asRecord(asRecord(operatorDecision.decision).semantic_analysis);
+          entry.semantic_analysis = {
+            status: toLiveE2eObservationStatus(
+              asNonEmptyString(semantic.status) || asNonEmptyString(asRecord(entry.semantic_analysis).status),
+            ),
+            judge_source:
+              asNonEmptyString(semantic.judge_source) ||
+              asNonEmptyString(asRecord(operatorDecision.decision).judge_source) ||
+              asNonEmptyString(operatorContext.operator_ref),
+            findings: uniqueStrings([
+              ...asStringArray(asRecord(entry.semantic_analysis).findings),
+              ...asStringArray(semantic.findings),
+              ...asStringArray(asRecord(operatorDecision.decision).findings),
+            ]),
+          };
+          entry.final_step_verdict =
+            operatorDecision.action === "continue" && asNonEmptyString(asRecord(entry.resume_result).status) === "resumed"
+              ? "resumed"
+              : asNonEmptyString(entry.semantic_analysis.status);
+          entry.decision = {
+            ...asRecord(entry.decision),
+            action: operatorDecision.action,
+            reason:
+              asNonEmptyString(asRecord(operatorDecision.decision).reason) ||
+              asNonEmptyString(asRecord(entry.decision).reason) ||
+              "Skill-agent operator decision accepted.",
+          };
+        } else if (operatorDecision.status === "rejected") {
+          entry.semantic_analysis = {
+            ...asRecord(entry.semantic_analysis),
+            status: "blocked",
+            findings: uniqueStrings([
+              ...asStringArray(asRecord(entry.semantic_analysis).findings),
+              "Operator decision artifact was rejected.",
+            ]),
+          };
+          entry.final_step_verdict = "blocked";
+          entry.decision = {
+            ...asRecord(entry.decision),
+            action: "block",
+            reason: "Operator decision artifact was rejected.",
+          };
+        } else {
+          throw new LiveE2eControllerStop({
+            reason: `Live E2E controller stopped at '${step}' with decision '${persistedAction}'.`,
+            state: cloneState(),
+            decision: asRecord(entry.decision),
+          });
+        }
+        recordPhase(
+          step,
+          "decide",
+          uniqueStrings([asNonEmptyString(entry.operator_decision_ref), asNonEmptyString(entry.transcript_ref), ...asStringArray(entry.artifact_refs)]),
+        );
+        persistStep(step, entry);
+        throw new LiveE2eControllerStop({
+          reason: `Live E2E controller stopped at '${step}' with decision '${asNonEmptyString(asRecord(entry.decision).action)}'.`,
+          state: cloneState(),
+          decision: asRecord(entry.decision),
+        });
+      }
     }
 
     const stage = asRecord(input.stageResult);
@@ -922,14 +1002,16 @@ export function createLiveE2eStepController(options) {
       const commandResults = Array.isArray(state.command_results)
         ? state.command_results.map((entry) => asRecord(entry))
         : [];
-      return commandResults.find((entry) => asNonEmptyString(entry.label) === normalizedLabel) ?? null;
+      return commandResults.findLast((entry) => asNonEmptyString(entry.label) === normalizedLabel) ?? null;
     },
     shouldUseCachedCommand: (label, iteration = 1) => {
-      if ((Number(iteration) || 1) > 1) return false;
       const step = COMMAND_LABEL_STEP[asNonEmptyString(label)];
       if (!step) return false;
+      const normalizedIteration = Number(iteration) || 1;
+      const stepInstanceId = buildStepInstanceId(step, normalizedIteration);
+      if (mode === "manual" && observedStepInstances().includes(stepInstanceId)) return true;
+      if (normalizedIteration > 1) return false;
       if (completedContinueSteps().includes(step)) return true;
-      const stepInstanceId = buildStepInstanceId(step, Number(iteration) || 1);
       return mode === "manual" && observedStepInstances().includes(stepInstanceId);
     },
     getStepJournal: () =>
