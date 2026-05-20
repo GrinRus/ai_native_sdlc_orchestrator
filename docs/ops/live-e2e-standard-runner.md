@@ -184,6 +184,18 @@ The helper accepts only medium, large, or xl profiles. It runs one fresh live E2
 - `2` / `needs_fix`: AOR code or live E2E flow likely needs a patch before rerun;
 - `3` / `blocked`: environment, provider, auth, permission, or safety setup prevented a valid evaluation.
 
+When the helper exits `blocked` because an acceptance profile is waiting for required skill-agent decisions, complete the same run with `manual-live-e2e.mjs`. After the terminal manual resume writes a passing run summary and final observation report, reconcile that same evidence into the qualification set without starting a new target workspace:
+
+```bash
+node ./scripts/live-e2e/qualification-loop.mjs \
+  --project-ref . \
+  --profile ./scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml \
+  --qualification-set-file /tmp/aor-live-e2e-qualification-set.json \
+  --record-run-summary-file <live-e2e-run-summary-file>
+```
+
+Record mode applies the same medium-or-larger and pass/fix/block classification gates as a fresh run, reads the observation report from the summary unless `--record-observation-report-file` is supplied, and upserts the qualification-set attempt by `run_id` so a manually resumed run replaces its earlier blocked accounting entry.
+
 The launching agent performs the fix and commit. Final qualification requires at least five full positive medium-or-larger runs across provider variants: at least two `openai-primary`, at least two `anthropic-primary`, and at least one `open-code-primary`.
 
 ## Layer behavior

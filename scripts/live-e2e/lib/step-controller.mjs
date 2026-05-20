@@ -867,8 +867,9 @@ export function createLiveE2eStepController(options) {
 
     const action = asNonEmptyString(asRecord(entry.decision).action) || "continue";
     const actionContinuesController = action === "continue" || (mode === "auto" && action === "retry_public_step");
+    const terminalManualContinue = mode === "manual" && actionContinuesController && state.current_step === null;
     if (
-      mode === "manual" ||
+      (mode === "manual" && !terminalManualContinue) ||
       (mode === "evaluator" && !actionContinuesController) ||
       (mode === "auto" && !actionContinuesController)
     ) {

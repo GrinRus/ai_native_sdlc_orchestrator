@@ -499,6 +499,130 @@ test("qualification loop owns controller mode for inline flags", () => {
   assert.match(run.stderr, /qualification-loop owns controller mode/);
 });
 
+test("qualification loop records manually completed medium run evidence", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const runId = "manual-qualified-run";
+    const observationFile = path.join(reportsRoot, `live-e2e-observation-report-${runId}.json`);
+    const summaryFile = path.join(reportsRoot, `live-e2e-run-summary-${runId}.json`);
+    fs.writeFileSync(
+      observationFile,
+      `${JSON.stringify(
+        {
+          report_status: "final",
+          final_analysis: {
+            status: "pass",
+            summary: "Live E2E step journal passed.",
+            findings: [],
+          },
+          step_journal: [],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      summaryFile,
+      `${JSON.stringify(
+        {
+          status: "pass",
+          run_id: runId,
+          provider_variant_id: "openai-primary",
+          target_catalog_id: "ky",
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "medium",
+          live_e2e_observation_report_file: observationFile,
+          canonical_status: {
+            acceptance_status: "pass",
+          },
+          quality_judgement: {
+            overall_status: "pass",
+          },
+          agent_operator_assessment: {
+            mission_satisfaction: "pass",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const qualificationSetFile = path.join(tempRoot, "qualification-set.json");
+    fs.writeFileSync(
+      qualificationSetFile,
+      `${JSON.stringify(
+        {
+          qualification_report_id: "live-e2e.final-qualification.v1",
+          required_provider_counts: {
+            "openai-primary": 2,
+            "anthropic-primary": 2,
+            "open-code-primary": 1,
+          },
+          qualification_status: "incomplete",
+          passing_run_count: 0,
+          provider_counts: {
+            "openai-primary": 0,
+            "anthropic-primary": 0,
+            "open-code-primary": 0,
+          },
+          missing_provider_requirements: [],
+          attempts: [
+            {
+              run_id: runId,
+              status: "blocked",
+              provider_variant_id: "openai-primary",
+              target_catalog_id: "ky",
+              feature_mission_id: "ky-release-doc-typing",
+              feature_size: "medium",
+              summary_ref: summaryFile,
+              observation_report_ref: observationFile,
+              analysis_ref: null,
+              recorded_at: "2026-05-20T00:00:00.000Z",
+            },
+          ],
+          updated_at: "2026-05-20T00:00:00.000Z",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--profile",
+        path.join(workspaceRoot, "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml"),
+        "--qualification-set-file",
+        qualificationSetFile,
+        "--record-run-summary-file",
+        summaryFile,
+      ],
+      {
+        cwd: workspaceRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    const output = JSON.parse(run.stdout);
+    assert.equal(output.status, "passed");
+    assert.equal(output.recorded_existing_run, true);
+    assert.equal(fs.existsSync(output.qualification_analysis_file), true);
+    const qualificationSet = JSON.parse(fs.readFileSync(qualificationSetFile, "utf8"));
+    assert.equal(qualificationSet.passing_run_count, 1);
+    assert.equal(qualificationSet.provider_counts["openai-primary"], 1);
+    assert.equal(qualificationSet.attempts.length, 1);
+    assert.equal(qualificationSet.attempts[0].run_id, runId);
+    assert.equal(qualificationSet.attempts[0].status, "passed");
+  });
+});
+
 /**
  * @param {{
  *   examplesRoot: string,

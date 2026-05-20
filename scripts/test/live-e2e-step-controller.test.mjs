@@ -321,6 +321,61 @@ test("live E2E step controller resumes manual state at the next incomplete step"
   });
 });
 
+test("live E2E step controller lets terminal manual continue finalize", () => {
+  withTempRoot((reportsRoot) => {
+    const profile = { live_e2e: { flow_range_policy: "delivery_default" } };
+    const prior = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-terminal-manual",
+      profile,
+      mode: "auto",
+    });
+    for (const [stage, label] of [
+      ["discovery", "discovery-run"],
+      ["spec", "spec-build"],
+      ["planning", "wave-create"],
+      ["handoff", "handoff-approve"],
+      ["execution", "run-start"],
+      ["review", "review-run"],
+      ["qa", "eval-run"],
+    ]) {
+      prior.observeStage({
+        stage,
+        stageResult: { stage, status: "pass", evidence_refs: [], summary: "ok" },
+        commandResults: [{ label, command_surface: `aor ${stage}`, status: "pass" }],
+        artifacts: {},
+      });
+    }
+
+    const terminal = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-terminal-manual",
+      profile,
+      mode: "manual",
+    });
+    const result = terminal.observeStage({
+      stage: "delivery",
+      stageResult: { stage: "delivery", status: "pass", evidence_refs: [], summary: "ok" },
+      commandResults: [{ label: "deliver-prepare", command_surface: "aor deliver prepare", status: "pass" }],
+      artifacts: {},
+    });
+
+    assert.equal(result.action, "continue");
+    const state = JSON.parse(fs.readFileSync(terminal.stateFile, "utf8"));
+    assert.deepEqual(state.completed_steps, [
+      "discovery",
+      "spec",
+      "planning",
+      "handoff",
+      "execution",
+      "review",
+      "qa",
+      "delivery",
+    ]);
+    assert.equal(state.current_step, null);
+  });
+});
+
 test("live E2E step controller exposes cached public command results for completed steps", () => {
   withTempRoot((reportsRoot) => {
     const transcriptFile = path.join(reportsRoot, "01-discovery-run.json");

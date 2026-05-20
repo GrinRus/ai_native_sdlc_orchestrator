@@ -179,7 +179,15 @@ function updateQualificationSet(options) {
     analysis_ref: asNonEmptyString(options.analysis.analysis_file) || null,
     recorded_at: nowIso(),
   };
-  attempts.push(attempt);
+  const runId = asNonEmptyString(attempt.run_id);
+  const existingAttemptIndex = runId
+    ? attempts.findIndex((entry) => asNonEmptyString(entry.run_id) === runId)
+    : -1;
+  if (existingAttemptIndex >= 0) {
+    attempts[existingAttemptIndex] = attempt;
+  } else {
+    attempts.push(attempt);
+  }
   const passing = attempts.filter((entry) => asNonEmptyString(entry.status) === "passed");
   const provider_counts = Object.fromEntries(
     Object.keys(REQUIRED_PROVIDER_COUNTS).map((provider) => [
@@ -211,6 +219,74 @@ function updateQualificationSet(options) {
 }
 
 /**
+ * @param {{
+ *   summaryFile: string,
+ *   observationFile: string | null,
+ *   qualificationSetFile: string | null,
+ *   recordedExistingRun: boolean,
+ * }}
+ */
+function recordQualificationResult(options) {
+  const summaryFile = path.resolve(options.summaryFile);
+  const summary = asRecord(readJson(summaryFile));
+  const observationFileRef = options.observationFile || asNonEmptyString(summary.live_e2e_observation_report_file);
+  if (!observationFileRef) {
+    throw new UsageError("--record-run-summary-file requires --record-observation-report-file when the summary omits live_e2e_observation_report_file.");
+  }
+  const observationFile = path.resolve(observationFileRef);
+  const observationReport = asRecord(readJson(observationFile));
+  const featureSize = asNonEmptyString(summary.feature_size);
+  if (!QUALIFYING_FEATURE_SIZES.has(featureSize)) {
+    throw new UsageError(
+      `Qualification loop requires recorded summary feature_size medium, large, or xl; received '${featureSize || "unknown"}'.`,
+    );
+  }
+  const status = classifyQualification(summary, observationReport);
+  const analysis = buildAnalysis({
+    summary,
+    observationReport,
+    status,
+  });
+  const analysisFile = path.join(
+    path.dirname(summaryFile),
+    `live-e2e-qualification-analysis-${normalizeId(asNonEmptyString(summary.run_id) || "run")}.json`,
+  );
+  analysis.analysis_file = analysisFile;
+  writeJson(analysisFile, analysis);
+  const qualificationSet = options.qualificationSetFile
+    ? updateQualificationSet({
+        qualificationSetFile: path.resolve(options.qualificationSetFile),
+        analysis,
+        summary: {
+          ...summary,
+          summary_ref: summaryFile,
+          live_e2e_observation_report_file: observationFile,
+        },
+      })
+    : null;
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        command: "scripts live-e2e qualification-loop",
+        status,
+        run_id: asNonEmptyString(summary.run_id) || null,
+        recorded_existing_run: options.recordedExistingRun,
+        qualification_analysis_file: analysisFile,
+        qualification_set_file: options.qualificationSetFile ? path.resolve(options.qualificationSetFile) : null,
+        qualification_set_status: asNonEmptyString(asRecord(qualificationSet).qualification_status) || null,
+        live_e2e_run_summary_file: summaryFile,
+        live_e2e_observation_report_file: observationFile,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  if (status === "passed") return 0;
+  if (status === "needs_fix") return 2;
+  return 3;
+}
+
+/**
  * @param {string} filePath
  */
 function fsExists(filePath) {
@@ -229,6 +305,7 @@ function runCli(rawArgs) {
     process.stdout.write(
       [
         "Usage: node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path> [--qualification-set-file <path>] [run-profile flags...]",
+        "       node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path> --record-run-summary-file <path> [--record-observation-report-file <path>] [--qualification-set-file <path>]",
         "",
         "Runs one medium-or-larger live E2E profile and writes a qualification analysis for the launching agent.",
       ].join("\n"),
@@ -237,7 +314,16 @@ function runCli(rawArgs) {
   }
   const flags = parseFlags(rawArgs);
   const qualificationSetFile = resolveOptionalStringFlag(flags["qualification-set-file"], "qualification-set-file");
-  const runProfileArgs = qualificationSetFile ? removeStringFlag(rawArgs, "qualification-set-file") : rawArgs;
+  const recordRunSummaryFile = resolveOptionalStringFlag(flags["record-run-summary-file"], "record-run-summary-file");
+  const recordObservationReportFile = resolveOptionalStringFlag(
+    flags["record-observation-report-file"],
+    "record-observation-report-file",
+  );
+  let runProfileArgs = qualificationSetFile ? removeStringFlag(rawArgs, "qualification-set-file") : rawArgs;
+  runProfileArgs = recordRunSummaryFile ? removeStringFlag(runProfileArgs, "record-run-summary-file") : runProfileArgs;
+  runProfileArgs = recordObservationReportFile
+    ? removeStringFlag(runProfileArgs, "record-observation-report-file")
+    : runProfileArgs;
   const hostRoot = requireDirectory(
     resolveOptionalStringFlag(flags["project-ref"], "project-ref") ??
       (() => {
@@ -272,6 +358,14 @@ function runCli(rawArgs) {
     asNonEmptyString(asRecord(loaded.profile.matrix_cell).feature_size);
   if (!QUALIFYING_FEATURE_SIZES.has(featureSize)) {
     throw new UsageError(`Qualification loop requires feature_size medium, large, or xl; received '${featureSize || "unknown"}'.`);
+  }
+  if (recordRunSummaryFile) {
+    return recordQualificationResult({
+      summaryFile: recordRunSummaryFile,
+      observationFile: recordObservationReportFile,
+      qualificationSetFile: qualificationSetFile ? path.resolve(qualificationSetFile) : null,
+      recordedExistingRun: true,
+    });
   }
 
   const child = spawnSync(process.execPath, [RUN_PROFILE_SCRIPT, ...runProfileArgs, "--controller-mode", "auto"], {
