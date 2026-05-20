@@ -588,16 +588,13 @@ function hydrateControllerArtifacts(artifacts, stepController) {
  * @param {number} [iteration]
  * @returns {boolean}
  */
-function controllerAcceptedStep(stepController, step, iteration = 1) {
+function controllerObservedStep(stepController, step, iteration = 1) {
   const journal =
     typeof stepController?.getStepJournal === "function"
       ? stepController.getStepJournal().map((entry) => asRecord(entry))
       : [];
   return journal.some(
-    (entry) =>
-      asNonEmptyString(entry.step_id) === step &&
-      (Number(entry.iteration) || 1) === iteration &&
-      asNonEmptyString(asRecord(entry.decision).action) === "continue",
+    (entry) => asNonEmptyString(entry.step_id) === step && (Number(entry.iteration) || 1) === iteration,
   );
 }
 
@@ -2069,10 +2066,10 @@ export function executeInstalledUserFlow(options) {
       "Handoff packet approved.",
     );
 
-    const executionAlreadyAccepted = controllerAcceptedStep(options.stepController, "execution");
+    const executionAlreadyObserved = controllerObservedStep(options.stepController, "execution");
     const cachedPreflightSummaryPath = asNonEmptyString(artifacts.verify_summary_file);
     const canReusePreExecutionReadiness =
-      executionAlreadyAccepted &&
+      executionAlreadyObserved &&
       cachedPreflightSummaryPath &&
       fileExists(cachedPreflightSummaryPath) &&
       asNonEmptyString(artifacts.target_cleanliness_before_execution_file) &&
@@ -2084,7 +2081,7 @@ export function executeInstalledUserFlow(options) {
       ...asStringArray(artifacts.preflight_step_result_files),
       asNonEmptyString(artifacts.target_cleanliness_before_execution_file),
     ]);
-    if (!canReusePreExecutionReadiness) {
+    if (!executionAlreadyObserved && !canReusePreExecutionReadiness) {
       const verifyPreflight = runCommand("project-verify-preflight", [
         "project",
         "verify",
@@ -2914,7 +2911,7 @@ export function executeFullJourneyFlow(options) {
     ]);
     artifacts.validation_report_file = getStringField(validate.payload, "validation_report_file");
 
-    const executionAlreadyAccepted = controllerAcceptedStep(options.stepController, "execution");
+    const executionAlreadyObserved = controllerObservedStep(options.stepController, "execution");
     const cachedBaselineVerifySummaryPath = asNonEmptyString(artifacts.baseline_verify_summary_file);
     const cachedTargetCleanlinessFile = asNonEmptyString(artifacts.target_cleanliness_before_execution_file);
     const cachedExecutionReadinessFile = asNonEmptyString(artifacts.execution_readiness_file);
@@ -2929,7 +2926,7 @@ export function executeFullJourneyFlow(options) {
       cachedExecutionReadinessFile,
     ]);
     const canReusePreExecutionReadiness =
-      executionAlreadyAccepted &&
+      executionAlreadyObserved &&
       baselineVerifySummaryPath &&
       fileExists(baselineVerifySummaryPath) &&
       Object.keys(baselineGateDecision).length > 0 &&
@@ -2937,7 +2934,7 @@ export function executeFullJourneyFlow(options) {
       fileExists(cachedTargetCleanlinessFile) &&
       cachedExecutionReadinessFile &&
       fileExists(cachedExecutionReadinessFile);
-    if (!canReusePreExecutionReadiness) {
+    if (!executionAlreadyObserved && !canReusePreExecutionReadiness) {
       const verifyPreflight = runCommand("project-verify-preflight", [
         "project",
         "verify",

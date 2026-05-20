@@ -889,6 +889,10 @@ export function createLiveE2eStepController(options) {
       .filter((entry) => asNonEmptyString(asRecord(entry.decision).action) === "continue")
       .map((entry) => asNonEmptyString(entry.step_id))
       .filter(Boolean);
+  const observedStepInstances = () =>
+    Object.values(entryByStep)
+      .map((entry) => asNonEmptyString(entry.step_instance_id) || asNonEmptyString(entry.step_id))
+      .filter(Boolean);
 
   return {
     mode,
@@ -910,7 +914,10 @@ export function createLiveE2eStepController(options) {
     shouldUseCachedCommand: (label, iteration = 1) => {
       if ((Number(iteration) || 1) > 1) return false;
       const step = COMMAND_LABEL_STEP[asNonEmptyString(label)];
-      return step ? completedContinueSteps().includes(step) : false;
+      if (!step) return false;
+      if (completedContinueSteps().includes(step)) return true;
+      const stepInstanceId = buildStepInstanceId(step, Number(iteration) || 1);
+      return mode === "manual" && observedStepInstances().includes(stepInstanceId);
     },
     getStepJournal: () =>
       Object.values(entryByStep).sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0)),

@@ -371,6 +371,84 @@ test("live E2E step controller exposes cached public command results for complet
   });
 });
 
+test("live E2E manual resume reuses cached commands for observed steps awaiting decision", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "01-run-start.json");
+    fs.writeFileSync(
+      transcriptFile,
+      `${JSON.stringify({
+        stdout: JSON.stringify({ routed_step_result_file: "step-result.json" }),
+        stderr: "",
+        parsed_json: { routed_step_result_file: "step-result.json" },
+        started_at: "2026-05-18T00:00:00.000Z",
+        finished_at: "2026-05-18T00:00:01.000Z",
+      })}\n`,
+      "utf8",
+    );
+    const first = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-observed-command-cache",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+        },
+      },
+      mode: "manual",
+    });
+    assert.throws(() =>
+      first.observeStage({
+        stage: "execution",
+        stageResult: { stage: "execution", status: "pass", evidence_refs: [transcriptFile], summary: "ok" },
+        commandResults: [
+          {
+            label: "run-start",
+            command_surface: "aor run start",
+            status: "pass",
+            transcript_file: transcriptFile,
+            artifact_refs: ["step-result.json"],
+            exit_code: 0,
+          },
+        ],
+        artifacts: { routed_step_result_file: "step-result.json" },
+      }),
+    );
+
+    const manualResume = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-observed-command-cache",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+        },
+      },
+      mode: "manual",
+    });
+    assert.equal(manualResume.shouldUseCachedCommand("run-start"), true);
+    assert.equal(manualResume.getCachedCommandResult("run-start").transcript_file, transcriptFile);
+
+    const autoResume = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-observed-command-cache",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+        },
+      },
+      mode: "auto",
+    });
+    assert.equal(autoResume.shouldUseCachedCommand("run-start"), false);
+  });
+});
+
 test("live E2E step controller does not skip unresolved persisted decisions on resume", () => {
   withTempRoot((reportsRoot) => {
     const first = createLiveE2eStepController({
