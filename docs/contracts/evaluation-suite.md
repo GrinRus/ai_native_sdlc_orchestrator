@@ -18,6 +18,9 @@ Naming and scoping guidance:
 - `version` should increment when grader logic, thresholds, or blocking rules change.
 - `dataset_ref` should pin one immutable dataset version (`dataset://dataset_id@version`) rather than floating aliases.
 - `subject_type` defines the target asset family and must align with the referenced dataset `subject_type`.
+- Governance integration suites are run-level suites and should point at governance-scoped run datasets,
+  not wrapper certification datasets or release-only datasets.
 
 ## Example
-See `examples/eval/suite-regress-short.yaml and related suite examples`.
+See `examples/eval/suite-regress-short.yaml`,
+`examples/eval/suite-governance-integration.yaml`, and related suite examples.

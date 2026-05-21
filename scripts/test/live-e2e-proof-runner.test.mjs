@@ -11,6 +11,7 @@ import {
   stringify as stringifyYaml,
 } from "../../packages/contracts/node_modules/yaml/dist/index.js";
 import { validateContractDocument } from "../../packages/contracts/src/index.mjs";
+import { loadEvaluationRegistry } from "../../packages/orchestrator-core/src/evaluation-registry.mjs";
 import { prepareAorInstallationProof } from "../live-e2e/lib/flows.mjs";
 import { validateGuidedJourneyProof } from "../live-e2e/lib/guided-proof.mjs";
 
@@ -545,6 +546,38 @@ test("qualification loop owns controller mode for inline flags", () => {
   );
   assert.equal(run.status, 1);
   assert.match(run.stderr, /qualification-loop owns controller mode/);
+});
+
+test("live E2E profile evaluation suites resolve in the examples evaluation registry", () => {
+  const registry = loadEvaluationRegistry({ workspaceRoot });
+  assert.equal(registry.ok, true, registry.issues.map((issue) => issue.message).join("; "));
+  const knownSuiteRefs = new Set(registry.suites.map((suite) => suite.suite_ref));
+  const profileRoot = path.join(workspaceRoot, "scripts/live-e2e/profiles");
+  const missingSuiteRefs = [];
+
+  for (const fileName of fs.readdirSync(profileRoot).sort()) {
+    if (!fileName.endsWith(".yaml")) {
+      continue;
+    }
+
+    const profilePath = path.join(profileRoot, fileName);
+    const profile = /** @type {Record<string, unknown>} */ (parseYaml(fs.readFileSync(profilePath, "utf8")));
+    const verification =
+      typeof profile.verification === "object" && profile.verification !== null
+        ? /** @type {Record<string, unknown>} */ (profile.verification)
+        : {};
+    const evalSuites = Array.isArray(verification.eval_suites)
+      ? verification.eval_suites.filter((entry) => typeof entry === "string")
+      : [];
+
+    for (const suiteRef of evalSuites) {
+      if (!knownSuiteRefs.has(suiteRef)) {
+        missingSuiteRefs.push(`${fileName}: ${suiteRef}`);
+      }
+    }
+  }
+
+  assert.deepEqual(missingSuiteRefs, []);
 });
 
 test("qualification loop records manually completed medium run evidence", () => {
