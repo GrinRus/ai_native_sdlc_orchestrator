@@ -815,11 +815,25 @@ function buildStepJournal(options) {
 }
 
 /**
- * @param {{ stepJournal: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }}
+ * @param {{ stepJournal: Array<Record<string, unknown>>, stageResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }}
  */
 function buildFinalAnalysis(options) {
   const codeQuality = buildCodeQualityObservation(options.artifacts);
   const qualityRelevantStepJournal = getQualityRelevantStepJournal(options.stepJournal);
+  const qualityRelevantStageIds = new Set(qualityRelevantStepJournal.map((entry) => asNonEmptyString(entry.step_id)).filter(Boolean));
+  const failingStages = options.stageResults
+    .filter((entry) => {
+      const stage = asNonEmptyString(entry.stage);
+      return (
+        asNonEmptyString(entry.status) === "fail" &&
+        (qualityRelevantStageIds.has(stage) || ["bootstrap", "install", ...LIVE_E2E_OBSERVATION_PRELUDE_STEPS].includes(stage))
+      );
+    })
+    .map((entry) => ({
+      stage: asNonEmptyString(entry.stage) || "unknown",
+      summary: asNonEmptyString(entry.summary) || "Stage failed.",
+      evidence_refs: asStringArray(entry.evidence_refs),
+    }));
   const deliveryStatus = asNonEmptyString(options.artifacts.delivery_manifest_file)
     ? options.artifacts.delivery_blocking === true ||
       ["fail", "not_pass"].includes(asNonEmptyString(options.artifacts.delivery_quality_gate_status))
@@ -840,9 +854,13 @@ function buildFinalAnalysis(options) {
   for (const step of qualityRelevantStepJournal) {
     status = worstObservationStatus(status, asNonEmptyString(step.final_step_verdict) || "not_pass");
   }
+  if (failingStages.length > 0) {
+    status = worstObservationStatus(status, "not_pass");
+  }
   const findings = uniqueStrings([
     ...asStringArray(codeQuality.findings),
     ...qualityRelevantStepJournal.flatMap((entry) => asStringArray(asRecord(entry.semantic_analysis).findings)),
+    ...failingStages.map((entry) => `Stage '${entry.stage}' failed: ${entry.summary}`),
   ]);
   return {
     status,
@@ -862,6 +880,7 @@ function buildFinalAnalysis(options) {
       ]),
       findings: asStringArray(codeQuality.findings),
     },
+    failed_stages: failingStages,
     delivery: {
       status: deliveryStatus,
       evidence_refs: uniqueStrings([asNonEmptyString(options.artifacts.delivery_manifest_file)]),
@@ -918,6 +937,7 @@ function buildObservationReport(options) {
   });
   const finalAnalysis = buildFinalAnalysis({
     stepJournal,
+    stageResults: options.flowResult.stageResults,
     artifacts: options.flowResult.artifacts,
   });
   return {

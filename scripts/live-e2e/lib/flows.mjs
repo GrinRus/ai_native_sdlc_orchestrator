@@ -2101,6 +2101,11 @@ export function executeInstalledUserFlow(options) {
       fileExists(cachedPreflightSummaryPath) &&
       asNonEmptyString(artifacts.target_cleanliness_before_execution_file) &&
       fileExists(asNonEmptyString(artifacts.target_cleanliness_before_execution_file));
+    if (executionAlreadyObserved && !canReusePreExecutionReadiness) {
+      const summary = "Observed execution cannot resume without preserved pre-execution readiness evidence.";
+      markStageRaw(stageMap, "execution", "fail", [], summary);
+      throw new Error(summary);
+    }
     let verifySummaryPath = /** @type {string | null} */ (cachedPreflightSummaryPath || null);
     /** @type {string[]} */
     let preflightEvidenceRefs = uniqueStrings([
@@ -2108,7 +2113,7 @@ export function executeInstalledUserFlow(options) {
       ...asStringArray(artifacts.preflight_step_result_files),
       asNonEmptyString(artifacts.target_cleanliness_before_execution_file),
     ]);
-    if (!executionAlreadyObserved && !canReusePreExecutionReadiness) {
+    if (!executionAlreadyObserved) {
       const verifyPreflight = runCommand("project-verify-preflight", [
         "project",
         "verify",
@@ -2970,7 +2975,12 @@ export function executeFullJourneyFlow(options) {
       fileExists(cachedTargetCleanlinessFile) &&
       cachedExecutionReadinessFile &&
       fileExists(cachedExecutionReadinessFile);
-    if (!executionAlreadyObserved && !canReusePreExecutionReadiness) {
+    if (executionAlreadyObserved && !canReusePreExecutionReadiness) {
+      const summary = "Observed execution cannot resume without preserved pre-execution readiness evidence.";
+      markStageRaw(stageMap, "execution", "fail", [], summary);
+      throw new Error(summary);
+    }
+    if (!executionAlreadyObserved) {
       const verifyPreflight = runCommand("project-verify-preflight", [
         "project",
         "verify",

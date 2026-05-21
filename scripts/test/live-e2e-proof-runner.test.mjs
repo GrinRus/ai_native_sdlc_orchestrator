@@ -2286,6 +2286,57 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
   });
 });
 
+test("full-journey mode fails closed when observed execution loses preserved readiness evidence", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.missing-resume-readiness.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const runId = "full-journey-missing-resume-readiness";
+
+    const first = runProofRunner({
+      runtimeRoot,
+      examplesRoot,
+      profilePath,
+      runId,
+      catalogRoot,
+    });
+    assert.equal(first.live_e2e_run_status, "pass");
+    const firstSummary = JSON.parse(fs.readFileSync(first.live_e2e_run_summary_file, "utf8"));
+    assert.equal(fs.existsSync(firstSummary.artifacts.target_cleanliness_before_execution_file), true);
+    fs.rmSync(firstSummary.artifacts.target_cleanliness_before_execution_file, { force: true });
+
+    const resumed = runProofRunner({
+      runtimeRoot,
+      examplesRoot,
+      profilePath,
+      runId,
+      catalogRoot,
+    });
+    assert.equal(resumed.live_e2e_run_status, "not_pass");
+    const resumedSummary = JSON.parse(fs.readFileSync(resumed.live_e2e_run_summary_file, "utf8"));
+    assert.match(String(resumedSummary.error), /cannot resume without preserved pre-execution readiness evidence/u);
+    assert.equal(resumedSummary.stage_results.find((entry) => entry.stage === "execution")?.status, "fail");
+    const observation = JSON.parse(fs.readFileSync(resumedSummary.live_e2e_observation_report_file, "utf8"));
+    assert.equal(observation.final_analysis.failed_stages[0].stage, "execution");
+  });
+});
+
 test("installed-user guided journey proof captures CLI, web, closure, and no-write evidence", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
