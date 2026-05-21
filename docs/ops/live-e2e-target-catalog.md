@@ -136,7 +136,12 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `full-journey-regress-pluggy.yaml`
   - `full-journey-repair-pluggy-medium-anthropic.yaml`
   - `full-journey-governance-pluggy-medium-openai.yaml`
-- Verification baseline: `python3 -m pip install -e . pytest`, `python3 -m pytest testing`.
+- Verification baseline: `python3 -m venv venv`,
+  `venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage`,
+  `venv/bin/python -m pytest testing`.
+- Checkout mode: full clone with tags. `pluggy` derives its package version from
+  `setuptools-scm`; shallow checkouts produce an invalid local version and break
+  pytest dependency resolution.
 
 ## Extended candidate targets
 - `spf13/cobra` (`cobra`): Go CLI framework, extended small regress cell, `go mod download`, `go test ./...`.

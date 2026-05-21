@@ -30,9 +30,13 @@ pnpm check
 | `regress-long` | `python3`, `make`, `git` | `make install` | `make test`<br>`make codestyle` | Python dependencies from index/mirror | `No module named ...`, `make: *** ... Error` |
 | `release-long` | `node`, `yarn`, `git` | `yarn install --immutable` | `yarn g:lint`<br>`yarn g:typecheck`<br>`yarn workspace @your-org/ts-utils test-unit`<br>`yarn workspace @your-org/core-lib test-unit` | Yarn workspace dependencies | `YN0000/YN...` install errors, workspace script failure |
 | `commander-js` full-journey profiles | `node >=22`, `npm`, `git` | `npm ci` | `npm run test`<br>`npm run check` | npm packages | lockfile install errors, failing parser/help tests, or check script errors |
-| `pluggy` full-journey profiles | `python3 >=3.9`, `pip`, `git` | `python3 -m pip install -e . pytest` | `python3 -m pytest testing` | Python dependencies from index/mirror | editable install failure or pytest failure |
+| `pluggy` full-journey profiles | `python3 >=3.9`, `pip`, `git` | `python3 -m venv venv`<br>`venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage` | `venv/bin/python -m pytest testing` | Python dependencies from index/mirror | venv creation, editable install, or pytest failure |
 | `cobra` extended target | `go`, `git` | `go mod download` | `go test ./...` | Go module downloads | module download or Go test failure |
 | `date-fns` extended target | `node >=22`, `pnpm`, `git` | `pnpm install` | `pnpm vitest run`<br>`pnpm run lint`<br>`pnpm run types` | pnpm packages | Vitest, lint, or typecheck failure |
+
+`pluggy` full-journey profiles require a full checkout with tags before editable
+install. The target derives its version with `setuptools-scm`; shallow clones
+report a pre-1.0 local version that conflicts with modern `pytest`.
 
 ## Notes
 
