@@ -136,7 +136,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `full-journey-regress-pluggy.yaml`
   - `full-journey-repair-pluggy-medium-anthropic.yaml`
   - `full-journey-governance-pluggy-medium-openai.yaml`
-- Verification baseline: `python -m pip install -e . pytest`, `python -m pytest testing`.
+- Verification baseline: `python3 -m pip install -e . pytest`, `python3 -m pytest testing`.
 
 ## Extended candidate targets
 - `spf13/cobra` (`cobra`): Go CLI framework, extended small regress cell, `go mod download`, `go test ./...`.
