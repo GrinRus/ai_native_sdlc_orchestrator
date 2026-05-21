@@ -47,6 +47,19 @@ function runGitChecked(options) {
 }
 
 /**
+ * @param {{ cwd: string, args: string[] }} options
+ */
+function runGitOutput(options) {
+  const run = spawnSync("git", options.args, { cwd: options.cwd, encoding: "utf8" });
+  assert.equal(
+    run.status,
+    0,
+    `git ${options.args.join(" ")} failed: ${(run.stderr ?? run.stdout ?? "").trim()}`,
+  );
+  return run.stdout.trim();
+}
+
+/**
  * @param {{
  *   hostTempRoot: string,
  *   branch?: string,
@@ -504,6 +517,8 @@ test("qualification loop records manually completed medium run evidence", () => 
     const reportsRoot = path.join(tempRoot, "reports");
     fs.mkdirSync(reportsRoot, { recursive: true });
     const runId = "manual-qualified-run";
+    const commitSha = runGitOutput({ cwd: workspaceRoot, args: ["rev-parse", "HEAD"] });
+    const branchName = runGitOutput({ cwd: workspaceRoot, args: ["branch", "--show-current"] });
     const observationFile = path.join(reportsRoot, `live-e2e-observation-report-${runId}.json`);
     const summaryFile = path.join(reportsRoot, `live-e2e-run-summary-${runId}.json`);
     fs.writeFileSync(
@@ -529,8 +544,12 @@ test("qualification loop records manually completed medium run evidence", () => 
         {
           status: "pass",
           run_id: runId,
+          commit_sha: commitSha,
+          branch_name: branchName,
+          profile_id: "live-e2e.full-journey.release.ky.medium.openai",
           provider_variant_id: "openai-primary",
           target_catalog_id: "ky",
+          scenario_family: "release",
           feature_mission_id: "ky-release-doc-typing",
           feature_size: "medium",
           live_e2e_observation_report_file: observationFile,
@@ -620,6 +639,165 @@ test("qualification loop records manually completed medium run evidence", () => 
     assert.equal(qualificationSet.attempts.length, 1);
     assert.equal(qualificationSet.attempts[0].run_id, runId);
     assert.equal(qualificationSet.attempts[0].status, "passed");
+    assert.equal(qualificationSet.attempts[0].commit_sha, commitSha);
+    assert.equal(qualificationSet.attempts[0].branch_name, branchName);
+  });
+});
+
+test("qualification loop rejects recorded run summary that mismatches the selected profile", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const runId = "manual-mismatched-run";
+    const commitSha = runGitOutput({ cwd: workspaceRoot, args: ["rev-parse", "HEAD"] });
+    const branchName = runGitOutput({ cwd: workspaceRoot, args: ["branch", "--show-current"] });
+    const observationFile = path.join(reportsRoot, "observation.json");
+    const summaryFile = path.join(reportsRoot, "summary.json");
+    const qualificationSetFile = path.join(tempRoot, "qualification-set.json");
+    const originalQualificationSet = {
+      qualification_report_id: "live-e2e.final-qualification.v1",
+      attempts: [],
+    };
+    fs.writeFileSync(observationFile, `${JSON.stringify({ report_status: "final", final_analysis: { status: "pass" } })}\n`, "utf8");
+    fs.writeFileSync(
+      summaryFile,
+      `${JSON.stringify(
+        {
+          status: "pass",
+          run_id: runId,
+          commit_sha: commitSha,
+          branch_name: branchName,
+          profile_id: "live-e2e.full-journey.regress.ky.medium.anthropic",
+          provider_variant_id: "anthropic-primary",
+          target_catalog_id: "ky",
+          scenario_family: "regress",
+          feature_mission_id: "ky-fetch-options-regression",
+          feature_size: "medium",
+          live_e2e_observation_report_file: observationFile,
+          canonical_status: { acceptance_status: "pass" },
+          quality_judgement: { overall_status: "pass" },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(qualificationSetFile, `${JSON.stringify(originalQualificationSet, null, 2)}\n`, "utf8");
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--profile",
+        path.join(workspaceRoot, "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml"),
+        "--qualification-set-file",
+        qualificationSetFile,
+        "--record-run-summary-file",
+        summaryFile,
+      ],
+      {
+        cwd: workspaceRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /profile_id.*mismatch/u);
+    assert.deepEqual(JSON.parse(fs.readFileSync(qualificationSetFile, "utf8")), originalQualificationSet);
+  });
+});
+
+test("qualification loop requires recorded commit metadata from current lineage", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const commitSha = runGitOutput({ cwd: workspaceRoot, args: ["rev-parse", "HEAD"] });
+    const branchName = runGitOutput({ cwd: workspaceRoot, args: ["branch", "--show-current"] });
+    const observationFile = path.join(reportsRoot, "observation.json");
+    fs.writeFileSync(observationFile, `${JSON.stringify({ report_status: "final", final_analysis: { status: "pass" } })}\n`, "utf8");
+    const writeSummary = (fileName, overrides = {}) => {
+      const summaryFile = path.join(reportsRoot, fileName);
+      fs.writeFileSync(
+        summaryFile,
+        `${JSON.stringify(
+          {
+            status: "pass",
+            run_id: fileName.replace(/\.json$/u, ""),
+            branch_name: branchName,
+            profile_id: "live-e2e.full-journey.release.ky.medium.openai",
+            provider_variant_id: "openai-primary",
+            target_catalog_id: "ky",
+            scenario_family: "release",
+            feature_mission_id: "ky-release-doc-typing",
+            feature_size: "medium",
+            live_e2e_observation_report_file: "observation.json",
+            canonical_status: { acceptance_status: "pass" },
+            quality_judgement: { overall_status: "pass" },
+            ...overrides,
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+      return summaryFile;
+    };
+    const profileArgs = [
+      "--project-ref",
+      workspaceRoot,
+      "--profile",
+      path.join(workspaceRoot, "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml"),
+    ];
+
+    const missingCommit = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        ...profileArgs,
+        "--qualification-set-file",
+        path.join(tempRoot, "missing-commit-qset.json"),
+        "--record-run-summary-file",
+        writeSummary("missing-commit.json"),
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(missingCommit.status, 1);
+    assert.match(missingCommit.stderr, /missing commit_sha/u);
+
+    const staleCommit = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        ...profileArgs,
+        "--qualification-set-file",
+        path.join(tempRoot, "stale-commit-qset.json"),
+        "--record-run-summary-file",
+        writeSummary("stale-commit.json", { commit_sha: "0".repeat(40) }),
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(staleCommit.status, 1);
+    assert.match(staleCommit.stderr, /not an ancestor/u);
+
+    const acceptedQset = path.join(tempRoot, "accepted-qset.json");
+    const accepted = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        ...profileArgs,
+        "--qualification-set-file",
+        acceptedQset,
+        "--record-run-summary-file",
+        writeSummary("accepted.json", { commit_sha: commitSha }),
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(accepted.status, 0, accepted.stderr || accepted.stdout);
+    const qualificationSet = JSON.parse(fs.readFileSync(acceptedQset, "utf8"));
+    assert.equal(qualificationSet.passing_run_count, 1);
+    assert.equal(qualificationSet.attempts[0].commit_sha, commitSha);
   });
 });
 

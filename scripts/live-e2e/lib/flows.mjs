@@ -17,7 +17,11 @@ import {
   writeJson,
 } from "./common.mjs";
 import { createStageMap, flattenStageMap, getProfileStages, markStage as markStageRaw } from "./stages.mjs";
-import { isLiveE2eControllerStop } from "./step-controller.mjs";
+import {
+  buildLiveE2eStepInstanceId,
+  isLiveE2eControllerStop,
+  resolveLiveE2eCommandStep,
+} from "./step-controller.mjs";
 import { DEFAULT_BACKLOG_REFS, createProofRunnerEnvironment, createSessionRoots } from "./profile-catalog.mjs";
 import {
   buildGuidedJourneyProof,
@@ -495,6 +499,20 @@ function buildCommandDiagnostic(result) {
     recommendation: result.ok ? "continue" : "inspect transcript and command stderr",
     interactive_continuation: interactiveContinuation,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} diagnostic
+ * @param {string} label
+ * @param {number} iteration
+ */
+function annotateCommandDiagnosticStep(diagnostic, label, iteration) {
+  const step = resolveLiveE2eCommandStep(label);
+  if (!step) return;
+  const normalizedIteration = Number(iteration) || 1;
+  diagnostic.step_id = step;
+  diagnostic.step_instance_id = buildLiveE2eStepInstanceId(step, normalizedIteration);
+  diagnostic.iteration = normalizedIteration;
 }
 
 /**
@@ -1911,11 +1929,18 @@ export function executeInstalledUserFlow(options) {
     const runCommand = (label, args, runOptions = {}) => {
       const iteration = Number(runOptions.iteration) || 1;
       if (options.stepController?.shouldUseCachedCommand?.(label, iteration) === true) {
-        const cachedDiagnostic = asRecord(options.stepController.getCachedCommandResult(label));
+        const cachedDiagnostic = asRecord(options.stepController.getCachedCommandResult(label, iteration));
         const cachedResult = buildCachedCommandResult(cachedDiagnostic);
         if (cachedResult) {
           commandIndex += 1;
-          if (!commandResults.some((entry) => asNonEmptyString(entry.label) === label)) {
+          if (
+            !commandResults.some(
+              (entry) =>
+                asNonEmptyString(entry.label) === label &&
+                (Number(entry.iteration) || 1) === iteration &&
+                asNonEmptyString(entry.step_instance_id) === asNonEmptyString(cachedDiagnostic.step_instance_id),
+            )
+          ) {
             commandResults.push(cachedDiagnostic);
           }
           return cachedResult;
@@ -1939,6 +1964,7 @@ export function executeInstalledUserFlow(options) {
       });
       commandIndex += 1;
       const diagnostic = buildCommandDiagnostic(result);
+      annotateCommandDiagnosticStep(diagnostic, label, iteration);
       if (!result.ok && runOptions.allowNonZeroWithPayload === true && result.payload) {
         diagnostic.accepted_nonzero_payload = true;
         diagnostic.failure_class = "nonzero-with-readable-payload";
@@ -1979,6 +2005,7 @@ export function executeInstalledUserFlow(options) {
         });
         commandIndex += 1;
         const answerDiagnostic = buildCommandDiagnostic(answerResult);
+        annotateCommandDiagnosticStep(answerDiagnostic, `${label}-interaction-answer`, iteration);
         commandResults.push(answerDiagnostic);
         if (!answerResult.ok) {
           const stderr = answerResult.stderr.trim() || answerResult.stdout.trim() || "interaction answer command failed";
@@ -2627,11 +2654,18 @@ export function executeFullJourneyFlow(options) {
     const runCommand = (label, args, runOptions = {}) => {
       const iteration = Number(runOptions.iteration) || 1;
       if (options.stepController?.shouldUseCachedCommand?.(label, iteration) === true) {
-        const cachedDiagnostic = asRecord(options.stepController.getCachedCommandResult(label));
+        const cachedDiagnostic = asRecord(options.stepController.getCachedCommandResult(label, iteration));
         const cachedResult = buildCachedCommandResult(cachedDiagnostic);
         if (cachedResult) {
           commandIndex += 1;
-          if (!commandResults.some((entry) => asNonEmptyString(entry.label) === label)) {
+          if (
+            !commandResults.some(
+              (entry) =>
+                asNonEmptyString(entry.label) === label &&
+                (Number(entry.iteration) || 1) === iteration &&
+                asNonEmptyString(entry.step_instance_id) === asNonEmptyString(cachedDiagnostic.step_instance_id),
+            )
+          ) {
             commandResults.push(cachedDiagnostic);
           }
           return cachedResult;
@@ -2655,6 +2689,7 @@ export function executeFullJourneyFlow(options) {
       });
       commandIndex += 1;
       const diagnostic = buildCommandDiagnostic(result);
+      annotateCommandDiagnosticStep(diagnostic, label, iteration);
       if (!result.ok && runOptions.allowNonZeroWithPayload === true && result.payload) {
         diagnostic.accepted_nonzero_payload = true;
         diagnostic.failure_class = "nonzero-with-readable-payload";
@@ -2697,6 +2732,7 @@ export function executeFullJourneyFlow(options) {
         });
         commandIndex += 1;
         const answerDiagnostic = buildCommandDiagnostic(answerResult);
+        annotateCommandDiagnosticStep(answerDiagnostic, `${label}-interaction-answer`, iteration);
         commandResults.push(answerDiagnostic);
         if (!answerResult.ok) {
           const stderr = answerResult.stderr.trim() || answerResult.stdout.trim() || "interaction answer command failed";

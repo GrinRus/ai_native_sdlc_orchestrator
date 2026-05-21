@@ -191,6 +191,26 @@ test("verifyProjectRuntime times out long-running verification commands", () => 
   });
 });
 
+test("verifyProjectRuntime uses a hard timeout signal for target commands", () => {
+  withTempRepo((repoRoot) => {
+    const command = 'node -e "process.on(\\"SIGTERM\\", () => {}); setTimeout(() => {}, 10000)"';
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationCommandTimeoutMs: 100,
+      repoTestCommands: [command],
+    });
+
+    assert.equal(result.verifySummary.status, "failed");
+    const failedStep = result.stepResults.find((step) => step.command === command);
+    assert.ok(failedStep);
+    assert.equal(failedStep.timed_out, true);
+
+    const transcript = fs.readFileSync(failedStep.evidence_refs[0], "utf8");
+    assert.match(transcript, /signal: SIGKILL/u);
+  });
+});
+
 test("verifyProjectRuntime blocks unsafe preflight defaults before running commands", () => {
   withTempRepo((repoRoot) => {
     const profilePath = path.join(repoRoot, "examples/project.aor.yaml");

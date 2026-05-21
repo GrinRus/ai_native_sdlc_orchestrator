@@ -167,14 +167,36 @@ export function buildLiveE2eStepPlan(step, command = null) {
 /**
  * @param {Array<Record<string, unknown>>} commandResults
  * @param {string[]} labels
+ * @param {string} [step]
+ * @param {number} [iteration]
  * @returns {Record<string, unknown> | undefined}
  */
-export function findLiveE2eCommandByPreferredLabel(commandResults, labels) {
+export function findLiveE2eCommandByPreferredLabel(commandResults, labels, step = "", iteration = 1) {
+  const normalizedStep = asNonEmptyString(step);
+  const normalizedIteration = Number(iteration) || 1;
+  const stepInstanceId = normalizedStep ? buildLiveE2eStepInstanceId(normalizedStep, normalizedIteration) : "";
   for (const label of labels) {
-    const command = commandResults.findLast((entry) => asNonEmptyString(entry.label) === label);
+    const matchingCommands = commandResults.filter((entry) => asNonEmptyString(entry.label) === label);
+    const command = stepInstanceId
+      ? matchingCommands.findLast((entry) => {
+          const entryStepInstanceId = asNonEmptyString(entry.step_instance_id);
+          if (entryStepInstanceId) return entryStepInstanceId === stepInstanceId;
+          const entryStep = asNonEmptyString(entry.step_id);
+          const entryIteration = Number(entry.iteration) || 1;
+          return entryStep === normalizedStep && entryIteration === normalizedIteration;
+        }) ?? matchingCommands.findLast((entry) => asNonEmptyString(entry.label) === label)
+      : matchingCommands.findLast((entry) => asNonEmptyString(entry.label) === label);
     if (command) return command;
   }
   return undefined;
+}
+
+/**
+ * @param {string} label
+ * @returns {string}
+ */
+export function resolveLiveE2eCommandStep(label) {
+  return COMMAND_LABEL_STEP[asNonEmptyString(label)] ?? "";
 }
 
 /**
@@ -262,8 +284,16 @@ function operatorFilePaths(options) {
  * @param {string} step
  * @param {number} iteration
  */
-function buildStepInstanceId(step, iteration) {
+export function buildLiveE2eStepInstanceId(step, iteration) {
   return iteration > 1 ? `${step}#${iteration}` : step;
+}
+
+/**
+ * @param {string} step
+ * @param {number} iteration
+ */
+function buildStepInstanceId(step, iteration) {
+  return buildLiveE2eStepInstanceId(step, iteration);
 }
 
 /**
@@ -688,7 +718,8 @@ export function createLiveE2eStepController(options) {
     }
 
     const stage = asRecord(input.stageResult);
-    const command = findLiveE2eCommandByPreferredLabel(input.commandResults, getLiveE2eCommandLabelPriority(step)) ?? {};
+    const command =
+      findLiveE2eCommandByPreferredLabel(input.commandResults, getLiveE2eCommandLabelPriority(step), step, iteration) ?? {};
     const artifactRefs = collectArtifactRefs(command, stage);
     const planned = planByStep[stepInstanceId] ?? planCommand({
       label: asNonEmptyString(command.label) || getLiveE2eCommandLabelPriority(step)[0] || step,
@@ -986,6 +1017,60 @@ export function createLiveE2eStepController(options) {
     Object.values(entryByStep)
       .map((entry) => asNonEmptyString(entry.step_instance_id) || asNonEmptyString(entry.step_id))
       .filter(Boolean);
+  const findCachedCommandResult = (label, iteration = 1) => {
+    const normalizedLabel = asNonEmptyString(label);
+    if (!normalizedLabel) return null;
+    const commandResults = Array.isArray(state.command_results)
+      ? state.command_results.map((entry) => asRecord(entry))
+      : [];
+    const matchingCommands = commandResults.filter((entry) => asNonEmptyString(entry.label) === normalizedLabel);
+    if (matchingCommands.length === 0) return null;
+
+    const step = resolveLiveE2eCommandStep(normalizedLabel);
+    if (!step) {
+      return matchingCommands.length === 1 ? matchingCommands[0] : null;
+    }
+
+    const normalizedIteration = Number(iteration) || 1;
+    const stepInstanceId = buildStepInstanceId(step, normalizedIteration);
+    const exact = matchingCommands.findLast((entry) => {
+      const entryStepInstanceId = asNonEmptyString(entry.step_instance_id);
+      if (entryStepInstanceId) return entryStepInstanceId === stepInstanceId;
+      const entryStep = asNonEmptyString(entry.step_id);
+      const entryIteration = Number(entry.iteration) || 1;
+      return entryStep === step && entryIteration === normalizedIteration;
+    });
+    if (exact) return exact;
+
+    const persistedEntry = asRecord(entryByStep[stepInstanceId]);
+    const persistedTranscriptRef = asNonEmptyString(persistedEntry.transcript_ref);
+    if (persistedTranscriptRef) {
+      const transcriptMatched = matchingCommands.findLast(
+        (entry) => asNonEmptyString(entry.transcript_file) === persistedTranscriptRef,
+      );
+      if (transcriptMatched) return transcriptMatched;
+      if (fileExists(persistedTranscriptRef)) {
+        return {
+          label: normalizedLabel,
+          command_surface: asNonEmptyString(persistedEntry.public_surface) || "cached public AOR command",
+          status: ["pass", "warn", "resumed"].includes(asNonEmptyString(asRecord(persistedEntry.deterministic_analysis).status))
+            ? "pass"
+            : "fail",
+          exit_code:
+            typeof asRecord(persistedEntry.deterministic_analysis).exit_code === "number"
+              ? asRecord(persistedEntry.deterministic_analysis).exit_code
+              : 0,
+          transcript_file: persistedTranscriptRef,
+          artifact_refs: asStringArray(persistedEntry.artifact_refs),
+          step_id: step,
+          step_instance_id: stepInstanceId,
+          iteration: normalizedIteration,
+        };
+      }
+    }
+
+    return matchingCommands.length === 1 ? matchingCommands[0] : null;
+  };
 
   return {
     mode,
@@ -996,23 +1081,20 @@ export function createLiveE2eStepController(options) {
     observeStage,
     getState: cloneState,
     hasPersistedProgress: () => asStringArray(state.completed_steps).length > 0,
-    getCachedCommandResult: (label) => {
-      const normalizedLabel = asNonEmptyString(label);
-      if (!normalizedLabel) return null;
-      const commandResults = Array.isArray(state.command_results)
-        ? state.command_results.map((entry) => asRecord(entry))
-        : [];
-      return commandResults.findLast((entry) => asNonEmptyString(entry.label) === normalizedLabel) ?? null;
-    },
+    getCachedCommandResult: findCachedCommandResult,
     shouldUseCachedCommand: (label, iteration = 1) => {
-      const step = COMMAND_LABEL_STEP[asNonEmptyString(label)];
+      const step = resolveLiveE2eCommandStep(label);
       if (!step) return false;
       const normalizedIteration = Number(iteration) || 1;
       const stepInstanceId = buildStepInstanceId(step, normalizedIteration);
-      if (mode === "manual" && observedStepInstances().includes(stepInstanceId)) return true;
+      if (mode === "manual" && observedStepInstances().includes(stepInstanceId)) {
+        return findCachedCommandResult(label, normalizedIteration) !== null;
+      }
       if (normalizedIteration > 1) return false;
-      if (completedContinueSteps().includes(step)) return true;
-      return mode === "manual" && observedStepInstances().includes(stepInstanceId);
+      if (completedContinueSteps().includes(step)) {
+        return findCachedCommandResult(label, normalizedIteration) !== null;
+      }
+      return mode === "manual" && observedStepInstances().includes(stepInstanceId) && findCachedCommandResult(label, normalizedIteration) !== null;
     },
     getStepJournal: () =>
       Object.values(entryByStep).sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0)),

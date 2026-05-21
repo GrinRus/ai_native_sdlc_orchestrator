@@ -468,7 +468,7 @@ export function verifyProjectRuntime(options = {}) {
         encoding: "utf8",
         env: buildVerificationCommandEnv(),
         timeout: commandTimeoutMs,
-        killSignal: "SIGTERM",
+        killSignal: "SIGKILL",
         detached: process.platform !== "win32",
         maxBuffer: COMMAND_OUTPUT_MAX_BUFFER,
       });

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -69,6 +70,26 @@ const LIVE_E2E_OPERATOR_ACTIONS = Object.freeze([
   "diagnose",
   "block",
 ]);
+
+/**
+ * @param {string} cwd
+ * @param {string[]} args
+ * @returns {string | null}
+ */
+function gitOutputOrNull(cwd, args) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  return result.status === 0 ? result.stdout.trim() || null : null;
+}
+
+/**
+ * @param {string} hostRoot
+ */
+function resolveHostSourceMetadata(hostRoot) {
+  return {
+    commit_sha: gitOutputOrNull(hostRoot, ["rev-parse", "HEAD"]),
+    branch_name: gitOutputOrNull(hostRoot, ["branch", "--show-current"]),
+  };
+}
 /**
  * @param {unknown} value
  * @returns {string[]}
@@ -1194,10 +1215,13 @@ function writeProofRunnerArtifacts(options) {
   options.flowResult.artifacts.release_status = canonicalStatus.release_status;
   options.flowResult.artifacts.proof_eligible_tier = canonicalStatus.proof_eligible_tier;
   options.flowResult.artifacts.required_matrix_acceptance_closed = canonicalStatus.required_matrix_acceptance_closed;
+  const sourceMetadata = resolveHostSourceMetadata(options.hostRoot);
 
   const summary = {
     run_id: options.runId,
     project_id: options.hostProjectId,
+    commit_sha: sourceMetadata.commit_sha,
+    branch_name: sourceMetadata.branch_name,
     profile_ref: options.profilePath,
     profile_id: options.profile.profile_id ?? null,
     scenario_id: options.profile.scenario_id ?? null,

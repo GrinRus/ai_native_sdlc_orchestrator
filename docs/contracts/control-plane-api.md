@@ -86,6 +86,7 @@ Project bootstrap baseline:
 - `project verify` accepts `verification_label` plus repeatable `repo_build_command`, `repo_lint_command`, and `repo_test_command` inputs. Labels separate baseline diagnostics, primary post-run gates, and diagnostic full-suite evidence while preserving command source in the verify summary.
 - `project verify` enforces a bounded per-command timeout derived from the project profile and records timeout evidence through `command_timeout_ms`, `timed_out`, transcripts, and `timed_out_commands`.
 - `project verify` disables inherited Node compile-cache state for target commands so AOR runtime/session caches cannot contaminate package-manager, lint, test, or build execution in target checkouts.
+- Live E2E run summaries include source metadata (`commit_sha`, `branch_name`) so qualification accounting can reject stale or cross-branch evidence before counting a run.
 
 ## Query families
 - projects
