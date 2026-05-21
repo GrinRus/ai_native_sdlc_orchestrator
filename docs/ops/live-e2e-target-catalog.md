@@ -122,7 +122,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `full-journey-regress-commander-js.yaml`
   - `full-journey-repair-commander-js-medium-anthropic.yaml`
   - `full-journey-governance-commander-js-medium-openai.yaml`
-- Verification baseline: `npm install`, `npm run test`, `npm run check`.
+- Verification baseline: `npm ci`, `npm run test`, `npm run check`.
 
 ## Target 5 — `pytest-dev/pluggy`
 - Catalog id: `pluggy`
