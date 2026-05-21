@@ -32,6 +32,12 @@ required_matrix_cells:
     feature_mission_id: pluggy-typing-governance
     provider_variant_id: openai-primary
     coverage_tier: required
+  - cell_id: pluggy.governance.medium.open-code
+    scenario_family: governance
+    feature_size: medium
+    feature_mission_id: pluggy-typing-governance
+    provider_variant_id: open-code-primary
+    coverage_tier: extended
 provider_comparison_pairs:
   - pair_id: pluggy.regress.small
     scenario_family: regress

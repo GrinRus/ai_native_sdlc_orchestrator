@@ -191,10 +191,12 @@ Required coverage matrix:
   - `regress/small/openai-primary`
   - `repair/medium/anthropic-primary`
   - `governance/medium/openai-primary`
+  - `governance/medium/open-code-primary` (extended)
 
 Extended candidate cells:
 - `ky.governance.large.openai` (`ky-retry-hooks-governance`)
 - `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)
+- `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)
 - `cobra.regress.small.openai`
 - `date-fns.regress.small.openai`
