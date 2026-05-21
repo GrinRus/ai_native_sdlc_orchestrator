@@ -1187,7 +1187,7 @@ function configureClaudeExternalRuntimeSuccess(options) {
         "if(request.step_class==='implement'&&fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eClaudeAdapterPatch = true;\\n');}",
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
-        "summary:'claude external runner ok',",
+        "summary:'claude external runner ok; Authentication confirmed',",
         "output:{runner:'node-inline-claude',step_class:request.step_class||null,execution_root:process.cwd()},",
         "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-claude-success'],",
         "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'claude-inline'}]",

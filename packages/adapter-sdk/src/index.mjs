@@ -400,7 +400,8 @@ export function classifyExternalRunnerFailure(options) {
     /\b401\b/u.test(combined) ||
     combined.includes("unauthorized") ||
     combined.includes("not authenticated") ||
-    combined.includes("authentication") ||
+    /\bauthentication\s+(?:failed|failure|required|error|invalid|expired|missing|denied|transient)\b/u.test(combined) ||
+    /\b(?:failed|failure|required|error|invalid|expired|missing|denied|transient)\s+authentication\b/u.test(combined) ||
     combined.includes("missing bearer") ||
     combined.includes("api key") ||
     combined.includes("apikey") ||

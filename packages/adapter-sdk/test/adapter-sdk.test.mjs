@@ -302,6 +302,32 @@ test("external runner failure classifier ignores benign permission words on succ
   );
 });
 
+test("external runner failure classifier ignores successful authentication confirmation text", () => {
+  assert.equal(
+    classifyExternalRunnerFailure({
+      stdout: JSON.stringify({
+        type: "result",
+        subtype: "success",
+        result: "Ready. Authentication confirmed, minimal non-interactive invocation successful.",
+      }),
+      stderr: "",
+      errorMessage: null,
+      defaultFailureKind: "none",
+    }),
+    "none",
+  );
+
+  assert.equal(
+    classifyExternalRunnerFailure({
+      stdout: "",
+      stderr: "authentication transient",
+      errorMessage: null,
+      defaultFailureKind: "external-runner-failed",
+    }),
+    "auth-failed",
+  );
+});
+
 test("external runner failure classifier ignores nested target Permission denied logs", () => {
   const targetOutput = [
     "Running npm test",
