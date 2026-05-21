@@ -103,6 +103,29 @@ export function getLiveE2eIncludedSteps(policy) {
 }
 
 /**
+ * @param {Record<string, unknown>} controllerStop
+ * @param {string[]} includedSteps
+ * @returns {boolean}
+ */
+export function isLiveE2eControllerStopInProgress(controllerStop, includedSteps) {
+  const stop = asRecord(controllerStop);
+  if (Object.keys(stop).length === 0) return false;
+
+  const decision = asRecord(stop.decision);
+  const state = asRecord(stop.state);
+  const completedSteps = new Set(asStringArray(state.completed_steps));
+  const allIncludedStepsCompleted =
+    includedSteps.length > 0 && includedSteps.every((step) => completedSteps.has(step));
+  const terminalManualContinue =
+    asNonEmptyString(decision.action) === "continue" &&
+    !asNonEmptyString(decision.next_step) &&
+    !asNonEmptyString(state.current_step) &&
+    allIncludedStepsCompleted;
+
+  return !terminalManualContinue;
+}
+
+/**
  * @param {Record<string, unknown>} profile
  */
 export function resolveLiveE2eOperatorContext(profile) {

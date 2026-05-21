@@ -8,6 +8,7 @@ import {
   LiveE2eControllerStop,
   createLiveE2eStepController,
   findLiveE2eCommandByPreferredLabel,
+  isLiveE2eControllerStopInProgress,
   isLiveE2eControllerStop,
 } from "../live-e2e/lib/step-controller.mjs";
 
@@ -756,6 +757,59 @@ test("live E2E step controller exposes cached public command results for complet
     assert.equal(second.getCachedCommandResult("discovery-run").transcript_file, transcriptFile);
     assert.deepEqual(second.getState().artifacts_snapshot, { analysis_report_file: "analysis.json" });
   });
+});
+
+test("live E2E terminal manual continue is not an in-progress observation report", () => {
+  const includedSteps = ["discovery", "spec"];
+  assert.equal(isLiveE2eControllerStopInProgress({}, includedSteps), false);
+  assert.equal(
+    isLiveE2eControllerStopInProgress(
+      {
+        decision: {
+          action: "continue",
+          next_step: null,
+        },
+        state: {
+          current_step: null,
+          completed_steps: includedSteps,
+        },
+      },
+      includedSteps,
+    ),
+    false,
+  );
+  assert.equal(
+    isLiveE2eControllerStopInProgress(
+      {
+        decision: {
+          action: "continue",
+          next_step: "spec",
+        },
+        state: {
+          current_step: "spec",
+          completed_steps: ["discovery"],
+        },
+      },
+      includedSteps,
+    ),
+    true,
+  );
+  assert.equal(
+    isLiveE2eControllerStopInProgress(
+      {
+        decision: {
+          action: "diagnose",
+          next_step: null,
+        },
+        state: {
+          current_step: null,
+          completed_steps: includedSteps,
+        },
+      },
+      includedSteps,
+    ),
+    true,
+  );
 });
 
 test("live E2E manual resume reuses cached commands for observed steps awaiting decision", () => {

@@ -37,6 +37,7 @@ import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib
 import {
   buildLiveE2eStepPlan,
   createLiveE2eStepController,
+  isLiveE2eControllerStopInProgress,
   resolveLiveE2eOperatorContext,
 } from "./lib/step-controller.mjs";
 
@@ -927,7 +928,7 @@ function buildObservationReport(options) {
   const setupJournal = buildSetupJournal(options.flowResult.artifacts);
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const controllerStop = asRecord(options.flowResult.artifacts.live_e2e_controller_stop);
-  const reportStatus = Object.keys(controllerStop).length > 0 ? "in_progress" : "final";
+  const reportStatus = isLiveE2eControllerStopInProgress(controllerStop, includedSteps) ? "in_progress" : "final";
   const agentJudgeDocument =
     asNonEmptyString(operatorContext.operator_kind) === "skill-agent" ? {} : options.agentJudgeDocument;
   const stepJournal = buildStepJournal({
