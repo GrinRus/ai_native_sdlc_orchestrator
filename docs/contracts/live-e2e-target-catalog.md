@@ -43,6 +43,9 @@ Missions must not use `allowed_paths` or `forbidden_paths` as Runtime Harness or
 Catalog target `verification` keeps the existing command shape:
 - `setup_commands` are readiness commands. Failure means the target cannot be prepared safely.
 - `commands` are target quality checks. They remain the full target diagnostic signal unless a mission declares a narrower post-run gate.
+- Persistent setup artifacts needed by later verification should live under the
+  profile runtime root, normally `.aor/`, so readiness tooling does not pollute
+  target source-change evidence.
 
 Feature missions may add `post_run_quality`:
 - `primary_commands` are the deterministic mission-blocking post-run quality gate for that mission.

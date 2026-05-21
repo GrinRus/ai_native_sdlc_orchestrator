@@ -136,9 +136,9 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `full-journey-regress-pluggy.yaml`
   - `full-journey-repair-pluggy-medium-anthropic.yaml`
   - `full-journey-governance-pluggy-medium-openai.yaml`
-- Verification baseline: `python3 -m venv venv`,
-  `venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage`,
-  `venv/bin/python -m pytest testing`.
+- Verification baseline: `python3 -m venv .aor/live-e2e-venv`,
+  `.aor/live-e2e-venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage`,
+  `.aor/live-e2e-venv/bin/python -m pytest testing`.
 - Checkout mode: full clone with tags. `pluggy` derives its package version from
   `setuptools-scm`; shallow checkouts produce an invalid local version and break
   pytest dependency resolution.

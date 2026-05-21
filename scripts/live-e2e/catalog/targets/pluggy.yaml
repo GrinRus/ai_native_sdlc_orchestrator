@@ -6,10 +6,10 @@ repo:
   checkout_strategy: full
 verification:
   setup_commands:
-    - python3 -m venv venv
-    - venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage
+    - python3 -m venv .aor/live-e2e-venv
+    - .aor/live-e2e-venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage
   commands:
-    - venv/bin/python -m pytest testing
+    - .aor/live-e2e-venv/bin/python -m pytest testing
 safety_defaults:
   write_back_to_remote: false
   preferred_delivery_mode: patch-only
@@ -52,10 +52,10 @@ feature_missions:
       - review-report
     acceptance_checks:
       - keep the change inside hook behavior and tests
-      - preserve venv/bin/python -m pytest testing evidence
+      - preserve .aor/live-e2e-venv/bin/python -m pytest testing evidence
     post_run_quality:
       primary_commands:
-        - venv/bin/python -m pytest testing
+        - .aor/live-e2e-venv/bin/python -m pytest testing
       diagnostic_commands: []
       diagnostic_failure_mode: warn
     supported_scenarios:
@@ -82,7 +82,7 @@ feature_missions:
     kpis:
       - kpi_id: pluggy-diagnostics-green
         name: Pluggy diagnostics gate
-        target: venv/bin/python -m pytest testing passes after the change
+        target: .aor/live-e2e-venv/bin/python -m pytest testing passes after the change
         measurement: post-run primary verification
     definition_of_done:
       - Regression tests cover the repaired diagnostic.
@@ -97,7 +97,7 @@ feature_missions:
       - preserve bounded pytest evidence
     post_run_quality:
       primary_commands:
-        - venv/bin/python -m pytest testing
+        - .aor/live-e2e-venv/bin/python -m pytest testing
       diagnostic_commands: []
       diagnostic_failure_mode: warn
     supported_scenarios:
@@ -130,7 +130,7 @@ feature_missions:
           cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
-      - venv/bin/python -m pytest testing passes.
+      - .aor/live-e2e-venv/bin/python -m pytest testing passes.
       - Governance and learning artifacts link to the same mission and target
         checkout.
     expected_evidence: &a3
@@ -143,7 +143,7 @@ feature_missions:
       - avoid any upstream write-back
     post_run_quality:
       primary_commands:
-        - venv/bin/python -m pytest testing
+        - .aor/live-e2e-venv/bin/python -m pytest testing
       diagnostic_commands: []
       diagnostic_failure_mode: warn
     supported_scenarios:
