@@ -513,6 +513,66 @@ test("live E2E command cache resolves repeated labels by iteration", () => {
   });
 });
 
+test("live E2E command cache can resume from persisted journal when command snapshot is missing", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "11-run-start.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+      },
+    };
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-command-cache-journal-fallback",
+      profile,
+      mode: "manual",
+    });
+    controller.planCommand({ label: "run-start", commandSurface: "aor run start" });
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "execution",
+          stageResult: { stage: "execution", status: "pass", evidence_refs: [transcriptFile], summary: "execution passed" },
+          commandResults: [
+            {
+              label: "run-start",
+              command_surface: "aor run start",
+              status: "pass",
+              transcript_file: transcriptFile,
+              artifact_refs: ["step-result.json"],
+              exit_code: 0,
+            },
+          ],
+          artifacts: { routed_step_result_file: "step-result.json" },
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        return true;
+      },
+    );
+
+    const state = JSON.parse(fs.readFileSync(controller.stateFile, "utf8"));
+    state.command_results = [];
+    fs.writeFileSync(controller.stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-command-cache-journal-fallback",
+      profile,
+      mode: "manual",
+    });
+    assert.equal(resumed.shouldUseCachedCommand("run-start", 1), true);
+    const cached = resumed.getCachedCommandResult("run-start", 1);
+    assert.equal(cached.transcript_file, transcriptFile);
+    assert.equal(cached.step_instance_id, "execution");
+    assert.equal(cached.iteration, 1);
+  });
+});
+
 test("live E2E step controller gates manual mode after one completed step", () => {
   withTempRoot((reportsRoot) => {
     const controller = createLiveE2eStepController({

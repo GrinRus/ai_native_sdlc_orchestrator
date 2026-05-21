@@ -60,6 +60,41 @@ function runGitOutput(options) {
 }
 
 /**
+ * @param {string} filePath
+ */
+function writePassingQualificationObservation(filePath) {
+  fs.writeFileSync(filePath, `${JSON.stringify({ report_status: "final", final_analysis: { status: "pass" } })}\n`, "utf8");
+}
+
+/**
+ * @param {{
+ *   runId: string,
+ *   observationRef?: string,
+ *   overrides?: Record<string, unknown>,
+ * }} options
+ */
+function buildPassingRecordedSummary(options) {
+  const commitSha = runGitOutput({ cwd: workspaceRoot, args: ["rev-parse", "HEAD"] });
+  const branchName = runGitOutput({ cwd: workspaceRoot, args: ["branch", "--show-current"] });
+  return {
+    status: "pass",
+    run_id: options.runId,
+    commit_sha: commitSha,
+    branch_name: branchName,
+    profile_id: "live-e2e.full-journey.release.ky.medium.openai",
+    provider_variant_id: "openai-primary",
+    target_catalog_id: "ky",
+    scenario_family: "release",
+    feature_mission_id: "ky-release-doc-typing",
+    feature_size: "medium",
+    ...(options.observationRef ? { live_e2e_observation_report_file: options.observationRef } : {}),
+    canonical_status: { acceptance_status: "pass" },
+    quality_judgement: { overall_status: "pass" },
+    ...options.overrides,
+  };
+}
+
+/**
  * @param {{
  *   hostTempRoot: string,
  *   branch?: string,
@@ -798,6 +833,98 @@ test("qualification loop requires recorded commit metadata from current lineage"
     const qualificationSet = JSON.parse(fs.readFileSync(acceptedQset, "utf8"));
     assert.equal(qualificationSet.passing_run_count, 1);
     assert.equal(qualificationSet.attempts[0].commit_sha, commitSha);
+  });
+});
+
+test("qualification loop resolves relative recorded observation override", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const observationFile = path.join(reportsRoot, "override-observation.json");
+    const summaryFile = path.join(reportsRoot, "summary-without-observation-ref.json");
+    const qualificationSetFile = path.join(tempRoot, "qualification-set.json");
+    writePassingQualificationObservation(observationFile);
+    fs.writeFileSync(
+      summaryFile,
+      `${JSON.stringify(buildPassingRecordedSummary({ runId: "relative-observation-override" }), null, 2)}\n`,
+      "utf8",
+    );
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--profile",
+        path.join(workspaceRoot, "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml"),
+        "--qualification-set-file",
+        qualificationSetFile,
+        "--record-run-summary-file",
+        summaryFile,
+        "--record-observation-report-file",
+        "override-observation.json",
+      ],
+      {
+        cwd: reportsRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    const output = JSON.parse(run.stdout);
+    assert.equal(output.live_e2e_observation_report_file, observationFile);
+    const qualificationSet = JSON.parse(fs.readFileSync(qualificationSetFile, "utf8"));
+    assert.equal(qualificationSet.passing_run_count, 1);
+    assert.equal(qualificationSet.attempts[0].observation_report_ref, observationFile);
+  });
+});
+
+test("qualification loop rejects corrupt qualification set without replacing it", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const observationFile = path.join(reportsRoot, "observation.json");
+    const summaryFile = path.join(reportsRoot, "summary.json");
+    const qualificationSetFile = path.join(tempRoot, "qualification-set.json");
+    const corruptQualificationSet = "{not-json\n";
+    writePassingQualificationObservation(observationFile);
+    fs.writeFileSync(
+      summaryFile,
+      `${JSON.stringify(
+        buildPassingRecordedSummary({
+          runId: "corrupt-qset-record",
+          observationRef: observationFile,
+        }),
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(qualificationSetFile, corruptQualificationSet, "utf8");
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--profile",
+        path.join(workspaceRoot, "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml"),
+        "--qualification-set-file",
+        qualificationSetFile,
+        "--record-run-summary-file",
+        summaryFile,
+      ],
+      {
+        cwd: workspaceRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /JSON/u);
+    assert.equal(fs.readFileSync(qualificationSetFile, "utf8"), corruptQualificationSet);
   });
 });
 

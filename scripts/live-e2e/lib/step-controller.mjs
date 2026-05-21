@@ -1024,7 +1024,6 @@ export function createLiveE2eStepController(options) {
       ? state.command_results.map((entry) => asRecord(entry))
       : [];
     const matchingCommands = commandResults.filter((entry) => asNonEmptyString(entry.label) === normalizedLabel);
-    if (matchingCommands.length === 0) return null;
 
     const step = resolveLiveE2eCommandStep(normalizedLabel);
     if (!step) {
