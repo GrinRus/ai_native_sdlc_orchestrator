@@ -311,6 +311,42 @@ test("live E2E step controller preserves repeated execution and review iteration
   });
 });
 
+test("live E2E delivery certification does not reuse review cached evidence", () => {
+  withTempRoot((reportsRoot) => {
+    const reviewTranscript = path.join(reportsRoot, "13-review-run.json");
+    fs.writeFileSync(reviewTranscript, "{}\n", "utf8");
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-delivery-cert-cache",
+      profile: { live_e2e: { flow_range_policy: "delivery_default" } },
+      mode: "auto",
+    });
+
+    controller.planCommand({ label: "review-run", commandSurface: "aor review run", iteration: 1 });
+    controller.observeStage({
+      stage: "review",
+      iteration: 1,
+      stageResult: { stage: "review", status: "pass", evidence_refs: [reviewTranscript], summary: "reviewed" },
+      commandResults: [
+        {
+          label: "review-run",
+          command_surface: "aor review run",
+          status: "pass",
+          transcript_file: reviewTranscript,
+          artifact_refs: [reviewTranscript],
+          exit_code: 0,
+        },
+      ],
+      artifacts: {},
+    });
+
+    assert.equal(controller.shouldUseCachedCommand("harness-certify", 1), true);
+    assert.equal(controller.getCachedCommandResult("harness-certify", 1).transcript_file, reviewTranscript);
+    assert.equal(controller.shouldUseCachedCommand("delivery-harness-certify", 1), false);
+    assert.equal(controller.getCachedCommandResult("delivery-harness-certify", 1), null);
+  });
+});
+
 test("live E2E command selection prefers latest repeated label", () => {
   const firstRunStart = { label: "run-start", transcript_file: "11-run-start.json" };
   const secondRunStart = { label: "run-start", transcript_file: "15-run-start.json" };

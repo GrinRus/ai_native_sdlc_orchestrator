@@ -152,6 +152,8 @@ node ./scripts/live-e2e/manual-live-e2e.mjs \
 
 One invocation runs only the next pending controller step, writes `live_e2e_controller_state_file` plus a `live-e2e-step-observation-*` artifact, and prints the current decision. Re-run the same command with the same `--run-id` after completing any required public action. After the execution step has been observed, including while it is waiting for a skill-agent decision, manual resume reuses the preserved pre-execution baseline and target-cleanliness evidence instead of re-checking the already-mutated target checkout as if execution had not run; if that preserved readiness evidence is missing, resume fails closed. The same rule applies to repair-loop iterations such as `execution#2`: installing the operator decision must update the persisted observation, not rerun or reclassify the already observed public execution. When repeated command labels exist in the command journal, the controller resolves cached evidence by matching label plus step instance and iteration; legacy state may fall back only when the transcript matches the persisted step journal entry or the label is not repeated.
 
+Delivery-time harness certification uses the delivery-owned diagnostic label `delivery-harness-certify`. Review-time `harness-certify` evidence must not be replayed as delivery certification evidence, because delivery certification is a fresh public `aor harness certify` precondition before `aor deliver prepare`.
+
 When the step stops for a required skill-agent decision, write the decision JSON from the request's expected response shape and install it before resuming:
 
 ```bash

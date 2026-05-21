@@ -3700,7 +3700,7 @@ export function executeFullJourneyFlow(options) {
       ...(artifacts.evaluation_report_file ? [artifacts.evaluation_report_file] : []),
     ]);
     if (harnessCertification) {
-      const certify = runCommand("harness-certify", [
+      const certify = runCommand("delivery-harness-certify", [
         "harness",
         "certify",
         "--project-ref",

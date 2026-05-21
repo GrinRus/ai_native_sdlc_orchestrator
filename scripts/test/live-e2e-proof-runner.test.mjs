@@ -4323,6 +4323,59 @@ test("full-journey mode fails when runtime harness detects code-changing no-op",
   });
 });
 
+test("installed-user full-journey delivery certification uses delivery-owned command evidence", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.delivery-cert.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        harness: {
+          enabled: true,
+        },
+      },
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-delivery-cert-cache",
+      catalogRoot,
+    });
+    assert.equal(result.live_e2e_run_status, "pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    const commandLabels = summary.command_results.map((entry) => entry.label);
+    assert.equal(commandLabels.includes("harness-certify"), false);
+    assert.equal(commandLabels.includes("delivery-harness-certify"), true);
+    assert.equal(commandLabels.indexOf("delivery-harness-certify") < commandLabels.indexOf("deliver-prepare"), true);
+    const certificationCommand = summary.command_results.find((entry) => entry.label === "delivery-harness-certify");
+    assert.equal(certificationCommand.status, "pass");
+    assert.equal(certificationCommand.step_id, "delivery");
+    assert.equal(certificationCommand.step_instance_id, "delivery");
+    const promotionDecisionRef = certificationCommand.artifact_refs.find((ref) => ref.includes("promotion-decision"));
+    assert.equal(typeof promotionDecisionRef, "string");
+    assert.equal(fs.existsSync(promotionDecisionRef), true);
+    const observation = JSON.parse(fs.readFileSync(summary.live_e2e_observation_report_file, "utf8"));
+    const deliveryEntry = observation.step_journal.find((entry) => entry.step_id === "delivery");
+    assert.equal(deliveryEntry.public_surface, "aor deliver prepare");
+    assert.equal(deliveryEntry.final_step_verdict, "pass");
+  });
+});
+
 test("full-journey mode can pass after a public implementation repair iteration", () => {
   withTempRoot((tempRoot) => {
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });

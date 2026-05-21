@@ -23,7 +23,7 @@ const STEP_COMMAND_LABELS = Object.freeze({
   execution: ["run-start", "project-verify-routed-live"],
   review: ["review-run", "harness-certify", "eval-run"],
   qa: ["eval-run", "project-verify-post-run-primary"],
-  delivery: ["deliver-prepare"],
+  delivery: ["deliver-prepare", "delivery-harness-certify"],
   release: ["release-prepare"],
   learning: ["learning-handoff", "audit-runs"],
 });

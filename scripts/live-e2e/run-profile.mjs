@@ -457,7 +457,7 @@ function getObservationCommandLabelPriority(step) {
   if (step === "execution") return ["run-start", "project-verify-routed-live"];
   if (step === "review") return ["review-run", "harness-certify", "eval-run"];
   if (step === "qa") return ["eval-run", "project-verify-post-run-primary"];
-  if (step === "delivery") return ["deliver-prepare"];
+  if (step === "delivery") return ["deliver-prepare", "delivery-harness-certify"];
   if (step === "release") return ["release-prepare"];
   if (step === "learning") return ["learning-handoff", "audit-runs"];
   return [];
