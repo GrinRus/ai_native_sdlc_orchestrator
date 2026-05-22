@@ -25,8 +25,27 @@ function withTempProject(callback) {
   try {
     callback(tempRoot);
   } finally {
-    fs.rmSync(tempRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    removeTempProject(tempRoot);
   }
+}
+
+function removeTempProject(projectRoot) {
+  try {
+    fs.rmSync(projectRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 200 });
+  } catch (error) {
+    if (!isRetriableTempCleanupError(error)) {
+      throw error;
+    }
+  }
+}
+
+function isRetriableTempCleanupError(error) {
+  return (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    ["ENOTEMPTY", "EBUSY", "EPERM"].includes(error.code)
+  );
 }
 
 /**
