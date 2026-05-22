@@ -9,6 +9,7 @@ import {
   RELEASE_LABEL,
   validatePackedFiles,
   validatePublishEvent,
+  RELEASE_NPM_VERSION,
   validateReleaseState,
 } from "../release-lib.mjs";
 
@@ -136,7 +137,7 @@ test("release verifier rejects publish workflows without trusted publishing runt
         "jobs:",
         "  publish:",
         "    steps:",
-        "      - run: npm install -g npm@11.5.1",
+        `      - run: npm install -g npm@${RELEASE_NPM_VERSION}`,
         "      - run: npm publish --access public --provenance",
         "",
       ].join("\n"),
@@ -150,6 +151,7 @@ test("release verifier rejects publish workflows without trusted publishing runt
     assert.equal(result.ok, false);
     assert.match(result.findings.join("\n"), /node-version: 22\.14\.0/u);
     assert.match(result.findings.join("\n"), /npm publish --access public --tag alpha --provenance/u);
+    assert.doesNotMatch(result.findings.join("\n"), /npm@11\.5\.1/u);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

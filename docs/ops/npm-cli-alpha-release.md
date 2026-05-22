@@ -82,8 +82,9 @@ future stable releases.
 
 The workflow uses npm Trusted Publishing through GitHub OIDC. Do not add npm
 tokens or token fallback behavior. The release workflows pin Node.js `22.14.0`
-and install `npm@11.5.1`, matching the npm Trusted Publishing minimums instead
-of relying on the hosted runner image defaults.
+and install `npm@11.15.0`, matching the npm Trusted Publishing registry
+contract that requires explicit publish permissions instead of relying on the
+hosted runner image defaults.
 
 ## External prerequisites
 
