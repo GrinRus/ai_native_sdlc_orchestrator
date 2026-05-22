@@ -26,7 +26,22 @@ function initializeFixtureRepo(options) {
 }
 
 function removeTempRepo(repoRoot) {
-  fs.rmSync(repoRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  try {
+    fs.rmSync(repoRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 200 });
+  } catch (error) {
+    if (!isRetriableTempCleanupError(error)) {
+      throw error;
+    }
+  }
+}
+
+function isRetriableTempCleanupError(error) {
+  return (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    ["ENOTEMPTY", "EBUSY", "EPERM"].includes(error.code)
+  );
 }
 
 /**
