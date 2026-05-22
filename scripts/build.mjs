@@ -152,11 +152,20 @@ const requiredFiles = [
   ".github/workflows/dependency-review.yml",
   ".github/workflows/codeql.yml",
   ".github/workflows/scorecard.yml",
+  ".github/workflows/release-candidate.yml",
+  ".github/workflows/release-publish.yml",
+  "docs/ops/npm-cli-alpha-release.md",
   "scripts/lint.mjs",
   "scripts/test.mjs",
   "scripts/build.mjs",
+  "scripts/release-event-guard.mjs",
+  "scripts/release-lib.mjs",
+  "scripts/release-pack.mjs",
+  "scripts/release-smoke.mjs",
+  "scripts/release-verify.mjs",
   "scripts/slice-cycle.mjs",
   "scripts/slice-cycle-lib.mjs",
+  "scripts/test/release-flow.test.mjs",
   "scripts/test/slice-cycle.test.mjs",
   ...waveFiles,
 ];
@@ -179,9 +188,31 @@ if (!String(packageJson.packageManager || "").startsWith("pnpm@")) {
   console.error("package.json must declare pnpm as packageManager");
   process.exit(1);
 }
+if (packageJson.name !== "@grinrus/aor") {
+  console.error("package.json must publish the CLI alpha package as @grinrus/aor.");
+  process.exit(1);
+}
+if (packageJson.private !== false) {
+  console.error("package.json must be publishable for the root CLI alpha package.");
+  process.exit(1);
+}
+if (packageJson.bin?.aor !== "./apps/cli/bin/aor.mjs") {
+  console.error("package.json must expose bin.aor as ./apps/cli/bin/aor.mjs.");
+  process.exit(1);
+}
+if (packageJson.dependencies?.yaml !== "^2.8.1") {
+  console.error("package.json must declare yaml as a root runtime dependency for npm packaging.");
+  process.exit(1);
+}
 for (const script of ["build", "test", "lint", "check"]) {
   if (!packageJson.scripts || !packageJson.scripts[script]) {
     console.error(`package.json is missing script '${script}'`);
+    process.exit(1);
+  }
+}
+for (const script of ["release:verify", "release:pack", "release:smoke", "release:gate"]) {
+  if (!packageJson.scripts || !packageJson.scripts[script]) {
+    console.error(`package.json is missing release script '${script}'`);
     process.exit(1);
   }
 }
@@ -196,10 +227,11 @@ if (packageJson.scripts?.["production:ready"] !== "node ./scripts/production-rea
 
 const readme = read("README.md");
 for (const section of [
-  "## Status: source-only alpha",
-  "## Current source channel",
+  "## Status: alpha distribution",
+  "## Current distribution channels",
   "## What is AOR?",
   "## Requirements",
+  "## Install CLI from npm alpha",
   "## Clone and install from source",
   "## Run your first no-write local mission",
   "## What you should see",
@@ -224,9 +256,10 @@ for (const section of [
 
 for (const needle of [
   "git clone https://github.com/GrinRus/ai_native_sdlc_orchestrator.git",
+  "npm install -g @grinrus/aor@0.1.0-alpha.1",
+  "docs/ops/npm-cli-alpha-release.md",
+  "workspace packages stay `private:true`",
   "pnpm install --frozen-lockfile",
-  "public source-only main channel",
-  "private:true / 0.0.0",
   "pnpm aor doctor --project-ref",
   "pnpm aor onboard",
   "pnpm aor mission create",
@@ -345,6 +378,29 @@ const workflowExpectations = new Map([
       "publish_results: false",
       "ossf/scorecard-action@",
       "github/codeql-action/upload-sarif@",
+    ],
+  ],
+  [
+    ".github/workflows/release-candidate.yml",
+    [
+      "pull_request:",
+      "release/v",
+      "contents: read",
+      "pnpm install --frozen-lockfile",
+      "pnpm release:gate",
+    ],
+  ],
+  [
+    ".github/workflows/release-publish.yml",
+    [
+      "pull_request:",
+      "types:",
+      "contents: write",
+      "id-token: write",
+      "release:publish",
+      "node ./scripts/release-event-guard.mjs",
+      "pnpm release:gate",
+      "npm publish --access public --tag alpha --provenance",
     ],
   ],
 ]);

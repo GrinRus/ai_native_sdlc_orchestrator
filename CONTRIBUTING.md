@@ -4,7 +4,7 @@ Thanks for contributing to AOR.
 
 AOR is a docs-first repository with implemented CLI/API/web/runtime baselines today. The highest-value contributions are the ones that keep the roadmap, contracts, examples, command surfaces, and implementation baselines aligned while the runtime is hardened toward production readiness.
 
-The public distribution channel is currently GitHub source only. Workspace packages remain private and unpublished until the maintainers explicitly open a package release channel.
+The public distribution channels are GitHub source and the npm CLI alpha package `@grinrus/aor`. Internal workspace packages remain private and unpublished unless maintainers explicitly open a separate package API channel.
 
 ## Ways to contribute
 
@@ -48,6 +48,26 @@ For live E2E dependency requirements, use `docs/ops/live-e2e-dependency-matrix.m
    ```
 7. Open a focused pull request with the evidence needed to review the slice.
 
+## Release workflow
+
+Normal feature and fix work still merges to `main` through regular PRs and does
+not publish artifacts. npm CLI alpha releases use a short-lived
+`release/v<semver-alpha>` branch, for example `release/v0.1.0-alpha.1`.
+
+Release PRs must:
+
+- target `main` from the same repository, not a fork;
+- carry the `release:publish` label before merge;
+- keep `package.json` version equal to the release branch version;
+- include a matching `CHANGELOG.md` entry;
+- run `pnpm release:gate` before merge.
+
+After a labeled release PR is merged, `.github/workflows/release-publish.yml`
+re-runs the release gate on the merge commit, creates the matching tag and
+GitHub Release, and publishes `@grinrus/aor` with npm Trusted Publishing and
+provenance. The workflow must fail closed if the npm Trusted Publisher, npm
+scope, branch name, label, version, or artifact checks are missing.
+
 ## Continuous slice loop
 
 Use the slice helper commands to keep one-slice-at-a-time delivery explicit:
@@ -75,6 +95,8 @@ The repository uses a repository-integrity workflow plus focused security workfl
 - `.github/workflows/dependency-review.yml`
 - `.github/workflows/codeql.yml`
 - `.github/workflows/scorecard.yml`
+- `.github/workflows/release-candidate.yml`
+- `.github/workflows/release-publish.yml`
 
 The repository-integrity workflow runs on:
 - pull requests;
@@ -84,6 +106,7 @@ The repository-integrity workflow runs on:
 What the workflows prove today:
 - `pnpm check` runs the repository-integrity baseline (`lint`, `test`, and `build`);
 - `pnpm production:ready` runs the stricter self-hosted production-readiness gate;
+- release candidate PRs from `release/v<semver-alpha>` run `pnpm release:gate`;
 - dependency review, CodeQL, and OpenSSF Scorecard run as separate security workflows.
 
 If the repository-integrity workflow fails, the failing step maps directly to one of the root checks so the remediation path stays explicit. If a security workflow fails, treat it as a supply-chain or code-scanning finding unless the workflow output clearly identifies a setup problem.

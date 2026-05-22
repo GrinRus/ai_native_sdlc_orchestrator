@@ -152,6 +152,7 @@ graph TD
   W28S01[W28-S01 AOR install proof and setup journal]
   W28S02[W28-S02 Full-lifecycle and interaction gap closure]
   W28S03[W28-S03 Matrix target expansion]
+  W29S01[W29-S01 npm CLI alpha release channel]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -392,6 +393,7 @@ graph TD
   W27S05 --> W28S01
   W28S01 --> W28S02
   W28S01 --> W28S03
+  W28S03 --> W29S01
 ```
 
 ## W0 hard dependencies
@@ -658,6 +660,11 @@ graph TD
 | W28-S02 | W28-S01 |
 | W28-S03 | W28-S01 |
 
+## W29 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W29-S01 | W28-S03 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -807,6 +814,7 @@ graph TD
 146. W28-S01
 147. W28-S02
 148. W28-S03
+149. W29-S01
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

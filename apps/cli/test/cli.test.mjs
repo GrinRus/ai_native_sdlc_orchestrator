@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { parse as parseYaml } from "../../../packages/contracts/node_modules/yaml/dist/index.js";
+import { parse as parseYaml } from "yaml";
 
 import { appendRunEvent, applyRunControlAction } from "../../api/src/index.mjs";
 import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";

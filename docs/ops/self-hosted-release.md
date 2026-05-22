@@ -13,6 +13,11 @@ This mode does not include hosted SaaS, managed multi-tenant operations, tenant 
 
 ## Release gate
 
+Operators can use either the source checkout or the npm CLI alpha package
+`@grinrus/aor` for the CLI entrypoint. The npm package is an alpha distribution
+of the same bounded CLI/runtime surface; third-party runner binaries and
+credentials remain external host prerequisites.
+
 Run the baseline repository gate first:
 
 ```bash

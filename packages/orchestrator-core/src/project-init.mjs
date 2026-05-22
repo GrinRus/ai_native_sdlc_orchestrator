@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { stringify as stringifyYaml } from "../../contracts/node_modules/yaml/dist/index.js";
+import { stringify as stringifyYaml } from "yaml";
 
 import { loadContractFile, validateContractDocument } from "../../contracts/src/index.mjs";
 import { materializeBootstrapArtifactPacket } from "./artifact-store.mjs";
