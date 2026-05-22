@@ -6,6 +6,7 @@ export const RELEASE_PACKAGE_NAME = "@grinrus/aor";
 export const RELEASE_LABEL = "release:publish";
 export const RELEASE_VERSION_PATTERN = /^\d+\.\d+\.\d+-alpha\.\d+$/u;
 export const RELEASE_BRANCH_PATTERN = /^release\/v(\d+\.\d+\.\d+-alpha\.\d+)$/u;
+export const RELEASE_NPM_VERSION = "11.15.0";
 
 const REQUIRED_PACKAGE_FILE_PATTERNS = [
   "apps/cli/bin",
@@ -225,7 +226,7 @@ export function validateReleaseState(options = {}) {
     }
     const workflow = readText(rootDir, workflowPath);
     ensureIncludes(findings, workflow, "node-version: 22.14.0", workflowPath);
-    ensureIncludes(findings, workflow, "npm@11.5.1", workflowPath);
+    ensureIncludes(findings, workflow, `npm@${RELEASE_NPM_VERSION}`, workflowPath);
     if (workflowPath.endsWith("release-publish.yml")) {
       ensureIncludes(findings, workflow, "id-token: write", workflowPath);
       ensureIncludes(findings, workflow, "npm publish --access public --tag alpha --provenance", workflowPath);
