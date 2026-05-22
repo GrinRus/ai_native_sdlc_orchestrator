@@ -196,8 +196,8 @@ if (packageJson.private !== false) {
   console.error("package.json must be publishable for the root CLI alpha package.");
   process.exit(1);
 }
-if (packageJson.bin?.aor !== "./apps/cli/bin/aor.mjs") {
-  console.error("package.json must expose bin.aor as ./apps/cli/bin/aor.mjs.");
+if (packageJson.bin?.aor !== "apps/cli/bin/aor.mjs") {
+  console.error("package.json must expose bin.aor as apps/cli/bin/aor.mjs.");
   process.exit(1);
 }
 if (packageJson.dependencies?.yaml !== "^2.8.1") {
