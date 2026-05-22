@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
 import { loadContractFile } from "../../contracts/src/index.mjs";
@@ -399,7 +400,8 @@ export function classifyExternalRunnerFailure(options) {
     /\b401\b/u.test(combined) ||
     combined.includes("unauthorized") ||
     combined.includes("not authenticated") ||
-    combined.includes("authentication") ||
+    /\bauthentication\s+(?:failed|failure|required|error|invalid|expired|missing|denied|transient)\b/u.test(combined) ||
+    /\b(?:failed|failure|required|error|invalid|expired|missing|denied|transient)\s+authentication\b/u.test(combined) ||
     combined.includes("missing bearer") ||
     combined.includes("api key") ||
     combined.includes("apikey") ||
@@ -578,6 +580,43 @@ function toEvidenceRef(projectRoot, filePath) {
     return `evidence://${normalizedPath}`;
   }
   return `evidence://${relative}`;
+}
+
+/**
+ * @param {string} value
+ * @param {number} maxLength
+ */
+function boundedEvidenceSegment(value, maxLength) {
+  const normalized = [];
+  let lastWasSeparator = true;
+
+  for (const character of value.toLowerCase()) {
+    const isAlphaNumeric =
+      (character >= "a" && character <= "z") || (character >= "0" && character <= "9");
+    if (isAlphaNumeric) {
+      normalized.push(character);
+      lastWasSeparator = false;
+    } else if (!lastWasSeparator) {
+      normalized.push("-");
+      lastWasSeparator = true;
+    }
+  }
+
+  if (normalized[normalized.length - 1] === "-") {
+    normalized.pop();
+  }
+
+  return (normalized.length > 0 ? normalized.join("") : "unknown").slice(0, maxLength);
+}
+
+/**
+ * @param {{ kind: "request" | "raw", adapterId: string, evidenceToken: string, timestamp: number }} options
+ */
+function buildLiveAdapterEvidenceFileName(options) {
+  const adapterSegment = boundedEvidenceSegment(options.adapterId, 40);
+  const tokenSegment = boundedEvidenceSegment(options.evidenceToken, 32);
+  const tokenHash = createHash("sha256").update(options.evidenceToken).digest("hex").slice(0, 16);
+  return `adapter-live-${options.kind}-${adapterSegment}-${tokenSegment}-${tokenHash}-${options.timestamp}.json`;
 }
 
 /**
@@ -1156,7 +1195,12 @@ export function createLiveAdapter(options) {
         fs.mkdirSync(requestDir, { recursive: true });
         requestFile = path.join(
           requestDir,
-          `adapter-live-request-${adapterId}-${normalizedEvidenceToken}-${Date.now()}.json`,
+          buildLiveAdapterEvidenceFileName({
+            kind: "request",
+            adapterId,
+            evidenceToken: normalizedEvidenceToken,
+            timestamp: Date.now(),
+          }),
         );
         fs.writeFileSync(requestFile, serializedRunnerInput, "utf8");
         requestFileRef = toEvidenceRef(projectRoot, requestFile);
@@ -1223,7 +1267,12 @@ export function createLiveAdapter(options) {
         fs.mkdirSync(evidenceDir, { recursive: true });
         rawEvidenceFile = path.join(
           evidenceDir,
-          `adapter-live-raw-${adapterId}-${normalizedEvidenceToken}-${Date.now()}.json`,
+          buildLiveAdapterEvidenceFileName({
+            kind: "raw",
+            adapterId,
+            evidenceToken: normalizedEvidenceToken,
+            timestamp: Date.now(),
+          }),
         );
         fs.writeFileSync(rawEvidenceFile, `${JSON.stringify(rawEvidenceRecord, null, 2)}\n`, "utf8");
         rawEvidenceRef = toEvidenceRef(projectRoot, rawEvidenceFile);

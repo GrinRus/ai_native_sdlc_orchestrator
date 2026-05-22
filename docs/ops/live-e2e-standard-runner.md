@@ -55,6 +55,7 @@ Catalog-backed full-journey profiles:
 - `full-journey-regress-pluggy.yaml`
 - `full-journey-repair-pluggy-medium-anthropic.yaml`
 - `full-journey-governance-pluggy-medium-openai.yaml`
+- `full-journey-governance-pluggy-medium-open-code.yaml`
 - `full-journey-governance-ky-large-openai.yaml`
 - `full-journey-release-nextjs.yaml`
 - `full-journey-release-nextjs-anthropic.yaml`
@@ -89,6 +90,10 @@ Provider permission-mode analogues:
 - OpenCode restricted: `opencode run --format json` with the same file-attached request transport.
 
 Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. Preflight and full external runner execution are hard local subprocess bounds: a runner that exceeds them has its local process group killed and is reported as timeout evidence instead of leaving the public lifecycle waiting indefinitely. Per-step policy budgets may shorten an external runner request, but they must not extend it beyond the adapter profile timeout. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
+
+Live adapter request and raw-output evidence files must use bounded filenames. Full-journey run ids, repair suffixes, step ids, and request ids can be long, so the persisted file name keeps the adapter prefix for operator readability and uses a short token plus hash for uniqueness. The evidence ref remains the durable contract; consumers must not depend on the full run id being embedded in the basename.
+
+Skill-agent operator decisions cannot override deterministic validation. A `continue` decision is accepted only when the step's deterministic analysis is `pass`, `warn`, or `resumed` and the decision declares `semantic_analysis.judge_source=skill-agent`; deterministic `not_pass`, `blocked`, or `interaction_required` evidence must be diagnosed, answered, retried through public surfaces, or blocked instead of continued.
 
 `run start` passes concrete packet refs into the adapter request when the public lifecycle has materialized them. Full-journey execution binds the approved handoff and spec result as refs such as `packet://handoff@evidence://...` and `packet://spec@evidence://...`, while preserving abstract fallback refs when no concrete artifact exists. Runners should use those refs before broad repository searches so runtime harness evidence is tied to the intended packet artifacts.
 
@@ -145,7 +150,9 @@ node ./scripts/live-e2e/manual-live-e2e.mjs \
   --run-id <stable-run-id>
 ```
 
-One invocation runs only the next pending controller step, writes `live_e2e_controller_state_file` plus a `live-e2e-step-observation-*` artifact, and prints the current decision. Re-run the same command with the same `--run-id` after completing any required public action.
+One invocation runs only the next pending controller step, writes `live_e2e_controller_state_file` plus a `live-e2e-step-observation-*` artifact, and prints the current decision. Re-run the same command with the same `--run-id` after completing any required public action. After the execution step has been observed, including while it is waiting for a skill-agent decision, manual resume reuses the preserved pre-execution baseline and target-cleanliness evidence instead of re-checking the already-mutated target checkout as if execution had not run; if that preserved readiness evidence is missing, resume fails closed. The same rule applies to repair-loop iterations such as `execution#2`: installing the operator decision must update the persisted observation, not rerun or reclassify the already observed public execution. When repeated command labels exist in the command journal, the controller resolves cached evidence by matching label plus step instance and iteration; legacy state may fall back only when the transcript matches the persisted step journal entry or the label is not repeated.
+
+Delivery-time harness certification uses the delivery-owned diagnostic label `delivery-harness-certify`. Review-time `harness-certify` evidence must not be replayed as delivery certification evidence, because delivery certification is a fresh public `aor harness certify` precondition before `aor deliver prepare`.
 
 When the step stops for a required skill-agent decision, write the decision JSON from the request's expected response shape and install it before resuming:
 
@@ -184,6 +191,18 @@ The helper accepts only medium, large, or xl profiles. It runs one fresh live E2
 - `2` / `needs_fix`: AOR code or live E2E flow likely needs a patch before rerun;
 - `3` / `blocked`: environment, provider, auth, permission, or safety setup prevented a valid evaluation.
 
+When the helper exits `blocked` because an acceptance profile is waiting for required skill-agent decisions, complete the same run with `manual-live-e2e.mjs`. After the terminal manual resume writes a passing run summary and final observation report, reconcile that same evidence into the qualification set without starting a new target workspace:
+
+```bash
+node ./scripts/live-e2e/qualification-loop.mjs \
+  --project-ref . \
+  --profile ./scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml \
+  --qualification-set-file /tmp/aor-live-e2e-qualification-set.json \
+  --record-run-summary-file <live-e2e-run-summary-file>
+```
+
+Record mode applies the same medium-or-larger and pass/fix/block classification gates as a fresh run, reads the observation report from the summary unless `--record-observation-report-file` is supplied, and upserts the qualification-set attempt by `run_id` so a manually resumed run replaces its earlier blocked accounting entry. The recorded summary must match the selected profile's `profile_id`, `target_catalog_id`, `feature_mission_id`, `scenario_family`, `provider_variant_id`, and `feature_size`. Run summaries include `commit_sha` and `branch_name`; record mode requires `commit_sha` to be on the current branch lineage and rejects cross-profile, cross-provider, corrupt, or stale qualification evidence before writing the qualification set.
+
 The launching agent performs the fix and commit. Final qualification requires at least five full positive medium-or-larger runs across provider variants: at least two `openai-primary`, at least two `anthropic-primary`, and at least one `open-code-primary`.
 
 ## Layer behavior
@@ -207,6 +226,7 @@ Full-journey layer:
 - includes the materialized spec step-result as a concrete `packet://spec@evidence://...` promotion ref for adapter context, while `run start` binds the approved handoff ref into the compiled context.
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
 - repeats public `run start` / `review run` iterations with iteration-specific run ids when review or primary verification requests repair, and records each repeated step as `execution#N` and `review#N` in the step journal.
+- bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Timeout failures are preserved as failed step-result evidence; for full-journey baseline diagnostics they are interpreted through the same diagnostic/blocking gate rules as other target verification failures.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - gates continuation after every observed public step by the online live E2E controller decision.
 - keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, must execute them as ordinary observed steps.

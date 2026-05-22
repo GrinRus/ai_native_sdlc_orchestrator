@@ -7,6 +7,8 @@ import test from "node:test";
 import {
   LiveE2eControllerStop,
   createLiveE2eStepController,
+  findLiveE2eCommandByPreferredLabel,
+  isLiveE2eControllerStopInProgress,
   isLiveE2eControllerStop,
 } from "../live-e2e/lib/step-controller.mjs";
 
@@ -172,6 +174,74 @@ test("live E2E step controller rejects inconsistent skill-agent continue decisio
   });
 });
 
+test("live E2E step controller rejects skill-agent continue when deterministic checks fail", () => {
+  withTempRoot((reportsRoot) => {
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-skill-agent-deterministic-fail",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      mode: "auto",
+    });
+    controller.planCommand({ label: "run-start", commandSurface: "aor run start" });
+    const decisionFile = path.join(
+      reportsRoot,
+      "live-e2e-operator-decision-controller-skill-agent-deterministic-fail-01-execution.json",
+    );
+    fs.writeFileSync(
+      decisionFile,
+      `${JSON.stringify(
+        {
+          step_id: "execution",
+          status: "accepted",
+          operator_ref: "skill://live-e2e-runner",
+          action: "continue",
+          semantic_analysis: {
+            status: "pass",
+            judge_source: "skill-agent",
+            findings: [],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "execution",
+          stageResult: {
+            stage: "execution",
+            status: "not_pass",
+            evidence_refs: [],
+            summary: "Run start did not materialize routed execution evidence.",
+          },
+          commandResults: [{ label: "run-start", command_surface: "aor run start", status: "pass" }],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "block");
+        return true;
+      },
+    );
+
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.operator_decision_status, "rejected");
+    assert.equal(entry.decision.action, "block");
+    assert.equal(entry.final_step_verdict, "blocked");
+  });
+});
+
 test("live E2E step controller preserves repeated execution and review iterations", () => {
   withTempRoot((reportsRoot) => {
     const reviewTranscript = path.join(reportsRoot, "01-review-run.json");
@@ -238,6 +308,305 @@ test("live E2E step controller preserves repeated execution and review iteration
     assert.equal(journal.every((entry) => fs.existsSync(entry.plan_ref)), true);
     assert.equal(journal.every((entry) => fs.existsSync(entry.inspection_ref)), true);
     assert.equal(journal.every((entry) => fs.existsSync(entry.classification_ref)), true);
+  });
+});
+
+test("live E2E delivery certification does not reuse review cached evidence", () => {
+  withTempRoot((reportsRoot) => {
+    const reviewTranscript = path.join(reportsRoot, "13-review-run.json");
+    fs.writeFileSync(reviewTranscript, "{}\n", "utf8");
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-delivery-cert-cache",
+      profile: { live_e2e: { flow_range_policy: "delivery_default" } },
+      mode: "auto",
+    });
+
+    controller.planCommand({ label: "review-run", commandSurface: "aor review run", iteration: 1 });
+    controller.observeStage({
+      stage: "review",
+      iteration: 1,
+      stageResult: { stage: "review", status: "pass", evidence_refs: [reviewTranscript], summary: "reviewed" },
+      commandResults: [
+        {
+          label: "review-run",
+          command_surface: "aor review run",
+          status: "pass",
+          transcript_file: reviewTranscript,
+          artifact_refs: [reviewTranscript],
+          exit_code: 0,
+        },
+      ],
+      artifacts: {},
+    });
+
+    assert.equal(controller.shouldUseCachedCommand("harness-certify", 1), true);
+    assert.equal(controller.getCachedCommandResult("harness-certify", 1).transcript_file, reviewTranscript);
+    assert.equal(controller.shouldUseCachedCommand("delivery-harness-certify", 1), false);
+    assert.equal(controller.getCachedCommandResult("delivery-harness-certify", 1), null);
+  });
+});
+
+test("live E2E command selection prefers latest repeated label", () => {
+  const firstRunStart = { label: "run-start", transcript_file: "11-run-start.json" };
+  const secondRunStart = { label: "run-start", transcript_file: "15-run-start.json" };
+  const selected = findLiveE2eCommandByPreferredLabel(
+    [firstRunStart, { label: "run-status", transcript_file: "12-run-status.json" }, secondRunStart],
+    ["run-start"],
+  );
+
+  assert.equal(selected.transcript_file, "15-run-start.json");
+});
+
+test("live E2E manual resume applies operator decision to observed repair iteration", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "15-run-start.json");
+    const staleTranscriptFile = path.join(reportsRoot, "11-run-start.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    fs.writeFileSync(staleTranscriptFile, "{}\n", "utf8");
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+      },
+    };
+    const first = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-repair-decision-resume",
+      profile,
+      mode: "manual",
+    });
+    first.planCommand({ label: "run-start", commandSurface: "aor run start", iteration: 2 });
+    assert.throws(
+      () =>
+        first.observeStage({
+          stage: "execution",
+          iteration: 2,
+          stageResult: {
+            stage: "execution",
+            status: "pass",
+            evidence_refs: [transcriptFile],
+            summary: "repair execution passed",
+          },
+          commandResults: [
+            {
+              label: "run-start",
+              command_surface: "aor run start",
+              status: "pass",
+              transcript_file: staleTranscriptFile,
+              artifact_refs: ["step-result-initial.json"],
+              exit_code: 0,
+            },
+            {
+              label: "run-start",
+              command_surface: "aor run start",
+              status: "pass",
+              transcript_file: transcriptFile,
+              artifact_refs: ["step-result-repair-2.json"],
+              exit_code: 0,
+            },
+          ],
+          artifacts: { routed_step_result_file: "step-result-repair-2.json" },
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "diagnose");
+        return true;
+      },
+    );
+
+    const [pendingEntry] = first.getStepJournal();
+    const decisionRequest = JSON.parse(fs.readFileSync(pendingEntry.agent_decision_request_ref, "utf8"));
+    fs.writeFileSync(
+      decisionRequest.operator_decision_expected_ref,
+      `${JSON.stringify(
+        {
+          step_id: "execution",
+          step_instance_id: "execution#2",
+          iteration: 2,
+          status: "accepted",
+          operator_ref: "skill://live-e2e-runner",
+          action: "continue",
+          semantic_analysis: {
+            status: "pass",
+            judge_source: "skill-agent",
+            findings: ["Repair execution evidence accepted."],
+          },
+          evidence_refs: [transcriptFile],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const second = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-repair-decision-resume",
+      profile,
+      mode: "manual",
+    });
+    assert.equal(second.shouldUseCachedCommand("run-start", 2), true);
+    assert.equal(second.getCachedCommandResult("run-start", 2).transcript_file, transcriptFile);
+    assert.throws(
+      () =>
+        second.observeStage({
+          stage: "execution",
+          iteration: 2,
+          stageResult: {
+            stage: "execution",
+            status: "not_pass",
+            evidence_refs: [],
+            summary: "This recomputed status must not overwrite persisted repair evidence.",
+          },
+          commandResults: [{ label: "run-start", command_surface: "aor run start", status: "pass" }],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "continue");
+        return true;
+      },
+    );
+
+    const [acceptedEntry] = second.getStepJournal();
+    assert.equal(acceptedEntry.operator_decision_status, "accepted");
+    assert.equal(acceptedEntry.deterministic_analysis.status, "pass");
+    assert.equal(acceptedEntry.decision.action, "continue");
+  });
+});
+
+test("live E2E command cache resolves repeated labels by iteration", () => {
+  withTempRoot((reportsRoot) => {
+    const firstTranscript = path.join(reportsRoot, "11-run-start.json");
+    const repairTranscript = path.join(reportsRoot, "15-run-start.json");
+    fs.writeFileSync(firstTranscript, "{}\n", "utf8");
+    fs.writeFileSync(repairTranscript, "{}\n", "utf8");
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+      },
+    };
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-command-cache-iteration",
+      profile,
+      mode: "manual",
+    });
+
+    for (const [iteration, transcriptFile] of [
+      [1, firstTranscript],
+      [2, repairTranscript],
+    ]) {
+      controller.planCommand({ label: "run-start", commandSurface: "aor run start", iteration });
+      assert.throws(
+        () =>
+          controller.observeStage({
+            stage: "execution",
+            iteration,
+            stageResult: {
+              stage: "execution",
+              status: "pass",
+              evidence_refs: [transcriptFile],
+              summary: `execution ${iteration} passed`,
+            },
+            commandResults: [
+              {
+                label: "run-start",
+                step_id: "execution",
+                step_instance_id: iteration === 1 ? "execution" : "execution#2",
+                iteration,
+                command_surface: "aor run start",
+                status: "pass",
+                transcript_file: transcriptFile,
+                artifact_refs: [`step-result-${iteration}.json`],
+                exit_code: 0,
+              },
+            ],
+            artifacts: { routed_step_result_file: `step-result-${iteration}.json` },
+          }),
+        (error) => {
+          assert.equal(isLiveE2eControllerStop(error), true);
+          return true;
+        },
+      );
+    }
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-command-cache-iteration",
+      profile,
+      mode: "manual",
+    });
+    assert.equal(resumed.shouldUseCachedCommand("run-start", 1), true);
+    assert.equal(resumed.shouldUseCachedCommand("run-start", 2), true);
+    assert.equal(resumed.getCachedCommandResult("run-start", 1).transcript_file, firstTranscript);
+    assert.equal(resumed.getCachedCommandResult("run-start", 2).transcript_file, repairTranscript);
+  });
+});
+
+test("live E2E command cache can resume from persisted journal when command snapshot is missing", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "11-run-start.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+      },
+    };
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-command-cache-journal-fallback",
+      profile,
+      mode: "manual",
+    });
+    controller.planCommand({ label: "run-start", commandSurface: "aor run start" });
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "execution",
+          stageResult: { stage: "execution", status: "pass", evidence_refs: [transcriptFile], summary: "execution passed" },
+          commandResults: [
+            {
+              label: "run-start",
+              command_surface: "aor run start",
+              status: "pass",
+              transcript_file: transcriptFile,
+              artifact_refs: ["step-result.json"],
+              exit_code: 0,
+            },
+          ],
+          artifacts: { routed_step_result_file: "step-result.json" },
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        return true;
+      },
+    );
+
+    const state = JSON.parse(fs.readFileSync(controller.stateFile, "utf8"));
+    state.command_results = [];
+    fs.writeFileSync(controller.stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-command-cache-journal-fallback",
+      profile,
+      mode: "manual",
+    });
+    assert.equal(resumed.shouldUseCachedCommand("run-start", 1), true);
+    const cached = resumed.getCachedCommandResult("run-start", 1);
+    assert.equal(cached.transcript_file, transcriptFile);
+    assert.equal(cached.step_instance_id, "execution");
+    assert.equal(cached.iteration, 1);
   });
 });
 
@@ -321,6 +690,61 @@ test("live E2E step controller resumes manual state at the next incomplete step"
   });
 });
 
+test("live E2E step controller lets terminal manual continue finalize", () => {
+  withTempRoot((reportsRoot) => {
+    const profile = { live_e2e: { flow_range_policy: "delivery_default" } };
+    const prior = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-terminal-manual",
+      profile,
+      mode: "auto",
+    });
+    for (const [stage, label] of [
+      ["discovery", "discovery-run"],
+      ["spec", "spec-build"],
+      ["planning", "wave-create"],
+      ["handoff", "handoff-approve"],
+      ["execution", "run-start"],
+      ["review", "review-run"],
+      ["qa", "eval-run"],
+    ]) {
+      prior.observeStage({
+        stage,
+        stageResult: { stage, status: "pass", evidence_refs: [], summary: "ok" },
+        commandResults: [{ label, command_surface: `aor ${stage}`, status: "pass" }],
+        artifacts: {},
+      });
+    }
+
+    const terminal = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-terminal-manual",
+      profile,
+      mode: "manual",
+    });
+    const result = terminal.observeStage({
+      stage: "delivery",
+      stageResult: { stage: "delivery", status: "pass", evidence_refs: [], summary: "ok" },
+      commandResults: [{ label: "deliver-prepare", command_surface: "aor deliver prepare", status: "pass" }],
+      artifacts: {},
+    });
+
+    assert.equal(result.action, "continue");
+    const state = JSON.parse(fs.readFileSync(terminal.stateFile, "utf8"));
+    assert.deepEqual(state.completed_steps, [
+      "discovery",
+      "spec",
+      "planning",
+      "handoff",
+      "execution",
+      "review",
+      "qa",
+      "delivery",
+    ]);
+    assert.equal(state.current_step, null);
+  });
+});
+
 test("live E2E step controller exposes cached public command results for completed steps", () => {
   withTempRoot((reportsRoot) => {
     const transcriptFile = path.join(reportsRoot, "01-discovery-run.json");
@@ -368,6 +792,137 @@ test("live E2E step controller exposes cached public command results for complet
     assert.equal(second.shouldUseCachedCommand("spec-build"), false);
     assert.equal(second.getCachedCommandResult("discovery-run").transcript_file, transcriptFile);
     assert.deepEqual(second.getState().artifacts_snapshot, { analysis_report_file: "analysis.json" });
+  });
+});
+
+test("live E2E terminal manual continue is not an in-progress observation report", () => {
+  const includedSteps = ["discovery", "spec"];
+  assert.equal(isLiveE2eControllerStopInProgress({}, includedSteps), false);
+  assert.equal(
+    isLiveE2eControllerStopInProgress(
+      {
+        decision: {
+          action: "continue",
+          next_step: null,
+        },
+        state: {
+          current_step: null,
+          completed_steps: includedSteps,
+        },
+      },
+      includedSteps,
+    ),
+    false,
+  );
+  assert.equal(
+    isLiveE2eControllerStopInProgress(
+      {
+        decision: {
+          action: "continue",
+          next_step: "spec",
+        },
+        state: {
+          current_step: "spec",
+          completed_steps: ["discovery"],
+        },
+      },
+      includedSteps,
+    ),
+    true,
+  );
+  assert.equal(
+    isLiveE2eControllerStopInProgress(
+      {
+        decision: {
+          action: "diagnose",
+          next_step: null,
+        },
+        state: {
+          current_step: null,
+          completed_steps: includedSteps,
+        },
+      },
+      includedSteps,
+    ),
+    true,
+  );
+});
+
+test("live E2E manual resume reuses cached commands for observed steps awaiting decision", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "01-run-start.json");
+    fs.writeFileSync(
+      transcriptFile,
+      `${JSON.stringify({
+        stdout: JSON.stringify({ routed_step_result_file: "step-result.json" }),
+        stderr: "",
+        parsed_json: { routed_step_result_file: "step-result.json" },
+        started_at: "2026-05-18T00:00:00.000Z",
+        finished_at: "2026-05-18T00:00:01.000Z",
+      })}\n`,
+      "utf8",
+    );
+    const first = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-observed-command-cache",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+        },
+      },
+      mode: "manual",
+    });
+    assert.throws(() =>
+      first.observeStage({
+        stage: "execution",
+        stageResult: { stage: "execution", status: "pass", evidence_refs: [transcriptFile], summary: "ok" },
+        commandResults: [
+          {
+            label: "run-start",
+            command_surface: "aor run start",
+            status: "pass",
+            transcript_file: transcriptFile,
+            artifact_refs: ["step-result.json"],
+            exit_code: 0,
+          },
+        ],
+        artifacts: { routed_step_result_file: "step-result.json" },
+      }),
+    );
+
+    const manualResume = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-observed-command-cache",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+        },
+      },
+      mode: "manual",
+    });
+    assert.equal(manualResume.shouldUseCachedCommand("run-start"), true);
+    assert.equal(manualResume.getCachedCommandResult("run-start").transcript_file, transcriptFile);
+
+    const autoResume = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-observed-command-cache",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+        },
+      },
+      mode: "auto",
+    });
+    assert.equal(autoResume.shouldUseCachedCommand("run-start"), false);
   });
 });
 

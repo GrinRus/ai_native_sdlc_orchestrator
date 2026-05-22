@@ -122,7 +122,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `full-journey-regress-commander-js.yaml`
   - `full-journey-repair-commander-js-medium-anthropic.yaml`
   - `full-journey-governance-commander-js-medium-openai.yaml`
-- Verification baseline: `npm install`, `npm run test`, `npm run check`.
+- Verification baseline: `npm ci`, `npm run test`, `npm run check`.
 
 ## Target 5 — `pytest-dev/pluggy`
 - Catalog id: `pluggy`
@@ -136,7 +136,13 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `full-journey-regress-pluggy.yaml`
   - `full-journey-repair-pluggy-medium-anthropic.yaml`
   - `full-journey-governance-pluggy-medium-openai.yaml`
-- Verification baseline: `python -m pip install -e . pytest`, `python -m pytest testing`.
+  - `full-journey-governance-pluggy-medium-open-code.yaml` (extended)
+- Verification baseline: `python3 -m venv .aor/live-e2e-venv`,
+  `.aor/live-e2e-venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage`,
+  `.aor/live-e2e-venv/bin/python -m pytest testing`.
+- Checkout mode: full clone with tags. `pluggy` derives its package version from
+  `setuptools-scm`; shallow checkouts produce an invalid local version and break
+  pytest dependency resolution.
 
 ## Extended candidate targets
 - `spf13/cobra` (`cobra`): Go CLI framework, extended small regress cell, `go mod download`, `go test ./...`.
@@ -186,10 +192,12 @@ Required coverage matrix:
   - `regress/small/openai-primary`
   - `repair/medium/anthropic-primary`
   - `governance/medium/openai-primary`
+  - `governance/medium/open-code-primary` (extended)
 
 Extended candidate cells:
 - `ky.governance.large.openai` (`ky-retry-hooks-governance`)
 - `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)
+- `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)
 - `cobra.regress.small.openai`
 - `date-fns.regress.small.openai`
@@ -197,7 +205,7 @@ Extended candidate cells:
 Provider comparison rule:
 - every curated repo must prove at least one equivalent mission class on both `openai-primary` and `anthropic-primary`.
 - `openai-primary` and `anthropic-primary` are mandatory provider variants for W14 matrix coverage.
-- `open-code-primary` remains extended candidate coverage after W22-S03, including the cataloged `ky.regress.small.open-code` cell; required OpenCode baseline certification awaits a future real-runner proof.
+- `open-code-primary` remains extended candidate coverage after W22-S03, including the cataloged `ky.regress.small.open-code`, `ky.regress.medium.open-code`, and `pluggy.governance.medium.open-code` cells; required OpenCode baseline certification awaits a future committed real-runner proof.
 
 Feature-size taxonomy:
 - `small`: one focused behavior surface, usually 1-2 files and one targeted regression.

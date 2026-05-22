@@ -157,6 +157,7 @@ final_analysis:
       - source/index.ts
     evidence_refs:
       - runtime://reports/review-report-live-e2e.json
+  failed_stages: []
   delivery:
     status: pass
     evidence_refs:

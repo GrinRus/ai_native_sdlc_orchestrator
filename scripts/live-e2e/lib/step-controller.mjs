@@ -23,7 +23,7 @@ const STEP_COMMAND_LABELS = Object.freeze({
   execution: ["run-start", "project-verify-routed-live"],
   review: ["review-run", "harness-certify", "eval-run"],
   qa: ["eval-run", "project-verify-post-run-primary"],
-  delivery: ["deliver-prepare"],
+  delivery: ["deliver-prepare", "delivery-harness-certify"],
   release: ["release-prepare"],
   learning: ["learning-handoff", "audit-runs"],
 });
@@ -103,6 +103,29 @@ export function getLiveE2eIncludedSteps(policy) {
 }
 
 /**
+ * @param {Record<string, unknown>} controllerStop
+ * @param {string[]} includedSteps
+ * @returns {boolean}
+ */
+export function isLiveE2eControllerStopInProgress(controllerStop, includedSteps) {
+  const stop = asRecord(controllerStop);
+  if (Object.keys(stop).length === 0) return false;
+
+  const decision = asRecord(stop.decision);
+  const state = asRecord(stop.state);
+  const completedSteps = new Set(asStringArray(state.completed_steps));
+  const allIncludedStepsCompleted =
+    includedSteps.length > 0 && includedSteps.every((step) => completedSteps.has(step));
+  const terminalManualContinue =
+    asNonEmptyString(decision.action) === "continue" &&
+    !asNonEmptyString(decision.next_step) &&
+    !asNonEmptyString(state.current_step) &&
+    allIncludedStepsCompleted;
+
+  return !terminalManualContinue;
+}
+
+/**
  * @param {Record<string, unknown>} profile
  */
 export function resolveLiveE2eOperatorContext(profile) {
@@ -167,14 +190,36 @@ export function buildLiveE2eStepPlan(step, command = null) {
 /**
  * @param {Array<Record<string, unknown>>} commandResults
  * @param {string[]} labels
+ * @param {string} [step]
+ * @param {number} [iteration]
  * @returns {Record<string, unknown> | undefined}
  */
-export function findLiveE2eCommandByPreferredLabel(commandResults, labels) {
+export function findLiveE2eCommandByPreferredLabel(commandResults, labels, step = "", iteration = 1) {
+  const normalizedStep = asNonEmptyString(step);
+  const normalizedIteration = Number(iteration) || 1;
+  const stepInstanceId = normalizedStep ? buildLiveE2eStepInstanceId(normalizedStep, normalizedIteration) : "";
   for (const label of labels) {
-    const command = commandResults.find((entry) => asNonEmptyString(entry.label) === label);
+    const matchingCommands = commandResults.filter((entry) => asNonEmptyString(entry.label) === label);
+    const command = stepInstanceId
+      ? matchingCommands.findLast((entry) => {
+          const entryStepInstanceId = asNonEmptyString(entry.step_instance_id);
+          if (entryStepInstanceId) return entryStepInstanceId === stepInstanceId;
+          const entryStep = asNonEmptyString(entry.step_id);
+          const entryIteration = Number(entry.iteration) || 1;
+          return entryStep === normalizedStep && entryIteration === normalizedIteration;
+        }) ?? matchingCommands.findLast((entry) => asNonEmptyString(entry.label) === label)
+      : matchingCommands.findLast((entry) => asNonEmptyString(entry.label) === label);
     if (command) return command;
   }
   return undefined;
+}
+
+/**
+ * @param {string} label
+ * @returns {string}
+ */
+export function resolveLiveE2eCommandStep(label) {
+  return COMMAND_LABEL_STEP[asNonEmptyString(label)] ?? "";
 }
 
 /**
@@ -224,14 +269,21 @@ function isOperatorAction(action) {
  * @param {Record<string, unknown>} decision
  * @param {string} action
  * @param {Record<string, unknown>} operatorContext
+ * @param {Record<string, unknown>} entry
  * @returns {string | null}
  */
-function rejectInconsistentSkillAgentDecision(decision, action, operatorContext) {
+function rejectInconsistentSkillAgentDecision(decision, action, operatorContext, entry) {
   if (asNonEmptyString(operatorContext.operator_kind) !== "skill-agent") return null;
   const semantic = asRecord(decision.semantic_analysis);
   const judgeSource = asNonEmptyString(semantic.judge_source) || asNonEmptyString(decision.judge_source);
   if (judgeSource !== "skill-agent") {
     return "Skill-agent operator decisions must declare semantic_analysis.judge_source=skill-agent.";
+  }
+  const deterministicStatus = toLiveE2eObservationStatus(
+    asNonEmptyString(asRecord(entry.deterministic_analysis).status) || asNonEmptyString(entry.final_step_verdict),
+  );
+  if (action === "continue" && !["pass", "warn", "resumed"].includes(deterministicStatus)) {
+    return `Skill-agent operator decision cannot continue with deterministic status '${deterministicStatus}'.`;
   }
   const semanticStatus = toLiveE2eObservationStatus(asNonEmptyString(semantic.status));
   if (action === "continue" && !["pass", "warn", "resumed"].includes(semanticStatus)) {
@@ -255,8 +307,16 @@ function operatorFilePaths(options) {
  * @param {string} step
  * @param {number} iteration
  */
-function buildStepInstanceId(step, iteration) {
+export function buildLiveE2eStepInstanceId(step, iteration) {
   return iteration > 1 ? `${step}#${iteration}` : step;
+}
+
+/**
+ * @param {string} step
+ * @param {number} iteration
+ */
+function buildStepInstanceId(step, iteration) {
+  return buildLiveE2eStepInstanceId(step, iteration);
 }
 
 /**
@@ -268,7 +328,12 @@ function resolveOperatorDecision(options) {
     const decision = asRecord(readJson(options.decisionFile));
     const action = asNonEmptyString(decision.action) || asNonEmptyString(asRecord(decision.decision).action);
     const status = asNonEmptyString(decision.status) || "accepted";
-    const rejectionReason = rejectInconsistentSkillAgentDecision(decision, action, options.operatorContext);
+    const rejectionReason = rejectInconsistentSkillAgentDecision(
+      decision,
+      action,
+      options.operatorContext,
+      options.entry,
+    );
     const stepMatches =
       !asNonEmptyString(decision.step_id) ||
       asNonEmptyString(decision.step_id) === asNonEmptyString(options.entry.step_id) ||
@@ -588,15 +653,96 @@ export function createLiveE2eStepController(options) {
     }
     const iteration = Number(input.iteration) || 1;
     const stepInstanceId = buildStepInstanceId(step, iteration);
-    if (
-      entryByStep[stepInstanceId] &&
-      ["continue", "retry_public_step"].includes(asNonEmptyString(asRecord(entryByStep[stepInstanceId].decision).action))
-    ) {
-      return { action: "continue", decision: asRecord(entryByStep[stepInstanceId].decision) };
+    const persistedEntry = entryByStep[stepInstanceId];
+    if (persistedEntry) {
+      const persistedAction = asNonEmptyString(asRecord(persistedEntry.decision).action);
+      if (["continue", "retry_public_step"].includes(persistedAction)) {
+        return { action: "continue", decision: asRecord(persistedEntry.decision) };
+      }
+      if (mode === "manual" && asNonEmptyString(persistedEntry.operator_decision_status) === "missing") {
+        const persistedSequence = Number(persistedEntry.sequence) || 1;
+        const files = operatorFilePaths({
+          reportsRoot: options.reportsRoot,
+          runId: options.runId,
+          sequence: persistedSequence,
+          step: stepInstanceId,
+        });
+        const operatorDecision = resolveOperatorDecision({
+          profile: options.profile,
+          entry: persistedEntry,
+          decisionFile: files.decisionFile,
+          operatorContext,
+        });
+        const entry = { ...persistedEntry };
+        entry.operator_decision_ref = operatorDecision.ref;
+        entry.operator_decision_status = operatorDecision.status;
+        if (operatorDecision.status === "accepted") {
+          const semantic = asRecord(asRecord(operatorDecision.decision).semantic_analysis);
+          entry.semantic_analysis = {
+            status: toLiveE2eObservationStatus(
+              asNonEmptyString(semantic.status) || asNonEmptyString(asRecord(entry.semantic_analysis).status),
+            ),
+            judge_source:
+              asNonEmptyString(semantic.judge_source) ||
+              asNonEmptyString(asRecord(operatorDecision.decision).judge_source) ||
+              asNonEmptyString(operatorContext.operator_ref),
+            findings: uniqueStrings([
+              ...asStringArray(asRecord(entry.semantic_analysis).findings),
+              ...asStringArray(semantic.findings),
+              ...asStringArray(asRecord(operatorDecision.decision).findings),
+            ]),
+          };
+          entry.final_step_verdict =
+            operatorDecision.action === "continue" && asNonEmptyString(asRecord(entry.resume_result).status) === "resumed"
+              ? "resumed"
+              : asNonEmptyString(entry.semantic_analysis.status);
+          entry.decision = {
+            ...asRecord(entry.decision),
+            action: operatorDecision.action,
+            reason:
+              asNonEmptyString(asRecord(operatorDecision.decision).reason) ||
+              asNonEmptyString(asRecord(entry.decision).reason) ||
+              "Skill-agent operator decision accepted.",
+          };
+        } else if (operatorDecision.status === "rejected") {
+          entry.semantic_analysis = {
+            ...asRecord(entry.semantic_analysis),
+            status: "blocked",
+            findings: uniqueStrings([
+              ...asStringArray(asRecord(entry.semantic_analysis).findings),
+              "Operator decision artifact was rejected.",
+            ]),
+          };
+          entry.final_step_verdict = "blocked";
+          entry.decision = {
+            ...asRecord(entry.decision),
+            action: "block",
+            reason: "Operator decision artifact was rejected.",
+          };
+        } else {
+          throw new LiveE2eControllerStop({
+            reason: `Live E2E controller stopped at '${step}' with decision '${persistedAction}'.`,
+            state: cloneState(),
+            decision: asRecord(entry.decision),
+          });
+        }
+        recordPhase(
+          step,
+          "decide",
+          uniqueStrings([asNonEmptyString(entry.operator_decision_ref), asNonEmptyString(entry.transcript_ref), ...asStringArray(entry.artifact_refs)]),
+        );
+        persistStep(step, entry);
+        throw new LiveE2eControllerStop({
+          reason: `Live E2E controller stopped at '${step}' with decision '${asNonEmptyString(asRecord(entry.decision).action)}'.`,
+          state: cloneState(),
+          decision: asRecord(entry.decision),
+        });
+      }
     }
 
     const stage = asRecord(input.stageResult);
-    const command = findLiveE2eCommandByPreferredLabel(input.commandResults, getLiveE2eCommandLabelPriority(step)) ?? {};
+    const command =
+      findLiveE2eCommandByPreferredLabel(input.commandResults, getLiveE2eCommandLabelPriority(step), step, iteration) ?? {};
     const artifactRefs = collectArtifactRefs(command, stage);
     const planned = planByStep[stepInstanceId] ?? planCommand({
       label: asNonEmptyString(command.label) || getLiveE2eCommandLabelPriority(step)[0] || step,
@@ -867,8 +1013,9 @@ export function createLiveE2eStepController(options) {
 
     const action = asNonEmptyString(asRecord(entry.decision).action) || "continue";
     const actionContinuesController = action === "continue" || (mode === "auto" && action === "retry_public_step");
+    const terminalManualContinue = mode === "manual" && actionContinuesController && state.current_step === null;
     if (
-      mode === "manual" ||
+      (mode === "manual" && !terminalManualContinue) ||
       (mode === "evaluator" && !actionContinuesController) ||
       (mode === "auto" && !actionContinuesController)
     ) {
@@ -889,6 +1036,63 @@ export function createLiveE2eStepController(options) {
       .filter((entry) => asNonEmptyString(asRecord(entry.decision).action) === "continue")
       .map((entry) => asNonEmptyString(entry.step_id))
       .filter(Boolean);
+  const observedStepInstances = () =>
+    Object.values(entryByStep)
+      .map((entry) => asNonEmptyString(entry.step_instance_id) || asNonEmptyString(entry.step_id))
+      .filter(Boolean);
+  const findCachedCommandResult = (label, iteration = 1) => {
+    const normalizedLabel = asNonEmptyString(label);
+    if (!normalizedLabel) return null;
+    const commandResults = Array.isArray(state.command_results)
+      ? state.command_results.map((entry) => asRecord(entry))
+      : [];
+    const matchingCommands = commandResults.filter((entry) => asNonEmptyString(entry.label) === normalizedLabel);
+
+    const step = resolveLiveE2eCommandStep(normalizedLabel);
+    if (!step) {
+      return matchingCommands.length === 1 ? matchingCommands[0] : null;
+    }
+
+    const normalizedIteration = Number(iteration) || 1;
+    const stepInstanceId = buildStepInstanceId(step, normalizedIteration);
+    const exact = matchingCommands.findLast((entry) => {
+      const entryStepInstanceId = asNonEmptyString(entry.step_instance_id);
+      if (entryStepInstanceId) return entryStepInstanceId === stepInstanceId;
+      const entryStep = asNonEmptyString(entry.step_id);
+      const entryIteration = Number(entry.iteration) || 1;
+      return entryStep === step && entryIteration === normalizedIteration;
+    });
+    if (exact) return exact;
+
+    const persistedEntry = asRecord(entryByStep[stepInstanceId]);
+    const persistedTranscriptRef = asNonEmptyString(persistedEntry.transcript_ref);
+    if (persistedTranscriptRef) {
+      const transcriptMatched = matchingCommands.findLast(
+        (entry) => asNonEmptyString(entry.transcript_file) === persistedTranscriptRef,
+      );
+      if (transcriptMatched) return transcriptMatched;
+      if (fileExists(persistedTranscriptRef)) {
+        return {
+          label: normalizedLabel,
+          command_surface: asNonEmptyString(persistedEntry.public_surface) || "cached public AOR command",
+          status: ["pass", "warn", "resumed"].includes(asNonEmptyString(asRecord(persistedEntry.deterministic_analysis).status))
+            ? "pass"
+            : "fail",
+          exit_code:
+            typeof asRecord(persistedEntry.deterministic_analysis).exit_code === "number"
+              ? asRecord(persistedEntry.deterministic_analysis).exit_code
+              : 0,
+          transcript_file: persistedTranscriptRef,
+          artifact_refs: asStringArray(persistedEntry.artifact_refs),
+          step_id: step,
+          step_instance_id: stepInstanceId,
+          iteration: normalizedIteration,
+        };
+      }
+    }
+
+    return matchingCommands.length === 1 ? matchingCommands[0] : null;
+  };
 
   return {
     mode,
@@ -899,18 +1103,20 @@ export function createLiveE2eStepController(options) {
     observeStage,
     getState: cloneState,
     hasPersistedProgress: () => asStringArray(state.completed_steps).length > 0,
-    getCachedCommandResult: (label) => {
-      const normalizedLabel = asNonEmptyString(label);
-      if (!normalizedLabel) return null;
-      const commandResults = Array.isArray(state.command_results)
-        ? state.command_results.map((entry) => asRecord(entry))
-        : [];
-      return commandResults.find((entry) => asNonEmptyString(entry.label) === normalizedLabel) ?? null;
-    },
+    getCachedCommandResult: findCachedCommandResult,
     shouldUseCachedCommand: (label, iteration = 1) => {
-      if ((Number(iteration) || 1) > 1) return false;
-      const step = COMMAND_LABEL_STEP[asNonEmptyString(label)];
-      return step ? completedContinueSteps().includes(step) : false;
+      const step = resolveLiveE2eCommandStep(label);
+      if (!step) return false;
+      const normalizedIteration = Number(iteration) || 1;
+      const stepInstanceId = buildStepInstanceId(step, normalizedIteration);
+      if (mode === "manual" && observedStepInstances().includes(stepInstanceId)) {
+        return findCachedCommandResult(label, normalizedIteration) !== null;
+      }
+      if (normalizedIteration > 1) return false;
+      if (completedContinueSteps().includes(step)) {
+        return findCachedCommandResult(label, normalizedIteration) !== null;
+      }
+      return mode === "manual" && observedStepInstances().includes(stepInstanceId) && findCachedCommandResult(label, normalizedIteration) !== null;
     },
     getStepJournal: () =>
       Object.values(entryByStep).sort((left, right) => (Number(left.sequence) || 0) - (Number(right.sequence) || 0)),

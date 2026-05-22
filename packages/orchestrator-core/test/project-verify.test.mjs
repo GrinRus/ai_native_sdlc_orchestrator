@@ -165,6 +165,52 @@ test("verifyProjectRuntime reports blocked next step when bounded command fails"
   });
 });
 
+test("verifyProjectRuntime times out long-running verification commands", () => {
+  withTempRepo((repoRoot) => {
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationCommandTimeoutMs: 100,
+      repoTestCommands: ['node -e "setTimeout(() => {}, 10000)"'],
+    });
+
+    assert.equal(result.verifySummary.status, "failed");
+    assert.equal(result.verifySummary.command_timeout_ms, 1000);
+    assert.equal(result.verifySummary.timed_out_commands.length, 1);
+
+    const failedStep = result.stepResults.find((step) => step.command === 'node -e "setTimeout(() => {}, 10000)"');
+    assert.ok(failedStep);
+    assert.equal(failedStep.status, "failed");
+    assert.equal(failedStep.timed_out, true);
+    assert.equal(failedStep.command_timeout_ms, 1000);
+    assert.match(failedStep.summary, /timed out after 1000ms/u);
+
+    const transcript = fs.readFileSync(failedStep.evidence_refs[0], "utf8");
+    assert.match(transcript, /timeout_ms: 1000/u);
+    assert.match(transcript, /timed_out: true/u);
+  });
+});
+
+test("verifyProjectRuntime uses a hard timeout signal for target commands", () => {
+  withTempRepo((repoRoot) => {
+    const command = 'node -e "process.on(\\"SIGTERM\\", () => {}); setTimeout(() => {}, 10000)"';
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationCommandTimeoutMs: 100,
+      repoTestCommands: [command],
+    });
+
+    assert.equal(result.verifySummary.status, "failed");
+    const failedStep = result.stepResults.find((step) => step.command === command);
+    assert.ok(failedStep);
+    assert.equal(failedStep.timed_out, true);
+
+    const transcript = fs.readFileSync(failedStep.evidence_refs[0], "utf8");
+    assert.match(transcript, /signal: SIGKILL/u);
+  });
+});
+
 test("verifyProjectRuntime blocks unsafe preflight defaults before running commands", () => {
   withTempRepo((repoRoot) => {
     const profilePath = path.join(repoRoot, "examples/project.aor.yaml");

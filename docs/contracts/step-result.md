@@ -15,6 +15,7 @@ Normalized output of one step regardless of whether that step was an artifact, p
 ## Notes
 Step results make routing, validation, and quality logic consistent across the lifecycle.
 Execution engines may add replay metadata (for example route/asset/policy/adapter selections, timestamps, dry-run mode, and blocked-next-step guidance) as optional fields.
+`project verify` runner step results may add `command_timeout_ms` and `timed_out` so command-bound failures are machine-readable in addition to the transcript evidence.
 Runtime Harness controllers may add optional decision metadata:
 - `mission_outcome` (`satisfied|not_satisfied|not_applicable|unknown`)
 - `failure_class`

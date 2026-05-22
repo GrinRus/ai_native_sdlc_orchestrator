@@ -80,6 +80,8 @@ These fields declare deterministic defaults only. Actual context selection, expa
 
 Optional `runtime_defaults.workspace_cleanup` can define `on_success`, `on_abort`, and `on_failure` actions (`delete`, `retain`, or `none`) for isolated roots.
 
+`project verify` target commands are bounded per command. `runtime_defaults.verification_command_timeout_sec` may set an explicit per-command timeout for lint, test, build, and setup-derived verification commands. If it is omitted, `budget_policy.verification_command_timeout_sec` may provide the same bound. If both are omitted, AOR derives a bounded default from `budget_policy.default_timeout_sec` capped by the implementation default. The timeout is per target command, not a whole-lifecycle or provider-run budget.
+
 `writeback_policy.default_delivery_mode` should resolve to one of the delivery-plan modes:
 - `no-write`
 - `patch-only`

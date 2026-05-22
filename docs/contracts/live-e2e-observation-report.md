@@ -159,11 +159,14 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `summary`
 - `findings`
 - `code_quality`
+- `failed_stages`
 - `delivery`
 - `release`
 - `learning`
 
 ## Notes
+`failed_stages[]` records deterministic stage-level failures that are inside the observed step range or setup/prelude range. Stages outside the active flow range, such as `release` or `learning` in `delivery_default` profiles, may remain outside terminal status accounting unless they are part of `step_journal[]`.
+
 Artifact quality may be judged by the live E2E skill or by the operator running the flow. If no external judge file is supplied, the runner must still write deterministic semantic analysis from public transcripts and artifacts; it must not emit a legacy missing-judge matrix.
 
 The journal is not a post-run reconstruction. The controller must persist the step observation and `controller_state_ref` after `plan -> execute -> inspect -> classify -> decide -> persist`, before the next public step is allowed to execute.

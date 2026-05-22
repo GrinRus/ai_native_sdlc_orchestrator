@@ -11,6 +11,7 @@ import {
   stringify as stringifyYaml,
 } from "../../packages/contracts/node_modules/yaml/dist/index.js";
 import { validateContractDocument } from "../../packages/contracts/src/index.mjs";
+import { loadEvaluationRegistry } from "../../packages/orchestrator-core/src/evaluation-registry.mjs";
 import { prepareAorInstallationProof } from "../live-e2e/lib/flows.mjs";
 import { validateGuidedJourneyProof } from "../live-e2e/lib/guided-proof.mjs";
 
@@ -44,6 +45,54 @@ function runGitChecked(options) {
     0,
     `git ${options.args.join(" ")} failed: ${(run.stderr ?? run.stdout ?? "").trim()}`,
   );
+}
+
+/**
+ * @param {{ cwd: string, args: string[] }} options
+ */
+function runGitOutput(options) {
+  const run = spawnSync("git", options.args, { cwd: options.cwd, encoding: "utf8" });
+  assert.equal(
+    run.status,
+    0,
+    `git ${options.args.join(" ")} failed: ${(run.stderr ?? run.stdout ?? "").trim()}`,
+  );
+  return run.stdout.trim();
+}
+
+/**
+ * @param {string} filePath
+ */
+function writePassingQualificationObservation(filePath) {
+  fs.writeFileSync(filePath, `${JSON.stringify({ report_status: "final", final_analysis: { status: "pass" } })}\n`, "utf8");
+}
+
+/**
+ * @param {{
+ *   runId: string,
+ *   observationRef?: string,
+ *   overrides?: Record<string, unknown>,
+ * }} options
+ */
+function buildPassingRecordedSummary(options) {
+  const commitSha = runGitOutput({ cwd: workspaceRoot, args: ["rev-parse", "HEAD"] });
+  const branchName = runGitOutput({ cwd: workspaceRoot, args: ["branch", "--show-current"] });
+  return {
+    status: "pass",
+    run_id: options.runId,
+    commit_sha: commitSha,
+    branch_name: branchName,
+    profile_id: "live-e2e.full-journey.release.ky.medium.openai",
+    provider_variant_id: "openai-primary",
+    target_catalog_id: "ky",
+    scenario_family: "release",
+    feature_mission_id: "ky-release-doc-typing",
+    feature_size: "medium",
+    ...(options.observationRef ? { live_e2e_observation_report_file: options.observationRef } : {}),
+    canonical_status: { acceptance_status: "pass" },
+    quality_judgement: { overall_status: "pass" },
+    ...options.overrides,
+  };
 }
 
 /**
@@ -499,6 +548,419 @@ test("qualification loop owns controller mode for inline flags", () => {
   assert.match(run.stderr, /qualification-loop owns controller mode/);
 });
 
+test("live E2E profile evaluation suites resolve in the examples evaluation registry", () => {
+  const registry = loadEvaluationRegistry({ workspaceRoot });
+  assert.equal(registry.ok, true, registry.issues.map((issue) => issue.message).join("; "));
+  const knownSuiteRefs = new Set(registry.suites.map((suite) => suite.suite_ref));
+  const profileRoot = path.join(workspaceRoot, "scripts/live-e2e/profiles");
+  const missingSuiteRefs = [];
+
+  for (const fileName of fs.readdirSync(profileRoot).sort()) {
+    if (!fileName.endsWith(".yaml")) {
+      continue;
+    }
+
+    const profilePath = path.join(profileRoot, fileName);
+    const profile = /** @type {Record<string, unknown>} */ (parseYaml(fs.readFileSync(profilePath, "utf8")));
+    const verification =
+      typeof profile.verification === "object" && profile.verification !== null
+        ? /** @type {Record<string, unknown>} */ (profile.verification)
+        : {};
+    const evalSuites = Array.isArray(verification.eval_suites)
+      ? verification.eval_suites.filter((entry) => typeof entry === "string")
+      : [];
+
+    for (const suiteRef of evalSuites) {
+      if (!knownSuiteRefs.has(suiteRef)) {
+        missingSuiteRefs.push(`${fileName}: ${suiteRef}`);
+      }
+    }
+  }
+
+  assert.deepEqual(missingSuiteRefs, []);
+});
+
+test("qualification loop records manually completed medium run evidence", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const runId = "manual-qualified-run";
+    const commitSha = runGitOutput({ cwd: workspaceRoot, args: ["rev-parse", "HEAD"] });
+    const branchName = runGitOutput({ cwd: workspaceRoot, args: ["branch", "--show-current"] }) || null;
+    const observationFile = path.join(reportsRoot, `live-e2e-observation-report-${runId}.json`);
+    const summaryFile = path.join(reportsRoot, `live-e2e-run-summary-${runId}.json`);
+    fs.writeFileSync(
+      observationFile,
+      `${JSON.stringify(
+        {
+          report_status: "final",
+          final_analysis: {
+            status: "pass",
+            summary: "Live E2E step journal passed.",
+            findings: [],
+          },
+          step_journal: [],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      summaryFile,
+      `${JSON.stringify(
+        {
+          status: "pass",
+          run_id: runId,
+          commit_sha: commitSha,
+          branch_name: branchName,
+          profile_id: "live-e2e.full-journey.release.ky.medium.openai",
+          provider_variant_id: "openai-primary",
+          target_catalog_id: "ky",
+          scenario_family: "release",
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "medium",
+          live_e2e_observation_report_file: observationFile,
+          canonical_status: {
+            acceptance_status: "pass",
+          },
+          quality_judgement: {
+            overall_status: "pass",
+          },
+          agent_operator_assessment: {
+            mission_satisfaction: "pass",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const qualificationSetFile = path.join(tempRoot, "qualification-set.json");
+    fs.writeFileSync(
+      qualificationSetFile,
+      `${JSON.stringify(
+        {
+          qualification_report_id: "live-e2e.final-qualification.v1",
+          required_provider_counts: {
+            "openai-primary": 2,
+            "anthropic-primary": 2,
+            "open-code-primary": 1,
+          },
+          qualification_status: "incomplete",
+          passing_run_count: 0,
+          provider_counts: {
+            "openai-primary": 0,
+            "anthropic-primary": 0,
+            "open-code-primary": 0,
+          },
+          missing_provider_requirements: [],
+          attempts: [
+            {
+              run_id: runId,
+              status: "blocked",
+              provider_variant_id: "openai-primary",
+              target_catalog_id: "ky",
+              feature_mission_id: "ky-release-doc-typing",
+              feature_size: "medium",
+              summary_ref: summaryFile,
+              observation_report_ref: observationFile,
+              analysis_ref: null,
+              recorded_at: "2026-05-20T00:00:00.000Z",
+            },
+          ],
+          updated_at: "2026-05-20T00:00:00.000Z",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--profile",
+        path.join(workspaceRoot, "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml"),
+        "--qualification-set-file",
+        qualificationSetFile,
+        "--record-run-summary-file",
+        summaryFile,
+      ],
+      {
+        cwd: workspaceRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    const output = JSON.parse(run.stdout);
+    assert.equal(output.status, "passed");
+    assert.equal(output.recorded_existing_run, true);
+    assert.equal(fs.existsSync(output.qualification_analysis_file), true);
+    const qualificationSet = JSON.parse(fs.readFileSync(qualificationSetFile, "utf8"));
+    assert.equal(qualificationSet.passing_run_count, 1);
+    assert.equal(qualificationSet.provider_counts["openai-primary"], 1);
+    assert.equal(qualificationSet.attempts.length, 1);
+    assert.equal(qualificationSet.attempts[0].run_id, runId);
+    assert.equal(qualificationSet.attempts[0].status, "passed");
+    assert.equal(qualificationSet.attempts[0].commit_sha, commitSha);
+    assert.equal(qualificationSet.attempts[0].branch_name, branchName);
+  });
+});
+
+test("qualification loop rejects recorded run summary that mismatches the selected profile", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const runId = "manual-mismatched-run";
+    const commitSha = runGitOutput({ cwd: workspaceRoot, args: ["rev-parse", "HEAD"] });
+    const branchName = runGitOutput({ cwd: workspaceRoot, args: ["branch", "--show-current"] });
+    const observationFile = path.join(reportsRoot, "observation.json");
+    const summaryFile = path.join(reportsRoot, "summary.json");
+    const qualificationSetFile = path.join(tempRoot, "qualification-set.json");
+    const originalQualificationSet = {
+      qualification_report_id: "live-e2e.final-qualification.v1",
+      attempts: [],
+    };
+    fs.writeFileSync(observationFile, `${JSON.stringify({ report_status: "final", final_analysis: { status: "pass" } })}\n`, "utf8");
+    fs.writeFileSync(
+      summaryFile,
+      `${JSON.stringify(
+        {
+          status: "pass",
+          run_id: runId,
+          commit_sha: commitSha,
+          branch_name: branchName,
+          profile_id: "live-e2e.full-journey.regress.ky.medium.anthropic",
+          provider_variant_id: "anthropic-primary",
+          target_catalog_id: "ky",
+          scenario_family: "regress",
+          feature_mission_id: "ky-fetch-options-regression",
+          feature_size: "medium",
+          live_e2e_observation_report_file: observationFile,
+          canonical_status: { acceptance_status: "pass" },
+          quality_judgement: { overall_status: "pass" },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(qualificationSetFile, `${JSON.stringify(originalQualificationSet, null, 2)}\n`, "utf8");
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--profile",
+        path.join(workspaceRoot, "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml"),
+        "--qualification-set-file",
+        qualificationSetFile,
+        "--record-run-summary-file",
+        summaryFile,
+      ],
+      {
+        cwd: workspaceRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /profile_id.*mismatch/u);
+    assert.deepEqual(JSON.parse(fs.readFileSync(qualificationSetFile, "utf8")), originalQualificationSet);
+  });
+});
+
+test("qualification loop requires recorded commit metadata from current lineage", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const commitSha = runGitOutput({ cwd: workspaceRoot, args: ["rev-parse", "HEAD"] });
+    const branchName = runGitOutput({ cwd: workspaceRoot, args: ["branch", "--show-current"] });
+    const observationFile = path.join(reportsRoot, "observation.json");
+    fs.writeFileSync(observationFile, `${JSON.stringify({ report_status: "final", final_analysis: { status: "pass" } })}\n`, "utf8");
+    const writeSummary = (fileName, overrides = {}) => {
+      const summaryFile = path.join(reportsRoot, fileName);
+      fs.writeFileSync(
+        summaryFile,
+        `${JSON.stringify(
+          {
+            status: "pass",
+            run_id: fileName.replace(/\.json$/u, ""),
+            branch_name: branchName,
+            profile_id: "live-e2e.full-journey.release.ky.medium.openai",
+            provider_variant_id: "openai-primary",
+            target_catalog_id: "ky",
+            scenario_family: "release",
+            feature_mission_id: "ky-release-doc-typing",
+            feature_size: "medium",
+            live_e2e_observation_report_file: "observation.json",
+            canonical_status: { acceptance_status: "pass" },
+            quality_judgement: { overall_status: "pass" },
+            ...overrides,
+          },
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
+      return summaryFile;
+    };
+    const profileArgs = [
+      "--project-ref",
+      workspaceRoot,
+      "--profile",
+      path.join(workspaceRoot, "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml"),
+    ];
+
+    const missingCommit = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        ...profileArgs,
+        "--qualification-set-file",
+        path.join(tempRoot, "missing-commit-qset.json"),
+        "--record-run-summary-file",
+        writeSummary("missing-commit.json"),
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(missingCommit.status, 1);
+    assert.match(missingCommit.stderr, /missing commit_sha/u);
+
+    const staleCommit = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        ...profileArgs,
+        "--qualification-set-file",
+        path.join(tempRoot, "stale-commit-qset.json"),
+        "--record-run-summary-file",
+        writeSummary("stale-commit.json", { commit_sha: "0".repeat(40) }),
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(staleCommit.status, 1);
+    assert.match(staleCommit.stderr, /not an ancestor/u);
+
+    const acceptedQset = path.join(tempRoot, "accepted-qset.json");
+    const accepted = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        ...profileArgs,
+        "--qualification-set-file",
+        acceptedQset,
+        "--record-run-summary-file",
+        writeSummary("accepted.json", { commit_sha: commitSha }),
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(accepted.status, 0, accepted.stderr || accepted.stdout);
+    const qualificationSet = JSON.parse(fs.readFileSync(acceptedQset, "utf8"));
+    assert.equal(qualificationSet.passing_run_count, 1);
+    assert.equal(qualificationSet.attempts[0].commit_sha, commitSha);
+  });
+});
+
+test("qualification loop resolves relative recorded observation override", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const observationFile = path.join(reportsRoot, "override-observation.json");
+    const summaryFile = path.join(reportsRoot, "summary-without-observation-ref.json");
+    const qualificationSetFile = path.join(tempRoot, "qualification-set.json");
+    writePassingQualificationObservation(observationFile);
+    fs.writeFileSync(
+      summaryFile,
+      `${JSON.stringify(buildPassingRecordedSummary({ runId: "relative-observation-override" }), null, 2)}\n`,
+      "utf8",
+    );
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--profile",
+        path.join(workspaceRoot, "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml"),
+        "--qualification-set-file",
+        qualificationSetFile,
+        "--record-run-summary-file",
+        summaryFile,
+        "--record-observation-report-file",
+        "override-observation.json",
+      ],
+      {
+        cwd: reportsRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    const output = JSON.parse(run.stdout);
+    assert.equal(output.live_e2e_observation_report_file, observationFile);
+    const qualificationSet = JSON.parse(fs.readFileSync(qualificationSetFile, "utf8"));
+    assert.equal(qualificationSet.passing_run_count, 1);
+    assert.equal(qualificationSet.attempts[0].observation_report_ref, observationFile);
+  });
+});
+
+test("qualification loop rejects corrupt qualification set without replacing it", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const observationFile = path.join(reportsRoot, "observation.json");
+    const summaryFile = path.join(reportsRoot, "summary.json");
+    const qualificationSetFile = path.join(tempRoot, "qualification-set.json");
+    const corruptQualificationSet = "{not-json\n";
+    writePassingQualificationObservation(observationFile);
+    fs.writeFileSync(
+      summaryFile,
+      `${JSON.stringify(
+        buildPassingRecordedSummary({
+          runId: "corrupt-qset-record",
+          observationRef: observationFile,
+        }),
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(qualificationSetFile, corruptQualificationSet, "utf8");
+
+    const run = spawnSync(
+      process.execPath,
+      [
+        qualificationLoopScriptPath,
+        "--project-ref",
+        workspaceRoot,
+        "--profile",
+        path.join(workspaceRoot, "scripts/live-e2e/profiles/full-journey-release-ky-medium-openai.yaml"),
+        "--qualification-set-file",
+        qualificationSetFile,
+        "--record-run-summary-file",
+        summaryFile,
+      ],
+      {
+        cwd: workspaceRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /JSON/u);
+    assert.equal(fs.readFileSync(qualificationSetFile, "utf8"), corruptQualificationSet);
+  });
+});
+
 /**
  * @param {{
  *   examplesRoot: string,
@@ -758,7 +1220,7 @@ function configureClaudeExternalRuntimeSuccess(options) {
         "if(request.step_class==='implement'&&fs.existsSync(path.join(process.cwd(),'src','index.js'))){fs.appendFileSync(path.join(process.cwd(),'src','index.js'),'export const liveE2eClaudeAdapterPatch = true;\\n');}",
         "process.stdout.write(JSON.stringify({",
         "status:'success',",
-        "summary:'claude external runner ok',",
+        "summary:'claude external runner ok; Authentication confirmed',",
         "output:{runner:'node-inline-claude',step_class:request.step_class||null,execution_root:process.cwd()},",
         "evidence_refs:['evidence://external-runner/live-e2e-proof-runner-claude-success'],",
         "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'claude-inline'}]",
@@ -1854,6 +2316,57 @@ test("installed-user proof runner runs a catalog-backed full-journey profile wit
     assert.deepEqual(learningScorecard.coverage_follow_up, summary.coverage_follow_up);
     assert.deepEqual(learningHandoff.matrix_cell, summary.matrix_cell);
     assert.deepEqual(learningHandoff.coverage_follow_up, summary.coverage_follow_up);
+  });
+});
+
+test("full-journey mode fails closed when observed execution loses preserved readiness evidence", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.missing-resume-readiness.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+    });
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const runId = "full-journey-missing-resume-readiness";
+
+    const first = runProofRunner({
+      runtimeRoot,
+      examplesRoot,
+      profilePath,
+      runId,
+      catalogRoot,
+    });
+    assert.equal(first.live_e2e_run_status, "pass");
+    const firstSummary = JSON.parse(fs.readFileSync(first.live_e2e_run_summary_file, "utf8"));
+    assert.equal(fs.existsSync(firstSummary.artifacts.target_cleanliness_before_execution_file), true);
+    fs.rmSync(firstSummary.artifacts.target_cleanliness_before_execution_file, { force: true });
+
+    const resumed = runProofRunner({
+      runtimeRoot,
+      examplesRoot,
+      profilePath,
+      runId,
+      catalogRoot,
+    });
+    assert.equal(resumed.live_e2e_run_status, "not_pass");
+    const resumedSummary = JSON.parse(fs.readFileSync(resumed.live_e2e_run_summary_file, "utf8"));
+    assert.match(String(resumedSummary.error), /cannot resume without preserved pre-execution readiness evidence/u);
+    assert.equal(resumedSummary.stage_results.find((entry) => entry.stage === "execution")?.status, "fail");
+    const observation = JSON.parse(fs.readFileSync(resumedSummary.live_e2e_observation_report_file, "utf8"));
+    assert.equal(observation.final_analysis.failed_stages[0].stage, "execution");
   });
 });
 
@@ -3807,6 +4320,59 @@ test("full-journey mode fails when runtime harness detects code-changing no-op",
     assert.equal(summary.command_results.some((entry) => entry.label === "review-run"), true);
     assert.equal(summary.command_results.some((entry) => entry.label === "eval-run"), false);
     assert.equal(summary.command_results.some((entry) => entry.label === "learning-handoff"), false);
+  });
+});
+
+test("installed-user full-journey delivery certification uses delivery-owned command evidence", () => {
+  withTempRoot((tempRoot) => {
+    const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
+    const examplesRoot = createExamplesRoot({ tempRoot });
+    configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const catalogRoot = path.join(tempRoot, "catalog");
+    seedLocalCatalogSupport({ catalogRoot });
+    writeLocalCatalogTarget({
+      catalogRoot,
+      catalogId: "local-target",
+      repoUrl: targetRepo.targetRepoRoot,
+      ref: targetRepo.targetRef,
+      missionId: "local-mission",
+    });
+    const profilePath = path.join(tempRoot, "full-journey.delivery-cert.yaml");
+    writeLocalFullJourneyProfile({
+      outputProfilePath: profilePath,
+      catalogId: "local-target",
+      missionId: "local-mission",
+      verification: {
+        harness: {
+          enabled: true,
+        },
+      },
+    });
+
+    const result = runProofRunner({
+      runtimeRoot: path.join(tempRoot, "runtime"),
+      examplesRoot,
+      profilePath,
+      runId: "full-journey-delivery-cert-cache",
+      catalogRoot,
+    });
+    assert.equal(result.live_e2e_run_status, "pass");
+    const summary = JSON.parse(fs.readFileSync(result.live_e2e_run_summary_file, "utf8"));
+    const commandLabels = summary.command_results.map((entry) => entry.label);
+    assert.equal(commandLabels.includes("harness-certify"), false);
+    assert.equal(commandLabels.includes("delivery-harness-certify"), true);
+    assert.equal(commandLabels.indexOf("delivery-harness-certify") < commandLabels.indexOf("deliver-prepare"), true);
+    const certificationCommand = summary.command_results.find((entry) => entry.label === "delivery-harness-certify");
+    assert.equal(certificationCommand.status, "pass");
+    assert.equal(certificationCommand.step_id, "delivery");
+    assert.equal(certificationCommand.step_instance_id, "delivery");
+    const promotionDecisionRef = certificationCommand.artifact_refs.find((ref) => ref.includes("promotion-decision"));
+    assert.equal(typeof promotionDecisionRef, "string");
+    assert.equal(fs.existsSync(promotionDecisionRef), true);
+    const observation = JSON.parse(fs.readFileSync(summary.live_e2e_observation_report_file, "utf8"));
+    const deliveryEntry = observation.step_journal.find((entry) => entry.step_id === "delivery");
+    assert.equal(deliveryEntry.public_surface, "aor deliver prepare");
+    assert.equal(deliveryEntry.final_step_verdict, "pass");
   });
 });
 

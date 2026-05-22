@@ -97,7 +97,6 @@ feature_missions:
       - openai-primary
       - anthropic-primary
       - open-code-primary
-      - open-code-primary
     size_budget:
       max_changed_files: 6
       max_added_lines: 220
@@ -148,6 +147,7 @@ feature_missions:
     recommended_provider_variants:
       - openai-primary
       - anthropic-primary
+      - open-code-primary
     size_budget:
       max_changed_files: 8
       max_added_lines: 300

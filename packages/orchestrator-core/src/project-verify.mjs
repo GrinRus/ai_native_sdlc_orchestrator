@@ -8,6 +8,17 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 import { isSupportedWorkspaceMode, prepareWorkspaceIsolation } from "./workspace-isolation.mjs";
 
 const NO_WRITE_PREFLIGHT_SEQUENCE = Object.freeze(["clone", "inspect", "analyze", "validate", "verify", "stop"]);
+const DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
+const MIN_VERIFICATION_COMMAND_TIMEOUT_MS = 1000;
+const COMMAND_OUTPUT_MAX_BUFFER = 20 * 1024 * 1024;
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+}
 
 /**
  * @param {Record<string, unknown>} profile
@@ -210,6 +221,72 @@ function buildVerificationCommandEnv() {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function secondsToTimeoutMs(value) {
+  if (!Number.isFinite(value) || Number(value) <= 0) {
+    return null;
+  }
+
+  const milliseconds = Math.floor(Number(value) * 1000);
+  return Math.max(milliseconds, MIN_VERIFICATION_COMMAND_TIMEOUT_MS);
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @param {number | null | undefined} overrideMs
+ * @returns {number}
+ */
+function resolveVerificationCommandTimeoutMs(profile, overrideMs) {
+  if (Number.isFinite(overrideMs) && Number(overrideMs) > 0) {
+    return Math.max(Math.floor(Number(overrideMs)), MIN_VERIFICATION_COMMAND_TIMEOUT_MS);
+  }
+
+  const runtimeDefaults = asRecord(profile.runtime_defaults);
+  const budgetPolicy = asRecord(profile.budget_policy);
+  const explicitProfileTimeout =
+    secondsToTimeoutMs(runtimeDefaults.verification_command_timeout_sec) ??
+    secondsToTimeoutMs(budgetPolicy.verification_command_timeout_sec);
+  if (explicitProfileTimeout !== null) {
+    return explicitProfileTimeout;
+  }
+
+  const budgetDefaultTimeout = secondsToTimeoutMs(budgetPolicy.default_timeout_sec);
+  if (budgetDefaultTimeout !== null) {
+    return Math.min(budgetDefaultTimeout, DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS);
+  }
+
+  return DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS;
+}
+
+/**
+ * @param {import("node:child_process").SpawnSyncReturns<string>} commandRun
+ * @returns {boolean}
+ */
+function commandTimedOut(commandRun) {
+  const error = /** @type {{ code?: unknown } | undefined} */ (commandRun.error);
+  return error?.code === "ETIMEDOUT";
+}
+
+/**
+ * @param {number | undefined} pid
+ */
+function terminateTimedOutProcessGroup(pid) {
+  if (process.platform === "win32" || !Number.isInteger(pid) || Number(pid) <= 0) {
+    return;
+  }
+
+  for (const signal of ["SIGTERM", "SIGKILL"]) {
+    try {
+      process.kill(-Number(pid), signal);
+    } catch {
+      continue;
+    }
+  }
+}
+
+/**
  * @param {{
  *   runtimeLayout: { reportsRoot: string },
  *   runId: string,
@@ -229,6 +306,8 @@ function buildVerificationCommandEnv() {
  *   missingPrerequisites?: string[],
  *   executionRoot?: string | null,
  *   isolationMode?: string | null,
+ *   commandTimeoutMs?: number | null,
+ *   timedOut?: boolean,
  * }} options
  * @returns {{ stepResultPath: string, stepResult: Record<string, unknown> }}
  */
@@ -252,6 +331,12 @@ function materializeStepResult(options) {
     execution_root: options.executionRoot ?? null,
     execution_isolation_mode: options.isolationMode ?? null,
   };
+  if (typeof options.commandTimeoutMs === "number") {
+    stepResult.command_timeout_ms = options.commandTimeoutMs;
+  }
+  if (typeof options.timedOut === "boolean") {
+    stepResult.timed_out = options.timedOut;
+  }
 
   const validation = validateContractDocument({
     family: "step-result",
@@ -300,6 +385,7 @@ function readValidationGateStatus(runtimeLayout) {
  *  repoBuildCommands?: string[],
  *  repoLintCommands?: string[],
  *  repoTestCommands?: string[],
+ *  verificationCommandTimeoutMs?: number,
  * }} options
  */
 export function verifyProjectRuntime(options = {}) {
@@ -337,6 +423,7 @@ export function verifyProjectRuntime(options = {}) {
     repoLintCommands: options.repoLintCommands,
     repoTestCommands: options.repoTestCommands,
   });
+  const commandTimeoutMs = resolveVerificationCommandTimeoutMs(profile, options.verificationCommandTimeoutMs);
   const stepResultFiles = [];
   /** @type {Array<Record<string, unknown>>} */
   const stepResults = [];
@@ -380,7 +467,15 @@ export function verifyProjectRuntime(options = {}) {
         shell: true,
         encoding: "utf8",
         env: buildVerificationCommandEnv(),
+        timeout: commandTimeoutMs,
+        killSignal: "SIGKILL",
+        detached: process.platform !== "win32",
+        maxBuffer: COMMAND_OUTPUT_MAX_BUFFER,
       });
+      const timedOut = commandTimedOut(commandRun);
+      if (timedOut) {
+        terminateTimedOutProcessGroup(commandRun.pid);
+      }
 
       const transcript = [
         `command: ${item.command}`,
@@ -390,8 +485,12 @@ export function verifyProjectRuntime(options = {}) {
         `repo_scope: ${item.repoId}`,
         `execution_root: ${workspaceIsolation.executionRoot}`,
         `execution_isolation_mode: ${workspaceIsolation.mode}`,
+        `timeout_ms: ${commandTimeoutMs}`,
+        `timed_out: ${timedOut}`,
         "node_compile_cache: disabled",
         `exit_code: ${commandRun.status ?? -1}`,
+        `signal: ${commandRun.signal ?? ""}`,
+        `error_code: ${/** @type {{ code?: unknown } | undefined} */ (commandRun.error)?.code ?? ""}`,
         "stdout:",
         commandRun.stdout ?? "",
         "stderr:",
@@ -399,11 +498,14 @@ export function verifyProjectRuntime(options = {}) {
       ].join("\n");
       fs.writeFileSync(transcriptPath, `${transcript}\n`, "utf8");
 
-      const status = commandRun.status === 0 ? "passed" : "failed";
-      const missingPrerequisites = status === "failed" ? inferMissingPrerequisites(item.command, commandRun) : [];
+      const status = commandRun.status === 0 && !timedOut ? "passed" : "failed";
+      const missingPrerequisites =
+        status === "failed" && !timedOut ? inferMissingPrerequisites(item.command, commandRun) : [];
       const blockedNextStep =
         status === "failed"
-          ? missingPrerequisites.length > 0
+          ? timedOut
+            ? "Inspect transcript, reduce command scope or target hang risk, or raise runtime_defaults.verification_command_timeout_sec before rerunning verify."
+            : missingPrerequisites.length > 0
             ? `Resolve missing prerequisites (${missingPrerequisites.join("; ")}), then rerun verify.`
             : "Inspect transcript, fix command prerequisites or command definition ownership, then rerun verify."
           : null;
@@ -411,6 +513,8 @@ export function verifyProjectRuntime(options = {}) {
       const summary =
         status === "passed"
           ? `Verification command '${item.command}' passed under owner '${item.repoId}'.`
+          : timedOut
+            ? `Verification command '${item.command}' timed out after ${commandTimeoutMs}ms.`
           : missingPrerequisites.length > 0
             ? `Verification command '${item.command}' failed: missing prerequisite(s) detected.`
             : `Verification command '${item.command}' failed with exit code ${commandRun.status ?? -1}.`;
@@ -437,6 +541,8 @@ export function verifyProjectRuntime(options = {}) {
         missingPrerequisites,
         executionRoot: workspaceIsolation.executionRoot,
         isolationMode: workspaceIsolation.mode,
+        commandTimeoutMs,
+        timedOut,
       });
       stepResults.push(stepResult);
       stepResultFiles.push(stepResultPath);
@@ -508,6 +614,15 @@ export function verifyProjectRuntime(options = {}) {
       cleanup: cleanupResult,
     },
     step_result_refs: stepResultFiles,
+    command_timeout_ms: commandTimeoutMs,
+    timed_out_commands: stepResults
+      .filter((result) => result.timed_out === true)
+      .map((result) => ({
+        repo_scope: result.repo_scope ?? null,
+        command: result.command ?? null,
+        step_result_ref:
+          stepResultFiles[stepResults.indexOf(result)] ?? null,
+      })),
     command_owners: Array.from(
       new Set(
         stepResults

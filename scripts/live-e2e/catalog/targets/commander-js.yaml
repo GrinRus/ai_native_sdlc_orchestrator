@@ -6,7 +6,7 @@ repo:
   checkout_strategy: shallow
 verification:
   setup_commands:
-    - npm install
+    - npm ci
   commands:
     - npm run test
     - npm run check

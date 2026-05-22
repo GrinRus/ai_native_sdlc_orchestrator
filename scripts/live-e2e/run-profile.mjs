@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -36,6 +37,7 @@ import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib
 import {
   buildLiveE2eStepPlan,
   createLiveE2eStepController,
+  isLiveE2eControllerStopInProgress,
   resolveLiveE2eOperatorContext,
 } from "./lib/step-controller.mjs";
 
@@ -69,6 +71,26 @@ const LIVE_E2E_OPERATOR_ACTIONS = Object.freeze([
   "diagnose",
   "block",
 ]);
+
+/**
+ * @param {string} cwd
+ * @param {string[]} args
+ * @returns {string | null}
+ */
+function gitOutputOrNull(cwd, args) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  return result.status === 0 ? result.stdout.trim() || null : null;
+}
+
+/**
+ * @param {string} hostRoot
+ */
+function resolveHostSourceMetadata(hostRoot) {
+  return {
+    commit_sha: gitOutputOrNull(hostRoot, ["rev-parse", "HEAD"]),
+    branch_name: gitOutputOrNull(hostRoot, ["branch", "--show-current"]),
+  };
+}
 /**
  * @param {unknown} value
  * @returns {string[]}
@@ -435,7 +457,7 @@ function getObservationCommandLabelPriority(step) {
   if (step === "execution") return ["run-start", "project-verify-routed-live"];
   if (step === "review") return ["review-run", "harness-certify", "eval-run"];
   if (step === "qa") return ["eval-run", "project-verify-post-run-primary"];
-  if (step === "delivery") return ["deliver-prepare"];
+  if (step === "delivery") return ["deliver-prepare", "delivery-harness-certify"];
   if (step === "release") return ["release-prepare"];
   if (step === "learning") return ["learning-handoff", "audit-runs"];
   return [];
@@ -794,11 +816,25 @@ function buildStepJournal(options) {
 }
 
 /**
- * @param {{ stepJournal: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }}
+ * @param {{ stepJournal: Array<Record<string, unknown>>, stageResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }}
  */
 function buildFinalAnalysis(options) {
   const codeQuality = buildCodeQualityObservation(options.artifacts);
   const qualityRelevantStepJournal = getQualityRelevantStepJournal(options.stepJournal);
+  const qualityRelevantStageIds = new Set(qualityRelevantStepJournal.map((entry) => asNonEmptyString(entry.step_id)).filter(Boolean));
+  const failingStages = options.stageResults
+    .filter((entry) => {
+      const stage = asNonEmptyString(entry.stage);
+      return (
+        asNonEmptyString(entry.status) === "fail" &&
+        (qualityRelevantStageIds.has(stage) || ["bootstrap", "install", ...LIVE_E2E_OBSERVATION_PRELUDE_STEPS].includes(stage))
+      );
+    })
+    .map((entry) => ({
+      stage: asNonEmptyString(entry.stage) || "unknown",
+      summary: asNonEmptyString(entry.summary) || "Stage failed.",
+      evidence_refs: asStringArray(entry.evidence_refs),
+    }));
   const deliveryStatus = asNonEmptyString(options.artifacts.delivery_manifest_file)
     ? options.artifacts.delivery_blocking === true ||
       ["fail", "not_pass"].includes(asNonEmptyString(options.artifacts.delivery_quality_gate_status))
@@ -819,9 +855,13 @@ function buildFinalAnalysis(options) {
   for (const step of qualityRelevantStepJournal) {
     status = worstObservationStatus(status, asNonEmptyString(step.final_step_verdict) || "not_pass");
   }
+  if (failingStages.length > 0) {
+    status = worstObservationStatus(status, "not_pass");
+  }
   const findings = uniqueStrings([
     ...asStringArray(codeQuality.findings),
     ...qualityRelevantStepJournal.flatMap((entry) => asStringArray(asRecord(entry.semantic_analysis).findings)),
+    ...failingStages.map((entry) => `Stage '${entry.stage}' failed: ${entry.summary}`),
   ]);
   return {
     status,
@@ -841,6 +881,7 @@ function buildFinalAnalysis(options) {
       ]),
       findings: asStringArray(codeQuality.findings),
     },
+    failed_stages: failingStages,
     delivery: {
       status: deliveryStatus,
       evidence_refs: uniqueStrings([asNonEmptyString(options.artifacts.delivery_manifest_file)]),
@@ -887,7 +928,7 @@ function buildObservationReport(options) {
   const setupJournal = buildSetupJournal(options.flowResult.artifacts);
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const controllerStop = asRecord(options.flowResult.artifacts.live_e2e_controller_stop);
-  const reportStatus = Object.keys(controllerStop).length > 0 ? "in_progress" : "final";
+  const reportStatus = isLiveE2eControllerStopInProgress(controllerStop, includedSteps) ? "in_progress" : "final";
   const agentJudgeDocument =
     asNonEmptyString(operatorContext.operator_kind) === "skill-agent" ? {} : options.agentJudgeDocument;
   const stepJournal = buildStepJournal({
@@ -897,6 +938,7 @@ function buildObservationReport(options) {
   });
   const finalAnalysis = buildFinalAnalysis({
     stepJournal,
+    stageResults: options.flowResult.stageResults,
     artifacts: options.flowResult.artifacts,
   });
   return {
@@ -1194,10 +1236,13 @@ function writeProofRunnerArtifacts(options) {
   options.flowResult.artifacts.release_status = canonicalStatus.release_status;
   options.flowResult.artifacts.proof_eligible_tier = canonicalStatus.proof_eligible_tier;
   options.flowResult.artifacts.required_matrix_acceptance_closed = canonicalStatus.required_matrix_acceptance_closed;
+  const sourceMetadata = resolveHostSourceMetadata(options.hostRoot);
 
   const summary = {
     run_id: options.runId,
     project_id: options.hostProjectId,
+    commit_sha: sourceMetadata.commit_sha,
+    branch_name: sourceMetadata.branch_name,
     profile_ref: options.profilePath,
     profile_id: options.profile.profile_id ?? null,
     scenario_id: options.profile.scenario_id ?? null,

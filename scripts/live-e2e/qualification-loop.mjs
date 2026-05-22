@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -34,6 +35,34 @@ const REQUIRED_PROVIDER_COUNTS = Object.freeze({
 });
 
 /**
+ * @param {string} cwd
+ * @param {string[]} args
+ * @returns {string}
+ */
+function runGitOutput(cwd, args) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  if (result.status !== 0) {
+    const detail = (result.stderr || result.stdout || "").trim();
+    throw new UsageError(`Unable to read git ${args.join(" ")} from '${cwd}': ${detail || "command failed"}.`);
+  }
+  return result.stdout.trim();
+}
+
+/**
+ * @param {string} cwd
+ * @param {string} ancestor
+ * @param {string} descendant
+ * @returns {boolean}
+ */
+function isGitAncestor(cwd, ancestor, descendant) {
+  const result = spawnSync("git", ["merge-base", "--is-ancestor", ancestor, descendant], {
+    cwd,
+    encoding: "utf8",
+  });
+  return result.status === 0;
+}
+
+/**
  * @param {string[]} rawArgs
  * @param {string} flagName
  */
@@ -59,6 +88,81 @@ function removeStringFlag(rawArgs, flagName) {
     output.push(rawArgs[index]);
   }
   return output;
+}
+
+/**
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   fullJourney: Record<string, unknown> | null,
+ *   featureSize: string,
+ * }}
+ */
+function buildExpectedSummaryIdentity(options) {
+  const matrixCell = asRecord(options.fullJourney?.matrixCell);
+  return {
+    profile_id: asNonEmptyString(options.profile.profile_id),
+    target_catalog_id: asNonEmptyString(matrixCell.target_catalog_id) || asNonEmptyString(options.profile.target_catalog_id),
+    feature_mission_id: asNonEmptyString(matrixCell.feature_mission_id) || asNonEmptyString(options.profile.feature_mission_id),
+    scenario_family: asNonEmptyString(matrixCell.scenario_family) || asNonEmptyString(options.profile.scenario_family),
+    provider_variant_id: asNonEmptyString(matrixCell.provider_variant_id) || asNonEmptyString(options.profile.provider_variant_id),
+    feature_size: options.featureSize,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} summary
+ * @param {Record<string, string>} expected
+ */
+function assertRecordedSummaryMatchesProfile(summary, expected) {
+  for (const [field, expectedValue] of Object.entries(expected)) {
+    const actualValue = asNonEmptyString(summary[field]);
+    if (!expectedValue) continue;
+    if (!actualValue) {
+      throw new UsageError(`Recorded run summary is missing '${field}', required to match the selected profile.`);
+    }
+    if (actualValue !== expectedValue) {
+      throw new UsageError(
+        `Recorded run summary '${field}' mismatch: expected '${expectedValue}' from selected profile, received '${actualValue}'.`,
+      );
+    }
+  }
+}
+
+/**
+ * @param {Record<string, unknown>} summary
+ * @param {string} hostRoot
+ */
+function assertRecordedSummaryBelongsToCurrentGitLineage(summary, hostRoot) {
+  const summaryCommit = asNonEmptyString(summary.commit_sha);
+  if (!summaryCommit) {
+    throw new UsageError("Recorded run summary is missing commit_sha; rerun live E2E with current run-profile metadata.");
+  }
+  if (!/^[0-9a-f]{40}$/iu.test(summaryCommit)) {
+    throw new UsageError(`Recorded run summary commit_sha '${summaryCommit}' is not a full git commit SHA.`);
+  }
+  const headCommit = runGitOutput(hostRoot, ["rev-parse", "HEAD"]);
+  if (!isGitAncestor(hostRoot, summaryCommit, headCommit)) {
+    throw new UsageError(
+      `Recorded run summary commit_sha '${summaryCommit}' is not an ancestor of current HEAD '${headCommit}'.`,
+    );
+  }
+  const summaryBranch = asNonEmptyString(summary.branch_name);
+  if (summaryBranch) {
+    const currentBranch = runGitOutput(hostRoot, ["branch", "--show-current"]);
+    if (currentBranch && summaryBranch !== currentBranch) {
+      throw new UsageError(
+        `Recorded run summary branch_name mismatch: expected current branch '${currentBranch}', received '${summaryBranch}'.`,
+      );
+    }
+  }
+}
+
+/**
+ * @param {string} summaryFile
+ * @param {string} fileRef
+ */
+function resolveSummaryRelativePath(summaryFile, fileRef) {
+  return path.isAbsolute(fileRef) ? fileRef : path.resolve(path.dirname(summaryFile), fileRef);
 }
 
 /**
@@ -141,6 +245,7 @@ function buildAnalysis(options) {
     feature_mission_id: asNonEmptyString(options.summary.feature_mission_id) || null,
     feature_size: asNonEmptyString(options.summary.feature_size) || null,
     commit_sha: asNonEmptyString(options.summary.commit_sha) || null,
+    branch_name: asNonEmptyString(options.summary.branch_name) || null,
     failing_steps: failingSteps,
     quality_drops: qualityDrops,
     evidence_refs: [
@@ -163,7 +268,7 @@ function buildAnalysis(options) {
  * @param {{ qualificationSetFile: string, analysis: Record<string, unknown>, summary: Record<string, unknown> }}
  */
 function updateQualificationSet(options) {
-  const existing = options.qualificationSetFile && path.isAbsolute(options.qualificationSetFile) && fsExists(options.qualificationSetFile)
+  const existing = options.qualificationSetFile && path.isAbsolute(options.qualificationSetFile) && fs.existsSync(options.qualificationSetFile)
     ? asRecord(readJson(options.qualificationSetFile))
     : {};
   const attempts = Array.isArray(existing.attempts) ? existing.attempts.map((entry) => asRecord(entry)) : [];
@@ -174,12 +279,22 @@ function updateQualificationSet(options) {
     target_catalog_id: asNonEmptyString(options.summary.target_catalog_id) || null,
     feature_mission_id: asNonEmptyString(options.summary.feature_mission_id) || null,
     feature_size: asNonEmptyString(options.summary.feature_size) || null,
+    commit_sha: asNonEmptyString(options.summary.commit_sha) || null,
+    branch_name: asNonEmptyString(options.summary.branch_name) || null,
     summary_ref: asNonEmptyString(options.summary.summary_ref) || null,
     observation_report_ref: asNonEmptyString(options.summary.live_e2e_observation_report_file) || null,
     analysis_ref: asNonEmptyString(options.analysis.analysis_file) || null,
     recorded_at: nowIso(),
   };
-  attempts.push(attempt);
+  const runId = asNonEmptyString(attempt.run_id);
+  const existingAttemptIndex = runId
+    ? attempts.findIndex((entry) => asNonEmptyString(entry.run_id) === runId)
+    : -1;
+  if (existingAttemptIndex >= 0) {
+    attempts[existingAttemptIndex] = attempt;
+  } else {
+    attempts.push(attempt);
+  }
   const passing = attempts.filter((entry) => asNonEmptyString(entry.status) === "passed");
   const provider_counts = Object.fromEntries(
     Object.keys(REQUIRED_PROVIDER_COUNTS).map((provider) => [
@@ -211,14 +326,75 @@ function updateQualificationSet(options) {
 }
 
 /**
- * @param {string} filePath
+ * @param {{
+ *   summaryFile: string,
+ *   observationFile: string | null,
+ *   qualificationSetFile: string | null,
+ *   recordedExistingRun: boolean,
+ *   expectedIdentity: Record<string, string>,
+ *   hostRoot: string,
+ * }}
  */
-function fsExists(filePath) {
-  try {
-    return Boolean(filePath) && Boolean(readJson(filePath));
-  } catch {
-    return false;
+function recordQualificationResult(options) {
+  const summaryFile = path.resolve(options.summaryFile);
+  const summary = asRecord(readJson(summaryFile));
+  assertRecordedSummaryMatchesProfile(summary, options.expectedIdentity);
+  assertRecordedSummaryBelongsToCurrentGitLineage(summary, options.hostRoot);
+  const observationFileRef = options.observationFile || asNonEmptyString(summary.live_e2e_observation_report_file);
+  if (!observationFileRef) {
+    throw new UsageError("--record-run-summary-file requires --record-observation-report-file when the summary omits live_e2e_observation_report_file.");
   }
+  const observationFile = resolveSummaryRelativePath(summaryFile, observationFileRef);
+  const observationReport = asRecord(readJson(observationFile));
+  const featureSize = asNonEmptyString(summary.feature_size);
+  if (!QUALIFYING_FEATURE_SIZES.has(featureSize)) {
+    throw new UsageError(
+      `Qualification loop requires recorded summary feature_size medium, large, or xl; received '${featureSize || "unknown"}'.`,
+    );
+  }
+  const status = classifyQualification(summary, observationReport);
+  const analysis = buildAnalysis({
+    summary,
+    observationReport,
+    status,
+  });
+  const analysisFile = path.join(
+    path.dirname(summaryFile),
+    `live-e2e-qualification-analysis-${normalizeId(asNonEmptyString(summary.run_id) || "run")}.json`,
+  );
+  analysis.analysis_file = analysisFile;
+  writeJson(analysisFile, analysis);
+  const qualificationSet = options.qualificationSetFile
+    ? updateQualificationSet({
+        qualificationSetFile: path.resolve(options.qualificationSetFile),
+        analysis,
+        summary: {
+          ...summary,
+          summary_ref: summaryFile,
+          live_e2e_observation_report_file: observationFile,
+        },
+      })
+    : null;
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        command: "scripts live-e2e qualification-loop",
+        status,
+        run_id: asNonEmptyString(summary.run_id) || null,
+        recorded_existing_run: options.recordedExistingRun,
+        qualification_analysis_file: analysisFile,
+        qualification_set_file: options.qualificationSetFile ? path.resolve(options.qualificationSetFile) : null,
+        qualification_set_status: asNonEmptyString(asRecord(qualificationSet).qualification_status) || null,
+        live_e2e_run_summary_file: summaryFile,
+        live_e2e_observation_report_file: observationFile,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  if (status === "passed") return 0;
+  if (status === "needs_fix") return 2;
+  return 3;
 }
 
 /**
@@ -229,6 +405,7 @@ function runCli(rawArgs) {
     process.stdout.write(
       [
         "Usage: node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path> [--qualification-set-file <path>] [run-profile flags...]",
+        "       node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path> --record-run-summary-file <path> [--record-observation-report-file <path>] [--qualification-set-file <path>]",
         "",
         "Runs one medium-or-larger live E2E profile and writes a qualification analysis for the launching agent.",
       ].join("\n"),
@@ -237,7 +414,16 @@ function runCli(rawArgs) {
   }
   const flags = parseFlags(rawArgs);
   const qualificationSetFile = resolveOptionalStringFlag(flags["qualification-set-file"], "qualification-set-file");
-  const runProfileArgs = qualificationSetFile ? removeStringFlag(rawArgs, "qualification-set-file") : rawArgs;
+  const recordRunSummaryFile = resolveOptionalStringFlag(flags["record-run-summary-file"], "record-run-summary-file");
+  const recordObservationReportFile = resolveOptionalStringFlag(
+    flags["record-observation-report-file"],
+    "record-observation-report-file",
+  );
+  let runProfileArgs = qualificationSetFile ? removeStringFlag(rawArgs, "qualification-set-file") : rawArgs;
+  runProfileArgs = recordRunSummaryFile ? removeStringFlag(runProfileArgs, "record-run-summary-file") : runProfileArgs;
+  runProfileArgs = recordObservationReportFile
+    ? removeStringFlag(runProfileArgs, "record-observation-report-file")
+    : runProfileArgs;
   const hostRoot = requireDirectory(
     resolveOptionalStringFlag(flags["project-ref"], "project-ref") ??
       (() => {
@@ -272,6 +458,20 @@ function runCli(rawArgs) {
     asNonEmptyString(asRecord(loaded.profile.matrix_cell).feature_size);
   if (!QUALIFYING_FEATURE_SIZES.has(featureSize)) {
     throw new UsageError(`Qualification loop requires feature_size medium, large, or xl; received '${featureSize || "unknown"}'.`);
+  }
+  if (recordRunSummaryFile) {
+    return recordQualificationResult({
+      summaryFile: recordRunSummaryFile,
+      observationFile: recordObservationReportFile,
+      qualificationSetFile: qualificationSetFile ? path.resolve(qualificationSetFile) : null,
+      recordedExistingRun: true,
+      expectedIdentity: buildExpectedSummaryIdentity({
+        profile: loaded.profile,
+        fullJourney,
+        featureSize,
+      }),
+      hostRoot,
+    });
   }
 
   const child = spawnSync(process.execPath, [RUN_PROFILE_SCRIPT, ...runProfileArgs, "--controller-mode", "auto"], {
