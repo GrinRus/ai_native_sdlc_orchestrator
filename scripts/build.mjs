@@ -400,7 +400,7 @@ const workflowExpectations = new Map([
       "release:publish",
       "node ./scripts/release-event-guard.mjs",
       "pnpm release:gate",
-      "npm publish --access public --provenance",
+      "npm publish --access public --tag alpha --provenance",
     ],
   ],
 ]);

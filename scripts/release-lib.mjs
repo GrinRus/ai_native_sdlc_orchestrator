@@ -211,7 +211,7 @@ export function validateReleaseState(options = {}) {
       "release/v<semver-alpha>",
       RELEASE_LABEL,
       "npm Trusted Publishing",
-      "npm publish --access public --provenance",
+      "npm publish --access public --tag alpha --provenance",
       "pnpm release:gate",
     ]) {
       ensureIncludes(findings, runbook, required, runbookPath);
@@ -228,7 +228,7 @@ export function validateReleaseState(options = {}) {
     ensureIncludes(findings, workflow, "npm@11.5.1", workflowPath);
     if (workflowPath.endsWith("release-publish.yml")) {
       ensureIncludes(findings, workflow, "id-token: write", workflowPath);
-      ensureIncludes(findings, workflow, "npm publish --access public --provenance", workflowPath);
+      ensureIncludes(findings, workflow, "npm publish --access public --tag alpha --provenance", workflowPath);
     }
   }
 

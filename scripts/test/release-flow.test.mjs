@@ -123,12 +123,23 @@ test("release verifier rejects wrong package name and public internal packages",
   }
 });
 
-test("release verifier rejects publish workflows without trusted publishing runtime pins", () => {
+test("release verifier rejects publish workflows without trusted publishing runtime pins and alpha tag", () => {
   const tempRoot = copyFixtureRepo();
   try {
     fs.writeFileSync(
       path.join(tempRoot, ".github/workflows/release-publish.yml"),
-      "name: Release publish\npermissions:\n  contents: write\n",
+      [
+        "name: Release publish",
+        "permissions:",
+        "  contents: write",
+        "  id-token: write",
+        "jobs:",
+        "  publish:",
+        "    steps:",
+        "      - run: npm install -g npm@11.5.1",
+        "      - run: npm publish --access public --provenance",
+        "",
+      ].join("\n"),
       "utf8",
     );
     const result = validateReleaseState({
@@ -138,8 +149,7 @@ test("release verifier rejects publish workflows without trusted publishing runt
     });
     assert.equal(result.ok, false);
     assert.match(result.findings.join("\n"), /node-version: 22\.14\.0/u);
-    assert.match(result.findings.join("\n"), /npm@11\.5\.1/u);
-    assert.match(result.findings.join("\n"), /id-token: write/u);
+    assert.match(result.findings.join("\n"), /npm publish --access public --tag alpha --provenance/u);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

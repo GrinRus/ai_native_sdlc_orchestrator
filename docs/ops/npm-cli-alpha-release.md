@@ -70,11 +70,15 @@ publishes only when all of these conditions are true:
 - `pnpm release:gate` passes on the merge commit.
 
 The publish workflow creates tag `v<semver-alpha>`, creates the matching GitHub
-Release, and publishes with:
+Release, and publishes prerelease builds to the npm `alpha` dist-tag with:
 
 ```bash
-npm publish --access public --provenance
+npm publish --access public --tag alpha --provenance
 ```
+
+Do not publish alpha versions without `--tag alpha`: npm publish defaults to the
+`latest` dist-tag when no explicit tag is supplied, and `latest` is reserved for
+future stable releases.
 
 The workflow uses npm Trusted Publishing through GitHub OIDC. Do not add npm
 tokens or token fallback behavior. The release workflows pin Node.js `22.14.0`
