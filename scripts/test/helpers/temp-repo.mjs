@@ -25,6 +25,10 @@ function initializeFixtureRepo(options) {
   runGitChecked({ cwd: options.repoRoot, args: ["commit", "-m", "initial"] });
 }
 
+function removeTempRepo(repoRoot) {
+  fs.rmSync(repoRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+}
+
 /**
  * @template T
  * @param {{ prefix: string, workspaceRoot: string }} options
@@ -38,12 +42,12 @@ export function withTempRepo(options, callback) {
   try {
     const result = callback(repoRoot);
     if (result && typeof /** @type {{ then?: unknown }} */ (result).then === "function") {
-      return Promise.resolve(result).finally(() => fs.rmSync(repoRoot, { recursive: true, force: true }));
+      return Promise.resolve(result).finally(() => removeTempRepo(repoRoot));
     }
-    fs.rmSync(repoRoot, { recursive: true, force: true });
+    removeTempRepo(repoRoot);
     return result;
   } catch (error) {
-    fs.rmSync(repoRoot, { recursive: true, force: true });
+    removeTempRepo(repoRoot);
     throw error;
   }
 }
