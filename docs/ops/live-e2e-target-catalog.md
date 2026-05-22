@@ -136,6 +136,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `full-journey-regress-pluggy.yaml`
   - `full-journey-repair-pluggy-medium-anthropic.yaml`
   - `full-journey-governance-pluggy-medium-openai.yaml`
+  - `full-journey-governance-pluggy-medium-open-code.yaml` (extended)
 - Verification baseline: `python3 -m venv .aor/live-e2e-venv`,
   `.aor/live-e2e-venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage`,
   `.aor/live-e2e-venv/bin/python -m pytest testing`.
@@ -204,7 +205,7 @@ Extended candidate cells:
 Provider comparison rule:
 - every curated repo must prove at least one equivalent mission class on both `openai-primary` and `anthropic-primary`.
 - `openai-primary` and `anthropic-primary` are mandatory provider variants for W14 matrix coverage.
-- `open-code-primary` remains extended candidate coverage after W22-S03, including the cataloged `ky.regress.small.open-code` and `ky.regress.medium.open-code` cells; required OpenCode baseline certification awaits a future real-runner proof.
+- `open-code-primary` remains extended candidate coverage after W22-S03, including the cataloged `ky.regress.small.open-code`, `ky.regress.medium.open-code`, and `pluggy.governance.medium.open-code` cells; required OpenCode baseline certification awaits a future committed real-runner proof.
 
 Feature-size taxonomy:
 - `small`: one focused behavior surface, usually 1-2 files and one targeted regression.
