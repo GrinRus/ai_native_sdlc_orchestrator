@@ -79,6 +79,7 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W18:** `W18-S04` Monorepo and bounded multirepo flow proof
 - **W20:** `W20-S01` Multirepo scoped locks and cross-repo validation
 - **W24:** `W24-S03` Strict delivery gate consolidation
+- **W29:** `W29-S01` npm CLI alpha release channel
 
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.

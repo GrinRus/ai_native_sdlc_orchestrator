@@ -1,5 +1,12 @@
 # Package and module map
 
+## Distribution package
+
+The root package publishes the npm CLI alpha as `@grinrus/aor` with bin command
+`aor`. It packages the CLI entrypoint plus the private internal runtime modules
+needed by that CLI. The root package is the only public package channel in the
+current alpha.
+
 ## Apps
 All apps listed here are package-managed workspace entries, not just folders.
 

@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import {
   parse as parseYaml,
   stringify as stringifyYaml,
-} from "../../packages/contracts/node_modules/yaml/dist/index.js";
+} from "yaml";
 import { validateContractDocument } from "../../packages/contracts/src/index.mjs";
 import { loadEvaluationRegistry } from "../../packages/orchestrator-core/src/evaluation-registry.mjs";
 import { prepareAorInstallationProof } from "../live-e2e/lib/flows.mjs";

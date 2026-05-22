@@ -1031,6 +1031,18 @@ if (productionReadinessTestRun.status !== 0) {
 
 console.log("production readiness tests ok: gate passes only with real W25 proof evidence");
 
+const releaseFlowTestsPath = path.join(root, "scripts/test/release-flow.test.mjs");
+const releaseFlowTestRun = spawnSync(process.execPath, ["--test", releaseFlowTestsPath], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (releaseFlowTestRun.status !== 0) {
+  process.exit(releaseFlowTestRun.status ?? 1);
+}
+
+console.log("release flow tests ok: package metadata, branch guards, and publish event rules");
+
 const readmeBlackBoxTestsPath = path.join(root, "scripts/test/readme-black-box.test.mjs");
 const readmeBlackBoxTestRun = spawnSync(process.execPath, ["--test", readmeBlackBoxTestsPath], {
   cwd: root,

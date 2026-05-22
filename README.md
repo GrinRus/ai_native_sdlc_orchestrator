@@ -4,14 +4,14 @@ AOR is an AI-native SDLC control plane and orchestrator. It coordinates
 bounded work packets, contracts, runners, evidence, reviews, and delivery
 decisions across the software lifecycle.
 
-AOR is not a coding agent, hosted SaaS, or package you install from npm today.
+AOR is not a coding agent, hosted SaaS, or managed release platform.
 
-## Status: source-only alpha
+## Status: alpha distribution
 
-AOR is a public source checkout for early operators, contributors, and
-researchers. The repository is docs-first and includes implemented CLI, API,
-web, and runtime baselines, but it is not a production-ready general-purpose
-orchestrator runtime.
+AOR is an alpha distribution for early operators, contributors, and
+researchers. The repository remains docs-first and includes implemented CLI,
+API, web, and runtime baselines, but it is not a production-ready
+general-purpose orchestrator runtime.
 
 The current production-candidate claim is intentionally bounded: AOR has a
 self-hosted CLI/API production candidate for the documented mode in
@@ -20,18 +20,19 @@ self-hosted CLI/API production candidate for the documented mode in
 they do not mean unattended production automation is safe for arbitrary
 projects.
 
-Packages remain `private: true` and `version: 0.0.0`. Public distribution is
-source-only until npm or GitHub Releases are explicitly added in a separate
-release decision.
+The first package channel is the npm CLI alpha package `@grinrus/aor`. Internal
+workspace apps and packages remain private implementation modules and are not
+public semver APIs.
 
-## Current source channel
+## Current distribution channels
 
-The public source-only main channel is the `main` branch on GitHub. There is no
-npm, GitHub Releases, Docker, or GHCR version channel yet.
+The public source channel is the `main` branch on GitHub. Versioned npm CLI
+alpha releases are published as `@grinrus/aor` and tagged with matching GitHub
+Releases. There is no Docker or GHCR version channel yet.
 
-The package state is intentionally `private:true / 0.0.0`: use the repository
-source checkout as the versioned artifact until a separate distribution policy
-changes that.
+The root package is publishable as `@grinrus/aor@0.1.0-alpha.1`; internal
+workspace packages stay `private:true`. The release branch and publish process
+are documented in `docs/ops/npm-cli-alpha-release.md`.
 
 ## What is AOR?
 
@@ -61,6 +62,17 @@ tracker, or release platform yet.
 Third-party runner binaries and authentication, such as Codex CLI, Claude Code,
 or OpenCode, are installed and configured outside AOR.
 
+## Install CLI from npm alpha
+
+```bash
+npm install -g @grinrus/aor@0.1.0-alpha.1
+aor --help
+```
+
+The npm alpha installs the CLI executable and bundled AOR examples/assets used
+by the safe onboarding path. It does not install third-party runner binaries or
+configure provider authentication.
+
 ## Clone and install from source
 
 ```bash
@@ -72,7 +84,9 @@ pnpm aor --help
 ```
 
 This installs the source checkout and exposes the local CLI through the root
-`pnpm aor` script. It does not publish or install npm packages.
+`pnpm aor` script. It is still the contributor path for changing AOR itself.
+When using the npm CLI package, replace `pnpm aor` in the examples below with
+`aor`.
 
 ## Run your first no-write local mission
 
@@ -187,6 +201,7 @@ Use these surfaces as implemented baselines, not as a hosted product claim.
 
 | Capability | Status | How to try or verify |
 | --- | --- | --- |
+| npm CLI alpha package | Implemented alpha | `npm install -g @grinrus/aor@0.1.0-alpha.1`. |
 | Source checkout install | Implemented | `corepack enable` and `pnpm install --frozen-lockfile`. |
 | Repository integrity checks | Implemented | `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check`. |
 | Guided target onboarding | Implemented baseline | `pnpm aor onboard ... --json`. |
@@ -197,16 +212,17 @@ Use these surfaces as implemented baselines, not as a hosted product claim.
 
 ## Readiness evidence
 
-Root checks prove repository integrity for this source checkout. They validate
-docs, examples, contracts, command surfaces, tests, and scaffold policy; they do
-not certify AOR as an unattended production runtime for arbitrary repositories.
+Root checks prove repository integrity for this source checkout and npm alpha
+release flow. They validate docs, examples, contracts, command surfaces, tests,
+package metadata, and scaffold policy; they do not certify AOR as an unattended
+production runtime for arbitrary repositories.
 
 `pnpm production:ready --json` is a maintainer-facing gate for the bounded
 self-hosted CLI/API mode documented in this repository. Internal evaluation and
 proof fixtures exist for maintainers, but they are not a public onboarding path
 and are intentionally not part of the README workflow.
 
-The current roadmap source of truth extends through W28 in
+The current roadmap source of truth extends through W29 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -214,15 +230,15 @@ without routing operators into internal evaluation material.
 
 Do not use AOR yet if you need:
 
-- npm-installable public packages.
-- GitHub Releases, Docker images, or GHCR distribution.
+- stable GA npm packages or public SDK package APIs.
+- Docker images or GHCR distribution.
 - Hosted SaaS, managed accounts, or enterprise identity/SSO.
 - Broad runner/provider parity across arbitrary tools.
 - Default upstream write-back automation.
 - Unattended production automation for critical repositories.
 
-These are valid future directions, but they are outside the current
-source-only alpha contract.
+These are valid future directions, but they are outside the current alpha
+distribution contract.
 
 ## Docs map
 
@@ -238,6 +254,8 @@ Start here when you need deeper context:
 - `docs/backlog/mvp-roadmap.md` - roadmap and readiness story.
 - `docs/ops/self-hosted-release.md` - bounded self-hosted release operating
   model.
+- `docs/ops/npm-cli-alpha-release.md` - npm CLI alpha release branch and publish
+  flow.
 
 ## Contributor quickstart
 
@@ -310,18 +328,19 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current source-only alpha focuses on:
+The current alpha distribution focuses on:
 
 - Safer operator onboarding.
 - Stronger runner-adapter coverage.
 - Clearer review, QA, and delivery evidence.
 - Public-repo security posture and governance.
 - Bounded self-hosted CLI/API operation.
+- Reproducible npm CLI alpha distribution.
 
 ## Contributing
 
 See `CONTRIBUTING.md` for the contributor workflow, local gates, PR checklist,
-and security reminders. Pull requests should preserve the source-only alpha
+and security reminders. Pull requests should preserve the alpha distribution
 contract unless they intentionally update the release policy.
 
 ## Security and responsible disclosure

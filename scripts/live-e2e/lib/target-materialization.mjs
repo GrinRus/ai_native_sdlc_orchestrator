@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
-import { stringify as stringifyYaml } from "../../../packages/contracts/node_modules/yaml/dist/index.js";
+import { stringify as stringifyYaml } from "yaml";
 import { loadContractFile, validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 
 import {

@@ -1,0 +1,52 @@
+name: Release candidate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      release_branch:
+        description: release/v<semver-alpha> branch to validate
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || inputs.release_branch || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-candidate:
+    name: Release candidate gate
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AOR_RELEASE_BRANCH: ${{ github.event.pull_request.head.ref || inputs.release_branch }}
+      AOR_RELEASE_STRICT_BRANCH: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref || inputs.release_branch }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Setup npm for trusted publishing parity
+        run: npm install -g npm@11.5.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run release candidate gate
+        run: pnpm release:gate

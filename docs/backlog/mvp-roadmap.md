@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-28-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-29-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -39,6 +39,7 @@ The authoritative planning model for implementation lives in:
 | W26 | Make self-hosted production readiness repeatable, reviewable, and documented as a CLI/API production candidate with optional web. | 3 | EPIC-0, EPIC-7 | `docs/backlog/wave-26-implementation-slices.md` |
 | W27 | Replace legacy live E2E matrices with a black-box step journal and resumable interaction answers. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-27-implementation-slices.md` |
 | W28 | Close installed-user live E2E gaps with install proof, evaluator naming cleanup, and expanded target coverage. | 3 | EPIC-7 | `docs/backlog/wave-28-implementation-slices.md` |
+| W29 | Open the npm CLI alpha release channel with guarded release branch automation. | 1 | EPIC-5 | `docs/backlog/wave-29-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -478,6 +479,21 @@ The authoritative planning model for implementation lives in:
 - Commander.js and pluggy are required matrix targets, while Cobra and date-fns are extended candidates.
 
 **Detailed slices:** `docs/backlog/wave-28-implementation-slices.md`
+
+## W29 - npm CLI alpha distribution
+**Goal:** Open the first package distribution channel while keeping normal
+development on `main` non-publishing and preserving private internal package
+boundaries.
+
+**Exit criteria:**
+- The root package publishes as `@grinrus/aor` with bin command `aor`.
+- Release candidate PRs from `release/v<semver-alpha>` run `pnpm release:gate`.
+- Merged release PRs publish only with `release:publish`, matching version, and
+  npm Trusted Publishing.
+- Docker, GHCR, hosted SaaS, and public SDK package channels remain out of
+  scope.
+
+**Detailed slices:** `docs/backlog/wave-29-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

@@ -1,14 +1,17 @@
 # Security Policy
 
-AOR is a pre-release, source-only alpha repository. Security reports are still important because AOR orchestrates runners, reads project context, writes runtime artifacts, and can be configured near credentials or private repositories.
+AOR is a pre-release alpha project with a GitHub source channel and npm CLI
+alpha package. Security reports are still important because AOR orchestrates
+runners, reads project context, writes runtime artifacts, and can be configured
+near credentials or private repositories.
 
 ## Supported Versions
 
 | Version | Supported |
 | --- | --- |
-| `main` | Yes, for source-only alpha reports |
-| npm packages | Not applicable; packages are private and unpublished |
-| GitHub Releases | Not applicable; no versioned releases are published yet |
+| `main` | Yes, for source-channel alpha reports |
+| `@grinrus/aor@0.1.0-alpha.x` | Yes, for npm CLI alpha reports |
+| Internal workspace packages | Not public APIs; report issues through the source repo |
 
 ## Reporting a Vulnerability
 
@@ -28,7 +31,9 @@ Reports are especially useful when they involve:
 
 ## Public Disclosure
 
-Please wait for maintainer confirmation before disclosing vulnerability details publicly. The maintainer will coordinate a fix, credit, and disclosure timing appropriate for a source-only alpha project.
+Please wait for maintainer confirmation before disclosing vulnerability details
+publicly. The maintainer will coordinate a fix, credit, and disclosure timing
+appropriate for an alpha project.
 
 ## Non-Security Issues
 

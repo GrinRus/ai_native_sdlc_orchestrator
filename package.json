@@ -1,11 +1,52 @@
 {
-  "name": "aor",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@grinrus/aor",
+  "private": false,
+  "version": "0.1.0-alpha.1",
+  "description": "AI-native SDLC orchestrator CLI for bounded packets, evidence, reviews, and delivery decisions.",
   "license": "Apache-2.0",
+  "type": "module",
   "bin": {
     "aor": "./apps/cli/bin/aor.mjs"
   },
+  "files": [
+    "apps/cli/bin",
+    "apps/cli/src",
+    "packages/adapter-sdk/src",
+    "packages/contracts/src",
+    "packages/harness/src",
+    "packages/observability/src",
+    "packages/orchestrator-core/src",
+    "packages/provider-routing/src",
+    "examples/project*.aor.yaml",
+    "examples/adapters",
+    "examples/context",
+    "examples/control-plane-api",
+    "examples/delivery-manifest*.yaml",
+    "examples/eval",
+    "examples/packets",
+    "examples/policies",
+    "examples/project-analysis-report.sample.yaml",
+    "examples/prompts",
+    "examples/reports",
+    "examples/routes",
+    "examples/skills",
+    "examples/wrappers",
+    "docs/contracts",
+    "docs/ops/npm-cli-alpha-release.md",
+    "docs/ops/production-readiness-gate.md",
+    "docs/ops/self-hosted-release.md",
+    "CHANGELOG.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GrinRus/ai_native_sdlc_orchestrator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GrinRus/ai_native_sdlc_orchestrator/issues"
+  },
+  "homepage": "https://github.com/GrinRus/ai_native_sdlc_orchestrator#readme",
   "packageManager": "pnpm@10.12.4",
   "engines": {
     "node": ">=22"
@@ -18,11 +59,18 @@
     "aor": "node ./apps/cli/bin/aor.mjs",
     "check": "node ./scripts/lint.mjs && node ./scripts/test.mjs && node ./scripts/build.mjs",
     "production:ready": "node ./scripts/production-readiness.mjs",
+    "release:verify": "node ./scripts/release-verify.mjs",
+    "release:pack": "node ./scripts/release-pack.mjs",
+    "release:smoke": "node ./scripts/release-smoke.mjs",
+    "release:gate": "pnpm check && pnpm production:ready && pnpm release:verify && pnpm release:pack && pnpm release:smoke",
     "slice:status": "node ./scripts/slice-cycle.mjs status",
     "slice:next": "node ./scripts/slice-cycle.mjs next",
     "slice:plan": "node ./scripts/slice-cycle.mjs plan",
     "slice:gate": "node ./scripts/slice-cycle.mjs gate",
     "slice:sync-ready": "node ./scripts/slice-cycle.mjs sync-ready",
     "slice:complete": "node ./scripts/slice-cycle.mjs complete"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
   }
 }

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { parse as parseYaml } from "../../../packages/contracts/node_modules/yaml/dist/index.js";
+import { parse as parseYaml } from "yaml";
 
 export class UsageError extends Error {
   /**
@@ -317,4 +317,3 @@ export function requireDirectory(filePath) {
   }
   return absolute;
 }
-

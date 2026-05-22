@@ -272,5 +272,10 @@ This is the master index for the implementation slices across all defined waves.
 | W28-S02 | Full-lifecycle and interaction gap closure | EPIC-7 | done | `scripts/live-e2e/**`, `.agents/skills/**`, `docs/ops/**`, tests | W28-S01 |
 | W28-S03 | Matrix target expansion | EPIC-7 | done | `scripts/live-e2e/catalog/**`, `scripts/live-e2e/profiles/**`, `docs/ops/**`, `docs/backlog/**` | W28-S01 |
 
+## W29 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W29-S01 | npm CLI alpha release channel | EPIC-5 | done | `package.json`, `.github/workflows/**`, `scripts/**`, `README.md`, `docs/ops/**`, `docs/backlog/**` | W28-S03 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

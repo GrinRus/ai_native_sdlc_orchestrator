@@ -1,0 +1,101 @@
+name: Release publish
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish npm CLI alpha
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      startsWith(github.event.pull_request.head.ref, 'release/v') &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'release:publish')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AOR_RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
+      AOR_RELEASE_STRICT_BRANCH: "true"
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout merge commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup npm for trusted publishing
+        run: npm install -g npm@11.5.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate release event
+        id: guard
+        run: node ./scripts/release-event-guard.mjs
+
+      - name: Run release gate on merge commit
+        run: pnpm release:gate
+
+      - name: Check tag and npm version are unused
+        env:
+          RELEASE_TAG: ${{ steps.guard.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Tag ${RELEASE_TAG} already exists."
+            exit 1
+          fi
+          if npm view "@grinrus/aor@${RELEASE_VERSION}" version >/dev/null 2>&1; then
+            echo "npm version @grinrus/aor@${RELEASE_VERSION} already exists."
+            exit 1
+          fi
+
+      - name: Create and push release tag
+        env:
+          RELEASE_TAG: ${{ steps.guard.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${RELEASE_TAG}" -m "${RELEASE_TAG}"
+          git push origin "${RELEASE_TAG}"
+
+      - name: Create GitHub Release
+        env:
+          RELEASE_TAG: ${{ steps.guard.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          gh release create "${RELEASE_TAG}" \
+            --target "${GITHUB_SHA}" \
+            --title "AOR ${RELEASE_TAG}" \
+            --notes "npm CLI alpha release for @grinrus/aor@${RELEASE_VERSION}. Release gate: pnpm release:gate."
+
+      - name: Publish npm package
+        run: npm publish --access public --provenance
+
+      - name: Delete release branch
+        continue-on-error: true
+        run: git push origin --delete "${AOR_RELEASE_BRANCH}"
