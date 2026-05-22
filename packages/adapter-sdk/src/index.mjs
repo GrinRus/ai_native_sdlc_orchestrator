@@ -587,8 +587,26 @@ function toEvidenceRef(projectRoot, filePath) {
  * @param {number} maxLength
  */
 function boundedEvidenceSegment(value, maxLength) {
-  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return (normalized || "unknown").slice(0, maxLength);
+  const normalized = [];
+  let lastWasSeparator = true;
+
+  for (const character of value.toLowerCase()) {
+    const isAlphaNumeric =
+      (character >= "a" && character <= "z") || (character >= "0" && character <= "9");
+    if (isAlphaNumeric) {
+      normalized.push(character);
+      lastWasSeparator = false;
+    } else if (!lastWasSeparator) {
+      normalized.push("-");
+      lastWasSeparator = true;
+    }
+  }
+
+  if (normalized[normalized.length - 1] === "-") {
+    normalized.pop();
+  }
+
+  return (normalized.length > 0 ? normalized.join("") : "unknown").slice(0, maxLength);
 }
 
 /**

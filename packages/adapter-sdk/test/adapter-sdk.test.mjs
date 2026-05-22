@@ -562,7 +562,8 @@ test("live adapter keeps raw evidence filenames bounded for long live run ids", 
       executionRoot,
     });
 
-    const longRunId = `live-e2e.${"very-long-segment.".repeat(18)}repair-2`;
+    const edgePadding = "-".repeat(1024);
+    const longRunId = `${edgePadding}live-e2e.${"very-long-segment.".repeat(18)}repair-2${edgePadding}`;
     const response = adapter.execute({
       request_id: `${longRunId}.run-start-implement.${"request.".repeat(8)}`,
       run_id: longRunId,
