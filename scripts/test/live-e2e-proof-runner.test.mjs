@@ -586,7 +586,7 @@ test("qualification loop records manually completed medium run evidence", () => 
     fs.mkdirSync(reportsRoot, { recursive: true });
     const runId = "manual-qualified-run";
     const commitSha = runGitOutput({ cwd: workspaceRoot, args: ["rev-parse", "HEAD"] });
-    const branchName = runGitOutput({ cwd: workspaceRoot, args: ["branch", "--show-current"] });
+    const branchName = runGitOutput({ cwd: workspaceRoot, args: ["branch", "--show-current"] }) || null;
     const observationFile = path.join(reportsRoot, `live-e2e-observation-report-${runId}.json`);
     const summaryFile = path.join(reportsRoot, `live-e2e-run-summary-${runId}.json`);
     fs.writeFileSync(
