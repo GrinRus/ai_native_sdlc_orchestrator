@@ -144,8 +144,8 @@ export function validateReleaseState(options = {}) {
   if (!RELEASE_VERSION_PATTERN.test(packageVersion)) {
     findings.push("package.json version must be an alpha semver such as 0.1.0-alpha.1.");
   }
-  if (packageJson.bin?.aor !== "./apps/cli/bin/aor.mjs") {
-    findings.push("package.json bin.aor must point to ./apps/cli/bin/aor.mjs.");
+  if (packageJson.bin?.aor !== "apps/cli/bin/aor.mjs") {
+    findings.push("package.json bin.aor must point to apps/cli/bin/aor.mjs.");
   }
   if (packageJson.engines?.node !== ">=22") {
     findings.push("package.json engines.node must remain >=22.");
