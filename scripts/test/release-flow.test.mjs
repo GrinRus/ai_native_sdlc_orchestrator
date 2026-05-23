@@ -124,7 +124,7 @@ test("release verifier rejects wrong package name and public internal packages",
   }
 });
 
-test("release verifier rejects publish workflows without trusted publishing runtime pins and alpha tag", () => {
+test("release verifier rejects publish workflows without trusted publishing runtime pins, prerelease, and alpha tag", () => {
   const tempRoot = copyFixtureRepo();
   try {
     fs.writeFileSync(
@@ -150,6 +150,7 @@ test("release verifier rejects publish workflows without trusted publishing runt
     });
     assert.equal(result.ok, false);
     assert.match(result.findings.join("\n"), /node-version: 22\.14\.0/u);
+    assert.match(result.findings.join("\n"), /--prerelease/u);
     assert.match(result.findings.join("\n"), /npm publish --access public --tag alpha --provenance/u);
     assert.doesNotMatch(result.findings.join("\n"), /npm@11\.5\.1/u);
   } finally {
