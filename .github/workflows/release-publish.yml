@@ -90,6 +90,7 @@ jobs:
         run: |
           gh release create "${RELEASE_TAG}" \
             --target "${GITHUB_SHA}" \
+            --prerelease \
             --title "AOR ${RELEASE_TAG}" \
             --notes "npm CLI alpha release for @grinrus/aor@${RELEASE_VERSION}. npm dist-tag: alpha. Release gate: pnpm release:gate."
 
