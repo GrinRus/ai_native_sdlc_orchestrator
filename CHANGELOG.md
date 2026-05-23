@@ -7,6 +7,13 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.2] - 2026-05-23
+
+- Verified the automated npm Trusted Publishing release path after bootstrap.
+- Pinned release automation to the npm CLI version that supports explicit
+  trusted-publishing permissions.
+- Marked automated alpha GitHub Releases as prereleases.
+
 ## [0.1.0-alpha.1] - 2026-05-22
 
 - Added the first npm CLI alpha package channel as `@grinrus/aor`.
