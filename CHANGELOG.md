@@ -7,6 +7,18 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.3] - 2026-05-24
+
+- Added W30 alpha-hardening source-of-truth docs, including the W30 backlog
+  wave, ADR index, and architecture decisions for the self-hosted alpha
+  boundary.
+- Added the OpenAPI 3.1 detached control-plane API contract and readiness
+  drift checks that compare the contract to the implemented router surface.
+- Added self-hosted operations guidance for environment modes,
+  secrets/redaction, `.aor` backup/restore, and incident evidence preservation.
+- Refreshed npm alpha release and installed-user smoke evidence for the
+  hardened self-hosted CLI/API alpha path.
+
 ## [0.1.0-alpha.2] - 2026-05-23
 
 - Verified the automated npm Trusted Publishing release path after bootstrap.
