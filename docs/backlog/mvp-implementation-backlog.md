@@ -277,5 +277,15 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W29-S01 | npm CLI alpha release channel | EPIC-5 | done | `package.json`, `.github/workflows/**`, `scripts/**`, `README.md`, `docs/ops/**`, `docs/backlog/**` | W28-S03 |
 
+## W30 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W30-S01 | Post-W29 alpha-hardening planning source of truth | EPIC-0 | done | `docs/backlog/**`, `README.md` | W29-S01 |
+| W30-S02 | Alpha architecture decision records | EPIC-0 | done | `docs/architecture/**`, `README.md`, `docs/ops/**`, `docs/contracts/**` | W30-S01 |
+| W30-S03 | Machine-readable detached API contract | EPIC-6 | done | `docs/contracts/**`, `examples/control-plane-api/**`, `apps/api/**`, `scripts/**`, tests | W30-S02 |
+| W30-S04 | Self-hosted operations hardening docs | EPIC-7 | done | `docs/ops/**`, `SECURITY.md`, `README.md` | W30-S03 |
+| W30-S05 | Alpha readiness gate expansion | EPIC-0 | done | `scripts/**`, `docs/ops/**`, `docs/contracts/**`, `docs/product/**`, tests | W30-S04 |
+| W30-S06 | Alpha release and onboarding proof refresh | EPIC-5 | done | `docs/ops/**`, `scripts/**`, `docs/product/**`, `package.json`, release tests | W30-S05 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

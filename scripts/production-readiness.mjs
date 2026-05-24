@@ -4,8 +4,12 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { listControlPlaneRoutes } from "../apps/api/src/http-router.mjs";
+
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultProofFixturePath = "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json";
+const defaultOpenApiPath = "docs/contracts/control-plane-api.openapi.json";
+const defaultStoryMatrixPath = "docs/product/user-story-coverage-matrix.md";
 
 function resolvePath(rootDir, file) {
   return path.isAbsolute(file) ? file : path.join(rootDir, file);
@@ -87,8 +91,8 @@ function parseDelimitedMarkdownList(value) {
     .filter(Boolean);
 }
 
-function parseStoryCoverageMatrix(rootDir) {
-  const matrix = readText(rootDir, "docs/product/user-story-coverage-matrix.md");
+function parseStoryCoverageMatrix(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
+  const matrix = readText(rootDir, storyMatrixPath);
   const rows = new Map();
 
   for (const line of matrix.split(/\r?\n/u)) {
@@ -263,8 +267,8 @@ function checkProductionProof(rootDir, proofFixturePath) {
   ]);
 }
 
-function checkStoryHonesty(rootDir) {
-  const { rows, documentedCounts } = parseStoryCoverageMatrix(rootDir);
+function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
+  const { rows, documentedCounts } = parseStoryCoverageMatrix(rootDir, storyMatrixPath);
   const findings = [];
   if (rows.size !== 112) {
     findings.push(`Expected 112 user-story rows, found ${rows.size}.`);
@@ -334,11 +338,11 @@ function checkStoryHonesty(rootDir) {
 
   if (findings.length > 0) {
     return fail("story-status-honesty", "Story matrix production evidence is not honest or reviewable.", findings, [
-      "docs/product/user-story-coverage-matrix.md",
+      storyMatrixPath,
     ]);
   }
   return pass("story-status-honesty", "Story statuses distinguish proof-covered rows from baseline and external blocked rows.", [
-    "docs/product/user-story-coverage-matrix.md",
+    storyMatrixPath,
   ]);
 }
 
@@ -492,22 +496,177 @@ function checkContractAndHarnessEvidence(rootDir) {
   ]);
 }
 
+function collectOpenApiOperations(openApiDocument) {
+  const operations = new Map();
+  const paths = openApiDocument?.paths && typeof openApiDocument.paths === "object" ? openApiDocument.paths : {};
+
+  for (const [routePath, pathItem] of Object.entries(paths)) {
+    if (!pathItem || typeof pathItem !== "object") continue;
+    for (const method of ["get", "post", "put", "patch", "delete"]) {
+      const operation = pathItem[method];
+      if (!operation || typeof operation !== "object") continue;
+      const routeId = operation["x-aor-route-id"];
+      if (typeof routeId !== "string" || routeId.length === 0) continue;
+      operations.set(routeId, {
+        routeId,
+        method: method.toUpperCase(),
+        path: routePath,
+        permission: operation["x-aor-permission"],
+        kind: operation["x-aor-kind"],
+      });
+    }
+  }
+
+  return operations;
+}
+
+function checkAlphaHardening(rootDir, openApiPath = defaultOpenApiPath) {
+  const findings = [];
+  const requiredFiles = [
+    "docs/backlog/wave-30-implementation-slices.md",
+    "docs/architecture/adr/0000-index.md",
+    "docs/architecture/adr/0001-alpha-filesystem-runtime-sor.md",
+    "docs/architecture/adr/0002-alpha-hybrid-api-transport.md",
+    "docs/architecture/adr/0003-alpha-detachable-web-console.md",
+    openApiPath,
+    "docs/ops/self-hosted-environment-matrix.md",
+    "docs/ops/self-hosted-secrets-and-redaction.md",
+    "docs/ops/self-hosted-backup-restore.md",
+    "docs/ops/self-hosted-incident-runbook.md",
+  ];
+
+  for (const file of requiredFiles) {
+    if (!fileExists(rootDir, file)) {
+      findings.push(`${file} is required for W30 alpha hardening.`);
+    }
+  }
+
+  let openApiDocument = null;
+  if (fileExists(rootDir, openApiPath)) {
+    try {
+      openApiDocument = readJson(rootDir, openApiPath);
+    } catch (error) {
+      findings.push(`${openApiPath} is not valid JSON: ${error.message}`);
+    }
+  }
+
+  if (openApiDocument) {
+    if (openApiDocument.openapi !== "3.1.0") {
+      findings.push(`${openApiPath} must use openapi=3.1.0.`);
+    }
+    if (!openApiDocument.info?.title || !openApiDocument.paths) {
+      findings.push(`${openApiPath} must include info.title and paths.`);
+    }
+
+    const openApiOperations = collectOpenApiOperations(openApiDocument);
+    const routerRoutes = listControlPlaneRoutes();
+    const routeIds = new Set(routerRoutes.map((route) => route.id));
+
+    for (const route of routerRoutes) {
+      if (!route.path) {
+        findings.push(`Router route ${route.id} is missing OpenAPI path metadata.`);
+        continue;
+      }
+      const operation = openApiOperations.get(route.id);
+      if (!operation) {
+        findings.push(`${openApiPath} is missing route id ${route.id}.`);
+        continue;
+      }
+      if (operation.method !== route.method) {
+        findings.push(`${openApiPath} route ${route.id} uses ${operation.method}, expected ${route.method}.`);
+      }
+      if (operation.path !== route.path) {
+        findings.push(`${openApiPath} route ${route.id} path is ${operation.path}, expected ${route.path}.`);
+      }
+      if (operation.permission !== route.permission) {
+        findings.push(`${openApiPath} route ${route.id} permission is ${operation.permission}, expected ${route.permission}.`);
+      }
+      if (operation.kind !== route.kind) {
+        findings.push(`${openApiPath} route ${route.id} kind is ${operation.kind}, expected ${route.kind}.`);
+      }
+    }
+
+    for (const routeId of openApiOperations.keys()) {
+      if (!routeIds.has(routeId)) {
+        findings.push(`${openApiPath} documents unknown route id ${routeId}.`);
+      }
+    }
+
+    for (const required of ["auth.missing_credentials", "auth.invalid_token", "auth.forbidden_project", "auth.insufficient_permission"]) {
+      if (!JSON.stringify(openApiDocument).includes(required)) {
+        findings.push(`${openApiPath} must document auth error code ${required}.`);
+      }
+    }
+    if (!JSON.stringify(openApiDocument).includes("text/event-stream")) {
+      findings.push(`${openApiPath} must document the SSE event stream response.`);
+    }
+  }
+
+  const readme = readText(rootDir, "README.md");
+  for (const required of [
+    "There is no Docker or GHCR version channel yet",
+    "Hosted SaaS",
+    "enterprise identity/SSO",
+    "Default upstream write-back automation",
+    "W30",
+  ]) {
+    if (!readme.includes(required)) {
+      findings.push(`README.md must preserve alpha boundary wording '${required}'.`);
+    }
+  }
+
+  const releaseRunbook = readText(rootDir, "docs/ops/npm-cli-alpha-release.md");
+  for (const required of [
+    "W30",
+    "pnpm production:ready --json",
+    "aor app --help",
+    "No Docker",
+  ]) {
+    if (!releaseRunbook.includes(required)) {
+      findings.push(`docs/ops/npm-cli-alpha-release.md must mention '${required}'.`);
+    }
+  }
+
+  if (findings.length > 0) {
+    return fail("w30-alpha-hardening", "W30 alpha hardening evidence is incomplete or drifting.", findings, [
+      "docs/backlog/wave-30-implementation-slices.md",
+      "docs/architecture/adr/0000-index.md",
+      openApiPath,
+      "docs/ops/self-hosted-environment-matrix.md",
+      "docs/ops/npm-cli-alpha-release.md",
+    ]);
+  }
+  return pass("w30-alpha-hardening", "W30 ADR, OpenAPI, ops, release, and alpha-boundary evidence is present.", [
+    "docs/backlog/wave-30-implementation-slices.md",
+    "docs/architecture/adr/0000-index.md",
+    openApiPath,
+    "docs/ops/self-hosted-environment-matrix.md",
+    "docs/ops/self-hosted-secrets-and-redaction.md",
+    "docs/ops/self-hosted-backup-restore.md",
+    "docs/ops/self-hosted-incident-runbook.md",
+  ]);
+}
+
 export function runProductionReadinessGate(options = {}) {
   const rootDir = path.resolve(options.rootDir ?? defaultRoot);
   const proofFixturePath = options.proofFixturePath ?? defaultProofFixturePath;
+  const openApiPath = options.openApiPath ?? defaultOpenApiPath;
+  const storyMatrixPath = options.storyMatrixPath ?? defaultStoryMatrixPath;
   const checks = [
     checkBaselineBoundary(rootDir),
     checkProductionProof(rootDir, proofFixturePath),
-    checkStoryHonesty(rootDir),
+    checkStoryHonesty(rootDir, storyMatrixPath),
     checkSourceOfTruth(rootDir),
     checkAuthHardening(rootDir),
     checkContractAndHarnessEvidence(rootDir),
+    checkAlphaHardening(rootDir, openApiPath),
   ];
   const status = checks.every((check) => check.status === "pass") ? "pass" : "fail";
   return {
     status,
     root_dir: rootDir,
     proof_fixture_path: proofFixturePath,
+    openapi_path: openApiPath,
     checks,
   };
 }
@@ -516,6 +675,7 @@ function parseArgs(argv) {
   const args = {
     rootDir: defaultRoot,
     proofFixturePath: defaultProofFixturePath,
+    openApiPath: defaultOpenApiPath,
     json: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -525,6 +685,9 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === "--proof-fixture") {
       args.proofFixturePath = argv[index + 1];
+      index += 1;
+    } else if (arg === "--openapi") {
+      args.openApiPath = argv[index + 1];
       index += 1;
     } else if (arg === "--json") {
       args.json = true;

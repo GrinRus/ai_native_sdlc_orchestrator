@@ -38,6 +38,7 @@ The gate verifies:
 - source-of-truth alignment: README, self-hosted readiness docs, and this runbook agree on current non-production status and gate usage;
 - W23 hardening evidence: nested contract validation and production-hardened auth scope coverage are present;
 - W24 harness evidence: run-level Runtime Harness report fields, strict-delivery example evidence, and controller tests exist.
+- W30 alpha hardening: ADR index and accepted alpha-boundary ADRs exist, the OpenAPI 3.1 route contract matches the implemented HTTP/SSE router, self-hosted ops runbooks exist, W30 backlog source-of-truth docs are present, unsupported Docker/GHCR/SaaS/SSO/default-write-back claims remain out of scope, and OpenCode stories remain blocked without real certification proof.
 
 ## Failure interpretation
 
@@ -49,6 +50,7 @@ The gate verifies:
 | `source-of-truth-alignment` | README/readiness/runbook docs disagree. | Align wording before release review. |
 | `production-auth-hardening` | Production auth scope or redaction evidence is incomplete. | Restore W23-S02 docs and tests. |
 | `contract-and-harness-evidence` | Nested contract or run-level Runtime Harness evidence is incomplete. | Restore W23-S01/W24-S01 contract, example, and test evidence. |
+| `w30-alpha-hardening` | W30 ADRs, OpenAPI route contract, ops runbooks, backlog source-of-truth, or alpha non-goal claims are missing or drifting. | Restore W30 docs/spec/check evidence before release review. |
 
 ## Safety rules
 
@@ -56,3 +58,4 @@ The gate verifies:
 - Do not treat W14 coverage fixtures or deterministic external-runner mock output as production proof.
 - Do not enable upstream write-back by default. The committed W25 proof fixture must retain the no-upstream-write assertion.
 - Do not move OpenCode stories to `proof-covered` until a real OpenCode certification proof exists.
+- Do not claim W30 target-architecture migration, Docker/GHCR distribution, hosted SaaS, enterprise SSO, or default upstream write-back from the alpha-hardening gate.

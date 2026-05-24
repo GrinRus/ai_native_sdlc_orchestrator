@@ -19,6 +19,11 @@ Use GitHub Private Vulnerability Reporting for this repository when it is availa
 
 Do not publish secrets, exploit details, private repository names, target checkout contents, live runner transcripts, or credential-bearing `.aor/` artifacts in public issues, pull requests, discussions, or comments.
 
+For self-hosted alpha operation, use `docs/ops/self-hosted-secrets-and-redaction.md`
+for secret placement and redaction guidance, and
+`docs/ops/self-hosted-incident-runbook.md` for evidence preservation during
+security triage.
+
 ## AOR-Specific Security Areas
 
 Reports are especially useful when they involve:

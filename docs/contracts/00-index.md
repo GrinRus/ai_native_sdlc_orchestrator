@@ -53,6 +53,7 @@
 - `live-e2e-scenario-policy.md`
 - `live-e2e-target-catalog.md`
 - `control-plane-api.md`
+- `control-plane-api.openapi.json`
 
 ## Loader coverage
 See `contract-loader-coverage.md` for the contract-to-loader mapping table, current limitation status, and W0-S03 reference-integrity failure shapes.

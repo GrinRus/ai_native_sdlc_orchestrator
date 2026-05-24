@@ -16,6 +16,10 @@ Before starting production-hardened transport:
 - configure any extra redaction values that should be treated as secrets;
 - keep upstream Git/provider permissions separate from AOR transport auth.
 
+Use `docs/ops/self-hosted-environment-matrix.md` to choose the operating mode
+and `docs/ops/self-hosted-secrets-and-redaction.md` to place bearer tokens,
+runner credentials, and local redaction values outside committed files.
+
 ## Denied actions
 
 Missing credentials, invalid tokens, wrong-project tokens, and insufficient scopes return `auth.*` errors with:

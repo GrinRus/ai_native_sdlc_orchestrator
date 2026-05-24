@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-29-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-30-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -40,6 +40,7 @@ The authoritative planning model for implementation lives in:
 | W27 | Replace legacy live E2E matrices with a black-box step journal and resumable interaction answers. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-27-implementation-slices.md` |
 | W28 | Close installed-user live E2E gaps with install proof, evaluator naming cleanup, and expanded target coverage. | 3 | EPIC-7 | `docs/backlog/wave-28-implementation-slices.md` |
 | W29 | Open the npm CLI alpha release channel with guarded release branch automation. | 1 | EPIC-5 | `docs/backlog/wave-29-implementation-slices.md` |
+| W30 | Harden the self-hosted CLI/API alpha with ADRs, OpenAPI drift checks, operations runbooks, readiness evidence, and installed-user release smoke coverage. | 6 | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-30-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -133,6 +134,12 @@ The authoritative planning model for implementation lives in:
 | W26-S01 | production-readiness gate target: production security, proof, and traceability stories |
 | W26-S02 | maintainability stabilization target: production-touched runtime and control-plane surfaces |
 | W26-S03 | self-hosted release documentation target: operator, security, delivery, release, and readiness surfaces |
+| W30-S01 | enablement slice (post-W29 source-of-truth planning) |
+| W30-S02 | ARC-01, ARC-08, OPS-10, SEC-06 |
+| W30-S03 | OPS-01, OPS-02, OPS-10, SEC-02, SEC-06 |
+| W30-S04 | OPS-04, OPS-06, OPS-10, SEC-02, SEC-06 |
+| W30-S05 | OPS-06, OPS-10, SEC-06, DEV-04, AIP-12 |
+| W30-S06 | OPS-06, OPS-10, PBO-01, PBO-02, PBO-03, SEC-02, SEC-06 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -494,6 +501,19 @@ boundaries.
   scope.
 
 **Detailed slices:** `docs/backlog/wave-29-implementation-slices.md`
+
+## W30 - alpha hardening
+**Goal:** Harden the current self-hosted CLI/API alpha with source-of-truth planning, ADRs, an OpenAPI route contract, operations runbooks, readiness checks, and release smoke coverage without starting the target-architecture rewrite.
+
+**Exit criteria:**
+- W30 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
+- Alpha ADRs define the current `.aor` filesystem runtime, hybrid module plus HTTP/SSE API transport, and detachable web boundary.
+- The detached API route surface has a machine-readable OpenAPI 3.1 contract and readiness drift check.
+- Self-hosted operators have environment, secrets/redaction, backup/restore, and incident evidence runbooks.
+- `pnpm production:ready --json` reports W30 evidence and fails closed on missing W30 docs, OpenAPI drift, and dishonest OpenCode status.
+- The npm alpha release smoke path proves help, doctor, onboarding, and optional API/web guidance without claiming GA or hosted service readiness.
+
+**Detailed slices:** `docs/backlog/wave-30-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

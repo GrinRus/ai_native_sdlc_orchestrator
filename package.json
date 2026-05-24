@@ -34,7 +34,11 @@
     "docs/contracts",
     "docs/ops/npm-cli-alpha-release.md",
     "docs/ops/production-readiness-gate.md",
+    "docs/ops/self-hosted-backup-restore.md",
+    "docs/ops/self-hosted-environment-matrix.md",
+    "docs/ops/self-hosted-incident-runbook.md",
     "docs/ops/self-hosted-release.md",
+    "docs/ops/self-hosted-secrets-and-redaction.md",
     "CHANGELOG.md",
     "README.md",
     "LICENSE"

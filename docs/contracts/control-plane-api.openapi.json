@@ -1,0 +1,506 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AOR detached control-plane API",
+    "version": "1.0.0-alpha",
+    "description": "Machine-readable contract for the implemented self-hosted alpha HTTP/SSE control-plane routes. This spec describes the current hybrid module plus detached transport baseline; it does not claim hosted SaaS, full CLI-over-HTTP parity, or target-stack APIs."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:{port}",
+      "description": "Self-hosted detached control-plane transport",
+      "variables": {
+        "port": {
+          "default": "3000"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "read"
+    },
+    {
+      "name": "mutation"
+    },
+    {
+      "name": "stream"
+    }
+  ],
+  "paths": {
+    "/api/projects/{projectId}/state": {
+      "get": {
+        "operationId": "getProjectState",
+        "tags": ["read"],
+        "x-aor-route-id": "project-state",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/packets": {
+      "get": {
+        "operationId": "listPackets",
+        "tags": ["read"],
+        "x-aor-route-id": "packets",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/step-results": {
+      "get": {
+        "operationId": "listStepResults",
+        "tags": ["read"],
+        "x-aor-route-id": "step-results",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/quality-artifacts": {
+      "get": {
+        "operationId": "listQualityArtifacts",
+        "tags": ["read"],
+        "x-aor-route-id": "quality-artifacts",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/delivery-manifests": {
+      "get": {
+        "operationId": "listDeliveryManifests",
+        "tags": ["read"],
+        "x-aor-route-id": "delivery-manifests",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/promotion-decisions": {
+      "get": {
+        "operationId": "listPromotionDecisions",
+        "tags": ["read"],
+        "x-aor-route-id": "promotion-decisions",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/strategic-snapshot": {
+      "get": {
+        "operationId": "getStrategicSnapshot",
+        "tags": ["read"],
+        "x-aor-route-id": "strategic-snapshot",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/planner-metrics": {
+      "get": {
+        "operationId": "getPlannerMetrics",
+        "tags": ["read"],
+        "x-aor-route-id": "planner-metrics",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/finance-monitoring": {
+      "get": {
+        "operationId": "getFinanceMonitoring",
+        "tags": ["read"],
+        "x-aor-route-id": "finance-monitoring",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/next-action-report": {
+      "get": {
+        "operationId": "getNextActionReport",
+        "tags": ["read"],
+        "x-aor-route-id": "next-action-report",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/multirepo-coordination": {
+      "get": {
+        "operationId": "getMultirepoCoordination",
+        "tags": ["read"],
+        "x-aor-route-id": "multirepo-coordination",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/compiler-revisions": {
+      "get": {
+        "operationId": "listCompilerRevisions",
+        "tags": ["read"],
+        "x-aor-route-id": "compiler-revisions",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/runs": {
+      "get": {
+        "operationId": "listRuns",
+        "tags": ["read"],
+        "x-aor-route-id": "runs",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/runs/{runId}/events/history": {
+      "get": {
+        "operationId": "getRunEventHistory",
+        "tags": ["read"],
+        "x-aor-route-id": "event-history",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "$ref": "#/components/parameters/runId" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/runs/{runId}/policy-history": {
+      "get": {
+        "operationId": "getRunPolicyHistory",
+        "tags": ["read"],
+        "x-aor-route-id": "policy-history",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "$ref": "#/components/parameters/runId" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/runs/{runId}/events": {
+      "get": {
+        "operationId": "streamRunEvents",
+        "tags": ["stream"],
+        "x-aor-route-id": "run-events",
+        "x-aor-permission": "read",
+        "x-aor-kind": "stream",
+        "parameters": [
+          { "$ref": "#/components/parameters/projectId" },
+          { "$ref": "#/components/parameters/runId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Replay-safe server-sent event stream using live-run-event payloads.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/run-control/actions": {
+      "post": {
+        "operationId": "runControlAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "run-control-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonObject" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "409": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/ui-lifecycle/actions": {
+      "post": {
+        "operationId": "uiLifecycleAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "ui-lifecycle-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonObject" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "409": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/lifecycle-command/actions": {
+      "post": {
+        "operationId": "lifecycleCommandAction",
+        "tags": ["mutation"],
+        "x-aor-route-id": "lifecycle-command-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonObject" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "409": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    },
+    "/api/projects/{projectId}/interactions/answers": {
+      "post": {
+        "operationId": "submitInteractionAnswer",
+        "tags": ["mutation"],
+        "x-aor-route-id": "interaction-answers",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonObject" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JsonObject" },
+          "400": { "$ref": "#/components/responses/JsonError" },
+          "401": { "$ref": "#/components/responses/AuthError" },
+          "403": { "$ref": "#/components/responses/AuthError" },
+          "409": { "$ref": "#/components/responses/JsonError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Required in production-hardened mode. local-trusted loopback mode may run without bearer credentials."
+      }
+    },
+    "parameters": {
+      "projectId": {
+        "name": "projectId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "runId": {
+        "name": "runId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "requestBodies": {
+      "JsonObject": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/JsonObject"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "JsonObject": {
+        "description": "Route-specific JSON response backed by the documented AOR contract families.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/JsonObject"
+            }
+          }
+        }
+      },
+      "JsonError": {
+        "description": "Stable JSON error envelope.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "AuthError": {
+        "description": "Authentication or authorization denial. Transport-level denials do not invoke mutation handlers.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AuthErrorEnvelope"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "JsonObject": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "AuthErrorEnvelope": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "auth.missing_credentials",
+                  "auth.invalid_token",
+                  "auth.forbidden_project",
+                  "auth.insufficient_permission"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "required_permission": {
+                "type": "string",
+                "enum": ["read", "mutate"]
+              },
+              "project_id": {
+                "type": "string"
+              },
+              "token_id": {
+                "type": "string"
+              },
+              "security_mode": {
+                "type": "string",
+                "enum": ["local-trusted", "production-hardened"]
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}

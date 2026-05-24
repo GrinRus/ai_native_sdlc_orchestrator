@@ -153,6 +153,12 @@ graph TD
   W28S02[W28-S02 Full-lifecycle and interaction gap closure]
   W28S03[W28-S03 Matrix target expansion]
   W29S01[W29-S01 npm CLI alpha release channel]
+  W30S01[W30-S01 Post-W29 alpha-hardening planning source of truth]
+  W30S02[W30-S02 Alpha architecture decision records]
+  W30S03[W30-S03 Machine-readable detached API contract]
+  W30S04[W30-S04 Self-hosted operations hardening docs]
+  W30S05[W30-S05 Alpha readiness gate expansion]
+  W30S06[W30-S06 Alpha release and onboarding proof refresh]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -394,6 +400,12 @@ graph TD
   W28S01 --> W28S02
   W28S01 --> W28S03
   W28S03 --> W29S01
+  W29S01 --> W30S01
+  W30S01 --> W30S02
+  W30S02 --> W30S03
+  W30S03 --> W30S04
+  W30S04 --> W30S05
+  W30S05 --> W30S06
 ```
 
 ## W0 hard dependencies
@@ -665,6 +677,16 @@ graph TD
 |---|---|
 | W29-S01 | W28-S03 |
 
+## W30 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W30-S01 | W29-S01 |
+| W30-S02 | W30-S01 |
+| W30-S03 | W30-S02 |
+| W30-S04 | W30-S03 |
+| W30-S05 | W30-S04 |
+| W30-S06 | W30-S05 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -815,6 +837,12 @@ graph TD
 147. W28-S02
 148. W28-S03
 149. W29-S01
+150. W30-S01
+151. W30-S02
+152. W30-S03
+153. W30-S04
+154. W30-S05
+155. W30-S06
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

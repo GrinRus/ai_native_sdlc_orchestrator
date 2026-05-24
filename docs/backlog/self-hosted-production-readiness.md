@@ -2,7 +2,7 @@
 
 ## Status
 
-AOR is a **self-hosted CLI/API production candidate** for the bounded mode documented in `docs/ops/self-hosted-release.md`. The current repository remains docs-first, but W22-W26 source-of-truth repair, hardening, real proof, production gate, stabilization, and release documentation are now closed for that self-hosted candidate mode.
+AOR is a **self-hosted CLI/API production candidate** for the bounded mode documented in `docs/ops/self-hosted-release.md`. The current repository remains docs-first, but W22-W26 source-of-truth repair, hardening, real proof, production gate, stabilization, and release documentation are now closed for that self-hosted candidate mode. W30 adds alpha-hardening evidence around ADRs, OpenAPI route drift checks, self-hosted operations runbooks, readiness checks, and installed-user release smoke coverage.
 
 Hosted SaaS, enterprise identity, tenant billing, hosted rollback, and managed multi-tenant operations are not in scope for the W22-W26 release.
 
@@ -43,6 +43,7 @@ Production readiness requires:
 | Production readiness has a separate gate. | `W26-S01` | `pnpm production:ready` rejects missing or mock-backed W25 proof and verifies story honesty, auth, nested contracts, run-level harness, source-of-truth alignment, and proof fixture integrity. |
 | Production-touched hotspots were stabilized without redesign. | `W26-S02` | Production proof evidence assessment was extracted from the live E2E runner into `scripts/live-e2e/lib/production-proof.mjs`; live E2E proof runner tests and slice gates passed. |
 | Self-hosted release documentation is final for the bounded mode. | `W26-S03` | `docs/ops/self-hosted-release.md` documents supported mode, release gate, rollback, auth config, no-write/write-back policy, proof evidence, and non-goals. |
+| Alpha hardening has reviewable ADR, API, ops, readiness, and release evidence. | `W30-S01` through `W30-S06` | ADR index, `docs/contracts/control-plane-api.openapi.json`, self-hosted operations runbooks, W30 production-readiness checks, and installed-package smoke coverage keep the alpha boundary explicit without target-stack migration. |
 
 ## Story status policy
 
@@ -69,5 +70,6 @@ The final verdict is **self-hosted production candidate** for the bounded CLI/AP
 4. W26 production-readiness gate (`pnpm production:ready`) passes.
 5. W26 maintainability stabilization is accepted for production-touched hotspots.
 6. W26 release documentation states the supported mode, rollback procedure, auth configuration, no-write/write-back policy, proof evidence, and non-goals.
+7. W30 alpha-hardening checks pass for ADRs, OpenAPI route coverage, self-hosted operations docs, and release smoke boundaries.
 
 This verdict does not extend to hosted SaaS, enterprise identity-provider integration, managed multi-tenant operations, default upstream write-back, or uncertified extended adapters such as OpenCode.

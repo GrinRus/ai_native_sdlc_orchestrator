@@ -33,6 +33,7 @@ Run the normal source gates first:
 ```bash
 pnpm check
 pnpm production:ready
+pnpm production:ready --json
 ```
 
 Then run the npm release gate:
@@ -45,7 +46,14 @@ pnpm release:gate
 metadata verification, `npm pack --dry-run --json`, and an installed-package
 smoke test. The smoke test installs the generated tarball into a temporary npm
 project, runs `aor --help`, and runs `doctor` plus `onboard` against a temporary
-git repository while asserting that only `.aor/` runtime state changes.
+git repository while asserting that only `.aor/` runtime state changes. W30
+extends that smoke path to run `aor app --help` so optional API/web guidance is
+covered without starting a hosted service or making the web console required.
+
+W30 alpha hardening also requires the production-readiness gate to verify the
+ADR index, OpenAPI 3.1 control-plane route contract, self-hosted operations
+runbooks, story-status honesty for blocked OpenCode outcomes, and alpha
+non-goals before release review.
 
 For strict release-branch validation, set the release branch explicitly:
 
@@ -114,5 +122,5 @@ version. If a release is bad:
 4. Leave the original git tag and GitHub Release intact unless they expose
    secrets. If secrets are exposed, treat it as a security incident.
 
-No Docker, GHCR, hosted SaaS, enterprise identity, or public SDK package release
-is part of this alpha channel.
+No Docker, GHCR, hosted SaaS, enterprise identity, default upstream write-back,
+or public SDK package release is part of this alpha channel.
