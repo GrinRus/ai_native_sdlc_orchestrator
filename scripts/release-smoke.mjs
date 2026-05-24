@@ -108,6 +108,11 @@ try {
     throw new Error(`Installed package help output did not look like AOR help:\n${help.stdout}`);
   }
 
+  const appHelp = runChecked(process.execPath, [installedBin, "app", "--help"], { cwd: installRoot });
+  if (!appHelp.stdout.includes("web console is optional") || !appHelp.stdout.includes("CLI/API/headless")) {
+    throw new Error(`Installed package app help did not preserve optional API/web boundary:\n${appHelp.stdout}`);
+  }
+
   const targetRepo = createTargetRepo(tempRoot);
   const runtimeRoot = path.join(targetRepo, ".aor");
   const baseArgs = ["--project-ref", targetRepo, "--runtime-root", runtimeRoot, "--json"];
@@ -126,7 +131,7 @@ try {
   }
 
   assertOnlyRuntimeStateChanged(targetRepo);
-  process.stdout.write(`release smoke ok: installed ${tarballName} and ran no-write onboarding smoke\n`);
+  process.stdout.write(`release smoke ok: installed ${tarballName} and ran no-write onboarding plus optional app-boundary smoke\n`);
 } catch (error) {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exit(1);

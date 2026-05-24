@@ -8,6 +8,10 @@ AOR is a **self-hosted CLI/API production candidate** for the bounded mode descr
 - The web console is optional and detachable; CLI/API/runtime must remain usable without it.
 - Runtime outputs stay under `.aor/` in the operator workspace and must not be committed.
 - Production proof is limited to the committed W25 real-run fixture and the stricter production-readiness gate.
+- W30 alpha-hardening ADRs, OpenAPI route drift checks, and self-hosted operations runbooks are part of the reviewable bounded-mode evidence.
+
+The alpha architecture boundary is recorded in
+`docs/architecture/adr/0000-index.md`.
 
 This mode does not include hosted SaaS, managed multi-tenant operations, tenant billing, enterprise identity-provider integration, or default upstream write-back automation.
 
@@ -30,7 +34,7 @@ Then run the production-readiness gate:
 pnpm production:ready
 ```
 
-The production gate verifies the W25 proof fixture, story-status honesty, source-of-truth alignment, production auth hardening, nested contract validation, and run-level Runtime Harness evidence. Use JSON output for review packets:
+The production gate verifies the W25 proof fixture, story-status honesty, source-of-truth alignment, production auth hardening, nested contract validation, run-level Runtime Harness evidence, and W30 alpha-hardening evidence. Use JSON output for review packets:
 
 ```bash
 pnpm production:ready --json
@@ -51,6 +55,12 @@ The default production proof fixture is:
 7. Configure additional redaction values for local secrets before starting connected surfaces.
 
 The production-hardened auth model is documented in `docs/ops/control-plane-production-hardening.md`.
+Environment, secrets, backup/restore, and incident procedures are documented in:
+
+- `docs/ops/self-hosted-environment-matrix.md`
+- `docs/ops/self-hosted-secrets-and-redaction.md`
+- `docs/ops/self-hosted-backup-restore.md`
+- `docs/ops/self-hosted-incident-runbook.md`
 
 ## Delivery policy
 
@@ -85,6 +95,9 @@ Production-candidate proof is reviewable through:
 - `docs/ops/production-readiness-gate.md`
 - `docs/backlog/self-hosted-production-readiness.md`
 - `docs/product/user-story-coverage-matrix.md`
+- `docs/architecture/adr/0000-index.md`
+- `docs/contracts/control-plane-api.openapi.json`
+- `docs/ops/self-hosted-environment-matrix.md`
 
 The proof must remain non-mock, code-changing, `external_runner_mode=real-external-process`, `real_code_change_proof_complete=true`, `overall_status=pass`, and no-upstream-write.
 

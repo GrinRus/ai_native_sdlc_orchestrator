@@ -17,6 +17,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W19:** `W19-S01` User-story registry and coverage evidence matrix
 - **W22:** `W22-S01` Evidence-strength story coverage model; `W22-S02` Production readiness source-of-truth
 - **W26:** `W26-S01` Production readiness gate; `W26-S02` Maintainability stabilization
+- **W30:** `W30-S01` Post-W29 alpha-hardening planning source of truth; `W30-S02` Alpha architecture decision records; `W30-S05` Alpha readiness gate expansion
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -80,6 +81,7 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W20:** `W20-S01` Multirepo scoped locks and cross-repo validation
 - **W24:** `W24-S03` Strict delivery gate consolidation
 - **W29:** `W29-S01` npm CLI alpha release channel
+- **W30:** `W30-S06` Alpha release and onboarding proof refresh
 
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
@@ -100,6 +102,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W23:** `W23-S02` Explicit production auth scopes; `W23-S03` Shared lifecycle service boundary
 - **W24:** `W24-S02` Interactive continuation hardening
 - **W27:** `W27-S02` Runtime interaction resume
+- **W30:** `W30-S03` Machine-readable detached API contract
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -127,3 +130,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W26:** `W26-S03` Self-hosted release documentation
 - **W27:** `W27-S01` Step-journal observation contract; `W27-S03` Live E2E step controller output; `W27-S04` Profile and skill migration; `W27-S05` Legacy cleanup and proof alignment
 - **W28:** `W28-S01` AOR install proof and setup journal; `W28-S02` Full-lifecycle and interaction gap closure; `W28-S03` Matrix target expansion
+- **W30:** `W30-S04` Self-hosted operations hardening docs

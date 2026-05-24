@@ -34,7 +34,11 @@ const REQUIRED_PACKAGE_FILE_PATTERNS = [
   "docs/contracts",
   "docs/ops/npm-cli-alpha-release.md",
   "docs/ops/production-readiness-gate.md",
+  "docs/ops/self-hosted-backup-restore.md",
+  "docs/ops/self-hosted-environment-matrix.md",
+  "docs/ops/self-hosted-incident-runbook.md",
   "docs/ops/self-hosted-release.md",
+  "docs/ops/self-hosted-secrets-and-redaction.md",
   "CHANGELOG.md",
   "README.md",
   "LICENSE",
@@ -59,6 +63,7 @@ const REQUIRED_PACKED_FILES = [
   "examples/wrappers/wrapper-runner-default.yaml",
   "docs/contracts/00-index.md",
   "docs/ops/npm-cli-alpha-release.md",
+  "docs/ops/self-hosted-environment-matrix.md",
 ];
 
 const FORBIDDEN_PACKED_PATHS = [

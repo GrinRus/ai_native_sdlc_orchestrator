@@ -11,6 +11,10 @@ Current code is **hybrid module + detached transport**:
 - CLI/API lifecycle behavior is owned by shared package services under `packages/orchestrator-core/src/operator-cli/**` and `packages/orchestrator-core/src/control-plane/**`; app-level API and CLI modules are transports/wrappers and must not import each other.
 - Contract and artifact semantics stay aligned across both bindings.
 
+ADR `docs/architecture/adr/0002-alpha-hybrid-api-transport.md` records this as
+the accepted alpha transport boundary. A future NestJS-backed transport requires
+a new ADR before implementation work changes this contract.
+
 Implemented operation families:
 - read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
@@ -21,6 +25,15 @@ Implemented operation families:
 
 The `control-plane-api` family is loader-covered with a machine-checkable baseline example:
 - `examples/control-plane-api/module-surface-baseline.yaml`
+
+W30 adds a machine-readable detached transport contract:
+- `docs/contracts/control-plane-api.openapi.json`
+
+The OpenAPI 3.1 artifact is the route-level contract for the implemented
+detached HTTP/SSE surface. `pnpm production:ready` validates that each router
+route has a matching OpenAPI path, method, route id, permission, and route kind.
+This drift check covers the current alpha transport only; it is not a hosted
+SaaS API claim and does not imply full CLI-over-HTTP parity.
 
 Required top-level fields in the loader baseline:
 - `api_id`, `version`, `binding_mode`, `deferred_transport_status`;

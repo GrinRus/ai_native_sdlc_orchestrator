@@ -178,6 +178,7 @@ test("packed file validation rejects runtime, test, and live E2E artifacts", () 
     "examples/wrappers/wrapper-runner-default.yaml",
     "docs/contracts/00-index.md",
     "docs/ops/npm-cli-alpha-release.md",
+    "docs/ops/self-hosted-environment-matrix.md",
     ".aor/projects/run.json",
     "scripts/test/release-flow.test.mjs",
     "examples/live-e2e/fixture.json",

@@ -8,6 +8,11 @@ The repository currently runs on a Node.js ESM JavaScript baseline:
 - headless-first control-plane behavior exposed through CLI plus module-backed API and detachable web surface;
 - `.aor/` runtime root for materialized reports, packets, manifests, and related evidence.
 
+W30 accepted ADRs keep this alpha boundary explicit:
+- `docs/architecture/adr/0001-alpha-filesystem-runtime-sor.md` keeps `.aor/` as the alpha runtime system of record.
+- `docs/architecture/adr/0002-alpha-hybrid-api-transport.md` keeps the API as hybrid module plus detached HTTP/SSE transport.
+- `docs/architecture/adr/0003-alpha-detachable-web-console.md` keeps the web console optional and detachable.
+
 ## Target architecture stack (roadmap intent)
 
 The long-term design target remains:

@@ -23,6 +23,10 @@
 - `control-plane-production-hardening.md` — local-trusted versus production-hardened transport mode, bearer scopes, denied-action audit behavior, and redaction surfaces.
 - `production-readiness-gate.md` — self-hosted production-readiness gate usage, evidence checks, and failure interpretation.
 - `self-hosted-release.md` — supported self-hosted CLI/API production-candidate mode, release gate, rollback, auth, delivery policy, proof evidence, and non-goals.
+- `self-hosted-environment-matrix.md` — local trusted, production-hardened, connected web, and npm alpha operating modes with credentials and verification commands.
+- `self-hosted-secrets-and-redaction.md` — secret placement, bearer principal boundaries, and redaction surfaces.
+- `self-hosted-backup-restore.md` — workspace-local `.aor/` evidence backup and restore procedure.
+- `self-hosted-incident-runbook.md` — containment, evidence preservation, and recovery for bounded self-hosted incidents.
 - `npm-cli-alpha-release.md` — npm CLI alpha package release branch, gate, publish automation, prerequisites, and rollback policy.
 
 ## UI lifecycle

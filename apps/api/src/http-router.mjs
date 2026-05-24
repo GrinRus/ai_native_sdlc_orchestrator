@@ -201,6 +201,40 @@ const ROUTES = Object.freeze([
   },
 ]);
 
+const ROUTE_OPENAPI_PATHS = Object.freeze({
+  "project-state": "/api/projects/{projectId}/state",
+  packets: "/api/projects/{projectId}/packets",
+  "step-results": "/api/projects/{projectId}/step-results",
+  "quality-artifacts": "/api/projects/{projectId}/quality-artifacts",
+  "delivery-manifests": "/api/projects/{projectId}/delivery-manifests",
+  "promotion-decisions": "/api/projects/{projectId}/promotion-decisions",
+  "strategic-snapshot": "/api/projects/{projectId}/strategic-snapshot",
+  "planner-metrics": "/api/projects/{projectId}/planner-metrics",
+  "finance-monitoring": "/api/projects/{projectId}/finance-monitoring",
+  "next-action-report": "/api/projects/{projectId}/next-action-report",
+  "multirepo-coordination": "/api/projects/{projectId}/multirepo-coordination",
+  "compiler-revisions": "/api/projects/{projectId}/compiler-revisions",
+  runs: "/api/projects/{projectId}/runs",
+  "event-history": "/api/projects/{projectId}/runs/{runId}/events/history",
+  "policy-history": "/api/projects/{projectId}/runs/{runId}/policy-history",
+  "run-events": "/api/projects/{projectId}/runs/{runId}/events",
+  "run-control-actions": "/api/projects/{projectId}/run-control/actions",
+  "ui-lifecycle-actions": "/api/projects/{projectId}/ui-lifecycle/actions",
+  "lifecycle-command-actions": "/api/projects/{projectId}/lifecycle-command/actions",
+  "interaction-answers": "/api/projects/{projectId}/interactions/answers",
+});
+
+export function listControlPlaneRoutes() {
+  return ROUTES.map((route) => ({
+    id: route.id,
+    method: route.method,
+    path: ROUTE_OPENAPI_PATHS[route.id] ?? null,
+    permission: route.permission,
+    kind: route.kind,
+    params: [...route.params],
+  }));
+}
+
 /**
  * @param {string} pathname
  * @returns {{ route: (typeof ROUTES)[number], params: Record<string, string> } | null}

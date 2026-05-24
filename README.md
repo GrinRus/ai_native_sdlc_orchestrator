@@ -246,14 +246,20 @@ Start here when you need deeper context:
 
 - `docs/architecture/12-orchestrator-operating-model.md` - end-to-end runtime
   model and boundaries.
+- `docs/architecture/adr/0000-index.md` - accepted alpha-boundary
+  architecture decisions and migration triggers.
 - `docs/contracts/00-index.md` - contract index for packets, reports, profiles,
   wrappers, and scorecards.
+- `docs/contracts/control-plane-api.openapi.json` - OpenAPI 3.1 contract for
+  the implemented detached HTTP/SSE control-plane routes.
 - `docs/architecture/14-cli-command-catalog.md` - implemented and planned CLI
   command surface.
 - `docs/backlog/backlog-operating-model.md` - planning and delivery workflow.
 - `docs/backlog/mvp-roadmap.md` - roadmap and readiness story.
 - `docs/ops/self-hosted-release.md` - bounded self-hosted release operating
   model.
+- `docs/ops/self-hosted-environment-matrix.md` - supported alpha operating
+  modes, required credentials, and verification commands.
 - `docs/ops/npm-cli-alpha-release.md` - npm CLI alpha release branch and publish
   flow.
 
@@ -328,7 +334,7 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current alpha distribution focuses on:
+The current alpha distribution is tracked through `W30` and focuses on:
 
 - Safer operator onboarding.
 - Stronger runner-adapter coverage.
@@ -336,6 +342,8 @@ The current alpha distribution focuses on:
 - Public-repo security posture and governance.
 - Bounded self-hosted CLI/API operation.
 - Reproducible npm CLI alpha distribution.
+- Alpha hardening through ADRs, OpenAPI route drift checks, self-hosted
+  operations runbooks, and release smoke evidence.
 
 ## Contributing
 

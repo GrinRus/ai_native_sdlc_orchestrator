@@ -2,6 +2,12 @@ api_id: control-plane.api.hybrid-surface
 version: 1
 binding_mode: hybrid-module-and-detached-http-sse
 deferred_transport_status: implemented
+openapi_contract:
+  owning_slice: W30-S03
+  status: implemented
+  path: docs/contracts/control-plane-api.openapi.json
+  drift_check: pnpm production:ready
+  scope: current detached HTTP/SSE alpha route surface only
 
 read_operations:
   - operation_id: read.project-state
