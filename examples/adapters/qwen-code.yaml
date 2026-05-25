@@ -41,7 +41,7 @@ execution:
     request_via_stdin: true
     request_transport: stdin-json
     preflight_timeout_ms: 120000
-    timeout_ms: 600000
+    timeout_ms: 3600000
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true
@@ -60,3 +60,5 @@ log_features:
 certification_state: candidate
 limitations:
   - Candidate adapter only; not part of required provider coverage until a real runner certification promotes it.
+  - Qwen Code 0.15.2 restricted/default mode is not certified for AOR JSON-envelope requests: local smoke shows stdin and argv JSON requests can time out without structured permission_denial output.
+  - Qwen restricted/default may remove write and shell tools from the available tool set instead of emitting an approval request; keep orchestrator-mediated restricted behavior pending until the runner exposes a non-interactive permission event.
