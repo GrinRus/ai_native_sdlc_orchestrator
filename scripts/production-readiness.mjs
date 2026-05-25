@@ -270,8 +270,8 @@ function checkProductionProof(rootDir, proofFixturePath) {
 function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
   const { rows, documentedCounts } = parseStoryCoverageMatrix(rootDir, storyMatrixPath);
   const findings = [];
-  if (rows.size !== 113) {
-    findings.push(`Expected 113 user-story rows, found ${rows.size}.`);
+  if (rows.size !== 114) {
+    findings.push(`Expected 114 user-story rows, found ${rows.size}.`);
   }
 
   const actualCounts = {

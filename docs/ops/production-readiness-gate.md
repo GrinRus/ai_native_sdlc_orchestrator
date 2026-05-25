@@ -34,11 +34,12 @@ The gate verifies:
 
 - baseline/production boundary: `pnpm check` is still the repository-integrity gate, and `pnpm production:ready` is separate;
 - W25 real proof fixture: `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, target verdicts pass, and no upstream write occurred;
-- story honesty: all 113 stories remain machine-counted, proof-covered rows cite executable W25 fixture evidence, and OpenCode stories remain blocked until real OpenCode certification exists;
+- story honesty: all 114 stories remain machine-counted, proof-covered rows cite executable W25 fixture evidence, and OpenCode stories remain blocked until real OpenCode certification exists;
 - source-of-truth alignment: README, self-hosted readiness docs, and this runbook agree on current non-production status and gate usage;
 - W23 hardening evidence: nested contract validation and production-hardened auth scope coverage are present;
 - W24 harness evidence: run-level Runtime Harness report fields, strict-delivery example evidence, and controller tests exist.
 - W30 alpha hardening: ADR index and accepted alpha-boundary ADRs exist, the OpenAPI 3.1 route contract matches the implemented HTTP/SSE router, self-hosted ops runbooks exist, W30 backlog source-of-truth docs are present, unsupported Docker/GHCR/SaaS/SSO/default-write-back claims remain out of scope, and OpenCode stories remain blocked without real certification proof.
+- W32 operator requests: the request surface remains baseline evidence only, keeps no-write default behavior, stores raw request text only in durable artifacts, and does not upgrade production proof status without fresh executable proof.
 
 ## Failure interpretation
 
@@ -51,6 +52,7 @@ The gate verifies:
 | `production-auth-hardening` | Production auth scope or redaction evidence is incomplete. | Restore W23-S02 docs and tests. |
 | `contract-and-harness-evidence` | Nested contract or run-level Runtime Harness evidence is incomplete. | Restore W23-S01/W24-S01 contract, example, and test evidence. |
 | `w30-alpha-hardening` | W30 ADRs, OpenAPI route contract, ops runbooks, backlog source-of-truth, or alpha non-goal claims are missing or drifting. | Restore W30 docs/spec/check evidence before release review. |
+| `operator-request-drift` | Operator-request docs, contracts, or read surfaces imply chat-style direct mutation or expose raw request text. | Restore W32 baseline semantics before using the request surface in release review. |
 
 ## Safety rules
 

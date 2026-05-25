@@ -6,6 +6,8 @@ import { authorizeRequest, normalizeAuthPolicy, sendAuthError } from "./http-aut
 import {
   handleInteractionAnswer,
   handleLifecycleCommandAction,
+  handleOperatorRequestAction,
+  handleOperatorRequestCreate,
   handleRunControlAction,
   handleUiLifecycleAction,
 } from "./http-mutation-handlers.mjs";
@@ -88,7 +90,7 @@ export function createControlPlaneHttpServer(options) {
         }
       }
 
-      const matchedRoute = matchControlPlaneRoute(requestUrl.pathname);
+      const matchedRoute = matchControlPlaneRoute(requestUrl.pathname, method);
       if (!matchedRoute) {
         sendError(response, 404, "route_not_found", `Unsupported control-plane path '${requestUrl.pathname}'.`);
         return;
@@ -141,6 +143,21 @@ export function createControlPlaneHttpServer(options) {
 
       if (route.id === "run-control-actions") {
         await handleRunControlAction({ request, response, runtimeOptions: runtimeOptionsWithSecurity });
+        return;
+      }
+
+      if (route.id === "operator-request-create") {
+        await handleOperatorRequestCreate({ request, response, runtimeOptions: runtimeOptionsWithSecurity });
+        return;
+      }
+
+      if (route.id === "operator-request-actions") {
+        await handleOperatorRequestAction({
+          request,
+          response,
+          params,
+          runtimeOptions: runtimeOptionsWithSecurity,
+        });
         return;
       }
 

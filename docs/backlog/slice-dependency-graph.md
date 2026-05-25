@@ -160,6 +160,7 @@ graph TD
   W30S05[W30-S05 Alpha readiness gate expansion]
   W30S06[W30-S06 Alpha release and onboarding proof refresh]
   W31S01[W31-S01 Installed-user local app launch and onboarding UI]
+  W32S01[W32-S01 Operator-request interactive runtime flow]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -408,6 +409,8 @@ graph TD
   W30S04 --> W30S05
   W30S05 --> W30S06
   W30S06 --> W31S01
+  W31S01 --> W32S01
+  W24S02 --> W32S01
 ```
 
 ## W0 hard dependencies
@@ -694,6 +697,11 @@ graph TD
 |---|---|
 | W31-S01 | W30-S06 |
 
+## W32 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W32-S01 | W31-S01, W24-S02 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -851,6 +859,7 @@ graph TD
 154. W30-S05
 155. W30-S06
 156. W31-S01
+157. W32-S01
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

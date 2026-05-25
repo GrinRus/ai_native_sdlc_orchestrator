@@ -100,6 +100,16 @@ const ROUTES = Object.freeze([
     kind: "read",
   },
   {
+    id: "operator-requests",
+    pattern: /^\/api\/projects\/([^/]+)\/operator-requests$/u,
+    method: "GET",
+    allow: "GET, POST",
+    permission: "read",
+    methodMessage: "Operator-request list route supports GET for reads and POST for creation.",
+    params: ["projectId"],
+    kind: "read",
+  },
+  {
     id: "multirepo-coordination",
     pattern: /^\/api\/projects\/([^/]+)\/multirepo-coordination$/u,
     method: "GET",
@@ -170,6 +180,26 @@ const ROUTES = Object.freeze([
     kind: "mutation",
   },
   {
+    id: "operator-request-create",
+    pattern: /^\/api\/projects\/([^/]+)\/operator-requests$/u,
+    method: "POST",
+    allow: "GET, POST",
+    permission: "mutate",
+    methodMessage: "Operator-request creation route supports GET for reads and POST for creation.",
+    params: ["projectId"],
+    kind: "mutation",
+  },
+  {
+    id: "operator-request-actions",
+    pattern: /^\/api\/projects\/([^/]+)\/operator-requests\/([^/]+)\/actions$/u,
+    method: "POST",
+    allow: "POST",
+    permission: "mutate",
+    methodMessage: "Operator-request action route supports only POST.",
+    params: ["projectId", "requestId"],
+    kind: "mutation",
+  },
+  {
     id: "ui-lifecycle-actions",
     pattern: /^\/api\/projects\/([^/]+)\/ui-lifecycle\/actions$/u,
     method: "POST",
@@ -212,6 +242,7 @@ const ROUTE_OPENAPI_PATHS = Object.freeze({
   "planner-metrics": "/api/projects/{projectId}/planner-metrics",
   "finance-monitoring": "/api/projects/{projectId}/finance-monitoring",
   "next-action-report": "/api/projects/{projectId}/next-action-report",
+  "operator-requests": "/api/projects/{projectId}/operator-requests",
   "multirepo-coordination": "/api/projects/{projectId}/multirepo-coordination",
   "compiler-revisions": "/api/projects/{projectId}/compiler-revisions",
   runs: "/api/projects/{projectId}/runs",
@@ -219,6 +250,8 @@ const ROUTE_OPENAPI_PATHS = Object.freeze({
   "policy-history": "/api/projects/{projectId}/runs/{runId}/policy-history",
   "run-events": "/api/projects/{projectId}/runs/{runId}/events",
   "run-control-actions": "/api/projects/{projectId}/run-control/actions",
+  "operator-request-create": "/api/projects/{projectId}/operator-requests",
+  "operator-request-actions": "/api/projects/{projectId}/operator-requests/{requestId}/actions",
   "ui-lifecycle-actions": "/api/projects/{projectId}/ui-lifecycle/actions",
   "lifecycle-command-actions": "/api/projects/{projectId}/lifecycle-command/actions",
   "interaction-answers": "/api/projects/{projectId}/interactions/answers",
@@ -237,9 +270,12 @@ export function listControlPlaneRoutes() {
 
 /**
  * @param {string} pathname
+ * @param {string} [method]
  * @returns {{ route: (typeof ROUTES)[number], params: Record<string, string> } | null}
  */
-export function matchControlPlaneRoute(pathname) {
+export function matchControlPlaneRoute(pathname, method) {
+  /** @type {{ route: (typeof ROUTES)[number], params: Record<string, string> } | null} */
+  let methodMismatch = null;
   for (const route of ROUTES) {
     const match = route.pattern.exec(pathname);
     if (!match) {
@@ -249,7 +285,11 @@ export function matchControlPlaneRoute(pathname) {
     route.params.forEach((name, index) => {
       params[name] = decodeURIComponent(match[index + 1]);
     });
-    return { route, params };
+    const matched = { route, params };
+    if (!method || route.method === method) {
+      return matched;
+    }
+    methodMismatch ??= matched;
   }
-  return null;
+  return methodMismatch;
 }

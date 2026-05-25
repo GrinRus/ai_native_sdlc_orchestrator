@@ -17,6 +17,7 @@ Operators need live state without making the UI part of the critical path.
 - route and policy decisions
 - approval requests
 - runner-requested questions and answer audit refs
+- operator-request creation, run, proposal, patch, and next-action refresh evidence
 - validation, eval, and harness outcomes
 - delivery and release milestones
 - incident creation and follow-up actions
@@ -39,6 +40,14 @@ The app can submit the first Mission form through
 `command: "mission create"`, then invoke `next` to refresh the durable
 `next-action-report`. It does not own run-state transitions, answer
 continuation, review decisions, or delivery gates.
+
+The app can also submit operator-initiated interventions through
+`POST /api/projects/:projectId/operator-requests` and run them through
+`POST /api/projects/:projectId/operator-requests/:requestId/actions` with
+`action=run`. Read views use `GET /api/projects/:projectId/operator-requests`
+and must show sanitized summaries and refs, not raw request text. Successful
+runs refresh/materialize `next-action-report` so the right rail and headless
+CLI/API surfaces converge on the same next action.
 
 ## Interactive continuation
 When a runner asks a question, AOR treats it as a run continuation boundary:

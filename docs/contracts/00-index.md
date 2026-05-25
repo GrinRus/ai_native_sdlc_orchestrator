@@ -29,6 +29,7 @@
 - `evaluation-suite.md`
 - `promotion-decision.md`
 - `compiled-context-artifact.md`
+- `operator-request.md`
 
 ## Platform assets
 - `provider-route-profile.md`

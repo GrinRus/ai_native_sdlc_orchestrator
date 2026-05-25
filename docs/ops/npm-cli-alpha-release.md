@@ -53,6 +53,10 @@ covered. W31 extends it further with
 `aor app --smoke --open false --json`, which starts the local packaged SPA,
 checks `/`, `/app-config.json`, and `GET /api/projects/:projectId/state`, then
 exits without starting a hosted service or making the web console required.
+W32 extends the source checkout and package smoke expectations with
+`aor request create --json`, `aor request run --json`, and sanitized
+operator-request API coverage so the packaged CLI proves bounded interactive
+runtime work without changing target files outside `.aor/`.
 
 W30 alpha hardening also requires the production-readiness gate to verify the
 ADR index, OpenAPI 3.1 control-plane route contract, self-hosted operations
@@ -62,6 +66,13 @@ non-goals before release review.
 W31 local app launch readiness also requires `npm pack --dry-run --json` to
 include `apps/web/dist`, the shared app launcher, and the shared HTTP transport
 files while excluding tests and target runtime state.
+
+W32 request readiness also requires the package to include the shared
+operator-request runtime files, CLI request handler, `operator-request`
+contract/example, and operator-intervention context bundle/rule. Release smoke
+must verify no-write request runs produce proposal evidence, patch-only requests
+require explicit allowed paths, and sanitized list/status outputs omit raw
+request text.
 
 For strict release-branch validation, set the release branch explicitly:
 

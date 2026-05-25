@@ -44,7 +44,7 @@ aor ui attach \
 
 Note: when a reachable `--control-plane` URL is provided, connected mode uses detached transport for:
 - read/follow (`GET` + SSE);
-- bounded mutation actions (`POST /api/projects/:projectId/run-control/actions`, `POST /api/projects/:projectId/ui-lifecycle/actions`, `POST /api/projects/:projectId/lifecycle-command/actions`, and `POST /api/projects/:projectId/interactions/answers`).
+- bounded mutation actions (`POST /api/projects/:projectId/run-control/actions`, `POST /api/projects/:projectId/ui-lifecycle/actions`, `POST /api/projects/:projectId/lifecycle-command/actions`, `POST /api/projects/:projectId/operator-requests`, `POST /api/projects/:projectId/operator-requests/:requestId/actions`, and `POST /api/projects/:projectId/interactions/answers`).
 Without a control-plane URL, attach remains disconnected/read-model mode while headless workflows stay available.
 
 Disconnected/read-model attach (no control-plane URL):
@@ -130,12 +130,29 @@ curl -sS \
   http://127.0.0.1:8080/api/projects/<PROJECT_ID>/interactions/answers
 ```
 
+Operator request create and run over detached transport:
+```bash
+curl -sS \
+  -X POST \
+  -H "content-type: application/json" \
+  -d '{"target_stage":"discovery","intent_type":"analyze","request_text":"Explain the latest blocker and propose the next safe action.","target_refs":["evidence://.aor/projects/<PROJECT_ID>/reports/next-action-report.json"],"delivery_mode":"no-write"}' \
+  http://127.0.0.1:8080/api/projects/<PROJECT_ID>/operator-requests
+
+curl -sS \
+  -X POST \
+  -H "content-type: application/json" \
+  -d '{"action":"run","target_step":"plan"}' \
+  http://127.0.0.1:8080/api/projects/<PROJECT_ID>/operator-requests/<REQUEST_ID>/actions
+```
+
 Mutation error-shape checks:
 - malformed JSON returns `error.code: "invalid_json"`;
 - unsupported action returns `error.code: "invalid_run_control_action"`, `error.code: "invalid_ui_lifecycle_action"`, or `error.code: "invalid_lifecycle_command"`;
 - missing lifecycle command flags return `error.code: "invalid_lifecycle_flags"`;
 - policy/transition block returns HTTP `409` with `error.code` in the `run_control.blocked` family and a durable `run_control.audit_file`.
 - lifecycle policy/validation blocks return HTTP `409` with `error.code` in the `lifecycle_command.*` family and the original CLI `command_output` preserved.
+- invalid operator request scope, intent, stage, or delivery mode returns HTTP `400` with `error.code` in the `operator_request.*` family;
+- accepted operator request reads omit raw `request_text` and return summaries, refs, status, result refs, and evidence refs only;
 - accepted interaction answers with resumable checkpoints return HTTP `200` and `interaction_answer.interaction_status="resumed"`; non-resumable boundaries return HTTP `409` with `error.code: "interaction.continuation_blocked"` plus `interaction_answer.answer_audit_ref`.
 
 ## Full-flow console checks
@@ -154,8 +171,10 @@ Expected full-flow console evidence:
 - `guided_lifecycle` shows each stage status, evidence count/refs, blocker codes, policy-history count, event-history count, and the exact current next action from `next-action-report`;
 - final stages include `closure_state` and `safety_gates`: review decision, delivery gate status, downstream block flag, delivery blocked reasons, release-packet status, learning status, and the same evidence chain returned by CLI/API;
 - connected stage mutations use `POST /api/projects/:projectId/lifecycle-command/actions`; `mission create` creates guided intake evidence and `next` refreshes the durable next-action report;
-- `contract_alignment.mutation_model` includes `POST /api/projects/:projectId/lifecycle-command/actions` and `POST /api/projects/:projectId/interactions/answers`;
-- `contract_alignment.read_model` includes `GET /api/projects/:projectId/next-action-report`;
+- Ask AOR/request-change actions use `POST /api/projects/:projectId/operator-requests` and `POST /api/projects/:projectId/operator-requests/:requestId/actions`;
+- `contract_alignment.mutation_model` includes `POST /api/projects/:projectId/lifecycle-command/actions`, `POST /api/projects/:projectId/operator-requests`, `POST /api/projects/:projectId/operator-requests/:requestId/actions`, and `POST /api/projects/:projectId/interactions/answers`;
+- `contract_alignment.read_model` includes `GET /api/projects/:projectId/next-action-report` and `GET /api/projects/:projectId/operator-requests`;
+- Evidence & Documents lets operators copy refs and attach refs as operator-request targets without opening raw mutable files;
 - pending runner questions are derived from `step-result.requested_interaction`;
 - submitted answers return `interaction_answer.answer_audit_ref` and live/event-history payloads reference that audit ref without raw answer text;
 - detaching the session stops web follow capture only; run state and evidence remain queryable through CLI/API.

@@ -30,11 +30,32 @@ guided_journey:
   starts_from_first_run: true
   web_smoke:
     enabled: true
+    operator_request_controls: true
   proof_requirements:
     - cli-transcripts
     - web-smoke
+    - operator-request-no-write-analysis
+    - operator-request-patch-only-document-proposal
+    - interaction-inbox-answer-audit
     - durable-packets-and-reports
     - no-upstream-write-assertions
+operator_requests:
+  enabled: true
+  default_delivery_mode: no-write
+  scenarios:
+    - id: no-write-analysis
+      source_surface: cli
+      stage: discovery
+      intent: analyze
+      target_step: planning
+    - id: patch-only-document-proposal
+      source_surface: web
+      stage: review
+      intent: revise-document
+      target_step: review
+      delivery_mode: patch-only
+      allowed_paths:
+        - docs/**
 runtime:
   mode: ephemeral
   runtime_root: .aor

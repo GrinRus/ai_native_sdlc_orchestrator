@@ -13,6 +13,7 @@ not by themselves claim that the target stack is active.
 | `0002-alpha-hybrid-api-transport.md` | Accepted | The alpha control plane remains hybrid module plus detached HTTP/SSE transport. | CLI/API boundary, OpenAPI contract, production-hardening gate |
 | `0003-alpha-detachable-web-console.md` | Accepted | The web console remains optional and detachable; CLI/API stay primary. | Operator UX, self-hosted release mode, web smoke boundary |
 | `0004-alpha-packaged-local-web-console.md` | Accepted | The npm alpha includes a packaged local SPA as a supported installed-user surface while headless operation remains valid. | Installed-user first run, `aor app`, packaged web assets, release smoke |
+| `0005-operator-requests-runtime-interventions.md` | Accepted | Operator-initiated interventions are durable runtime-owned `operator-request` artifacts, not direct runner chat. | Ask AOR, request CLI/API, context compilation, proposal/patch evidence |
 
 ## Target-architecture relationship
 
@@ -22,5 +23,5 @@ orchestration, PostgreSQL, S3-compatible evidence storage, Redis, and
 OpenTelemetry as roadmap intent. W30 does not implement those dependencies.
 
 Future migration work should add new ADRs before changing the runtime system of
-record, transport framework, web ownership boundary, or durable orchestration
-model.
+record, transport framework, web ownership boundary, durable orchestration
+model, or operator-request prompt/mutation semantics.

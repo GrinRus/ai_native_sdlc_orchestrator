@@ -663,8 +663,8 @@ const userStoryFamilies = [
   {
     prefix: "OPS",
     roleCluster: "Operator / SRE",
-    total: 10,
-    tierCounts: { MVP: 8, "MVP+": 1, Later: 1 },
+    total: 11,
+    tierCounts: { MVP: 9, "MVP+": 1, Later: 1 },
   },
   {
     prefix: "SEC",

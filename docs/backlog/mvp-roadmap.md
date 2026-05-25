@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-31-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-32-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -42,6 +42,7 @@ The authoritative planning model for implementation lives in:
 | W29 | Open the npm CLI alpha release channel with guarded release branch automation. | 1 | EPIC-5 | `docs/backlog/wave-29-implementation-slices.md` |
 | W30 | Harden the self-hosted CLI/API alpha with ADRs, OpenAPI drift checks, operations runbooks, readiness evidence, and installed-user release smoke coverage. | 6 | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-30-implementation-slices.md` |
 | W31 | Launch the packaged local app for installed users and make first Mission intake understandable through the UI. | 1 | EPIC-6 | `docs/backlog/wave-31-implementation-slices.md` |
+| W32 | Add runtime-owned interactive operator requests across CLI, API, and the local app for bounded artifact analysis and change proposals. | 1 | EPIC-6 | `docs/backlog/wave-32-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -142,6 +143,7 @@ The authoritative planning model for implementation lives in:
 | W30-S05 | OPS-06, OPS-10, SEC-06, DEV-04, AIP-12 |
 | W30-S06 | OPS-06, OPS-10, PBO-01, PBO-02, PBO-03, SEC-02, SEC-06 |
 | W31-S01 | PBO-09, OPS-01, OPS-06 |
+| W32-S01 | OPS-11, OPS-04, DEV-05, RQA-02 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -529,6 +531,19 @@ boundaries.
 - README, product stories, architecture, contracts, ADRs, ops runbooks, packaging, and release smoke docs describe the installed-user UI path.
 
 **Detailed slices:** `docs/backlog/wave-31-implementation-slices.md`
+
+## W32 - operator-request interactive runtime flow
+**Goal:** Let operators ask AOR to analyze, explain, revise, repair, validate, plan, implement, or review bounded project artifacts from any flow stage through durable runtime-owned requests rather than direct chat.
+
+**Exit criteria:**
+- W32 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
+- The `operator-request` contract, canonical example, and operator-intervention context rule/bundle are loader-covered.
+- CLI, API, and web can create and run operator requests with `delivery_mode=no-write` by default and explicit `patch-only` scope when patches are requested.
+- Request runs route through compiled context, produce routed step results, proposal/patch evidence, and refresh `next-action-report`.
+- Read/live/web surfaces show sanitized summaries and refs, while raw request text remains only in durable request artifacts.
+- Live E2E docs and fixtures cover no-write analysis, patch-only document proposal, and separation from runtime-initiated interaction answers.
+
+**Detailed slices:** `docs/backlog/wave-32-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

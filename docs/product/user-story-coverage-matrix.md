@@ -1,6 +1,6 @@
 # User story coverage matrix
 
-This matrix is the machine-checkable story registry for the current 113-story AOR working set. It records current implementation evidence, distinguishes baseline evidence from production proof, and calls out blocked outcomes whose prerequisites remain outside the current self-hosted release scope.
+This matrix is the machine-checkable story registry for the current 114-story AOR working set. It records current implementation evidence, distinguishes baseline evidence from production proof, and calls out blocked outcomes whose prerequisites remain outside the current self-hosted release scope.
 
 Coverage status values:
 - `baseline-covered` - current docs, contracts, examples, and code expose a bounded executable baseline path; no production proof is implied.
@@ -8,7 +8,7 @@ Coverage status values:
 - `partial` - current implementation covers part of the outcome, but a backlog slice owns the missing behavior, hardening, or proof evidence.
 - `blocked` - the outcome cannot be closed honestly until a named prerequisite or real proof slice lands.
 
-Current W31-S01 status counts: `baseline-covered=107`, `proof-covered=4`, `partial=0`, `blocked=2`.
+Current W32-S01 status counts: `baseline-covered=108`, `proof-covered=4`, `partial=0`, `blocked=2`.
 
 | Story ID | Role cluster | Tier | Outcome | Coverage status | Evidence | Gap slice |
 |---|---|---|---|---|---|---|
@@ -82,6 +82,7 @@ Current W31-S01 status counts: `baseline-covered=107`, `proof-covered=4`, `parti
 | OPS-08 | Operator / SRE | MVP | Select required matrix cells by scenario, provider, and feature size. | baseline-covered | W14 scenario/provider/feature-size matrix | none |
 | OPS-09 | Operator / SRE | MVP+ | Inspect policy and audit guardrails for run controls. | baseline-covered | W6-S03 run-control audit guardrails | none |
 | OPS-10 | Operator / SRE | Later | Use richer event, policy, and production observability views. | baseline-covered | W8-S04 operator visibility, W19-S06 planner metrics projection, W20-S02 redacted production transport/event baseline, W20-S05 finance monitoring projection, W21-S05 guided stage policy/event counts and finance monitoring panel, W23-S02 explicit production auth denial coverage, W26-S01 production-readiness gate checks, W26-S03 self-hosted release runbook status boundaries, and W30 OpenAPI/SSE route contract plus self-hosted environment and incident operations docs. | none |
+| OPS-11 | Operator / SRE | MVP | Ask AOR to analyze or change bounded project artifacts from any flow stage. | baseline-covered | W32-S01 `operator-request` contract, `aor request create/run/status`, `GET/POST /api/projects/:projectId/operator-requests`, request run action route, compiled-context operator-intervention bundle, proposal/patch evidence, web Ask AOR drawer, Evidence & Documents workbench, Interactions Inbox separation, runtime/API/CLI tests, web SPA coverage, and live E2E fixture updates. | none |
 | SEC-01 | Security / compliance | MVP | Enforce provider and adapter allowlists. | baseline-covered | route policies, adapter capability validation, W2-S03, W8-S03 | none |
 | SEC-02 | Security / compliance | MVP | Apply secret-safe logging and redaction. | baseline-covered | W10-S04 auth hardening baseline, W20-S02 shared redaction across HTTP/SSE/CLI/live logs/run-control audit, W23-S02 production-hardened denied-action redaction coverage for missing/empty/read-only/mutate-only/wrong-project scopes, W24-S02 continuation tests proving raw answers stay out of CLI/API/SSE/web read surfaces, and W30 self-hosted secrets/redaction runbook plus OpenAPI auth-error contract evidence. | none |
 | SEC-03 | Security / compliance | MVP | Preserve audit trails for approvals, overrides, and route changes. | baseline-covered | audit records, W6-S03, W7-S04 | none |

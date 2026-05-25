@@ -27,6 +27,7 @@ export type ContractFamily =
   | "evaluation-suite"
   | "promotion-decision"
   | "compiled-context-artifact"
+  | "operator-request"
   | "provider-route-profile"
   | "wrapper-profile"
   | "prompt-bundle"

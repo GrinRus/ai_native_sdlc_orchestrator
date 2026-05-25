@@ -17,6 +17,7 @@ An installed user can connect a repository, understand readiness, launch a local
 | Mission intake | Capture goals, constraints, KPI, Definition of Done, source refs, allowed paths, and delivery mode. | `intake-request-body` and artifact packet evidence. | W21-S04 |
 | Next action | Resolve exactly one recommended action for the current state, plus blockers and evidence refs. | Deterministic next-action report over runtime packets, reports, policies, and run state. | W21-S04 |
 | Local app | Launch the packaged local web console that mirrors the same guided stages without taking orchestration ownership. | Same-origin SPA config, control-plane read models, lifecycle mutations, live events, and UI lifecycle state. | W31-S01 |
+| Operator request | Ask AOR to analyze, explain, revise, repair, validate, plan, implement, or review bounded artifacts from any flow stage. | `operator-request`, compiled-context, step-result, proposal/patch refs, next-action report. | W32-S01 |
 | Execute | Run bounded work only after validation, policy, handoff, approval, and writeback preconditions are explicit. | Step results, live-run events, run-control audit, Runtime Harness report. | W21-S05 |
 | Review and QA | Expose verdicts, holds, approval, repair requests, and missing evidence as durable artifacts. | Review report, review decision, Runtime Harness report, eval reports. | W21-S06 |
 | Delivery and release | Prepare delivery and release evidence only under explicit delivery mode and review gates. | Delivery plan, delivery manifest, release packet, writeback result. | W21-S06 |
@@ -33,6 +34,7 @@ These public commands are the installed-user vocabulary. W21-S02 implements the 
 | `aor mission create` | Capture product mission evidence in one guided intake flow. | `intake-request-body` packet evidence with goals, constraints, KPI/DoD, source refs, allowed paths, and delivery mode. |
 | `aor next` | Recommend one deterministic next action and explain blockers. | `next-action-report` over onboarding reports, intake packets, run-control state, bounded write-back policy, and closure evidence. |
 | `aor app` | Start the optional local SPA console for the current project. | Shared HTTP/SSE control-plane transport, packaged `apps/web/dist`, `/app-config.json`, same-origin API routes, `ui attach` lifecycle state. |
+| `aor request create/run/status` | Create and run bounded operator interventions from any stage. | `operator-request` contract, routed step execution, compiled-context refs, proposal/patch evidence, next-action refresh. |
 
 Low-level commands remain stable, scriptable, and machine-readable. Guided commands may default to human-readable output, but they must preserve machine-readable evidence refs whenever the underlying command already exposes them.
 
@@ -66,6 +68,15 @@ Each stage exposes durable evidence refs, blocker codes, selected-run policy his
 
 The Mission form uses a safe walkthrough template for the first run. The template does not change packet schemas; it only fills existing intake fields: title, brief, goal, constraint, KPI, Definition of Done, and `delivery-mode=no-write`. Submitting the form sends `command: "mission create"` and then invokes `next` so the UI can immediately refresh the right rail with the current next action, blockers, evidence refs, and runtime root.
 
+Each stage exposes an Ask AOR action. The request drawer captures intent,
+target refs, allowed paths, delivery mode, and a preview of what runtime will
+do. Submitting creates an `operator-request`, runs it through a selected target
+step, and refreshes evidence. The Evidence & Documents workbench can attach
+`.aor/` artifact refs or supported project-relative refs as request targets.
+The Interactions Inbox remains for runtime-initiated `requested_interaction`
+questions and submits answers through `/interactions/answers`; it is distinct
+from operator-initiated `operator-request` work.
+
 For the final three stages, the web console reads `next-action-report.closure_state` directly:
 - review/QA shows review report, Runtime Harness report, current `review-decision`, downstream delivery gate status, and whether downstream delivery is blocked;
 - delivery/release shows delivery-plan, delivery-manifest, release-packet, write-back result, release readiness, and blocked reasons;
@@ -94,6 +105,7 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 | Product mission | `intake-request-body` | W21-S04 preserves goals, constraints, KPI, Definition of Done, source refs, allowed paths, and delivery mode. |
 | Next action | `next-action-report` | W21-S04 resolves one primary action with blockers, evidence refs, mission state, active run state, and explicit write-back policy; W21-S06 adds `closure_state` for review, delivery, release, and learning. |
 | Web lifecycle | `control-plane-api`, `live-run-event` | W21-S05 maps guided stages to read models and lifecycle mutations without UI-owned orchestration; W31-S01 adds the packaged local SPA launcher and app-config route. |
+| Operator intervention | `operator-request`, `compiled-context-artifact`, `step-result` | W32-S01 adds runtime-owned Ask AOR/request flow across CLI, API, and web without creating a chat-only bypass. |
 | Closure | `next-action-report`, `review-decision`, `delivery-plan`, `delivery-manifest`, `release-packet`, `learning-loop-handoff` | W21-S06 exposes final-stage decisions, blockers, evidence refs, and exact next actions consistently across CLI/API/web. |
 | Proof | Live E2E profiles and observation reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, web smoke evidence, durable closure artifacts, and no-upstream-write assertions. |
 

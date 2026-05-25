@@ -38,6 +38,7 @@ Quality boundaries are explicit:
 - **Project analysis report** — repeatable onboarding knowledge.
 - **Packet chain** — discovery through release.
 - **Run and step results** — normalized execution state.
+- **Operator request** — durable operator-initiated intervention intent that can be compiled into a routed step without becoming direct chat.
 - **Quality evidence** — validation, eval, harness, logs, traces, and diffs.
 - **Delivery plan** — pre-write policy decision and gate status.
 - **Delivery manifest** — actual delivery transaction.
@@ -54,6 +55,7 @@ Quality boundaries are explicit:
 - full end-to-end rehearsal
 - full end-to-end rehearsal from curated feature mission
 - installed-user local app intake, where `aor app` serves the packaged SPA on loopback and the UI drives only control-plane-owned lifecycle mutations
+- operator-request intervention, where CLI/API/web create a scoped `operator-request`, compile it into the selected runtime step, and emit proposal/patch evidence without bypassing policies
 
 ## Detailed execution pattern
 1. load the project profile and target repository information;
@@ -61,20 +63,23 @@ Quality boundaries are explicit:
 3. optionally launch the local packaged UI with `aor app` for readiness, Mission intake, next-action, and evidence inspection;
 4. materialize the next packet boundary;
 5. request human approval if the policy requires it;
-6. prepare the routed step by resolving route, wrapper, prompt bundle, context assets, step policy, and compiled context;
-7. execute the step through the selected adapter;
-8. classify the adapter/runtime outcome into stable failure classes;
-9. validate mission semantics, including expected evidence, diff scope, delivery lineage, and release lineage;
-10. decide whether to pass, retry, repair, escalate, block, or fail;
-11. run deterministic verification and eval when the step policy requires it;
-12. persist step decision evidence and update the run-level Runtime Harness report;
-13. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
-14. only if the delivery plan is ready and mission semantics are closed, materialize a delivery manifest;
-15. if the flow reaches release, materialize a release packet;
-16. run review, audit, and learning closure surfaces before declaring the run complete;
-17. if the flow fails materially, open or update an incident path.
+6. if the operator asks for analysis, document changes, repair, validation, planning, implementation, or review, persist an `operator-request` with target refs, allowed paths, delivery mode, and source surface before any runtime work starts;
+7. prepare the routed step by resolving route, wrapper, prompt bundle, context assets, step policy, and compiled context. Operator-request runs add `packet://operator-request@...` to input packet refs and overlay `context-bundle://context.bundle.operator-intervention@v1`;
+8. execute the step through the selected adapter;
+9. classify the adapter/runtime outcome into stable failure classes;
+10. validate mission semantics, including expected evidence, diff scope, delivery lineage, and release lineage;
+11. decide whether to pass, retry, repair, escalate, block, or fail;
+12. run deterministic verification and eval when the step policy requires it;
+13. persist step decision evidence and update the run-level Runtime Harness report;
+14. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
+15. only if the delivery plan is ready and mission semantics are closed, materialize a delivery manifest;
+16. if the flow reaches release, materialize a release packet;
+17. run review, audit, and learning closure surfaces before declaring the run complete;
+18. if the flow fails materially, open or update an incident path.
 
 The local app path is an operator surface, not a runtime dependency. It serves `/`, `/app-config.json`, and same-origin `/api/projects/:projectId/**` routes from the CLI-launched process, then invokes the same lifecycle-command handlers as the CLI. Stopping the app server must not stop runs or mutate workflow state beyond the explicit commands the operator submitted.
+
+Operator requests are explicit runtime inputs, not free-form steering. The default `delivery_mode=no-write` produces analysis or proposal evidence only. `patch-only` requires explicit `allowed_paths` and produces patch evidence without silently mutating source files in v1. Higher delivery modes remain governed by the existing delivery plan, review, promotion, and writeback gates.
 
 Strictness is mission-type driven. Code-changing, live, and release missions use strict semantic gates. Docs-only, no-write rehearsal, and asset-certification flows may use softer profiles, but their softness must be explicit in runtime evidence.
 

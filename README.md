@@ -133,6 +133,15 @@ intake fields: title, brief, goal, constraint, KPI, Definition of Done, and
 `delivery-mode=no-write`. Riskier delivery modes stay visible but require an
 explicit user selection and the existing policy gates.
 
+From any UI stage, use **Ask AOR** to create a durable operator request. This
+is not a direct chat with a runner: the request is stored as an
+`operator-request` artifact, validated against target refs, allowed paths, and
+delivery mode, compiled into the selected runtime step context, and run through
+the same routed runtime path as CLI/API execution. The default is still
+`delivery-mode=no-write`, which produces analysis/proposal evidence only.
+`patch-only` creates patch evidence inside explicit `allowed_paths` without
+silently mutating project files.
+
 For a headless source checkout or CI-style first run, the equivalent command
 sequence remains:
 
@@ -159,6 +168,27 @@ pnpm aor mission create \
 pnpm aor next \
   --project-ref "$TARGET_REPO" \
   --runtime-root "$AOR_RUNTIME" \
+  --json
+```
+
+The same operator-request flow is available headlessly:
+
+```bash
+aor request create \
+  --project-ref "$TARGET_REPO" \
+  --runtime-root "$AOR_RUNTIME" \
+  --stage spec \
+  --intent analyze \
+  --request "Explain the README and identify safe first changes" \
+  --target-ref README.md \
+  --delivery-mode no-write \
+  --json
+
+aor request run \
+  --project-ref "$TARGET_REPO" \
+  --runtime-root "$AOR_RUNTIME" \
+  --request-ref "packet://operator-request@evidence://..." \
+  --target-step spec \
   --json
 ```
 
@@ -193,6 +223,9 @@ it creates target-repo files outside `.aor/`.
   JSON output.
 - `aor app` serves the packaged SPA at `/`, app config at `/app-config.json`,
   and the same-origin control-plane API under `/api/projects/:projectId/**`.
+- `Ask AOR` and `aor request create/run/status` write durable operator-request
+  evidence, proposal refs, optional patch refs, compiled-context refs, and a
+  refreshed next-action report.
 - `delivery_mode=no-write` and `upstream_writes_default=false` remain the safe
   defaults for the first local workflow.
 - `.aor/` is ignored runtime state and must not be committed.
@@ -255,6 +288,7 @@ claim.
 | No-write mission intake | Implemented baseline | `pnpm aor mission create ... --delivery-mode no-write --json`. |
 | Next-action reporting | Implemented baseline | `pnpm aor next ... --json`. |
 | Local installed-user UI | Implemented baseline | `aor app --project-ref <repo>` launches the packaged SPA. |
+| Operator requests | Implemented baseline | `aor request create/run/status` routes bounded Ask AOR work through runtime evidence. |
 | CLI/API/web baselines | Implemented baseline | See `apps/*`, `packages/*`, and the command catalog. |
 | Production-readiness gate | Implemented bounded gate | `pnpm production:ready --json`. |
 
@@ -270,7 +304,7 @@ self-hosted CLI/API mode documented in this repository. Internal evaluation and
 proof fixtures exist for maintainers, but they are not a public onboarding path
 and are intentionally not part of the README workflow.
 
-The current roadmap source of truth extends through W31 in
+The current roadmap source of truth extends through W32 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -357,7 +391,7 @@ Core rules:
 
 ## Command surface status
 
-The CLI command surface currently includes **44 implemented** commands and **0 planned** commands. The command catalog lives in `docs/architecture/14-cli-command-catalog.md`.
+The CLI command surface currently includes **47 implemented** commands and **0 planned** commands. The command catalog lives in `docs/architecture/14-cli-command-catalog.md`.
 
 ## Repository map
 
@@ -382,7 +416,7 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current alpha distribution is tracked through `W31` and focuses on:
+The current alpha distribution is tracked through `W32` and focuses on:
 
 - Safer operator onboarding.
 - Stronger runner-adapter coverage.
@@ -393,6 +427,8 @@ The current alpha distribution is tracked through `W31` and focuses on:
 - W30 alpha hardening through ADRs, OpenAPI route drift checks, self-hosted
   operations runbooks, and release smoke evidence.
 - Installed-user local app launch with a guided Mission intake UI.
+- Runtime-owned operator requests for bounded analysis, document proposals,
+  patch evidence, and next-action refresh from CLI, API, or web.
 
 ## Contributing
 

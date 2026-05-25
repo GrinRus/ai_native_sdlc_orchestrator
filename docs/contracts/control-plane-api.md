@@ -18,6 +18,7 @@ a new ADR before implementation work changes this contract.
 Implemented operation families:
 - read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
+- operator requests: create/list/run bounded operator-initiated runtime interventions with sanitized read payloads;
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
 - live events: append/read/open stream using the `live-run-event` contract family.
 
@@ -90,6 +91,7 @@ The control plane remains the orchestration owner:
 - web stages read the same project, packet, run, quality, finance, and lifecycle state exposed by the control plane;
 - guided mutations must call runtime command handlers or existing control-plane mutation families;
 - guided web can invoke the bounded `mission create` and `next` lifecycle-command mutations to create mission evidence and refresh the durable `next-action-report`;
+- guided web can invoke operator-request mutations to analyze, explain, revise, repair, validate, plan, implement, or review bounded artifacts from any stage while keeping raw request text in durable evidence only;
 - the installed local SPA is served by `aor app` from the shared HTTP transport, not by importing `apps/api` into the CLI launcher;
 - read-only, disconnected, connected, detached, blocked, and ready UI states must be derived from durable runtime state;
 - guided flows must preserve no-upstream-write defaults until delivery mode, policy, review, approval, and writeback evidence are explicit.
@@ -154,6 +156,25 @@ HTTP interactive answer mutation baseline:
 - for runtime permission requests, answer submission records the structured decision but must not claim a pass unless an actual continuation or reinvocation has run. Current coarse external-process adapters report `continuation.reinvoke_required` after user approval so the next runtime action is explicit.
 - `approve_for_run` creates a run-scoped grant that may auto-approve later matching permission requests in the same run after hard-deny policy checks still pass; it is not persisted globally.
 
+## Operator request mutations (W32-S01)
+
+Operator-initiated runtime work uses first-class request artifacts rather than
+`run steer` text. The detached transport exposes:
+- `GET /api/projects/:projectId/operator-requests` for sanitized summaries and refs;
+- `POST /api/projects/:projectId/operator-requests` to create an `operator-request`;
+- `POST /api/projects/:projectId/operator-requests/:requestId/actions` with `action=run` to compile the request into the selected routed step.
+
+Create payload fields:
+- `target_stage`, `intent_type`, `request_text`;
+- optional `target_refs[]`, `allowed_paths[]`, and `delivery_mode`;
+- `delivery_mode` defaults to `no-write`; non-`no-write` modes require explicit allowed paths.
+
+Run responses include `operator_request_ref`, `run_id`,
+`routed_step_result_file`, `compiled_context_ref`, `proposal_refs`,
+`patch_refs`, and `next_action_report_file`. Raw request text is omitted from
+read/list payloads and command output; the durable request artifact is the
+only raw-text storage location.
+
 ## Read surface baseline (module operations)
 
 Read operations must reuse existing contract families and IDs rather than introducing API-only parallel shapes.
@@ -166,6 +187,7 @@ Run-level read baseline:
 - `strategic_snapshot.finance_monitoring` and `GET /api/projects/:projectId/finance-monitoring` expose one `finance-monitoring-snapshot` read model with cost/latency grouping by project, route, bundle, compiler revision, and adapter.
 - `GET /api/projects/:projectId/compiler-revisions` returns contract-backed `compiler-revision-status` reports so compiler lifecycle, compatibility, decision history, incidents, and evaluation lineage are queryable without opening raw files.
 - `GET /api/projects/:projectId/next-action-report` returns the latest durable `next-action-report` if one exists, including `closure_state` for review, delivery, release, and learning final-stage evidence, or `null` when `aor next` has not materialized one yet. The read route does not generate or refresh the report.
+- `GET /api/projects/:projectId/operator-requests` returns contract-backed operator-request records with `request_summary`, status, refs, and evidence links while omitting raw `request_text`.
 - Empty projects must return `status=no-data`, `no_data=true`, and `value=null` per metric rather than claiming a zero success or failure rate.
 - Planner metrics derive only from durable run, review, Runtime Harness, incident, and run-control audit artifacts; they do not mutate scheduler state.
 - Finance monitoring separates `production_monitoring`, `offline_certification`, and `rehearsal` evidence classes. Production monitoring requires explicit event scope and must not be inferred from certification or rehearsal artifacts.

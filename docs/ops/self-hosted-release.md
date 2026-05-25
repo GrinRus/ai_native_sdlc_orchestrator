@@ -10,6 +10,7 @@ AOR is a **self-hosted CLI/API production candidate** for the bounded mode descr
 - Production proof is limited to the committed W25 real-run fixture and the stricter production-readiness gate.
 - W30 alpha-hardening ADRs, OpenAPI route drift checks, and self-hosted operations runbooks are part of the reviewable bounded-mode evidence.
 - W31 installed-user app launch evidence covers the local SPA first-run path without changing the headless runtime boundary.
+- W32 operator-request evidence covers bounded operator-initiated analysis and proposal/patch work without changing the no-upstream-write default.
 
 The alpha architecture boundary is recorded in
 `docs/architecture/adr/0000-index.md`.
@@ -55,6 +56,7 @@ The default production proof fixture is:
 6. Scope bearer principals to the expected project id unless cross-project automation is intentional.
 7. Configure additional redaction values for local secrets before starting connected surfaces.
 8. For installed-user UI validation, launch `aor app --project-ref <repo> --runtime-root <repo>/.aor` on loopback.
+9. For operator-initiated runtime work, use `aor request create/run/status` or the local UI Ask AOR drawer; keep `delivery-mode=no-write` unless proposal patches are explicitly scoped with allowed paths.
 
 The production-hardened auth model is documented in `docs/ops/control-plane-production-hardening.md`.
 Environment, secrets, backup/restore, and incident procedures are documented in:
@@ -76,6 +78,16 @@ Default production-candidate operation is no-upstream-write:
 Strict code-changing delivery must have Runtime Harness execution evidence with routed step decisions, review pass evidence, approved handoff/promotion evidence where required, and meaningful implementation changed paths. Run-level Runtime Harness evidence is preserved when available, but delivery quality is judged from execution health, review, verification, and final result evidence rather than run-level ownership alone.
 
 The W25 proof fixture demonstrates `patch-only` delivery with no upstream write.
+
+Operator requests follow the same delivery-policy vocabulary:
+
+- `no-write` requests are analysis/proposal only.
+- `patch-only` requests require explicit allowed paths and produce patch
+  evidence rather than silent source mutation.
+- `run steer` is only a run-control transition; bounded work requests go
+  through `operator-request` artifacts and compiled context.
+- API, CLI, web, and live/read payloads must show sanitized summaries and refs
+  instead of raw request text.
 
 ## Rollback
 
@@ -101,6 +113,8 @@ Production-candidate proof is reviewable through:
 - `docs/contracts/control-plane-api.openapi.json`
 - `docs/ops/self-hosted-environment-matrix.md`
 - `docs/architecture/adr/0004-alpha-packaged-local-web-console.md`
+- `docs/architecture/adr/0005-operator-requests-runtime-interventions.md`
+- `examples/live-e2e/fixtures/w32-s01/operator-request-interactive-flow.sample.json`
 
 The proof must remain non-mock, code-changing, `external_runner_mode=real-external-process`, `real_code_change_proof_complete=true`, `overall_status=pass`, and no-upstream-write.
 

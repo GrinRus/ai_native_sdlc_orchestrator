@@ -12,6 +12,7 @@ import {
 } from "yaml";
 import { validateContractDocument } from "../../packages/contracts/src/index.mjs";
 import { loadEvaluationRegistry } from "../../packages/orchestrator-core/src/evaluation-registry.mjs";
+import { OPERATOR_REQUEST_TARGET_STEPS } from "../../packages/orchestrator-core/src/operator-request.mjs";
 import { prepareAorInstallationProof } from "../live-e2e/lib/flows.mjs";
 import { validateGuidedJourneyProof } from "../live-e2e/lib/guided-proof.mjs";
 
@@ -2470,6 +2471,23 @@ test("installed-user guided journey proof captures CLI, web, closure, and no-wri
     });
     assert.ok(issues.some((issue) => issue.includes("web_smoke_html_file")));
   });
+});
+
+test("installed-user guided journey operator-request scenarios use supported target step classes", () => {
+  const profilePath = path.join(workspaceRoot, "scripts/live-e2e/profiles/installed-user-guided-journey.yaml");
+  const profile = parseYaml(fs.readFileSync(profilePath, "utf8"));
+  const scenarios = Array.isArray(profile.operator_requests?.scenarios)
+    ? profile.operator_requests.scenarios
+    : [];
+  assert.ok(scenarios.length > 0, "installed-user guided profile must declare operator-request scenarios");
+  for (const scenario of scenarios) {
+    const targetStep = scenario.target_step;
+    assert.equal(
+      OPERATOR_REQUEST_TARGET_STEPS.includes(targetStep),
+      true,
+      `operator-request scenario '${scenario.id ?? "unknown"}' uses unsupported target_step '${targetStep}'`,
+    );
+  }
 });
 
 test("full-journey mode defaults to packaged bootstrap assets when --examples-root is omitted", () => {

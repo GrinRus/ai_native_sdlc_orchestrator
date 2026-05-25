@@ -1,12 +1,12 @@
 # Supported user stories
 
-This document groups the AOR user-story surface into role clusters. The current working set maps to **113 stories** across the lifecycle, but this document is intentionally easier to navigate than a flat list.
+This document groups the AOR user-story surface into role clusters. The current working set maps to **114 stories** across the lifecycle, but this document is intentionally easier to navigate than a flat list.
 
 The flat, machine-checkable registry lives in `docs/product/user-story-coverage-matrix.md`. It assigns stable story IDs, tiers, implementation evidence, coverage status, and backlog gap references for every story in this working set.
 
 ## Coverage summary
-- Total stories: **113**
-- MVP: **74**
+- Total stories: **114**
+- MVP: **75**
 - MVP+: **24**
 - Later: **15**
 
@@ -20,7 +20,7 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 | Delivery engineer | 10 | 7 | 2 | 1 |
 | Reviewer / QA | 6 | 4 | 1 | 1 |
 | AI platform owner | 12 | 6 | 4 | 2 |
-| Operator / SRE | 10 | 8 | 1 | 1 |
+| Operator / SRE | 11 | 9 | 1 | 1 |
 | Security / compliance | 6 | 4 | 1 | 1 |
 | Repository / multirepo owner | 6 | 4 | 1 | 1 |
 | Incident / improvement owner | 6 | 3 | 2 | 1 |
@@ -91,8 +91,11 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 - Run full-journey live acceptance only on curated repositories and curated feature missions.
 - Select the required matrix cell by scenario family, pinned provider variant, and declared feature size.
 - Track which required matrix cells are still uncovered after each live E2E run.
+- Ask AOR to analyze or change bounded project artifacts from any flow stage through runtime-owned request evidence.
 
 W18 closes the connected operator-surface path for runner-requested questions: surface the question from `step-result.requested_interaction`, submit an approved operator answer through the control plane, emit query-safe live events, and keep the answer trail auditable without making the web UI own orchestration.
+
+`W32-S01` adds operator-initiated runtime intervention: CLI, API, and web can create a durable `operator-request`, compile it into the selected runtime step, and materialize proposal/patch evidence while keeping `run steer` as run-control only.
 
 ### Security / compliance
 - Enforce provider and adapter allowlists.

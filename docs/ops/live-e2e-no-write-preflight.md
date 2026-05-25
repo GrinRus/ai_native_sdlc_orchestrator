@@ -108,6 +108,58 @@ Expected W10-S01 signals:
 Evidence fixtures captured for this procedure:
 - `examples/live-e2e/fixtures/w10-s01/external-live-adapter-transcript.json`
 
+## Operator-request rehearsal (W32-S01 baseline)
+Use this bounded rehearsal when validating interactive operator requests without
+upstream writes:
+
+```bash
+aor request create \
+  --project-ref <AOR_WORKSPACE> \
+  --runtime-root <AOR_WORKSPACE>/.aor/w32-s01-operator-request \
+  --stage discovery \
+  --intent analyze \
+  --request "Analyze the current next action and explain the safest follow-up." \
+  --target-ref evidence://.aor/projects/<PROJECT_ID>/reports/next-action-report.json \
+  --delivery-mode no-write \
+  --json
+
+aor request run \
+  --project-ref <AOR_WORKSPACE> \
+  --runtime-root <AOR_WORKSPACE>/.aor/w32-s01-operator-request \
+  --request-ref <OPERATOR_REQUEST_REF> \
+  --target-step plan \
+  --json
+```
+
+Use this patch-only document-change rehearsal when the operator asks for a
+document update proposal:
+
+```bash
+aor request create \
+  --project-ref <AOR_WORKSPACE> \
+  --runtime-root <AOR_WORKSPACE>/.aor/w32-s01-operator-request \
+  --stage review \
+  --intent revise-document \
+  --request "Propose edits for the installed-user first-run runbook." \
+  --target-ref docs/ops/installed-user-first-run.md \
+  --allowed-path "docs/ops/**" \
+  --delivery-mode patch-only \
+  --json
+```
+
+Expected W32-S01 signals:
+- request create writes an `operator-request` artifact with raw text stored only
+  in durable evidence;
+- request status/list output shows sanitized summary plus refs, not raw text;
+- request run writes a routed `step-result` with `operator_request_ref`;
+- no-write emits proposal evidence only;
+- patch-only emits proposal and patch evidence and does not mutate target files
+  silently;
+- `next-action-report` is refreshed after the run.
+
+Evidence fixture captured for this procedure:
+- `examples/live-e2e/fixtures/w32-s01/operator-request-interactive-flow.sample.json`
+
 ## Quality rehearsal procedure (W3-S06 baseline)
 Use this baseline on selected public targets after no-write preflight gates pass:
 

@@ -3,6 +3,7 @@ import {
   listCompilerRevisionStatuses,
   listDeliveryManifests,
   listMultirepoCoordinationStatuses,
+  listOperatorRequests,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
@@ -57,6 +58,9 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
       return;
     case "next-action-report":
       sendJson(response, 200, readNextActionReport(runtimeOptions));
+      return;
+    case "operator-requests":
+      sendJson(response, 200, listOperatorRequests(runtimeOptions));
       return;
     case "multirepo-coordination":
       sendJson(response, 200, listMultirepoCoordinationStatuses(runtimeOptions));

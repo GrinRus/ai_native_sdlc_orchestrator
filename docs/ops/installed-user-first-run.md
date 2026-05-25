@@ -21,7 +21,9 @@ The UI first-run path is:
 3. open Mission;
 4. apply the safe walkthrough template;
 5. submit Mission;
-6. inspect the refreshed right rail for next action, blockers, evidence refs, and runtime root.
+6. inspect the refreshed right rail for next action, blockers, evidence refs, and runtime root;
+7. optionally use Ask AOR on any stage to create a bounded operator request
+   against selected evidence or document refs.
 
 Guided shortcuts default to human-readable output. Pass `--json` when automation needs stable fields such as `guided_status`, `guided_actionable_blockers`, `resolved_project_ref`, and `resolved_runtime_root`.
 
@@ -33,6 +35,7 @@ Guided shortcuts default to human-readable output. Pass `--json` when automation
 | `aor mission create` | `aor intake create` | Writes product-intake packet evidence with goals, constraints, KPI, Definition of Done, allowed paths, source refs, and delivery mode. |
 | `aor next` | current first-run state | Writes a durable deterministic next-action report with one primary action, blockers, evidence refs, and write-back policy. |
 | `aor app` | shared control-plane HTTP transport plus packaged SPA | Launches the local UI; web is optional and headless CLI/API operation remains valid. |
+| `aor request create/run/status` | `operator-request` runtime service and routed execution | Creates and runs bounded operator-initiated work through compiled context; read outputs are sanitized and no-write is default. |
 
 ## Mission safe template
 The UI safe walkthrough template fills only existing `mission create` inputs:
@@ -64,6 +67,54 @@ aor mission create \
 
 aor next --project-ref <repo> --runtime-root <repo>/.aor --json
 ```
+
+## Ask AOR / operator request
+Use Ask AOR when the operator wants AOR to analyze, explain, revise, repair,
+validate, plan, implement, or review a bounded artifact without starting a
+free-form chat. In the UI, open a stage, select **Ask AOR**, attach evidence or
+document refs from the Evidence & Documents workbench, keep delivery mode
+`no-write` unless a patch proposal is explicitly needed, and run the request.
+
+Headless equivalent:
+```sh
+aor request create \
+  --project-ref <repo> \
+  --runtime-root <repo>/.aor \
+  --stage discovery \
+  --intent analyze \
+  --request "Explain the current blocker and suggest the next safe action." \
+  --target-ref evidence://.aor/projects/<project_id>/reports/next-action-report.json \
+  --json
+
+aor request run \
+  --project-ref <repo> \
+  --runtime-root <repo>/.aor \
+  --request-ref <operator_request_ref> \
+  --target-step plan \
+  --json
+```
+
+Patch proposals require explicit scope:
+```sh
+aor request create \
+  --project-ref <repo> \
+  --runtime-root <repo>/.aor \
+  --stage review \
+  --intent revise-document \
+  --request "Propose edits that make the onboarding runbook clearer." \
+  --target-ref docs/ops/installed-user-first-run.md \
+  --allowed-path "docs/ops/**" \
+  --delivery-mode patch-only \
+  --json
+```
+
+Expected request evidence:
+- the request artifact under `.aor/projects/<project_id>/reports/`;
+- sanitized CLI/API/web summaries that omit raw request text;
+- a routed step result with `operator_request_ref`;
+- proposal refs for no-write and patch-only modes;
+- patch refs for patch-only mode;
+- a refreshed `next-action-report`.
 
 ## Smoke mode
 Use smoke mode for release or CI validation:
