@@ -115,7 +115,40 @@ function readJsonFile(filePath) {
  * @returns {string}
  */
 function normalizeId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const normalized = [];
+  let previousWasReplacement = false;
+  for (const char of value.toLowerCase()) {
+    const code = char.charCodeAt(0);
+    const allowed =
+      (code >= 97 && code <= 122) ||
+      (code >= 48 && code <= 57) ||
+      char === "." ||
+      char === "_" ||
+      char === "-";
+    if (allowed) {
+      normalized.push(char);
+      previousWasReplacement = false;
+      continue;
+    }
+    if (!previousWasReplacement) {
+      normalized.push("-");
+      previousWasReplacement = true;
+    }
+  }
+
+  let start = 0;
+  let end = normalized.length;
+  while (start < end && normalized[start] === "-") start += 1;
+  while (end > start && normalized[end - 1] === "-") end -= 1;
+  return normalized.slice(start, end).join("");
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {boolean}
+ */
+function isRunTokenBoundary(value) {
+  return value === undefined || value === "." || value === "_" || value === "-" || value === ":";
 }
 
 /**
@@ -275,8 +308,17 @@ function containsRunToken(value, runId) {
   if (normalizedValue === normalizedRunId) {
     return true;
   }
-  const pattern = new RegExp(`(^|[._:-])${normalizedRunId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[._:-])`, "u");
-  return pattern.test(normalizedValue);
+  let index = normalizedValue.indexOf(normalizedRunId);
+  while (index !== -1) {
+    const before = index === 0 ? undefined : normalizedValue[index - 1];
+    const afterIndex = index + normalizedRunId.length;
+    const after = afterIndex >= normalizedValue.length ? undefined : normalizedValue[afterIndex];
+    if (isRunTokenBoundary(before) && isRunTokenBoundary(after)) {
+      return true;
+    }
+    index = normalizedValue.indexOf(normalizedRunId, index + 1);
+  }
+  return false;
 }
 
 /**
