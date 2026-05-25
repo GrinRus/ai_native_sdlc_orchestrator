@@ -41,7 +41,7 @@ execution:
     request_via_stdin: true
     request_transport: stdin-json
     preflight_timeout_ms: 120000
-    timeout_ms: 600000
+    timeout_ms: 3600000
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true

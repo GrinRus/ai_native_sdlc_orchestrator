@@ -59,8 +59,38 @@ Follow-up smoke on 2026-05-25 narrowed the pending Qwen path:
 | `json` + `yolo` + stdin or argv AOR request JSON | `pass`, marker written | Full-bypass mapping remains usable. |
 | `--bare --auth-type ...` | auth/config failure before permission flow | Bare mode is not a certification workaround in the current host auth setup. |
 
+## OpenCode Full-Journey Attempt
+Follow-up acceptance proof on 2026-05-25 exercised the real OpenCode runner beyond permission preflight:
+
+| Field | Value |
+| --- | --- |
+| Profile | `scripts/live-e2e/profiles/full-journey-regress-ky-medium-open-code.yaml` |
+| Run ID | `opencode-full-journey-ky-medium-20260525` |
+| Provider variant | `open-code-primary` |
+| Runner version | `opencode 1.14.30` |
+| Runtime permission mode | `full-bypass` |
+| Interaction policy | `fail-closed` |
+| Controller result | `blocked` |
+| Canonical coverage | `attempted_failed` |
+| Acceptance status | `fail` |
+
+Evidence summary:
+
+- The manual controller completed `discovery`, `spec`, `planning`, `handoff`, and reached `execution`.
+- `execution` used route `route.implement.default.open-code-primary`, adapter/provider `open-code`, and the external command `opencode run --format json --dangerously-skip-permissions ... --file <adapter request>`.
+- Request transport was `file-attachment`, matching the OpenCode adapter contract.
+- Runtime Harness blocked the run with `failure_class=provider-timeout`, `repair_status=exhausted`, and `runtime_harness_decision=block`.
+- The final OpenCode attempt used the previous `timeout_ms=600000` adapter bound, ended with `timed_out=true`, `signal=SIGKILL`, and `exit_code=null`, and established that the former 10 minute hard cap was too short for this proof lane.
+- Two repair retries were attempted; both hit `provider-timeout` at about 601 seconds, exhausting the policy budget.
+- After this attempt, real external provider adapter profiles were aligned to `timeout_ms=3600000` while keeping `preflight_timeout_ms=120000`, so future full-journey attempts can use the intended 60 minute full-runner bound.
+- `runtime_permission_summary.total=0`; the full-bypass proof did not produce runtime permission interactions.
+- The profile safety policy remained `no-upstream-write`; the target-cleanliness check before execution passed.
+- Strict code-changing inspection reported `strict_code_changing_noop=true` with no meaningful changed paths, so the operator decision blocked continuation to `review`.
+
+This is committed blocked/pending evidence, not promotion evidence. Keep `open-code-primary` as extended candidate coverage until a passing full-journey proof completes with meaningful target changes and closed acceptance status.
+
 ## Interpretation
 - Claude Code and OpenCode confirm the v1 control-plane path: full-bypass stays non-interactive, while restricted mode can return permission evidence that AOR can surface as an interaction.
 - Qwen confirms YOLO/full-bypass mapping, but restricted/default mode does not yet expose a reliable non-interactive permission request for AOR JSON-envelope execution. Keep restricted Qwen behavior pending instead of promoting the adapter.
-- OpenCode remains extended candidate coverage until a committed full-journey real-runner proof promotes it.
+- OpenCode remains extended candidate coverage until a passing committed full-journey real-runner proof promotes it.
 - Qwen remains a candidate adapter until restricted-mode behavior and full live-run evidence are complete.
