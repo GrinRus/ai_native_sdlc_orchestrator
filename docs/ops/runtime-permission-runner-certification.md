@@ -45,8 +45,22 @@ Results:
 | Qwen Code | `full-bypass` | `qwen --output-format json --approval-mode yolo` | `pass` | Auth, edit readiness, and permission readiness passed; marker written. |
 | Qwen Code | `restricted` | `qwen --output-format json --approval-mode default` | `pending` | Edit-readiness probe timed out with no structured denial output; keep candidate status. |
 
+## Qwen Restricted Investigation
+Follow-up smoke on 2026-05-25 narrowed the pending Qwen path:
+
+| Case | Result | Interpretation |
+| --- | --- | --- |
+| `json` + `default` + positional write prompt | `exit=0`, marker missing | Qwen completed but `default` mode exposed `read_file` without `write_file`; no structured `permission_denials[]`. |
+| `stream-json` + `default` + positional write prompt | `exit=0`, marker missing | Same permission shape as JSON, with stream events instead of one JSON array. |
+| `json` + `default` + stdin AOR request JSON | timeout, marker missing | Current adapter transport shape can hang before usable denial evidence. |
+| `stream-json` + `default` + stdin AOR request JSON | timeout, marker missing | Stream output confirms restricted tool set, but the process does not finish cleanly. |
+| `json`/`stream-json` + `default` + argv AOR request JSON | timeout, marker missing | Passing the raw AOR envelope as a positional prompt does not avoid the restricted-mode hang. |
+| `json` + `auto-edit` + positional write prompt | `pass`, marker written | `auto-edit` restores write capability and is not a restricted/manual approval proof. |
+| `json` + `yolo` + stdin or argv AOR request JSON | `pass`, marker written | Full-bypass mapping remains usable. |
+| `--bare --auth-type ...` | auth/config failure before permission flow | Bare mode is not a certification workaround in the current host auth setup. |
+
 ## Interpretation
 - Claude Code and OpenCode confirm the v1 control-plane path: full-bypass stays non-interactive, while restricted mode can return permission evidence that AOR can surface as an interaction.
-- Qwen confirms YOLO/full-bypass mapping, but restricted/default mode still needs more runner-specific investigation before it can be treated as certified.
+- Qwen confirms YOLO/full-bypass mapping, but restricted/default mode does not yet expose a reliable non-interactive permission request for AOR JSON-envelope execution. Keep restricted Qwen behavior pending instead of promoting the adapter.
 - OpenCode remains extended candidate coverage until a committed full-journey real-runner proof promotes it.
 - Qwen remains a candidate adapter until restricted-mode behavior and full live-run evidence are complete.
