@@ -9,6 +9,7 @@ export {
   listDeliveryManifests,
   listCompilerRevisionStatuses,
   listMultirepoCoordinationStatuses,
+  listOperatorRequests,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,
@@ -71,6 +72,13 @@ export { resolveStepPolicyForStep } from "../policy-resolution.mjs";
 export { analyzeProjectRuntime } from "../project-analysis.mjs";
 export { initializeProjectRuntime } from "../project-init.mjs";
 export { resolveNextAction } from "../next-action.mjs";
+export {
+  OperatorRequestError,
+  createOperatorRequest,
+  getOperatorRequestStatus,
+  listOperatorRequests as listOperatorRequestRecords,
+  runOperatorRequest,
+} from "../operator-request.mjs";
 export { validateProjectRuntime } from "../project-validate.mjs";
 export { verifyProjectRuntime } from "../project-verify.mjs";
 export { materializeIntakeArtifactPacket } from "../artifact-store.mjs";

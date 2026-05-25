@@ -4,3 +4,4 @@ export * from "./run-control.mjs";
 export * from "./ui-lifecycle.mjs";
 export * from "./interaction-answer.mjs";
 export * from "./lifecycle-command.mjs";
+export * from "../operator-request.mjs";

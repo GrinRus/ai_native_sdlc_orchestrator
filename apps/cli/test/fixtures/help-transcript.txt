@@ -29,6 +29,9 @@ Implemented commands:
   - aor run cancel
   - aor run answer
   - aor run status
+  - aor request create
+  - aor request run
+  - aor request status
   - aor deliver prepare
   - aor release prepare
   - aor multirepo lock

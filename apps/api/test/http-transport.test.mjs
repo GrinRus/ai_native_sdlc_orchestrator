@@ -564,6 +564,16 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(missionPayload.lifecycle_command.blocked, false);
       assert.equal(missionPayload.lifecycle_command.command_output.product_intake_completeness.status, "complete");
 
+      const packetsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/packets`);
+      assert.equal(packetsResponse.status, 200);
+      const packetsPayload = await packetsResponse.json();
+      assert.equal(
+        packetsPayload.some(
+          (entry) => entry.family === "artifact-packet" && entry.document.packet_type === "intake-request",
+        ),
+        true,
+      );
+
       const nextResponse = await postJson(commandUrl, {
         command: "next",
         flags: {},
@@ -880,6 +890,61 @@ test("detached control-plane authn/authz enforces bearer auth with project-scope
       assert.equal(mutateAllowedPayload.run_control.action, "start");
       assert.equal(mutateAllowedPayload.run_control.blocked, false);
       assert.equal(fs.existsSync(mutateAllowedPayload.run_control.audit_file), true);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("local app server serves SPA config and existing control-plane routes", async () => {
+  await withTempRepo(async (projectRoot) => {
+    const transport = await createControlPlaneHttpServer({
+      cwd: workspaceRoot,
+      projectRef: projectRoot,
+      host: "127.0.0.1",
+      port: 0,
+      app: {
+        staticRoot: path.join(workspaceRoot, "apps/web/dist"),
+        packageVersion: "0.0.0-test",
+      },
+    });
+
+    try {
+      const htmlResponse = await fetch(`${transport.baseUrl}/`);
+      assert.equal(htmlResponse.status, 200);
+      const html = await htmlResponse.text();
+      assert.match(html, /AOR Operator Console/);
+
+      const configResponse = await getJson(`${transport.baseUrl}/app-config.json`);
+      assert.equal(configResponse.status, 200);
+      const config = await configResponse.json();
+      assert.equal(config.project_id, transport.projectId);
+      assert.equal(config.api_base_url, transport.baseUrl);
+
+      const stateResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
+      assert.equal(stateResponse.status, 200);
+      const state = await stateResponse.json();
+      assert.equal(state.project_id, transport.projectId);
+
+      const missionResponse = await postJson(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/lifecycle-command/actions`,
+        {
+          command: "mission create",
+          flags: {
+            title: "Local app mission",
+            brief: "Create mission evidence from the local app.",
+            goal: ["Prove app lifecycle mutation."],
+            constraint: ["No upstream writes."],
+            kpi: ["app-ready:App ready:ready:status"],
+            dod: ["Mission packet exists."],
+            "delivery-mode": "no-write",
+          },
+        },
+      );
+      assert.equal(missionResponse.status, 200);
+      const mission = await missionResponse.json();
+      assert.equal(mission.lifecycle_command.command, "mission create");
+      assert.equal(mission.lifecycle_command.blocked, false);
     } finally {
       await transport.close();
     }

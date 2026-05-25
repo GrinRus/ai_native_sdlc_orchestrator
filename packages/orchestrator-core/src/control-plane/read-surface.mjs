@@ -2,6 +2,7 @@ export {
   listCompilerRevisionStatuses,
   listDeliveryManifests,
   listMultirepoCoordinationStatuses,
+  listOperatorRequests,
   listPacketArtifacts,
   listPromotionDecisions,
   listQualityArtifacts,

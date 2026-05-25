@@ -9,22 +9,39 @@ The guided layer targets the first-run vocabulary defined in `docs/product/02-in
 - `aor onboard <repo>` for project bootstrap and asset-mode setup;
 - `aor mission create` for product goals, constraints, KPI, Definition of Done, source refs, allowed paths, and delivery mode;
 - `aor next` for deterministic next-action guidance;
-- `aor app` for optional web attach/discovery.
+- `aor app` for launching the optional local web console.
+- `aor request create/run/status` for runtime-owned operator interventions from any stage.
 
 These are wrappers over runtime-owned command families. They must not remove or rename existing grouped commands, and they must keep ids, packet refs, report refs, blockers, and evidence locations visible.
 
-W21-S02 implements the first-run shell for `doctor`, `onboard`, `app`, and `next`. These shortcuts default to human-readable output for installed users and accept `--json` when scripts need machine-readable fields. `onboard` delegates to `project init`; W21-S03 makes that path clean-repo safe by defaulting to bundled registry roots, writing the generated profile under `.aor/`, and emitting an onboarding report. `app` delegates by instruction to `ui attach` / `ui detach`; `next` is a discovery shortcut until W21-S04 adds the deterministic next-action report.
+W21-S02 implements the first-run shell for `doctor`, `onboard`, `app`, and `next`. These shortcuts default to human-readable output for installed users and accept `--json` when scripts need machine-readable fields. `onboard` delegates to `project init`; W21-S03 makes that path clean-repo safe by defaulting to bundled registry roots, writing the generated profile under `.aor/`, and emitting an onboarding report. W31-S01 changes the public `aor app` behavior from guidance to a foreground local app launcher backed by the same control-plane routes; `ui attach` and `ui detach` remain lower-level lifecycle commands. `next` writes the deterministic next-action report used by CLI/API/web surfaces.
+
+`aor app` launcher semantics:
+- default host is `127.0.0.1`; default port `0` asks the OS for a free local port;
+- `--open true|false` controls browser launch;
+- `--smoke --open false --json` starts the server, checks `/`, `/app-config.json`, and `GET /api/projects/:projectId/state`, prints JSON, then exits;
+- the foreground server is stopped by `Ctrl+C` or process termination;
+- the packaged UI can submit `mission create` and `next` through `POST /api/projects/:projectId/lifecycle-command/actions`, but orchestration remains owned by runtime command handlers.
+- the packaged UI can create and run operator requests through `POST /api/projects/:projectId/operator-requests` and `POST /api/projects/:projectId/operator-requests/:requestId/actions`, preserving the same scope and delivery-mode checks as the CLI.
+
+Operator request command semantics:
+- `aor request create` stores raw request text only in durable `operator-request` evidence and exposes sanitized summaries in read surfaces;
+- `aor request run` compiles `packet://operator-request@...` into the selected target step, applies the `operator-intervention` context bundle, materializes proposal/patch evidence, and refreshes `next-action-report`;
+- `aor request status` reads sanitized status and refs without becoming a chat surface;
+- `aor run steer` remains a run-control transition and does not accept arbitrary operator work text.
 
 ## Operator lifecycle
 1. initialize or inspect the project profile
 2. bootstrap and analyze / validate / verify the target project
-3. create or ingest feature-specific work
-4. inspect packets and approvals
-5. start, pause, resume, steer, or cancel execution runs
-6. inspect evidence, review verdicts, and quality outputs
-7. launch eval or harness workflows
-8. prepare delivery or release output
-9. open incidents, audit runs, and close learning handoff
+3. optionally launch `aor app` for local guided intake and live inspection
+4. create or ingest feature-specific work
+5. create bounded operator requests for analysis, explanation, document proposals, validation, repair, or review when the operator needs runtime help before the next transition
+6. inspect packets and approvals
+7. start, pause, resume, steer, or cancel execution runs
+8. inspect evidence, review verdicts, and quality outputs
+9. launch eval or harness workflows
+10. prepare delivery or release output
+11. open incidents, audit runs, and close learning handoff
 
 ## UX rules
 - commands should reflect the packet-first model;

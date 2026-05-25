@@ -21,7 +21,8 @@
     "status": "implemented",
     "guided_stage": "optional-app",
     "guided_web_optional": true,
-    "guided_web_mandatory": false
+    "guided_web_mandatory": false,
+    "app_mode": "local-spa"
   },
   "next": {
     "command": "next",

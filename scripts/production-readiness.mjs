@@ -4,7 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { listControlPlaneRoutes } from "../apps/api/src/http-router.mjs";
+import { listControlPlaneRoutes } from "../packages/orchestrator-core/src/control-plane/http/http-router.mjs";
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultProofFixturePath = "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json";
@@ -270,8 +270,8 @@ function checkProductionProof(rootDir, proofFixturePath) {
 function checkStoryHonesty(rootDir, storyMatrixPath = defaultStoryMatrixPath) {
   const { rows, documentedCounts } = parseStoryCoverageMatrix(rootDir, storyMatrixPath);
   const findings = [];
-  if (rows.size !== 112) {
-    findings.push(`Expected 112 user-story rows, found ${rows.size}.`);
+  if (rows.size !== 114) {
+    findings.push(`Expected 114 user-story rows, found ${rows.size}.`);
   }
 
   const actualCounts = {

@@ -32,7 +32,27 @@ const DEFAULT_REGISTRY_ROOTS = Object.freeze({
  * @returns {string}
  */
 function normalizeId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  let normalized = "";
+  let pendingSeparator = false;
+  for (const character of value.toLowerCase()) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    const isLowerAscii = codePoint >= 97 && codePoint <= 122;
+    const isDigit = codePoint >= 48 && codePoint <= 57;
+    const isAllowedSymbol = character === "." || character === "_" || character === "-";
+    if (isLowerAscii || isDigit || isAllowedSymbol) {
+      if (pendingSeparator && normalized.length > 0) {
+        normalized += "-";
+      }
+      normalized += character;
+      pendingSeparator = false;
+    } else if (normalized.length > 0) {
+      pendingSeparator = true;
+    }
+  }
+  while (normalized.endsWith("-")) {
+    normalized = normalized.slice(0, -1);
+  }
+  return normalized;
 }
 
 /**

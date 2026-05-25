@@ -339,8 +339,9 @@ export function handleGuidedCommand(context) {
   if (command === "app") {
     const { projectRoot, runtimeRoot } = resolveGuidedProject({ flags, cwd });
     const readiness = inspectReadiness(projectRoot, runtimeRoot);
-    const controlPlane =
-      resolveOptionalStringFlag("control-plane", flags["control-plane"]) ?? "http://localhost:3000";
+    const host = resolveOptionalStringFlag("host", flags.host) ?? "127.0.0.1";
+    const port = resolveOptionalStringFlag("port", flags.port) ?? "0";
+    const open = resolveOptionalStringFlag("open", flags.open) ?? "true";
 
     outputState.resolvedProjectRef = projectRoot;
     outputState.resolvedRuntimeRoot = runtimeRoot;
@@ -349,14 +350,15 @@ export function handleGuidedCommand(context) {
     outputState.guidedStatus = readiness.status;
     outputState.guidedSummary =
       readiness.status === "ready"
-        ? "The web console is optional. Headless CLI and API operation remain valid when it is absent or detached."
-        : "The optional web console can be attached after project blockers are resolved.";
-    outputState.guidedLowLevelCommand = "ui attach";
+        ? "The local web console can launch from this project. Headless CLI and API operation remain valid when it is stopped."
+        : "The optional local web console can launch after project blockers are resolved.";
+    outputState.guidedLowLevelCommand = "app launch";
     outputState.guidedActionableBlockers = readiness.blockers;
     outputState.guidedRecommendedCommands =
       readiness.status === "ready"
         ? [
-            `${projectCommand("ui attach", projectRoot)} --control-plane ${shellQuote(controlPlane)}`,
+            `${projectCommand("app", projectRoot)} --host ${shellQuote(host)} --port ${shellQuote(port)} --open ${shellQuote(open)}`,
+            `${projectCommand("app", projectRoot)} --smoke true --open false --json`,
             projectCommand("ui detach", projectRoot),
             projectCommand("run status", projectRoot),
           ]
@@ -364,10 +366,14 @@ export function handleGuidedCommand(context) {
     outputState.guidedWebSurface = {
       optional: true,
       mandatory: false,
-      control_plane: controlPlane,
-      attach_command: `${projectCommand("ui attach", projectRoot)} --control-plane ${shellQuote(controlPlane)}`,
+      host,
+      port,
+      open,
+      launch_command: `${projectCommand("app", projectRoot)} --host ${shellQuote(host)} --port ${shellQuote(port)} --open ${shellQuote(open)}`,
+      smoke_command: `${projectCommand("app", projectRoot)} --smoke true --open false --json`,
       detach_command: projectCommand("ui detach", projectRoot),
       web_app_root: "apps/web",
+      app_mode: "local-spa",
       headless_safe: true,
     };
     outputState.readOnly = true;

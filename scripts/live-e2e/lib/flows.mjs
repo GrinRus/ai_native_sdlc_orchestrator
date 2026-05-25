@@ -2793,6 +2793,10 @@ export function executeFullJourneyFlow(options) {
         ".",
         "--runtime-root",
         ".aor",
+        "--smoke",
+        "true",
+        "--open",
+        "false",
         "--json",
       ]);
       artifacts.guided_app_transcript_file = guidedApp.transcriptFile;

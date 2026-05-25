@@ -183,6 +183,111 @@
         }
       }
     },
+    "/api/projects/{projectId}/operator-requests": {
+      "get": {
+        "operationId": "listOperatorRequests",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "operator-requests",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createOperatorRequest",
+        "tags": [
+          "mutation"
+        ],
+        "x-aor-route-id": "operator-request-create",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/JsonObject"
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/operator-requests/{requestId}/actions": {
+      "post": {
+        "operationId": "runOperatorRequest",
+        "tags": [
+          "mutation"
+        ],
+        "x-aor-route-id": "operator-request-actions",
+        "x-aor-permission": "mutate",
+        "x-aor-kind": "mutation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/JsonObject"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "409": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/multirepo-coordination": {
       "get": {
         "operationId": "getMultirepoCoordination",

@@ -1,0 +1,110 @@
+{
+  "proof_id": "w32-s01.operator-request-interactive-flow.v1",
+  "run_id": "w32-s01.operator-request",
+  "profile_id": "live-e2e.installed-user.guided-journey",
+  "status": "baseline-covered",
+  "scope": "operator-request-public-surface-smoke",
+  "command_labels": [
+    "guided-doctor",
+    "guided-onboard",
+    "guided-app-smoke",
+    "mission-create",
+    "next-after-mission",
+    "operator-request-create-no-write",
+    "operator-request-run-no-write",
+    "operator-request-status",
+    "operator-request-create-patch-only",
+    "operator-request-run-patch-only",
+    "interaction-answer"
+  ],
+  "operator_requests": [
+    {
+      "request_id": "operator-request-w32-no-write-analysis",
+      "source_surface": "cli",
+      "target_stage": "discovery",
+      "intent_type": "analyze",
+      "delivery_mode": "no-write",
+      "status": "completed",
+      "operator_request_ref": "packet://operator-request@evidence://.aor/projects/local-target/reports/operator-request-w32-no-write-analysis.json",
+      "sanitized_read_assertion": {
+        "request_text_omitted": true,
+        "request_summary_present": true
+      },
+      "target_refs": [
+        "evidence://.aor/projects/local-target/reports/next-action-report.json"
+      ],
+      "result_refs": [
+        "evidence://.aor/projects/local-target/reports/operator-request-w32-no-write-analysis.proposal.json"
+      ],
+      "evidence_refs": [
+        "evidence://.aor/projects/local-target/reports/step-result-w32-s01.operator-request.analysis.json",
+        "evidence://.aor/projects/local-target/reports/compiled-context-w32-s01.operator-request.analysis.json"
+      ],
+      "assertions": {
+        "compiled_context_includes_operator_request_ref": true,
+        "step_result_links_operator_request_ref": true,
+        "patch_refs_empty": true,
+        "next_action_report_refreshed": true
+      }
+    },
+    {
+      "request_id": "operator-request-w32-patch-only-docs",
+      "source_surface": "web",
+      "target_stage": "review",
+      "intent_type": "revise-document",
+      "delivery_mode": "patch-only",
+      "status": "completed",
+      "operator_request_ref": "packet://operator-request@evidence://.aor/projects/local-target/reports/operator-request-w32-patch-only-docs.json",
+      "target_refs": [
+        "docs/ops/installed-user-first-run.md"
+      ],
+      "allowed_paths": [
+        "docs/ops/**"
+      ],
+      "result_refs": [
+        "evidence://.aor/projects/local-target/reports/operator-request-w32-patch-only-docs.proposal.json",
+        "evidence://.aor/projects/local-target/reports/operator-request-w32-patch-only-docs.patch"
+      ],
+      "evidence_refs": [
+        "evidence://.aor/projects/local-target/reports/step-result-w32-s01.operator-request.patch-only.json"
+      ],
+      "assertions": {
+        "patch_only_requires_allowed_paths": true,
+        "patch_evidence_materialized": true,
+        "target_file_not_silently_mutated": true,
+        "upstream_writes_default": false
+      }
+    }
+  ],
+  "interactions_inbox": {
+    "source": "step-result.requested_interaction",
+    "answer_route": "POST /api/projects/:projectId/interactions/answers",
+    "answer_audit_ref": "evidence://.aor/projects/local-target/reports/interaction-answer-w32-s01.json",
+    "raw_answer_omitted_from_reads": true,
+    "separate_from_operator_requests": true
+  },
+  "web_smoke": {
+    "layout": "operator-console",
+    "ask_aor_available_on_stage_count": 7,
+    "evidence_documents_workbench": true,
+    "attach_ref_as_target": true,
+    "interactions_inbox": true,
+    "request_result_panel": true
+  },
+  "api_smoke": {
+    "routes": [
+      "GET /api/projects/:projectId/operator-requests",
+      "POST /api/projects/:projectId/operator-requests",
+      "POST /api/projects/:projectId/operator-requests/:requestId/actions",
+      "POST /api/projects/:projectId/interactions/answers"
+    ],
+    "sanitized_read_payloads": true
+  },
+  "no_write_assertions": {
+    "write_back_to_remote": false,
+    "remote_write_commands": [],
+    "runtime_state_under_aor": true,
+    "target_changes_outside_aor": [],
+    "target_head_unchanged": true
+  }
+}

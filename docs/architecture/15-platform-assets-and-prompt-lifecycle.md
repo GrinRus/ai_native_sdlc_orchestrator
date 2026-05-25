@@ -82,3 +82,16 @@ Prompt bundles, context docs, context rules, context skills, wrappers, routes, p
 Runtime Harness reports may identify impacted asset refs and recommend recertification. Promotion or freeze remains owned by Asset Certification Capability and `promotion-decision`, not by learning handoff or run diagnosis.
 
 Compiler revisions are tracked through `compiler-revision-status`: one report records revision identity, lifecycle state, compatibility, decision history, compiled-context refs, evaluation refs, incident refs, and certification evidence. The CLI/API read path is `aor compiler revision` and `GET /api/projects/:projectId/compiler-revisions`.
+
+## Operator intervention context
+
+Operator requests do not introduce a separate prompt system. `aor request run`
+and the web Ask AOR drawer use the normal route, wrapper, prompt bundle,
+policy, adapter, and context compiler path for the selected target step. The
+only additive context asset is `context-bundle://context.bundle.operator-intervention@v1`,
+which expands the always-on `context-rule://context.rule.operator-intervention@v1`.
+
+That rule tells the runtime to treat `packet://operator-request@...` as
+durable bounded operator intent, validate target refs and delivery mode, and
+produce proposal/patch evidence without silent source mutation for v1
+document-edit flows.

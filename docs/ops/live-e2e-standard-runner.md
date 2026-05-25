@@ -11,6 +11,14 @@ Every run starts by proving the AOR launcher before target execution. Source-cha
 
 The runner invokes the installed project flow step by step. Each step follows `plan -> execute -> inspect -> classify -> decide -> persist`; the next public command is allowed only after the current step decision is `continue` or after a requested interaction/frontend/manual action is completed through a public surface.
 
+Operator-initiated interventions are public-surface actions, not private runner
+repairs. When a profile asks for interactive operator-request coverage, the
+runner must create the request through `aor request create` or
+`POST /api/projects/:projectId/operator-requests`, run it through
+`aor request run` or the request action route, and inspect only durable
+request, proposal, patch, step-result, and next-action evidence. The runner
+must not call `run steer` with free-form text or mutate target files directly.
+
 Full-journey implementation is iterative. Acceptance profiles declare `implementation_loop.enabled=true`, `max_iterations`, `review_repair_actions`, and `stop_on_blocking_review`. The public lifecycle may repeat `execution#N -> review#N` until review and verification pass or the iteration budget is exhausted. Runtime Harness internal repair remains execution-health evidence only; it does not replace the public `run start` / `review run` / `review decide --decision request-repair` loop.
 
 W14 extends the full-journey layer into a curated matrix across:
@@ -176,6 +184,13 @@ node ./scripts/live-e2e/manual-live-e2e.mjs \
 ```
 
 Interaction answers must still go through `aor run answer` or the HTTP answer route; a local operator decision file cannot substitute for answer audit evidence.
+
+Operator-initiated requests use `aor request create/run/status` and stay
+separate from runtime-initiated `requested_interaction` answers. A no-write
+analysis request may target current evidence refs from the step observation.
+A document-change rehearsal must use `delivery-mode=patch-only` with explicit
+`--allowed-path` and must assert that proposal/patch evidence exists while no
+upstream write occurs.
 
 ## Step evaluator
 Use the step evaluator when the run must fail closed if any controller phase evidence is missing:

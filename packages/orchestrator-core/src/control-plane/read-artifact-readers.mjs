@@ -4,7 +4,7 @@ import path from "node:path";
 import { loadContractFile } from "../../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
 
-const ARTIFACT_PACKET_REGEX = /^[^.]+\.(artifact)\.[^.]+\.[^.]+\.json$/;
+const ARTIFACT_PACKET_REGEX = /^.+\.artifact\..+\.json$/;
 const WAVE_TICKET_REGEX = /^wave-ticket-.*\.json$/;
 const HANDOFF_PACKET_REGEX = /^[^.]+\.handoff\..*\.json$/;
 const DELIVERY_PLAN_REGEX = /^delivery-plan-.*\.json$/;
@@ -25,6 +25,7 @@ const LEARNING_LOOP_SCORECARD_REGEX = /^learning-loop-scorecard-.*\.json$/;
 const LEARNING_LOOP_HANDOFF_REGEX = /^learning-loop-handoff-.*\.json$/;
 const RUN_CONTROL_AUDIT_REGEX = /^run-control-event-.*\.json$/;
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/;
+const OPERATOR_REQUEST_REGEX = /^operator-request-.*\.json$/;
 
 /**
  * @param {string} value
@@ -329,6 +330,43 @@ export function listRunControlAudits(options = {}) {
   const init = initializeProjectRuntime(options);
   const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
   return loadJsonDocuments({ init, files: reportFiles, matcher: RUN_CONTROL_AUDIT_REGEX });
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @returns {Record<string, unknown>}
+ */
+function sanitizeOperatorRequestDocument(document) {
+  const sanitized = { ...document };
+  delete sanitized.request_text;
+  if (typeof sanitized.request_summary !== "string" || sanitized.request_summary.trim().length === 0) {
+    const raw = typeof document.request_text === "string" ? document.request_text.replace(/\s+/gu, " ").trim() : "";
+    sanitized.request_summary = raw.length > 220 ? `${raw.slice(0, 217)}...` : raw;
+  }
+  return sanitized;
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ * }} options
+ */
+export function listOperatorRequests(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  return loadContractDocuments({
+    init,
+    files: reportFiles,
+    family: "operator-request",
+    matcher: OPERATOR_REQUEST_REGEX,
+  }).map((entry) => ({
+    ...entry,
+    operator_request_ref: `packet://operator-request@${entry.artifact_ref}`,
+    document: sanitizeOperatorRequestDocument(entry.document),
+  }));
 }
 
 /**

@@ -287,5 +287,15 @@ This is the master index for the implementation slices across all defined waves.
 | W30-S05 | Alpha readiness gate expansion | EPIC-0 | done | `scripts/**`, `docs/ops/**`, `docs/contracts/**`, `docs/product/**`, tests | W30-S04 |
 | W30-S06 | Alpha release and onboarding proof refresh | EPIC-5 | done | `docs/ops/**`, `scripts/**`, `docs/product/**`, `package.json`, release tests | W30-S05 |
 
+## W31 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W31-S01 | Installed-user local app launch and onboarding UI | EPIC-6 | done | `apps/web/**`, `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/backlog/**`, `scripts/**`, `package.json` | W30-S06 |
+
+## W32 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W32-S01 | Operator-request interactive runtime flow | EPIC-6 | done | `packages/contracts/**`, `packages/orchestrator-core/**`, `apps/web/**`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/**`, `scripts/**` | W31-S01, W24-S02 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

@@ -109,7 +109,7 @@ try {
   }
 
   const appHelp = runChecked(process.execPath, [installedBin, "app", "--help"], { cwd: installRoot });
-  if (!appHelp.stdout.includes("web console is optional") || !appHelp.stdout.includes("CLI/API/headless")) {
+  if (!appHelp.stdout.includes("local loopback web console") || !appHelp.stdout.includes("--smoke --open false --json")) {
     throw new Error(`Installed package app help did not preserve optional API/web boundary:\n${appHelp.stdout}`);
   }
 
@@ -130,8 +130,33 @@ try {
     throw new Error("Installed package onboard smoke did not write expected runtime evidence.");
   }
 
+  const appSmoke = parseJsonOutput(
+    runChecked(process.execPath, [
+      installedBin,
+      "app",
+      "--project-ref",
+      targetRepo,
+      "--runtime-root",
+      runtimeRoot,
+      "--smoke",
+      "true",
+      "--open",
+      "false",
+      "--json",
+    ]).stdout,
+  );
+  if (
+    appSmoke.command !== "app" ||
+    appSmoke.status !== "smoke-pass" ||
+    appSmoke.html_loaded !== true ||
+    appSmoke.config_project_id !== appSmoke.project_id ||
+    appSmoke.state_project_id !== appSmoke.project_id
+  ) {
+    throw new Error(`Installed package app smoke failed:\n${JSON.stringify(appSmoke, null, 2)}`);
+  }
+
   assertOnlyRuntimeStateChanged(targetRepo);
-  process.stdout.write(`release smoke ok: installed ${tarballName} and ran no-write onboarding plus optional app-boundary smoke\n`);
+  process.stdout.write(`release smoke ok: installed ${tarballName} and ran no-write onboarding plus local app smoke\n`);
 } catch (error) {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exit(1);

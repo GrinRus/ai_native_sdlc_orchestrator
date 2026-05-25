@@ -34,6 +34,47 @@ Guardrail behavior:
 - missing `--target-step` blocks operation as out-of-scope;
 - high-risk steer may require `--approval-ref` by policy.
 
+`run steer` remains a run-control transition. Do not put free-form work
+instructions into `run steer`; use `aor request create` and `aor request run`
+when the operator wants AOR to analyze, explain, repair, revise, validate,
+plan, implement, or review bounded artifacts through the runtime.
+
+## Operator-initiated runtime work
+```bash
+aor request create \
+  --project-ref <AOR_WORKSPACE> \
+  --runtime-root <AOR_WORKSPACE>/.aor \
+  --stage execution \
+  --intent repair \
+  --request "Analyze the failed run evidence and propose a safe repair." \
+  --target-ref evidence://.aor/projects/<PROJECT_ID>/reports/step-result-<RUN_ID>.json \
+  --delivery-mode no-write \
+  --json
+
+aor request run \
+  --project-ref <AOR_WORKSPACE> \
+  --runtime-root <AOR_WORKSPACE>/.aor \
+  --request-ref <OPERATOR_REQUEST_REF> \
+  --target-step repair \
+  --json
+```
+
+Expected output fields:
+- `operator_request_ref`
+- `operator_request_run.run_id`
+- `routed_step_result_file`
+- `compiled_context_ref`
+- `proposal_refs`
+- `patch_refs`
+- `next_action_report_file`
+
+Safety behavior:
+- `delivery-mode` defaults to `no-write`;
+- `patch-only`, `local-branch`, and `fork-first-pr` require explicit
+  `--allowed-path` scope;
+- raw request text is stored only in the durable `operator-request` artifact;
+- status, list, API, and web read surfaces show sanitized summaries and refs.
+
 ## Cancel
 ```bash
 aor run cancel \

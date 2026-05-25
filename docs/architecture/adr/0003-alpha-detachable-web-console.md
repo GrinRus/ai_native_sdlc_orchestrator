@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted for W30 alpha hardening.
+Accepted for W30 alpha hardening. Amended by ADR 0004 for W31 packaged local
+SPA launch.
 
 ## Context
 
@@ -17,12 +18,17 @@ detachable. CLI/API/headless operation must remain valid without the web app.
 Release smoke coverage may verify web/API guidance, but it must not require a
 hosted service or make the web console the runtime owner.
 
+ADR 0004 amends this boundary: the npm alpha may include a packaged local SPA
+and `aor app` may launch it as a supported installed-user surface, as long as
+headless CLI/API/runtime operation remains valid without that SPA.
+
 ## Consequences
 
 - Web actions must continue to call control-plane mutations or read models.
 - Self-hosted release docs describe the web console as optional.
-- Installed-package smoke tests can verify `aor app --help` guidance without
-  starting a hosted UI.
+- Installed-package smoke tests can verify `aor app --smoke --open false --json`
+  without starting a hosted UI or requiring the web console for runtime
+  operation.
 - Next.js/React target work remains a future architecture track.
 
 ## Migration triggers

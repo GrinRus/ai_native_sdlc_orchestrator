@@ -42,6 +42,10 @@ read_operations:
     operation_family: read
     output_contract_families:
       - next-action-report
+  - operation_id: read.operator-requests
+    operation_family: read
+    output_contract_families:
+      - operator-request
 
 run_control_operations:
   - operation_id: run.start
@@ -73,6 +77,27 @@ live_event_operations:
     event_contract_family: live-run-event
     replay_supported: true
     backpressure: bounded-replay-window
+
+operator_request_operations:
+  owning_slice: W32-S01
+  status: implemented-bounded-subset
+  request_contract_family: operator-request
+  create:
+    operation_id: operator-request.create
+    route: POST /api/projects/:projectId/operator-requests
+    raw_request_text_storage: durable-artifact-only
+    read_surface_payload: sanitized-summary-and-refs
+  run:
+    operation_id: operator-request.run
+    route: POST /api/projects/:projectId/operator-requests/:requestId/actions
+    action: run
+    routed_runtime: true
+    context_packet_ref: packet://operator-request
+    refreshes_next_action_report: true
+  status_read:
+    operation_id: operator-request.status
+    route: GET /api/projects/:projectId/operator-requests
+    raw_request_text_storage: omitted-from-read-surface
 
 lifecycle_command_operations:
   owning_slice: W18-S02
@@ -173,6 +198,7 @@ deferred_transport:
     - GET /api/projects/:projectId/planner-metrics
     - GET /api/projects/:projectId/finance-monitoring
     - GET /api/projects/:projectId/next-action-report
+    - GET /api/projects/:projectId/operator-requests
     - GET /api/projects/:projectId/packets
     - GET /api/projects/:projectId/step-results
     - GET /api/projects/:projectId/quality-artifacts
@@ -184,6 +210,8 @@ deferred_transport:
     - GET /api/projects/:projectId/runs/:runId/policy-history
     - GET /api/projects/:projectId/runs/:runId/events
     - POST /api/projects/:projectId/run-control/actions
+    - POST /api/projects/:projectId/operator-requests
+    - POST /api/projects/:projectId/operator-requests/:requestId/actions
     - POST /api/projects/:projectId/ui-lifecycle/actions
     - POST /api/projects/:projectId/lifecycle-command/actions
     - POST /api/projects/:projectId/interactions/answers

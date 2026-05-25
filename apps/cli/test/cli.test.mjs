@@ -562,6 +562,7 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     const appHuman = invokeCli(["app", "--project-ref", projectRoot]);
     assert.equal(appHuman.exitCode, 0, appHuman.stderr);
     assert.match(appHuman.stdout, /^aor app\nStatus: ready/m);
+    assert.match(appHuman.stdout, /launch: aor app/);
     assert.match(appHuman.stdout, /mandatory: false/);
 
     const appJson = invokeCli(["app", "--project-ref", projectRoot, "--json"]);
@@ -569,6 +570,75 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     const appPayload = JSON.parse(appJson.stdout);
     assert.equal(appPayload.guided_web_surface.optional, true);
     assert.equal(appPayload.guided_web_surface.mandatory, false);
+    assert.equal(appPayload.guided_web_surface.app_mode, "local-spa");
+    assert.match(appPayload.guided_web_surface.launch_command, /aor app/);
+    assert.match(appPayload.guided_web_surface.smoke_command, /--smoke true --open false --json/);
+
+    const appSmoke = spawnSync(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "app",
+      "--project-ref",
+      projectRoot,
+      "--smoke",
+      "true",
+      "--open",
+      "false",
+      "--json",
+    ], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+    assert.equal(appSmoke.status, 0, appSmoke.stderr);
+    const appSmokePayload = JSON.parse(appSmoke.stdout);
+    assert.equal(appSmokePayload.status, "smoke-pass");
+    assert.equal(appSmokePayload.html_loaded, true);
+    assert.equal(appSmokePayload.state_project_id, appSmokePayload.project_id);
+
+    const invalidAppPort = spawnSync(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "app",
+      "--project-ref",
+      projectRoot,
+      "--port",
+      "12abc",
+      "--open",
+      "false",
+    ], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+    assert.equal(invalidAppPort.status, 1);
+    assert.match(invalidAppPort.stderr, /--port/);
+
+    const invalidAppHost = spawnSync(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "app",
+      "--project-ref",
+      projectRoot,
+      "--host",
+      "http://127.0.0.1",
+      "--open",
+      "false",
+    ], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+    assert.equal(invalidAppHost.status, 1);
+    assert.match(invalidAppHost.stderr, /--host/);
+
+    const missingAppProject = spawnSync(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "app",
+      "--project-ref",
+      path.join(projectRoot, "missing"),
+      "--open",
+      "false",
+    ], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+    assert.equal(missingAppProject.status, 1);
+    assert.match(missingAppProject.stderr, /does not exist or is not a directory/);
 
     const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
     assert.equal(nextJson.exitCode, 0, nextJson.stderr);
@@ -605,6 +675,7 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
           guided_stage: appPayload.guided_stage,
           guided_web_optional: appPayload.guided_web_surface.optional,
           guided_web_mandatory: appPayload.guided_web_surface.mandatory,
+          app_mode: appPayload.guided_web_surface.app_mode,
         },
         next: {
           command: nextPayload.command,

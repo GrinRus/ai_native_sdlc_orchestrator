@@ -103,6 +103,8 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W24:** `W24-S02` Interactive continuation hardening
 - **W27:** `W27-S02` Runtime interaction resume
 - **W30:** `W30-S03` Machine-readable detached API contract
+- **W31:** `W31-S01` Installed-user local app launch and onboarding UI
+- **W32:** `W32-S01` Operator-request interactive runtime flow
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.

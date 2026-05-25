@@ -842,6 +842,7 @@ function writeRuntimeRepairInput(options) {
  *   promotionEvidenceRefs?: string[],
  *   coordinationEvidenceRefs?: string[],
  *   runtimeEvidenceRefs?: string[],
+ *   operatorRequestRef?: string,
  * }} options
  */
 export function executeRoutedStep(options) {
@@ -1303,6 +1304,7 @@ export function executeRoutedStep(options) {
       adapter_resolution: adapterResolution,
       adapter_request: adapterRequest,
       adapter_response: adapterResponse,
+      operator_request_ref: asString(options.operatorRequestRef),
       context_compilation: {
         compiled_context_ref: compiledContextRef,
         compiled_context_file: compiledContextArtifactPath,

@@ -662,6 +662,28 @@ test("operator console smoke script renders html and emits transcript summary", 
   });
 });
 
+test("packaged SPA exposes installed-user guided mission controls", () => {
+  const source = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(workspaceRoot, "apps/web/src/spa.css"), "utf8");
+
+  for (const required of [
+    "safe-walkthrough",
+    "Create mission",
+    "Mission intake",
+    "Next action",
+    "Evidence refs",
+    "No upstream writes",
+    "lifecycle-command/actions",
+    "mission create",
+    "next",
+    "next?.document ?? next",
+  ]) {
+    assert.ok(source.includes(required), `SPA source should include '${required}'`);
+  }
+  assert.ok(css.includes(".app-shell"), "SPA CSS should define app shell layout");
+  assert.ok(css.includes(".right-rail"), "SPA CSS should define evidence rail layout");
+});
+
 test("web connected mode consumes detached HTTP/SSE transport while preserving detachable session behavior", async () => {
   await withTempProject(async (projectRoot) => {
     const runId = seedOperatorArtifacts(projectRoot);

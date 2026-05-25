@@ -1,12 +1,12 @@
 # Supported user stories
 
-This document groups the AOR user-story surface into role clusters. The current working set still maps to **112 stories** across the lifecycle, but this document is intentionally easier to navigate than a flat list.
+This document groups the AOR user-story surface into role clusters. The current working set maps to **114 stories** across the lifecycle, but this document is intentionally easier to navigate than a flat list.
 
 The flat, machine-checkable registry lives in `docs/product/user-story-coverage-matrix.md`. It assigns stable story IDs, tiers, implementation evidence, coverage status, and backlog gap references for every story in this working set.
 
 ## Coverage summary
-- Total stories: **112**
-- MVP: **73**
+- Total stories: **114**
+- MVP: **75**
 - MVP+: **24**
 - Later: **15**
 
@@ -20,11 +20,11 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 | Delivery engineer | 10 | 7 | 2 | 1 |
 | Reviewer / QA | 6 | 4 | 1 | 1 |
 | AI platform owner | 12 | 6 | 4 | 2 |
-| Operator / SRE | 10 | 8 | 1 | 1 |
+| Operator / SRE | 11 | 9 | 1 | 1 |
 | Security / compliance | 6 | 4 | 1 | 1 |
 | Repository / multirepo owner | 6 | 4 | 1 | 1 |
 | Incident / improvement owner | 6 | 3 | 2 | 1 |
-| Project bootstrap / onboarding | 8 | 5 | 2 | 1 |
+| Project bootstrap / onboarding | 9 | 6 | 2 | 1 |
 | Delivery transaction / Git / PR | 8 | 5 | 2 | 1 |
 | Finance / audit / hygiene | 8 | 4 | 3 | 1 |
 
@@ -91,8 +91,11 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 - Run full-journey live acceptance only on curated repositories and curated feature missions.
 - Select the required matrix cell by scenario family, pinned provider variant, and declared feature size.
 - Track which required matrix cells are still uncovered after each live E2E run.
+- Ask AOR to analyze or change bounded project artifacts from any flow stage through runtime-owned request evidence.
 
 W18 closes the connected operator-surface path for runner-requested questions: surface the question from `step-result.requested_interaction`, submit an approved operator answer through the control plane, emit query-safe live events, and keep the answer trail auditable without making the web UI own orchestration.
+
+`W32-S01` adds operator-initiated runtime intervention: CLI, API, and web can create a durable `operator-request`, compile it into the selected runtime step, and materialize proposal/patch evidence while keeping `run steer` as run-control only.
 
 ### Security / compliance
 - Enforce provider and adapter allowlists.
@@ -123,6 +126,8 @@ Bounded multirepo means one AOR project profile can coordinate several explicit 
 `W21-S01` makes onboarding a first-class installed-user journey rather than a list of independent bootstrap commands. Later W21 slices implement the guided CLI shortcuts, asset-mode onboarding report, next-action resolver, guided web stages, closure UX, and proof rehearsal.
 
 `W21-S04` closes the guided mission and next-action resolver portion: installed users get one primary next command, evidence refs, blockers, active-run handling, and explicit write-back policy before delivery-capable work is recommended.
+
+`W31-S01` closes the installed-user local UI intake story: a user who installed `@grinrus/aor` can run `aor onboard .`, launch `aor app`, apply the safe walkthrough Mission template, submit the first mission, and see the refreshed next action, blockers, evidence refs, and `.aor/` runtime root without reading internal implementation docs.
 
 ### Delivery transaction / Git / PR flow
 - Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.
