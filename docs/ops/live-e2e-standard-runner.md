@@ -98,6 +98,8 @@ Provider permission-mode analogues:
 - Qwen candidate full-bypass: `qwen --output-format json --approval-mode yolo`.
 - Qwen candidate restricted: `qwen --output-format json --approval-mode default`.
 
+Use `runtime-permission-runner-certification.md` for the post-merge real-runner smoke lane that checks these mappings without changing contracts or provider status.
+
 Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. Preflight and full external runner execution are hard local subprocess bounds: a runner that exceeds them has its local process group killed and is reported as timeout evidence instead of leaving the public lifecycle waiting indefinitely. Per-step policy budgets may shorten an external runner request, but they must not extend it beyond the adapter profile timeout. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
 
 Live adapter request and raw-output evidence files must use bounded filenames. Full-journey run ids, repair suffixes, step ids, and request ids can be long, so the persisted file name keeps the adapter prefix for operator readability and uses a short token plus hash for uniqueness. The evidence ref remains the durable contract; consumers must not depend on the full run id being embedded in the basename.
