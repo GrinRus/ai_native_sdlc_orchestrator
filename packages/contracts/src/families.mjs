@@ -720,6 +720,8 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       strictness_profile: "string",
       overall_decision: "string",
       step_decisions: "array",
+      runtime_permission_summary: "object",
+      runtime_permission_decisions: "array",
       run_findings: "array",
       recommendations: "array",
       impacted_asset_refs: "array",

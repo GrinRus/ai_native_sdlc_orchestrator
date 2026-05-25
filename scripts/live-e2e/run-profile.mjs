@@ -16,6 +16,8 @@ import {
   readJson,
   requireDirectory,
   resolveOptionalStringFlag,
+  resolveRuntimeAgentAutoApprovalProfile,
+  resolveRuntimeAgentInteractionPolicy,
   resolveRunnerAuthMode,
   resolveRuntimeAgentPermissionMode,
   uniqueStrings,
@@ -1237,6 +1239,13 @@ function writeProofRunnerArtifacts(options) {
   options.flowResult.artifacts.proof_eligible_tier = canonicalStatus.proof_eligible_tier;
   options.flowResult.artifacts.required_matrix_acceptance_closed = canonicalStatus.required_matrix_acceptance_closed;
   const sourceMetadata = resolveHostSourceMetadata(options.hostRoot);
+  const latestRuntimeHarnessReportFile =
+    productionProof?.evidence_refs?.runtime_harness_report_file ??
+    asNonEmptyString(options.flowResult.artifacts.latest_runtime_harness_report_file) ??
+    asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file) ??
+    null;
+  const latestRuntimeHarnessReport = readJsonIfPresent(latestRuntimeHarnessReportFile);
+  const runtimePermissionSummary = asRecord(latestRuntimeHarnessReport.runtime_permission_summary);
 
   const summary = {
     run_id: options.runId,
@@ -1369,10 +1378,12 @@ function writeProofRunnerArtifacts(options) {
       asNonEmptyString(options.flowResult.artifacts.review_report_file) ??
       null,
     latest_runtime_harness_report_file:
-      productionProof?.evidence_refs?.runtime_harness_report_file ??
-      asNonEmptyString(options.flowResult.artifacts.latest_runtime_harness_report_file) ??
-      asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file) ??
-      null,
+      latestRuntimeHarnessReportFile,
+    runtime_permission_summary:
+      Object.keys(runtimePermissionSummary).length > 0 ? runtimePermissionSummary : null,
+    runtime_permission_decisions: Array.isArray(latestRuntimeHarnessReport.runtime_permission_decisions)
+      ? latestRuntimeHarnessReport.runtime_permission_decisions
+      : [],
     coverage_follow_up:
       typeof options.flowResult.artifacts.coverage_follow_up === "object" && options.flowResult.artifacts.coverage_follow_up
         ? options.flowResult.artifacts.coverage_follow_up
@@ -1380,7 +1391,7 @@ function writeProofRunnerArtifacts(options) {
     scorecard_files: [scorecardFile],
     control_surfaces: {
       installed_user_proof_runner:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
       manual_live_e2e:
         "node ./scripts/live-e2e/manual-live-e2e.mjs --project-ref <path> --profile <path> --run-id <id>",
       step_evaluator:
@@ -1394,6 +1405,9 @@ function writeProofRunnerArtifacts(options) {
     runner_auth_mode: asNonEmptyString(options.flowResult.artifacts.runner_auth_mode) || null,
     runner_auth_source: asNonEmptyString(options.flowResult.artifacts.runner_auth_source) || null,
     runtime_agent_permission_mode: asNonEmptyString(options.flowResult.artifacts.runtime_agent_permission_mode) || null,
+    runtime_agent_interaction_policy: asNonEmptyString(options.flowResult.artifacts.runtime_agent_interaction_policy) || null,
+    runtime_agent_auto_approval_profile:
+      asNonEmptyString(options.flowResult.artifacts.runtime_agent_auto_approval_profile) || null,
     error:
       observationReport.overall_status === "not_pass"
         ? options.flowResult.stageResults.find((stage) => stage.status === "fail")?.summary ||
@@ -1445,7 +1459,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
         "",
         "Installed-user black-box proof runner with online step-controller evaluation.",
       ].join("\n"),
@@ -1473,6 +1487,17 @@ function runCli(rawArgs) {
   const runnerAuthMode = resolveRunnerAuthMode(resolveOptionalStringFlag(flags["runner-auth-mode"], "runner-auth-mode"));
   const runtimeAgentPermissionMode = resolveRuntimeAgentPermissionMode(
     resolveOptionalStringFlag(flags["runtime-agent-permission-mode"], "runtime-agent-permission-mode"),
+  );
+  const runtimeAgentInteractionPolicy = resolveRuntimeAgentInteractionPolicy(
+    resolveOptionalStringFlag(flags["runtime-agent-interaction-policy"], "runtime-agent-interaction-policy"),
+  );
+  const requestedAutoApprovalProfile = resolveOptionalStringFlag(
+    flags["runtime-agent-auto-approval-profile"],
+    "runtime-agent-auto-approval-profile",
+  );
+  const runtimeAgentAutoApprovalProfile = resolveRuntimeAgentAutoApprovalProfile(
+    requestedAutoApprovalProfile ??
+      (runtimeAgentInteractionPolicy === "orchestrator-mediated" ? "conservative" : null),
   );
   const controllerMode = resolveLiveE2eControllerMode(resolveOptionalStringFlag(flags["controller-mode"], "controller-mode"));
   const explicitExamplesRoot =
@@ -1592,6 +1617,8 @@ function runCli(rawArgs) {
         aor_installation_proof_file: asNonEmptyString(aorInstallation.proofFile),
         live_e2e_setup_journal_entries: [asRecord(aorInstallation.setupEntry)],
         runtime_agent_permission_mode: runtimeAgentPermissionMode,
+        runtime_agent_interaction_policy: runtimeAgentInteractionPolicy,
+        runtime_agent_auto_approval_profile: runtimeAgentAutoApprovalProfile,
       },
     };
   } else {
@@ -1619,6 +1646,8 @@ function runCli(rawArgs) {
             coverageTier: fullJourneyResolution.coverageTier,
             runnerAuthMode,
             runtimeAgentPermissionMode,
+            runtimeAgentInteractionPolicy,
+            runtimeAgentAutoApprovalProfile,
             authProbeRequired: resolveAuthProbeRequired(profile),
             stepController,
           })
@@ -1631,6 +1660,8 @@ function runCli(rawArgs) {
             aorLaunch,
             runnerAuthMode,
             runtimeAgentPermissionMode,
+            runtimeAgentInteractionPolicy,
+            runtimeAgentAutoApprovalProfile,
             stepController,
             examplesRoot:
               examplesRoot ??
@@ -1661,6 +1692,8 @@ function runCli(rawArgs) {
           aor_installation_proof_file: aorInstallation.proofFile,
           live_e2e_setup_journal_entries: [aorInstallation.setupEntry],
           runtime_agent_permission_mode: runtimeAgentPermissionMode,
+          runtime_agent_interaction_policy: runtimeAgentInteractionPolicy,
+          runtime_agent_auto_approval_profile: runtimeAgentAutoApprovalProfile,
         },
       };
     }

@@ -376,13 +376,56 @@ function collectRunnerInteractions(stepResults) {
         step_result_id: asString(entry.document.step_result_id),
         step_result_ref: asString(entry.artifact_ref) ?? asString(entry.file),
         interaction_id: asString(requestedInteraction.interaction_id),
+        interaction_type: asString(requestedInteraction.interaction_type) ?? "clarification_question",
         interaction_status: status,
         question_summary: asString(requestedInteraction.prompt_summary) ?? asString(requestedInteraction.summary),
         answer_required: status === "requested",
+        runtime_permission_request: asRecord(requestedInteraction.runtime_permission_request),
+        runtime_permission_decision: asRecord(requestedInteraction.runtime_permission_decision),
         answer_audit_refs: Array.isArray(requestedInteraction.answer_audit_refs)
           ? requestedInteraction.answer_audit_refs.filter((value) => typeof value === "string")
           : [],
         continuation: asRecord(requestedInteraction.continuation),
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * @param {Array<{ artifact_ref?: string, file?: string, document: Record<string, unknown> }>} stepResults
+ * @returns {Array<Record<string, unknown>>}
+ */
+function collectRuntimePermissionDecisions(stepResults) {
+  return stepResults
+    .map((entry) => {
+      const requestedInteraction = asRecord(entry.document.requested_interaction);
+      const topLevelRequest = asRecord(entry.document.runtime_permission_request);
+      const interactionRequest = asRecord(requestedInteraction.runtime_permission_request);
+      const permissionRequest = Object.keys(topLevelRequest).length > 0 ? topLevelRequest : interactionRequest;
+      const topLevelDecision = asRecord(entry.document.runtime_permission_decision);
+      const interactionDecision = asRecord(requestedInteraction.runtime_permission_decision);
+      const permissionDecision = Object.keys(topLevelDecision).length > 0 ? topLevelDecision : interactionDecision;
+      if (Object.keys(permissionDecision).length === 0) {
+        return null;
+      }
+      return {
+        run_id: asString(entry.document.run_id),
+        step_id: asString(entry.document.step_id),
+        step_result_id: asString(entry.document.step_result_id),
+        step_result_ref: asString(entry.artifact_ref) ?? asString(entry.file),
+        interaction_id: asString(requestedInteraction.interaction_id),
+        adapter_id: asString(permissionRequest.adapter_id),
+        permission_mode: asString(permissionRequest.permission_mode),
+        operation_type: asString(permissionRequest.operation_type) ?? "unknown",
+        target: asString(permissionRequest.target) ?? asString(permissionRequest.target_path),
+        command: asString(permissionRequest.command),
+        decision: asString(permissionDecision.decision) ?? "unknown",
+        rule_id: asString(permissionDecision.rule_id),
+        approval_scope: asString(permissionDecision.approval_scope),
+        approval_resume_mode: asString(permissionDecision.approval_resume_mode),
+        continuation_strategy: asString(permissionDecision.continuation_strategy),
+        audit_ref: asString(permissionDecision.audit_ref),
+        grant_ref: asString(permissionDecision.grant_ref),
       };
     })
     .filter(Boolean);
@@ -1122,6 +1165,7 @@ export async function applyOperatorLifecycleCommand(options) {
  *   runId: string,
  *   interactionId: string,
  *   answer: string,
+ *   decision?: string,
  *   reason?: string,
  *   approvalRef?: string,
  *   answerEvidenceRef?: string,
@@ -1145,6 +1189,7 @@ export async function submitOperatorInteractionAnswer(options) {
         run_id: options.runId,
         interaction_id: options.interactionId,
         answer: options.answer,
+        decision: options.decision ?? null,
         reason: options.reason ?? null,
         approval_ref: options.approvalRef ?? null,
         answer_evidence_ref: options.answerEvidenceRef ?? null,
@@ -1167,6 +1212,7 @@ export async function submitOperatorInteractionAnswer(options) {
     runId: options.runId,
     interactionId: options.interactionId,
     answer: options.answer,
+    decision: options.decision,
     reason: options.reason,
     approvalRef: options.approvalRef,
     answerEvidenceRef: options.answerEvidenceRef,
@@ -1180,6 +1226,7 @@ export async function submitOperatorInteractionAnswer(options) {
       interaction_id: result.interactionId,
       interaction_status: result.interactionStatus,
       answer_accepted: result.answerAccepted,
+      decision: result.decision ?? null,
       answer_audit_ref: result.answerAuditRef,
       step_result_ref: result.stepResultRef,
       blocked: result.blocked,
@@ -1242,6 +1289,7 @@ export async function buildOperatorConsoleSnapshot(options) {
         })
       : null;
 
+    const selectedStepResults = filterArtifactsByRunId(stepResults, selectedRunId);
     return withGuidedLifecycle({
       project: state,
       ui_lifecycle: uiLifecycle.state,
@@ -1258,8 +1306,9 @@ export async function buildOperatorConsoleSnapshot(options) {
       finance_monitoring: financeMonitoring,
       run_detail: {
         packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
-        step_results: filterArtifactsByRunId(stepResults, selectedRunId),
-        interactions: collectRunnerInteractions(filterArtifactsByRunId(stepResults, selectedRunId)),
+        step_results: selectedStepResults,
+        interactions: collectRunnerInteractions(selectedStepResults),
+        runtime_permission_decisions: collectRuntimePermissionDecisions(selectedStepResults),
         quality_artifacts: filterArtifactsByRunId(qualityArtifacts, selectedRunId),
         delivery_manifests: filterArtifactsByRunId(deliveryManifests, selectedRunId),
         promotion_decisions: filterArtifactsByRunId(promotionDecisions, selectedRunId),
@@ -1385,6 +1434,7 @@ export async function buildOperatorConsoleSnapshot(options) {
       ])
     : [null, null];
 
+  const selectedStepResults = filterArtifactsByRunId(stepResults, selectedRunId);
   return withGuidedLifecycle({
     project: state,
     ui_lifecycle: uiLifecycle.state,
@@ -1401,8 +1451,9 @@ export async function buildOperatorConsoleSnapshot(options) {
     finance_monitoring: financeRaw,
     run_detail: {
       packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
-      step_results: filterArtifactsByRunId(stepResults, selectedRunId),
-      interactions: collectRunnerInteractions(filterArtifactsByRunId(stepResults, selectedRunId)),
+      step_results: selectedStepResults,
+      interactions: collectRunnerInteractions(selectedStepResults),
+      runtime_permission_decisions: collectRuntimePermissionDecisions(selectedStepResults),
       quality_artifacts: filterArtifactsByRunId(qualityArtifacts, selectedRunId),
       delivery_manifests: filterArtifactsByRunId(deliveryManifests, selectedRunId),
       promotion_decisions: filterArtifactsByRunId(promotionDecisions, selectedRunId),
@@ -1525,9 +1576,30 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
     .map((interaction) => {
       const interactionId = escapeHtml(String(interaction.interaction_id ?? "n/a"));
       const status = escapeHtml(String(interaction.interaction_status ?? "unknown"));
+      const interactionType = escapeHtml(String(interaction.interaction_type ?? "clarification_question"));
       const summary = escapeHtml(String(interaction.question_summary ?? "No summary available."));
       const answerRequired = interaction.answer_required === true ? "yes" : "no";
-      return `<li><code>${interactionId}</code> status=<code>${status}</code> answer_required=<code>${answerRequired}</code> ${summary}</li>`;
+      const permissionRequest = asRecord(interaction.runtime_permission_request);
+      const operation = escapeHtml(String(permissionRequest.operation_type ?? "n/a"));
+      const target = escapeHtml(String(permissionRequest.target ?? permissionRequest.command ?? "n/a"));
+      return `<li><code>${interactionId}</code> type=<code>${interactionType}</code> status=<code>${status}</code> answer_required=<code>${answerRequired}</code> op=<code>${operation}</code> target=<code>${target}</code> ${summary}</li>`;
+    })
+    .join("\n");
+  const runtimePermissionItems = (
+    Array.isArray(snapshot.run_detail.runtime_permission_decisions)
+      ? snapshot.run_detail.runtime_permission_decisions
+      : []
+  )
+    .map((entry) => {
+      const decision = escapeHtml(String(entry.decision ?? "unknown"));
+      const operation = escapeHtml(String(entry.operation_type ?? "unknown"));
+      const target = escapeHtml(String(entry.target ?? entry.command ?? "n/a"));
+      const adapter = escapeHtml(String(entry.adapter_id ?? "n/a"));
+      const mode = escapeHtml(String(entry.permission_mode ?? "n/a"));
+      const ruleId = escapeHtml(String(entry.rule_id ?? "n/a"));
+      const auditRef = escapeHtml(String(entry.audit_ref ?? "n/a"));
+      const continuation = escapeHtml(String(entry.continuation_strategy ?? "n/a"));
+      return `<li><code>${decision}</code> op=<code>${operation}</code> target=<code>${target}</code> adapter=<code>${adapter}</code> mode=<code>${mode}</code> rule=<code>${ruleId}</code> continuation=<code>${continuation}</code> audit=<code>${auditRef}</code></li>`;
     })
     .join("\n");
   const lifecycleItems = (snapshot.api_ui_contract_alignment.lifecycle_commands ?? [])
@@ -1667,6 +1739,10 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
     <section class="panel">
       <h2>Runner interactions</h2>
       <ul>${interactionItems || "<li>No pending runner interactions.</li>"}</ul>
+    </section>
+    <section class="panel">
+      <h2>Runtime permission decisions</h2>
+      <ul>${runtimePermissionItems || "<li>No runtime permission decisions for selected run.</li>"}</ul>
     </section>
     <section class="panel">
       <h2>Run detail evidence links</h2>

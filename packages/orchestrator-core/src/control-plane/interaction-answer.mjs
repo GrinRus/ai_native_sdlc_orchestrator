@@ -140,6 +140,32 @@ function optionalRecord(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {"approve_once" | "approve_for_run" | "deny" | null}
+ */
+function normalizeOperatorDecision(value) {
+  const normalized = asString(value);
+  if (normalized === "approve_once" || normalized === "approve_for_run" || normalized === "deny") {
+    return normalized;
+  }
+  return null;
+}
+
+/**
+ * @param {string | null} decision
+ * @returns {"user_approved" | "user_denied" | null}
+ */
+function runtimePermissionDecisionValue(decision) {
+  if (decision === "approve_once" || decision === "approve_for_run") {
+    return "user_approved";
+  }
+  if (decision === "deny") {
+    return "user_denied";
+  }
+  return null;
+}
+
+/**
  * @param {{
  *   status: "requested" | "answered" | "resumed" | "resume_failed" | "blocked",
  *   timestamp: string,
@@ -201,6 +227,7 @@ function resolveExistingStateHistory(options) {
  *   runId: string,
  *   interactionId: string,
  *   answer: string,
+ *   decision?: string,
  *   reason?: string,
  *   approvalRef?: string,
  *   answerEvidenceRef?: string,
@@ -227,6 +254,47 @@ export function submitInteractionAnswer(options) {
   const auditFile = path.join(init.runtimeLayout.reportsRoot, `${auditId}.json`);
   const answerAuditRef = toEvidenceRef(init, auditFile);
   const answerEvidenceRefs = uniqueStrings([options.answerEvidenceRef ?? ""]);
+  const operatorDecision = normalizeOperatorDecision(options.decision);
+  if (options.decision !== undefined && !operatorDecision) {
+    throw new InteractionAnswerError(
+      400,
+      "interaction_answer.invalid_decision",
+      "decision must be one of: approve_once, deny, approve_for_run.",
+    );
+  }
+  const permissionInteraction = asString(match.requestedInteraction.interaction_type) === "permission_request";
+  if (permissionInteraction && !operatorDecision) {
+    throw new InteractionAnswerError(
+      400,
+      "interaction_answer.decision_required",
+      "permission_request interactions require decision=approve_once, deny, or approve_for_run.",
+    );
+  }
+  if (!permissionInteraction && operatorDecision) {
+    throw new InteractionAnswerError(
+      400,
+      "interaction_answer.invalid_decision_context",
+      "structured decisions are only valid for permission_request interactions.",
+    );
+  }
+  const existingRuntimePermissionDecision = asRecord(match.requestedInteraction.runtime_permission_decision);
+  const operatorRuntimePermissionDecision =
+    permissionInteraction && operatorDecision
+      ? {
+          ...existingRuntimePermissionDecision,
+          decision: runtimePermissionDecisionValue(operatorDecision),
+          operator_decision: operatorDecision,
+          approval_scope:
+            operatorDecision === "deny"
+              ? "none"
+              : asString(existingRuntimePermissionDecision.approval_scope) ?? "step-coarse",
+          approval_resume_mode:
+            operatorDecision === "deny"
+              ? null
+              : asString(existingRuntimePermissionDecision.approval_resume_mode) ?? "full-bypass",
+          audit_ref: answerAuditRef,
+        }
+      : null;
   const answerAudit = /** @type {Record<string, unknown>} */ (redactSensitiveValue({
     audit_id: auditId,
     created_at: timestamp,
@@ -235,9 +303,16 @@ export function submitInteractionAnswer(options) {
     step_result_ref: match.artifactRef,
     step_result_file: match.file,
     answer_text: options.answer,
+    decision: operatorDecision,
     answer_evidence_refs: answerEvidenceRefs,
     reason: options.reason ?? null,
     approval_ref: options.approvalRef ?? null,
+    ...(permissionInteraction
+      ? {
+          runtime_permission_request: asRecord(match.requestedInteraction.runtime_permission_request),
+          runtime_permission_decision: operatorRuntimePermissionDecision,
+        }
+      : {}),
     evidence_refs: uniqueStrings([match.artifactRef, ...answerEvidenceRefs]),
   }, options.redactionPolicy));
   fs.writeFileSync(auditFile, `${JSON.stringify(answerAudit, null, 2)}\n`, "utf8");
@@ -249,12 +324,14 @@ export function submitInteractionAnswer(options) {
     ...asStringArray(match.requestedInteraction.evidence_refs),
   ]);
   const requestedContinuation = asRecord(match.requestedInteraction.continuation);
-  const canResume = asString(requestedContinuation.next_action) === "resume_from_boundary";
+  const canResume = !permissionInteraction && asString(requestedContinuation.next_action) === "resume_from_boundary";
   const blockedReason = canResume
     ? null
     : {
-        code: "continuation.resume_failed",
-        message: "Answer audit was accepted, but the recorded interaction boundary is not resumable.",
+        code: permissionInteraction ? "continuation.reinvoke_required" : "continuation.resume_failed",
+        message: permissionInteraction
+          ? "Permission answer audit was accepted, but this runtime requires a step reinvocation before it can resume."
+          : "Answer audit was accepted, but the recorded interaction boundary is not resumable.",
       };
   const previousHistory = resolveExistingStateHistory({
     requestedInteraction: match.requestedInteraction,
@@ -292,6 +369,11 @@ export function submitInteractionAnswer(options) {
     interaction_id: options.interactionId,
     status: canResume ? "resumed" : "blocked",
     answer_audit_refs: uniqueStrings([...previousAnswerRefs, answerAuditRef]),
+    ...(permissionInteraction
+      ? {
+          runtime_permission_decision: operatorRuntimePermissionDecision,
+        }
+      : {}),
     continuation: {
       next_action: canResume ? "continue_run" : "remain_blocked",
       reason_code: canResume ? "answer-resumed" : blockedReason?.code,
@@ -311,6 +393,11 @@ export function submitInteractionAnswer(options) {
         }
       : {}),
     requested_interaction: requestedInteraction,
+    ...(permissionInteraction
+      ? {
+          runtime_permission_decision: requestedInteraction.runtime_permission_decision,
+        }
+      : {}),
     evidence_refs: uniqueStrings([...asStringArray(match.document.evidence_refs), answerAuditRef]),
   };
   fs.writeFileSync(match.file, `${JSON.stringify(nextDocument, null, 2)}\n`, "utf8");
@@ -405,6 +492,7 @@ export function submitInteractionAnswer(options) {
     interactionId: options.interactionId,
     interactionStatus: canResume ? "resumed" : "blocked",
     answerAccepted: true,
+    decision: operatorDecision,
     answerAuditFile: auditFile,
     answerAuditRef,
     stepResultFile: match.file,

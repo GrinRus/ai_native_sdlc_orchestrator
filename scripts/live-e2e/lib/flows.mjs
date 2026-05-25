@@ -1813,6 +1813,8 @@ function buildCanonicalRunStatus(options) {
  *   examplesRoot: string,
  *   runnerAuthMode: "host" | "isolated",
  *   runtimeAgentPermissionMode: "full-bypass" | "restricted",
+ *   runtimeAgentInteractionPolicy: "fail-closed" | "ask-all" | "orchestrator-mediated",
+ *   runtimeAgentAutoApprovalProfile: "none" | "conservative" | "auto-edit" | "trusted-run",
  *   stepController?: ReturnType<import("./step-controller.mjs").createLiveE2eStepController>,
  * }}
  */
@@ -1831,6 +1833,8 @@ export function executeInstalledUserFlow(options) {
   });
   const env = proofRunnerEnvironment.env;
   env.AOR_RUNTIME_AGENT_PERMISSION_MODE = options.runtimeAgentPermissionMode;
+  env.AOR_RUNTIME_AGENT_INTERACTION_POLICY = options.runtimeAgentInteractionPolicy;
+  env.AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE = options.runtimeAgentAutoApprovalProfile;
 
   const artifacts = {
     host_runtime_root: options.layout.runtimeRoot,
@@ -1842,6 +1846,8 @@ export function executeInstalledUserFlow(options) {
     runner_auth_mode: proofRunnerEnvironment.runnerAuthMode,
     runner_auth_source: proofRunnerEnvironment.runnerAuthSource,
     runtime_agent_permission_mode: options.runtimeAgentPermissionMode,
+    runtime_agent_interaction_policy: options.runtimeAgentInteractionPolicy,
+    runtime_agent_auto_approval_profile: options.runtimeAgentAutoApprovalProfile,
     run_tier: resolveRunTier(options.profile),
   };
   hydrateControllerArtifacts(artifacts, options.stepController);
@@ -2543,6 +2549,8 @@ export function executeInstalledUserFlow(options) {
  *   coverageTier: string,
  *   runnerAuthMode: "host" | "isolated",
  *   runtimeAgentPermissionMode: "full-bypass" | "restricted",
+ *   runtimeAgentInteractionPolicy: "fail-closed" | "ask-all" | "orchestrator-mediated",
+ *   runtimeAgentAutoApprovalProfile: "none" | "conservative" | "auto-edit" | "trusted-run",
  *   authProbeRequired: boolean,
  *   stepController?: ReturnType<import("./step-controller.mjs").createLiveE2eStepController>,
  * }} options
@@ -2562,6 +2570,8 @@ export function executeFullJourneyFlow(options) {
   });
   const env = proofRunnerEnvironment.env;
   env.AOR_RUNTIME_AGENT_PERMISSION_MODE = options.runtimeAgentPermissionMode;
+  env.AOR_RUNTIME_AGENT_INTERACTION_POLICY = options.runtimeAgentInteractionPolicy;
+  env.AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE = options.runtimeAgentAutoApprovalProfile;
   if (options.examplesRootOverride) {
     env.AOR_BOOTSTRAP_ASSETS_ROOT = options.examplesRootOverride;
     env.AOR_EXAMPLES_ROOT = options.examplesRootOverride;
@@ -2577,6 +2587,8 @@ export function executeFullJourneyFlow(options) {
     runner_auth_mode: proofRunnerEnvironment.runnerAuthMode,
     runner_auth_source: proofRunnerEnvironment.runnerAuthSource,
     runtime_agent_permission_mode: options.runtimeAgentPermissionMode,
+    runtime_agent_interaction_policy: options.runtimeAgentInteractionPolicy,
+    runtime_agent_auto_approval_profile: options.runtimeAgentAutoApprovalProfile,
     target_catalog_file: options.catalogTargetPath,
     scenario_policy_file: options.scenarioPolicyPath,
     provider_variant_file: options.providerVariantPath,
@@ -2847,6 +2859,8 @@ export function executeFullJourneyFlow(options) {
       runnerAuthMode: proofRunnerEnvironment.runnerAuthMode,
       runnerAuthSource: proofRunnerEnvironment.runnerAuthSource,
       runtimeAgentPermissionMode: options.runtimeAgentPermissionMode,
+      runtimeAgentInteractionPolicy: options.runtimeAgentInteractionPolicy,
+      runtimeAgentAutoApprovalProfile: options.runtimeAgentAutoApprovalProfile,
       authProbeRequired: options.authProbeRequired,
       permissionReadinessRequired: asRecord(options.profile.production_proof).require_permission_readiness === true,
       runId: options.runId,
@@ -2858,7 +2872,7 @@ export function executeFullJourneyFlow(options) {
       markStage(
         stageMap,
         "bootstrap",
-        "fail",
+        liveAdapterPreflight.status === "interaction_required" ? "interaction_required" : "fail",
         uniqueStrings([projectInit.transcriptFile, liveAdapterPreflight.reportFile, ...collectStringRefs(projectInit.payload)]),
         liveAdapterPreflight.summary,
       );

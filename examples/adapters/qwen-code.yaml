@@ -1,5 +1,5 @@
-adapter_id: codex-cli
-runner_family: codex
+adapter_id: qwen-code
+runner_family: qwen
 version: 1
 launch_modes:
   - interactive
@@ -11,54 +11,52 @@ capabilities:
   structured_output: true
   live_logs: true
   mcp_tools: true
-  subagents: true
+  subagents: false
 constraints:
   requires_local_runtime: true
   default_network_mode: deny-by-default
   supports_no_write_rehearsal: true
 execution:
-  live_baseline: true
+  live_baseline: false
   runtime_mode: external-process
-  handler: codex-cli-external-runner
-  evidence_namespace: evidence://adapter-live/codex-cli
+  handler: qwen-code-external-runner
+  evidence_namespace: evidence://adapter-live/qwen-code
   external_runtime:
-    command: codex
+    command: qwen
     permission_policy:
       default_mode: full-bypass
       modes:
         full-bypass:
           args:
-            - --ask-for-approval
-            - never
-            - exec
-            - --json
-            - --ephemeral
-            - --sandbox
-            - workspace-write
+            - --output-format
+            - json
+            - --approval-mode
+            - yolo
         restricted:
           args:
-            - exec
-            - --json
-            - --ephemeral
-            - --sandbox
-            - workspace-write
+            - --output-format
+            - json
+            - --approval-mode
+            - default
     request_via_stdin: true
+    request_transport: stdin-json
     preflight_timeout_ms: 120000
     timeout_ms: 600000
 sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true
-  supports_pause_resume: true
+  supports_pause_resume: false
   continuation_strategy: reinvoke
   approval_grant_scope: step-coarse
   approval_resume_mode: full-bypass
   permission_request_detection:
     - structured-output
     - stdout-stderr-patterns
-    - jsonl-events
 log_features:
   stdout: true
   stderr: true
   tool_calls: true
   normalized_summary: true
-certification_state: stable
+certification_state: candidate
+limitations:
+  - Candidate adapter only; not part of required provider coverage until a real runner certification promotes it.

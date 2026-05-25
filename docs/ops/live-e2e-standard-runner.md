@@ -79,6 +79,13 @@ By default, live E2E uses `--runner-auth-mode host`: AOR runtime state remains i
 
 By default, live E2E also uses `--runtime-agent-permission-mode full-bypass` so non-interactive acceptance runs do not pause on runner-native tool approval prompts inside isolated checkouts. Use `--runtime-agent-permission-mode restricted` when diagnosing adapter-native permission behavior. The selected mode is passed to public `aor` subprocesses through `AOR_RUNTIME_AGENT_PERMISSION_MODE` and is recorded in live adapter preflight, raw adapter evidence, routed step results, and the run summary.
 
+Runtime permission mediation is configured separately from provider permission args:
+- `--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated` controls whether runtime permission blocks stay diagnostic failures, always ask the operator, or first go through AOR policy auto-approval.
+- `--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run` controls the auto-approval rule set when mediation is enabled. If `orchestrator-mediated` is selected without an explicit profile, the runner uses `conservative`.
+
+Acceptance and production-proof profiles should keep the default `fail-closed` unless the profile exists specifically to test interactive permission handling. In mediated profiles, permission readiness can report `interaction_required` instead of a hard preflight failure.
+Run summaries copy the latest Runtime Harness `runtime_permission_summary` and `runtime_permission_decisions[]` when present, so mediated runs expose decision counts, audit refs, selected modes, and continuation strategy without reading raw adapter logs.
+
 This is required for Claude Code because `--permission-mode auto` can ask the operator to approve tool reads or writes when the compiled context links handoff/spec artifacts under `.aor/`. AOR invokes Claude through `--print` in non-interactive live E2E, so there is no interactive approval channel to answer those prompts during the run.
 
 Provider permission-mode analogues:
@@ -88,6 +95,8 @@ Provider permission-mode analogues:
 - Claude Code restricted: `--permission-mode auto`.
 - OpenCode full-bypass: `opencode run --format json --dangerously-skip-permissions` with the AOR request attached through OpenCode's message/`--file` CLI surface.
 - OpenCode restricted: `opencode run --format json` with the same file-attached request transport.
+- Qwen candidate full-bypass: `qwen --output-format json --approval-mode yolo`.
+- Qwen candidate restricted: `qwen --output-format json --approval-mode default`.
 
 Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. Preflight and full external runner execution are hard local subprocess bounds: a runner that exceeds them has its local process group killed and is reported as timeout evidence instead of leaving the public lifecycle waiting indefinitely. Per-step policy budgets may shorten an external runner request, but they must not extend it beyond the adapter profile timeout. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
 

@@ -30,6 +30,12 @@ import { refreshRuntimeHarnessReportForStep } from "./runtime-harness-refresh.mj
 import { invokeStepAdapterForStep } from "./step-adapter-invocation.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
 import { rewriteStepResult, writeStepResult } from "./step-result-writer.mjs";
+import {
+  evaluateRuntimePermissionRequest,
+  normalizeRuntimeAgentAutoApprovalProfile,
+  normalizeRuntimeAgentInteractionPolicy,
+  writeRuntimePermissionDecisionAudit,
+} from "./runtime-permission-policy.mjs";
 
 const STEP_CLASS_TO_RESULT_CLASS = Object.freeze({
   discovery: "artifact",
@@ -263,6 +269,203 @@ function buildRequestedInteraction(options) {
 }
 
 /**
+ * @param {{
+ *   stepResultId: string,
+ *   summary: string,
+ *   evidenceRefs: string[],
+ *   timestamp: string,
+ *   runtimePermissionRequest: Record<string, unknown>,
+ *   runtimePermissionDecision: Record<string, unknown>,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function buildRuntimePermissionRequestedInteraction(options) {
+  return {
+    ...buildRequestedInteraction({
+      stepResultId: options.stepResultId,
+      summary: options.summary,
+      evidenceRefs: options.evidenceRefs,
+      timestamp: options.timestamp,
+    }),
+    interaction_type: "permission_request",
+    runtime_permission_request: options.runtimePermissionRequest,
+    runtime_permission_decision: options.runtimePermissionDecision,
+    allowed_decisions: ["approve_once", "deny", "approve_for_run"],
+  };
+}
+
+/**
+ * @param {{
+ *   stepResultId: string,
+ *   summary: string,
+ *   evidenceRefs: string[],
+ *   adapterOutput: Record<string, unknown>,
+ *   adapterResolution: Record<string, unknown> | null,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function resolveRuntimePermissionRequest(options) {
+  const existing = asRecord(options.adapterOutput.runtime_permission_request);
+  if (Object.keys(existing).length > 0) {
+    return existing;
+  }
+  const adapter = asRecord(asRecord(options.adapterResolution).adapter);
+  const profile = asRecord(adapter.profile);
+  const externalRunner = asRecord(options.adapterOutput.external_runner);
+  return {
+    interaction_type: "permission_request",
+    adapter_id: asString(adapter.adapter_id) ?? asString(options.adapterOutput.provider_adapter) ?? "unknown",
+    runner_family: asString(profile.runner_family) ?? null,
+    permission_mode: asString(externalRunner.permission_mode) ?? null,
+    permission_mode_source: asString(externalRunner.permission_mode_source) ?? null,
+    operation_type: "unknown",
+    tool_name: null,
+    target: null,
+    target_path: null,
+    command: null,
+    confidence: "low",
+    summary: options.summary,
+    evidence_refs: options.evidenceRefs,
+  };
+}
+
+/**
+ * @param {Record<string, unknown> | null} adapterResolution
+ * @returns {Record<string, unknown>}
+ */
+function resolveApprovalFeatures(adapterResolution) {
+  const adapter = asRecord(asRecord(adapterResolution).adapter);
+  const profile = asRecord(adapter.profile);
+  return asRecord(profile.approval_features);
+}
+
+/**
+ * @param {string | null} value
+ * @returns {string}
+ */
+function normalizePermissionComparable(value) {
+  return typeof value === "string" ? value.trim().replace(/\s+/gu, " ") : "";
+}
+
+/**
+ * @param {Record<string, unknown>} request
+ * @returns {{ adapterId: string, operationType: string, target: string, command: string, toolName: string }}
+ */
+function runtimePermissionSignature(request) {
+  return {
+    adapterId: normalizePermissionComparable(asString(request.adapter_id)),
+    operationType: normalizePermissionComparable(asString(request.operation_type)),
+    target: normalizePermissionComparable(asString(request.target) ?? asString(request.target_path)),
+    command: normalizePermissionComparable(asString(request.command)),
+    toolName: normalizePermissionComparable(asString(request.tool_name)),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} request
+ * @param {Record<string, unknown>} grantRequest
+ * @returns {boolean}
+ */
+function runtimePermissionGrantMatches(request, grantRequest) {
+  const current = runtimePermissionSignature(request);
+  const granted = runtimePermissionSignature(grantRequest);
+  if (current.adapterId && granted.adapterId && current.adapterId !== granted.adapterId) {
+    return false;
+  }
+  if (!current.operationType || !granted.operationType || current.operationType !== granted.operationType) {
+    return false;
+  }
+  if (current.target || granted.target) {
+    return current.target !== "" && current.target === granted.target;
+  }
+  if (current.command || granted.command) {
+    return current.command !== "" && current.command === granted.command;
+  }
+  return current.toolName !== "" && current.toolName === granted.toolName;
+}
+
+/**
+ * @param {{ runtimeLayout: { reportsRoot: string }, projectRoot: string, runId: string, runtimePermissionRequest: Record<string, unknown> }} options
+ * @returns {{ grantRef: string, grantDecision: Record<string, unknown> } | null}
+ */
+function resolveRunScopedRuntimePermissionGrant(options) {
+  if (!fs.existsSync(options.runtimeLayout.reportsRoot)) {
+    return null;
+  }
+  const entries = fs.readdirSync(options.runtimeLayout.reportsRoot, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) {
+      continue;
+    }
+    const filePath = path.join(options.runtimeLayout.reportsRoot, entry.name);
+    let document;
+    try {
+      document = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    } catch {
+      continue;
+    }
+    const record = asRecord(document);
+    if (asString(record.run_id) !== options.runId) {
+      continue;
+    }
+    const requestedInteraction = asRecord(record.requested_interaction);
+    const grantDecision = asRecord(record.runtime_permission_decision ?? requestedInteraction.runtime_permission_decision);
+    if (
+      asString(grantDecision.decision) !== "user_approved" ||
+      asString(grantDecision.operator_decision) !== "approve_for_run"
+    ) {
+      continue;
+    }
+    const grantRequest = asRecord(record.runtime_permission_request ?? requestedInteraction.runtime_permission_request);
+    if (!runtimePermissionGrantMatches(options.runtimePermissionRequest, grantRequest)) {
+      continue;
+    }
+    return {
+      grantRef: asString(grantDecision.audit_ref) ?? toEvidenceRef(options.projectRoot, filePath),
+      grantDecision,
+    };
+  }
+  return null;
+}
+
+/**
+ * @param {{
+ *   runtimeLayout: { reportsRoot: string },
+ *   projectRoot: string,
+ *   runId: string,
+ *   runtimePermissionRequest: Record<string, unknown>,
+ *   runtimePermissionDecision: Record<string, unknown>,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function applyRunScopedRuntimePermissionGrant(options) {
+  if (asString(options.runtimePermissionDecision.decision) !== "ask_user") {
+    return options.runtimePermissionDecision;
+  }
+  const grant = resolveRunScopedRuntimePermissionGrant({
+    runtimeLayout: options.runtimeLayout,
+    projectRoot: options.projectRoot,
+    runId: options.runId,
+    runtimePermissionRequest: options.runtimePermissionRequest,
+  });
+  if (!grant) {
+    return options.runtimePermissionDecision;
+  }
+  return {
+    ...options.runtimePermissionDecision,
+    decision: "auto_approve",
+    rule_id: "runtime-permission.auto-approve.approve-for-run-grant",
+    reason: "Matching run-scoped operator approval grant was found for this permission request.",
+    approval_scope: asString(grant.grantDecision.approval_scope) ?? asString(options.runtimePermissionDecision.approval_scope) ?? "step-coarse",
+    approval_resume_mode:
+      asString(grant.grantDecision.approval_resume_mode) ??
+      asString(options.runtimePermissionDecision.approval_resume_mode) ??
+      "full-bypass",
+    grant_ref: grant.grantRef,
+  };
+}
+
+/**
  * @param {string} projectId
  * @param {string} runId
  * @param {string} stepId
@@ -454,6 +657,40 @@ function resolveActionBudget(stepResult, action) {
     return maxAttempts;
   }
   return action === "escalate" ? 0 : 1;
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @returns {string | null}
+ */
+function resolveApprovalResumeMode(stepResult) {
+  const decision = asRecord(stepResult.runtime_permission_decision);
+  if (asString(decision.decision) !== "auto_approve" && asString(decision.decision) !== "user_approved") {
+    return null;
+  }
+  return asString(decision.approval_resume_mode);
+}
+
+/**
+ * @param {string | null} mode
+ * @param {() => ReturnType<typeof executeRoutedStep>} callback
+ * @returns {ReturnType<typeof executeRoutedStep>}
+ */
+function runWithRuntimePermissionMode(mode, callback) {
+  if (!mode) {
+    return callback();
+  }
+  const previous = process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE;
+  process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE = mode;
+  try {
+    return callback();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE;
+    } else {
+      process.env.AOR_RUNTIME_AGENT_PERMISSION_MODE = previous;
+    }
+  }
 }
 
 /**
@@ -1135,15 +1372,97 @@ export function executeRoutedStep(options) {
   if (Object.keys(externalRunnerForStep).length > 0) {
     stepResult.external_runner = externalRunnerForStep;
   }
-  const runtimeOutcome = classifyRuntimeStepOutcome(stepResult, {
+  let runtimeOutcome = classifyRuntimeStepOutcome(stepResult, {
     gitStatusAvailable: changedPathStatusBefore.available && changedPathStatusAfter.available,
     strictCodeChangingNoop,
     nonBootstrapChangedPaths,
     meaningfulChangedPaths: missionScopedChanges.meaningfulChangedPaths,
   });
+  let runtimePermissionRequest = null;
+  let runtimePermissionDecision = null;
+  let runtimePermissionDecisionAuditRef = null;
+  let runtimePermissionDecisionAuditFile = null;
+  if (runtimeOutcome.failureClass === "permission-mode-blocked" || runtimeOutcome.failureClass === "edit-denied") {
+    const interactionPolicy = normalizeRuntimeAgentInteractionPolicy(process.env.AOR_RUNTIME_AGENT_INTERACTION_POLICY);
+    const autoApprovalProfile = normalizeRuntimeAgentAutoApprovalProfile(
+      process.env.AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE,
+      interactionPolicy,
+    );
+    if (interactionPolicy !== "fail-closed") {
+      const approvalFeatures = resolveApprovalFeatures(adapterResolution);
+      runtimePermissionRequest = resolveRuntimePermissionRequest({
+        stepResultId,
+        summary,
+        evidenceRefs,
+        adapterOutput: adapterOutputForStep,
+        adapterResolution,
+      });
+      runtimePermissionDecision = evaluateRuntimePermissionRequest({
+        runtimePermissionRequest,
+        context: {
+          execution_root: executionRoot,
+          runtime_agent_interaction_policy: interactionPolicy,
+          runtime_agent_auto_approval_profile: autoApprovalProfile,
+          approval_grant_scope: asString(approvalFeatures.approval_grant_scope) ?? "step-coarse",
+          approval_resume_mode: asString(approvalFeatures.approval_resume_mode) ?? "full-bypass",
+          declared_verification_commands: asStringArray(
+            asRecord(asRecord(policyResolution).resolved_bounds).command_constraints?.allowed_commands,
+          ),
+        },
+      });
+      runtimePermissionDecision = {
+        ...runtimePermissionDecision,
+        continuation_strategy: asString(approvalFeatures.continuation_strategy) ?? "reinvoke",
+      };
+      runtimePermissionDecision = applyRunScopedRuntimePermissionGrant({
+        runtimeLayout: init.runtimeLayout,
+        projectRoot: init.projectRoot,
+        runId,
+        runtimePermissionRequest,
+        runtimePermissionDecision,
+      });
+      const audit = writeRuntimePermissionDecisionAudit({
+        runtimeLayout: init.runtimeLayout,
+        projectRoot: init.projectRoot,
+        runId,
+        stepResultId,
+        runtimePermissionRequest,
+        runtimePermissionDecision,
+        evidenceRefs: uniqueStrings([...evidenceRefs, asString(runtimePermissionDecision.grant_ref) ?? ""]),
+      });
+      runtimePermissionDecisionAuditRef = audit.auditRef;
+      runtimePermissionDecisionAuditFile = audit.auditFile;
+      runtimePermissionDecision = {
+        ...runtimePermissionDecision,
+        audit_ref: runtimePermissionDecisionAuditRef,
+        audit_file: runtimePermissionDecisionAuditFile,
+      };
+      runtimeOutcome =
+        runtimePermissionDecision.decision === "auto_approve"
+          ? {
+              failureClass: runtimeOutcome.failureClass,
+              decision: "retry",
+              missionOutcome: "not_satisfied",
+            }
+          : {
+              failureClass: runtimeOutcome.failureClass,
+              decision: "block",
+              missionOutcome: "not_satisfied",
+            };
+    }
+  }
   stepResult.mission_outcome = runtimeOutcome.missionOutcome;
   stepResult.failure_class = runtimeOutcome.failureClass;
   stepResult.runtime_harness_decision = runtimeOutcome.decision;
+  if (runtimePermissionRequest) {
+    stepResult.runtime_permission_request = runtimePermissionRequest;
+  }
+  if (runtimePermissionDecision) {
+    stepResult.runtime_permission_decision = runtimePermissionDecision;
+  }
+  if (runtimePermissionDecisionAuditRef && !stepResult.evidence_refs.includes(runtimePermissionDecisionAuditRef)) {
+    stepResult.evidence_refs = [...stepResult.evidence_refs, runtimePermissionDecisionAuditRef];
+  }
   stepResult.repair_attempts = synthesizeRepairAttempts(
     stepResult,
     runtimeOutcome,
@@ -1166,7 +1485,18 @@ export function executeRoutedStep(options) {
         ]
       : [];
   stepResult.requested_interaction =
-    runtimeOutcome.failureClass === "interactive-question-requested"
+    runtimePermissionRequest && runtimePermissionDecision?.decision === "ask_user"
+      ? buildRuntimePermissionRequestedInteraction({
+          stepResultId,
+          summary: runtimePermissionDecision.reason ?? summary,
+          evidenceRefs: runtimePermissionDecisionAuditRef
+            ? [...evidenceRefs, runtimePermissionDecisionAuditRef]
+            : evidenceRefs,
+          timestamp: finishedAt,
+          runtimePermissionRequest,
+          runtimePermissionDecision,
+        })
+      : runtimeOutcome.failureClass === "interactive-question-requested"
       ? buildRequestedInteraction({
           stepResultId,
           summary,
@@ -1287,7 +1617,18 @@ export function executeRuntimeHarnessControlledStep(options) {
     ]);
 
     if (decision === "retry") {
-      const retried = executeRoutedStep(options);
+      const resumeMode = resolveApprovalResumeMode(current.stepResult);
+      const permissionDecision = asRecord(current.stepResult.runtime_permission_decision);
+      const permissionDecisionRefs = uniqueStrings([
+        asString(permissionDecision.audit_ref) ?? "",
+        ...asStringArray(options.runtimeEvidenceRefs),
+      ]);
+      const retried = runWithRuntimePermissionMode(resumeMode, () =>
+        executeRoutedStep({
+          ...options,
+          runtimeEvidenceRefs: permissionDecisionRefs,
+        }),
+      );
       const attemptFinishedAt = new Date().toISOString();
       executedAttempts.push({
         attempt: executedAttempts.length + 1,

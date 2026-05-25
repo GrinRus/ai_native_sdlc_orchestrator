@@ -283,10 +283,13 @@ export function handleRunControlCommand(context) {
   } else if (command === "run answer") {
     ensureRequiredFlags(command, flags);
     const answerEvidenceRef = resolveOptionalStringFlag("answer-evidence-ref", flags["answer-evidence-ref"]);
+    const decision = resolveOptionalStringFlag("decision", flags.decision);
     const answer =
       flags.answer === undefined ? "" : (resolveOptionalStringFlag("answer", flags.answer) ?? "");
-    if (answer.length === 0 && !answerEvidenceRef) {
-      throw new CliUsageError("Flag '--answer' is required unless '--answer-evidence-ref' points to durable evidence.");
+    if (answer.length === 0 && !answerEvidenceRef && !decision) {
+      throw new CliUsageError(
+        "Flag '--answer' is required unless '--answer-evidence-ref' points to durable evidence or '--decision' is supplied.",
+      );
     }
 
     try {
@@ -297,6 +300,7 @@ export function handleRunControlCommand(context) {
         runId: /** @type {string} */ (resolveOptionalStringFlag("run-id", flags["run-id"])),
         interactionId: /** @type {string} */ (resolveOptionalStringFlag("interaction-id", flags["interaction-id"])),
         answer,
+        decision,
         reason: resolveOptionalStringFlag("reason", flags.reason),
         approvalRef: resolveOptionalStringFlag("approval-ref", flags["approval-ref"]),
         answerEvidenceRef,
@@ -311,6 +315,7 @@ export function handleRunControlCommand(context) {
         interaction_id: answerResult.interactionId,
         interaction_status: answerResult.interactionStatus,
         answer_accepted: answerResult.answerAccepted,
+        decision: answerResult.decision,
         answer_audit_file: answerResult.answerAuditFile,
         answer_audit_ref: answerResult.answerAuditRef,
         step_result_file: answerResult.stepResultFile,

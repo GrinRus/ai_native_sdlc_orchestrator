@@ -32,6 +32,28 @@ function withTempRepo(callback) {
   }
 }
 
+/**
+ * @param {Record<string, string>} env
+ * @param {() => void} callback
+ */
+function withEnv(env, callback) {
+  const previous = new Map(Object.keys(env).map((key) => [key, process.env[key]]));
+  for (const [key, value] of Object.entries(env)) {
+    process.env[key] = value;
+  }
+  try {
+    callback();
+  } finally {
+    for (const [key, value] of previous.entries()) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
 test("changed path parsing strips git quoting before bootstrap-owned filtering", () => {
   withTempRepo((repoRoot) => {
     const cachePath = path.join(
@@ -72,6 +94,37 @@ function configureCodexExternalRuntime(repoRoot, runtime) {
     "        full-bypass:",
     "          args:",
     ...permissionArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
+    "    request_via_stdin: true",
+    "    timeout_ms: 30000",
+  ].join("\n");
+  const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
+  fs.writeFileSync(adapterPath, updated, "utf8");
+}
+
+/**
+ * @param {string} repoRoot
+ * @param {{ command: string, fullBypassArgs: string[], restrictedArgs: string[] }} runtime
+ */
+function configureCodexExternalRuntimePermissionModes(repoRoot, runtime) {
+  const adapterPath = path.join(repoRoot, "examples/adapters/codex-cli.yaml");
+  const source = fs.readFileSync(adapterPath, "utf8");
+  const executionBlock = [
+    "execution:",
+    "  live_baseline: true",
+    "  runtime_mode: external-process",
+    "  handler: codex-cli-external-runner",
+    "  evidence_namespace: evidence://adapter-live/codex-cli",
+    "  external_runtime:",
+    `    command: ${JSON.stringify(runtime.command)}`,
+    "    permission_policy:",
+    "      default_mode: full-bypass",
+    "      modes:",
+    "        full-bypass:",
+    "          args:",
+    ...runtime.fullBypassArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
+    "        restricted:",
+    "          args:",
+    ...runtime.restrictedArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
     "    request_via_stdin: true",
     "    timeout_ms: 30000",
   ].join("\n");
@@ -268,6 +321,80 @@ test("runtime harness classifies structured permission denials before strict no-
   assert.deepEqual(nestedOutcome, {
     failureClass: "permission-mode-blocked",
     decision: "repair",
+    missionOutcome: "not_satisfied",
+  });
+
+  const mediatedOutcome = classifyRuntimeStepOutcome(
+    {
+      step_result_id: "run.permission.step.implement.mediated",
+      run_id: "run.permission",
+      step_id: "run.start.implement",
+      step_class: "runner",
+      status: "failed",
+      summary: "Adapter blocked on permission.",
+      evidence_refs: [],
+      failure_class: "permission-mode-blocked",
+      runtime_permission_decision: {
+        decision: "ask_user",
+        rule_id: "runtime-permission.ask-user.sensitive-or-unknown",
+      },
+      routed_execution: {
+        mode: "execute",
+        adapter_response: {
+          status: "blocked",
+          output: {
+            failure_kind: "permission-mode-blocked",
+          },
+        },
+      },
+    },
+    {
+      gitStatusAvailable: true,
+      strictCodeChangingNoop: true,
+      meaningfulChangedPaths: [],
+    },
+  );
+
+  assert.deepEqual(mediatedOutcome, {
+    failureClass: "permission-mode-blocked",
+    decision: "block",
+    missionOutcome: "not_satisfied",
+  });
+
+  const approvedOutcome = classifyRuntimeStepOutcome(
+    {
+      step_result_id: "run.permission.step.implement.approved",
+      run_id: "run.permission",
+      step_id: "run.start.implement",
+      step_class: "runner",
+      status: "failed",
+      summary: "Operator approved permission.",
+      evidence_refs: [],
+      failure_class: "permission-mode-blocked",
+      runtime_permission_decision: {
+        decision: "user_approved",
+        rule_id: "runtime-permission.ask-user.sensitive-or-unknown",
+      },
+      routed_execution: {
+        mode: "execute",
+        adapter_response: {
+          status: "blocked",
+          output: {
+            failure_kind: "permission-mode-blocked",
+          },
+        },
+      },
+    },
+    {
+      gitStatusAvailable: true,
+      strictCodeChangingNoop: true,
+      meaningfulChangedPaths: [],
+    },
+  );
+
+  assert.deepEqual(approvedOutcome, {
+    failureClass: "permission-mode-blocked",
+    decision: "retry",
     missionOutcome: "not_satisfied",
   });
 });
@@ -673,6 +800,253 @@ test("materializeRuntimeHarnessReport marks strict code-changing live no-op as r
     assert.equal(report.report.step_decisions[0].repair_attempts[0].failure_class, "no-op");
     assert.equal(report.report.step_decisions[0].repair_attempts[0].policy_budget.max_attempts, 2);
     assert.deepEqual(report.report.step_decisions[0].mission_semantics.non_bootstrap_changed_paths, []);
+  });
+});
+
+test("orchestrator-mediated permission auto-approval reinvokes a restricted runtime with the resume mode", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "runtime-permission-auto-approve";
+    const fullBypassScript = [
+      "const fs=require('node:fs');",
+      "const path=require('node:path');",
+      "fs.mkdirSync('src',{recursive:true});",
+      "fs.writeFileSync(path.join('src','auto-approved.js'),'export const autoApproved = true;\\n');",
+      "process.stdout.write(JSON.stringify({status:'success',summary:'approved retry ok',output:{runner:'full-bypass'},evidence_refs:['evidence://external-runner/auto-approved']}));",
+    ].join("");
+    const restrictedScript = [
+      "process.stdout.write(JSON.stringify({",
+      "type:'result',subtype:'success',result:'Need permission to read source.',",
+      "permission_denials:[{tool_name:'Read',tool_input:{file_path:'src/index.js'}}]",
+      "}));",
+    ].join("");
+    configureCodexExternalRuntimePermissionModes(repoRoot, {
+      command: process.execPath,
+      fullBypassArgs: ["-e", fullBypassScript],
+      restrictedArgs: ["-e", restrictedScript],
+    });
+
+    withEnv(
+      {
+        AOR_RUNTIME_AGENT_PERMISSION_MODE: "restricted",
+        AOR_RUNTIME_AGENT_INTERACTION_POLICY: "orchestrator-mediated",
+        AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE: "conservative",
+      },
+      () => {
+        const result = executeRuntimeHarnessControlledStep({
+          projectRef: repoRoot,
+          cwd: repoRoot,
+          stepClass: "implement",
+          dryRun: false,
+          runId,
+          stepId: "run.start.implement",
+          approvedHandoffRef: "evidence://handoff/runtime-permission-auto-approve",
+          promotionEvidenceRefs: ["evidence://promotion/runtime-permission-auto-approve"],
+          executionRoot: repoRoot,
+        });
+
+        assert.equal(result.stepResult.runtime_harness_decision, "pass");
+        assert.equal(result.stepResult.status, "passed");
+        assert.equal(fs.existsSync(path.join(repoRoot, "src/auto-approved.js")), true);
+        assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.permission_mode, "full-bypass");
+        assert.ok(
+          result.stepResult.evidence_refs.some((ref) =>
+            String(ref).includes("runtime-permission-decision-runtime-permission-auto-approve"),
+          ),
+        );
+
+        const report = materializeRuntimeHarnessReport({
+          projectRef: repoRoot,
+          cwd: repoRoot,
+          runId,
+        });
+        assert.equal(report.report.overall_decision, "pass");
+        assert.equal(report.report.runtime_permission_summary.decision_counts.auto_approve, 1);
+        assert.equal(report.report.runtime_permission_summary.continuation_strategies.includes("reinvoke"), true);
+        assert.equal(report.report.runtime_permission_decisions[0].decision, "auto_approve");
+        assert.equal(report.report.runtime_permission_decisions[0].operation_type, "file_read");
+        assert.equal(report.report.runtime_permission_decisions[0].approval_resume_mode, "full-bypass");
+        assert.ok(
+          report.report.runtime_permission_summary.audit_refs.some((ref) =>
+            String(ref).includes("runtime-permission-decision-runtime-permission-auto-approve"),
+          ),
+        );
+      },
+    );
+  });
+});
+
+test("approve_for_run grants auto-approve later matching permission requests in the same run", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "runtime-permission-approve-for-run";
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    fs.mkdirSync(init.runtimeLayout.reportsRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.reportsRoot, "step-result-runtime-permission-grant.json"),
+      `${JSON.stringify(
+        {
+          step_result_id: `${runId}.permission.grant`,
+          run_id: runId,
+          step_id: "run.start.implement",
+          step_class: "runner",
+          status: "failed",
+          failure_class: "permission-mode-blocked",
+          runtime_permission_request: {
+            adapter_id: "codex-cli",
+            operation_type: "file_write",
+            target: "src/run-grant.js",
+            tool_name: "Edit",
+          },
+          runtime_permission_decision: {
+            decision: "user_approved",
+            operator_decision: "approve_for_run",
+            approval_scope: "step-coarse",
+            approval_resume_mode: "full-bypass",
+            audit_ref: "evidence://reports/interaction-answer-runtime-permission-grant.json",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const restrictedScript = [
+      "process.stdout.write(JSON.stringify({",
+      "type:'result',subtype:'success',result:'Need permission to edit source.',",
+      "permission_denials:[{tool_name:'Edit',tool_input:{file_path:'src/run-grant.js'}}]",
+      "}));",
+    ].join("");
+    const fullBypassScript = [
+      "const fs=require('node:fs');",
+      "fs.mkdirSync('src',{recursive:true});",
+      "fs.writeFileSync('src/run-grant.js','export const runGrant = true;\\n');",
+      "process.stdout.write(JSON.stringify({status:'success',summary:'run grant ok',output:{runner:'full-bypass'}}));",
+    ].join("");
+    configureCodexExternalRuntimePermissionModes(repoRoot, {
+      command: process.execPath,
+      fullBypassArgs: ["-e", fullBypassScript],
+      restrictedArgs: ["-e", restrictedScript],
+    });
+
+    withEnv(
+      {
+        AOR_RUNTIME_AGENT_PERMISSION_MODE: "restricted",
+        AOR_RUNTIME_AGENT_INTERACTION_POLICY: "orchestrator-mediated",
+        AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE: "conservative",
+      },
+      () => {
+        const result = executeRuntimeHarnessControlledStep({
+          projectRef: repoRoot,
+          cwd: repoRoot,
+          stepClass: "implement",
+          dryRun: false,
+          runId,
+          stepId: "run.start.implement",
+          approvedHandoffRef: "evidence://handoff/runtime-permission-approve-for-run",
+          promotionEvidenceRefs: ["evidence://promotion/runtime-permission-approve-for-run"],
+          executionRoot: repoRoot,
+        });
+
+        assert.equal(result.stepResult.runtime_harness_decision, "pass");
+        assert.equal(result.stepResult.routed_execution.adapter_response.output.external_runner.permission_mode, "full-bypass");
+        assert.equal(fs.existsSync(path.join(repoRoot, "src/run-grant.js")), true);
+        const decisionAudits = fs
+          .readdirSync(init.runtimeLayout.reportsRoot)
+          .filter((entry) => entry.startsWith("runtime-permission-decision-") && entry.endsWith(".json"))
+          .map((entry) => JSON.parse(fs.readFileSync(path.join(init.runtimeLayout.reportsRoot, entry), "utf8")));
+        assert.equal(
+          decisionAudits.some(
+            (entry) =>
+              entry.runtime_permission_decision?.rule_id === "runtime-permission.auto-approve.approve-for-run-grant" &&
+              entry.runtime_permission_decision?.grant_ref === "evidence://reports/interaction-answer-runtime-permission-grant.json",
+          ),
+          true,
+        );
+      },
+    );
+  });
+});
+
+test("orchestrator-mediated permission requests ask the user or deny without repair", () => {
+  withTempRepo((repoRoot) => {
+    const askRunId = "runtime-permission-ask-user";
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stdout.write(JSON.stringify({",
+          "type:'result',subtype:'success',result:'Need permission to edit source.',",
+          "permission_denials:[{tool_name:'Edit',tool_input:{file_path:'src/index.js'}}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    withEnv(
+      {
+        AOR_RUNTIME_AGENT_INTERACTION_POLICY: "orchestrator-mediated",
+        AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE: "conservative",
+      },
+      () => {
+        const askResult = executeRoutedStep({
+          projectRef: repoRoot,
+          cwd: repoRoot,
+          stepClass: "implement",
+          dryRun: false,
+          runId: askRunId,
+          stepId: "run.start.implement",
+          approvedHandoffRef: "evidence://handoff/runtime-permission-ask-user",
+          promotionEvidenceRefs: ["evidence://promotion/runtime-permission-ask-user"],
+          executionRoot: repoRoot,
+        });
+
+        assert.equal(askResult.stepResult.runtime_harness_decision, "block");
+        assert.equal(askResult.stepResult.runtime_permission_decision.decision, "ask_user");
+        assert.equal(askResult.stepResult.requested_interaction.interaction_type, "permission_request");
+        assert.equal(askResult.stepResult.requested_interaction.runtime_permission_request.operation_type, "file_write");
+      },
+    );
+  });
+
+  withTempRepo((repoRoot) => {
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stdout.write(JSON.stringify({",
+          "type:'result',subtype:'success',result:'Need permission to read a system file.',",
+          "permission_denials:[{tool_name:'Read',tool_input:{file_path:'/etc/passwd'}}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    withEnv(
+      {
+        AOR_RUNTIME_AGENT_INTERACTION_POLICY: "orchestrator-mediated",
+        AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE: "trusted-run",
+      },
+      () => {
+        const denied = executeRoutedStep({
+          projectRef: repoRoot,
+          cwd: repoRoot,
+          stepClass: "implement",
+          dryRun: false,
+          runId: "runtime-permission-auto-deny",
+          stepId: "run.start.implement",
+          approvedHandoffRef: "evidence://handoff/runtime-permission-auto-deny",
+          promotionEvidenceRefs: ["evidence://promotion/runtime-permission-auto-deny"],
+          executionRoot: repoRoot,
+        });
+
+        assert.equal(denied.stepResult.runtime_harness_decision, "block");
+        assert.equal(denied.stepResult.runtime_permission_decision.decision, "auto_deny");
+        assert.equal(denied.stepResult.requested_interaction, null);
+        assert.deepEqual(denied.stepResult.repair_attempts[0].policy_action, "none");
+      },
+    );
   });
 });
 

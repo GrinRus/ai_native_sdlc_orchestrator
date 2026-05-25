@@ -773,7 +773,7 @@ test("live adapter applies resolved route timeout when it is shorter than the ad
     adapterId: "claude-code",
     adapterProfile: buildExternalRunnerProfile({
       command: process.execPath,
-      args: ["-e", "setTimeout(() => process.stdout.write(JSON.stringify({status:'success'})), 10);"],
+      args: ["-e", "process.stdout.write(JSON.stringify({status:'success'}));"],
       timeoutMs: 3000,
       handler: null,
     }),
@@ -790,7 +790,7 @@ test("live adapter applies resolved route timeout when it is shorter than the ad
       policy_id: "policy.step.runner.default",
       resolved_bounds: {
         budget: {
-          timeout_sec: 1,
+          timeout_sec: 2,
         },
       },
     },
@@ -798,7 +798,7 @@ test("live adapter applies resolved route timeout when it is shorter than the ad
   });
 
   assert.equal(response.status, "success");
-  assert.equal(response.output.external_runner.timeout_ms, 1000);
+  assert.equal(response.output.external_runner.timeout_ms, 2000);
   assert.equal(response.output.external_runner.timed_out, false);
 });
 
@@ -1052,6 +1052,9 @@ test("live adapter classifies external runner permission blocks", () => {
 
   assert.equal(response.status, "blocked");
   assert.equal(response.output.failure_kind, "permission-mode-blocked");
+  assert.equal(response.output.runtime_permission_request.interaction_type, "permission_request");
+  assert.equal(response.output.runtime_permission_request.adapter_id, "claude-code");
+  assert.equal(response.output.runtime_permission_request.operation_type, "file_write");
 });
 
 test("live adapter accepts successful runner output with target Permission denied logs", () => {
@@ -1183,6 +1186,9 @@ test("live adapter blocks successful Claude JSON results that include permission
   assert.equal(response.status, "blocked");
   assert.equal(response.output.failure_kind, "permission-mode-blocked");
   assert.equal(response.output.runner_output.permission_denials.length, 1);
+  assert.equal(response.output.runtime_permission_request.operation_type, "file_read");
+  assert.equal(response.output.runtime_permission_request.tool_name, "Read");
+  assert.equal(response.output.runtime_permission_request.target, ".aor/projects/run/artifacts/handoff.json");
 });
 
 test("live adapter blocks nested runner_output permission denials without relying on raw text", () => {
@@ -1218,6 +1224,46 @@ test("live adapter blocks nested runner_output permission denials without relyin
   assert.equal(response.status, "blocked");
   assert.equal(response.output.failure_kind, "permission-mode-blocked");
   assert.equal(response.output.runner_output.runner_output.permission_denials.length, 1);
+});
+
+test("live adapter parses Qwen JSON array output and detects permission denials", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: {
+      runner_family: "qwen",
+      ...buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "process.stdout.write(JSON.stringify([",
+            "{type:'system',subtype:'session_start',session_id:'qwen-test'},",
+            "{type:'result',subtype:'success',permission_denials:[{tool_name:'Bash',tool_input:{command:'git status --short'}}]}",
+            "]));",
+          ].join(""),
+        ],
+        handler: null,
+      }),
+    },
+  });
+
+  const response = adapter.execute({
+    request_id: "req-qwen-json-array-permission",
+    run_id: "run-qwen-json-array-permission",
+    step_id: "step-qwen-json-array-permission",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "blocked");
+  assert.equal(response.output.failure_kind, "permission-mode-blocked");
+  assert.equal(response.output.runner_output.json_events.length, 2);
+  assert.equal(response.output.runtime_permission_request.runner_family, "qwen");
+  assert.equal(response.output.runtime_permission_request.operation_type, "shell_command");
+  assert.equal(response.output.runtime_permission_request.command, "git status --short");
 });
 
 test("live adapter blocks successful runner exits that still emit tool denial evidence", () => {

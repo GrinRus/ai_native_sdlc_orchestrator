@@ -280,6 +280,34 @@ export function resolveRuntimeAgentPermissionMode(value) {
 }
 
 /**
+ * @param {string | null} value
+ * @returns {"fail-closed" | "ask-all" | "orchestrator-mediated"}
+ */
+export function resolveRuntimeAgentInteractionPolicy(value) {
+  const normalized = value ? value.toLowerCase() : "fail-closed";
+  if (normalized === "fail-closed" || normalized === "ask-all" || normalized === "orchestrator-mediated") {
+    return normalized;
+  }
+  throw new UsageError(
+    "Flag '--runtime-agent-interaction-policy' must be one of: fail-closed, ask-all, orchestrator-mediated.",
+  );
+}
+
+/**
+ * @param {string | null} value
+ * @returns {"none" | "conservative" | "auto-edit" | "trusted-run"}
+ */
+export function resolveRuntimeAgentAutoApprovalProfile(value) {
+  const normalized = value ? value.toLowerCase() : "none";
+  if (normalized === "none" || normalized === "conservative" || normalized === "auto-edit" || normalized === "trusted-run") {
+    return normalized;
+  }
+  throw new UsageError(
+    "Flag '--runtime-agent-auto-approval-profile' must be one of: none, conservative, auto-edit, trusted-run.",
+  );
+}
+
+/**
  * @param {string} filePath
  * @returns {boolean}
  */

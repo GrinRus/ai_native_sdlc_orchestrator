@@ -34,6 +34,7 @@ These fields describe AOR runtime control decisions. They do not replace review,
 
 When present, `requested_interaction` must stay query-safe and should carry:
 - `requested` (`true`);
+- `interaction_type` in `permission_request|clarification_question|auth_required` when known;
 - `interaction_id` when the runtime can assign a stable run-local id;
 - `status` in `requested|answered|resumed|resume_failed|blocked`;
 - `prompt_summary` or `summary` with a short sanitized question summary;
@@ -41,8 +42,11 @@ When present, `requested_interaction` must stay query-safe and should carry:
 - `answer_audit_refs` after an operator answer has been accepted;
 - `continuation` with the intended control-plane next action (`resume_from_boundary|continue_run|remain_blocked`) and a reason code when blocked.
 - `state_history[]` when the runtime has observed more than one continuation state for the same interaction.
+- `runtime_permission_request` for permission interactions, with adapter id, runner family, selected permission mode, operation type, sanitized target or command, confidence, and evidence refs.
+- `runtime_permission_decision` for permission interactions, with decision, rule id, approval scope, continuation strategy, optional operator decision, and audit ref.
 
 The field must not embed sensitive answer text. Operator answers belong in durable audit evidence and may be referenced from this field after submission.
+Permission requests may also be summarized at top level as `runtime_permission_request` and `runtime_permission_decision` so Runtime Harness reports and policy history can inspect auto decisions even when no user-facing `requested_interaction` was needed.
 `state_history[]` is the durable query-safe ledger for interactive continuation. Each entry should include `status`, `timestamp`, optional sanitized `summary`, `evidence_refs[]`, optional `answer_audit_refs[]`, and optional `continuation`. It may record `requested`, `answered`, `resumed`, `resume_failed`, and `blocked` states for one `interaction_id`; it must never include raw operator answer text.
 `repair_attempts` is the step-local Runtime Harness ledger. It should preserve the trigger, failure class, selected policy action, input evidence refs, repair route/compiled-context refs when executed, result, and budget exhaustion metadata. When repair executes, `input_evidence_refs` should include the generated repair input evidence that carries previous findings, failed step-result refs, diff status, adapter evidence, validator findings, and the current Runtime Harness report ref.
 `mission_semantics` records the semantic validation evidence used by the step controller, including changed paths, meaningful changed paths, ignored request input files, and strict no-op detection inputs when available. Runtime Harness no longer emits allowed/forbidden path gates, mission-scoped changed paths, or scope-violation paths as implementation-quality verdicts.

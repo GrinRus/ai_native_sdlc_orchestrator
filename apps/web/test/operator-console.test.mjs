@@ -182,6 +182,47 @@ function writeRuntimeJson(filePath, document) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @param {string} runId
+ */
+function seedRuntimePermissionDecision(projectRoot, runId) {
+  const initResult = invokeCli(["project", "init", "--project-ref", projectRoot]);
+  assert.equal(initResult.exitCode, 0, initResult.stderr);
+  const initPayload = JSON.parse(initResult.stdout);
+  const reportsRoot = initPayload.runtime_layout.reportsRoot;
+  writeRuntimeJson(path.join(reportsRoot, `step-result-${runId}-runtime-permission.json`), {
+    step_result_id: `${runId}.web.runtime-permission`,
+    run_id: runId,
+    step_id: "run.start.implement",
+    step_class: "runner",
+    status: "failed",
+    summary: "Runtime requested permission and AOR auto-approved it.",
+    evidence_refs: ["evidence://reports/runtime-permission-decision-web.json"],
+    runtime_permission_request: {
+      interaction_type: "permission_request",
+      adapter_id: "codex-cli",
+      runner_family: "codex",
+      permission_mode: "restricted",
+      operation_type: "file_read",
+      tool_name: "Read",
+      target: "src/index.js",
+      confidence: "high",
+      evidence_refs: ["evidence://adapter/raw-permission.json"],
+    },
+    runtime_permission_decision: {
+      decision: "auto_approve",
+      rule_id: "runtime-permission.auto-approve.safe-read",
+      interaction_policy: "orchestrator-mediated",
+      profile: "conservative",
+      approval_scope: "step-coarse",
+      approval_resume_mode: "full-bypass",
+      continuation_strategy: "reinvoke",
+      audit_ref: "evidence://reports/runtime-permission-decision-web.json",
+    },
+  });
+}
+
+/**
  * @param {{ artifactsRoot: string, reportsRoot: string }} runtimeLayout
  * @param {string} projectId
  * @param {string} runId
@@ -274,6 +315,7 @@ function seedGuidedClosureArtifacts(runtimeLayout, projectId, runId) {
 test("web console snapshot builds run list and run detail from shared API contracts", async () => {
   await withTempProject(async (projectRoot) => {
     const runId = seedOperatorArtifacts(projectRoot);
+    seedRuntimePermissionDecision(projectRoot, runId);
     const snapshot = await buildOperatorConsoleSnapshot({
       cwd: projectRoot,
       projectRef: projectRoot,
@@ -285,6 +327,9 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.ok(snapshot.runs.some((run) => run.run_id === runId));
     assert.ok(snapshot.packet_artifacts.length >= 1);
     assert.ok(snapshot.run_detail.step_results.length >= 1);
+    assert.equal(snapshot.run_detail.runtime_permission_decisions.length, 1);
+    assert.equal(snapshot.run_detail.runtime_permission_decisions[0].decision, "auto_approve");
+    assert.equal(snapshot.run_detail.runtime_permission_decisions[0].continuation_strategy, "reinvoke");
     assert.equal(snapshot.run_detail.event_history.run_id, runId);
     assert.equal(snapshot.run_detail.event_history.total_events, 0);
     assert.ok(snapshot.run_detail.policy_history.entry_count >= 1);
@@ -350,6 +395,8 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.match(html, /Guided lifecycle/);
     assert.match(html, /Lifecycle commands/);
     assert.match(html, /Runner interactions/);
+    assert.match(html, /Runtime permission decisions/);
+    assert.match(html, /runtime-permission\.auto-approve\.safe-read/);
   });
 });
 
