@@ -259,6 +259,41 @@ function documentLinksRun(document, runId) {
 }
 
 /**
+ * Routed live execution can mint nested run ids under the public live-e2e run,
+ * for example `project.run.<outer-run>.routed-execution.v1`.
+ *
+ * @param {string} value
+ * @param {string} runId
+ * @returns {boolean}
+ */
+function containsRunToken(value, runId) {
+  const normalizedValue = normalizeId(value);
+  const normalizedRunId = normalizeId(runId);
+  if (!normalizedValue || !normalizedRunId) {
+    return false;
+  }
+  if (normalizedValue === normalizedRunId) {
+    return true;
+  }
+  const pattern = new RegExp(`(^|[._:-])${normalizedRunId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[._:-])`, "u");
+  return pattern.test(normalizedValue);
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} runId
+ * @returns {boolean}
+ */
+function stepResultLinksRun(document, runId) {
+  if (documentLinksRun(document, runId)) {
+    return true;
+  }
+  return [document.run_id, document.step_result_id, document.step_id, document.subject_ref]
+    .map((value) => asString(value))
+    .some((value) => value !== null && containsRunToken(value, runId));
+}
+
+/**
  * @param {Record<string, unknown>} adapterOutput
  * @returns {string | null}
  */
@@ -584,7 +619,31 @@ function loadAllRunStepArtifacts(options) {
       const loaded = loadContractFile({ filePath, family: "step-result" });
       if (!loaded.ok) return null;
       const document = asRecord(loaded.document);
-      return document.run_id === options.runId
+      return documentLinksRun(document, options.runId)
+        ? {
+            file: filePath,
+            artifact_ref: toEvidenceRef(options.init.projectRoot, filePath),
+            document,
+          }
+        : null;
+    })
+    .filter((entry) => entry !== null);
+}
+
+/**
+ * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   runId: string,
+ * }} options
+ */
+function loadRuntimePermissionStepArtifacts(options) {
+  return listJsonFiles(options.init.runtimeLayout.reportsRoot)
+    .filter((filePath) => path.basename(filePath).startsWith("step-result-"))
+    .map((filePath) => {
+      const loaded = loadContractFile({ filePath, family: "step-result" });
+      if (!loaded.ok) return null;
+      const document = asRecord(loaded.document);
+      return stepResultLinksRun(document, options.runId)
         ? {
             file: filePath,
             artifact_ref: toEvidenceRef(options.init.projectRoot, filePath),
@@ -926,14 +985,14 @@ export function materializeRuntimeHarnessReport(options) {
     ignoredInputFiles: missionScopedChanges.ignoredInputFiles,
     strictCodeChangingNoop,
   };
-  const allStepArtifacts = loadAllRunStepArtifacts({ init, runId: options.runId });
   const stepArtifacts = loadRunStepArtifacts({ init, runId: options.runId });
+  const runtimePermissionStepArtifacts = loadRuntimePermissionStepArtifacts({ init, runId: options.runId });
   const qualityArtifacts = loadRunQualityArtifacts({ init, runId: options.runId });
   const deliveryArtifacts = loadRunDeliveryArtifacts({ init, runId: options.runId });
   const stepDecisions = stepArtifacts.map((artifact) =>
     buildStepDecision(artifact.document, artifact.artifact_ref, missionSemantics),
   );
-  const runtimePermissionDecisions = collectRuntimePermissionDecisions(allStepArtifacts);
+  const runtimePermissionDecisions = collectRuntimePermissionDecisions(runtimePermissionStepArtifacts);
   const runtimePermissionSummary = buildRuntimePermissionSummary(runtimePermissionDecisions);
   const stepFindings = stepDecisions
     .filter((decision) => asString(decision.runtime_harness_decision) !== "pass")

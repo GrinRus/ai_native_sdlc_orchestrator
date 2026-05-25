@@ -875,6 +875,69 @@ test("orchestrator-mediated permission auto-approval reinvokes a restricted runt
   });
 });
 
+test("Runtime Harness report aggregates permission decisions from nested live execution run ids", () => {
+  withTempRepo((repoRoot) => {
+    const outerRunId = "runtime-permission-nested-live";
+    const nestedRunId = `github-sandbox.run.${outerRunId}.routed-execution.v1`;
+    const fullBypassScript = [
+      "const fs=require('node:fs');",
+      "const path=require('node:path');",
+      "fs.mkdirSync('src',{recursive:true});",
+      "fs.writeFileSync(path.join('src','nested-live-approved.js'),'export const nestedLiveApproved = true;\\n');",
+      "process.stdout.write(JSON.stringify({status:'success',summary:'nested live retry ok',output:{runner:'full-bypass'},evidence_refs:['evidence://external-runner/nested-live-approved']}));",
+    ].join("");
+    const restrictedScript = [
+      "process.stdout.write(JSON.stringify({",
+      "type:'result',subtype:'success',result:'Need permission to read package metadata.',",
+      "permission_denials:[{tool_name:'Read',tool_input:{file_path:'package.json'}}]",
+      "}));",
+    ].join("");
+    fs.writeFileSync(path.join(repoRoot, "package.json"), "{\"name\":\"nested-live\"}\n", "utf8");
+    configureCodexExternalRuntimePermissionModes(repoRoot, {
+      command: process.execPath,
+      fullBypassArgs: ["-e", fullBypassScript],
+      restrictedArgs: ["-e", restrictedScript],
+    });
+
+    withEnv(
+      {
+        AOR_RUNTIME_AGENT_PERMISSION_MODE: "restricted",
+        AOR_RUNTIME_AGENT_INTERACTION_POLICY: "orchestrator-mediated",
+        AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE: "conservative",
+      },
+      () => {
+        const step = executeRuntimeHarnessControlledStep({
+          projectRef: repoRoot,
+          cwd: repoRoot,
+          stepClass: "implement",
+          dryRun: false,
+          runId: nestedRunId,
+          stepId: "routed.implement",
+          approvedHandoffRef: "evidence://handoff/runtime-permission-nested-live",
+          promotionEvidenceRefs: ["evidence://promotion/runtime-permission-nested-live"],
+          executionRoot: repoRoot,
+        });
+
+        assert.equal(step.stepResult.runtime_harness_decision, "pass");
+        assert.equal(fs.existsSync(path.join(repoRoot, "src/nested-live-approved.js")), true);
+
+        const report = materializeRuntimeHarnessReport({
+          projectRef: repoRoot,
+          cwd: repoRoot,
+          runId: outerRunId,
+        });
+
+        assert.equal(report.report.overall_decision, "pass");
+        assert.equal(report.report.runtime_permission_summary.decision_counts.auto_approve, 1);
+        assert.equal(report.report.runtime_permission_decisions[0].decision, "auto_approve");
+        assert.equal(report.report.runtime_permission_decisions[0].operation_type, "file_read");
+        assert.equal(report.report.runtime_permission_decisions[0].target, "package.json");
+        assert.equal(report.report.runtime_permission_decisions[0].continuation_strategy, "reinvoke");
+      },
+    );
+  });
+});
+
 test("approve_for_run grants auto-approve later matching permission requests in the same run", () => {
   withTempRepo((repoRoot) => {
     const runId = "runtime-permission-approve-for-run";

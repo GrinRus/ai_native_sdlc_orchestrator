@@ -191,6 +191,83 @@ function readJsonIfPresent(filePath) {
 }
 
 /**
+ * @param {Array<Record<string, unknown>>} runtimePermissionDecisions
+ * @returns {Record<string, unknown>}
+ */
+function buildRuntimePermissionSummary(runtimePermissionDecisions) {
+  const decisionCounts = {};
+  for (const decision of runtimePermissionDecisions) {
+    const key = asNonEmptyString(decision.decision) || "unknown";
+    decisionCounts[key] = (Number(decisionCounts[key]) || 0) + 1;
+  }
+  return {
+    total: runtimePermissionDecisions.length,
+    decision_counts: decisionCounts,
+    permission_modes: uniqueStrings(runtimePermissionDecisions.map((decision) => asNonEmptyString(decision.permission_mode))),
+    interaction_policies: uniqueStrings(
+      runtimePermissionDecisions.map((decision) => asNonEmptyString(decision.interaction_policy)),
+    ),
+    auto_approval_profiles: uniqueStrings(
+      runtimePermissionDecisions.map((decision) => asNonEmptyString(decision.auto_approval_profile)),
+    ),
+    approval_scopes: uniqueStrings(runtimePermissionDecisions.map((decision) => asNonEmptyString(decision.approval_scope))),
+    approval_resume_modes: uniqueStrings(
+      runtimePermissionDecisions.map((decision) => asNonEmptyString(decision.approval_resume_mode)),
+    ),
+    continuation_strategies: uniqueStrings(
+      runtimePermissionDecisions.map((decision) => asNonEmptyString(decision.continuation_strategy)),
+    ),
+    audit_refs: uniqueStrings(runtimePermissionDecisions.map((decision) => asNonEmptyString(decision.audit_ref))),
+    grant_refs: uniqueStrings(runtimePermissionDecisions.map((decision) => asNonEmptyString(decision.grant_ref))),
+  };
+}
+
+/**
+ * @param {string[]} reportFiles
+ * @returns {{ report_file: string | null, summary: Record<string, unknown> | null, decisions: Array<Record<string, unknown>> }}
+ */
+function collectRuntimePermissionEvidence(reportFiles) {
+  const reports = uniqueStrings(reportFiles.map((filePath) => asNonEmptyString(filePath))).map((filePath) => ({
+    filePath,
+    report: readJsonIfPresent(filePath),
+  }));
+  const decisions = [];
+  const seenDecisionKeys = new Set();
+  for (const { report } of reports) {
+    const reportDecisions = Array.isArray(report.runtime_permission_decisions)
+      ? report.runtime_permission_decisions.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
+      : [];
+    for (const decision of reportDecisions) {
+      const record = asRecord(decision);
+      const key = [
+        asNonEmptyString(record.step_result_ref),
+        asNonEmptyString(record.audit_ref),
+        asNonEmptyString(record.decision),
+        asNonEmptyString(record.operation_type),
+      ]
+        .filter(Boolean)
+        .join("|");
+      if (key && seenDecisionKeys.has(key)) continue;
+      if (key) seenDecisionKeys.add(key);
+      decisions.push(record);
+    }
+  }
+  if (decisions.length > 0) {
+    return {
+      report_file: reports.find(({ report }) => Array.isArray(report.runtime_permission_decisions) && report.runtime_permission_decisions.length > 0)?.filePath ?? null,
+      summary: buildRuntimePermissionSummary(decisions),
+      decisions,
+    };
+  }
+  const summaryReport = reports.find(({ report }) => Object.keys(asRecord(report.runtime_permission_summary)).length > 0);
+  return {
+    report_file: summaryReport?.filePath ?? reports[0]?.filePath ?? null,
+    summary: summaryReport ? asRecord(summaryReport.report.runtime_permission_summary) : null,
+    decisions: [],
+  };
+}
+
+/**
  * @param {Record<string, unknown>} artifacts
  * @returns {string[]}
  */
@@ -1240,12 +1317,19 @@ function writeProofRunnerArtifacts(options) {
   options.flowResult.artifacts.required_matrix_acceptance_closed = canonicalStatus.required_matrix_acceptance_closed;
   const sourceMetadata = resolveHostSourceMetadata(options.hostRoot);
   const latestRuntimeHarnessReportFile =
-    productionProof?.evidence_refs?.runtime_harness_report_file ??
-    asNonEmptyString(options.flowResult.artifacts.latest_runtime_harness_report_file) ??
-    asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file) ??
+    asNonEmptyString(productionProof?.evidence_refs?.runtime_harness_report_file) ||
+    asNonEmptyString(options.flowResult.artifacts.latest_runtime_harness_report_file) ||
+    asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file) ||
+    asNonEmptyString(options.flowResult.artifacts.delivery_runtime_harness_report_file) ||
+    asNonEmptyString(options.flowResult.artifacts.run_start_runtime_harness_report_file) ||
     null;
-  const latestRuntimeHarnessReport = readJsonIfPresent(latestRuntimeHarnessReportFile);
-  const runtimePermissionSummary = asRecord(latestRuntimeHarnessReport.runtime_permission_summary);
+  const runtimePermissionEvidence = collectRuntimePermissionEvidence([
+    asNonEmptyString(productionProof?.evidence_refs?.runtime_harness_report_file),
+    asNonEmptyString(options.flowResult.artifacts.latest_runtime_harness_report_file),
+    asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file),
+    asNonEmptyString(options.flowResult.artifacts.delivery_runtime_harness_report_file),
+    asNonEmptyString(options.flowResult.artifacts.run_start_runtime_harness_report_file),
+  ]);
 
   const summary = {
     run_id: options.runId,
@@ -1379,11 +1463,8 @@ function writeProofRunnerArtifacts(options) {
       null,
     latest_runtime_harness_report_file:
       latestRuntimeHarnessReportFile,
-    runtime_permission_summary:
-      Object.keys(runtimePermissionSummary).length > 0 ? runtimePermissionSummary : null,
-    runtime_permission_decisions: Array.isArray(latestRuntimeHarnessReport.runtime_permission_decisions)
-      ? latestRuntimeHarnessReport.runtime_permission_decisions
-      : [],
+    runtime_permission_summary: runtimePermissionEvidence.summary,
+    runtime_permission_decisions: runtimePermissionEvidence.decisions,
     coverage_follow_up:
       typeof options.flowResult.artifacts.coverage_follow_up === "object" && options.flowResult.artifacts.coverage_follow_up
         ? options.flowResult.artifacts.coverage_follow_up

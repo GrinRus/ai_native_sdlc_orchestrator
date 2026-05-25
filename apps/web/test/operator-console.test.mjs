@@ -223,6 +223,49 @@ function seedRuntimePermissionDecision(projectRoot, runId) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @param {string} runId
+ */
+function seedNestedRuntimePermissionDecision(projectRoot, runId) {
+  const initResult = invokeCli(["project", "init", "--project-ref", projectRoot]);
+  assert.equal(initResult.exitCode, 0, initResult.stderr);
+  const initPayload = JSON.parse(initResult.stdout);
+  const nestedRunId = `github-sandbox.run.${runId}.routed-execution.v1`;
+  const projectsRoot = path.dirname(path.dirname(initPayload.runtime_layout.reportsRoot));
+  const reportsRoot = path.join(projectsRoot, `github-sandbox.run.${runId}`, "reports");
+  writeRuntimeJson(path.join(reportsRoot, `step-result-${nestedRunId}-runtime-permission.json`), {
+    step_result_id: `${nestedRunId}.step.implement`,
+    run_id: nestedRunId,
+    step_id: "routed.implement",
+    step_class: "runner",
+    status: "failed",
+    summary: "Nested routed runtime requested permission and AOR auto-approved it.",
+    evidence_refs: ["evidence://reports/runtime-permission-decision-nested-web.json"],
+    runtime_permission_request: {
+      interaction_type: "permission_request",
+      adapter_id: "codex-cli",
+      runner_family: "codex",
+      permission_mode: "restricted",
+      operation_type: "file_read",
+      tool_name: "Read",
+      target: "package.json",
+      confidence: "high",
+      evidence_refs: ["evidence://adapter/nested-raw-permission.json"],
+    },
+    runtime_permission_decision: {
+      decision: "auto_approve",
+      rule_id: "runtime-permission.auto-approve.safe-read",
+      interaction_policy: "orchestrator-mediated",
+      profile: "conservative",
+      approval_scope: "step-coarse",
+      approval_resume_mode: "full-bypass",
+      continuation_strategy: "reinvoke",
+      audit_ref: "evidence://reports/runtime-permission-decision-nested-web.json",
+    },
+  });
+}
+
+/**
  * @param {{ artifactsRoot: string, reportsRoot: string }} runtimeLayout
  * @param {string} projectId
  * @param {string} runId
@@ -397,6 +440,31 @@ test("web console snapshot builds run list and run detail from shared API contra
     assert.match(html, /Runner interactions/);
     assert.match(html, /Runtime permission decisions/);
     assert.match(html, /runtime-permission\.auto-approve\.safe-read/);
+  });
+});
+
+test("web console surfaces nested live runtime permission decisions on the public run", async () => {
+  await withTempProject(async (projectRoot) => {
+    const runId = seedOperatorArtifacts(projectRoot);
+    seedNestedRuntimePermissionDecision(projectRoot, runId);
+
+    const snapshot = await buildOperatorConsoleSnapshot({
+      cwd: projectRoot,
+      projectRef: projectRoot,
+      runId,
+    });
+
+    assert.equal(snapshot.selected_run_id, runId);
+    assert.equal(snapshot.run_detail.runtime_permission_decisions.length, 1);
+    assert.equal(snapshot.run_detail.runtime_permission_decisions[0].run_id.includes(runId), true);
+    assert.equal(snapshot.run_detail.runtime_permission_decisions[0].decision, "auto_approve");
+    assert.equal(snapshot.run_detail.runtime_permission_decisions[0].target, "package.json");
+
+    const html = renderOperatorConsoleHtml(snapshot);
+    assert.match(html, /Runtime permission decisions/u);
+    assert.match(html, /auto_approve/u);
+    assert.match(html, /package\.json/u);
+    assert.match(html, /reinvoke/u);
   });
 });
 
