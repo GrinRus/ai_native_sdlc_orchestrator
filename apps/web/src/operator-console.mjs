@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
+
+import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
 import {
   applyRunControlAction,
   attachUiLifecycle,
@@ -41,6 +45,8 @@ const LIFECYCLE_COMMANDS = Object.freeze([
   "release prepare",
   "learning handoff",
 ]);
+
+const STEP_RESULT_REGEX = /^step-result-.*\.json$/;
 
 const GUIDED_STAGE_DEFINITIONS = Object.freeze([
   {
@@ -336,6 +342,200 @@ function escapeHtml(value) {
 }
 
 /**
+ * @param {string} runRef
+ * @returns {string}
+ */
+function normalizeRunRef(runRef) {
+  return runRef.startsWith("run://") ? runRef.slice("run://".length) : runRef;
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeId(value) {
+  const normalized = [];
+  let previousWasReplacement = false;
+  for (const char of value.toLowerCase()) {
+    const code = char.charCodeAt(0);
+    const allowed =
+      (code >= 97 && code <= 122) ||
+      (code >= 48 && code <= 57) ||
+      char === "." ||
+      char === "_" ||
+      char === "-";
+    if (allowed) {
+      normalized.push(char);
+      previousWasReplacement = false;
+      continue;
+    }
+    if (!previousWasReplacement) {
+      normalized.push("-");
+      previousWasReplacement = true;
+    }
+  }
+
+  let start = 0;
+  let end = normalized.length;
+  while (start < end && normalized[start] === "-") start += 1;
+  while (end > start && normalized[end - 1] === "-") end -= 1;
+  return normalized.slice(start, end).join("");
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {boolean}
+ */
+function isRunTokenBoundary(value) {
+  return value === undefined || value === "." || value === "_" || value === "-" || value === ":";
+}
+
+/**
+ * @param {string} value
+ * @param {string} runId
+ * @returns {boolean}
+ */
+function containsRunToken(value, runId) {
+  const normalizedValue = normalizeId(value);
+  const normalizedRunId = normalizeId(runId);
+  if (!normalizedValue || !normalizedRunId) return false;
+  if (normalizedValue === normalizedRunId) return true;
+  let index = normalizedValue.indexOf(normalizedRunId);
+  while (index !== -1) {
+    const before = index === 0 ? undefined : normalizedValue[index - 1];
+    const afterIndex = index + normalizedRunId.length;
+    const after = afterIndex >= normalizedValue.length ? undefined : normalizedValue[afterIndex];
+    if (isRunTokenBoundary(before) && isRunTokenBoundary(after)) {
+      return true;
+    }
+    index = normalizedValue.indexOf(normalizedRunId, index + 1);
+  }
+  return false;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @returns {string[]}
+ */
+function extractRunRefs(document) {
+  return uniqueStrings([
+    ...(asString(document.run_id) ? [asString(document.run_id)] : []),
+    ...(asString(document.subject_ref) ? [asString(document.subject_ref)] : []),
+    ...asStringArray(document.run_refs),
+    ...asStringArray(document.linked_run_refs),
+  ].map((runRef) => normalizeRunRef(runRef ?? "")));
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string | null} runId
+ * @returns {boolean}
+ */
+function documentLinksRun(document, runId) {
+  return runId !== null && extractRunRefs(document).includes(runId);
+}
+
+/**
+ * Routed live execution can mint nested run ids under the public live-e2e run,
+ * for example `project.run.<outer-run>.routed-execution.v1`.
+ *
+ * @param {Record<string, unknown>} document
+ * @param {string | null} runId
+ * @returns {boolean}
+ */
+function stepResultLinksRun(document, runId) {
+  if (!runId) return false;
+  if (documentLinksRun(document, runId)) return true;
+  return [document.run_id, document.step_result_id, document.step_id, document.subject_ref]
+    .map((value) => asString(value))
+    .some((value) => value !== null && containsRunToken(value, runId));
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function toPosix(value) {
+  return value.replace(/\\/g, "/");
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toEvidenceRef(projectRoot, filePath) {
+  return `evidence://${toPosix(path.relative(projectRoot, filePath))}`;
+}
+
+/**
+ * @param {string} dirPath
+ * @returns {string[]}
+ */
+function listJsonFiles(dirPath) {
+  if (!fs.existsSync(dirPath)) return [];
+  return fs
+    .readdirSync(dirPath)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => path.join(dirPath, entry))
+    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
+}
+
+/**
+ * @param {Array<{ file?: string, artifact_ref?: string, document: Record<string, unknown> }>} entries
+ * @returns {Array<{ file?: string, artifact_ref?: string, document: Record<string, unknown> }>}
+ */
+function uniqueArtifactEntries(entries) {
+  const seen = new Set();
+  return entries.filter((entry) => {
+    const key = asString(entry.file) ?? asString(entry.artifact_ref) ?? asString(entry.document.step_result_id);
+    if (!key) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * Routed live E2E can execute the target under a sibling runtime project whose
+ * id is derived from the public run id. The console keeps the public run
+ * selected while exposing only the sibling step-results that link back to it.
+ *
+ * @param {Record<string, unknown>} projectState
+ * @param {string | null} runId
+ * @returns {Array<{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> }>}
+ */
+function listLinkedSiblingStepResults(projectState, runId) {
+  const runtimeRoot = asString(projectState.runtime_root);
+  const projectRoot = asString(projectState.project_root);
+  const currentProjectId = asString(projectState.project_id);
+  if (!runtimeRoot || !projectRoot || !runId) return [];
+  const projectsRoot = path.join(runtimeRoot, "projects");
+  if (!fs.existsSync(projectsRoot)) return [];
+
+  const entries = [];
+  for (const projectEntry of fs.readdirSync(projectsRoot, { withFileTypes: true })) {
+    if (!projectEntry.isDirectory() || projectEntry.name === currentProjectId) continue;
+    if (!containsRunToken(projectEntry.name, runId)) continue;
+    const reportsRoot = path.join(projectsRoot, projectEntry.name, "reports");
+    for (const filePath of listJsonFiles(reportsRoot)) {
+      if (!STEP_RESULT_REGEX.test(path.basename(filePath))) continue;
+      const loaded = loadContractFile({ filePath, family: "step-result" });
+      if (!loaded.ok) continue;
+      const document = asRecord(loaded.document);
+      if (!stepResultLinksRun(document, runId)) continue;
+      entries.push({
+        family: "step-result",
+        file: filePath,
+        artifact_ref: toEvidenceRef(projectRoot, filePath),
+        document,
+      });
+    }
+  }
+  return entries;
+}
+
+/**
  * @param {Array<{ document: Record<string, unknown> }>} artifacts
  * @param {string | null} runId
  * @returns {Array<{ document: Record<string, unknown> }>}
@@ -343,6 +543,16 @@ function escapeHtml(value) {
 function filterArtifactsByRunId(artifacts, runId) {
   if (!runId) return [];
   return artifacts.filter((artifact) => artifact.document.run_id === runId);
+}
+
+/**
+ * @param {Array<{ document: Record<string, unknown> }>} stepResults
+ * @param {string | null} runId
+ * @returns {Array<{ document: Record<string, unknown> }>}
+ */
+function filterStepResultsByLinkedRunId(stepResults, runId) {
+  if (!runId) return [];
+  return stepResults.filter((entry) => stepResultLinksRun(entry.document, runId));
 }
 
 /**
@@ -376,13 +586,56 @@ function collectRunnerInteractions(stepResults) {
         step_result_id: asString(entry.document.step_result_id),
         step_result_ref: asString(entry.artifact_ref) ?? asString(entry.file),
         interaction_id: asString(requestedInteraction.interaction_id),
+        interaction_type: asString(requestedInteraction.interaction_type) ?? "clarification_question",
         interaction_status: status,
         question_summary: asString(requestedInteraction.prompt_summary) ?? asString(requestedInteraction.summary),
         answer_required: status === "requested",
+        runtime_permission_request: asRecord(requestedInteraction.runtime_permission_request),
+        runtime_permission_decision: asRecord(requestedInteraction.runtime_permission_decision),
         answer_audit_refs: Array.isArray(requestedInteraction.answer_audit_refs)
           ? requestedInteraction.answer_audit_refs.filter((value) => typeof value === "string")
           : [],
         continuation: asRecord(requestedInteraction.continuation),
+      };
+    })
+    .filter(Boolean);
+}
+
+/**
+ * @param {Array<{ artifact_ref?: string, file?: string, document: Record<string, unknown> }>} stepResults
+ * @returns {Array<Record<string, unknown>>}
+ */
+function collectRuntimePermissionDecisions(stepResults) {
+  return stepResults
+    .map((entry) => {
+      const requestedInteraction = asRecord(entry.document.requested_interaction);
+      const topLevelRequest = asRecord(entry.document.runtime_permission_request);
+      const interactionRequest = asRecord(requestedInteraction.runtime_permission_request);
+      const permissionRequest = Object.keys(topLevelRequest).length > 0 ? topLevelRequest : interactionRequest;
+      const topLevelDecision = asRecord(entry.document.runtime_permission_decision);
+      const interactionDecision = asRecord(requestedInteraction.runtime_permission_decision);
+      const permissionDecision = Object.keys(topLevelDecision).length > 0 ? topLevelDecision : interactionDecision;
+      if (Object.keys(permissionDecision).length === 0) {
+        return null;
+      }
+      return {
+        run_id: asString(entry.document.run_id),
+        step_id: asString(entry.document.step_id),
+        step_result_id: asString(entry.document.step_result_id),
+        step_result_ref: asString(entry.artifact_ref) ?? asString(entry.file),
+        interaction_id: asString(requestedInteraction.interaction_id),
+        adapter_id: asString(permissionRequest.adapter_id),
+        permission_mode: asString(permissionRequest.permission_mode),
+        operation_type: asString(permissionRequest.operation_type) ?? "unknown",
+        target: asString(permissionRequest.target) ?? asString(permissionRequest.target_path),
+        command: asString(permissionRequest.command),
+        decision: asString(permissionDecision.decision) ?? "unknown",
+        rule_id: asString(permissionDecision.rule_id),
+        approval_scope: asString(permissionDecision.approval_scope),
+        approval_resume_mode: asString(permissionDecision.approval_resume_mode),
+        continuation_strategy: asString(permissionDecision.continuation_strategy),
+        audit_ref: asString(permissionDecision.audit_ref),
+        grant_ref: asString(permissionDecision.grant_ref),
       };
     })
     .filter(Boolean);
@@ -605,7 +858,7 @@ function collectGuidedStageEvidence(options) {
 
   if (options.stageId === "execution") {
     return uniqueStrings([
-      ...evidenceRefsFor(stepResults, (entry) => asString(entry.document.run_id) === asString(snapshot.selected_run_id)),
+      ...evidenceRefsFor(stepResults, (entry) => stepResultLinksRun(entry.document, asString(snapshot.selected_run_id))),
       ...asArray(asRecord(asRecord(snapshot.run_detail).event_history).events).map((event) => asString(asRecord(event).event_id)),
       ...nextActionEvidence,
     ]);
@@ -698,7 +951,7 @@ function isGuidedStageDone(options) {
     );
   }
   if (options.stageId === "execution") {
-    return stepResults.some((entry) => asString(entry.document.run_id) === asString(snapshot.selected_run_id));
+    return stepResults.some((entry) => stepResultLinksRun(entry.document, asString(snapshot.selected_run_id)));
   }
   if (options.stageId === "review-qa") {
     return (
@@ -1122,6 +1375,7 @@ export async function applyOperatorLifecycleCommand(options) {
  *   runId: string,
  *   interactionId: string,
  *   answer: string,
+ *   decision?: string,
  *   reason?: string,
  *   approvalRef?: string,
  *   answerEvidenceRef?: string,
@@ -1145,6 +1399,7 @@ export async function submitOperatorInteractionAnswer(options) {
         run_id: options.runId,
         interaction_id: options.interactionId,
         answer: options.answer,
+        decision: options.decision ?? null,
         reason: options.reason ?? null,
         approval_ref: options.approvalRef ?? null,
         answer_evidence_ref: options.answerEvidenceRef ?? null,
@@ -1167,6 +1422,7 @@ export async function submitOperatorInteractionAnswer(options) {
     runId: options.runId,
     interactionId: options.interactionId,
     answer: options.answer,
+    decision: options.decision,
     reason: options.reason,
     approvalRef: options.approvalRef,
     answerEvidenceRef: options.answerEvidenceRef,
@@ -1180,6 +1436,7 @@ export async function submitOperatorInteractionAnswer(options) {
       interaction_id: result.interactionId,
       interaction_status: result.interactionStatus,
       answer_accepted: result.answerAccepted,
+      decision: result.decision ?? null,
       answer_audit_ref: result.answerAuditRef,
       step_result_ref: result.stepResultRef,
       blocked: result.blocked,
@@ -1242,6 +1499,10 @@ export async function buildOperatorConsoleSnapshot(options) {
         })
       : null;
 
+    const linkedSiblingStepResults = listLinkedSiblingStepResults(state, selectedRunId);
+    const visibleStepResults = uniqueArtifactEntries([...stepResults, ...linkedSiblingStepResults]);
+    const selectedStepResults = filterArtifactsByRunId(visibleStepResults, selectedRunId);
+    const selectedLinkedStepResults = filterStepResultsByLinkedRunId(visibleStepResults, selectedRunId);
     return withGuidedLifecycle({
       project: state,
       ui_lifecycle: uiLifecycle.state,
@@ -1249,7 +1510,7 @@ export async function buildOperatorConsoleSnapshot(options) {
       runs,
       selected_run_id: selectedRunId,
       packet_artifacts: packets,
-      step_results: stepResults,
+      step_results: visibleStepResults,
       quality_artifacts: qualityArtifacts,
       delivery_manifests: deliveryManifests,
       promotion_decisions: promotionDecisions,
@@ -1258,8 +1519,9 @@ export async function buildOperatorConsoleSnapshot(options) {
       finance_monitoring: financeMonitoring,
       run_detail: {
         packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
-        step_results: filterArtifactsByRunId(stepResults, selectedRunId),
-        interactions: collectRunnerInteractions(filterArtifactsByRunId(stepResults, selectedRunId)),
+        step_results: selectedStepResults,
+        interactions: collectRunnerInteractions(selectedLinkedStepResults),
+        runtime_permission_decisions: collectRuntimePermissionDecisions(selectedLinkedStepResults),
         quality_artifacts: filterArtifactsByRunId(qualityArtifacts, selectedRunId),
         delivery_manifests: filterArtifactsByRunId(deliveryManifests, selectedRunId),
         promotion_decisions: filterArtifactsByRunId(promotionDecisions, selectedRunId),
@@ -1385,6 +1647,10 @@ export async function buildOperatorConsoleSnapshot(options) {
       ])
     : [null, null];
 
+  const linkedSiblingStepResults = listLinkedSiblingStepResults(asRecord(state), selectedRunId);
+  const visibleStepResults = uniqueArtifactEntries([...stepResults, ...linkedSiblingStepResults]);
+  const selectedStepResults = filterArtifactsByRunId(visibleStepResults, selectedRunId);
+  const selectedLinkedStepResults = filterStepResultsByLinkedRunId(visibleStepResults, selectedRunId);
   return withGuidedLifecycle({
     project: state,
     ui_lifecycle: uiLifecycle.state,
@@ -1392,7 +1658,7 @@ export async function buildOperatorConsoleSnapshot(options) {
     runs,
     selected_run_id: selectedRunId,
     packet_artifacts: packets,
-    step_results: stepResults,
+    step_results: visibleStepResults,
     quality_artifacts: qualityArtifacts,
     delivery_manifests: deliveryManifests,
     promotion_decisions: promotionDecisions,
@@ -1401,8 +1667,9 @@ export async function buildOperatorConsoleSnapshot(options) {
     finance_monitoring: financeRaw,
     run_detail: {
       packet_artifacts: filterPacketsByRunId(packets, selectedRunId),
-      step_results: filterArtifactsByRunId(stepResults, selectedRunId),
-      interactions: collectRunnerInteractions(filterArtifactsByRunId(stepResults, selectedRunId)),
+      step_results: selectedStepResults,
+      interactions: collectRunnerInteractions(selectedLinkedStepResults),
+      runtime_permission_decisions: collectRuntimePermissionDecisions(selectedLinkedStepResults),
       quality_artifacts: filterArtifactsByRunId(qualityArtifacts, selectedRunId),
       delivery_manifests: filterArtifactsByRunId(deliveryManifests, selectedRunId),
       promotion_decisions: filterArtifactsByRunId(promotionDecisions, selectedRunId),
@@ -1525,9 +1792,30 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
     .map((interaction) => {
       const interactionId = escapeHtml(String(interaction.interaction_id ?? "n/a"));
       const status = escapeHtml(String(interaction.interaction_status ?? "unknown"));
+      const interactionType = escapeHtml(String(interaction.interaction_type ?? "clarification_question"));
       const summary = escapeHtml(String(interaction.question_summary ?? "No summary available."));
       const answerRequired = interaction.answer_required === true ? "yes" : "no";
-      return `<li><code>${interactionId}</code> status=<code>${status}</code> answer_required=<code>${answerRequired}</code> ${summary}</li>`;
+      const permissionRequest = asRecord(interaction.runtime_permission_request);
+      const operation = escapeHtml(String(permissionRequest.operation_type ?? "n/a"));
+      const target = escapeHtml(String(permissionRequest.target ?? permissionRequest.command ?? "n/a"));
+      return `<li><code>${interactionId}</code> type=<code>${interactionType}</code> status=<code>${status}</code> answer_required=<code>${answerRequired}</code> op=<code>${operation}</code> target=<code>${target}</code> ${summary}</li>`;
+    })
+    .join("\n");
+  const runtimePermissionItems = (
+    Array.isArray(snapshot.run_detail.runtime_permission_decisions)
+      ? snapshot.run_detail.runtime_permission_decisions
+      : []
+  )
+    .map((entry) => {
+      const decision = escapeHtml(String(entry.decision ?? "unknown"));
+      const operation = escapeHtml(String(entry.operation_type ?? "unknown"));
+      const target = escapeHtml(String(entry.target ?? entry.command ?? "n/a"));
+      const adapter = escapeHtml(String(entry.adapter_id ?? "n/a"));
+      const mode = escapeHtml(String(entry.permission_mode ?? "n/a"));
+      const ruleId = escapeHtml(String(entry.rule_id ?? "n/a"));
+      const auditRef = escapeHtml(String(entry.audit_ref ?? "n/a"));
+      const continuation = escapeHtml(String(entry.continuation_strategy ?? "n/a"));
+      return `<li><code>${decision}</code> op=<code>${operation}</code> target=<code>${target}</code> adapter=<code>${adapter}</code> mode=<code>${mode}</code> rule=<code>${ruleId}</code> continuation=<code>${continuation}</code> audit=<code>${auditRef}</code></li>`;
     })
     .join("\n");
   const lifecycleItems = (snapshot.api_ui_contract_alignment.lifecycle_commands ?? [])
@@ -1667,6 +1955,10 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
     <section class="panel">
       <h2>Runner interactions</h2>
       <ul>${interactionItems || "<li>No pending runner interactions.</li>"}</ul>
+    </section>
+    <section class="panel">
+      <h2>Runtime permission decisions</h2>
+      <ul>${runtimePermissionItems || "<li>No runtime permission decisions for selected run.</li>"}</ul>
     </section>
     <section class="panel">
       <h2>Run detail evidence links</h2>

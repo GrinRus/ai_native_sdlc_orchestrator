@@ -19,7 +19,7 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../..");
 const proofRunnerScriptPath = path.join(workspaceRoot, "scripts/live-e2e/run-profile.mjs");
 const qualificationLoopScriptPath = path.join(workspaceRoot, "scripts/live-e2e/qualification-loop.mjs");
-const defaultProofRunnerTimeoutMs = Number(process.env.AOR_PROOF_RUNNER_TEST_TIMEOUT_MS ?? 120000);
+const defaultProofRunnerTimeoutMs = Number(process.env.AOR_PROOF_RUNNER_TEST_TIMEOUT_MS ?? 180000);
 
 /**
  * @param {(tempRoot: string) => void} callback

@@ -98,6 +98,8 @@ function resolvePreflightRequestTransport(externalRuntime) {
  *   runnerAuthMode: string,
  *   runnerAuthSource: string,
  *   runtimeAgentPermissionMode: string,
+ *   runtimeAgentInteractionPolicy?: string,
+ *   runtimeAgentAutoApprovalProfile?: string,
  *   authProbeRequired: boolean,
  *   permissionReadinessRequired?: boolean,
  *   runId: string,
@@ -130,6 +132,8 @@ export function runLiveAdapterPreflight(options) {
     runner_auth_mode: options.runnerAuthMode,
     runner_auth_source: options.runnerAuthSource,
     runtime_agent_permission_mode: options.runtimeAgentPermissionMode,
+    runtime_agent_interaction_policy: options.runtimeAgentInteractionPolicy ?? "fail-closed",
+    runtime_agent_auto_approval_profile: options.runtimeAgentAutoApprovalProfile ?? "none",
     adapter_profile_file: adapterProfileFile,
     auth_probe: {
       enabled: options.authProbeRequired,
@@ -157,6 +161,22 @@ export function runLiveAdapterPreflight(options) {
     writeJson(reportFile, report);
     return {
       status: "fail",
+      summary,
+      report,
+      reportFile,
+    };
+  };
+  const interactionRequired = (failureKind, summary, extra = {}) => {
+    const report = {
+      ...baseReport,
+      ...extra,
+      status: "interaction_required",
+      failure_kind: failureKind,
+      summary,
+    };
+    writeJson(reportFile, report);
+    return {
+      status: "interaction_required",
       summary,
       report,
       reportFile,
@@ -439,20 +459,31 @@ export function runLiveAdapterPreflight(options) {
     : null;
   if (editReadiness && editReadiness.status !== "pass") {
     const failureKind = asNonEmptyString(editReadiness.failure_kind) || "permission-mode-blocked";
+    const reportPayload = {
+      ...runtimeReport,
+      resolved_command: resolvedCommand,
+      auth_probe: authProbeReport,
+      edit_readiness: {
+        enabled: true,
+        status: "fail",
+        failure_kind: failureKind,
+        attempts: [editReadiness],
+      },
+    };
+    if (
+      (options.runtimeAgentInteractionPolicy ?? "fail-closed") !== "fail-closed" &&
+      (failureKind === "permission-mode-blocked" || failureKind === "edit-denied")
+    ) {
+      return interactionRequired(
+        failureKind,
+        `Live adapter preflight edit-readiness requires runtime permission interaction for adapter '${adapterId}'.`,
+        reportPayload,
+      );
+    }
     return fail(
       failureKind,
       `Live adapter preflight failed edit-readiness for adapter '${adapterId}' before run start.`,
-      {
-        ...runtimeReport,
-        resolved_command: resolvedCommand,
-        auth_probe: authProbeReport,
-        edit_readiness: {
-          enabled: true,
-          status: "fail",
-          failure_kind: failureKind,
-          attempts: [editReadiness],
-        },
-      },
+      reportPayload,
     );
   }
 
@@ -525,32 +556,40 @@ export function runLiveAdapterPreflight(options) {
   }
   if (permissionReadiness && permissionReadiness.status !== "pass") {
     const failureKind = asNonEmptyString(permissionReadiness.failure_kind) || "permission-mode-blocked";
+    const reportPayload = {
+      ...runtimeReport,
+      resolved_command: resolvedCommand,
+      auth_probe: authProbeReport,
+      edit_readiness: editReadiness
+        ? {
+            enabled: true,
+            status: "pass",
+            attempts: [editReadiness],
+          }
+        : {
+            enabled: false,
+            status: "not_required",
+          },
+      permission_readiness: {
+        enabled: true,
+        status: "fail",
+        failure_kind: failureKind,
+        attempts: [permissionReadiness],
+        nonce_file: permissionNonceFile,
+        marker_file: permissionMarkerFile,
+      },
+    };
+    if ((options.runtimeAgentInteractionPolicy ?? "fail-closed") !== "fail-closed" && failureKind === "permission-mode-blocked") {
+      return interactionRequired(
+        failureKind,
+        `Live adapter preflight permission-readiness requires runtime permission interaction for adapter '${adapterId}'.`,
+        reportPayload,
+      );
+    }
     return fail(
       failureKind,
       `Live adapter preflight failed permission-readiness for adapter '${adapterId}' before run start.`,
-      {
-        ...runtimeReport,
-        resolved_command: resolvedCommand,
-        auth_probe: authProbeReport,
-        edit_readiness: editReadiness
-          ? {
-              enabled: true,
-              status: "pass",
-              attempts: [editReadiness],
-            }
-          : {
-              enabled: false,
-              status: "not_required",
-            },
-        permission_readiness: {
-          enabled: true,
-          status: "fail",
-          failure_kind: failureKind,
-          attempts: [permissionReadiness],
-          nonce_file: permissionNonceFile,
-          marker_file: permissionMarkerFile,
-        },
-      },
+      reportPayload,
     );
   }
 

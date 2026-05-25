@@ -121,6 +121,18 @@ step_decisions:
       meaningful_changed_paths: []
     evidence_refs:
       - evidence://reports/step-result-routed-run-sample.json
+runtime_permission_summary:
+  total: 0
+  decision_counts: {}
+  permission_modes: []
+  interaction_policies: []
+  auto_approval_profiles: []
+  approval_scopes: []
+  approval_resume_modes: []
+  continuation_strategies: []
+  audit_refs: []
+  grant_refs: []
+runtime_permission_decisions: []
 run_findings:
   - finding_id: run.sample.runtime.permission-mode-blocked
     severity: fail

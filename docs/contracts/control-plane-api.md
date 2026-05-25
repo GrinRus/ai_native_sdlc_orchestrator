@@ -141,7 +141,7 @@ HTTP lifecycle command mutation baseline:
 
 HTTP interactive answer mutation baseline:
 - route: `POST /api/projects/:projectId/interactions/answers`;
-- payload fields: `run_id`, `interaction_id`, `answer`, and optional `reason`, `approval_ref`, `answer_evidence_ref`;
+- payload fields: `run_id`, `interaction_id`, optional `answer`, optional structured `decision` (`approve_once|deny|approve_for_run`), and optional `reason`, `approval_ref`, `answer_evidence_ref`;
 - the referenced interaction must match the latest unresolved run-linked `step-result.requested_interaction`;
 - accepted answers write one durable `interaction-answer-*.json` audit artifact under the runtime reports root before any continuation state changes;
 - response payloads return `{ interaction_answer }` with `interaction_id`, `interaction_status`, `answer_audit_ref`, `step_result_ref`, `run_control_transition`, `blocked_reason`, and live event ids;
@@ -149,6 +149,9 @@ HTTP interactive answer mutation baseline:
 - non-resumable boundaries return HTTP `409` with `error.code=interaction.continuation_blocked` and keep the run blocked with evidence refs;
 - live events and query payloads must reference `answer_audit_ref` and must not include the raw answer text.
 - CLI, API, and web surfaces expose the same query-safe answer result; raw answer text is allowed only in the durable answer audit artifact, never in command output, read models, SSE payloads, or web snapshots.
+- for runtime permission requests, `decision` is required; legacy free-text `answer` is only compatible with ordinary clarification questions.
+- for runtime permission requests, answer submission records the structured decision but must not claim a pass unless an actual continuation or reinvocation has run. Current coarse external-process adapters report `continuation.reinvoke_required` after user approval so the next runtime action is explicit.
+- `approve_for_run` creates a run-scoped grant that may auto-approve later matching permission requests in the same run after hard-deny policy checks still pass; it is not persisted globally.
 
 ## Read surface baseline (module operations)
 

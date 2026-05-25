@@ -99,6 +99,18 @@ step_decisions:
         - repos/frontend/src/api/client.ts
     evidence_refs:
       - evidence://reports/step-result-run-delivery-004.json
+runtime_permission_summary:
+  total: 0
+  decision_counts: {}
+  permission_modes: []
+  interaction_policies: []
+  auto_approval_profiles: []
+  approval_scopes: []
+  approval_resume_modes: []
+  continuation_strategies: []
+  audit_refs: []
+  grant_refs: []
+runtime_permission_decisions: []
 run_findings: []
 recommendations: []
 impacted_asset_refs: []

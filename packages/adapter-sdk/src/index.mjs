@@ -362,6 +362,156 @@ function hasNonEmptyPermissionDenials(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {Array<Record<string, unknown>>}
+ */
+function collectPermissionDenials(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => collectPermissionDenials(entry));
+  }
+
+  const record = asRecord(value);
+  const entries = Object.entries(record);
+  if (entries.length === 0) {
+    return [];
+  }
+
+  const ownDenials = Array.isArray(record.permission_denials)
+    ? record.permission_denials.filter((entry) => typeof entry === "object" && entry !== null).map((entry) => asRecord(entry))
+    : [];
+  return [...ownDenials, ...entries.flatMap(([, entry]) => collectPermissionDenials(entry))];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function firstString(value) {
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value.trim();
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const resolved = firstString(entry);
+      if (resolved) return resolved;
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} toolInput
+ * @returns {string | null}
+ */
+function resolvePermissionTarget(toolInput) {
+  return (
+    firstString(toolInput.file_path) ??
+    firstString(toolInput.path) ??
+    firstString(toolInput.paths) ??
+    firstString(toolInput.pattern) ??
+    firstString(toolInput.url) ??
+    null
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} toolInput
+ * @returns {string | null}
+ */
+function resolvePermissionCommand(toolInput) {
+  return firstString(toolInput.command) ?? firstString(toolInput.cmd) ?? firstString(toolInput.shell_command) ?? null;
+}
+
+/**
+ * @param {string | null} toolName
+ * @param {Record<string, unknown>} toolInput
+ * @param {string} text
+ * @returns {string}
+ */
+function inferPermissionOperationType(toolName, toolInput, text) {
+  const combined = `${toolName ?? ""} ${stableJsonText(toolInput)} ${text}`.toLowerCase();
+  if (/\b(?:bash|shell|terminal|exec|command)\b/u.test(combined) || resolvePermissionCommand(toolInput)) {
+    return "shell_command";
+  }
+  if (/\b(?:grep|glob|search|find|ls|list)\b/u.test(combined)) {
+    return "file_search";
+  }
+  if (/\b(?:stat)\b/u.test(combined)) {
+    return "file_stat";
+  }
+  if (/\b(?:write|edit|multiedit|create|patch|modify)\b/u.test(combined)) {
+    return "file_write";
+  }
+  if (/\b(?:read|open|cat)\b/u.test(combined)) {
+    return "file_read";
+  }
+  if (/\b(?:fetch|web|http|network|curl|wget)\b/u.test(combined)) {
+    return "network_access";
+  }
+  if (/\bmcp\b/u.test(combined)) {
+    return "mcp_tool";
+  }
+  return "unknown";
+}
+
+/**
+ * @param {string} text
+ * @returns {string}
+ */
+function sanitizeSummary(text) {
+  return text.replace(/\s+/gu, " ").trim().slice(0, 300);
+}
+
+/**
+ * @param {{
+ *   adapterId: string,
+ *   runnerFamily: string | null,
+ *   permissionMode: string,
+ *   permissionModeSource: string,
+ *   runnerPayload: Record<string, unknown>,
+ *   runnerToolTraces: Array<Record<string, unknown>>,
+ *   stdout: string,
+ *   stderr: string,
+ *   evidenceRefs: string[],
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+function buildRuntimePermissionRequest(options) {
+  const denials = collectPermissionDenials(options.runnerPayload);
+  denials.push(...collectPermissionDenials(options.runnerToolTraces));
+  const firstDenial = denials[0] ?? {};
+  const toolInput = asRecord(firstDenial.tool_input ?? firstDenial.input ?? firstDenial.arguments);
+  const toolName =
+    firstString(firstDenial.tool_name) ??
+    firstString(firstDenial.name) ??
+    firstString(firstDenial.tool) ??
+    null;
+  const combinedText = `${stableJsonText(options.runnerPayload)}\n${stableJsonText(options.runnerToolTraces)}\n${options.stdout}\n${options.stderr}`;
+  const target = resolvePermissionTarget(toolInput);
+  const command = resolvePermissionCommand(toolInput);
+  const operationType = inferPermissionOperationType(toolName, toolInput, combinedText);
+  const structured = denials.length > 0;
+
+  return {
+    interaction_type: "permission_request",
+    adapter_id: options.adapterId,
+    runner_family: options.runnerFamily,
+    permission_mode: options.permissionMode,
+    permission_mode_source: options.permissionModeSource,
+    operation_type: operationType,
+    tool_name: toolName,
+    target,
+    target_path: target,
+    command,
+    confidence: structured ? "high" : "medium",
+    summary: structured
+      ? `Runtime requested permission for ${toolName ?? operationType}.`
+      : sanitizeSummary(options.stderr || options.stdout || "Runtime requested permission."),
+    evidence_refs: options.evidenceRefs,
+  };
+}
+
+/**
  * @param {string} text
  * @returns {string}
  */
@@ -495,6 +645,23 @@ function classifyStructuredRunnerFailure(options) {
  * @returns {{ runnerPayload: Record<string, unknown>, runnerEvidenceRefs: string[], runnerToolTraces: Array<Record<string, unknown>> }}
  */
 function extractRunnerOutput(parsed) {
+  if (Array.isArray(parsed)) {
+    const runnerEvidenceRefs = [];
+    const runnerToolTraces = [];
+    for (const record of parsed) {
+      const extracted = extractRunnerOutput(record);
+      runnerEvidenceRefs.push(...extracted.runnerEvidenceRefs);
+      runnerToolTraces.push(...extracted.runnerToolTraces);
+    }
+    return {
+      runnerPayload: {
+        json_events: parsed,
+      },
+      runnerEvidenceRefs,
+      runnerToolTraces,
+    };
+  }
+
   const parsedRecord = asRecord(parsed);
   const hasEnvelopeOutput = Object.prototype.hasOwnProperty.call(parsedRecord, "output");
   return {
@@ -966,6 +1133,7 @@ export function createMockAdapter(options = {}) {
 export function createLiveAdapter(options) {
   const adapterId = requireString("adapterId", options.adapterId);
   const adapterProfile = asRecord(options.adapterProfile);
+  const runnerFamily = asOptionalString(adapterProfile.runner_family) ?? adapterId;
   const executionProfile = asRecord(adapterProfile.execution);
   const runtimeMode = asOptionalString(executionProfile.runtime_mode);
   const handler = asOptionalString(executionProfile.handler);
@@ -1316,6 +1484,20 @@ export function createLiveAdapter(options) {
         },
         ...runnerToolTraces,
       ];
+      const withRuntimePermissionRequest = (output) => ({
+        ...output,
+        runtime_permission_request: buildRuntimePermissionRequest({
+          adapterId,
+          runnerFamily,
+          permissionMode: runtimeInvocation.permissionMode,
+          permissionModeSource: runtimeInvocation.source,
+          runnerPayload,
+          runnerToolTraces,
+          stdout,
+          stderr,
+          evidenceRefs,
+        }),
+      });
 
       if (invocationTimedOut) {
         return createAdapterResponseEnvelope({
@@ -1342,7 +1524,11 @@ export function createLiveAdapter(options) {
               errorMessage: invocationError.message,
               defaultFailureKind: "external-runner-failed",
             });
-        const blocked = missingCommand || failureKind === "auth-failed" || failureKind === "permission-mode-blocked";
+        const blocked =
+          missingCommand ||
+          failureKind === "auth-failed" ||
+          failureKind === "permission-mode-blocked" ||
+          failureKind === "edit-denied";
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,
           adapter_id: adapterId,
@@ -1351,7 +1537,9 @@ export function createLiveAdapter(options) {
             ? `External runner command '${runtimeCommand}' is not available on PATH for adapter '${adapterId}'.`
             : `External runner launch failed for adapter '${adapterId}': ${invocationError.message}.`,
           output: {
-            ...baseOutput,
+            ...(failureKind === "permission-mode-blocked" || failureKind === "edit-denied"
+              ? withRuntimePermissionRequest(baseOutput)
+              : baseOutput),
             blocked,
             failure_kind: failureKind,
           },
@@ -1371,13 +1559,19 @@ export function createLiveAdapter(options) {
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,
           adapter_id: adapterId,
-          status: failureKind === "auth-failed" || failureKind === "permission-mode-blocked" ? "blocked" : "failed",
+          status:
+            failureKind === "auth-failed" || failureKind === "permission-mode-blocked" || failureKind === "edit-denied"
+              ? "blocked"
+              : "failed",
           summary: `External runner command '${runtimeCommand}' exited with code ${String(
             invocation.status ?? "null",
           )} for adapter '${adapterId}'.`,
           output: {
-            ...baseOutput,
-            blocked: failureKind === "auth-failed" || failureKind === "permission-mode-blocked",
+            ...(failureKind === "permission-mode-blocked" || failureKind === "edit-denied"
+              ? withRuntimePermissionRequest(baseOutput)
+              : baseOutput),
+            blocked:
+              failureKind === "auth-failed" || failureKind === "permission-mode-blocked" || failureKind === "edit-denied",
             failure_kind: failureKind,
           },
           evidence_refs: evidenceRefs,
@@ -1406,7 +1600,9 @@ export function createLiveAdapter(options) {
           status: blocked ? "blocked" : "failed",
           summary: `External runner command '${runtimeCommand}' completed but emitted '${semanticFailureKind}' evidence for adapter '${adapterId}'.`,
           output: {
-            ...baseOutput,
+            ...(semanticFailureKind === "permission-mode-blocked" || semanticFailureKind === "edit-denied"
+              ? withRuntimePermissionRequest(baseOutput)
+              : baseOutput),
             blocked,
             failure_kind: semanticFailureKind,
           },

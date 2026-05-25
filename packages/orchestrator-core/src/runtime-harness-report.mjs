@@ -115,7 +115,40 @@ function readJsonFile(filePath) {
  * @returns {string}
  */
 function normalizeId(value) {
-  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const normalized = [];
+  let previousWasReplacement = false;
+  for (const char of value.toLowerCase()) {
+    const code = char.charCodeAt(0);
+    const allowed =
+      (code >= 97 && code <= 122) ||
+      (code >= 48 && code <= 57) ||
+      char === "." ||
+      char === "_" ||
+      char === "-";
+    if (allowed) {
+      normalized.push(char);
+      previousWasReplacement = false;
+      continue;
+    }
+    if (!previousWasReplacement) {
+      normalized.push("-");
+      previousWasReplacement = true;
+    }
+  }
+
+  let start = 0;
+  let end = normalized.length;
+  while (start < end && normalized[start] === "-") start += 1;
+  while (end > start && normalized[end - 1] === "-") end -= 1;
+  return normalized.slice(start, end).join("");
+}
+
+/**
+ * @param {string | undefined} value
+ * @returns {boolean}
+ */
+function isRunTokenBoundary(value) {
+  return value === undefined || value === "." || value === "_" || value === "-" || value === ":";
 }
 
 /**
@@ -259,6 +292,50 @@ function documentLinksRun(document, runId) {
 }
 
 /**
+ * Routed live execution can mint nested run ids under the public live-e2e run,
+ * for example `project.run.<outer-run>.routed-execution.v1`.
+ *
+ * @param {string} value
+ * @param {string} runId
+ * @returns {boolean}
+ */
+function containsRunToken(value, runId) {
+  const normalizedValue = normalizeId(value);
+  const normalizedRunId = normalizeId(runId);
+  if (!normalizedValue || !normalizedRunId) {
+    return false;
+  }
+  if (normalizedValue === normalizedRunId) {
+    return true;
+  }
+  let index = normalizedValue.indexOf(normalizedRunId);
+  while (index !== -1) {
+    const before = index === 0 ? undefined : normalizedValue[index - 1];
+    const afterIndex = index + normalizedRunId.length;
+    const after = afterIndex >= normalizedValue.length ? undefined : normalizedValue[afterIndex];
+    if (isRunTokenBoundary(before) && isRunTokenBoundary(after)) {
+      return true;
+    }
+    index = normalizedValue.indexOf(normalizedRunId, index + 1);
+  }
+  return false;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @param {string} runId
+ * @returns {boolean}
+ */
+function stepResultLinksRun(document, runId) {
+  if (documentLinksRun(document, runId)) {
+    return true;
+  }
+  return [document.run_id, document.step_result_id, document.step_id, document.subject_ref]
+    .map((value) => asString(value))
+    .some((value) => value !== null && containsRunToken(value, runId));
+}
+
+/**
  * @param {Record<string, unknown>} adapterOutput
  * @returns {string | null}
  */
@@ -306,6 +383,26 @@ function permissionFailureKindFromAdapterOutput(adapterOutput) {
 
 /**
  * @param {Record<string, unknown>} stepResult
+ * @returns {{ failureClass: string, decision: "retry" | "block", missionOutcome: string } | null}
+ */
+function runtimePermissionDecisionOutcome(stepResult) {
+  const decision = asRecord(stepResult.runtime_permission_decision);
+  const value = asString(decision.decision);
+  if (!value) {
+    return null;
+  }
+  const failureClass = asString(stepResult.failure_class) ?? "permission-mode-blocked";
+  if (value === "auto_approve" || value === "user_approved") {
+    return { failureClass, decision: "retry", missionOutcome: "not_satisfied" };
+  }
+  if (value === "ask_user" || value === "auto_deny" || value === "user_denied") {
+    return { failureClass, decision: "block", missionOutcome: "not_satisfied" };
+  }
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
  * @param {{ gitStatusAvailable?: boolean, strictCodeChangingNoop?: boolean, nonBootstrapChangedPaths?: string[], meaningfulChangedPaths?: string[] }} [options]
  * @returns {{ failureClass: string, decision: "pass" | "retry" | "repair" | "escalate" | "block" | "fail", missionOutcome: string }}
  */
@@ -324,6 +421,11 @@ export function classifyRuntimeStepOutcome(stepResult, options = {}) {
   const meaningfulChangedPaths = Array.isArray(options.meaningfulChangedPaths)
     ? options.meaningfulChangedPaths
     : options.nonBootstrapChangedPaths;
+  const runtimePermissionOutcome = runtimePermissionDecisionOutcome(stepResult);
+
+  if (runtimePermissionOutcome) {
+    return runtimePermissionOutcome;
+  }
 
   if (permissionFailureKind === "permission-mode-blocked") {
     return { failureClass: "permission-mode-blocked", decision: "repair", missionOutcome: "not_satisfied" };
@@ -534,21 +636,7 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
  * }} options
  */
 function loadRunStepArtifacts(options) {
-  const loadedArtifacts = listJsonFiles(options.init.runtimeLayout.reportsRoot)
-    .filter((filePath) => path.basename(filePath).startsWith("step-result-"))
-    .map((filePath) => {
-      const loaded = loadContractFile({ filePath, family: "step-result" });
-      if (!loaded.ok) return null;
-      const document = asRecord(loaded.document);
-      return document.run_id === options.runId
-        ? {
-            file: filePath,
-            artifact_ref: toEvidenceRef(options.init.projectRoot, filePath),
-            document,
-          }
-        : null;
-    })
-    .filter((entry) => entry !== null);
+  const loadedArtifacts = loadAllRunStepArtifacts(options);
   const seenStepKeys = new Set();
   return loadedArtifacts.filter((entry) => {
     const stepId = asString(entry.document.step_id) ?? entry.file;
@@ -558,6 +646,143 @@ function loadRunStepArtifacts(options) {
     seenStepKeys.add(key);
     return true;
   });
+}
+
+/**
+ * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   runId: string,
+ * }} options
+ */
+function loadAllRunStepArtifacts(options) {
+  return listJsonFiles(options.init.runtimeLayout.reportsRoot)
+    .filter((filePath) => path.basename(filePath).startsWith("step-result-"))
+    .map((filePath) => {
+      const loaded = loadContractFile({ filePath, family: "step-result" });
+      if (!loaded.ok) return null;
+      const document = asRecord(loaded.document);
+      return documentLinksRun(document, options.runId)
+        ? {
+            file: filePath,
+            artifact_ref: toEvidenceRef(options.init.projectRoot, filePath),
+            document,
+          }
+        : null;
+    })
+    .filter((entry) => entry !== null);
+}
+
+/**
+ * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   runId: string,
+ * }} options
+ */
+function loadRuntimePermissionStepArtifacts(options) {
+  return listJsonFiles(options.init.runtimeLayout.reportsRoot)
+    .filter((filePath) => path.basename(filePath).startsWith("step-result-"))
+    .map((filePath) => {
+      const loaded = loadContractFile({ filePath, family: "step-result" });
+      if (!loaded.ok) return null;
+      const document = asRecord(loaded.document);
+      return stepResultLinksRun(document, options.runId)
+        ? {
+            file: filePath,
+            artifact_ref: toEvidenceRef(options.init.projectRoot, filePath),
+            document,
+          }
+        : null;
+    })
+    .filter((entry) => entry !== null);
+}
+
+/**
+ * @param {Array<{ artifact_ref: string, document: Record<string, unknown> }>} stepArtifacts
+ * @returns {Array<Record<string, unknown>>}
+ */
+function collectRuntimePermissionDecisions(stepArtifacts) {
+  return stepArtifacts.flatMap((artifact) => {
+    const requestedInteraction = asRecord(artifact.document.requested_interaction);
+    const topLevelRequest = asRecord(artifact.document.runtime_permission_request);
+    const interactionRequest = asRecord(requestedInteraction.runtime_permission_request);
+    const runtimePermissionRequest =
+      Object.keys(topLevelRequest).length > 0 ? topLevelRequest : interactionRequest;
+    const topLevelDecision = asRecord(artifact.document.runtime_permission_decision);
+    const interactionDecision = asRecord(requestedInteraction.runtime_permission_decision);
+    const runtimePermissionDecision =
+      Object.keys(topLevelDecision).length > 0 ? topLevelDecision : interactionDecision;
+    if (Object.keys(runtimePermissionDecision).length === 0) {
+      return [];
+    }
+
+    const externalRunner = asRecord(artifact.document.external_runner);
+    return [
+      {
+        step_id: asString(artifact.document.step_id),
+        step_result_id: asString(artifact.document.step_result_id),
+        step_result_ref: artifact.artifact_ref,
+        interaction_id: asString(requestedInteraction.interaction_id),
+        adapter_id: asString(runtimePermissionRequest.adapter_id),
+        runner_family: asString(runtimePermissionRequest.runner_family),
+        permission_mode:
+          asString(runtimePermissionRequest.permission_mode) ?? asString(externalRunner.permission_mode),
+        operation_type: asString(runtimePermissionRequest.operation_type) ?? "unknown",
+        tool_name: asString(runtimePermissionRequest.tool_name),
+        target: asString(runtimePermissionRequest.target) ?? asString(runtimePermissionRequest.target_path),
+        command: asString(runtimePermissionRequest.command),
+        confidence: asString(runtimePermissionRequest.confidence),
+        decision: asString(runtimePermissionDecision.decision) ?? "unknown",
+        operator_decision: asString(runtimePermissionDecision.operator_decision),
+        rule_id: asString(runtimePermissionDecision.rule_id),
+        interaction_policy: asString(runtimePermissionDecision.interaction_policy),
+        auto_approval_profile: asString(runtimePermissionDecision.profile),
+        approval_scope: asString(runtimePermissionDecision.approval_scope),
+        approval_resume_mode: asString(runtimePermissionDecision.approval_resume_mode),
+        continuation_strategy: asString(runtimePermissionDecision.continuation_strategy),
+        audit_ref: asString(runtimePermissionDecision.audit_ref),
+        grant_ref: asString(runtimePermissionDecision.grant_ref),
+        evidence_refs: uniqueStrings([
+          artifact.artifact_ref,
+          asString(runtimePermissionDecision.audit_ref) ?? "",
+          asString(runtimePermissionDecision.grant_ref) ?? "",
+          ...asStringArray(runtimePermissionRequest.evidence_refs),
+          ...asStringArray(artifact.document.evidence_refs),
+        ]),
+      },
+    ];
+  });
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} runtimePermissionDecisions
+ * @returns {Record<string, unknown>}
+ */
+function buildRuntimePermissionSummary(runtimePermissionDecisions) {
+  const decisionCounts = {};
+  for (const decision of runtimePermissionDecisions) {
+    const key = asString(decision.decision) ?? "unknown";
+    decisionCounts[key] = (Number(decisionCounts[key]) || 0) + 1;
+  }
+  return {
+    total: runtimePermissionDecisions.length,
+    decision_counts: decisionCounts,
+    permission_modes: uniqueStrings(runtimePermissionDecisions.map((decision) => asString(decision.permission_mode) ?? "")),
+    interaction_policies: uniqueStrings(
+      runtimePermissionDecisions.map((decision) => asString(decision.interaction_policy) ?? ""),
+    ),
+    auto_approval_profiles: uniqueStrings(
+      runtimePermissionDecisions.map((decision) => asString(decision.auto_approval_profile) ?? ""),
+    ),
+    approval_scopes: uniqueStrings(runtimePermissionDecisions.map((decision) => asString(decision.approval_scope) ?? "")),
+    approval_resume_modes: uniqueStrings(
+      runtimePermissionDecisions.map((decision) => asString(decision.approval_resume_mode) ?? ""),
+    ),
+    continuation_strategies: uniqueStrings(
+      runtimePermissionDecisions.map((decision) => asString(decision.continuation_strategy) ?? ""),
+    ),
+    audit_refs: uniqueStrings(runtimePermissionDecisions.map((decision) => asString(decision.audit_ref) ?? "")),
+    grant_refs: uniqueStrings(runtimePermissionDecisions.map((decision) => asString(decision.grant_ref) ?? "")),
+  };
 }
 
 /**
@@ -803,11 +1028,14 @@ export function materializeRuntimeHarnessReport(options) {
     strictCodeChangingNoop,
   };
   const stepArtifacts = loadRunStepArtifacts({ init, runId: options.runId });
+  const runtimePermissionStepArtifacts = loadRuntimePermissionStepArtifacts({ init, runId: options.runId });
   const qualityArtifacts = loadRunQualityArtifacts({ init, runId: options.runId });
   const deliveryArtifacts = loadRunDeliveryArtifacts({ init, runId: options.runId });
   const stepDecisions = stepArtifacts.map((artifact) =>
     buildStepDecision(artifact.document, artifact.artifact_ref, missionSemantics),
   );
+  const runtimePermissionDecisions = collectRuntimePermissionDecisions(runtimePermissionStepArtifacts);
+  const runtimePermissionSummary = buildRuntimePermissionSummary(runtimePermissionDecisions);
   const stepFindings = stepDecisions
     .filter((decision) => asString(decision.runtime_harness_decision) !== "pass")
     .map((decision) => ({
@@ -879,6 +1107,8 @@ export function materializeRuntimeHarnessReport(options) {
     strictness_profile: strictnessProfile,
     overall_decision: resolveOverallDecision(runFindings, stepDecisions),
     step_decisions: stepDecisions,
+    runtime_permission_summary: runtimePermissionSummary,
+    runtime_permission_decisions: runtimePermissionDecisions,
     run_findings: runFindings,
     recommendations,
     impacted_asset_refs: impactedAssetRefs,

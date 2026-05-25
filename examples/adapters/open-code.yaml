@@ -48,6 +48,12 @@ sandbox_mode: local-or-container
 approval_features:
   supports_human_approval: true
   supports_pause_resume: false
+  continuation_strategy: reinvoke
+  approval_grant_scope: step-coarse
+  approval_resume_mode: full-bypass
+  permission_request_detection:
+    - structured-output
+    - stdout-stderr-patterns
 log_features:
   stdout: true
   stderr: true

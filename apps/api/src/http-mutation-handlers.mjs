@@ -172,6 +172,7 @@ export async function handleInteractionAnswer({ request, response, runtimeOption
   const runId = asString(payload.run_id);
   const interactionId = asString(payload.interaction_id);
   const answerEvidenceRef = asString(payload.answer_evidence_ref) ?? undefined;
+  const decision = asString(payload.decision) ?? undefined;
   const answer = typeof payload.answer === "string" ? payload.answer.trim() : "";
 
   if (!runId || !interactionId) {
@@ -179,12 +180,12 @@ export async function handleInteractionAnswer({ request, response, runtimeOption
     return;
   }
 
-  if (answer.length === 0 && !answerEvidenceRef) {
+  if (answer.length === 0 && !answerEvidenceRef && !decision) {
     sendError(
       response,
       400,
       "interaction_answer.invalid_answer",
-      "answer is required unless answer_evidence_ref points to durable operator evidence.",
+      "answer is required unless answer_evidence_ref points to durable operator evidence or decision is supplied.",
     );
     return;
   }
@@ -195,6 +196,7 @@ export async function handleInteractionAnswer({ request, response, runtimeOption
       runId,
       interactionId,
       answer,
+      decision,
       reason: asString(payload.reason) ?? undefined,
       approvalRef: asString(payload.approval_ref) ?? undefined,
       answerEvidenceRef,

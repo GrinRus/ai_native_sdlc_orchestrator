@@ -98,6 +98,8 @@ Each `step_decisions[]` entry should preserve:
 
 `repair_attempts` is the durable Runtime Harness ledger for a non-pass decision. It should preserve the trigger, failure class, selected policy action, input evidence refs, route/compiled-context refs when a repair route is executed, budget match/exhaustion metadata, and the attempt result. If a step has not yet executed repair, the ledger may contain a pending attempt with `result=not_started`. When repair executes, the repair step's compiled context should receive a generated repair input evidence ref containing previous findings, failed transcripts/evidence, diff status, adapter evidence, validator findings, and the current report ref. Exhausted budgets should be machine-readable through `result=exhausted` and `exhausted_budget=true`.
 
+`runtime_permission_summary` and `runtime_permission_decisions[]` aggregate every run-linked permission decision, including earlier blocked attempts that were later retried successfully and therefore may not appear as the latest `step_decisions[]` entry. The summary records decision counts, selected permission modes, interaction policies, auto-approval profiles, approval scopes/resume modes, continuation strategies, audit refs, and run-scoped grant refs. Each decision entry must remain query-safe and include only sanitized operation/target/command metadata plus evidence refs; raw provider output stays in adapter evidence.
+
 `failure_class` should use stable machine-readable values when known, including:
 - `provider-timeout`
 - `auth-failure`
@@ -113,6 +115,13 @@ Each `step_decisions[]` entry should preserve:
 - `delivery-empty-patch`
 - `runtime-failed`
 - `unknown`
+
+When runtime-agent permission mediation is enabled, `permission-mode-blocked` and `edit-denied` are not ordinary repair triggers. The Runtime Harness must use the audited `runtime_permission_decision`:
+- `auto_approve` or `user_approved` becomes a bounded `retry` using the adapter-declared coarse resume mode or future tool-call resume capability;
+- `ask_user` becomes `block` with `requested_interaction.interaction_type=permission_request`;
+- `auto_deny` becomes `block` with the policy rule and audit evidence.
+
+When the interaction policy is `fail-closed`, existing diagnostic behavior is preserved and permission readiness failures may remain repair/fail evidence for live E2E proof runs.
 
 `mission_semantics` records the run-level semantic evidence used by the Runtime Harness for the step decision, including `changed_paths`, `non_bootstrap_changed_paths`, `meaningful_changed_paths`, ignored request input files, and whether strict code-changing no-op detection was applied. Runtime Harness must not emit path whitelist/blacklist verdicts such as legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, or `scope_violation_paths`.
 

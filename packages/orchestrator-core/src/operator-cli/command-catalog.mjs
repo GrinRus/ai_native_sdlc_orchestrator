@@ -954,6 +954,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--run-id <id>",
       "--interaction-id <id>",
       "--answer <text> (optional when --answer-evidence-ref is supplied)",
+      "--decision approve_once|deny|approve_for_run (optional)",
       "--answer-evidence-ref <ref> (optional)",
       "--reason <text> (optional)",
       "--approval-ref <ref> (optional)",

@@ -60,7 +60,7 @@ export function toLifecycleCommandResponse(result) {
 }
 
 /**
- * @param {{ runId: string, interactionId: string, interactionStatus: string, answerAccepted: boolean, answerAuditFile: string, answerAuditRef: string, stepResultFile: string, stepResultRef: string, runControlTransition: unknown, blocked: boolean, blockedReason: Record<string, unknown> | null, evidenceEvent: { event_id: string }, stepEvent: { event_id: string }, resumedEvent?: { event_id: string }, blockedEvent?: { event_id: string } | null, warningEvent?: { event_id: string } | null, streamLogFile: string }} result
+ * @param {{ runId: string, interactionId: string, interactionStatus: string, answerAccepted: boolean, decision?: string | null, answerAuditFile: string, answerAuditRef: string, stepResultFile: string, stepResultRef: string, runControlTransition: unknown, blocked: boolean, blockedReason: Record<string, unknown> | null, evidenceEvent: { event_id: string }, stepEvent: { event_id: string }, resumedEvent?: { event_id: string }, blockedEvent?: { event_id: string } | null, warningEvent?: { event_id: string } | null, streamLogFile: string }} result
  * @returns {Record<string, unknown>}
  */
 export function toInteractionAnswerResponse(result) {
@@ -69,6 +69,7 @@ export function toInteractionAnswerResponse(result) {
     interaction_id: result.interactionId,
     interaction_status: result.interactionStatus,
     answer_accepted: result.answerAccepted,
+    decision: result.decision ?? null,
     answer_audit_file: result.answerAuditFile,
     answer_audit_ref: result.answerAuditRef,
     step_result_file: result.stepResultFile,

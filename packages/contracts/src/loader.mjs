@@ -8,6 +8,7 @@ import { cloneJson, describeActualType, isExpectedType, isPlainObject, issue } f
 
 const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-first-pr"];
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
+const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
 const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
 const LIVE_E2E_REQUIRED_SETUP_STEPS = ["install", "target_checkout", "project_bootstrap", "intake", "readiness"];
@@ -394,6 +395,90 @@ function validateRuntimeHarnessReport(document, source) {
     });
   }
 
+  const runtimePermissionSummary = validateOptionalObjectField({
+    record: document,
+    source,
+    field: "runtime_permission_summary",
+    issues,
+  });
+  if (runtimePermissionSummary) {
+    validateNestedNumberField({
+      record: runtimePermissionSummary,
+      source,
+      field: "runtime_permission_summary.total",
+      issues,
+      required: false,
+    });
+    validateOptionalObjectField({
+      record: runtimePermissionSummary,
+      source,
+      field: "runtime_permission_summary.decision_counts",
+      issues,
+    });
+    for (const field of [
+      "permission_modes",
+      "interaction_policies",
+      "auto_approval_profiles",
+      "approval_scopes",
+      "approval_resume_modes",
+      "continuation_strategies",
+      "audit_refs",
+      "grant_refs",
+    ]) {
+      validateOptionalStringArrayField({
+        record: runtimePermissionSummary,
+        source,
+        field: `runtime_permission_summary.${field}`,
+        issues,
+      });
+    }
+  }
+
+  const runtimePermissionDecisions = validateOptionalArrayField({
+    record: document,
+    source,
+    field: "runtime_permission_decisions",
+    issues,
+  });
+  if (runtimePermissionDecisions) {
+    runtimePermissionDecisions.forEach((entry, index) => {
+      const fieldPrefix = `runtime_permission_decisions[${index}]`;
+      if (!isPlainObject(entry)) {
+        issues.push(
+          issue({
+            code: "field_type_mismatch",
+            source,
+            field: fieldPrefix,
+            expected: "object",
+            actual: describeActualType(entry),
+            message: `Field '${fieldPrefix}' must be 'object'.`,
+          }),
+        );
+        return;
+      }
+      validateNestedStringField({
+        record: entry,
+        source,
+        field: `${fieldPrefix}.decision`,
+        issues,
+        required: false,
+      });
+      validateNestedStringField({
+        record: entry,
+        source,
+        field: `${fieldPrefix}.operation_type`,
+        issues,
+        required: false,
+      });
+      validateOptionalStringArrayField({
+        record: entry,
+        source,
+        field: `${fieldPrefix}.evidence_refs`,
+        issues,
+      });
+    });
+  }
+
   return issues;
 }
 
@@ -478,6 +563,14 @@ function validateStepResult(document, source) {
       issues,
       required: false,
     });
+    validateNestedEnumStringField({
+      record: requestedInteraction,
+      source,
+      field: "requested_interaction.interaction_type",
+      allowedValues: INTERACTION_TYPE_VALUES,
+      issues,
+      required: false,
+    });
     validateNestedStringField({
       record: requestedInteraction,
       source,
@@ -512,6 +605,33 @@ function validateStepResult(document, source) {
       source,
       parentField: "requested_interaction",
       fields: ["answer", "answer_text", "raw_answer"],
+      issues,
+    });
+    const runtimePermissionRequest = validateOptionalObjectField({
+      record: requestedInteraction,
+      source,
+      field: "requested_interaction.runtime_permission_request",
+      issues,
+    });
+    if (runtimePermissionRequest) {
+      validateNestedStringField({
+        record: runtimePermissionRequest,
+        source,
+        field: "requested_interaction.runtime_permission_request.operation_type",
+        issues,
+        required: false,
+      });
+      validateOptionalStringArrayField({
+        record: runtimePermissionRequest,
+        source,
+        field: "requested_interaction.runtime_permission_request.evidence_refs",
+        issues,
+      });
+    }
+    validateOptionalObjectField({
+      record: requestedInteraction,
+      source,
+      field: "requested_interaction.runtime_permission_decision",
       issues,
     });
 
