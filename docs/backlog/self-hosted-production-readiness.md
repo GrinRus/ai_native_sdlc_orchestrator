@@ -2,7 +2,7 @@
 
 ## Status
 
-AOR is a **self-hosted CLI/API production candidate** for the bounded mode documented in `docs/ops/self-hosted-release.md`. The current repository remains docs-first, but W22-W26 source-of-truth repair, hardening, real proof, production gate, stabilization, and release documentation are now closed for that self-hosted candidate mode. W30 adds alpha-hardening evidence around ADRs, OpenAPI route drift checks, self-hosted operations runbooks, readiness checks, and installed-user release smoke coverage.
+AOR is a **self-hosted CLI/API production candidate** for the bounded mode documented in `docs/ops/self-hosted-release.md`. The current repository remains docs-first, but W22-W26 source-of-truth repair, hardening, real proof, production gate, stabilization, and release documentation are now closed for that self-hosted candidate mode. W30 adds alpha-hardening evidence around ADRs, OpenAPI route drift checks, self-hosted operations runbooks, readiness checks, and installed-user release smoke coverage. W31 adds a packaged local UI launch path for installed users while preserving the headless boundary.
 
 Hosted SaaS, enterprise identity, tenant billing, hosted rollback, and managed multi-tenant operations are not in scope for the W22-W26 release.
 
@@ -44,6 +44,7 @@ Production readiness requires:
 | Production-touched hotspots were stabilized without redesign. | `W26-S02` | Production proof evidence assessment was extracted from the live E2E runner into `scripts/live-e2e/lib/production-proof.mjs`; live E2E proof runner tests and slice gates passed. |
 | Self-hosted release documentation is final for the bounded mode. | `W26-S03` | `docs/ops/self-hosted-release.md` documents supported mode, release gate, rollback, auth config, no-write/write-back policy, proof evidence, and non-goals. |
 | Alpha hardening has reviewable ADR, API, ops, readiness, and release evidence. | `W30-S01` through `W30-S06` | ADR index, `docs/contracts/control-plane-api.openapi.json`, self-hosted operations runbooks, W30 production-readiness checks, and installed-package smoke coverage keep the alpha boundary explicit without target-stack migration. |
+| Installed-user local app launch is packaged and smoke-tested. | `W31-S01` | ADR 0004, `aor app --smoke --open false --json`, packaged `apps/web/dist`, API app-route tests, web SPA tests, and release smoke evidence keep the UI optional while making first mission intake discoverable. |
 
 ## Story status policy
 
@@ -53,7 +54,7 @@ Production readiness requires:
 - `partial`
 - `blocked`
 
-As of W26-S03, the matrix records `baseline-covered=106`, `proof-covered=4`, `partial=0`, and `blocked=2`. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
+As of W31-S01, the matrix records `baseline-covered=107`, `proof-covered=4`, `partial=0`, and `blocked=2`. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
 
 The current production-proof fixture is `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`. It supports only the story rows that cite the fixture with `overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 
@@ -71,5 +72,6 @@ The final verdict is **self-hosted production candidate** for the bounded CLI/AP
 5. W26 maintainability stabilization is accepted for production-touched hotspots.
 6. W26 release documentation states the supported mode, rollback procedure, auth configuration, no-write/write-back policy, proof evidence, and non-goals.
 7. W30 alpha-hardening checks pass for ADRs, OpenAPI route coverage, self-hosted operations docs, and release smoke boundaries.
+8. W31 installed-user local app smoke passes without making the web UI mandatory.
 
 This verdict does not extend to hosted SaaS, enterprise identity-provider integration, managed multi-tenant operations, default upstream write-back, or uncertified extended adapters such as OpenCode.

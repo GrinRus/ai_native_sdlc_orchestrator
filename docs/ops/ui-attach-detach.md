@@ -1,6 +1,37 @@
 # UI attach / detach
 
-AOR is headless-first. The web UI is optional and its lifecycle is explicit through `aor ui attach` and `aor ui detach`.
+AOR is headless-first. The web UI is optional. Installed users normally start it with `aor app`; lower-level lifecycle state remains explicit through `aor ui attach` and `aor ui detach`.
+
+## Local app launcher
+
+Use this for the installed-user UI:
+```bash
+aor app \
+  --project-ref <repo> \
+  --runtime-root <repo>/.aor \
+  --host 127.0.0.1 \
+  --port 0 \
+  --open true
+```
+
+Expected behavior:
+- the command starts a foreground loopback server and prints the local URL;
+- `/` serves the packaged SPA;
+- `/app-config.json` returns project id, project ref, runtime root, version, and API base;
+- `/api/projects/:projectId/**` serves the same control-plane read, mutation, and SSE routes;
+- the browser opens unless `--open false` is passed;
+- `Ctrl+C` stops the app server without changing run state.
+
+Release/CI smoke:
+```bash
+aor app --project-ref <repo> --runtime-root <repo>/.aor --smoke --open false --json
+```
+
+Expected smoke outcome:
+- `status="smoke-pass"`;
+- `html_loaded=true`;
+- `config_project_id` and `state_project_id` match `project_id`;
+- only `.aor/` runtime state changes in the target repository.
 
 ## Attach
 Connected attach:
@@ -48,7 +79,7 @@ After detach, verify headless paths still work:
 aor run status --project-ref <AOR_WORKSPACE> --run-id <RUN_ID> --follow true
 ```
 
-For local detachable web smoke path:
+For source-checkout detachable web smoke path:
 ```bash
 node apps/web/scripts/operator-console-smoke.mjs \
   --project-ref <AOR_WORKSPACE> \

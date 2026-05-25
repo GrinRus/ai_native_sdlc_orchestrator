@@ -7,7 +7,7 @@ Define one control-plane surface for command, query, and live-stream operations 
 
 Current code is **hybrid module + detached transport**:
 - API surface is exported from `apps/api/src/index.mjs` as function operations for headless/in-process workflows.
-- Detached HTTP/SSE transport baseline is implemented in `apps/api/src/http-transport.mjs` for connected web mode.
+- Detached HTTP/SSE transport baseline is implemented in `packages/orchestrator-core/src/control-plane/http/**`; `apps/api/src/http-*.mjs` files are thin re-export wrappers for compatibility.
 - CLI/API lifecycle behavior is owned by shared package services under `packages/orchestrator-core/src/operator-cli/**` and `packages/orchestrator-core/src/control-plane/**`; app-level API and CLI modules are transports/wrappers and must not import each other.
 - Contract and artifact semantics stay aligned across both bindings.
 
@@ -90,6 +90,7 @@ The control plane remains the orchestration owner:
 - web stages read the same project, packet, run, quality, finance, and lifecycle state exposed by the control plane;
 - guided mutations must call runtime command handlers or existing control-plane mutation families;
 - guided web can invoke the bounded `mission create` and `next` lifecycle-command mutations to create mission evidence and refresh the durable `next-action-report`;
+- the installed local SPA is served by `aor app` from the shared HTTP transport, not by importing `apps/api` into the CLI launcher;
 - read-only, disconnected, connected, detached, blocked, and ready UI states must be derived from durable runtime state;
 - guided flows must preserve no-upstream-write defaults until delivery mode, policy, review, approval, and writeback evidence are explicit.
 
@@ -334,6 +335,8 @@ Reconnect and backpressure baseline:
 ## Detached HTTP transport baseline (W10-S03)
 
 Connected-mode transport mapping is implemented for read, follow, and bounded mutation baseline:
+- `GET /` for the packaged local SPA when the transport is started with an app static root;
+- `GET /app-config.json` for same-origin app configuration (`project_id`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata);
 - `GET /api/projects/:projectId/state`
 - `GET /api/projects/:projectId/strategic-snapshot`
 - `GET /api/projects/:projectId/planner-metrics`
@@ -385,15 +388,16 @@ Detached authn/authz baseline (W10-S04):
 
 Deferred beyond this baseline:
 - mutation-command HTTP endpoint parity for commands outside the supported W18 lifecycle subset;
-- production authn/authz and deployment hardening.
+- hosted deployment hardening beyond the bounded self-hosted alpha.
 
 ## API/UI alignment notes (W5-S04 + W9-S03 + W10-S03)
 
-- The detachable web console reads run/evidence state through detached HTTP/SSE when `control_plane` is configured and connected.
+- The local web console reads run/evidence state through same-origin HTTP/SSE when launched by `aor app`, or through detached HTTP/SSE when an explicit `control_plane` is configured.
 - Connected-mode web mutation actions for run-control and UI lifecycle route through detached HTTP mutation endpoints.
 - Headless/disconnected web operation remains module-backed and in-process.
 - Detach behavior is UI-local only: detaching unsubscribes the web listener while runtime artifacts stay owned by orchestrator runtime.
 - Connected-mode fallback and headless-safe semantics remain explicit through `ui-lifecycle` state.
+- The Mission form posts `command: "mission create"` to `POST /api/projects/:projectId/lifecycle-command/actions`, then posts `command: "next"` to refresh the durable next-action report. The safe walkthrough template only populates existing intake fields and does not alter packet schemas.
 
 ## Authentication and permission assumptions
 - Baseline assumption for local/operator rehearsals: trusted local operator context behind workspace access controls.

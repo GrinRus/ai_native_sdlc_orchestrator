@@ -193,7 +193,7 @@ function formatGuidedHumanOutput(output) {
       "",
       "Optional web:",
       `- mandatory: ${String(web.mandatory ?? false)}`,
-      `- attach: ${String(web.attach_command ?? "aor ui attach")}`,
+      `- launch: ${String(web.launch_command ?? "aor app")}`,
     );
   }
 
@@ -290,9 +290,10 @@ export function formatCommandHelp(definition) {
           ]
         : definition.command === "app"
           ? [
-              "- App guidance is read-only and does not require the web app to be running.",
-              "- The web console is optional; CLI/API/headless operation remains valid when detached.",
-              "- Use the shown 'aor ui attach' command when a control-plane URL is available.",
+              "- App launches a local loopback web console backed by the same control-plane read and mutation routes.",
+              "- The web console is optional; CLI/API/headless operation remains valid when the app is stopped.",
+              "- Use --smoke --open false --json for CI and release smoke checks.",
+              "- The local app serves the packaged SPA and same-origin /api/projects/:projectId routes.",
               "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
             ]
           : definition.command === "next"

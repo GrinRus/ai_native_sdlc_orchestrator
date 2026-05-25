@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-30-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-31-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -41,6 +41,7 @@ The authoritative planning model for implementation lives in:
 | W28 | Close installed-user live E2E gaps with install proof, evaluator naming cleanup, and expanded target coverage. | 3 | EPIC-7 | `docs/backlog/wave-28-implementation-slices.md` |
 | W29 | Open the npm CLI alpha release channel with guarded release branch automation. | 1 | EPIC-5 | `docs/backlog/wave-29-implementation-slices.md` |
 | W30 | Harden the self-hosted CLI/API alpha with ADRs, OpenAPI drift checks, operations runbooks, readiness evidence, and installed-user release smoke coverage. | 6 | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-30-implementation-slices.md` |
+| W31 | Launch the packaged local app for installed users and make first Mission intake understandable through the UI. | 1 | EPIC-6 | `docs/backlog/wave-31-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -101,7 +102,7 @@ The authoritative planning model for implementation lives in:
 | W18-S02 | gap closure: full lifecycle command mutations for connected web |
 | W18-S03 | gap closure: detachable web full-flow operator console |
 | W18-S04 | gap closure: monorepo and bounded multirepo flow proof |
-| W19-S01 | gap traceability target: all 112 story IDs |
+| W19-S01 | gap traceability target: original 112 story IDs |
 | W19-S02 | gap closure target: PSO-01, PSO-02, PSO-07, PBO-07 |
 | W19-S03 | gap closure target: DIS-03, DIS-07, DIS-08, ARC-08, PBO-08 |
 | W19-S04 | gap closure target: RQA-05, INC-03, INC-05 |
@@ -119,7 +120,7 @@ The authoritative planning model for implementation lives in:
 | W21-S05 | installed-user guided UX target: PSO-03, PSO-08, OPS-01, OPS-02, OPS-04, OPS-10 |
 | W21-S06 | installed-user guided UX target: PSO-05, DEV-05, RQA-02, RQA-06, OPS-04, DTX-07 |
 | W21-S07 | installed-user guided UX target: OPS-06, OPS-07, PBO-01, PBO-02, PBO-03, DTX-07 |
-| W22-S01 | evidence-strength status repair target: all 112 story IDs |
+| W22-S01 | evidence-strength status repair target: original 112 story IDs |
 | W22-S02 | production-readiness source-of-truth repair (no direct story closure) |
 | W22-S03 | OpenCode downgrade target: DEV-04, AIP-12, OPS-07 |
 | W23-S01 | production contract validation target: review, incident, learning, packet, and runtime evidence stories |
@@ -140,6 +141,7 @@ The authoritative planning model for implementation lives in:
 | W30-S04 | OPS-04, OPS-06, OPS-10, SEC-02, SEC-06 |
 | W30-S05 | OPS-06, OPS-10, SEC-06, DEV-04, AIP-12 |
 | W30-S06 | OPS-06, OPS-10, PBO-01, PBO-02, PBO-03, SEC-02, SEC-06 |
+| W31-S01 | PBO-09, OPS-01, OPS-06 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -382,7 +384,7 @@ The authoritative planning model for implementation lives in:
 
 **Exit criteria:**
 - W19 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc
-- the 112-story working set has stable IDs, tiers, coverage statuses, implementation evidence, and gap slice references
+- the original 112-story working set has stable IDs, tiers, coverage statuses, implementation evidence, and gap slice references
 - product intake, discovery research, review decisions, incident backfill, and planner metric gaps have explicit acceptance evidence paths
 
 **Detailed slices:** `docs/backlog/wave-19-implementation-slices.md`
@@ -418,7 +420,7 @@ The authoritative planning model for implementation lives in:
 **Goal:** Repair source-of-truth claims so the repository distinguishes baseline readiness from production readiness and treats OpenCode as extended candidate coverage until real certification exists.
 
 **Exit criteria:**
-- Story coverage uses evidence-strength statuses across all 112 stories.
+- Story coverage uses evidence-strength statuses across the original 112 stories.
 - Production readiness docs state that the W22 baseline is not yet production-ready and name the W23-W26 release criteria.
 - OpenCode is downgraded to extended candidate coverage until real certification exists.
 
@@ -514,6 +516,19 @@ boundaries.
 - The npm alpha release smoke path proves help, doctor, onboarding, and optional API/web guidance without claiming GA or hosted service readiness.
 
 **Detailed slices:** `docs/backlog/wave-30-implementation-slices.md`
+
+## W31 - installed-user local app launch and onboarding UI
+**Goal:** Make `@grinrus/aor` understandable for an installed user by launching a packaged local UI that guides onboarding, Mission intake, next action, blockers, evidence refs, and runtime state without making the web UI mandatory.
+
+**Exit criteria:**
+- W31 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
+- `aor app` starts a foreground local loopback server, opens the browser by default, and exposes smoke mode for release validation.
+- The shared HTTP/SSE transport lives in `packages/orchestrator-core`; `apps/api` remains a thin re-export surface.
+- The packaged React/Vite SPA works same-origin with `/app-config.json` and `/api/projects/:projectId/**`.
+- The Mission form writes existing intake evidence with `delivery-mode=no-write` by default and refreshes `next-action-report`.
+- README, product stories, architecture, contracts, ADRs, ops runbooks, packaging, and release smoke docs describe the installed-user UI path.
+
+**Detailed slices:** `docs/backlog/wave-31-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

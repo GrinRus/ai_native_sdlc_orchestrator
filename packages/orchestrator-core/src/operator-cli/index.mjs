@@ -1,4 +1,5 @@
 import { getCommandDefinition } from "./command-catalog.mjs";
+import { runAppCommand } from "./app-launcher.mjs";
 import {
   CliUsageError,
   executeImplementedCommand,
@@ -68,10 +69,23 @@ export function invokeCli(args, options = {}) {
 
 /**
  * @param {string[]} args
+ * @returns {boolean}
+ */
+function isAppLaunchInvocation(args) {
+  if (args[0] !== "app") return false;
+  return !args.slice(1).some((arg) => arg === "--help" || arg === "-h" || arg === "help");
+}
+
+/**
+ * @param {string[]} args
  * @param {{ cwd?: string, stdout?: NodeJS.WriteStream, stderr?: NodeJS.WriteStream }} [options]
- * @returns {number}
+ * @returns {number | Promise<number>}
  */
 export function runCli(args, options = {}) {
+  if (isAppLaunchInvocation(args)) {
+    return runAppCommand(args.slice(1), options);
+  }
+
   const stdout = options.stdout ?? process.stdout;
   const stderr = options.stderr ?? process.stderr;
 

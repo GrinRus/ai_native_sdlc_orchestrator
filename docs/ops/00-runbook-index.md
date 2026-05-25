@@ -9,7 +9,7 @@
 - `live-e2e-release-long.md` — long monorepo release rehearsal with stronger gates.
 - `live-e2e-standard-runner.md` — installed-user black-box step-controller runner, manual workflow, step evaluator, qualification loop, and artifact map for catalog profiles.
 - `runtime-permission-runner-certification.md` — post-merge real-runner smoke lane for runtime permission mode mappings and restricted-mode interaction evidence.
-- `installed-user-first-run.md` — public guided `aor doctor`, `aor onboard`, `aor mission create`, `aor next`, `aor app`, and W21-S07 guided proof shortcuts.
+- `installed-user-first-run.md` — public guided install, `aor doctor`, `aor onboard`, local `aor app`, Mission form, `aor next`, and guided proof shortcuts.
 - `live-e2e-learning-loop.md` — repeatable scorecard/incident capture and backlog-quality handoff flow.
 - `live-e2e-w7-governance-closure.md` — integrated W7 governance closure rehearsal and wave-level smoke checks.
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
@@ -31,7 +31,7 @@
 - `npm-cli-alpha-release.md` — npm CLI alpha package release branch, gate, publish automation, prerequisites, and rollback policy.
 
 ## UI lifecycle
-- `ui-attach-detach.md` — how to attach or detach the optional web UI from a running AOR system.
+- `ui-attach-detach.md` — how to launch the local web UI and attach or detach lower-level UI lifecycle state from a running AOR system.
 
 ## Profile selection rule of thumb
 - Need a fast smoke signal: `regress short`

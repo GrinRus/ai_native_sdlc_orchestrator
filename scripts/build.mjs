@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
 
@@ -435,4 +436,12 @@ for (const entry of fs.readdirSync(workflowDir, { withFileTypes: true })) {
   }
 }
 
-console.log("scaffold integrity ok: community files, workflow conventions, and root package settings are present");
+const webBuild = spawnSync("pnpm", ["web:build"], {
+  cwd: root,
+  stdio: "inherit",
+});
+if (webBuild.status !== 0) {
+  process.exit(webBuild.status ?? 1);
+}
+
+console.log("scaffold integrity ok: community files, workflow conventions, root package settings, and web app build are present");

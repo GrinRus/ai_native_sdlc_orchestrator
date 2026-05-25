@@ -6,7 +6,7 @@ Operators need live state without making the UI part of the critical path.
 ## Design rules
 - the runtime must stay headless-first;
 - the API and event stream must work without the web UI;
-- the UI can attach late and catch up from the read model plus the live stream;
+- the local UI can launch late and catch up from the read model plus the live stream;
 - detaching the UI must not change workflow state.
 - connected UI actions must call control-plane command mutations and must not own orchestration decisions.
 - production-hardened transport mode must authenticate every read, stream, and mutation route before handlers run.
@@ -23,8 +23,22 @@ Operators need live state without making the UI part of the critical path.
 
 ## Operator surfaces
 - CLI for direct operational control
-- optional web UI for dashboards and drill-down views
+- optional local web UI for dashboards, guided Mission intake, and drill-down views
 - API queries for automation and integrations
+
+## Local app launch
+
+`aor app` starts a local loopback web console from the installed package. The
+same process serves:
+- `/` for the packaged SPA;
+- `/app-config.json` for project id, project ref, runtime root, package version, and API base;
+- `/api/projects/:projectId/**` for the existing control-plane read, mutation, and SSE routes.
+
+The app can submit the first Mission form through
+`POST /api/projects/:projectId/lifecycle-command/actions` with
+`command: "mission create"`, then invoke `next` to refresh the durable
+`next-action-report`. It does not own run-state transitions, answer
+continuation, review decisions, or delivery gates.
 
 ## Interactive continuation
 When a runner asks a question, AOR treats it as a run continuation boundary:

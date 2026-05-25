@@ -4,7 +4,7 @@ import path from "node:path";
 import { loadContractFile } from "../../../contracts/src/index.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
 
-const ARTIFACT_PACKET_REGEX = /^[^.]+\.(artifact)\.[^.]+\.[^.]+\.json$/;
+const ARTIFACT_PACKET_REGEX = /^.+\.artifact\..+\.json$/;
 const WAVE_TICKET_REGEX = /^wave-ticket-.*\.json$/;
 const HANDOFF_PACKET_REGEX = /^[^.]+\.handoff\..*\.json$/;
 const DELIVERY_PLAN_REGEX = /^delivery-plan-.*\.json$/;

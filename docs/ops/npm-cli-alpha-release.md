@@ -3,8 +3,9 @@
 ## Supported release channel
 
 AOR publishes one npm alpha artifact: `@grinrus/aor`. The package exposes the
-`aor` CLI and bundles the runtime source, contracts, and example assets required
-for the documented no-write onboarding path.
+`aor` CLI and bundles the runtime source, contracts, example assets, and
+packaged `apps/web/dist` SPA required for the documented no-write onboarding
+and local UI path.
 
 Internal workspace packages under `apps/*` and `packages/*` stay private. They
 are implementation modules inside the CLI package, not public semver APIs.
@@ -48,12 +49,19 @@ smoke test. The smoke test installs the generated tarball into a temporary npm
 project, runs `aor --help`, and runs `doctor` plus `onboard` against a temporary
 git repository while asserting that only `.aor/` runtime state changes. W30
 extends that smoke path to run `aor app --help` so optional API/web guidance is
-covered without starting a hosted service or making the web console required.
+covered. W31 extends it further with
+`aor app --smoke --open false --json`, which starts the local packaged SPA,
+checks `/`, `/app-config.json`, and `GET /api/projects/:projectId/state`, then
+exits without starting a hosted service or making the web console required.
 
 W30 alpha hardening also requires the production-readiness gate to verify the
 ADR index, OpenAPI 3.1 control-plane route contract, self-hosted operations
 runbooks, story-status honesty for blocked OpenCode outcomes, and alpha
 non-goals before release review.
+
+W31 local app launch readiness also requires `npm pack --dry-run --json` to
+include `apps/web/dist`, the shared app launcher, and the shared HTTP transport
+files while excluding tests and target runtime state.
 
 For strict release-branch validation, set the release branch explicitly:
 

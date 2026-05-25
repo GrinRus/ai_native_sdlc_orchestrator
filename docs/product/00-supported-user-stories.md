@@ -1,12 +1,12 @@
 # Supported user stories
 
-This document groups the AOR user-story surface into role clusters. The current working set still maps to **112 stories** across the lifecycle, but this document is intentionally easier to navigate than a flat list.
+This document groups the AOR user-story surface into role clusters. The current working set maps to **113 stories** across the lifecycle, but this document is intentionally easier to navigate than a flat list.
 
 The flat, machine-checkable registry lives in `docs/product/user-story-coverage-matrix.md`. It assigns stable story IDs, tiers, implementation evidence, coverage status, and backlog gap references for every story in this working set.
 
 ## Coverage summary
-- Total stories: **112**
-- MVP: **73**
+- Total stories: **113**
+- MVP: **74**
 - MVP+: **24**
 - Later: **15**
 
@@ -24,7 +24,7 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 | Security / compliance | 6 | 4 | 1 | 1 |
 | Repository / multirepo owner | 6 | 4 | 1 | 1 |
 | Incident / improvement owner | 6 | 3 | 2 | 1 |
-| Project bootstrap / onboarding | 8 | 5 | 2 | 1 |
+| Project bootstrap / onboarding | 9 | 6 | 2 | 1 |
 | Delivery transaction / Git / PR | 8 | 5 | 2 | 1 |
 | Finance / audit / hygiene | 8 | 4 | 3 | 1 |
 
@@ -123,6 +123,8 @@ Bounded multirepo means one AOR project profile can coordinate several explicit 
 `W21-S01` makes onboarding a first-class installed-user journey rather than a list of independent bootstrap commands. Later W21 slices implement the guided CLI shortcuts, asset-mode onboarding report, next-action resolver, guided web stages, closure UX, and proof rehearsal.
 
 `W21-S04` closes the guided mission and next-action resolver portion: installed users get one primary next command, evidence refs, blockers, active-run handling, and explicit write-back policy before delivery-capable work is recommended.
+
+`W31-S01` closes the installed-user local UI intake story: a user who installed `@grinrus/aor` can run `aor onboard .`, launch `aor app`, apply the safe walkthrough Mission template, submit the first mission, and see the refreshed next action, blockers, evidence refs, and `.aor/` runtime root without reading internal implementation docs.
 
 ### Delivery transaction / Git / PR flow
 - Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.

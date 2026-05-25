@@ -69,9 +69,10 @@ npm install -g @grinrus/aor@0.1.0-alpha.3
 aor --help
 ```
 
-The npm alpha installs the CLI executable and bundled AOR examples/assets used
-by the safe onboarding path. It does not install third-party runner binaries or
-configure provider authentication.
+The npm alpha installs the CLI executable, bundled AOR examples/assets used by
+the safe onboarding path, and the packaged local web console used by `aor app`.
+It does not install third-party runner binaries or configure provider
+authentication.
 
 ## Clone and install from source
 
@@ -90,11 +91,17 @@ When using the npm CLI package, replace `pnpm aor` in the examples below with
 
 ## Run your first no-write local mission
 
-Run AOR against a local target repository. The safest first path uses
-`delivery-mode no-write` and stores runtime state under the target repository.
-It intentionally lets AOR generate a bundled project profile under `.aor/`
-instead of copying example assets into the target repository. This path does not
-require authenticated external runners.
+Run AOR against a local target repository. The safest first path uses the npm
+CLI, initializes `.aor/` with `aor onboard .`, and then launches the local UI
+with `aor app`. The UI opens the Mission form, offers a safe walkthrough
+template, submits the existing `mission create` command through the control
+plane, and immediately refreshes `next` so the right rail shows the current
+next action, blockers, evidence refs, and runtime root.
+
+This path keeps `delivery-mode no-write` by default and stores runtime state
+under the target repository. It intentionally lets AOR generate a bundled
+project profile under `.aor/` instead of copying example assets into the target
+repository. It does not require authenticated external runners.
 
 In no-write mode, AOR still writes runtime state: it can create reports,
 packets, and the generated bundled profile under `$TARGET_REPO/.aor`, but it
@@ -104,6 +111,32 @@ must not edit target source files or attempt upstream write-back.
 export TARGET_REPO=/path/to/local-project
 export AOR_RUNTIME="$TARGET_REPO/.aor"
 
+aor doctor --project-ref "$TARGET_REPO" --runtime-root "$AOR_RUNTIME" --json
+
+aor onboard \
+  --project-ref "$TARGET_REPO" \
+  --runtime-root "$AOR_RUNTIME" \
+  --json
+
+aor app \
+  --project-ref "$TARGET_REPO" \
+  --runtime-root "$AOR_RUNTIME"
+```
+
+`aor app` starts a foreground local loopback server on `127.0.0.1`, opens the
+browser by default, and prints the URL. Press `Ctrl+C` in that terminal to stop
+the server. If the UI starts before onboarding, the Readiness stage shows an
+explicit Initialize action instead of silently creating mission evidence.
+
+In the Mission form, the bundled safe walkthrough template fills only existing
+intake fields: title, brief, goal, constraint, KPI, Definition of Done, and
+`delivery-mode=no-write`. Riskier delivery modes stay visible but require an
+explicit user selection and the existing policy gates.
+
+For a headless source checkout or CI-style first run, the equivalent command
+sequence remains:
+
+```bash
 pnpm aor doctor --project-ref "$TARGET_REPO" --runtime-root "$AOR_RUNTIME" --json
 
 pnpm aor onboard \
@@ -129,6 +162,12 @@ pnpm aor next \
   --json
 ```
 
+For release or CI smoke, use the packaged app route without opening a browser:
+
+```bash
+aor app --project-ref "$TARGET_REPO" --runtime-root "$AOR_RUNTIME" --smoke --open false --json
+```
+
 Use a disposable local checkout or branch until you understand the generated
 state. Runtime output under `.aor/` can contain project metadata, reports, and
 operational evidence; keep it out of commits.
@@ -148,9 +187,12 @@ it creates target-repo files outside `.aor/`.
 - `doctor` reports readiness or actionable blockers for the target repository.
 - `onboard` writes onboarding evidence and a generated bundled profile under
   `$AOR_RUNTIME`.
-- `mission create` writes an intake artifact packet and request body.
+- the UI Mission form or `mission create` writes an intake artifact packet and
+  request body.
 - `next` writes a next-action report and returns the relevant artifact paths in
   JSON output.
+- `aor app` serves the packaged SPA at `/`, app config at `/app-config.json`,
+  and the same-origin control-plane API under `/api/projects/:projectId/**`.
 - `delivery_mode=no-write` and `upstream_writes_default=false` remain the safe
   defaults for the first local workflow.
 - `.aor/` is ignored runtime state and must not be committed.
@@ -186,16 +228,21 @@ workflow decisions, local paths, and future runner output. `.gitignore` excludes
 
 ## Optional API/web surfaces
 
-AOR is headless-first. The CLI is the primary public operator path today.
+AOR is headless-first. The CLI and control-plane runtime stay usable without
+the web console.
 
-The repository also contains API and web baselines for the control-plane model:
+The npm alpha also includes a packaged local SPA for installed users:
 
-- `apps/api` hosts the API surface used by the documented self-hosted mode.
-- `apps/web` is optional and detachable from core orchestration.
-- `pnpm aor app --help` describes local app attachment commands.
+- `aor app` launches the optional local web console for a target project.
+- `apps/web` contains the React/Vite operator console source and packaged
+  `dist` assets.
+- `apps/api` remains a thin API export surface; shared HTTP/SSE transport lives
+  in `packages/orchestrator-core`.
+- `pnpm aor app --help` describes the local app launcher and smoke flags.
 - API contracts are documented under `docs/contracts/control-plane-api.md`.
 
-Use these surfaces as implemented baselines, not as a hosted product claim.
+Use these surfaces as implemented local baselines, not as a hosted product
+claim.
 
 ## What works today
 
@@ -207,6 +254,7 @@ Use these surfaces as implemented baselines, not as a hosted product claim.
 | Guided target onboarding | Implemented baseline | `pnpm aor onboard ... --json`. |
 | No-write mission intake | Implemented baseline | `pnpm aor mission create ... --delivery-mode no-write --json`. |
 | Next-action reporting | Implemented baseline | `pnpm aor next ... --json`. |
+| Local installed-user UI | Implemented baseline | `aor app --project-ref <repo>` launches the packaged SPA. |
 | CLI/API/web baselines | Implemented baseline | See `apps/*`, `packages/*`, and the command catalog. |
 | Production-readiness gate | Implemented bounded gate | `pnpm production:ready --json`. |
 
@@ -222,7 +270,7 @@ self-hosted CLI/API mode documented in this repository. Internal evaluation and
 proof fixtures exist for maintainers, but they are not a public onboarding path
 and are intentionally not part of the README workflow.
 
-The current roadmap source of truth extends through W29 in
+The current roadmap source of truth extends through W31 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -317,7 +365,7 @@ The CLI command surface currently includes **44 implemented** commands and **0 p
 apps/
   api/                 Control-plane API baseline.
   cli/                 CLI executable wrapper and command entrypoint.
-  web/                 Optional web surface baseline.
+  web/                 Optional packaged local web console.
 packages/
   orchestrator-core/   Shared runtime, contracts, adapters, and command logic.
 docs/
@@ -334,7 +382,7 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current alpha distribution is tracked through `W30` and focuses on:
+The current alpha distribution is tracked through `W31` and focuses on:
 
 - Safer operator onboarding.
 - Stronger runner-adapter coverage.
@@ -342,8 +390,9 @@ The current alpha distribution is tracked through `W30` and focuses on:
 - Public-repo security posture and governance.
 - Bounded self-hosted CLI/API operation.
 - Reproducible npm CLI alpha distribution.
-- Alpha hardening through ADRs, OpenAPI route drift checks, self-hosted
+- W30 alpha hardening through ADRs, OpenAPI route drift checks, self-hosted
   operations runbooks, and release smoke evidence.
+- Installed-user local app launch with a guided Mission intake UI.
 
 ## Contributing
 

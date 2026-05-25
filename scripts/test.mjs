@@ -687,8 +687,8 @@ const userStoryFamilies = [
   {
     prefix: "PBO",
     roleCluster: "Project bootstrap / onboarding",
-    total: 8,
-    tierCounts: { MVP: 5, "MVP+": 2, Later: 1 },
+    total: 9,
+    tierCounts: { MVP: 6, "MVP+": 2, Later: 1 },
   },
   {
     prefix: "DTX",
@@ -1054,6 +1054,20 @@ if (readmeBlackBoxTestRun.status !== 0) {
 }
 
 console.log("README black-box tests ok: documented no-write quickstart runs on an external target repo");
+
+const webDistIndex = path.join(root, "apps/web/dist/index.html");
+if (!fs.existsSync(webDistIndex)) {
+  const webBuildRun = spawnSync("pnpm", ["web:build"], {
+    cwd: root,
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
+  if (webBuildRun.status !== 0) {
+    process.exit(webBuildRun.status ?? 1);
+  }
+}
+
+console.log("web app test bundle ok: local app smoke can serve packaged SPA assets");
 
 const liveE2EProofRunnerTestsPath = path.join(root, "scripts/test/live-e2e-proof-runner.test.mjs");
 const liveE2EStepControllerTestsPath = path.join(root, "scripts/test/live-e2e-step-controller.test.mjs");

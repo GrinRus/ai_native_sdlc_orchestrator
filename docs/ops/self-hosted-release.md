@@ -4,11 +4,12 @@
 
 AOR is a **self-hosted CLI/API production candidate** for the bounded mode described here:
 
-- CLI and API/control-plane runtime are the supported operator surfaces.
-- The web console is optional and detachable; CLI/API/runtime must remain usable without it.
+- CLI and API/control-plane runtime are supported operator surfaces.
+- The npm alpha also includes an optional packaged local web console launched by `aor app`; CLI/API/runtime must remain usable without it.
 - Runtime outputs stay under `.aor/` in the operator workspace and must not be committed.
 - Production proof is limited to the committed W25 real-run fixture and the stricter production-readiness gate.
 - W30 alpha-hardening ADRs, OpenAPI route drift checks, and self-hosted operations runbooks are part of the reviewable bounded-mode evidence.
+- W31 installed-user app launch evidence covers the local SPA first-run path without changing the headless runtime boundary.
 
 The alpha architecture boundary is recorded in
 `docs/architecture/adr/0000-index.md`.
@@ -53,6 +54,7 @@ The default production proof fixture is:
 5. Grant only explicit `read` and/or `mutate` permissions needed by the caller.
 6. Scope bearer principals to the expected project id unless cross-project automation is intentional.
 7. Configure additional redaction values for local secrets before starting connected surfaces.
+8. For installed-user UI validation, launch `aor app --project-ref <repo> --runtime-root <repo>/.aor` on loopback.
 
 The production-hardened auth model is documented in `docs/ops/control-plane-production-hardening.md`.
 Environment, secrets, backup/restore, and incident procedures are documented in:
@@ -79,7 +81,7 @@ The W25 proof fixture demonstrates `patch-only` delivery with no upstream write.
 
 Rollback is workspace-local for this supported mode:
 
-1. Stop the detached API/web surfaces.
+1. Stop the detached API/web surfaces, including any foreground `aor app` process.
 2. Preserve `.aor/` evidence for audit before cleanup.
 3. Revert or discard local target checkout changes according to the operator's repository policy.
 4. Drop local branches created by `local-branch` delivery only after delivery manifests and audit refs are preserved.
@@ -98,6 +100,7 @@ Production-candidate proof is reviewable through:
 - `docs/architecture/adr/0000-index.md`
 - `docs/contracts/control-plane-api.openapi.json`
 - `docs/ops/self-hosted-environment-matrix.md`
+- `docs/architecture/adr/0004-alpha-packaged-local-web-console.md`
 
 The proof must remain non-mock, code-changing, `external_runner_mode=real-external-process`, `real_code_change_proof_complete=true`, `overall_status=pass`, and no-upstream-write.
 

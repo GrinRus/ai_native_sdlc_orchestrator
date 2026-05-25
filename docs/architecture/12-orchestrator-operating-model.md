@@ -53,24 +53,28 @@ Quality boundaries are explicit:
 - harness-only
 - full end-to-end rehearsal
 - full end-to-end rehearsal from curated feature mission
+- installed-user local app intake, where `aor app` serves the packaged SPA on loopback and the UI drives only control-plane-owned lifecycle mutations
 
 ## Detailed execution pattern
 1. load the project profile and target repository information;
 2. analyze or verify the project if required;
-3. materialize the next packet boundary;
-4. request human approval if the policy requires it;
-5. prepare the routed step by resolving route, wrapper, prompt bundle, context assets, step policy, and compiled context;
-6. execute the step through the selected adapter;
-7. classify the adapter/runtime outcome into stable failure classes;
-8. validate mission semantics, including expected evidence, diff scope, delivery lineage, and release lineage;
-9. decide whether to pass, retry, repair, escalate, block, or fail;
-10. run deterministic verification and eval when the step policy requires it;
-11. persist step decision evidence and update the run-level Runtime Harness report;
-12. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
-13. only if the delivery plan is ready and mission semantics are closed, materialize a delivery manifest;
-14. if the flow reaches release, materialize a release packet;
-15. run review, audit, and learning closure surfaces before declaring the run complete;
-16. if the flow fails materially, open or update an incident path.
+3. optionally launch the local packaged UI with `aor app` for readiness, Mission intake, next-action, and evidence inspection;
+4. materialize the next packet boundary;
+5. request human approval if the policy requires it;
+6. prepare the routed step by resolving route, wrapper, prompt bundle, context assets, step policy, and compiled context;
+7. execute the step through the selected adapter;
+8. classify the adapter/runtime outcome into stable failure classes;
+9. validate mission semantics, including expected evidence, diff scope, delivery lineage, and release lineage;
+10. decide whether to pass, retry, repair, escalate, block, or fail;
+11. run deterministic verification and eval when the step policy requires it;
+12. persist step decision evidence and update the run-level Runtime Harness report;
+13. if the flow reaches delivery, materialize a delivery plan before any write-back path starts;
+14. only if the delivery plan is ready and mission semantics are closed, materialize a delivery manifest;
+15. if the flow reaches release, materialize a release packet;
+16. run review, audit, and learning closure surfaces before declaring the run complete;
+17. if the flow fails materially, open or update an incident path.
+
+The local app path is an operator surface, not a runtime dependency. It serves `/`, `/app-config.json`, and same-origin `/api/projects/:projectId/**` routes from the CLI-launched process, then invokes the same lifecycle-command handlers as the CLI. Stopping the app server must not stop runs or mutate workflow state beyond the explicit commands the operator submitted.
 
 Strictness is mission-type driven. Code-changing, live, and release missions use strict semantic gates. Docs-only, no-write rehearsal, and asset-certification flows may use softer profiles, but their softness must be explicit in runtime evidence.
 
