@@ -80,8 +80,9 @@ Evidence summary:
 - `execution` used route `route.implement.default.open-code-primary`, adapter/provider `open-code`, and the external command `opencode run --format json --dangerously-skip-permissions ... --file <adapter request>`.
 - Request transport was `file-attachment`, matching the OpenCode adapter contract.
 - Runtime Harness blocked the run with `failure_class=provider-timeout`, `repair_status=exhausted`, and `runtime_harness_decision=block`.
-- The final OpenCode attempt had `timeout_ms=600000`, `timed_out=true`, `signal=SIGKILL`, and `exit_code=null`.
+- The final OpenCode attempt used the previous `timeout_ms=600000` adapter bound, ended with `timed_out=true`, `signal=SIGKILL`, and `exit_code=null`, and established that the former 10 minute hard cap was too short for this proof lane.
 - Two repair retries were attempted; both hit `provider-timeout` at about 601 seconds, exhausting the policy budget.
+- After this attempt, real external provider adapter profiles were aligned to `timeout_ms=3600000` while keeping `preflight_timeout_ms=120000`, so future full-journey attempts can use the intended 60 minute full-runner bound.
 - `runtime_permission_summary.total=0`; the full-bypass proof did not produce runtime permission interactions.
 - The profile safety policy remained `no-upstream-write`; the target-cleanliness check before execution passed.
 - Strict code-changing inspection reported `strict_code_changing_noop=true` with no meaningful changed paths, so the operator decision blocked continuation to `review`.
