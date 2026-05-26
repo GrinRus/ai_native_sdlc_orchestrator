@@ -426,6 +426,13 @@ test("web console snapshot builds run list and run detail from shared API contra
       liveEventCount: 2,
     });
     assert.match(html, /AOR Operator Console/);
+    assert.match(html, /Static operator snapshot/);
+    assert.match(html, /This HTML snapshot does not render browser mutation controls/);
+    assert.match(html, /<main aria-describedby="operator-console-boundary">/);
+    assert.match(html, /<section class="panel" aria-labelledby="guided-lifecycle-heading">/);
+    assert.match(html, /<section class="panel" aria-labelledby="run-detail-evidence-heading">/);
+    assert.match(html, /\.ref-list[\s\S]*overflow-wrap: anywhere/);
+    assert.doesNotMatch(html, /<(button|form|input|select|textarea)\b/u);
     assert.match(html, new RegExp(runId));
     assert.match(html, /Run detail evidence links/);
     assert.match(html, /Policy history entries/);

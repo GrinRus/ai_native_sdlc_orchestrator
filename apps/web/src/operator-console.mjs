@@ -1886,46 +1886,95 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
         background: var(--bg);
         color: var(--ink);
       }
+      main {
+        display: block;
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      .page-header {
+        max-width: 1180px;
+        margin: 0 auto 16px;
+      }
       .panel {
         background: var(--surface);
         border: 1px solid var(--line);
         border-radius: 8px;
         padding: 16px;
         margin-bottom: 16px;
+        overflow-x: auto;
       }
       h1, h2 {
         margin: 0 0 8px;
       }
+      .eyebrow {
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 700;
+        margin: 0 0 6px;
+        text-transform: uppercase;
+      }
+      .snapshot-boundary {
+        color: var(--muted);
+        max-width: 72ch;
+      }
       p, li {
         color: var(--muted);
+      }
+      ul {
+        padding-left: 1.25rem;
+      }
+      li {
+        margin: 0.25rem 0;
       }
       code {
         color: var(--accent);
       }
+      a {
+        color: var(--accent);
+      }
+      code,
+      a,
+      .ref-list,
+      .ref-list li,
+      .meta-list li {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
       strong {
         color: var(--ink);
+      }
+      @media (max-width: 720px) {
+        body {
+          padding: 12px;
+        }
+        .panel {
+          padding: 12px;
+        }
       }
     </style>
   </head>
   <body>
-    <section class="panel">
+    <header class="page-header panel">
+      <p class="eyebrow">Static operator snapshot</p>
       <h1>AOR Operator Console</h1>
+      <p id="operator-console-boundary" class="snapshot-boundary">Generated from runtime and control-plane reads. This HTML snapshot does not render browser mutation controls; use the CLI or detached control-plane API for actions, then regenerate the snapshot.</p>
       <p>Project: <code>${escapeHtml(snapshot.project.project_id)}</code></p>
       <p>Selected run: <code>${escapeHtml(snapshot.selected_run_id ?? "none")}</code></p>
       <p>UI lifecycle: <code>${escapeHtml(String(snapshot.ui_lifecycle.connection_state ?? "detached"))}</code></p>
       <p>Guided state: <code>${escapeHtml(String(snapshot.guided_lifecycle?.state ?? "unknown"))}</code></p>
       <p>Stream protocol: <code>${escapeHtml(options.streamProtocol ?? "disabled")}</code></p>
       <p>Live events in session: <code>${String(options.liveEventCount ?? 0)}</code></p>
-    </section>
-    <section class="panel">
-      <h2>Guided lifecycle</h2>
+    </header>
+    <main aria-describedby="operator-console-boundary">
+    <section class="panel" aria-labelledby="guided-lifecycle-heading">
+      <h2 id="guided-lifecycle-heading">Guided lifecycle</h2>
       <p>Current stage: <code>${escapeHtml(String(snapshot.guided_lifecycle?.current_stage_id ?? "unknown"))}</code></p>
       <p>Mutation transport: <code>${escapeHtml(String(snapshot.guided_lifecycle?.mutation_transport?.lifecycle_endpoint ?? "none"))}</code></p>
       <p>Next-action report: <code>${escapeHtml(String(snapshot.guided_lifecycle?.next_action_report_ref ?? "missing"))}</code></p>
-      <ul>${guidedStageItems || "<li>No guided stages available.</li>"}</ul>
+      <ul class="ref-list">${guidedStageItems || "<li>No guided stages available.</li>"}</ul>
     </section>
-    <section class="panel">
-      <h2>Strategic Snapshot</h2>
+    <section class="panel" aria-labelledby="strategic-snapshot-heading">
+      <h2 id="strategic-snapshot-heading">Strategic Snapshot</h2>
       <p>Backlog slices tracked: <code>${String(snapshot.strategic_snapshot.wave_snapshot.total_slices)}</code></p>
       <p>Ready slices: <code>${String(snapshot.strategic_snapshot.wave_snapshot.state_totals.ready)}</code></p>
       <p>Blocked slices: <code>${String(snapshot.strategic_snapshot.wave_snapshot.state_totals.blocked)}</code></p>
@@ -1937,40 +1986,41 @@ export function renderOperatorConsoleHtml(snapshot, options = {}) {
       <p>Repair rate: <code>${escapeHtml(formatPlannerMetric(plannerMetricValues.repair_rate))}</code></p>
       <p>Blocker rate: <code>${escapeHtml(formatPlannerMetric(plannerMetricValues.blocker_rate))}</code></p>
     </section>
-    <section class="panel">
-      <h2>Finance Monitoring</h2>
+    <section class="panel" aria-labelledby="finance-monitoring-heading">
+      <h2 id="finance-monitoring-heading">Finance Monitoring</h2>
       <p>Telemetry state: <code>${escapeHtml(String(financeMonitoring.telemetry_state ?? "no-data"))}</code></p>
       <p>Route groups: <code>${String(routeGroups.length)}</code></p>
       <p>Production monitoring: <code>${escapeHtml(String(productionMonitoring.status ?? "no-data"))}</code></p>
       <p>Production events: <code>${String(productionMonitoring.event_count ?? 0)}</code></p>
     </section>
-    <section class="panel">
-      <h2>Run list</h2>
-      <ul>${runs || "<li>No runs found.</li>"}</ul>
+    <section class="panel" aria-labelledby="run-list-heading">
+      <h2 id="run-list-heading">Run list</h2>
+      <ul class="meta-list">${runs || "<li>No runs found.</li>"}</ul>
     </section>
-    <section class="panel">
-      <h2>Lifecycle commands</h2>
-      <ul>${lifecycleItems || "<li>No lifecycle command mutations available.</li>"}</ul>
+    <section class="panel" aria-labelledby="lifecycle-commands-heading">
+      <h2 id="lifecycle-commands-heading">Lifecycle commands</h2>
+      <ul class="ref-list">${lifecycleItems || "<li>No lifecycle command mutations available.</li>"}</ul>
     </section>
-    <section class="panel">
-      <h2>Runner interactions</h2>
-      <ul>${interactionItems || "<li>No pending runner interactions.</li>"}</ul>
+    <section class="panel" aria-labelledby="runner-interactions-heading">
+      <h2 id="runner-interactions-heading">Runner interactions</h2>
+      <ul class="ref-list">${interactionItems || "<li>No pending runner interactions.</li>"}</ul>
     </section>
-    <section class="panel">
-      <h2>Runtime permission decisions</h2>
-      <ul>${runtimePermissionItems || "<li>No runtime permission decisions for selected run.</li>"}</ul>
+    <section class="panel" aria-labelledby="runtime-permission-decisions-heading">
+      <h2 id="runtime-permission-decisions-heading">Runtime permission decisions</h2>
+      <ul class="ref-list">${runtimePermissionItems || "<li>No runtime permission decisions for selected run.</li>"}</ul>
     </section>
-    <section class="panel">
-      <h2>Run detail evidence links</h2>
-      <ul>${detailLinks || "<li>No step-result artifacts for selected run.</li>"}</ul>
+    <section class="panel" aria-labelledby="run-detail-evidence-heading">
+      <h2 id="run-detail-evidence-heading">Run detail evidence links</h2>
+      <ul class="ref-list">${detailLinks || "<li>No step-result artifacts for selected run.</li>"}</ul>
       <p>Policy history entries: <code>${String(snapshot.run_detail.policy_history?.entry_count ?? 0)}</code></p>
-      <ul>${policyHistoryLinks || "<li>No policy history for selected run.</li>"}</ul>
+      <ul class="ref-list">${policyHistoryLinks || "<li>No policy history for selected run.</li>"}</ul>
       <p>Event history entries: <code>${String(snapshot.run_detail.event_history?.total_events ?? 0)}</code></p>
-      <ul>${eventHistoryLinks || "<li>No event history for selected run.</li>"}</ul>
+      <ul class="ref-list">${eventHistoryLinks || "<li>No event history for selected run.</li>"}</ul>
       <p>Stream backpressure: <code>${escapeHtml(
         JSON.stringify(options.streamBackpressure ?? { policy: "not-following" }),
       )}</code></p>
     </section>
+    </main>
   </body>
 </html>
 `;
