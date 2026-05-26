@@ -1,11 +1,68 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 const root = process.cwd();
+const liveE2ETestSuiteTimeoutMs = parsePositiveInteger(
+  process.env.AOR_LIVE_E2E_TEST_SUITE_TIMEOUT_MS,
+  10 * 60 * 1000,
+);
+const liveE2EContextFile = path.join(os.tmpdir(), `aor-live-e2e-test-context-${process.pid}.json`);
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : fallback;
+}
+
+function isTimedOutRun(run) {
+  return run.error?.code === "ETIMEDOUT" || run.signal === "SIGTERM" || run.signal === "SIGKILL";
+}
+
+function removeFileIfExists(filePath) {
+  fs.rmSync(filePath, { force: true });
+}
+
+function readJsonIfExists(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function printLiveE2ETimeoutDiagnostic(run, testFiles) {
+  if (!isTimedOutRun(run)) return;
+
+  const context = readJsonIfExists(liveE2EContextFile);
+  const contextParts =
+    context && typeof context === "object"
+      ? [
+          `state=${String(context.state ?? "unknown")}`,
+          `test_file=${String(context.test_file ?? "unknown")}`,
+          `profile=${String(context.profile ?? "unknown")}`,
+          `run_id=${String(context.run_id ?? "unknown")}`,
+          `subprocess_timeout_ms=${String(context.timeout_ms ?? "unknown")}`,
+        ]
+      : ["no live E2E subprocess context file was available"];
+
+  console.error(
+    [
+      `live-e2e test suite timed out after ${liveE2ETestSuiteTimeoutMs}ms; failing closed.`,
+      `test_files=${testFiles.map((file) => path.relative(root, file)).join(", ")}`,
+      `signal=${String(run.signal)}`,
+      run.error ? `error=${run.error.message}` : "",
+      `last_context=${contextParts.join("; ")}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
+}
 
 function read(file) {
   return fs.readFileSync(path.join(root, file), "utf8");
@@ -1071,14 +1128,27 @@ console.log("web app test bundle ok: local app smoke can serve packaged SPA asse
 
 const liveE2EProofRunnerTestsPath = path.join(root, "scripts/test/live-e2e-proof-runner.test.mjs");
 const liveE2EStepControllerTestsPath = path.join(root, "scripts/test/live-e2e-step-controller.test.mjs");
+removeFileIfExists(liveE2EContextFile);
 const liveE2EProofRunnerTestRun = spawnSync(process.execPath, ["--test", liveE2EStepControllerTestsPath, liveE2EProofRunnerTestsPath], {
   cwd: root,
+  env: {
+    ...process.env,
+    AOR_PROOF_RUNNER_TEST_CONTEXT_FILE: liveE2EContextFile,
+  },
+  killSignal: "SIGKILL",
   stdio: "inherit",
+  timeout: liveE2ETestSuiteTimeoutMs,
 });
 
 if (liveE2EProofRunnerTestRun.status !== 0) {
+  printLiveE2ETimeoutDiagnostic(liveE2EProofRunnerTestRun, [
+    liveE2EStepControllerTestsPath,
+    liveE2EProofRunnerTestsPath,
+  ]);
+  removeFileIfExists(liveE2EContextFile);
   process.exit(liveE2EProofRunnerTestRun.status ?? 1);
 }
+removeFileIfExists(liveE2EContextFile);
 
 console.log("live-e2e tests ok: online step controller and installed-user black-box proof flow");
 
