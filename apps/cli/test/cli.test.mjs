@@ -530,6 +530,7 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(doctorPayload.guided_status, "ready");
     assert.equal(doctorPayload.read_only, true);
     assert.deepEqual(doctorPayload.guided_actionable_blockers, []);
+    assert.ok(doctorPayload.guided_recommended_commands.every((entry) => !entry.includes("--runtime-root")));
 
     const invalidJsonProject = path.join(projectRoot, "invalid-json-target");
     fs.mkdirSync(invalidJsonProject, { recursive: true });
@@ -573,6 +574,7 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(appPayload.guided_web_surface.app_mode, "local-spa");
     assert.match(appPayload.guided_web_surface.launch_command, /aor app/);
     assert.match(appPayload.guided_web_surface.smoke_command, /--smoke true --open false --json/);
+    assert.ok(appPayload.guided_recommended_commands.every((entry) => !entry.includes("--runtime-root")));
 
     const appSmoke = spawnSync(process.execPath, [
       path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
@@ -646,6 +648,55 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(nextPayload.guided_low_level_command, "intake create");
     assert.equal(nextPayload.next_action_primary.action_id, "mission-create");
     assert.equal(fs.existsSync(nextPayload.next_action_report_file), true);
+    assert.ok(nextPayload.guided_recommended_commands.every((entry) => !entry.includes("--runtime-root")));
+
+    const customRuntimeRoot = path.join(projectRoot, "custom-aor-runtime");
+    const runtimeRootFlag = `--runtime-root ${customRuntimeRoot}`;
+    const customDoctorHuman = invokeCli(["doctor", "--project-ref", projectRoot, "--runtime-root", customRuntimeRoot]);
+    assert.equal(customDoctorHuman.exitCode, 0, customDoctorHuman.stderr);
+    assert.ok(customDoctorHuman.stdout.includes(runtimeRootFlag));
+
+    const customDoctorJson = invokeCli([
+      "doctor",
+      "--project-ref",
+      projectRoot,
+      "--runtime-root",
+      customRuntimeRoot,
+      "--json",
+    ]);
+    assert.equal(customDoctorJson.exitCode, 0, customDoctorJson.stderr);
+    const customDoctorPayload = JSON.parse(customDoctorJson.stdout);
+    assert.equal(customDoctorPayload.resolved_runtime_root, customRuntimeRoot);
+    assert.ok(customDoctorPayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
+
+    const customAppJson = invokeCli([
+      "app",
+      "--project-ref",
+      projectRoot,
+      "--runtime-root",
+      customRuntimeRoot,
+      "--json",
+    ]);
+    assert.equal(customAppJson.exitCode, 0, customAppJson.stderr);
+    const customAppPayload = JSON.parse(customAppJson.stdout);
+    assert.ok(customAppPayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
+    assert.ok(customAppPayload.guided_web_surface.launch_command.includes(runtimeRootFlag));
+    assert.ok(customAppPayload.guided_web_surface.smoke_command.includes(runtimeRootFlag));
+    assert.ok(customAppPayload.guided_web_surface.detach_command.includes(runtimeRootFlag));
+
+    const customNextJson = invokeCli([
+      "next",
+      "--project-ref",
+      projectRoot,
+      "--runtime-root",
+      customRuntimeRoot,
+      "--json",
+    ]);
+    assert.equal(customNextJson.exitCode, 0, customNextJson.stderr);
+    const customNextPayload = JSON.parse(customNextJson.stdout);
+    assert.equal(customNextPayload.resolved_runtime_root, customRuntimeRoot);
+    assert.ok(customNextPayload.next_action_primary.command.includes(runtimeRootFlag));
+    assert.ok(customNextPayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
 
     const transcriptFixture = JSON.parse(
       fs.readFileSync(path.join(fixturesDir, "installed-user-first-run-transcript.json"), "utf8"),
@@ -818,11 +869,15 @@ test("guided mission create writes intake evidence and next resolves mission sta
 
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    const customRuntimeRoot = path.join(projectRoot, "custom-aor-runtime");
+    const runtimeRootFlag = `--runtime-root ${customRuntimeRoot}`;
     const incompleteMission = invokeCli([
       "mission",
       "create",
       "--project-ref",
       projectRoot,
+      "--runtime-root",
+      customRuntimeRoot,
       "--mission-id",
       "missing-acceptance",
       "--goal",
@@ -837,18 +892,30 @@ test("guided mission create writes intake evidence and next resolves mission sta
     assert.equal(incompleteMission.exitCode, 0, incompleteMission.stderr);
     const incompletePayload = JSON.parse(incompleteMission.stdout);
     assert.equal(incompletePayload.guided_status, "blocked");
+    assert.equal(incompletePayload.resolved_runtime_root, customRuntimeRoot);
     assert.deepEqual(incompletePayload.product_intake_completeness.missing_fields, [
       "kpis",
       "definition_of_done",
     ]);
+    assert.ok(incompletePayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
+    assert.ok(
+      incompletePayload.guided_actionable_blockers.every((blocker) =>
+        String(blocker.next_command).includes(runtimeRootFlag),
+      ),
+    );
 
-    const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
+    const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--runtime-root", customRuntimeRoot, "--json"]);
     assert.equal(nextJson.exitCode, 0, nextJson.stderr);
     const nextPayload = JSON.parse(nextJson.stdout);
     const blockerCodes = nextPayload.next_action_blockers.map((blocker) => blocker.code);
     assert.equal(nextPayload.next_action_status, "blocked");
     assert.ok(blockerCodes.includes("mission-kpis-missing"));
     assert.ok(blockerCodes.includes("mission-definition_of_done-missing"));
+    assert.ok(nextPayload.next_action_primary.command.includes(runtimeRootFlag));
+    assert.ok(nextPayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
+    assert.ok(
+      nextPayload.next_action_blockers.every((blocker) => String(blocker.next_command).includes(runtimeRootFlag)),
+    );
   });
 
   withTempProject((projectRoot) => {

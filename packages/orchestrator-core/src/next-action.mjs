@@ -6,6 +6,7 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 
 const TERMINAL_RUN_STATUSES = new Set(["canceled", "cancelled", "completed", "failed", "pass", "fail", "aborted"]);
 const DELIVERY_READY_STATUSES = new Set(["ready", "submitted", "ready-for-close", "completed", "pass"]);
+const DEFAULT_RUNTIME_ROOT = ".aor";
 
 /**
  * @param {unknown} value
@@ -651,6 +652,69 @@ function projectCommand(command, projectRoot) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @returns {string}
+ */
+function defaultRuntimeRoot(projectRoot) {
+  return path.resolve(projectRoot, DEFAULT_RUNTIME_ROOT);
+}
+
+/**
+ * @param {{ projectRoot: string, runtimeRoot: string, explicitRuntimeRoot?: boolean }} options
+ * @returns {boolean}
+ */
+function shouldIncludeRuntimeRoot(options) {
+  return options.explicitRuntimeRoot === true || path.resolve(options.runtimeRoot) !== defaultRuntimeRoot(options.projectRoot);
+}
+
+/**
+ * @param {string} command
+ * @param {string} runtimeRoot
+ * @param {boolean} includeRuntimeRoot
+ * @returns {string}
+ */
+function appendRuntimeRootFlag(command, runtimeRoot, includeRuntimeRoot) {
+  if (!includeRuntimeRoot || /\s--runtime-root(?:\s|=)/u.test(command)) {
+    return command;
+  }
+  return `${command} --runtime-root ${shellQuote(runtimeRoot)}`;
+}
+
+/**
+ * @param {Record<string, unknown>} action
+ * @param {string} runtimeRoot
+ * @param {boolean} includeRuntimeRoot
+ * @returns {Record<string, unknown>}
+ */
+function withRuntimeRootActionCommand(action, runtimeRoot, includeRuntimeRoot) {
+  const command = asString(action.command);
+  return command
+    ? {
+        ...action,
+        command: appendRuntimeRootFlag(command, runtimeRoot, includeRuntimeRoot),
+      }
+    : action;
+}
+
+/**
+ * @param {Array<Record<string, unknown>>} blockers
+ * @param {string} runtimeRoot
+ * @param {boolean} includeRuntimeRoot
+ * @returns {Array<Record<string, unknown>>}
+ */
+function withRuntimeRootBlockerCommands(blockers, runtimeRoot, includeRuntimeRoot) {
+  return blockers.map((blocker) => {
+    const nextCommand = asString(blocker.next_command);
+    return nextCommand
+      ? {
+          ...blocker,
+          next_command: appendRuntimeRootFlag(nextCommand, runtimeRoot, includeRuntimeRoot),
+        }
+      : blocker;
+  });
+}
+
+/**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @returns {{ packetFile: string, bodyFile: string | null, packet: Record<string, unknown>, body: Record<string, unknown> | null } | null}
  */
@@ -763,6 +827,11 @@ export function resolveNextAction(options = {}) {
     command: "aor next",
   });
   const projectRoot = init.projectRoot;
+  const includeRuntimeRoot = shouldIncludeRuntimeRoot({
+    projectRoot,
+    runtimeRoot: init.runtimeRoot,
+    explicitRuntimeRoot: options.runtimeRoot !== undefined,
+  });
   const reportFile = path.join(init.runtimeLayout.reportsRoot, "next-action-report.json");
   const onboardingStatus = asString(init.onboardingReport?.status) ?? "blocked";
   const onboardingEvidenceRef = toEvidenceRef(projectRoot, init.onboardingReportFile);
@@ -927,6 +996,9 @@ export function resolveNextAction(options = {}) {
       }
     }
   }
+
+  primaryAction = withRuntimeRootActionCommand(primaryAction, init.runtimeRoot, includeRuntimeRoot);
+  blockers = withRuntimeRootBlockerCommands(blockers, init.runtimeRoot, includeRuntimeRoot);
 
   const report = {
     report_id: `${init.projectId}.next-action.v1`,
