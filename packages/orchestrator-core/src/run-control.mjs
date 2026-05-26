@@ -394,6 +394,7 @@ function resolveNextActions(action, state) {
  *   targetStep?: string,
  *   reason?: string,
  *   approvalRef?: string,
+ *   preflightBlock?: { code?: string, message?: string, evidenceRefs?: string[] },
  *   redactionPolicy?: unknown,
  * }} options
  */
@@ -426,10 +427,18 @@ export function applyRunControlAction(options) {
   const stateBefore = existingState.state;
   const transition = resolveTransition(action, normalizeStatus(asString(stateBefore?.status)));
   const guardrails = evaluateGuardrails(profile, action, approvalRef, targetStep);
+  const preflightBlock = asRecord(options.preflightBlock);
+  const preflightBlockedReason =
+    action === "start" && asString(preflightBlock.code)
+      ? {
+          code: asString(preflightBlock.code) ?? "preflight.blocked",
+          message: asString(preflightBlock.message) ?? "Run start preflight blocked execution.",
+        }
+      : null;
   const blockedReason = guardrails.blocked
     ? guardrails.blocked_reason
     : transition.allowed
-      ? null
+      ? preflightBlockedReason
       : {
           code: transition.code ?? "transition.invalid",
           message: transition.message ?? "Transition is not allowed.",
@@ -462,6 +471,7 @@ export function applyRunControlAction(options) {
     },
     guardrails: guardrails.decision,
     approval_ref: approvalRef,
+    blocking_evidence_refs: asStringArray(preflightBlock.evidenceRefs),
     evidence_root: init.runtimeLayout.reportsRoot,
     state_file: stateFile,
     timestamp: eventTimestamp,
@@ -523,7 +533,7 @@ export function applyRunControlAction(options) {
     guardrails: guardrails.decision,
     transition: auditRecord.transition,
     applied: !blocked,
-    nextActions: resolveNextActions(action, stateAfter),
+    nextActions: blocked && !stateAfter ? ["run start"] : resolveNextActions(action, stateAfter),
   };
 }
 

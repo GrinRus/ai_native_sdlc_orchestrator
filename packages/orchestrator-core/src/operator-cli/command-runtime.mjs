@@ -621,6 +621,46 @@ export function finalizeRunControlState(options) {
 }
 
 /**
+ * @param {{
+ *   stateFile: string,
+ *   previousState: Record<string, unknown> | null,
+ *   targetStep: string,
+ *   failureCode: string,
+ *   failureSummary: string,
+ * }} options
+ * @returns {Record<string, unknown>}
+ */
+export function finalizeRunControlFailure(options) {
+  const nextState = {
+    schema_version: 1,
+    run_id: typeof options.previousState?.run_id === "string" ? options.previousState.run_id : null,
+    status: "failed",
+    current_step: options.targetStep,
+    last_action: "start",
+    started_at:
+      typeof options.previousState?.started_at === "string"
+        ? options.previousState.started_at
+        : new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    action_sequence:
+      typeof options.previousState?.action_sequence === "number" && Number.isFinite(options.previousState.action_sequence)
+        ? options.previousState.action_sequence
+        : 1,
+    approval_refs: asStringArray(options.previousState?.approval_refs),
+    audit_refs: asStringArray(options.previousState?.audit_refs),
+    step_result_refs: asStringArray(options.previousState?.step_result_refs),
+    failure: {
+      code: options.failureCode,
+      summary: options.failureSummary,
+    },
+    evidence_root:
+      typeof options.previousState?.evidence_root === "string" ? options.previousState.evidence_root : path.dirname(options.stateFile),
+  };
+  writeJson(options.stateFile, nextState);
+  return nextState;
+}
+
+/**
  * @param {string} runRef
  * @returns {string}
  */

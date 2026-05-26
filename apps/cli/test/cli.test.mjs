@@ -1494,6 +1494,83 @@ test("CLI run answer writes audit refs and keeps raw answer out of command and f
   });
 });
 
+test("run start validation failure records blocked evidence before durable running state", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    const profilePath = path.join(projectRoot, "examples/project.aor.yaml");
+    fs.writeFileSync(
+      profilePath,
+      fs.readFileSync(profilePath, "utf8").replace("allow_direct_write: false", "allow_direct_write: true"),
+      "utf8",
+    );
+
+    const runId = "run-start-validation-failure";
+    const startResult = invokeCli(["run", "start", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(startResult.exitCode, 0, startResult.stderr);
+    const startPayload = JSON.parse(startResult.stdout);
+    assert.equal(startPayload.run_control_action, "start");
+    assert.equal(startPayload.run_control_blocked, true);
+    assert.equal(startPayload.run_control_blocked_reason.code, "validation.failed");
+    assert.equal(startPayload.run_control_state, null);
+    assert.equal(fs.existsSync(startPayload.run_control_state_file), false);
+    assert.equal(fs.existsSync(startPayload.run_control_audit_file), true);
+
+    const audit = JSON.parse(fs.readFileSync(startPayload.run_control_audit_file, "utf8"));
+    assert.equal(audit.blocked, true);
+    assert.equal(audit.blocked_reason.code, "validation.failed");
+    assert.ok(audit.blocking_evidence_refs.some((ref) => ref.endsWith("validation-report.json")));
+
+    const statusResult = invokeCli(["run", "status", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(statusResult.exitCode, 0, statusResult.stderr);
+    const statusPayload = JSON.parse(statusResult.stdout);
+    assert.deepEqual(
+      statusPayload.run_event_history.events.map((event) => event.event_type),
+      ["warning.raised", "evidence.linked"],
+    );
+    assert.match(statusPayload.run_event_history.events[0].summary, /passing validation report/);
+  });
+});
+
+test("run start runtime exception records terminal failed state before returning error", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const runId = "run-start-runtime-exception";
+    const startResult = invokeCli([
+      "run",
+      "start",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      "missing-project.aor.yaml",
+      "--run-id",
+      runId,
+      "--require-validation-pass",
+      "false",
+    ]);
+    assert.equal(startResult.exitCode, 1);
+    assert.match(startResult.stderr, /Run start failed after durable start transition/);
+
+    const statusResult = invokeCli(["run", "status", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(statusResult.exitCode, 0, statusResult.stderr);
+    const statusPayload = JSON.parse(statusResult.stdout);
+    const stateRoot = path.join(projectRoot, ".aor/projects/aor-core/state");
+    const stateFile = path.join(stateRoot, "run-control-state-run-start-runtime-exception.json");
+    assert.equal(fs.existsSync(stateFile), true);
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    assert.equal(state.status, "failed");
+    assert.equal(state.failure.code, "runtime_execution.error");
+    assert.deepEqual(
+      statusPayload.run_event_history.events.map((event) => event.event_type),
+      ["run.started", "evidence.linked", "run.terminal"],
+    );
+    assert.equal(statusPayload.run_event_history.events[2].status, "failed");
+    assert.match(statusPayload.run_event_history.events[2].summary, /missing-project\.aor\.yaml/);
+  });
+});
+
 test("W6 ui attach/detach command pack reports lifecycle state and preserves headless operation", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });

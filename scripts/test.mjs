@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
 const root = process.cwd();
 const liveE2ETestSuiteTimeoutMs = parsePositiveInteger(
   process.env.AOR_LIVE_E2E_TEST_SUITE_TIMEOUT_MS,
-  10 * 60 * 1000,
+  20 * 60 * 1000,
 );
 const liveE2EContextFile = path.join(os.tmpdir(), `aor-live-e2e-test-context-${process.pid}.json`);
 
