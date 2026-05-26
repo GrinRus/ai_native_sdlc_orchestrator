@@ -574,6 +574,9 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(appPayload.guided_web_surface.app_mode, "local-spa");
     assert.match(appPayload.guided_web_surface.launch_command, /aor app/);
     assert.match(appPayload.guided_web_surface.smoke_command, /--smoke true --open false --json/);
+    assert.ok(appPayload.guided_web_surface.local_control_plane_smoke_command.includes("--project-ref"));
+    assert.ok(appPayload.guided_web_surface.local_control_plane_smoke_command.includes(projectRoot));
+    assert.ok(appPayload.guided_web_surface.local_control_plane_smoke_command.includes(path.join(projectRoot, ".aor")));
     assert.ok(appPayload.guided_recommended_commands.every((entry) => !entry.includes("--runtime-root")));
 
     const appSmoke = spawnSync(process.execPath, [
@@ -683,6 +686,7 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.ok(customAppPayload.guided_web_surface.launch_command.includes(runtimeRootFlag));
     assert.ok(customAppPayload.guided_web_surface.smoke_command.includes(runtimeRootFlag));
     assert.ok(customAppPayload.guided_web_surface.detach_command.includes(runtimeRootFlag));
+    assert.ok(customAppPayload.guided_web_surface.local_control_plane_smoke_command.includes(customRuntimeRoot));
 
     const customNextJson = invokeCli([
       "next",
@@ -1065,6 +1069,15 @@ test("ui lifecycle command help documents attach and detach semantics", () => {
   assert.match(result.stdout, /Status: implemented in UI lifecycle shell \(W6-S04\)/);
   assert.match(result.stdout, /Attach records explicit UI lifecycle state/);
   assert.match(result.stdout, /--control-plane is optional/);
+});
+
+test("app guidance documents the local source checkout control-plane path", () => {
+  const result = invokeCli(["app", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /http:\/\/127\.0\.0\.1:8080/);
+  assert.match(result.stdout, /node apps\/api\/scripts\/control-plane-smoke\.mjs/);
 });
 
 test("delivery and release command help documents bounded policy semantics", () => {
@@ -1654,7 +1667,7 @@ test("W6 ui attach/detach command pack reports lifecycle state and preserves hea
       "--run-id",
       "ui-lifecycle-smoke",
       "--control-plane",
-      "http://localhost:8080",
+      "http://127.0.0.1:8080",
     ]);
     assert.equal(attachConnected.exitCode, 0, attachConnected.stderr);
     const attachConnectedPayload = JSON.parse(attachConnected.stdout);
@@ -1671,7 +1684,7 @@ test("W6 ui attach/detach command pack reports lifecycle state and preserves hea
       "--run-id",
       "ui-lifecycle-smoke",
       "--control-plane",
-      "http://localhost:8080",
+      "http://127.0.0.1:8080",
     ]);
     assert.equal(attachRetry.exitCode, 0, attachRetry.stderr);
     const attachRetryPayload = JSON.parse(attachRetry.stdout);

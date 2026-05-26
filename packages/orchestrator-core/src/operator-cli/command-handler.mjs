@@ -195,6 +195,9 @@ function formatGuidedHumanOutput(output) {
       `- mandatory: ${String(web.mandatory ?? false)}`,
       `- launch: ${String(web.launch_command ?? "aor app")}`,
     );
+    if (web.local_control_plane_smoke_command) {
+      lines.push(`- source checkout API smoke: ${String(web.local_control_plane_smoke_command)}`);
+    }
   }
 
   lines.push("", "Recommended commands:");
@@ -294,6 +297,8 @@ export function formatCommandHelp(definition) {
               "- The web console is optional; CLI/API/headless operation remains valid when the app is stopped.",
               "- Use --smoke --open false --json for CI and release smoke checks.",
               "- The local app serves the packaged SPA and same-origin /api/projects/:projectId routes.",
+              "- Local source checkout detached API guidance uses http://127.0.0.1:8080 by default.",
+              "- Source checkout API smoke: node apps/api/scripts/control-plane-smoke.mjs --project-ref <repo> --runtime-root <repo>/.aor --host 127.0.0.1 --port 8080",
               "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
             ]
           : definition.command === "next"

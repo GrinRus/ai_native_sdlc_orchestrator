@@ -28,6 +28,9 @@ export const GUIDED_COMMAND_GROUP = Object.freeze({
   commands: GUIDED_COMMANDS,
 });
 
+const LOCAL_CONTROL_PLANE_HOST = "127.0.0.1";
+const LOCAL_CONTROL_PLANE_PORT = 8080;
+
 /**
  * @param {string} value
  * @returns {string}
@@ -47,6 +50,25 @@ function projectCommand(command, projectRoot, context = {}) {
   return context.includeRuntimeRoot && context.runtimeRoot
     ? `${baseCommand} --runtime-root ${shellQuote(context.runtimeRoot)}`
     : baseCommand;
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} runtimeRoot
+ * @returns {string}
+ */
+function controlPlaneSmokeCommand(projectRoot, runtimeRoot) {
+  return [
+    "node apps/api/scripts/control-plane-smoke.mjs",
+    "--project-ref",
+    shellQuote(projectRoot),
+    "--runtime-root",
+    shellQuote(runtimeRoot),
+    "--host",
+    LOCAL_CONTROL_PLANE_HOST,
+    "--port",
+    String(LOCAL_CONTROL_PLANE_PORT),
+  ].join(" ");
 }
 
 /**
@@ -411,6 +433,7 @@ export function handleGuidedCommand(context) {
       launch_command: `${projectCommand("app", projectRoot, commandContext)} --host ${shellQuote(host)} --port ${shellQuote(port)} --open ${shellQuote(open)}`,
       smoke_command: `${projectCommand("app", projectRoot, commandContext)} --smoke true --open false --json`,
       detach_command: projectCommand("ui detach", projectRoot, commandContext),
+      local_control_plane_smoke_command: controlPlaneSmokeCommand(projectRoot, runtimeRoot),
       web_app_root: "apps/web",
       app_mode: "local-spa",
       headless_safe: true,

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -19,6 +20,39 @@ const workspaceRoot = path.resolve(currentDir, "../../..");
 async function withTempRepo(callback) {
   await withTempRepoHelper({ prefix: "aor-w9-s07-api-http-", workspaceRoot }, callback);
 }
+
+test("detached control-plane source checkout smoke command verifies local API transport", async () => {
+  await withTempRepo((repoRoot) => {
+    const runtimeRoot = path.join(repoRoot, ".aor-smoke");
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(workspaceRoot, "apps/api/scripts/control-plane-smoke.mjs"),
+        "--project-ref",
+        repoRoot,
+        "--runtime-root",
+        runtimeRoot,
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "0",
+        "--json",
+      ],
+      {
+        cwd: workspaceRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.status, "ready");
+    assert.match(payload.base_url, /^http:\/\/127\.0\.0\.1:\d+$/u);
+    assert.match(payload.state_url, /^http:\/\/127\.0\.0\.1:\d+\/api\/projects\/[^/]+\/state$/u);
+    assert.equal(payload.serve, false);
+    assert.equal(fs.existsSync(path.join(runtimeRoot, "projects", payload.project_id, "state", "project-init-state.json")), true);
+  });
+});
 
 /**
  * @param {Response} response

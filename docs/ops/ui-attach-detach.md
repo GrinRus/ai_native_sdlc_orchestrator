@@ -33,13 +33,42 @@ Expected smoke outcome:
 - `config_project_id` and `state_project_id` match `project_id`;
 - only `.aor/` runtime state changes in the target repository.
 
+Local-alpha source checkouts use the detached API at `http://127.0.0.1:8080`
+in CLI guidance and this runbook. This is a local operator control-plane path,
+not a hosted service or production deployment claim.
+
+## Local detached API smoke
+Verify the local detached API transport from a source checkout:
+```bash
+node apps/api/scripts/control-plane-smoke.mjs \
+  --project-ref <AOR_WORKSPACE> \
+  --runtime-root <AOR_WORKSPACE>/.aor \
+  --host 127.0.0.1 \
+  --port 8080
+```
+
+Keep the local control-plane process running for attach and console checks:
+```bash
+node apps/api/scripts/control-plane-smoke.mjs \
+  --project-ref <AOR_WORKSPACE> \
+  --runtime-root <AOR_WORKSPACE>/.aor \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --serve true
+```
+
+Expected smoke outcome:
+- status is `ready`;
+- `base_url` is `http://127.0.0.1:8080`;
+- `state_url` points to `/api/projects/<PROJECT_ID>/state`.
+
 ## Attach
 Connected attach:
 ```bash
 aor ui attach \
   --project-ref <AOR_WORKSPACE> \
   --run-id <RUN_ID> \
-  --control-plane http://localhost:8080
+  --control-plane http://127.0.0.1:8080
 ```
 
 Note: when a reachable `--control-plane` URL is provided, connected mode uses detached transport for:
