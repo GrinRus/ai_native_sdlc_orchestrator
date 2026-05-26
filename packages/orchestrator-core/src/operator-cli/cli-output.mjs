@@ -500,3 +500,60 @@ export function buildCliOutput({ command, resolvedFamilies, state }) {
     })
   );
 }
+
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isPlainObject(value) {
+  return Object.prototype.toString.call(value) === "[object Object]";
+}
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function compactOutputValue(value) {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item) => compactOutputValue(item))
+      .filter((item) => item !== undefined);
+    return items.length > 0 ? items : undefined;
+  }
+
+  if (isPlainObject(value)) {
+    /** @type {Record<string, unknown>} */
+    const compacted = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+      const compactedValue = compactOutputValue(nestedValue);
+      if (compactedValue !== undefined) {
+        compacted[key] = compactedValue;
+      }
+    }
+    return Object.keys(compacted).length > 0 ? compacted : undefined;
+  }
+
+  return value;
+}
+
+/**
+ * @param {Record<string, unknown>} output
+ * @returns {Record<string, unknown>}
+ */
+export function buildCompactCliOutput(output) {
+  /** @type {Record<string, unknown>} */
+  const compacted = {};
+
+  for (const [key, value] of Object.entries(output)) {
+    const compactedValue = compactOutputValue(value);
+    if (compactedValue !== undefined) {
+      compacted[key] = compactedValue;
+    }
+  }
+
+  return compacted;
+}

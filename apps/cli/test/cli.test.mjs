@@ -502,6 +502,10 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.match(binResult.stdout, /aor onboard/);
     assert.match(binResult.stdout, /aor app/);
     assert.match(binResult.stdout, /aor next/);
+    assert.match(binResult.stdout, /Guided shortcuts:/);
+    assert.match(binResult.stdout, /Run control:/);
+    assert.match(binResult.stdout, /Review and QA:/);
+    assert.match(binResult.stdout, /--json compact prints only populated command fields/);
 
     const doctorHelp = invokeCli(["doctor", "--help"]);
     assert.equal(doctorHelp.exitCode, 0);
@@ -531,6 +535,16 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(doctorPayload.read_only, true);
     assert.deepEqual(doctorPayload.guided_actionable_blockers, []);
     assert.ok(doctorPayload.guided_recommended_commands.every((entry) => !entry.includes("--runtime-root")));
+    assert.equal(Object.prototype.hasOwnProperty.call(doctorPayload, "validation_report_id"), true);
+
+    const compactDoctorJson = invokeCli(["doctor", "--project-ref", projectRoot, "--json", "compact"]);
+    assert.equal(compactDoctorJson.exitCode, 0, compactDoctorJson.stderr);
+    const compactDoctorPayload = JSON.parse(compactDoctorJson.stdout);
+    assert.equal(compactDoctorPayload.command, "doctor");
+    assert.equal(compactDoctorPayload.guided_stage, "doctor");
+    assert.equal(compactDoctorPayload.resolved_project_ref, projectRoot);
+    assert.equal(Object.prototype.hasOwnProperty.call(compactDoctorPayload, "validation_report_id"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(compactDoctorPayload, "contract_families"), false);
 
     const invalidJsonProject = path.join(projectRoot, "invalid-json-target");
     fs.mkdirSync(invalidJsonProject, { recursive: true });
@@ -1049,6 +1063,7 @@ test("operator command help documents read-only and future control semantics", (
   assert.match(result.stdout, /Status: implemented in operator shell \(W5-S03\)/);
   assert.match(result.stdout, /This command is read-only\./);
   assert.match(result.stdout, /Use run start\/pause\/resume\/steer\/cancel for bounded control actions\./);
+  assert.match(result.stdout, /--json compact/);
 });
 
 test("run-control command help documents guardrails and audit semantics", () => {
@@ -3221,6 +3236,27 @@ test("operator commands inspect runs, packets, and evidence through shared contr
     assert.equal(runStatusPayload.read_only, true);
     assert.ok(runStatusPayload.future_control_hooks.includes("run pause"));
 
+    const compactRunStatusResult = invokeCli([
+      "run",
+      "status",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+      "--follow",
+      "true",
+      "--max-replay",
+      "10",
+      "--json",
+      "compact",
+    ]);
+    assert.equal(compactRunStatusResult.exitCode, 0, compactRunStatusResult.stderr);
+    const compactRunStatusPayload = JSON.parse(compactRunStatusResult.stdout);
+    assert.equal(compactRunStatusPayload.command, "run status");
+    assert.equal(compactRunStatusPayload.read_only, true);
+    assert.equal(compactRunStatusPayload.run_event_history.total_events, 2);
+    assert.equal(Object.prototype.hasOwnProperty.call(compactRunStatusPayload, "validation_report_id"), false);
+
     const prepareResult = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
     assert.equal(prepareResult.exitCode, 0, prepareResult.stderr);
 
@@ -3287,6 +3323,14 @@ test("operator commands inspect runs, packets, and evidence through shared contr
         stream_protocol: runStatusPayload.stream_protocol,
         run_event_history_total: runStatusPayload.run_event_history.total_events,
         run_policy_history_entries: runStatusPayload.run_policy_history.entry_count,
+      },
+      run_status_compact: {
+        command: compactRunStatusPayload.command,
+        status: compactRunStatusPayload.status,
+        read_only: compactRunStatusPayload.read_only,
+        stream_protocol: compactRunStatusPayload.stream_protocol,
+        run_event_history_total: compactRunStatusPayload.run_event_history.total_events,
+        includes_full_schema_nulls: Object.prototype.hasOwnProperty.call(compactRunStatusPayload, "validation_report_id"),
       },
       packet_show: {
         command: packetPayload.command,

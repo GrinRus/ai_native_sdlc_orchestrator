@@ -1,27 +1,31 @@
 AOR CLI command surface
 
+Output modes:
+  - guided shortcuts default to human-readable output.
+  - --json keeps the full machine-readable schema for compatibility.
+  - --json compact prints only populated command fields for operator inspection.
+
 Implemented commands:
+Guided shortcuts:
   - aor doctor
   - aor onboard
   - aor app
   - aor next
   - aor mission create
+
+Core lifecycle:
   - aor project init
   - aor project analyze
   - aor project validate
   - aor project verify
-  - aor eval run
-  - aor harness replay
-  - aor harness certify
-  - aor asset promote
-  - aor asset freeze
-  - aor compiler revision
   - aor handoff prepare
   - aor handoff approve
   - aor intake create
   - aor discovery run
   - aor spec build
   - aor wave create
+
+Run control:
   - aor run start
   - aor run pause
   - aor run resume
@@ -29,24 +33,38 @@ Implemented commands:
   - aor run cancel
   - aor run answer
   - aor run status
-  - aor request create
-  - aor request run
-  - aor request status
+
+Review and QA:
+  - aor eval run
+  - aor harness replay
+  - aor harness certify
+  - aor asset promote
+  - aor asset freeze
+  - aor compiler revision
+  - aor review run
+  - aor review decide
+
+Delivery:
   - aor deliver prepare
-  - aor release prepare
   - aor multirepo lock
   - aor packet show
   - aor evidence show
+
+Release:
+  - aor release prepare
+  - aor learning handoff
+
+Operations:
   - aor incident open
   - aor incident backfill
   - aor incident recertify
   - aor incident show
   - aor audit runs
   - aor finance monitor
+  - aor request create
+  - aor request run
+  - aor request status
   - aor ui attach
-  - aor review run
-  - aor review decide
-  - aor learning handoff
   - aor ui detach
 
 Planned commands (not implemented yet):

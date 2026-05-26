@@ -12,12 +12,75 @@ import {
   resolveProjectRef,
   resolveRuntimeRoot,
 } from "./command-runtime.mjs";
-import { buildCliOutput, createCliOutputState } from "./cli-output.mjs";
+import { buildCliOutput, buildCompactCliOutput, createCliOutputState } from "./cli-output.mjs";
 import { executeCommandHandlerGroup, resolveCommandHandlerGroup } from "./command-handlers/index.mjs";
 
 export { CliUsageError };
 
 const GUIDED_SHORTCUT_COMMANDS = new Set(["doctor", "onboard", "app", "next"]);
+
+const TOP_LEVEL_HELP_GROUPS = Object.freeze([
+  {
+    title: "Guided shortcuts",
+    commands: ["doctor", "onboard", "app", "next", "mission create"],
+  },
+  {
+    title: "Core lifecycle",
+    commands: [
+      "project init",
+      "project analyze",
+      "project validate",
+      "project verify",
+      "handoff prepare",
+      "handoff approve",
+      "intake create",
+      "discovery run",
+      "spec build",
+      "wave create",
+    ],
+  },
+  {
+    title: "Run control",
+    commands: ["run start", "run pause", "run resume", "run steer", "run cancel", "run answer", "run status"],
+  },
+  {
+    title: "Review and QA",
+    commands: [
+      "eval run",
+      "harness replay",
+      "harness certify",
+      "asset promote",
+      "asset freeze",
+      "compiler revision",
+      "review run",
+      "review decide",
+    ],
+  },
+  {
+    title: "Delivery",
+    commands: ["deliver prepare", "multirepo lock", "packet show", "evidence show"],
+  },
+  {
+    title: "Release",
+    commands: ["release prepare", "learning handoff"],
+  },
+  {
+    title: "Operations",
+    commands: [
+      "incident open",
+      "incident backfill",
+      "incident recertify",
+      "incident show",
+      "audit runs",
+      "finance monitor",
+      "request create",
+      "request run",
+      "request status",
+      "ui attach",
+      "ui detach",
+    ],
+  },
+]);
 
 /**
  * @typedef {{
@@ -123,15 +186,16 @@ function parseGuidedShortcut(command, args) {
  * @param {Record<string, string | string[] | true>} flags
  * @returns {boolean}
  */
-function isJsonOutputRequested(flags) {
+function resolveJsonOutputMode(flags) {
   const value = flags.json;
-  if (value === undefined) return false;
-  if (value === true || value === "true") return true;
-  if (value === "false") return false;
+  if (value === undefined) return "default";
+  if (value === true || value === "true" || value === "full") return "full";
+  if (value === "compact") return "compact";
+  if (value === "false") return "off";
   if (Array.isArray(value)) {
     throw new CliUsageError("Flag '--json' accepts only one value.");
   }
-  throw new CliUsageError("Flag '--json' accepts only boolean values when a value is provided.");
+  throw new CliUsageError("Flag '--json' accepts boolean values or one of: full, compact.");
 }
 
 /**
@@ -280,7 +344,7 @@ export function formatCommandHelp(definition) {
           "- --project-ref is optional and defaults to cwd for installed-user first-run checks.",
           "- Missing project paths and unsupported Node versions are actionable blockers.",
           "- Warnings such as missing runtime root point to guided follow-up commands instead of failing the probe.",
-          "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+          "- Guided commands default to human-readable output; pass --json for the full schema or --json compact for populated fields.",
         ]
       : definition.command === "onboard"
         ? [
@@ -289,7 +353,7 @@ export function formatCommandHelp(definition) {
             "- Positional <repo> and --project-ref are alternatives; do not pass both.",
             "- Existing grouped commands remain available and keep their JSON output contract.",
             "- Asset ejection remains explicit through --asset-mode materialized or --materialize-bootstrap-assets and can create target-repo files outside .aor/.",
-            "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+            "- Guided commands default to human-readable output; pass --json for the full schema or --json compact for populated fields.",
           ]
         : definition.command === "app"
           ? [
@@ -299,7 +363,7 @@ export function formatCommandHelp(definition) {
               "- The local app serves the packaged SPA and same-origin /api/projects/:projectId routes.",
               "- Local source checkout detached API guidance uses http://127.0.0.1:8080 by default.",
               "- Source checkout API smoke: node apps/api/scripts/control-plane-smoke.mjs --project-ref <repo> --runtime-root <repo>/.aor --host 127.0.0.1 --port 8080",
-              "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+              "- Guided commands default to human-readable output; pass --json for the full schema or --json compact for populated fields.",
             ]
           : definition.command === "next"
             ? [
@@ -307,7 +371,7 @@ export function formatCommandHelp(definition) {
                 "- It chooses one primary action from onboarding, mission intake, active run, and discovery evidence.",
                 "- Incomplete mission intake is blocked with missing product evidence fields and exact repair command.",
                 "- Delivery-capable modes keep write-back policy explicit and upstream writes disabled by default.",
-                "- Guided commands default to human-readable output; pass --json for machine-readable fields.",
+                "- Guided commands default to human-readable output; pass --json for the full schema or --json compact for populated fields.",
               ]
             : definition.command === "mission create"
               ? [
@@ -497,6 +561,7 @@ export function formatCommandHelp(definition) {
                 "- --follow=true requires --run-id and reuses the shared live-run event stream protocol.",
                 "- When --run-id is set, output includes run_event_history and run_policy_history for troubleshooting.",
                 "- Use run start/pause/resume/steer/cancel for bounded control actions.",
+                "- Pass --json compact to omit unset compatibility fields during interactive operator inspection.",
               ]
       : definition.command === "packet show"
             ? [
@@ -634,13 +699,45 @@ export function formatCommandHelp(definition) {
  * @returns {string}
  */
 export function formatTopLevelHelp() {
-  const implementedLines = getImplementedCommands().map(
-    (definition) => `  - aor ${definition.command}`,
+  const implementedDefinitions = getImplementedCommands();
+  const implementedByCommand = new Map(
+    implementedDefinitions.map((definition) => [definition.command, definition]),
   );
+  const groupedCommands = new Set();
+  const implementedLines = [];
+
+  for (const group of TOP_LEVEL_HELP_GROUPS) {
+    const groupLines = group.commands
+      .filter((command) => implementedByCommand.has(command))
+      .map((command) => {
+        groupedCommands.add(command);
+        return `  - aor ${command}`;
+      });
+    if (groupLines.length > 0) {
+      implementedLines.push(`${group.title}:`, ...groupLines, "");
+    }
+  }
+
+  const ungroupedLines = implementedDefinitions
+    .filter((definition) => !groupedCommands.has(definition.command))
+    .map((definition) => `  - aor ${definition.command}`);
+  if (ungroupedLines.length > 0) {
+    implementedLines.push("Other:", ...ungroupedLines, "");
+  }
+
+  if (implementedLines.at(-1) === "") {
+    implementedLines.pop();
+  }
+
   const plannedLines = getPlannedCommands().map((definition) => `  - aor ${definition.command}`);
 
   const lines = [
     "AOR CLI command surface",
+    "",
+    "Output modes:",
+    "  - guided shortcuts default to human-readable output.",
+    "  - --json keeps the full machine-readable schema for compatibility.",
+    "  - --json compact prints only populated command fields for operator inspection.",
     "",
     "Implemented commands:",
     ...implementedLines,
@@ -652,6 +749,16 @@ export function formatTopLevelHelp() {
   ];
 
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * @param {Record<string, unknown>} output
+ * @param {"default" | "full" | "compact" | "off"} jsonOutputMode
+ * @returns {string}
+ */
+function formatJsonOutput(output, jsonOutputMode) {
+  const payload = jsonOutputMode === "compact" ? buildCompactCliOutput(output) : output;
+  return `${JSON.stringify(payload, null, 2)}\n`;
 }
 
 /**
@@ -703,7 +810,7 @@ export function executeImplementedCommand(command, flags, cwd) {
     throw new CliUsageError(`Command 'aor ${command}' is planned and not implemented yet.`);
   }
 
-  const guidedJsonOutput = GUIDED_SHORTCUT_COMMANDS.has(command) ? isJsonOutputRequested(flags) : false;
+  const jsonOutputMode = resolveJsonOutputMode(flags);
 
   const handlerGroup = resolveCommandHandlerGroup(command);
   if (!handlerGroup) {
@@ -745,7 +852,7 @@ export function executeImplementedCommand(command, flags, cwd) {
 
   const output = buildCliOutput({ command, resolvedFamilies, state: outputState });
 
-  if (GUIDED_SHORTCUT_COMMANDS.has(command) && !guidedJsonOutput) {
+  if (GUIDED_SHORTCUT_COMMANDS.has(command) && (jsonOutputMode === "default" || jsonOutputMode === "off")) {
     return {
       exitCode: 0,
       stdout: formatGuidedHumanOutput(output),
@@ -755,7 +862,7 @@ export function executeImplementedCommand(command, flags, cwd) {
 
   return {
     exitCode: 0,
-    stdout: `${JSON.stringify(output, null, 2)}\n`,
+    stdout: formatJsonOutput(output, jsonOutputMode),
     stderr: "",
   };
 }

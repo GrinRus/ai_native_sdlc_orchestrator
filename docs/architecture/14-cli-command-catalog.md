@@ -2,6 +2,11 @@
 
 This catalog separates bootstrap commands implemented in the current shell from roadmap-only commands.
 
+Top-level help groups implemented commands by operator surface: guided shortcuts,
+core lifecycle, run control, review/QA, delivery, release, and operations. This
+keeps the command list scannable while preserving every existing grouped command
+contract.
+
 ## Implemented CLI commands
 
 | Command | Status | Inputs | Outputs | Contract family |
@@ -63,7 +68,7 @@ Installed-user rehearsal is maintained as internal repo tooling under `scripts/l
 
 ## Guided first-run shortcuts for W21-S02/W21-S04/W31-S01
 - `aor doctor`, `aor onboard`, `aor app`, and `aor next` are additive installed-user shortcuts. They do not remove or rename grouped command contracts.
-- Guided shortcuts default to human-readable output. Pass `--json` to preserve machine-readable fields for scripts, tests, and control-plane wrappers.
+- Guided shortcuts default to human-readable output. Pass `--json` to preserve the full machine-readable schema for scripts, tests, and control-plane wrappers. Pass `--json compact` for a populated-fields-only operator summary when the full compatibility schema is too noisy.
 - `aor onboard <repo>` delegates to the existing `aor project init` bootstrap path. Clean repositories default to bundled asset mode, emit an onboarding report, and resolve project-profile registry roots without copying example registries into the target repo. Materialized asset mode remains explicit.
 - `aor app` launches the optional packaged local SPA in a foreground loopback server. `--smoke --open false --json` starts the server, checks `/`, `/app-config.json`, and `GET /api/projects/:projectId/state`, prints JSON, and exits for CI/release smoke.
 - `aor mission create` is an additive guided wrapper over `aor intake create`; it preserves product goals, constraints, KPIs, Definition of Done, source refs, allowed paths, and delivery mode in the existing intake-request packet/body contracts.
@@ -71,6 +76,7 @@ Installed-user rehearsal is maintained as internal repo tooling under `scripts/l
 
 ## Operator semantics for W5-S03
 - `aor run status`, `aor packet show`, and `aor evidence show` are read-only operator commands.
+- Common inspection commands accept `--json compact`; this keeps `--json` full-schema compatibility while omitting unset/null fields from interactive operator reads.
 - `aor run status --follow` reuses the shared live-run stream contract and backpressure semantics from the control-plane event stream.
 - Run-control command pack is implemented in W6-S03:
   - `aor run start`, `aor run pause`, `aor run resume`, `aor run steer`, `aor run cancel`
