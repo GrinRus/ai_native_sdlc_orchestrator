@@ -62,6 +62,87 @@ test("production readiness gate fails closed without the OpenAPI route contract"
   assert.match(w30Check?.findings?.join("\n") ?? "", /missing-control-plane-api\.openapi\.json/u);
 });
 
+test("control-plane OpenAPI documents typed local-alpha read and mutation payloads", () => {
+  const openApi = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/contracts/control-plane-api.openapi.json"), "utf8"),
+  );
+  const responses = openApi.components.responses;
+  const requestBodies = openApi.components.requestBodies;
+  const schemas = openApi.components.schemas;
+
+  const responseRefs = {
+    projectState: openApi.paths["/api/projects/{projectId}/state"].get.responses["200"].$ref,
+    runs: openApi.paths["/api/projects/{projectId}/runs"].get.responses["200"].$ref,
+    eventHistory: openApi.paths["/api/projects/{projectId}/runs/{runId}/events/history"].get.responses["200"].$ref,
+    runControl: openApi.paths["/api/projects/{projectId}/run-control/actions"].post.responses["200"].$ref,
+    runControlBlocked: openApi.paths["/api/projects/{projectId}/run-control/actions"].post.responses["409"].$ref,
+    uiLifecycle: openApi.paths["/api/projects/{projectId}/ui-lifecycle/actions"].post.responses["200"].$ref,
+    lifecycleCommand: openApi.paths["/api/projects/{projectId}/lifecycle-command/actions"].post.responses["200"].$ref,
+    lifecycleCommandBlocked: openApi.paths["/api/projects/{projectId}/lifecycle-command/actions"].post.responses["409"].$ref,
+    interactionAnswer: openApi.paths["/api/projects/{projectId}/interactions/answers"].post.responses["200"].$ref,
+    interactionAnswerBlocked: openApi.paths["/api/projects/{projectId}/interactions/answers"].post.responses["409"].$ref,
+  };
+
+  assert.deepEqual(responseRefs, {
+    projectState: "#/components/responses/ProjectState",
+    runs: "#/components/responses/Runs",
+    eventHistory: "#/components/responses/RunEventHistory",
+    runControl: "#/components/responses/RunControlAction",
+    runControlBlocked: "#/components/responses/RunControlActionError",
+    uiLifecycle: "#/components/responses/UiLifecycleAction",
+    lifecycleCommand: "#/components/responses/LifecycleCommandAction",
+    lifecycleCommandBlocked: "#/components/responses/LifecycleCommandActionError",
+    interactionAnswer: "#/components/responses/InteractionAnswer",
+    interactionAnswerBlocked: "#/components/responses/InteractionAnswerError",
+  });
+
+  assert.equal(openApi.paths["/api/projects/{projectId}/run-control/actions"].post.requestBody.$ref, "#/components/requestBodies/RunControlAction");
+  assert.equal(openApi.paths["/api/projects/{projectId}/ui-lifecycle/actions"].post.requestBody.$ref, "#/components/requestBodies/UiLifecycleAction");
+  assert.equal(openApi.paths["/api/projects/{projectId}/lifecycle-command/actions"].post.requestBody.$ref, "#/components/requestBodies/LifecycleCommandAction");
+  assert.equal(openApi.paths["/api/projects/{projectId}/interactions/answers"].post.requestBody.$ref, "#/components/requestBodies/InteractionAnswer");
+
+  for (const responseName of [
+    "ProjectState",
+    "Runs",
+    "RunEventHistory",
+    "RunControlAction",
+    "RunControlActionError",
+    "UiLifecycleAction",
+    "LifecycleCommandAction",
+    "LifecycleCommandActionError",
+    "InteractionAnswer",
+    "InteractionAnswerError",
+  ]) {
+    assert.ok(responses[responseName], `${responseName} response is documented`);
+  }
+
+  for (const requestName of [
+    "RunControlAction",
+    "UiLifecycleAction",
+    "LifecycleCommandAction",
+    "InteractionAnswer",
+  ]) {
+    assert.ok(requestBodies[requestName], `${requestName} request body is documented`);
+  }
+
+  for (const schemaName of [
+    "ProjectStateResponse",
+    "RunsResponse",
+    "RunSummary",
+    "RunEventHistoryResponse",
+    "RunControlActionRequest",
+    "RunControlPayload",
+    "UiLifecycleActionRequest",
+    "UiLifecyclePayload",
+    "LifecycleCommandActionRequest",
+    "LifecycleCommandPayload",
+    "InteractionAnswerRequest",
+    "InteractionAnswerPayload",
+  ]) {
+    assert.ok(schemas[schemaName], `${schemaName} schema is documented`);
+  }
+});
+
 test("production readiness gate fails closed on API router and OpenAPI drift", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-openapi-drift-"));
   const tempOpenApi = path.join(tempDir, "control-plane-api.openapi.json");

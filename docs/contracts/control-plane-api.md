@@ -35,6 +35,11 @@ detached HTTP/SSE surface. `pnpm production:ready` validates that each router
 route has a matching OpenAPI path, method, route id, permission, and route kind.
 This drift check covers the current alpha transport only; it is not a hosted
 SaaS API claim and does not imply full CLI-over-HTTP parity.
+The current schema depth is intentionally local-alpha scoped: project state,
+run summaries, bounded run event history, run-control mutations, lifecycle
+command mutations, UI lifecycle mutations, and interaction answer mutations have
+concrete request/response component schemas, while broad packet/report artifact
+lists continue to reference their owning contract families.
 
 Required top-level fields in the loader baseline:
 - `api_id`, `version`, `binding_mode`, `deferred_transport_status`;
@@ -389,6 +394,13 @@ Detached mutation payload baseline:
 - lifecycle-command response reuses CLI command output fields under `command_output` and adds transport-level `artifact_refs`, `evidence_refs`, `blocked`, and `blocked_reason`;
 - interaction answer payload fields: `run_id`, `interaction_id`, `answer`, `reason`, `approval_ref`, `answer_evidence_ref`;
 - interaction answer response writes and references durable answer audit evidence before reporting whether continuation remains blocked.
+
+The OpenAPI component names that own these local-alpha payloads are
+`ProjectStateResponse`, `RunsResponse`, `RunEventHistoryResponse`,
+`RunControlActionRequest`, `RunControlActionResponse`,
+`UiLifecycleActionRequest`, `UiLifecycleActionResponse`,
+`LifecycleCommandActionRequest`, `LifecycleCommandActionResponse`,
+`InteractionAnswerRequest`, and `InteractionAnswerResponse`.
 
 Detached mutation error-shape baseline:
 - `invalid_json` for malformed request body;
