@@ -107,6 +107,37 @@ function writeRuntimeJson(filePath, document) {
 }
 
 /**
+ * @param {{ projectRoot: string, count: number }} options
+ * @returns {Record<string, unknown>}
+ */
+function seedCliPromotionDecisions(options) {
+  const initResult = invokeCli(["project", "init", "--project-ref", options.projectRoot]);
+  assert.equal(initResult.exitCode, 0, initResult.stderr);
+  const initPayload = JSON.parse(initResult.stdout);
+  const artifactsRoot = /** @type {string} */ (initPayload.runtime_layout.artifactsRoot);
+  const projectId = /** @type {string} */ (initPayload.project_id);
+  const stateFile = /** @type {string} */ (initPayload.state_file);
+  for (let index = 0; index < options.count; index += 1) {
+    writeContractFixture({
+      family: "promotion-decision",
+      filePath: path.join(artifactsRoot, `promotion-decision-cli-scale-${String(index).padStart(3, "0")}.json`),
+      document: {
+        decision_id: `${projectId}.promotion.cli-scale.${index}`,
+        subject_ref: "wrapper://wrapper.runner.default@v3",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [stateFile],
+        evidence_summary: {
+          reason: "seed fixture for bounded CLI read-model smoke test",
+        },
+        status: "pass",
+      },
+    });
+  }
+  return initPayload;
+}
+
+/**
  * @param {{
  *   projectRoot: string,
  *   runId: string,
@@ -3345,6 +3376,27 @@ test("operator commands inspect runs, packets, and evidence through shared contr
       },
     };
     assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("operator evidence inspection bounds large runtime artifact lists", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    seedCliPromotionDecisions({ projectRoot, count: 12 });
+
+    const boundedResult = invokeCli(["evidence", "show", "--project-ref", projectRoot, "--limit", "3"]);
+    assert.equal(boundedResult.exitCode, 0, boundedResult.stderr);
+    const boundedPayload = JSON.parse(boundedResult.stdout);
+    assert.equal(boundedPayload.read_model_limit, 3);
+    assert.equal(boundedPayload.promotion_decisions.length, 3);
+    assert.equal(boundedPayload.quality_artifacts.length, 3);
+
+    const defaultResult = invokeCli(["evidence", "show", "--project-ref", projectRoot]);
+    assert.equal(defaultResult.exitCode, 0, defaultResult.stderr);
+    const defaultPayload = JSON.parse(defaultResult.stdout);
+    assert.equal(defaultPayload.read_model_limit, 200);
+    assert.equal(defaultPayload.promotion_decisions.length, 12);
   });
 });
 

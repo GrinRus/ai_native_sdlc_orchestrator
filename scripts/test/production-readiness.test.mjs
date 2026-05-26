@@ -143,6 +143,39 @@ test("control-plane OpenAPI documents typed local-alpha read and mutation payloa
   }
 });
 
+test("control-plane OpenAPI documents bounded read-model limit parameters", () => {
+  const openApi = JSON.parse(
+    fs.readFileSync(path.join(root, "docs/contracts/control-plane-api.openapi.json"), "utf8"),
+  );
+  assert.equal(openApi.components.parameters.readModelLimit.schema.default, 200);
+  assert.equal(openApi.components.parameters.readModelLimit.schema.maximum, 1000);
+
+  for (const pathName of [
+    "/api/projects/{projectId}/packets",
+    "/api/projects/{projectId}/step-results",
+    "/api/projects/{projectId}/quality-artifacts",
+    "/api/projects/{projectId}/delivery-manifests",
+    "/api/projects/{projectId}/promotion-decisions",
+    "/api/projects/{projectId}/strategic-snapshot",
+    "/api/projects/{projectId}/planner-metrics",
+    "/api/projects/{projectId}/finance-monitoring",
+    "/api/projects/{projectId}/multirepo-coordination",
+    "/api/projects/{projectId}/compiler-revisions",
+    "/api/projects/{projectId}/runs",
+  ]) {
+    const refs = openApi.paths[pathName].get.parameters.map((parameter) => parameter.$ref);
+    assert.ok(refs.includes("#/components/parameters/readModelLimit"), `${pathName} documents readModelLimit`);
+  }
+
+  for (const pathName of [
+    "/api/projects/{projectId}/runs/{runId}/events/history",
+    "/api/projects/{projectId}/runs/{runId}/policy-history",
+  ]) {
+    const refs = openApi.paths[pathName].get.parameters.map((parameter) => parameter.$ref);
+    assert.ok(refs.includes("#/components/parameters/eventHistoryLimit"), `${pathName} documents eventHistoryLimit`);
+  }
+});
+
 test("production readiness gate fails closed on API router and OpenAPI drift", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "aor-openapi-drift-"));
   const tempOpenApi = path.join(tempDir, "control-plane-api.openapi.json");

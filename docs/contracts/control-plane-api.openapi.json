@@ -72,6 +72,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -99,6 +102,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -126,6 +132,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -153,6 +162,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -180,6 +192,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -207,6 +222,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -234,6 +252,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -261,6 +282,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -288,6 +312,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -420,6 +447,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -447,6 +477,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -474,6 +507,9 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
           }
         ],
         "responses": {
@@ -504,6 +540,9 @@
           },
           {
             "$ref": "#/components/parameters/runId"
+          },
+          {
+            "$ref": "#/components/parameters/eventHistoryLimit"
           }
         ],
         "responses": {
@@ -534,6 +573,9 @@
           },
           {
             "$ref": "#/components/parameters/runId"
+          },
+          {
+            "$ref": "#/components/parameters/eventHistoryLimit"
           }
         ],
         "responses": {
@@ -756,6 +798,28 @@
         "schema": {
           "type": "string",
           "minLength": 1
+        }
+      },
+      "readModelLimit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Optional local-alpha read-model window. Detached read routes default to a bounded 200-entry window and cap explicit requests at 1000 entries.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 200
+        }
+      },
+      "eventHistoryLimit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Optional bounded history window. Defaults to the route-specific replay window.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },

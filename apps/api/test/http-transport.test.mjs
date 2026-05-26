@@ -6,8 +6,10 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { withTempRepo as withTempRepoHelper } from "../../../scripts/test/helpers/temp-repo.mjs";
+import { validateContractDocument } from "../../../packages/contracts/src/index.mjs";
 import { materializeCompilerRevisionStatus } from "../../../packages/orchestrator-core/src/compiler-revision.mjs";
 import { materializeMultirepoCoordinationStatus } from "../../../packages/orchestrator-core/src/multirepo-coordination.mjs";
+import { initializeProjectRuntime } from "../../../packages/orchestrator-core/src/project-init.mjs";
 import { applyRunControlAction, appendRunEvent, createControlPlaneHttpServer } from "../src/index.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
@@ -19,6 +21,45 @@ const workspaceRoot = path.resolve(currentDir, "../../..");
  */
 async function withTempRepo(callback) {
   await withTempRepoHelper({ prefix: "aor-w9-s07-api-http-", workspaceRoot }, callback);
+}
+
+/**
+ * @param {{ family: import("../../../packages/contracts/src/index.d.ts").ContractFamily, filePath: string, document: Record<string, unknown> }} options
+ */
+function writeContractFile(options) {
+  const validation = validateContractDocument({
+    family: options.family,
+    document: options.document,
+    source: `runtime://${options.family}`,
+  });
+  assert.equal(validation.ok, true, `${options.family} fixture must pass contract validation`);
+  fs.writeFileSync(options.filePath, `${JSON.stringify(options.document, null, 2)}\n`, "utf8");
+}
+
+/**
+ * @param {{ repoRoot: string, count: number }} options
+ * @returns {ReturnType<typeof initializeProjectRuntime>}
+ */
+function seedPromotionDecisions(options) {
+  const init = initializeProjectRuntime({ projectRef: options.repoRoot, cwd: options.repoRoot });
+  for (let index = 0; index < options.count; index += 1) {
+    writeContractFile({
+      family: "promotion-decision",
+      filePath: path.join(init.runtimeLayout.artifactsRoot, `promotion-decision-scale-${String(index).padStart(3, "0")}.json`),
+      document: {
+        decision_id: `${init.projectId}.promotion.scale.${index}`,
+        subject_ref: "wrapper://wrapper.runner.default@v3",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [init.stateFile],
+        evidence_summary: {
+          reason: "seed fixture for bounded read-model smoke test",
+        },
+        status: "pass",
+      },
+    });
+  }
+  return init;
 }
 
 test("detached control-plane source checkout smoke command verifies local API transport", async () => {
@@ -392,6 +433,43 @@ test("detached control-plane transport serves read baseline endpoints", async ()
       );
       assert.equal(nextActionResponse.status, 200);
       assert.equal(await nextActionResponse.json(), null);
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("detached control-plane read routes bound large runtime artifact windows", async () => {
+  await withTempRepo(async (repoRoot) => {
+    seedPromotionDecisions({ repoRoot, count: 225 });
+
+    const transport = await createControlPlaneHttpServer({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      host: "127.0.0.1",
+      port: 0,
+    });
+
+    try {
+      const defaultResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/promotion-decisions`);
+      assert.equal(defaultResponse.status, 200);
+      const defaultDecisions = await defaultResponse.json();
+      assert.equal(defaultDecisions.length <= 200, true);
+      assert.equal(defaultDecisions.length > 0, true);
+
+      const explicitLimitResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/promotion-decisions?limit=5`,
+      );
+      assert.equal(explicitLimitResponse.status, 200);
+      const explicitLimitDecisions = await explicitLimitResponse.json();
+      assert.equal(explicitLimitDecisions.length, 5);
+
+      const cappedLimitResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/promotion-decisions?limit=5000`,
+      );
+      assert.equal(cappedLimitResponse.status, 200);
+      const cappedLimitDecisions = await cappedLimitResponse.json();
+      assert.equal(cappedLimitDecisions.length, 225);
     } finally {
       await transport.close();
     }

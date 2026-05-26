@@ -567,6 +567,7 @@ export function formatCommandHelp(definition) {
             ? [
                 "- This command is read-only and resolves packet artifacts through the API read surface.",
                 "- --family filters contract families (artifact-packet, wave-ticket, handoff-packet, delivery-plan, delivery-manifest, release-packet).",
+                "- --limit bounds the artifact window for large local runtime roots.",
                 "- Use deliver/release prepare to materialize policy-bounded delivery and release artifacts.",
               ]
             : definition.command === "deliver prepare"
@@ -602,6 +603,7 @@ export function formatCommandHelp(definition) {
               ? [
                   "- This command is read-only and aggregates step, quality, and delivery evidence.",
                   "- --run-id scopes results to one run when contracts include run_id.",
+                  "- --limit bounds each evidence list for large local runtime roots; default is 200.",
                   "- Use incident open/show and audit runs for incident and run-centric audit actions.",
                 ]
               : definition.command === "incident open"

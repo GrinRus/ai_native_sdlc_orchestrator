@@ -462,6 +462,7 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["replay_events", "replayEvents"],
   ["packet_artifacts", "packetArtifacts"],
   ["selected_family", "selectedFamily"],
+  ["read_model_limit", "readModelLimit"],
   ["step_results", "stepResults"],
   ["quality_artifacts", "qualityArtifacts"],
   ["delivery_manifests", "deliveryManifests"],

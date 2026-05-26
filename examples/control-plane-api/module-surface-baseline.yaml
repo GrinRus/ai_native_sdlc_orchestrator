@@ -8,6 +8,10 @@ openapi_contract:
   path: docs/contracts/control-plane-api.openapi.json
   drift_check: pnpm production:ready
   scope: current detached HTTP/SSE alpha route surface only
+  read_model_limits:
+    default_limit: 200
+    max_limit: 1000
+    query_parameter: limit
   typed_payload_schemas:
     - ProjectStateResponse
     - RunsResponse

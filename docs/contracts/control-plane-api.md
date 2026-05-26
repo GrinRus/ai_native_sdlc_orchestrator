@@ -384,6 +384,12 @@ Connected-mode transport mapping is implemented for read, follow, and bounded mu
 - `POST /api/projects/:projectId/lifecycle-command/actions`
 - `POST /api/projects/:projectId/interactions/answers`
 
+Detached read-model scale baseline:
+- list/read-model routes that can fan out over `.aor` artifacts accept optional `?limit=<n>`;
+- detached HTTP list routes default to a bounded 200-entry local-alpha window and cap explicit `limit` requests at 1000 entries;
+- run event and policy history routes keep route-specific bounded replay windows and also accept `limit`;
+- the alpha filesystem runtime root remains the system of record; no database or storage migration is implied.
+
 Detached mutation payload baseline:
 - run-control payload fields: `action`, `run_id`, `target_step`, `reason`, `approval_ref`;
 - run-control response reuses module parity fields: `state_file`, `audit_file`, guardrail decision, transition, live event ids;
