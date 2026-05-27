@@ -100,7 +100,7 @@ Close the connected web full-flow and topology proof gaps while preserving the h
 2. Add an interaction panel that surfaces runner questions and submits operator answers through the W18-S02 API path.
 3. Keep live events, runner logs, policy history, step results, and artifact links visible during the flow.
 4. Add disconnected/headless-safe fallbacks that preserve read-only inspection when mutation transport is unavailable.
-5. Add web smoke tests and fixtures for full-flow progress, question answer, blocked state, and detach behavior.
+5. Add app smoke tests and fixtures for full-flow progress, question answer, blocked state, and detach behavior.
 
 ### Acceptance criteria
 1. The web console can drive the lifecycle through control-plane calls rather than local UI orchestration.

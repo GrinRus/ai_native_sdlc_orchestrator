@@ -773,8 +773,7 @@ export function createLiveE2eStepController(options) {
     const frontendInteractionRefs =
       step === "learning"
         ? uniqueStrings([
-            asNonEmptyString(input.artifacts.guided_web_smoke_summary_file),
-            asNonEmptyString(input.artifacts.guided_web_smoke_html_file),
+            asNonEmptyString(input.artifacts.guided_app_smoke_summary_file),
           ])
         : [];
     const entry = {

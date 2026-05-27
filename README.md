@@ -266,13 +266,16 @@ the web console.
 
 The npm alpha also includes a packaged local SPA for installed users:
 
-- `aor app` launches the optional local web console for a target project.
+- `aor app` launches the optional local web console for a target project. It is
+  the product operator-console path in the local alpha.
 - `apps/web` contains the React/Vite operator console source and packaged
   `dist` assets.
 - `apps/api` remains a thin API export surface; shared HTTP/SSE transport lives
   in `packages/orchestrator-core`.
 - `pnpm aor app --help` describes the local app launcher and smoke flags.
 - API contracts are documented under `docs/contracts/control-plane-api.md`.
+- There is no supported generated static HTML console; release and CI smoke use
+  the real `aor app --smoke --open false --json` path.
 
 Use these surfaces as implemented local baselines, not as a hosted product
 claim.
@@ -304,7 +307,7 @@ self-hosted CLI/API mode documented in this repository. Internal evaluation and
 proof fixtures exist for maintainers, but they are not a public onboarding path
 and are intentionally not part of the README workflow.
 
-The current roadmap source of truth extends through W32 in
+The current roadmap source of truth extends through W33 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -416,7 +419,7 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current alpha distribution is tracked through `W32` and focuses on:
+The current alpha distribution is tracked through `W33` and focuses on:
 
 - Safer operator onboarding.
 - Stronger runner-adapter coverage.
@@ -429,6 +432,8 @@ The current alpha distribution is tracked through `W32` and focuses on:
 - Installed-user local app launch with a guided Mission intake UI.
 - Runtime-owned operator requests for bounded analysis, document proposals,
   patch evidence, and next-action refresh from CLI, API, or web.
+- Console source-of-truth alignment around `aor app` and app-smoke proof,
+  without a generated static HTML console.
 
 ## Contributing
 

@@ -630,17 +630,16 @@ function resolveInteractiveFinalStepVerdict(requestedInteraction, deterministicF
  * @returns {Array<Record<string, unknown>>}
  */
 function buildFrontendInteractions(artifacts) {
-  const summaryFile = asNonEmptyString(artifacts.guided_web_smoke_summary_file);
-  const htmlFile = asNonEmptyString(artifacts.guided_web_smoke_html_file);
-  if (!summaryFile && !htmlFile) return [];
+  const summaryFile = asNonEmptyString(artifacts.guided_app_smoke_summary_file);
+  if (!summaryFile) return [];
   return [
     {
       step_id: "learning",
-      interaction_id: "guided-web-smoke",
+      interaction_id: "guided-app-smoke",
       surface: "web",
-      evidence_refs: uniqueStrings([summaryFile, htmlFile]),
+      evidence_refs: uniqueStrings([summaryFile]),
       status: "pass",
-      summary: "Guided frontend smoke interaction completed through the installed-user web surface.",
+      summary: "Guided app smoke completed through the installed-user web surface.",
     },
   ];
 }

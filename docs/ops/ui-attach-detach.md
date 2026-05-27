@@ -33,13 +33,42 @@ Expected smoke outcome:
 - `config_project_id` and `state_project_id` match `project_id`;
 - only `.aor/` runtime state changes in the target repository.
 
+Local-alpha source checkouts use the detached API at `http://127.0.0.1:8080`
+in CLI guidance and this runbook. This is a local operator control-plane path,
+not a hosted service or production deployment claim.
+
+## Local detached API smoke
+Verify the local detached API transport from a source checkout:
+```bash
+node apps/api/scripts/control-plane-smoke.mjs \
+  --project-ref <AOR_WORKSPACE> \
+  --runtime-root <AOR_WORKSPACE>/.aor \
+  --host 127.0.0.1 \
+  --port 8080
+```
+
+Keep the local control-plane process running for attach and console checks:
+```bash
+node apps/api/scripts/control-plane-smoke.mjs \
+  --project-ref <AOR_WORKSPACE> \
+  --runtime-root <AOR_WORKSPACE>/.aor \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --serve true
+```
+
+Expected smoke outcome:
+- status is `ready`;
+- `base_url` is `http://127.0.0.1:8080`;
+- `state_url` points to `/api/projects/<PROJECT_ID>/state`.
+
 ## Attach
 Connected attach:
 ```bash
 aor ui attach \
   --project-ref <AOR_WORKSPACE> \
   --run-id <RUN_ID> \
-  --control-plane http://localhost:8080
+  --control-plane http://127.0.0.1:8080
 ```
 
 Note: when a reachable `--control-plane` URL is provided, connected mode uses detached transport for:
@@ -79,19 +108,21 @@ After detach, verify headless paths still work:
 aor run status --project-ref <AOR_WORKSPACE> --run-id <RUN_ID> --follow true
 ```
 
-For source-checkout detachable web smoke path:
+The supported web readiness smoke is the real local app:
 ```bash
-node apps/web/scripts/operator-console-smoke.mjs \
+aor app \
   --project-ref <AOR_WORKSPACE> \
-  --run-id <RUN_ID> \
-  --follow true \
-  --output-html .aor/web/operator-console-<RUN_ID>.html
+  --runtime-root <AOR_WORKSPACE>/.aor \
+  --smoke true \
+  --open false \
+  --json
 ```
 
 Expected smoke outcome:
-- JSON summary reports `mode=detachable-web-console` and `detached=true`;
-- rendered HTML exists under `.aor/web/`;
-- run/evidence read surfaces stay available with UI detached.
+- JSON summary reports `mode="local-spa"` and `status="smoke-pass"`;
+- `html_loaded=true`;
+- `config_project_id` and `state_project_id` match `project_id`;
+- CLI/API/headless surfaces remain available when the app process exits.
 
 ## Detached mutation smoke (optional)
 Run-control mutation over detached transport:
@@ -156,24 +187,20 @@ Mutation error-shape checks:
 - accepted interaction answers with resumable checkpoints return HTTP `200` and `interaction_answer.interaction_status="resumed"`; non-resumable boundaries return HTTP `409` with `error.code: "interaction.continuation_blocked"` plus `interaction_answer.answer_audit_ref`.
 
 ## Full-flow console checks
-The detachable operator console must drive connected lifecycle actions through the control plane. Smoke the web module paths with:
+The local app console must drive lifecycle actions through same-origin control-plane routes. Smoke the installed-user app path with:
 ```bash
-node apps/web/scripts/operator-console-smoke.mjs \
+aor app \
   --project-ref <AOR_WORKSPACE> \
-  --run-id <RUN_ID> \
-  --control-plane http://127.0.0.1:8080 \
-  --output-html .aor/web/operator-console-<RUN_ID>.html
+  --runtime-root <AOR_WORKSPACE>/.aor \
+  --smoke true \
+  --open false \
+  --json
 ```
 
 Expected full-flow console evidence:
-- rendered HTML includes guided lifecycle, lifecycle command, and runner interaction sections;
-- `guided_lifecycle.stages` covers readiness, mission, discovery/spec/plan, execution, review/QA, delivery/release, and learning;
-- `guided_lifecycle` shows each stage status, evidence count/refs, blocker codes, policy-history count, event-history count, and the exact current next action from `next-action-report`;
-- final stages include `closure_state` and `safety_gates`: review decision, delivery gate status, downstream block flag, delivery blocked reasons, release-packet status, learning status, and the same evidence chain returned by CLI/API;
-- connected stage mutations use `POST /api/projects/:projectId/lifecycle-command/actions`; `mission create` creates guided intake evidence and `next` refreshes the durable next-action report;
+- app smoke loads the packaged SPA, `/app-config.json`, and `GET /api/projects/:projectId/state`;
+- connected stage mutations use `POST /api/projects/:projectId/lifecycle-command/actions`; the SPA Mission form creates guided intake evidence and `next` refreshes the durable next-action report;
 - Ask AOR/request-change actions use `POST /api/projects/:projectId/operator-requests` and `POST /api/projects/:projectId/operator-requests/:requestId/actions`;
-- `contract_alignment.mutation_model` includes `POST /api/projects/:projectId/lifecycle-command/actions`, `POST /api/projects/:projectId/operator-requests`, `POST /api/projects/:projectId/operator-requests/:requestId/actions`, and `POST /api/projects/:projectId/interactions/answers`;
-- `contract_alignment.read_model` includes `GET /api/projects/:projectId/next-action-report` and `GET /api/projects/:projectId/operator-requests`;
 - Evidence & Documents lets operators copy refs and attach refs as operator-request targets without opening raw mutable files;
 - pending runner questions are derived from `step-result.requested_interaction`;
 - submitted answers return `interaction_answer.answer_audit_ref` and live/event-history payloads reference that audit ref without raw answer text;
@@ -188,10 +215,9 @@ Closure branch checks:
 - completed learning handoff changes the primary action to evidence inspection rather than another mutation.
 
 Read-only checks:
-- open a snapshot with read-only mode when mutation transport is unavailable or intentionally disabled;
-- verify `guided_lifecycle.state=read_only`;
-- stage evidence, blockers, policy history, live/event history, and next-action report refs remain visible;
-- mutation descriptors report `available=false` without removing the exact CLI command the operator can run headlessly.
+- use CLI/API reads when mutation transport is unavailable or intentionally disabled;
+- stage evidence, blockers, policy history, live/event history, and next-action report refs remain visible through headless commands;
+- the local app must not become the only way to discover the exact CLI command an operator can run headlessly.
 
 ## Auth-enabled detached mode
 If detached transport auth is enabled, pass bearer token on every read/follow/mutation request:

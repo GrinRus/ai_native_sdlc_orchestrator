@@ -1,0 +1,10 @@
+{
+  "command": "aor app --smoke true --open false --json",
+  "mode": "local-spa",
+  "status": "smoke-pass",
+  "html_loaded": true,
+  "project_id": "local-target",
+  "config_project_id": "local-target",
+  "state_project_id": "local-target",
+  "summary_file": ".aor/projects/aor-core/reports/installed-user-guided-app-smoke-w21-s07.json"
+}

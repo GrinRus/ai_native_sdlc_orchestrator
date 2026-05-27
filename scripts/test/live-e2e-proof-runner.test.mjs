@@ -1562,7 +1562,7 @@ function writeLocalFullJourneyProfile(options) {
         flow_range_policy: options.guidedJourney || options.scenarioFamily === "release" ? "full_lifecycle" : "delivery_default",
         installation_policy: "source-install-required",
         interaction_capability: "public-control-plane",
-        frontend_capability: options.guidedJourney ? "guided-web-smoke" : "none",
+        frontend_capability: options.guidedJourney ? "guided-app-smoke" : "none",
         safety_policy: "no-upstream-write",
         operator_mode: "deterministic-fixture",
         agent_decision_policy: "optional",
@@ -1721,9 +1721,11 @@ function runProofRunner(options) {
  */
 function spawnProofRunnerProcess(args, options = {}) {
   const timeoutMs = options.timeoutMs ?? defaultProofRunnerTimeoutMs;
+  writeProofRunnerTestContext(args, timeoutMs, { state: "active" });
   const run = spawnSync(process.execPath, args, {
     cwd: workspaceRoot,
     encoding: "utf8",
+    killSignal: "SIGKILL",
     timeout: timeoutMs,
     env: {
       ...process.env,
@@ -1731,7 +1733,64 @@ function spawnProofRunnerProcess(args, options = {}) {
     },
   });
   run.proof_runner_timeout_ms = timeoutMs;
+  writeProofRunnerTestContext(args, timeoutMs, {
+    state: "completed",
+    status: run.status,
+    signal: run.signal,
+    timedOut: run.error?.code === "ETIMEDOUT" || run.signal === "SIGTERM" || run.signal === "SIGKILL",
+  });
   return run;
+}
+
+/**
+ * @param {string[]} args
+ * @param {string} flag
+ * @returns {string | null}
+ */
+function readFlagValue(args, flag) {
+  const index = args.indexOf(flag);
+  return index >= 0 && index + 1 < args.length ? args[index + 1] : null;
+}
+
+/**
+ * @param {string} filePath
+ * @returns {string}
+ */
+function relativeWorkspacePath(filePath) {
+  return path.relative(workspaceRoot, filePath).split(path.sep).join(path.posix.sep);
+}
+
+/**
+ * @param {string[]} args
+ * @param {number} timeoutMs
+ * @param {{
+ *   state: "active" | "completed",
+ *   status?: number | null,
+ *   signal?: NodeJS.Signals | null,
+ *   timedOut?: boolean,
+ * }} state
+ */
+function writeProofRunnerTestContext(args, timeoutMs, state) {
+  const contextFile = process.env.AOR_PROOF_RUNNER_TEST_CONTEXT_FILE;
+  if (!contextFile) return;
+
+  const payload = {
+    state: state.state,
+    test_file: relativeWorkspacePath(currentFilePath),
+    runner_script: args[0] ? relativeWorkspacePath(args[0]) : null,
+    profile: readFlagValue(args, "--profile"),
+    run_id: readFlagValue(args, "--run-id"),
+    project_ref: readFlagValue(args, "--project-ref"),
+    runtime_root: readFlagValue(args, "--runtime-root"),
+    timeout_ms: timeoutMs,
+    status: state.status ?? null,
+    signal: state.signal ?? null,
+    timed_out: state.timedOut ?? false,
+    updated_at: new Date().toISOString(),
+  };
+
+  fs.mkdirSync(path.dirname(contextFile), { recursive: true });
+  fs.writeFileSync(contextFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
 /**
@@ -1751,7 +1810,7 @@ function formatProofRunnerFailure(run, timeoutMs) {
   const stderr = typeof run.stderr === "string" ? run.stderr.trim() : "";
   const stdout = typeof run.stdout === "string" ? run.stdout.trim() : "";
   const error = run.error instanceof Error ? run.error : null;
-  const timedOut = error?.code === "ETIMEDOUT" || run.signal === "SIGTERM";
+  const timedOut = error?.code === "ETIMEDOUT" || run.signal === "SIGTERM" || run.signal === "SIGKILL";
   return [
     timedOut ? `proof runner timed out after ${timeoutMs}ms` : "proof runner failed",
     `status=${String(run.status)}`,
@@ -1786,6 +1845,8 @@ test("installed-user proof runner subprocesses have a bounded timeout diagnostic
     const targetRepo = createLocalTargetRepository({ hostTempRoot: tempRoot });
     const examplesRoot = createExamplesRoot({ tempRoot });
     configureCodexExternalRuntimeSuccess({ examplesRoot });
+    const contextFile = path.join(tempRoot, "proof-runner-context.json");
+    const previousContextFile = process.env.AOR_PROOF_RUNNER_TEST_CONTEXT_FILE;
     const profilePath = path.join(tempRoot, "regress-short.timeout.yaml");
     writeLocalProofRunnerProfile({
       templateProfilePath: path.join(workspaceRoot, "scripts/live-e2e/profiles/regress-short.yaml"),
@@ -1794,17 +1855,34 @@ test("installed-user proof runner subprocesses have a bounded timeout diagnostic
       targetRef: targetRepo.targetRef,
     });
 
-    assert.throws(
-      () =>
-        runProofRunner({
-          runtimeRoot: path.join(tempRoot, "runtime"),
-          examplesRoot,
-          profilePath,
-          runId: "installed-user-timeout",
-          timeoutMs: 1,
-        }),
-      /proof runner timed out after 1ms/u,
-    );
+    try {
+      process.env.AOR_PROOF_RUNNER_TEST_CONTEXT_FILE = contextFile;
+      assert.throws(
+        () =>
+          runProofRunner({
+            runtimeRoot: path.join(tempRoot, "runtime"),
+            examplesRoot,
+            profilePath,
+            runId: "installed-user-timeout",
+            timeoutMs: 1,
+          }),
+        /proof runner timed out after 1ms/u,
+      );
+    } finally {
+      if (previousContextFile === undefined) {
+        delete process.env.AOR_PROOF_RUNNER_TEST_CONTEXT_FILE;
+      } else {
+        process.env.AOR_PROOF_RUNNER_TEST_CONTEXT_FILE = previousContextFile;
+      }
+    }
+
+    const context = JSON.parse(fs.readFileSync(contextFile, "utf8"));
+    assert.equal(context.state, "completed");
+    assert.equal(context.test_file, "scripts/test/live-e2e-proof-runner.test.mjs");
+    assert.equal(context.profile, profilePath);
+    assert.equal(context.run_id, "installed-user-timeout");
+    assert.equal(context.timeout_ms, 1);
+    assert.equal(context.timed_out, true);
   });
 });
 
@@ -2397,7 +2475,7 @@ test("installed-user guided journey proof captures CLI, web, closure, and no-wri
       },
       guidedJourney: {
         enabled: true,
-        web_smoke: {
+        app_smoke: {
           enabled: true,
         },
       },
@@ -2447,10 +2525,11 @@ test("installed-user guided journey proof captures CLI, web, closure, and no-wri
     for (const artifactFile of Object.values(guidedProof.durable_artifact_files)) {
       assert.equal(fs.existsSync(artifactFile), true, String(artifactFile));
     }
-    assert.equal(fs.existsSync(summary.artifacts.guided_web_smoke_summary_file), true);
-    assert.equal(fs.existsSync(summary.artifacts.guided_web_smoke_html_file), true);
-    assert.equal(guidedProof.web_smoke.detached, true);
-    assert.equal(typeof guidedProof.web_smoke.guided_lifecycle_state, "string");
+    assert.equal(fs.existsSync(summary.artifacts.guided_app_smoke_summary_file), true);
+    assert.equal(guidedProof.app_smoke.mode, "local-spa");
+    assert.equal(guidedProof.app_smoke.status, "smoke-pass");
+    assert.equal(guidedProof.app_smoke.html_loaded, true);
+    assert.equal(guidedProof.app_smoke.config_project_id, guidedProof.app_smoke.state_project_id);
     assert.equal(guidedProof.no_write_assertions.output_policy_write_back_to_remote, true);
     assert.equal(guidedProof.no_write_assertions.target_head_unchanged, true);
     assert.equal(guidedProof.no_write_assertions.runtime_state_under_aor, true);
@@ -2465,11 +2544,11 @@ test("installed-user guided journey proof captures CLI, web, closure, and no-wri
     assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor release prepare"), true);
 
     const narrativeOnly = structuredClone(guidedProof);
-    narrativeOnly.durable_artifact_files.web_smoke_html_file = "";
+    narrativeOnly.app_smoke.status = "failed";
     const issues = validateGuidedJourneyProof(narrativeOnly, {
       targetCheckoutRoot: summary.target_checkout_root,
     });
-    assert.ok(issues.some((issue) => issue.includes("web_smoke_html_file")));
+    assert.ok(issues.some((issue) => issue.includes("app smoke did not pass")));
   });
 });
 

@@ -136,11 +136,13 @@ export function handleOperationsCommand(context) {
     const familyFiltered = family === "all" ? packets : packets.filter((packet) => packet.family === family);
     outputState.packetArtifacts = typeof limit === "number" ? familyFiltered.slice(0, limit) : familyFiltered;
     outputState.selectedFamily = family;
+    outputState.readModelLimit = limit ?? null;
     outputState.readOnly = true;
     outputState.futureControlHooks = ["deliver prepare", "release prepare"];
   } else if (command === "evidence show") {
     ensureRequiredFlags(command, flags);
     const runId = resolveOptionalStringFlag("run-id", flags["run-id"]);
+    const limit = resolveOptionalIntegerFlag("limit", flags.limit, { min: 1 }) ?? 200;
 
     const projectState = readProjectState({
       cwd,
@@ -158,6 +160,7 @@ export function handleOperationsCommand(context) {
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        limit,
       }),
       runId,
     );
@@ -166,6 +169,7 @@ export function handleOperationsCommand(context) {
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        limit,
       }),
       runId,
     );
@@ -174,6 +178,7 @@ export function handleOperationsCommand(context) {
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        limit,
       }),
       runId,
     );
@@ -182,9 +187,11 @@ export function handleOperationsCommand(context) {
         cwd,
         projectRef: /** @type {string} */ (flags["project-ref"]),
         runtimeRoot: resolveOptionalStringFlag("runtime-root", flags["runtime-root"]),
+        limit,
       }),
       runId,
     );
+    outputState.readModelLimit = limit;
     outputState.readOnly = true;
     outputState.futureControlHooks = ["incident open", "incident show", "audit runs"];
   } else if (command === "incident open") {

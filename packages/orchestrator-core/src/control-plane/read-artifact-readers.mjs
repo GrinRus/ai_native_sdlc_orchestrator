@@ -28,6 +28,32 @@ const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/;
 const OPERATOR_REQUEST_REGEX = /^operator-request-.*\.json$/;
 
 /**
+ * @param {unknown} value
+ * @returns {number | undefined}
+ */
+function asNonNegativeInteger(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return undefined;
+  }
+  return Math.floor(parsed);
+}
+
+/**
+ * @template T
+ * @param {T[]} entries
+ * @param {unknown} limit
+ * @returns {T[]}
+ */
+export function applyReadModelLimit(entries, limit) {
+  const normalizedLimit = asNonNegativeInteger(limit);
+  if (typeof normalizedLimit !== "number") {
+    return entries;
+  }
+  return normalizedLimit === 0 ? [] : entries.slice(0, normalizedLimit);
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -46,14 +72,15 @@ export function toEvidenceRef(init, filePath) {
 
 /**
  * @param {string} dirPath
+ * @param {{ limit?: number }} [options]
  * @returns {string[]}
  */
-export function listJsonFiles(dirPath) {
+export function listJsonFiles(dirPath, options = {}) {
   if (!fs.existsSync(dirPath)) {
     return [];
   }
 
-  return fs
+  const files = fs
     .readdirSync(dirPath)
     .filter((entry) => entry.endsWith(".json"))
     .map((entry) => path.join(dirPath, entry))
@@ -66,6 +93,22 @@ export function listJsonFiles(dirPath) {
       }
       return path.basename(right).localeCompare(path.basename(left));
     });
+
+  return applyReadModelLimit(files, options.limit);
+}
+
+/**
+ * @param {string} dirPath
+ * @param {RegExp[]} matchers
+ * @param {unknown} limit
+ * @returns {string[]}
+ */
+function listMatchingJsonFiles(dirPath, matchers, limit) {
+  const files = listJsonFiles(dirPath).filter((filePath) => {
+    const basename = path.basename(filePath);
+    return matchers.some((matcher) => matcher.test(basename));
+  });
+  return applyReadModelLimit(files, limit);
 }
 
 /**
@@ -170,16 +213,27 @@ export function readProjectState(options = {}) {
  */
 export function listPacketArtifacts(options = {}) {
   const init = initializeProjectRuntime(options);
-  const files = listJsonFiles(init.runtimeLayout.artifactsRoot);
+  const files = listMatchingJsonFiles(
+    init.runtimeLayout.artifactsRoot,
+    [
+      ARTIFACT_PACKET_REGEX,
+      WAVE_TICKET_REGEX,
+      HANDOFF_PACKET_REGEX,
+      DELIVERY_PLAN_REGEX,
+      DELIVERY_MANIFEST_REGEX,
+      RELEASE_PACKET_REGEX,
+    ],
+    options.limit,
+  );
 
-  return [
+  return applyReadModelLimit([
     ...loadContractDocuments({ init, files, family: "artifact-packet", matcher: ARTIFACT_PACKET_REGEX }),
     ...loadContractDocuments({ init, files, family: "wave-ticket", matcher: WAVE_TICKET_REGEX }),
     ...loadContractDocuments({ init, files, family: "handoff-packet", matcher: HANDOFF_PACKET_REGEX }),
     ...loadContractDocuments({ init, files, family: "delivery-plan", matcher: DELIVERY_PLAN_REGEX }),
     ...loadContractDocuments({ init, files, family: "delivery-manifest", matcher: DELIVERY_MANIFEST_REGEX }),
     ...loadContractDocuments({ init, files, family: "release-packet", matcher: RELEASE_PACKET_REGEX }),
-  ];
+  ], options.limit);
 }
 
 /**
@@ -192,8 +246,11 @@ export function listPacketArtifacts(options = {}) {
  */
 export function listStepResults(options = {}) {
   const init = initializeProjectRuntime(options);
-  const files = listJsonFiles(init.runtimeLayout.reportsRoot);
-  return loadContractDocuments({ init, files, family: "step-result", matcher: STEP_RESULT_REGEX });
+  const files = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [STEP_RESULT_REGEX], options.limit);
+  return applyReadModelLimit(
+    loadContractDocuments({ init, files, family: "step-result", matcher: STEP_RESULT_REGEX }),
+    options.limit,
+  );
 }
 
 /**
@@ -218,8 +275,11 @@ export function listDeliveryManifests(options = {}) {
  */
 export function listPromotionDecisions(options = {}) {
   const init = initializeProjectRuntime(options);
-  const files = listJsonFiles(init.runtimeLayout.artifactsRoot);
-  return loadContractDocuments({ init, files, family: "promotion-decision", matcher: PROMOTION_DECISION_REGEX });
+  const files = listMatchingJsonFiles(init.runtimeLayout.artifactsRoot, [PROMOTION_DECISION_REGEX], options.limit);
+  return applyReadModelLimit(
+    loadContractDocuments({ init, files, family: "promotion-decision", matcher: PROMOTION_DECISION_REGEX }),
+    options.limit,
+  );
 }
 
 /**
@@ -232,9 +292,25 @@ export function listPromotionDecisions(options = {}) {
  */
 export function listQualityArtifacts(options = {}) {
   const init = initializeProjectRuntime(options);
-  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  const reportFiles = listMatchingJsonFiles(
+    init.runtimeLayout.reportsRoot,
+    [
+      VALIDATION_REPORT_REGEX,
+      EVALUATION_REPORT_REGEX,
+      REVIEW_REPORT_REGEX,
+      REVIEW_DECISION_REGEX,
+      RUNTIME_HARNESS_REPORT_REGEX,
+      MULTIREPO_COORDINATION_STATUS_REGEX,
+      COMPILER_REVISION_STATUS_REGEX,
+      INCIDENT_REPORT_REGEX,
+      INCIDENT_BACKFILL_PROPOSAL_REGEX,
+      LEARNING_LOOP_SCORECARD_REGEX,
+      LEARNING_LOOP_HANDOFF_REGEX,
+    ],
+    options.limit,
+  );
 
-  return [
+  return applyReadModelLimit([
     ...loadContractDocuments({ init, files: reportFiles, family: "validation-report", matcher: VALIDATION_REPORT_REGEX }),
     ...loadContractDocuments({ init, files: reportFiles, family: "evaluation-report", matcher: EVALUATION_REPORT_REGEX }),
     ...loadContractDocuments({ init, files: reportFiles, family: "review-report", matcher: REVIEW_REPORT_REGEX }),
@@ -277,7 +353,7 @@ export function listQualityArtifacts(options = {}) {
       matcher: LEARNING_LOOP_HANDOFF_REGEX,
     }),
     ...listPromotionDecisions(options),
-  ];
+  ], options.limit);
 }
 
 /**
@@ -290,13 +366,16 @@ export function listQualityArtifacts(options = {}) {
  */
 export function listMultirepoCoordinationStatuses(options = {}) {
   const init = initializeProjectRuntime(options);
-  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
-  return loadContractDocuments({
-    init,
-    files: reportFiles,
-    family: "multirepo-coordination-status",
-    matcher: MULTIREPO_COORDINATION_STATUS_REGEX,
-  });
+  const reportFiles = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [MULTIREPO_COORDINATION_STATUS_REGEX], options.limit);
+  return applyReadModelLimit(
+    loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "multirepo-coordination-status",
+      matcher: MULTIREPO_COORDINATION_STATUS_REGEX,
+    }),
+    options.limit,
+  );
 }
 
 /**
@@ -309,13 +388,16 @@ export function listMultirepoCoordinationStatuses(options = {}) {
  */
 export function listCompilerRevisionStatuses(options = {}) {
   const init = initializeProjectRuntime(options);
-  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
-  return loadContractDocuments({
-    init,
-    files: reportFiles,
-    family: "compiler-revision-status",
-    matcher: COMPILER_REVISION_STATUS_REGEX,
-  });
+  const reportFiles = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [COMPILER_REVISION_STATUS_REGEX], options.limit);
+  return applyReadModelLimit(
+    loadContractDocuments({
+      init,
+      files: reportFiles,
+      family: "compiler-revision-status",
+      matcher: COMPILER_REVISION_STATUS_REGEX,
+    }),
+    options.limit,
+  );
 }
 
 /**
@@ -328,8 +410,8 @@ export function listCompilerRevisionStatuses(options = {}) {
  */
 export function listRunControlAudits(options = {}) {
   const init = initializeProjectRuntime(options);
-  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
-  return loadJsonDocuments({ init, files: reportFiles, matcher: RUN_CONTROL_AUDIT_REGEX });
+  const reportFiles = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [RUN_CONTROL_AUDIT_REGEX], options.limit);
+  return applyReadModelLimit(loadJsonDocuments({ init, files: reportFiles, matcher: RUN_CONTROL_AUDIT_REGEX }), options.limit);
 }
 
 /**
@@ -380,7 +462,7 @@ export function listOperatorRequests(options = {}) {
  */
 export function readNextActionReport(options = {}) {
   const init = initializeProjectRuntime(options);
-  const reportFiles = listJsonFiles(init.runtimeLayout.reportsRoot);
+  const reportFiles = listMatchingJsonFiles(init.runtimeLayout.reportsRoot, [NEXT_ACTION_REPORT_REGEX], options.limit);
   return (
     loadContractDocuments({
       init,

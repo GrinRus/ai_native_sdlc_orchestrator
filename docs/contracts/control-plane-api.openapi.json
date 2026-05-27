@@ -36,150 +36,297 @@
     "/api/projects/{projectId}/state": {
       "get": {
         "operationId": "getProjectState",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "project-state",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/ProjectState"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/packets": {
       "get": {
         "operationId": "listPackets",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "packets",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/step-results": {
       "get": {
         "operationId": "listStepResults",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "step-results",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/quality-artifacts": {
       "get": {
         "operationId": "listQualityArtifacts",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "quality-artifacts",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/delivery-manifests": {
       "get": {
         "operationId": "listDeliveryManifests",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "delivery-manifests",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/promotion-decisions": {
       "get": {
         "operationId": "listPromotionDecisions",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "promotion-decisions",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/strategic-snapshot": {
       "get": {
         "operationId": "getStrategicSnapshot",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "strategic-snapshot",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/planner-metrics": {
       "get": {
         "operationId": "getPlannerMetrics",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "planner-metrics",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/finance-monitoring": {
       "get": {
         "operationId": "getFinanceMonitoring",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "finance-monitoring",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/next-action-report": {
       "get": {
         "operationId": "getNextActionReport",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "next-action-report",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
@@ -291,94 +438,175 @@
     "/api/projects/{projectId}/multirepo-coordination": {
       "get": {
         "operationId": "getMultirepoCoordination",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "multirepo-coordination",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/compiler-revisions": {
       "get": {
         "operationId": "listCompilerRevisions",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "compiler-revisions",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/runs": {
       "get": {
         "operationId": "listRuns",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "runs",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/Runs"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/runs/{runId}/events/history": {
       "get": {
         "operationId": "getRunEventHistory",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "event-history",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
         "parameters": [
-          { "$ref": "#/components/parameters/projectId" },
-          { "$ref": "#/components/parameters/runId" }
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/runId"
+          },
+          {
+            "$ref": "#/components/parameters/eventHistoryLimit"
+          }
         ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/RunEventHistory"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/runs/{runId}/policy-history": {
       "get": {
         "operationId": "getRunPolicyHistory",
-        "tags": ["read"],
+        "tags": [
+          "read"
+        ],
         "x-aor-route-id": "policy-history",
         "x-aor-permission": "read",
         "x-aor-kind": "read",
         "parameters": [
-          { "$ref": "#/components/parameters/projectId" },
-          { "$ref": "#/components/parameters/runId" }
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/runId"
+          },
+          {
+            "$ref": "#/components/parameters/eventHistoryLimit"
+          }
         ],
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "200": {
+            "$ref": "#/components/responses/JsonObject"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/runs/{runId}/events": {
       "get": {
         "operationId": "streamRunEvents",
-        "tags": ["stream"],
+        "tags": [
+          "stream"
+        ],
         "x-aor-route-id": "run-events",
         "x-aor-permission": "read",
         "x-aor-kind": "stream",
         "parameters": [
-          { "$ref": "#/components/parameters/projectId" },
-          { "$ref": "#/components/parameters/runId" }
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/runId"
+          }
         ],
         "responses": {
           "200": {
@@ -391,80 +619,156 @@
               }
             }
           },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" }
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/run-control/actions": {
       "post": {
         "operationId": "runControlAction",
-        "tags": ["mutation"],
+        "tags": [
+          "mutation"
+        ],
         "x-aor-route-id": "run-control-actions",
         "x-aor-permission": "mutate",
         "x-aor-kind": "mutation",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
-        "requestBody": { "$ref": "#/components/requestBodies/JsonObject" },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/RunControlAction"
+        },
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "400": { "$ref": "#/components/responses/JsonError" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" },
-          "409": { "$ref": "#/components/responses/JsonError" }
+          "200": {
+            "$ref": "#/components/responses/RunControlAction"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "409": {
+            "$ref": "#/components/responses/RunControlActionError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/ui-lifecycle/actions": {
       "post": {
         "operationId": "uiLifecycleAction",
-        "tags": ["mutation"],
+        "tags": [
+          "mutation"
+        ],
         "x-aor-route-id": "ui-lifecycle-actions",
         "x-aor-permission": "mutate",
         "x-aor-kind": "mutation",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
-        "requestBody": { "$ref": "#/components/requestBodies/JsonObject" },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/UiLifecycleAction"
+        },
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "400": { "$ref": "#/components/responses/JsonError" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" },
-          "409": { "$ref": "#/components/responses/JsonError" }
+          "200": {
+            "$ref": "#/components/responses/UiLifecycleAction"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "409": {
+            "$ref": "#/components/responses/JsonError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/lifecycle-command/actions": {
       "post": {
         "operationId": "lifecycleCommandAction",
-        "tags": ["mutation"],
+        "tags": [
+          "mutation"
+        ],
         "x-aor-route-id": "lifecycle-command-actions",
         "x-aor-permission": "mutate",
         "x-aor-kind": "mutation",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
-        "requestBody": { "$ref": "#/components/requestBodies/JsonObject" },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/LifecycleCommandAction"
+        },
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "400": { "$ref": "#/components/responses/JsonError" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" },
-          "409": { "$ref": "#/components/responses/JsonError" }
+          "200": {
+            "$ref": "#/components/responses/LifecycleCommandAction"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "409": {
+            "$ref": "#/components/responses/LifecycleCommandActionError"
+          }
         }
       }
     },
     "/api/projects/{projectId}/interactions/answers": {
       "post": {
         "operationId": "submitInteractionAnswer",
-        "tags": ["mutation"],
+        "tags": [
+          "mutation"
+        ],
         "x-aor-route-id": "interaction-answers",
         "x-aor-permission": "mutate",
         "x-aor-kind": "mutation",
-        "parameters": [{ "$ref": "#/components/parameters/projectId" }],
-        "requestBody": { "$ref": "#/components/requestBodies/JsonObject" },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/InteractionAnswer"
+        },
         "responses": {
-          "200": { "$ref": "#/components/responses/JsonObject" },
-          "400": { "$ref": "#/components/responses/JsonError" },
-          "401": { "$ref": "#/components/responses/AuthError" },
-          "403": { "$ref": "#/components/responses/AuthError" },
-          "409": { "$ref": "#/components/responses/JsonError" }
+          "200": {
+            "$ref": "#/components/responses/InteractionAnswer"
+          },
+          "400": {
+            "$ref": "#/components/responses/JsonError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "409": {
+            "$ref": "#/components/responses/InteractionAnswerError"
+          }
         }
       }
     }
@@ -495,6 +799,28 @@
           "type": "string",
           "minLength": 1
         }
+      },
+      "readModelLimit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Optional local-alpha read-model window. Detached read routes default to a bounded 200-entry window and cap explicit requests at 1000 entries.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 200
+        }
+      },
+      "eventHistoryLimit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "description": "Optional bounded history window. Defaults to the route-specific replay window.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "requestBodies": {
@@ -504,6 +830,50 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/JsonObject"
+            }
+          }
+        }
+      },
+      "RunControlAction": {
+        "required": true,
+        "description": "Run-control mutation request for bounded start/pause/resume/steer/cancel actions.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunControlActionRequest"
+            }
+          }
+        }
+      },
+      "UiLifecycleAction": {
+        "required": true,
+        "description": "UI lifecycle attach/detach request. The web surface remains optional and detachable.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/UiLifecycleActionRequest"
+            }
+          }
+        }
+      },
+      "LifecycleCommandAction": {
+        "required": true,
+        "description": "Bounded lifecycle command request for the documented guided command subset.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/LifecycleCommandActionRequest"
+            }
+          }
+        }
+      },
+      "InteractionAnswer": {
+        "required": true,
+        "description": "Operator answer request for a pending runner interaction.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/InteractionAnswerRequest"
             }
           }
         }
@@ -539,6 +909,106 @@
             }
           }
         }
+      },
+      "ProjectState": {
+        "description": "Resolved project state and runtime-root layout.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProjectStateResponse"
+            }
+          }
+        }
+      },
+      "Runs": {
+        "description": "Read-only run summary list built from filesystem runtime artifacts.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunsResponse"
+            }
+          }
+        }
+      },
+      "RunEventHistory": {
+        "description": "Bounded run event-history read model.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunEventHistoryResponse"
+            }
+          }
+        }
+      },
+      "RunControlAction": {
+        "description": "Run-control mutation result with durable state and audit refs.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunControlActionResponse"
+            }
+          }
+        }
+      },
+      "RunControlActionError": {
+        "description": "Blocked run-control mutation with persisted audit evidence.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RunControlActionErrorResponse"
+            }
+          }
+        }
+      },
+      "UiLifecycleAction": {
+        "description": "UI lifecycle mutation result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/UiLifecycleActionResponse"
+            }
+          }
+        }
+      },
+      "LifecycleCommandAction": {
+        "description": "Lifecycle command mutation result with CLI output parity.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/LifecycleCommandActionResponse"
+            }
+          }
+        }
+      },
+      "LifecycleCommandActionError": {
+        "description": "Blocked lifecycle command mutation with command output when available.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/LifecycleCommandActionErrorResponse"
+            }
+          }
+        }
+      },
+      "InteractionAnswer": {
+        "description": "Accepted interaction answer result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/InteractionAnswerResponse"
+            }
+          }
+        }
+      },
+      "InteractionAnswerError": {
+        "description": "Accepted but non-resumable interaction answer result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/InteractionAnswerErrorResponse"
+            }
+          }
+        }
       }
     },
     "schemas": {
@@ -548,11 +1018,16 @@
       },
       "ErrorEnvelope": {
         "type": "object",
-        "required": ["error"],
+        "required": [
+          "error"
+        ],
         "properties": {
           "error": {
             "type": "object",
-            "required": ["code", "message"],
+            "required": [
+              "code",
+              "message"
+            ],
             "properties": {
               "code": {
                 "type": "string"
@@ -568,11 +1043,16 @@
       },
       "AuthErrorEnvelope": {
         "type": "object",
-        "required": ["error"],
+        "required": [
+          "error"
+        ],
         "properties": {
           "error": {
             "type": "object",
-            "required": ["code", "message"],
+            "required": [
+              "code",
+              "message"
+            ],
             "properties": {
               "code": {
                 "type": "string",
@@ -588,7 +1068,10 @@
               },
               "required_permission": {
                 "type": "string",
-                "enum": ["read", "mutate"]
+                "enum": [
+                  "read",
+                  "mutate"
+                ]
               },
               "project_id": {
                 "type": "string"
@@ -598,10 +1081,996 @@
               },
               "security_mode": {
                 "type": "string",
-                "enum": ["local-trusted", "production-hardened"]
+                "enum": [
+                  "local-trusted",
+                  "production-hardened"
+                ]
               }
             },
             "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProjectStateResponse": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "project_root",
+          "runtime_root",
+          "runtime_layout",
+          "state_file"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_root": {
+            "type": "string"
+          },
+          "project_profile_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "runtime_root": {
+            "type": "string"
+          },
+          "runtime_layout": {
+            "$ref": "#/components/schemas/RuntimeLayout"
+          },
+          "state_file": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "RuntimeLayout": {
+        "type": "object",
+        "description": "Filesystem runtime layout owned by .aor; property names mirror the runtime state artifact.",
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "root_dir": {
+            "type": "string"
+          },
+          "stateRoot": {
+            "type": "string"
+          },
+          "state_root": {
+            "type": "string"
+          },
+          "artifactsRoot": {
+            "type": "string"
+          },
+          "artifacts_root": {
+            "type": "string"
+          },
+          "reportsRoot": {
+            "type": "string"
+          },
+          "reports_root": {
+            "type": "string"
+          },
+          "logsRoot": {
+            "type": "string"
+          },
+          "logs_root": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunsResponse": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RunSummary"
+        }
+      },
+      "RunSummary": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "packet_refs",
+          "step_result_refs",
+          "quality_refs"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "packet_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "step_result_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "quality_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "finance_evidence": {
+            "$ref": "#/components/schemas/FinanceEvidenceSummary"
+          },
+          "policy_context": {
+            "$ref": "#/components/schemas/PolicyContextSummary"
+          },
+          "context_lifecycle": {
+            "$ref": "#/components/schemas/ContextLifecycleSummary"
+          },
+          "run_control_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "FinanceEvidenceSummary": {
+        "type": "object",
+        "properties": {
+          "route_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "wrapper_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prompt_bundle_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "context_bundle_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "compiler_revision_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "adapter_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "max_cost_usd": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "timeout_sec": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "max_cost_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeout_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "step_latency_samples_sec": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "certification_latency_samples_sec": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "promotion_candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JsonObject"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "PolicyContextSummary": {
+        "type": "object",
+        "properties": {
+          "route_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "policy_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "writeback_modes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "governance_decisions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "governance_reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval_required": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ContextLifecycleSummary": {
+        "type": "object",
+        "properties": {
+          "context_asset_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "provenance_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "decision_trail": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JsonObject"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunEventHistoryResponse": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "total_events",
+          "events"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "total_events": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunEventHistoryEntry"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunEventHistoryEntry": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "event_type"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "control_action": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "interaction_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_result_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "answer_audit_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "interaction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InteractionHistorySummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policy_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicyEventContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionHistorySummary": {
+        "type": "object",
+        "properties": {
+          "interaction_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_result_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "question_summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "answer_required": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "answer_audit_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "continuation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InteractionContinuation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionContinuation": {
+        "type": "object",
+        "properties": {
+          "next_action": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "PolicyEventContext": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "risk_tier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "high_risk": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "approval_required": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "approval_ref_present": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunControlActionRequest": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "pause",
+              "resume",
+              "steer",
+              "cancel"
+            ]
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "target_step": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "approval_ref": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunControlActionResponse": {
+        "type": "object",
+        "required": [
+          "run_control"
+        ],
+        "properties": {
+          "run_control": {
+            "$ref": "#/components/schemas/RunControlPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunControlActionErrorResponse": {
+        "type": "object",
+        "required": [
+          "error",
+          "run_control"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "run_control": {
+            "$ref": "#/components/schemas/RunControlPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "RunControlPayload": {
+        "type": "object",
+        "required": [
+          "action",
+          "run_id",
+          "blocked",
+          "applied",
+          "state_file",
+          "audit_file"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "transition": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "guardrails": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "state_file": {
+            "type": "string"
+          },
+          "audit_id": {
+            "type": "string"
+          },
+          "audit_file": {
+            "type": "string"
+          },
+          "primary_event_id": {
+            "type": "string"
+          },
+          "evidence_event_id": {
+            "type": "string"
+          },
+          "stream_log_file": {
+            "type": "string"
+          },
+          "next_actions": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "additionalProperties": true
+      },
+      "UiLifecycleActionRequest": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "attach",
+              "detach"
+            ]
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "control_plane": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "UiLifecycleActionResponse": {
+        "type": "object",
+        "required": [
+          "ui_lifecycle"
+        ],
+        "properties": {
+          "ui_lifecycle": {
+            "$ref": "#/components/schemas/UiLifecyclePayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "UiLifecyclePayload": {
+        "type": "object",
+        "required": [
+          "action",
+          "idempotent",
+          "connection_state",
+          "headless_safe",
+          "state",
+          "state_file"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "idempotent": {
+            "type": "boolean"
+          },
+          "connection_state": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "disconnected",
+              "detached"
+            ]
+          },
+          "headless_safe": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "state_file": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "LifecycleCommandActionRequest": {
+        "type": "object",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "flags": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "LifecycleCommandActionResponse": {
+        "type": "object",
+        "required": [
+          "lifecycle_command"
+        ],
+        "properties": {
+          "lifecycle_command": {
+            "$ref": "#/components/schemas/LifecycleCommandPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "LifecycleCommandActionErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "lifecycle_command": {
+            "$ref": "#/components/schemas/LifecycleCommandPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "LifecycleCommandPayload": {
+        "type": "object",
+        "required": [
+          "command",
+          "args",
+          "exit_code",
+          "stdout",
+          "stderr",
+          "blocked"
+        ],
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "command_output": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifact_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interactive_continuation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionAnswerRequest": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "interaction_id"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "interaction_id": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "approval_ref": {
+            "type": "string"
+          },
+          "answer_evidence_ref": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionAnswerResponse": {
+        "type": "object",
+        "required": [
+          "interaction_answer"
+        ],
+        "properties": {
+          "interaction_answer": {
+            "$ref": "#/components/schemas/InteractionAnswerPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionAnswerErrorResponse": {
+        "type": "object",
+        "required": [
+          "error",
+          "interaction_answer"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "interaction_answer": {
+            "$ref": "#/components/schemas/InteractionAnswerPayload"
+          }
+        },
+        "additionalProperties": true
+      },
+      "InteractionAnswerPayload": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "interaction_id",
+          "interaction_status",
+          "answer_accepted",
+          "blocked",
+          "answer_audit_file",
+          "answer_audit_ref"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "interaction_id": {
+            "type": "string"
+          },
+          "interaction_status": {
+            "type": "string"
+          },
+          "answer_accepted": {
+            "type": "boolean"
+          },
+          "decision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "answer_audit_file": {
+            "type": "string"
+          },
+          "answer_audit_ref": {
+            "type": "string"
+          },
+          "step_result_file": {
+            "type": "string"
+          },
+          "step_result_ref": {
+            "type": "string"
+          },
+          "run_control_transition": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_event_id": {
+            "type": "string"
+          },
+          "step_event_id": {
+            "type": "string"
+          },
+          "resumed_event_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blocked_event_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warning_event_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stream_log_file": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ErrorBody": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
           }
         },
         "additionalProperties": true

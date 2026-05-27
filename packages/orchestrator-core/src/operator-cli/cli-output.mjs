@@ -133,6 +133,7 @@ const CLI_OUTPUT_DEFAULTS = Object.freeze({
   runControlAuditId: null,
   runControlAuditFile: null,
   runControlBlocked: null,
+  runControlBlockedReason: null,
   runControlGuardrails: null,
   runControlTransition: null,
   interactionAnswer: null,
@@ -349,6 +350,7 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["run_control_audit_id", "runControlAuditId"],
   ["run_control_audit_file", "runControlAuditFile"],
   ["run_control_blocked", "runControlBlocked"],
+  ["run_control_blocked_reason", "runControlBlockedReason"],
   ["run_control_guardrails", "runControlGuardrails"],
   ["run_control_transition", "runControlTransition"],
   ["interaction_answer", "interactionAnswer"],
@@ -460,6 +462,7 @@ const CLI_OUTPUT_FIELD_MAPPINGS = Object.freeze([
   ["replay_events", "replayEvents"],
   ["packet_artifacts", "packetArtifacts"],
   ["selected_family", "selectedFamily"],
+  ["read_model_limit", "readModelLimit"],
   ["step_results", "stepResults"],
   ["quality_artifacts", "qualityArtifacts"],
   ["delivery_manifests", "deliveryManifests"],
@@ -497,4 +500,61 @@ export function buildCliOutput({ command, resolvedFamilies, state }) {
       secretValues: parseRedactionSecretList(process.env.AOR_REDACTION_SECRETS),
     })
   );
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isPlainObject(value) {
+  return Object.prototype.toString.call(value) === "[object Object]";
+}
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function compactOutputValue(value) {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item) => compactOutputValue(item))
+      .filter((item) => item !== undefined);
+    return items.length > 0 ? items : undefined;
+  }
+
+  if (isPlainObject(value)) {
+    /** @type {Record<string, unknown>} */
+    const compacted = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+      const compactedValue = compactOutputValue(nestedValue);
+      if (compactedValue !== undefined) {
+        compacted[key] = compactedValue;
+      }
+    }
+    return Object.keys(compacted).length > 0 ? compacted : undefined;
+  }
+
+  return value;
+}
+
+/**
+ * @param {Record<string, unknown>} output
+ * @returns {Record<string, unknown>}
+ */
+export function buildCompactCliOutput(output) {
+  /** @type {Record<string, unknown>} */
+  const compacted = {};
+
+  for (const [key, value] of Object.entries(output)) {
+    const compactedValue = compactOutputValue(value);
+    if (compactedValue !== undefined) {
+      compacted[key] = compactedValue;
+    }
+  }
+
+  return compacted;
 }

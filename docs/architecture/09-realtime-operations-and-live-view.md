@@ -41,6 +41,11 @@ The app can submit the first Mission form through
 `next-action-report`. It does not own run-state transitions, answer
 continuation, review decisions, or delivery gates.
 
+Release and live E2E smoke for the web surface uses
+`aor app --smoke true --open false --json`, which loads the real SPA,
+`/app-config.json`, and control-plane state route. A generated static HTML
+snapshot is not a supported operator console or proof path.
+
 The app can also submit operator-initiated interventions through
 `POST /api/projects/:projectId/operator-requests` and run them through
 `POST /api/projects/:projectId/operator-requests/:requestId/actions` with

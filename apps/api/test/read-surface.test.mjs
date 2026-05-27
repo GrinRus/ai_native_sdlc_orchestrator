@@ -1237,7 +1237,7 @@ test("ui lifecycle API supports attach/detach idempotency and disconnected mode"
       projectRef: repoRoot,
       cwd: repoRoot,
       runId: "ui-api-smoke",
-      controlPlane: "http://localhost:8080",
+      controlPlane: "http://127.0.0.1:8080",
     });
     assert.equal(attached.action, "attach");
     assert.equal(attached.idempotent, false);
@@ -1249,7 +1249,7 @@ test("ui lifecycle API supports attach/detach idempotency and disconnected mode"
       projectRef: repoRoot,
       cwd: repoRoot,
       runId: "ui-api-smoke",
-      controlPlane: "http://localhost:8080",
+      controlPlane: "http://127.0.0.1:8080",
     });
     assert.equal(attachedRetry.idempotent, true);
 

@@ -412,6 +412,27 @@ test("resolveNextAction blocks when guided mission intake is missing KPI and Def
   });
 });
 
+test("resolveNextAction preserves explicit runtime root in primary and blocker commands", () => {
+  withCleanRepo((tempRoot) => {
+    const defaultReport = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+    assert.equal(defaultReport.primary_action.command.includes("--runtime-root"), false);
+
+    const runtimeRoot = path.join(tempRoot, "custom-aor-runtime");
+    const runtimeRootFlag = `--runtime-root ${runtimeRoot}`;
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot, runtimeRoot });
+    writeMission(init, {
+      kpis: [],
+      definitionOfDone: [],
+      deliveryMode: "no-write",
+    });
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot, runtimeRoot }).nextActionReport;
+    assert.equal(report.status, "blocked");
+    assert.ok(report.primary_action.command.includes(runtimeRootFlag));
+    assert.ok(report.blockers.every((blocker) => String(blocker.next_command).includes(runtimeRootFlag)));
+  });
+});
+
 test("resolveNextAction points to run status when a run is already active", () => {
   withCleanRepo((tempRoot) => {
     const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });

@@ -1320,6 +1320,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "resolved_runtime_root",
       "packet_artifacts",
       "selected_family",
+      "read_model_limit",
       "read_only",
       "future_control_hooks",
       "contract_families",
@@ -1344,6 +1345,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--project-ref <path>",
       "--runtime-root <path> (optional)",
       "--run-id <id> (optional)",
+      "--limit <number> (optional, default 200)",
       "--help",
     ],
     outputs: [
@@ -1353,6 +1355,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "quality_artifacts",
       "delivery_manifests",
       "promotion_decisions",
+      "read_model_limit",
       "read_only",
       "future_control_hooks",
       "contract_families",

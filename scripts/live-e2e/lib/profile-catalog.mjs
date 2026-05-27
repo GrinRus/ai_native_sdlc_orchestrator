@@ -194,8 +194,8 @@ function assertLiveE2ePolicy(profile, source) {
   if (!["public-control-plane"].includes(interactionCapability)) {
     problems.push("live_e2e.interaction_capability must be public-control-plane");
   }
-  if (!["none", "guided-web-smoke"].includes(frontendCapability)) {
-    problems.push("live_e2e.frontend_capability must be none or guided-web-smoke");
+  if (!["none", "guided-app-smoke"].includes(frontendCapability)) {
+    problems.push("live_e2e.frontend_capability must be none or guided-app-smoke");
   }
   if (!["no-upstream-write"].includes(safetyPolicy)) {
     problems.push("live_e2e.safety_policy must be no-upstream-write");

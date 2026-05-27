@@ -107,6 +107,37 @@ function writeRuntimeJson(filePath, document) {
 }
 
 /**
+ * @param {{ projectRoot: string, count: number }} options
+ * @returns {Record<string, unknown>}
+ */
+function seedCliPromotionDecisions(options) {
+  const initResult = invokeCli(["project", "init", "--project-ref", options.projectRoot]);
+  assert.equal(initResult.exitCode, 0, initResult.stderr);
+  const initPayload = JSON.parse(initResult.stdout);
+  const artifactsRoot = /** @type {string} */ (initPayload.runtime_layout.artifactsRoot);
+  const projectId = /** @type {string} */ (initPayload.project_id);
+  const stateFile = /** @type {string} */ (initPayload.state_file);
+  for (let index = 0; index < options.count; index += 1) {
+    writeContractFixture({
+      family: "promotion-decision",
+      filePath: path.join(artifactsRoot, `promotion-decision-cli-scale-${String(index).padStart(3, "0")}.json`),
+      document: {
+        decision_id: `${projectId}.promotion.cli-scale.${index}`,
+        subject_ref: "wrapper://wrapper.runner.default@v3",
+        from_channel: "candidate",
+        to_channel: "stable",
+        evidence_refs: [stateFile],
+        evidence_summary: {
+          reason: "seed fixture for bounded CLI read-model smoke test",
+        },
+        status: "pass",
+      },
+    });
+  }
+  return initPayload;
+}
+
+/**
  * @param {{
  *   projectRoot: string,
  *   runId: string,
@@ -502,6 +533,10 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.match(binResult.stdout, /aor onboard/);
     assert.match(binResult.stdout, /aor app/);
     assert.match(binResult.stdout, /aor next/);
+    assert.match(binResult.stdout, /Guided shortcuts:/);
+    assert.match(binResult.stdout, /Run control:/);
+    assert.match(binResult.stdout, /Review and QA:/);
+    assert.match(binResult.stdout, /--json compact prints only populated command fields/);
 
     const doctorHelp = invokeCli(["doctor", "--help"]);
     assert.equal(doctorHelp.exitCode, 0);
@@ -530,6 +565,17 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(doctorPayload.guided_status, "ready");
     assert.equal(doctorPayload.read_only, true);
     assert.deepEqual(doctorPayload.guided_actionable_blockers, []);
+    assert.ok(doctorPayload.guided_recommended_commands.every((entry) => !entry.includes("--runtime-root")));
+    assert.equal(Object.prototype.hasOwnProperty.call(doctorPayload, "validation_report_id"), true);
+
+    const compactDoctorJson = invokeCli(["doctor", "--project-ref", projectRoot, "--json", "compact"]);
+    assert.equal(compactDoctorJson.exitCode, 0, compactDoctorJson.stderr);
+    const compactDoctorPayload = JSON.parse(compactDoctorJson.stdout);
+    assert.equal(compactDoctorPayload.command, "doctor");
+    assert.equal(compactDoctorPayload.guided_stage, "doctor");
+    assert.equal(compactDoctorPayload.resolved_project_ref, projectRoot);
+    assert.equal(Object.prototype.hasOwnProperty.call(compactDoctorPayload, "validation_report_id"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(compactDoctorPayload, "contract_families"), false);
 
     const invalidJsonProject = path.join(projectRoot, "invalid-json-target");
     fs.mkdirSync(invalidJsonProject, { recursive: true });
@@ -573,6 +619,10 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(appPayload.guided_web_surface.app_mode, "local-spa");
     assert.match(appPayload.guided_web_surface.launch_command, /aor app/);
     assert.match(appPayload.guided_web_surface.smoke_command, /--smoke true --open false --json/);
+    assert.ok(appPayload.guided_web_surface.local_control_plane_smoke_command.includes("--project-ref"));
+    assert.ok(appPayload.guided_web_surface.local_control_plane_smoke_command.includes(projectRoot));
+    assert.ok(appPayload.guided_web_surface.local_control_plane_smoke_command.includes(path.join(projectRoot, ".aor")));
+    assert.ok(appPayload.guided_recommended_commands.every((entry) => !entry.includes("--runtime-root")));
 
     const appSmoke = spawnSync(process.execPath, [
       path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
@@ -646,6 +696,56 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(nextPayload.guided_low_level_command, "intake create");
     assert.equal(nextPayload.next_action_primary.action_id, "mission-create");
     assert.equal(fs.existsSync(nextPayload.next_action_report_file), true);
+    assert.ok(nextPayload.guided_recommended_commands.every((entry) => !entry.includes("--runtime-root")));
+
+    const customRuntimeRoot = path.join(projectRoot, "custom-aor-runtime");
+    const runtimeRootFlag = `--runtime-root ${customRuntimeRoot}`;
+    const customDoctorHuman = invokeCli(["doctor", "--project-ref", projectRoot, "--runtime-root", customRuntimeRoot]);
+    assert.equal(customDoctorHuman.exitCode, 0, customDoctorHuman.stderr);
+    assert.ok(customDoctorHuman.stdout.includes(runtimeRootFlag));
+
+    const customDoctorJson = invokeCli([
+      "doctor",
+      "--project-ref",
+      projectRoot,
+      "--runtime-root",
+      customRuntimeRoot,
+      "--json",
+    ]);
+    assert.equal(customDoctorJson.exitCode, 0, customDoctorJson.stderr);
+    const customDoctorPayload = JSON.parse(customDoctorJson.stdout);
+    assert.equal(customDoctorPayload.resolved_runtime_root, customRuntimeRoot);
+    assert.ok(customDoctorPayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
+
+    const customAppJson = invokeCli([
+      "app",
+      "--project-ref",
+      projectRoot,
+      "--runtime-root",
+      customRuntimeRoot,
+      "--json",
+    ]);
+    assert.equal(customAppJson.exitCode, 0, customAppJson.stderr);
+    const customAppPayload = JSON.parse(customAppJson.stdout);
+    assert.ok(customAppPayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
+    assert.ok(customAppPayload.guided_web_surface.launch_command.includes(runtimeRootFlag));
+    assert.ok(customAppPayload.guided_web_surface.smoke_command.includes(runtimeRootFlag));
+    assert.ok(customAppPayload.guided_web_surface.detach_command.includes(runtimeRootFlag));
+    assert.ok(customAppPayload.guided_web_surface.local_control_plane_smoke_command.includes(customRuntimeRoot));
+
+    const customNextJson = invokeCli([
+      "next",
+      "--project-ref",
+      projectRoot,
+      "--runtime-root",
+      customRuntimeRoot,
+      "--json",
+    ]);
+    assert.equal(customNextJson.exitCode, 0, customNextJson.stderr);
+    const customNextPayload = JSON.parse(customNextJson.stdout);
+    assert.equal(customNextPayload.resolved_runtime_root, customRuntimeRoot);
+    assert.ok(customNextPayload.next_action_primary.command.includes(runtimeRootFlag));
+    assert.ok(customNextPayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
 
     const transcriptFixture = JSON.parse(
       fs.readFileSync(path.join(fixturesDir, "installed-user-first-run-transcript.json"), "utf8"),
@@ -818,11 +918,15 @@ test("guided mission create writes intake evidence and next resolves mission sta
 
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    const customRuntimeRoot = path.join(projectRoot, "custom-aor-runtime");
+    const runtimeRootFlag = `--runtime-root ${customRuntimeRoot}`;
     const incompleteMission = invokeCli([
       "mission",
       "create",
       "--project-ref",
       projectRoot,
+      "--runtime-root",
+      customRuntimeRoot,
       "--mission-id",
       "missing-acceptance",
       "--goal",
@@ -837,18 +941,30 @@ test("guided mission create writes intake evidence and next resolves mission sta
     assert.equal(incompleteMission.exitCode, 0, incompleteMission.stderr);
     const incompletePayload = JSON.parse(incompleteMission.stdout);
     assert.equal(incompletePayload.guided_status, "blocked");
+    assert.equal(incompletePayload.resolved_runtime_root, customRuntimeRoot);
     assert.deepEqual(incompletePayload.product_intake_completeness.missing_fields, [
       "kpis",
       "definition_of_done",
     ]);
+    assert.ok(incompletePayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
+    assert.ok(
+      incompletePayload.guided_actionable_blockers.every((blocker) =>
+        String(blocker.next_command).includes(runtimeRootFlag),
+      ),
+    );
 
-    const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--json"]);
+    const nextJson = invokeCli(["next", "--project-ref", projectRoot, "--runtime-root", customRuntimeRoot, "--json"]);
     assert.equal(nextJson.exitCode, 0, nextJson.stderr);
     const nextPayload = JSON.parse(nextJson.stdout);
     const blockerCodes = nextPayload.next_action_blockers.map((blocker) => blocker.code);
     assert.equal(nextPayload.next_action_status, "blocked");
     assert.ok(blockerCodes.includes("mission-kpis-missing"));
     assert.ok(blockerCodes.includes("mission-definition_of_done-missing"));
+    assert.ok(nextPayload.next_action_primary.command.includes(runtimeRootFlag));
+    assert.ok(nextPayload.guided_recommended_commands.every((entry) => entry.includes(runtimeRootFlag)));
+    assert.ok(
+      nextPayload.next_action_blockers.every((blocker) => String(blocker.next_command).includes(runtimeRootFlag)),
+    );
   });
 
   withTempProject((projectRoot) => {
@@ -978,6 +1094,7 @@ test("operator command help documents read-only and future control semantics", (
   assert.match(result.stdout, /Status: implemented in operator shell \(W5-S03\)/);
   assert.match(result.stdout, /This command is read-only\./);
   assert.match(result.stdout, /Use run start\/pause\/resume\/steer\/cancel for bounded control actions\./);
+  assert.match(result.stdout, /--json compact/);
 });
 
 test("run-control command help documents guardrails and audit semantics", () => {
@@ -998,6 +1115,15 @@ test("ui lifecycle command help documents attach and detach semantics", () => {
   assert.match(result.stdout, /Status: implemented in UI lifecycle shell \(W6-S04\)/);
   assert.match(result.stdout, /Attach records explicit UI lifecycle state/);
   assert.match(result.stdout, /--control-plane is optional/);
+});
+
+test("app guidance documents the local source checkout control-plane path", () => {
+  const result = invokeCli(["app", "--help"]);
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /http:\/\/127\.0\.0\.1:8080/);
+  assert.match(result.stdout, /node apps\/api\/scripts\/control-plane-smoke\.mjs/);
 });
 
 test("delivery and release command help documents bounded policy semantics", () => {
@@ -1494,6 +1620,83 @@ test("CLI run answer writes audit refs and keeps raw answer out of command and f
   });
 });
 
+test("run start validation failure records blocked evidence before durable running state", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    const profilePath = path.join(projectRoot, "examples/project.aor.yaml");
+    fs.writeFileSync(
+      profilePath,
+      fs.readFileSync(profilePath, "utf8").replace("allow_direct_write: false", "allow_direct_write: true"),
+      "utf8",
+    );
+
+    const runId = "run-start-validation-failure";
+    const startResult = invokeCli(["run", "start", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(startResult.exitCode, 0, startResult.stderr);
+    const startPayload = JSON.parse(startResult.stdout);
+    assert.equal(startPayload.run_control_action, "start");
+    assert.equal(startPayload.run_control_blocked, true);
+    assert.equal(startPayload.run_control_blocked_reason.code, "validation.failed");
+    assert.equal(startPayload.run_control_state, null);
+    assert.equal(fs.existsSync(startPayload.run_control_state_file), false);
+    assert.equal(fs.existsSync(startPayload.run_control_audit_file), true);
+
+    const audit = JSON.parse(fs.readFileSync(startPayload.run_control_audit_file, "utf8"));
+    assert.equal(audit.blocked, true);
+    assert.equal(audit.blocked_reason.code, "validation.failed");
+    assert.ok(audit.blocking_evidence_refs.some((ref) => ref.endsWith("validation-report.json")));
+
+    const statusResult = invokeCli(["run", "status", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(statusResult.exitCode, 0, statusResult.stderr);
+    const statusPayload = JSON.parse(statusResult.stdout);
+    assert.deepEqual(
+      statusPayload.run_event_history.events.map((event) => event.event_type),
+      ["warning.raised", "evidence.linked"],
+    );
+    assert.match(statusPayload.run_event_history.events[0].summary, /passing validation report/);
+  });
+});
+
+test("run start runtime exception records terminal failed state before returning error", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+
+    const runId = "run-start-runtime-exception";
+    const startResult = invokeCli([
+      "run",
+      "start",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      "missing-project.aor.yaml",
+      "--run-id",
+      runId,
+      "--require-validation-pass",
+      "false",
+    ]);
+    assert.equal(startResult.exitCode, 1);
+    assert.match(startResult.stderr, /Run start failed after durable start transition/);
+
+    const statusResult = invokeCli(["run", "status", "--project-ref", projectRoot, "--run-id", runId]);
+    assert.equal(statusResult.exitCode, 0, statusResult.stderr);
+    const statusPayload = JSON.parse(statusResult.stdout);
+    const stateRoot = path.join(projectRoot, ".aor/projects/aor-core/state");
+    const stateFile = path.join(stateRoot, "run-control-state-run-start-runtime-exception.json");
+    assert.equal(fs.existsSync(stateFile), true);
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    assert.equal(state.status, "failed");
+    assert.equal(state.failure.code, "runtime_execution.error");
+    assert.deepEqual(
+      statusPayload.run_event_history.events.map((event) => event.event_type),
+      ["run.started", "evidence.linked", "run.terminal"],
+    );
+    assert.equal(statusPayload.run_event_history.events[2].status, "failed");
+    assert.match(statusPayload.run_event_history.events[2].summary, /missing-project\.aor\.yaml/);
+  });
+});
+
 test("W6 ui attach/detach command pack reports lifecycle state and preserves headless operation", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
@@ -1510,7 +1713,7 @@ test("W6 ui attach/detach command pack reports lifecycle state and preserves hea
       "--run-id",
       "ui-lifecycle-smoke",
       "--control-plane",
-      "http://localhost:8080",
+      "http://127.0.0.1:8080",
     ]);
     assert.equal(attachConnected.exitCode, 0, attachConnected.stderr);
     const attachConnectedPayload = JSON.parse(attachConnected.stdout);
@@ -1527,7 +1730,7 @@ test("W6 ui attach/detach command pack reports lifecycle state and preserves hea
       "--run-id",
       "ui-lifecycle-smoke",
       "--control-plane",
-      "http://localhost:8080",
+      "http://127.0.0.1:8080",
     ]);
     assert.equal(attachRetry.exitCode, 0, attachRetry.stderr);
     const attachRetryPayload = JSON.parse(attachRetry.stdout);
@@ -3064,6 +3267,27 @@ test("operator commands inspect runs, packets, and evidence through shared contr
     assert.equal(runStatusPayload.read_only, true);
     assert.ok(runStatusPayload.future_control_hooks.includes("run pause"));
 
+    const compactRunStatusResult = invokeCli([
+      "run",
+      "status",
+      "--project-ref",
+      projectRoot,
+      "--run-id",
+      runId,
+      "--follow",
+      "true",
+      "--max-replay",
+      "10",
+      "--json",
+      "compact",
+    ]);
+    assert.equal(compactRunStatusResult.exitCode, 0, compactRunStatusResult.stderr);
+    const compactRunStatusPayload = JSON.parse(compactRunStatusResult.stdout);
+    assert.equal(compactRunStatusPayload.command, "run status");
+    assert.equal(compactRunStatusPayload.read_only, true);
+    assert.equal(compactRunStatusPayload.run_event_history.total_events, 2);
+    assert.equal(Object.prototype.hasOwnProperty.call(compactRunStatusPayload, "validation_report_id"), false);
+
     const prepareResult = invokeCli(["handoff", "prepare", "--project-ref", projectRoot]);
     assert.equal(prepareResult.exitCode, 0, prepareResult.stderr);
 
@@ -3131,6 +3355,14 @@ test("operator commands inspect runs, packets, and evidence through shared contr
         run_event_history_total: runStatusPayload.run_event_history.total_events,
         run_policy_history_entries: runStatusPayload.run_policy_history.entry_count,
       },
+      run_status_compact: {
+        command: compactRunStatusPayload.command,
+        status: compactRunStatusPayload.status,
+        read_only: compactRunStatusPayload.read_only,
+        stream_protocol: compactRunStatusPayload.stream_protocol,
+        run_event_history_total: compactRunStatusPayload.run_event_history.total_events,
+        includes_full_schema_nulls: Object.prototype.hasOwnProperty.call(compactRunStatusPayload, "validation_report_id"),
+      },
       packet_show: {
         command: packetPayload.command,
         status: packetPayload.status,
@@ -3144,6 +3376,27 @@ test("operator commands inspect runs, packets, and evidence through shared contr
       },
     };
     assert.deepEqual(transcriptSubset, transcriptFixture);
+  });
+});
+
+test("operator evidence inspection bounds large runtime artifact lists", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    seedCliPromotionDecisions({ projectRoot, count: 12 });
+
+    const boundedResult = invokeCli(["evidence", "show", "--project-ref", projectRoot, "--limit", "3"]);
+    assert.equal(boundedResult.exitCode, 0, boundedResult.stderr);
+    const boundedPayload = JSON.parse(boundedResult.stdout);
+    assert.equal(boundedPayload.read_model_limit, 3);
+    assert.equal(boundedPayload.promotion_decisions.length, 3);
+    assert.equal(boundedPayload.quality_artifacts.length, 3);
+
+    const defaultResult = invokeCli(["evidence", "show", "--project-ref", projectRoot]);
+    assert.equal(defaultResult.exitCode, 0, defaultResult.stderr);
+    const defaultPayload = JSON.parse(defaultResult.stdout);
+    assert.equal(defaultPayload.read_model_limit, 200);
+    assert.equal(defaultPayload.promotion_decisions.length, 12);
   });
 });
 

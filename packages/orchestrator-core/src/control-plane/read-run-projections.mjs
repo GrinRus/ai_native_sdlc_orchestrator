@@ -5,6 +5,7 @@ import { buildFinanceMonitoringSnapshot, buildPlannerMetricsSnapshot } from "../
 import { initializeProjectRuntime } from "../project-init.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
 import {
+  applyReadModelLimit,
   listJsonFiles,
   listPacketArtifacts,
   listQualityArtifacts,
@@ -430,8 +431,9 @@ function classifyRunRisk(run) {
  */
 function listRunControlStateIds(options = {}) {
   const init = initializeProjectRuntime(options);
-  const stateFiles = listJsonFiles(init.runtimeLayout.stateRoot).filter((filePath) =>
-    RUN_CONTROL_STATE_REGEX.test(path.basename(filePath)),
+  const stateFiles = applyReadModelLimit(
+    listJsonFiles(init.runtimeLayout.stateRoot).filter((filePath) => RUN_CONTROL_STATE_REGEX.test(path.basename(filePath))),
+    options.limit,
   );
 
   /** @type {string[]} */
@@ -447,7 +449,7 @@ function listRunControlStateIds(options = {}) {
     }
   }
 
-  return runIds;
+  return applyReadModelLimit(runIds, options.limit);
 }
 
 /**
@@ -765,7 +767,7 @@ export function listRuns(options = {}) {
     ensureRun(normalizeRunRef(runId));
   }
 
-  return [...runMap.values()].map((entry) => {
+  return applyReadModelLimit([...runMap.values()], options.limit).map((entry) => {
     const selectedPromotionCandidate = selectCanonicalPromotionCandidate(entry.finance_evidence.promotion_candidates);
     const seenTrailKeys = new Set();
     const decisionTrail = entry.context_lifecycle.decision_trail

@@ -22,7 +22,7 @@ An installed user can connect a repository, understand readiness, launch a local
 | Review and QA | Expose verdicts, holds, approval, repair requests, and missing evidence as durable artifacts. | Review report, review decision, Runtime Harness report, eval reports. | W21-S06 |
 | Delivery and release | Prepare delivery and release evidence only under explicit delivery mode and review gates. | Delivery plan, delivery manifest, release packet, writeback result. | W21-S06 |
 | Learning closure | Preserve scorecard and follow-up handoff with incident, monitoring, and recertification links. | Learning-loop scorecard, learning-loop handoff, incident reports, finance monitoring snapshot. | W21-S06 |
-| Guided proof | Rehearse the installed-user journey on a clean repo with no upstream-write defaults. | `installed-user-guided-journey.yaml`, CLI transcript files, web smoke evidence, guided proof summary, no-write assertions. | W21-S07 |
+| Guided proof | Rehearse the installed-user journey on a clean repo with no upstream-write defaults. | `installed-user-guided-journey.yaml`, CLI transcript files, app smoke evidence from `aor app --smoke`, guided proof summary, no-write assertions. | W21-S07 |
 
 ## Guided command vocabulary
 These public commands are the installed-user vocabulary. W21-S02 implements the first-run guided shell for `doctor`, `onboard`, `app`, and the initial `next` shell. W21-S03 adds clean bundled onboarding evidence, W21-S04 adds guided mission intake plus deterministic next-action reports, and W31-S01 makes `aor app` a real local app launcher for the first mission intake flow.
@@ -41,18 +41,19 @@ Low-level commands remain stable, scriptable, and machine-readable. Guided comma
 ## Web state model
 The optional web console mirrors the same stages with these states:
 - `read_only`: the web surface can inspect runtime evidence but cannot mutate state.
-- `disconnected`: the web surface uses module-backed snapshots without a detached transport.
+- `local`: the foreground `aor app` process serves the SPA and same-origin control-plane routes for the selected project.
 - `connected`: the web surface uses detached HTTP/SSE read and mutation endpoints.
 - `detached`: the web surface unsubscribes while CLI/API/headless runtime operation remains available.
 - `blocked`: the current stage has explicit blockers, missing evidence, or policy gates.
 - `ready`: the current stage has one safe next action.
 
-The web app must not invent separate lifecycle state. It reads control-plane state and invokes runtime-owned mutations.
+The web app must not invent separate lifecycle state. It reads control-plane state and invokes runtime-owned mutations. Static generated HTML snapshots are not a product console surface.
 
 W31-S01 adds the installed-package local app mode:
 - `aor app --project-ref <repo>` starts a foreground loopback server and opens the packaged SPA by default;
 - `/` serves the SPA, `/app-config.json` returns `project_id`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata;
 - `/api/projects/:projectId/**` remains the control-plane route family used by CLI/API/headless flows;
+- `aor app --smoke true --open false --json` validates the real SPA, config, and state routes for release and live E2E evidence;
 - if onboarding has not run yet, the Readiness stage shows an explicit Initialize action instead of silently creating mission evidence.
 
 W21-S05 maps the optional web console to seven guided stage views:
@@ -107,7 +108,7 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 | Web lifecycle | `control-plane-api`, `live-run-event` | W21-S05 maps guided stages to read models and lifecycle mutations without UI-owned orchestration; W31-S01 adds the packaged local SPA launcher and app-config route. |
 | Operator intervention | `operator-request`, `compiled-context-artifact`, `step-result` | W32-S01 adds runtime-owned Ask AOR/request flow across CLI, API, and web without creating a chat-only bypass. |
 | Closure | `next-action-report`, `review-decision`, `delivery-plan`, `delivery-manifest`, `release-packet`, `learning-loop-handoff` | W21-S06 exposes final-stage decisions, blockers, evidence refs, and exact next actions consistently across CLI/API/web. |
-| Proof | Live E2E profiles and observation reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, web smoke evidence, durable closure artifacts, and no-upstream-write assertions. |
+| Proof | Live E2E profiles and observation reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, app smoke evidence, durable closure artifacts, and no-upstream-write assertions. |
 
 ## Out of scope for the guided journey contract
 - implementing `aor doctor`, `aor onboard`, `aor mission create`, `aor next`, or `aor app`;

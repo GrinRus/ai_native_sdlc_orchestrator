@@ -62,6 +62,9 @@ function buildPrimaryPayload(result) {
       control_action: result.action,
       blocked: true,
       audit_id: result.auditRecord.audit_id,
+      evidence_refs: Array.isArray(result.auditRecord.blocking_evidence_refs)
+        ? result.auditRecord.blocking_evidence_refs
+        : [],
       policy_context: policyContext,
     };
   }
@@ -107,6 +110,7 @@ function buildPrimaryPayload(result) {
  *   targetStep?: string,
  *   reason?: string,
  *   approvalRef?: string,
+ *   preflightBlock?: { code?: string, message?: string, evidenceRefs?: string[] },
  *   redactionPolicy?: unknown,
  * }} options
  */
@@ -135,6 +139,9 @@ export function applyRunControlAction(options) {
       control_audit_file: result.auditFile,
       control_state_file: result.stateFile,
       blocked: result.blocked,
+      blocking_evidence_refs: Array.isArray(result.auditRecord.blocking_evidence_refs)
+        ? result.auditRecord.blocking_evidence_refs
+        : [],
       evidence_root: result.runtimeLayout.reportsRoot,
       policy_context: buildPolicyContext(result),
     },

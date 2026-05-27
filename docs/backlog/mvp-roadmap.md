@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-32-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-33-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -43,6 +43,7 @@ The authoritative planning model for implementation lives in:
 | W30 | Harden the self-hosted CLI/API alpha with ADRs, OpenAPI drift checks, operations runbooks, readiness evidence, and installed-user release smoke coverage. | 6 | EPIC-0, EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-30-implementation-slices.md` |
 | W31 | Launch the packaged local app for installed users and make first Mission intake understandable through the UI. | 1 | EPIC-6 | `docs/backlog/wave-31-implementation-slices.md` |
 | W32 | Add runtime-owned interactive operator requests across CLI, API, and the local app for bounded artifact analysis and change proposals. | 1 | EPIC-6 | `docs/backlog/wave-32-implementation-slices.md` |
+| W33 | Align the post-rebase console source of truth around `aor app`, remove the static snapshot surface, and preserve local-alpha stabilization fixes without adding security/hosted scope. | 10 | EPIC-0, EPIC-6 | `docs/backlog/wave-33-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -144,6 +145,16 @@ The authoritative planning model for implementation lives in:
 | W30-S06 | OPS-06, OPS-10, PBO-01, PBO-02, PBO-03, SEC-02, SEC-06 |
 | W31-S01 | PBO-09, OPS-01, OPS-06 |
 | W32-S01 | OPS-11, OPS-04, DEV-05, RQA-02 |
+| W33-S01 | source-of-truth alignment and obsolete console surface removal (no direct story closure) |
+| W33-S02 | local-alpha gate reliability repair (no direct story closure) |
+| W33-S03 | local-alpha run-state repair (no direct story closure) |
+| W33-S04 | local-alpha guided runtime-root repair (no direct story closure) |
+| W33-S05 | local-alpha control-plane/app launch guidance repair (no direct story closure) |
+| W33-S06 | local-alpha app-smoke console boundary repair (no direct story closure) |
+| W33-S07 | local-alpha CLI ergonomics repair (no direct story closure) |
+| W33-S08 | local-alpha OpenAPI payload clarity repair (no direct story closure) |
+| W33-S09 | local-alpha runtime read-model scale repair (no direct story closure) |
+| W33-S10 | local-alpha web maintainability repair (no direct story closure) |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -544,6 +555,19 @@ boundaries.
 - Live E2E docs and fixtures cover no-write analysis, patch-only document proposal, and separation from runtime-initiated interaction answers.
 
 **Detailed slices:** `docs/backlog/wave-32-implementation-slices.md`
+
+## W33 - console flow alignment and post-audit local-alpha repair
+**Goal:** Make `aor app` the only product operator console, remove the obsolete static snapshot renderer, and keep the rebased post-audit local-alpha repair slices traceable after W31 and W32.
+
+**Exit criteria:**
+- W33 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
+- `aor app` is documented as the packaged React/Vite local SPA served by a foreground loopback process with same-origin control-plane routes.
+- `aor ui attach` and `aor ui detach` remain lifecycle commands, not the main console launch path.
+- Live E2E guided proof captures app-smoke evidence from `aor app --smoke true --open false --json`; generated HTML snapshots are not a proof or console path.
+- The local-alpha repair fixes for root gates, runtime-root fidelity, launch guidance, CLI ergonomics, OpenAPI payload depth, runtime read bounds, and web maintainability are mapped to W33 rather than W31/W32 semantics.
+- Security, CORS/preflight, hosted deployment, SSO, and production contour hardening remain out of scope.
+
+**Detailed slices:** `docs/backlog/wave-33-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.
