@@ -23,6 +23,7 @@ W21-S02 implements the first-run shell for `doctor`, `onboard`, `app`, and `next
 - the foreground server is stopped by `Ctrl+C` or process termination;
 - the packaged UI can submit `mission create` and `next` through `POST /api/projects/:projectId/lifecycle-command/actions`, but orchestration remains owned by runtime command handlers.
 - the packaged UI can create and run operator requests through `POST /api/projects/:projectId/operator-requests` and `POST /api/projects/:projectId/operator-requests/:requestId/actions`, preserving the same scope and delivery-mode checks as the CLI.
+- generated static HTML snapshots are not a console path; smoke evidence comes from the real `aor app` SPA/config/state check.
 
 Operator request command semantics:
 - `aor request create` stores raw request text only in durable `operator-request` evidence and exposes sanitized summaries in read surfaces;

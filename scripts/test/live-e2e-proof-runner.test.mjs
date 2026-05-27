@@ -1562,7 +1562,7 @@ function writeLocalFullJourneyProfile(options) {
         flow_range_policy: options.guidedJourney || options.scenarioFamily === "release" ? "full_lifecycle" : "delivery_default",
         installation_policy: "source-install-required",
         interaction_capability: "public-control-plane",
-        frontend_capability: options.guidedJourney ? "guided-web-smoke" : "none",
+        frontend_capability: options.guidedJourney ? "guided-app-smoke" : "none",
         safety_policy: "no-upstream-write",
         operator_mode: "deterministic-fixture",
         agent_decision_policy: "optional",
@@ -2475,7 +2475,7 @@ test("installed-user guided journey proof captures CLI, web, closure, and no-wri
       },
       guidedJourney: {
         enabled: true,
-        web_smoke: {
+        app_smoke: {
           enabled: true,
         },
       },
@@ -2525,10 +2525,11 @@ test("installed-user guided journey proof captures CLI, web, closure, and no-wri
     for (const artifactFile of Object.values(guidedProof.durable_artifact_files)) {
       assert.equal(fs.existsSync(artifactFile), true, String(artifactFile));
     }
-    assert.equal(fs.existsSync(summary.artifacts.guided_web_smoke_summary_file), true);
-    assert.equal(fs.existsSync(summary.artifacts.guided_web_smoke_html_file), true);
-    assert.equal(guidedProof.web_smoke.detached, true);
-    assert.equal(typeof guidedProof.web_smoke.guided_lifecycle_state, "string");
+    assert.equal(fs.existsSync(summary.artifacts.guided_app_smoke_summary_file), true);
+    assert.equal(guidedProof.app_smoke.mode, "local-spa");
+    assert.equal(guidedProof.app_smoke.status, "smoke-pass");
+    assert.equal(guidedProof.app_smoke.html_loaded, true);
+    assert.equal(guidedProof.app_smoke.config_project_id, guidedProof.app_smoke.state_project_id);
     assert.equal(guidedProof.no_write_assertions.output_policy_write_back_to_remote, true);
     assert.equal(guidedProof.no_write_assertions.target_head_unchanged, true);
     assert.equal(guidedProof.no_write_assertions.runtime_state_under_aor, true);
@@ -2543,11 +2544,11 @@ test("installed-user guided journey proof captures CLI, web, closure, and no-wri
     assert.equal(summary.control_surfaces.public_cli_sequence.includes("aor release prepare"), true);
 
     const narrativeOnly = structuredClone(guidedProof);
-    narrativeOnly.durable_artifact_files.web_smoke_html_file = "";
+    narrativeOnly.app_smoke.status = "failed";
     const issues = validateGuidedJourneyProof(narrativeOnly, {
       targetCheckoutRoot: summary.target_checkout_root,
     });
-    assert.ok(issues.some((issue) => issue.includes("web_smoke_html_file")));
+    assert.ok(issues.some((issue) => issue.includes("app smoke did not pass")));
   });
 });
 

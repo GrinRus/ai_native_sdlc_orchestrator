@@ -42,8 +42,7 @@ const REQUIRED_DURABLE_ARTIFACT_FIELDS = Object.freeze([
   "release_packet_file",
   "learning_loop_scorecard_file",
   "learning_loop_handoff_file",
-  "web_smoke_summary_file",
-  "web_smoke_html_file",
+  "app_smoke_summary_file",
 ]);
 
 /**
@@ -105,7 +104,7 @@ function collectRequiredArtifactFiles(commandResults, artifacts) {
     asRecord(findCommand(commandResults, "guided-next-after-learning").parsed_payload) ||
     asRecord(findCommand(commandResults, "guided-next-after-delivery").parsed_payload);
   const reviewDecide = asRecord(findCommand(commandResults, "review-decide-approve").parsed_payload);
-  const webSmoke = asRecord(artifacts.guided_web_smoke);
+  const appSmoke = asRecord(artifacts.guided_app_smoke);
 
   return {
     onboarding_report_file:
@@ -132,12 +131,9 @@ function collectRequiredArtifactFiles(commandResults, artifacts) {
     release_packet_file: asNonEmptyString(artifacts.release_packet_file),
     learning_loop_scorecard_file: asNonEmptyString(artifacts.learning_loop_scorecard_file),
     learning_loop_handoff_file: asNonEmptyString(artifacts.learning_loop_handoff_file),
-    web_smoke_summary_file:
-      asNonEmptyString(webSmoke.summary_file) ||
-      asNonEmptyString(artifacts.guided_web_smoke_summary_file),
-    web_smoke_html_file:
-      asNonEmptyString(webSmoke.rendered_html_file) ||
-      asNonEmptyString(artifacts.guided_web_smoke_html_file),
+    app_smoke_summary_file:
+      asNonEmptyString(appSmoke.summary_file) ||
+      asNonEmptyString(artifacts.guided_app_smoke_summary_file),
   };
 }
 
@@ -162,7 +158,7 @@ export function buildGuidedJourneyProof(options) {
     .filter(Boolean);
   const outputPolicy = asRecord(options.profile.output_policy);
   const requiredArtifactFiles = collectRequiredArtifactFiles(options.commandResults, options.artifacts);
-  const webSmoke = asRecord(options.artifacts.guided_web_smoke);
+  const appSmoke = asRecord(options.artifacts.guided_app_smoke);
 
   return {
     proof_id: `${options.runId}.installed-user-guided-journey.v1`,
@@ -173,12 +169,13 @@ export function buildGuidedJourneyProof(options) {
     required_command_labels: [...REQUIRED_GUIDED_COMMAND_LABELS],
     command_transcript_files: transcriptFiles,
     durable_artifact_files: requiredArtifactFiles,
-    web_smoke: {
-      summary_file: asNonEmptyString(webSmoke.summary_file) || null,
-      rendered_html_file: asNonEmptyString(webSmoke.rendered_html_file) || null,
-      guided_lifecycle_state: asNonEmptyString(webSmoke.guided_lifecycle_state) || null,
-      guided_current_stage_id: asNonEmptyString(webSmoke.guided_current_stage_id) || null,
-      detached: webSmoke.detached === true,
+    app_smoke: {
+      summary_file: asNonEmptyString(appSmoke.summary_file) || null,
+      mode: asNonEmptyString(appSmoke.mode) || null,
+      status: asNonEmptyString(appSmoke.status) || null,
+      html_loaded: appSmoke.html_loaded === true,
+      config_project_id: asNonEmptyString(appSmoke.config_project_id) || null,
+      state_project_id: asNonEmptyString(appSmoke.state_project_id) || null,
     },
     no_write_assertions: {
       output_policy_write_back_to_remote: outputPolicy.write_back_to_remote === false,
@@ -240,12 +237,20 @@ export function validateGuidedJourneyProof(proof, options) {
     }
   }
 
-  const webSmoke = asRecord(proof.web_smoke);
-  if (webSmoke.detached !== true) {
-    issues.push("web smoke did not prove detach-safe behavior");
+  const appSmoke = asRecord(proof.app_smoke);
+  if (asNonEmptyString(appSmoke.mode) !== "local-spa") {
+    issues.push("app smoke did not prove local-spa mode");
   }
-  if (!asNonEmptyString(webSmoke.guided_lifecycle_state)) {
-    issues.push("web smoke did not report a guided lifecycle state");
+  if (asNonEmptyString(appSmoke.status) !== "smoke-pass") {
+    issues.push("app smoke did not pass");
+  }
+  if (appSmoke.html_loaded !== true) {
+    issues.push("app smoke did not load the packaged SPA");
+  }
+  const configProjectId = asNonEmptyString(appSmoke.config_project_id);
+  const stateProjectId = asNonEmptyString(appSmoke.state_project_id);
+  if (!configProjectId || !stateProjectId || configProjectId !== stateProjectId) {
+    issues.push("app smoke did not prove matching config/state project ids");
   }
 
   const noWrite = asRecord(proof.no_write_assertions);

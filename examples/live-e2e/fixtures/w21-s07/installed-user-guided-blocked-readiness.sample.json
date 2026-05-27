@@ -18,7 +18,7 @@
   "rejected_claims": [
     "success without command transcript",
     "success without durable packets or reports",
-    "success without web smoke or no-write assertions"
+    "success without app smoke or no-write assertions"
   ],
   "expected_next_step": "Resolve the prerequisite and rerun the same installed-user guided profile."
 }

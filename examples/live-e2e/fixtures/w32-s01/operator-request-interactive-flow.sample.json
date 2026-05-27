@@ -83,8 +83,8 @@
     "raw_answer_omitted_from_reads": true,
     "separate_from_operator_requests": true
   },
-  "web_smoke": {
-    "layout": "operator-console",
+  "app_smoke": {
+    "layout": "local-spa",
     "ask_aor_available_on_stage_count": 7,
     "evidence_documents_workbench": true,
     "attach_ref_as_target": true,

@@ -51,15 +51,15 @@
     "release_packet_file": ".aor/projects/local-target/reports/release-packet-w21-s07.installed-user-guided.json",
     "learning_loop_scorecard_file": ".aor/projects/local-target/reports/learning-loop-scorecard-w21-s07.installed-user-guided.json",
     "learning_loop_handoff_file": ".aor/projects/local-target/reports/learning-loop-handoff-w21-s07.installed-user-guided.json",
-    "web_smoke_summary_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.json",
-    "web_smoke_html_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.html"
+    "app_smoke_summary_file": ".aor/projects/aor-core/reports/installed-user-guided-app-smoke-w21-s07.json"
   },
-  "web_smoke": {
-    "summary_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.json",
-    "rendered_html_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.html",
-    "guided_lifecycle_state": "ready",
-    "guided_current_stage_id": "learning",
-    "detached": true
+  "app_smoke": {
+    "summary_file": ".aor/projects/aor-core/reports/installed-user-guided-app-smoke-w21-s07.json",
+    "mode": "local-spa",
+    "status": "smoke-pass",
+    "html_loaded": true,
+    "config_project_id": "local-target",
+    "state_project_id": "local-target"
   },
   "no_write_assertions": {
     "output_policy_write_back_to_remote": true,

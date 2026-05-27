@@ -7,7 +7,7 @@ live_e2e:
   flow_range_policy: full_lifecycle
   installation_policy: source-install-required
   interaction_capability: public-control-plane
-  frontend_capability: guided-web-smoke
+  frontend_capability: guided-app-smoke
   safety_policy: no-upstream-write
   operator_mode: skill-agent
   agent_decision_policy: required
@@ -28,12 +28,12 @@ bootstrap_template: github-default
 guided_journey:
   enabled: true
   starts_from_first_run: true
-  web_smoke:
+  app_smoke:
     enabled: true
     operator_request_controls: true
   proof_requirements:
     - cli-transcripts
-    - web-smoke
+    - app-smoke
     - operator-request-no-write-analysis
     - operator-request-patch-only-document-proposal
     - interaction-inbox-answer-audit

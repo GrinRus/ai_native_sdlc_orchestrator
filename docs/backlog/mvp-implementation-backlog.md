@@ -297,5 +297,19 @@ This is the master index for the implementation slices across all defined waves.
 |---|---|---|---|---|---|
 | W32-S01 | Operator-request interactive runtime flow | EPIC-6 | done | `packages/contracts/**`, `packages/orchestrator-core/**`, `apps/web/**`, `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/backlog/**`, `examples/**`, `scripts/**` | W31-S01, W24-S02 |
 
+## W33 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W33-S01 | Console flow source-of-truth and static snapshot removal | EPIC-0 | done | `docs/backlog/**`, `README.md`, `docs/architecture/**`, `docs/ops/**`, `docs/product/**`, `apps/web/**`, `scripts/live-e2e/**`, `examples/live-e2e/**` | W32-S01 |
+| W33-S02 | Reliable root gates and live E2E timeout bounds | EPIC-0 | done | `scripts/**`, `scripts/test/**`, `docs/backlog/**` | W33-S01 |
+| W33-S03 | Failure-safe run start durable state | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/cli/**`, tests | W33-S02 |
+| W33-S04 | Guided runtime-root fidelity | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/cli/**`, tests, docs | W33-S02 |
+| W33-S05 | Control-plane launch and port guidance alignment | EPIC-6 | done | `apps/cli/**`, `packages/orchestrator-core/**`, `docs/ops/**`, tests | W33-S04 |
+| W33-S06 | App-smoke console boundary and static snapshot removal | EPIC-6 | done | `apps/web/**`, `apps/cli/**`, `scripts/live-e2e/**`, `docs/ops/**`, tests | W33-S02 |
+| W33-S07 | CLI operator output ergonomics | EPIC-6 | done | `apps/cli/**`, `packages/orchestrator-core/**`, `docs/architecture/**`, tests | W33-S04 |
+| W33-S08 | Control-plane OpenAPI payload schema depth | EPIC-6 | done | `docs/contracts/**`, `examples/control-plane-api/**`, `apps/api/**`, `scripts/**`, tests | W33-S02 |
+| W33-S09 | Runtime read-model scale and pagination baseline | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, tests | W33-S02 |
+| W33-S10 | Web app smoke module cleanup and console surface simplification | EPIC-6 | done | `apps/web/**`, tests | W33-S06 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

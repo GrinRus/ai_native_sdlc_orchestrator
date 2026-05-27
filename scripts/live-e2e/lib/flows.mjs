@@ -904,58 +904,54 @@ function buildGuidedMissionCreateArgs(options) {
 
 /**
  * @param {{
- *   hostRoot: string,
+ *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
  *   targetCheckoutRoot: string,
  *   runId: string,
  *   reportsRoot: string,
+ *   env: NodeJS.ProcessEnv,
  * }}
  */
-function runGuidedWebSmoke(options) {
-  const outputHtml = path.join(
-    options.reportsRoot,
-    `installed-user-guided-web-smoke-${normalizeId(options.runId)}.html`,
-  );
+function runGuidedAppSmoke(options) {
   const summaryFile = path.join(
     options.reportsRoot,
-    `installed-user-guided-web-smoke-${normalizeId(options.runId)}.json`,
+    `installed-user-guided-app-smoke-${normalizeId(options.runId)}.json`,
   );
   const result = spawnSync(
-    process.execPath,
+    options.aorLaunch.command,
     [
-      path.join(options.hostRoot, "apps/web/scripts/operator-console-smoke.mjs"),
+      ...options.aorLaunch.argsPrefix,
+      "app",
       "--project-ref",
-      options.targetCheckoutRoot,
+      ".",
       "--runtime-root",
       ".aor",
-      "--run-id",
-      options.runId,
-      "--output-html",
-      outputHtml,
-      "--max-replay",
-      "20",
+      "--smoke",
+      "true",
+      "--open",
+      "false",
+      "--json",
     ],
     {
       cwd: options.targetCheckoutRoot,
       encoding: "utf8",
+      env: options.env,
     },
   );
   if (result.status !== 0) {
-    throw new Error(`Guided web smoke failed: ${(result.stderr ?? result.stdout ?? "").trim()}`);
+    throw new Error(`Guided app smoke failed: ${(result.stderr ?? result.stdout ?? "").trim()}`);
   }
   /** @type {Record<string, unknown>} */
   let summary;
   try {
     summary = asRecord(JSON.parse(result.stdout));
   } catch {
-    throw new Error("Guided web smoke did not emit JSON summary.");
+    throw new Error("Guided app smoke did not emit JSON summary.");
   }
   summary.summary_file = summaryFile;
-  summary.rendered_html_file = asNonEmptyString(summary.rendered_html_file) || outputHtml;
-  summary.command = "node apps/web/scripts/operator-console-smoke.mjs";
+  summary.command = "aor app --smoke true --open false --json";
   writeJson(summaryFile, summary);
   return {
     summaryFile,
-    htmlFile: outputHtml,
     summary,
   };
 }
@@ -4048,15 +4044,15 @@ export function executeFullJourneyFlow(options) {
       artifacts.next_action_report_file = getStringField(guidedNextAfterLearning.payload, "next_action_report_file");
       artifacts.guided_next_after_learning_transcript_file = guidedNextAfterLearning.transcriptFile;
 
-      const webSmoke = runGuidedWebSmoke({
-        hostRoot: options.hostRoot,
+      const appSmoke = runGuidedAppSmoke({
+        aorLaunch: options.aorLaunch,
         targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
         runId: options.runId,
         reportsRoot: options.layout.reportsRoot,
+        env,
       });
-      artifacts.guided_web_smoke_summary_file = webSmoke.summaryFile;
-      artifacts.guided_web_smoke_html_file = webSmoke.htmlFile;
-      artifacts.guided_web_smoke = webSmoke.summary;
+      artifacts.guided_app_smoke_summary_file = appSmoke.summaryFile;
+      artifacts.guided_app_smoke = appSmoke.summary;
     }
     markStage(
       stageMap,

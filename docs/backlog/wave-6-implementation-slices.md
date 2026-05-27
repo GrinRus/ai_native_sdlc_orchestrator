@@ -121,7 +121,7 @@ Deliver command-first post-MVP expansion for intake, run control, UI lifecycle, 
 ### Local tasks
 1. Implement attach/detach command handlers and lifecycle state reporting.
 2. Keep headless CLI and API operation unaffected when UI is detached.
-3. Add detachable web smoke tests and CLI transcript fixtures.
+3. Add detachable app smoke tests and CLI transcript fixtures.
 4. Document attach/detach operational guidance and failure handling.
 
 ### Acceptance criteria

@@ -161,6 +161,16 @@ graph TD
   W30S06[W30-S06 Alpha release and onboarding proof refresh]
   W31S01[W31-S01 Installed-user local app launch and onboarding UI]
   W32S01[W32-S01 Operator-request interactive runtime flow]
+  W33S01[W33-S01 Console flow source-of-truth and static snapshot removal]
+  W33S02[W33-S02 Reliable root gates and live E2E timeout bounds]
+  W33S03[W33-S03 Failure-safe run start durable state]
+  W33S04[W33-S04 Guided runtime-root fidelity]
+  W33S05[W33-S05 Control-plane launch and port guidance alignment]
+  W33S06[W33-S06 App-smoke console boundary and static snapshot removal]
+  W33S07[W33-S07 CLI operator output ergonomics]
+  W33S08[W33-S08 Control-plane OpenAPI payload schema depth]
+  W33S09[W33-S09 Runtime read-model scale and pagination baseline]
+  W33S10[W33-S10 Web app smoke module cleanup and console surface simplification]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -411,6 +421,16 @@ graph TD
   W30S06 --> W31S01
   W31S01 --> W32S01
   W24S02 --> W32S01
+  W32S01 --> W33S01
+  W33S01 --> W33S02
+  W33S02 --> W33S03
+  W33S02 --> W33S04
+  W33S04 --> W33S05
+  W33S02 --> W33S06
+  W33S04 --> W33S07
+  W33S02 --> W33S08
+  W33S02 --> W33S09
+  W33S06 --> W33S10
 ```
 
 ## W0 hard dependencies
@@ -702,6 +722,20 @@ graph TD
 |---|---|
 | W32-S01 | W31-S01, W24-S02 |
 
+## W33 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W33-S01 | W32-S01 |
+| W33-S02 | W33-S01 |
+| W33-S03 | W33-S02 |
+| W33-S04 | W33-S02 |
+| W33-S05 | W33-S04 |
+| W33-S06 | W33-S02 |
+| W33-S07 | W33-S04 |
+| W33-S08 | W33-S02 |
+| W33-S09 | W33-S02 |
+| W33-S10 | W33-S06 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -860,6 +894,16 @@ graph TD
 155. W30-S06
 156. W31-S01
 157. W32-S01
+158. W33-S01
+159. W33-S02
+160. W33-S03
+161. W33-S04
+162. W33-S05
+163. W33-S06
+164. W33-S07
+165. W33-S08
+166. W33-S09
+167. W33-S10
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

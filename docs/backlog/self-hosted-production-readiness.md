@@ -2,7 +2,7 @@
 
 ## Status
 
-AOR is a **self-hosted CLI/API production candidate** for the bounded mode documented in `docs/ops/self-hosted-release.md`. The current repository remains docs-first, but W22-W26 source-of-truth repair, hardening, real proof, production gate, stabilization, and release documentation are now closed for that self-hosted candidate mode. W30 adds alpha-hardening evidence around ADRs, OpenAPI route drift checks, self-hosted operations runbooks, readiness checks, and installed-user release smoke coverage. W31 adds a packaged local UI launch path for installed users while preserving the headless boundary. W32 adds runtime-owned operator requests for bounded analysis and proposal/patch evidence from CLI, API, and web surfaces.
+AOR is a **self-hosted CLI/API production candidate** for the bounded mode documented in `docs/ops/self-hosted-release.md`. The current repository remains docs-first, but W22-W26 source-of-truth repair, hardening, real proof, production gate, stabilization, and release documentation are now closed for that self-hosted candidate mode. W30 adds alpha-hardening evidence around ADRs, OpenAPI route drift checks, self-hosted operations runbooks, readiness checks, and installed-user release smoke coverage. W31 adds a packaged local UI launch path for installed users while preserving the headless boundary. W32 adds runtime-owned operator requests for bounded analysis and proposal/patch evidence from CLI, API, and web surfaces. W33 aligns local-alpha console proof around `aor app` and removes the obsolete static snapshot surface without expanding hosted, security, or production-hardening claims.
 
 Hosted SaaS, enterprise identity, tenant billing, hosted rollback, and managed multi-tenant operations are not in scope for the W22-W26 release.
 
@@ -46,6 +46,7 @@ Production readiness requires:
 | Alpha hardening has reviewable ADR, API, ops, readiness, and release evidence. | `W30-S01` through `W30-S06` | ADR index, `docs/contracts/control-plane-api.openapi.json`, self-hosted operations runbooks, W30 production-readiness checks, and installed-package smoke coverage keep the alpha boundary explicit without target-stack migration. |
 | Installed-user local app launch is packaged and smoke-tested. | `W31-S01` | ADR 0004, `aor app --smoke --open false --json`, packaged `apps/web/dist`, API app-route tests, web SPA tests, and release smoke evidence keep the UI optional while making first mission intake discoverable. |
 | Operator-request runtime intervention is bounded and query-safe. | `W32-S01` | ADR 0005, `operator-request` contract/example coverage, request CLI/API/runtime tests, web Ask AOR coverage, proposal/patch evidence, sanitized read payloads, and live E2E fixture docs keep operator-initiated work runtime-owned. |
+| Console proof uses the real local app, not generated static HTML. | `W33-S01` | `aor app --smoke true --open false --json`, app-smoke guided proof fields, updated live E2E fixtures, and web tests keep the product console path aligned with W31 without adding security or hosted scope. |
 
 ## Story status policy
 
@@ -55,7 +56,7 @@ Production readiness requires:
 - `partial`
 - `blocked`
 
-As of W32-S01, the matrix records `baseline-covered=108`, `proof-covered=4`, `partial=0`, and `blocked=2`. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
+As of W33-S01, the matrix records `baseline-covered=108`, `proof-covered=4`, `partial=0`, and `blocked=2`. W33 does not change evidence strength counts. A story can move to `proof-covered` only when executable evidence proves the story outcome at the required strength.
 
 The current production-proof fixture is `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`. It supports only the story rows that cite the fixture with `overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 
@@ -75,5 +76,6 @@ The final verdict is **self-hosted production candidate** for the bounded CLI/AP
 7. W30 alpha-hardening checks pass for ADRs, OpenAPI route coverage, self-hosted operations docs, and release smoke boundaries.
 8. W31 installed-user local app smoke passes without making the web UI mandatory.
 9. W32 operator-request checks pass without turning request text into query/live payload content or bypassing delivery-mode scope.
+10. W33 console alignment checks pass with app-smoke proof from `aor app` and no generated static HTML console dependency.
 
 This verdict does not extend to hosted SaaS, enterprise identity-provider integration, managed multi-tenant operations, default upstream write-back, or uncertified extended adapters such as OpenCode.
