@@ -286,7 +286,7 @@ The authoritative planning model for implementation lives in:
 - detached transport supports bounded authenticated mutation commands for connected operator clients
 - at least one regression target and one release-shaped target from the catalog have fresh live evidence produced through the external runner and real bounded delivery paths
 
-**Current status note:** `W10-S05` is now closed using the replacement target-backed proof bundles, with the latest black-box closure evidence at `examples/live-e2e/fixtures/w12-s04/w12-s04-evidence-bundle.json`. The `W10-S05 -> W11-S05` dependency is a historical closure dependency, not normal forward implementation order. The closure evidence anchors execution and delivery lineage to cloned target checkouts rather than the AOR workspace.
+**Current status note:** `W10-S05` is a historical closure row. Its old short-profile proof bundles were removed when live E2E moved to skill-agent-only proof, so they must not be used as current acceptance evidence. Current closure evidence for live E2E starts with catalog-backed full journeys, `installed-user-guided-journey`, and the W25 production-proof fixture.
 
 **Detailed slices:** `docs/backlog/wave-10-implementation-slices.md`
 
@@ -298,7 +298,7 @@ The authoritative planning model for implementation lives in:
 - preflight executes machine-readable setup and verification commands from the live E2E profile
 - routed live execution invokes the supported external adapter path from the target checkout root
 - delivery manifests and release packets anchor repo root and changed paths to the target checkout
-- fresh `regress-short` and `release-short` evidence bundles prove the target-backed flow without narrative-only assumptions
+- historical target-backed short-profile bundles were removed from current proof evidence; new closure claims must use catalog-backed full journeys with skill-agent decisions
 
 **Detailed slices:** `docs/backlog/wave-11-implementation-slices.md`
 
@@ -315,7 +315,7 @@ The authoritative planning model for implementation lives in:
 - installed-user proof runner: `scripts/live-e2e/run-profile.mjs`
 - black-box coverage: `scripts/test/live-e2e-proof-runner.test.mjs`
 - refreshed operator runbooks: `docs/ops/live-e2e-standard-runner.md`, `docs/ops/live-e2e-learning-loop.md`, `docs/ops/live-e2e-no-write-preflight.md`
-- refreshed proof fixtures: `examples/live-e2e/fixtures/w10-s05/*.json`, `examples/live-e2e/fixtures/w11-s05/*.json`, `examples/live-e2e/fixtures/w12-s04/*.json`, `examples/live-e2e/fixtures/w7-s05/w7-governance-integration-rehearsal.sample.md`
+- current proof fixtures: `examples/live-e2e/fixtures/w21-s07/*.json` for guided installed-user samples and `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` for the sanitized production-proof fixture
 
 **Detailed slices:** `docs/backlog/wave-12-implementation-slices.md`
 

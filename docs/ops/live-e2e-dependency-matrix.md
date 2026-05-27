@@ -36,7 +36,7 @@ report a pre-1.0 local version that conflicts with modern `pytest`.
 
 ## Notes
 
-- Supported live proof profiles are full-journey/catalog-backed profiles and `installed-user-guided-journey`. Removed bounded deterministic profiles such as `regress-short`, `release-short`, `regress-long`, `release-long`, and `w7-governance-integration` are archived fixture history, not current live E2E acceptance commands.
+- Supported live proof profiles are full-journey/catalog-backed profiles and `installed-user-guided-journey`. Removed bounded deterministic profiles such as `regress-short`, `release-short`, `regress-long`, `release-long`, and `w7-governance-integration` are not current live E2E acceptance commands.
 - Profiles declare `verification.setup_commands` and `verification.commands`; the internal `scripts/live-e2e/run-profile.mjs` proof runner executes them from a cloned target workspace as the canonical path.
 - Standard run summaries should expose `target_checkout_root` and `generated_project_profile_file` so target-workspace provenance is machine-checkable.
 - Routed live execution should surface explicit branch signatures: `success`, `missing-command`, `missing-live-runtime`, auth/permission blocks, and policy-blocked (`blocking_reasons` / unsupported-adapter) without mock-only fallthrough.
@@ -66,27 +66,9 @@ Proof-mode fields:
 - promoted run summaries must record `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, passing required target verdicts, Runtime Harness/review/delivery evidence refs, and `no_upstream_write_assertion.status=pass`.
 - the committed W25-S03 fixture lives at `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`; it is sanitized proof evidence for the `ky.regress.small.openai` production cell only, and proof integrity rejects mock-backed `full_code_changing_runtime` claims.
 
-## Archived W12-S04 short-profile fixture bundle (2026-04-23)
+## Removed bounded fixture bundles
 
-The W12-S04 `regress-short` and `release-short` artifacts are archived fixture integrity evidence only. They must not be used as current live E2E acceptance closure because the supported live flow now requires skill-agent operator decisions and catalog-backed full journeys.
-
-Refreshed target-backed runs:
-- `w12-s04.regress-short` (scenario `ky-regression-smoke`) status `pass`.
-- `w12-s04.release-short` (scenario `ky-release-short`) status `pass`.
-
-Observed prerequisite confirmations:
-- both runs used real cloned target checkouts (`target_checkout_root`) instead of the AOR workspace.
-- profile-driven `verification.setup_commands` and `verification.commands` ran through the standard preflight path.
-- routed live execution emitted raw adapter evidence and compiled-context linkage on both runs.
-- proof generation kept the installed-user black-box CLI flow and used a deterministic `--examples-root` override only for the adapter external runtime.
-
-Observed failure signatures and safety defaults:
-- missing-command, missing-live-runtime, auth/permission, and policy-blocked signatures remain explicit in standard runbook expectations; no silent mock-only fallback was observed.
-- release-shaped rehearsal anchored `delivery-manifest.repo_deliveries[0].repo_root` and `release-packet.source_provenance.delivery_execution_root` to the exercised target checkout.
-- no-write safety defaults (`write_back_to_remote=false`) remained effective while still materializing delivery/release evidence.
-
-Canonical fixture bundle:
-- `examples/live-e2e/fixtures/w12-s04/w12-s04-evidence-bundle.json`
+The legacy W7/W10/W11/W12 bounded rehearsal bundles were removed from the repository when live E2E moved to skill-agent-only proof. Those artifacts predate the current acceptance model, did not require accepted `operator_decision_ref` evidence for every included step, and must not be cited as live acceptance closure. Historical backlog rows may still describe why those waves existed, but current live proof evidence starts at catalog-backed full journeys, `installed-user-guided-journey`, and the W25 production-proof fixture.
 
 ## W14 scenario/provider/size matrix notes (2026-04-24)
 
