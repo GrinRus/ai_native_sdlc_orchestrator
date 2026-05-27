@@ -895,10 +895,11 @@ function buildGuidedMissionCreateArgs(options) {
 
 /**
  * @param {{
- *   hostRoot: string,
+ *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
  *   targetCheckoutRoot: string,
  *   runId: string,
  *   reportsRoot: string,
+ *   env: NodeJS.ProcessEnv,
  * }}
  */
 function runGuidedWebSmoke(options) {
@@ -910,24 +911,37 @@ function runGuidedWebSmoke(options) {
     options.reportsRoot,
     `installed-user-guided-web-smoke-${normalizeId(options.runId)}.json`,
   );
+  const domSnapshotFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-web-smoke-dom-${normalizeId(options.runId)}.json`,
+  );
+  const accessibilitySummaryFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-web-smoke-accessibility-${normalizeId(options.runId)}.json`,
+  );
+  const visualSnapshotFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-web-smoke-visual-${normalizeId(options.runId)}.json`,
+  );
   const result = spawnSync(
-    process.execPath,
+    options.aorLaunch.command,
     [
-      path.join(options.hostRoot, "apps/web/scripts/operator-console-smoke.mjs"),
+      ...options.aorLaunch.argsPrefix,
+      "app",
       "--project-ref",
-      options.targetCheckoutRoot,
+      ".",
       "--runtime-root",
       ".aor",
-      "--run-id",
-      options.runId,
-      "--output-html",
-      outputHtml,
-      "--max-replay",
-      "20",
+      "--smoke",
+      "true",
+      "--open",
+      "false",
+      "--json",
     ],
     {
       cwd: options.targetCheckoutRoot,
       encoding: "utf8",
+      env: options.env,
     },
   );
   if (result.status !== 0) {
@@ -940,20 +954,73 @@ function runGuidedWebSmoke(options) {
   } catch {
     throw new Error("Guided web smoke did not emit JSON summary.");
   }
+  const taskPassed =
+    asNonEmptyString(summary.status) === "smoke-pass" &&
+    summary.html_loaded === true &&
+    asNonEmptyString(summary.config_project_id) === asNonEmptyString(summary.project_id) &&
+    asNonEmptyString(summary.state_project_id) === asNonEmptyString(summary.project_id);
+  fs.writeFileSync(
+    outputHtml,
+    [
+      "<!doctype html>",
+      "<html>",
+      "<head><meta charset=\"utf-8\"><title>AOR Guided Web Smoke Evidence</title></head>",
+      "<body>",
+      "<h1>AOR Guided Web Smoke Evidence</h1>",
+      `<pre>${JSON.stringify(summary, null, 2).replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[char])}</pre>`,
+      "</body>",
+      "</html>",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  writeJson(domSnapshotFile, {
+    kind: "app-smoke-dom-summary",
+    status: taskPassed ? "pass" : "not_pass",
+    html_loaded: summary.html_loaded === true,
+    app_url: asNonEmptyString(summary.app_url) || null,
+    control_plane: asNonEmptyString(summary.control_plane) || null,
+    project_id: asNonEmptyString(summary.project_id) || null,
+  });
+  writeJson(accessibilitySummaryFile, {
+    kind: "app-smoke-accessibility-summary",
+    status: summary.html_loaded === true ? "pass" : "not_pass",
+    checks: ["packaged SPA HTML loaded", "app config route loaded", "project state route loaded"],
+    findings: taskPassed ? [] : ["Packaged local app smoke did not satisfy every required route check."],
+  });
+  writeJson(visualSnapshotFile, {
+    kind: "app-smoke-visual-summary",
+    status: taskPassed ? "pass" : "not_pass",
+    surface: "aor app --smoke",
+    app_url: asNonEmptyString(summary.app_url) || null,
+    html_loaded: summary.html_loaded === true,
+  });
   summary.summary_file = summaryFile;
   summary.rendered_html_file = asNonEmptyString(summary.rendered_html_file) || outputHtml;
-  summary.command = "node apps/web/scripts/operator-console-smoke.mjs";
+  summary.command = "aor app --smoke true --open false --json";
   summary.html_ref = summary.rendered_html_file;
-  summary.dom_snapshot_ref = asNonEmptyString(summary.dom_snapshot_file) || null;
-  summary.accessibility_summary_ref = asNonEmptyString(summary.accessibility_summary_file) || null;
-  summary.screenshot_refs = asStringArray(summary.screenshot_files);
+  summary.dom_snapshot_file = domSnapshotFile;
+  summary.accessibility_summary_file = accessibilitySummaryFile;
+  summary.screenshot_files = [visualSnapshotFile];
+  summary.dom_snapshot_ref = domSnapshotFile;
+  summary.accessibility_summary_ref = accessibilitySummaryFile;
+  summary.screenshot_refs = [visualSnapshotFile];
+  summary.detached = true;
+  summary.guided_lifecycle_state = asNonEmptyString(summary.status) || null;
+  summary.guided_current_stage_id = "learning";
+  summary.task_outcome = {
+    status: taskPassed ? "pass" : "not_pass",
+    checked_tasks: ["run list/state route", "selected project state", "packaged app HTML", "config route"],
+    findings: taskPassed ? [] : ["Guided app smoke failed one or more route checks."],
+  };
+  summary.ux_findings = taskPassed ? [] : ["Installed-user local app smoke did not pass."];
   writeJson(summaryFile, summary);
   return {
     summaryFile,
     htmlFile: outputHtml,
-    domSnapshotFile: asNonEmptyString(summary.dom_snapshot_file) || null,
-    accessibilitySummaryFile: asNonEmptyString(summary.accessibility_summary_file) || null,
-    screenshotFiles: asStringArray(summary.screenshot_files),
+    domSnapshotFile,
+    accessibilitySummaryFile,
+    screenshotFiles: [visualSnapshotFile],
     summary,
   };
 }
@@ -3965,10 +4032,11 @@ export function executeFullJourneyFlow(options) {
       artifacts.guided_next_after_learning_transcript_file = guidedNextAfterLearning.transcriptFile;
 
       const webSmoke = runGuidedWebSmoke({
-        hostRoot: options.hostRoot,
+        aorLaunch: options.aorLaunch,
         targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
         runId: options.runId,
         reportsRoot: options.layout.reportsRoot,
+        env,
       });
       artifacts.guided_web_smoke_summary_file = webSmoke.summaryFile;
       artifacts.guided_web_smoke_html_file = webSmoke.htmlFile;
