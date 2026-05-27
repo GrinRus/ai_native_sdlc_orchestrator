@@ -17,6 +17,7 @@ import {
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const RUN_PROFILE_SCRIPT = path.join(SCRIPT_DIR, "run-profile.mjs");
 const REQUIRED_PHASES = Object.freeze(["plan", "execute", "inspect", "classify", "decide", "persist"]);
+const OBSERVATION_STATUSES = Object.freeze(["pass", "warn", "not_pass", "blocked", "interaction_required", "resumed"]);
 
 /**
  * @param {Record<string, unknown>} report
@@ -25,11 +26,39 @@ const REQUIRED_PHASES = Object.freeze(["plan", "execute", "inspect", "classify",
  */
 function validateControllerEvidence(report, state) {
   const issues = [];
+  const reportStatus = asNonEmptyString(report.report_status) || "final";
   const stepJournal = Array.isArray(report.step_journal) ? report.step_journal.map((entry) => asRecord(entry)) : [];
   const operatorContext = asRecord(report.operator_context);
-  const requiresOperatorDecision =
-    asNonEmptyString(operatorContext.operator_kind) === "skill-agent" &&
-    asNonEmptyString(operatorContext.decision_policy) === "required";
+  if (asNonEmptyString(operatorContext.operator_kind) !== "skill-agent") {
+    issues.push("operator_context.operator_kind must be skill-agent");
+  }
+  if (asNonEmptyString(operatorContext.decision_policy) !== "required") {
+    issues.push("operator_context.decision_policy must be required");
+  }
+  if (asNonEmptyString(operatorContext.answer_policy) !== "agent-public-control-plane") {
+    issues.push("operator_context.answer_policy must be agent-public-control-plane");
+  }
+  if (!asNonEmptyString(report.final_skill_agent_verdict_request_file)) {
+    issues.push("final_skill_agent_verdict_request_file is required");
+  }
+  const finalSkillAgentVerdict = asRecord(report.final_skill_agent_verdict);
+  if (reportStatus === "final" && !asNonEmptyString(report.final_skill_agent_verdict_file)) {
+    issues.push("final_skill_agent_verdict_file is required for final reports");
+  }
+  if (reportStatus === "final" && Object.keys(finalSkillAgentVerdict).length === 0) {
+    issues.push("final_skill_agent_verdict is required for final reports");
+  }
+  if (Object.keys(finalSkillAgentVerdict).length > 0) {
+    if (asNonEmptyString(finalSkillAgentVerdict.judge_source) !== "skill-agent") {
+      issues.push("final_skill_agent_verdict.judge_source must be skill-agent");
+    }
+    if (!OBSERVATION_STATUSES.includes(asNonEmptyString(finalSkillAgentVerdict.status))) {
+      issues.push("final_skill_agent_verdict.status must use the live E2E status scale");
+    }
+    if (asStringArray(finalSkillAgentVerdict.inspected_evidence_refs).length === 0) {
+      issues.push("final_skill_agent_verdict.inspected_evidence_refs is required");
+    }
+  }
   if (stepJournal.length === 0) {
     issues.push("step_journal must contain at least one online controller observation");
   }
@@ -56,11 +85,17 @@ function validateControllerEvidence(report, state) {
     if (!asNonEmptyString(entry.agent_decision_request_ref)) {
       issues.push(`${stepId} missing agent_decision_request_ref`);
     }
-    if (requiresOperatorDecision && asNonEmptyString(entry.operator_decision_status) !== "accepted") {
+    if (asNonEmptyString(entry.operator_decision_status) !== "accepted") {
       issues.push(`${stepId} missing accepted skill-agent operator decision`);
     }
-    if (requiresOperatorDecision && !asNonEmptyString(entry.operator_decision_ref)) {
+    if (!asNonEmptyString(entry.operator_decision_ref)) {
       issues.push(`${stepId} missing operator_decision_ref`);
+    }
+    if (asStringArray(entry.inspected_evidence_refs).length === 0) {
+      issues.push(`${stepId} missing inspected_evidence_refs`);
+    }
+    if (asNonEmptyString(asRecord(entry.semantic_analysis).judge_source) !== "skill-agent") {
+      issues.push(`${stepId} semantic_analysis.judge_source must be skill-agent`);
     }
     for (const phase of REQUIRED_PHASES) {
       const phaseFound = phaseHistory.some(

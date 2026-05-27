@@ -175,14 +175,12 @@ function assertLiveE2ePolicy(profile, source) {
   const agentDecisionPolicy = asNonEmptyString(policy.agent_decision_policy);
   const interactionAnswerPolicy = asNonEmptyString(policy.interaction_answer_policy);
   const targetWritePolicy = asNonEmptyString(policy.target_write_policy);
-  const internalTestHooks = asRecord(profile.internal_test_hooks);
   const implementationLoop = asRecord(profile.implementation_loop);
   const acceptanceLike =
-    internalTestHooks.allow_deterministic_operator_for_test !== true &&
-    (["acceptance", "production-proof"].includes(asNonEmptyString(profile.run_tier)) ||
+    ["acceptance", "production-proof"].includes(asNonEmptyString(profile.run_tier)) ||
       asRecord(profile.production_proof).enabled === true ||
       asNonEmptyString(profile.journey_mode) === "full-journey" ||
-      Boolean(asNonEmptyString(profile.target_catalog_id)));
+      Boolean(asNonEmptyString(profile.target_catalog_id));
   const problems = [];
 
   if (!["delivery_default", "full_lifecycle"].includes(flowRangePolicy)) {
@@ -194,34 +192,25 @@ function assertLiveE2ePolicy(profile, source) {
   if (!["public-control-plane"].includes(interactionCapability)) {
     problems.push("live_e2e.interaction_capability must be public-control-plane");
   }
-  if (!["none", "guided-app-smoke"].includes(frontendCapability)) {
-    problems.push("live_e2e.frontend_capability must be none or guided-app-smoke");
+  if (!["none", "guided-web-smoke", "browser-task-proof"].includes(frontendCapability)) {
+    problems.push("live_e2e.frontend_capability must be none, guided-web-smoke, or browser-task-proof");
   }
   if (!["no-upstream-write"].includes(safetyPolicy)) {
     problems.push("live_e2e.safety_policy must be no-upstream-write");
   }
-  if (!["skill-agent", "deterministic-fixture"].includes(operatorMode)) {
-    problems.push("live_e2e.operator_mode must be skill-agent or deterministic-fixture");
+  if (operatorMode !== "skill-agent") {
+    problems.push("live_e2e.operator_mode must be skill-agent");
   }
-  if (!["required", "optional"].includes(agentDecisionPolicy)) {
-    problems.push("live_e2e.agent_decision_policy must be required or optional");
+  if (agentDecisionPolicy !== "required") {
+    problems.push("live_e2e.agent_decision_policy must be required");
   }
-  if (!["agent-required", "deterministic-fixture"].includes(interactionAnswerPolicy)) {
-    problems.push("live_e2e.interaction_answer_policy must be agent-required or deterministic-fixture");
+  if (interactionAnswerPolicy !== "agent-required") {
+    problems.push("live_e2e.interaction_answer_policy must be agent-required");
   }
   if (targetWritePolicy !== "aor-runtime-only-before-execution") {
     problems.push("live_e2e.target_write_policy must be aor-runtime-only-before-execution");
   }
   if (acceptanceLike) {
-    if (operatorMode !== "skill-agent") {
-      problems.push("acceptance/production-proof profiles must use live_e2e.operator_mode=skill-agent");
-    }
-    if (agentDecisionPolicy !== "required") {
-      problems.push("acceptance/production-proof profiles must use live_e2e.agent_decision_policy=required");
-    }
-    if (interactionAnswerPolicy !== "agent-required") {
-      problems.push("acceptance/production-proof profiles must use live_e2e.interaction_answer_policy=agent-required");
-    }
     if (implementationLoop.enabled !== true) {
       problems.push("acceptance/production-proof profiles must enable implementation_loop.enabled=true");
     }

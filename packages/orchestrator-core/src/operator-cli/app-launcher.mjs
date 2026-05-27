@@ -22,6 +22,48 @@ function parseBooleanFlag(value, defaultValue) {
 }
 
 /**
+ * @param {string | boolean | undefined} value
+ * @returns {"off" | "full" | "compact"}
+ */
+function parseJsonFlag(value) {
+  if (value === undefined || value === false || value === "false") return "off";
+  if (value === true || value === "true" || value === "full") return "full";
+  if (value === "compact") return "compact";
+  throw new Error("Flag '--json' accepts boolean values or one of: full, compact.");
+}
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function compactJson(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => compactJson(entry)).filter((entry) => entry !== undefined);
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value)
+      .map(([key, entry]) => [key, compactJson(entry)])
+      .filter(([, entry]) => {
+        if (entry === undefined || entry === null || entry === "") return false;
+        if (Array.isArray(entry) && entry.length === 0) return false;
+        if (entry && typeof entry === "object" && Object.keys(entry).length === 0) return false;
+        return true;
+      });
+    return Object.fromEntries(entries);
+  }
+  return value;
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {"full" | "compact"} jsonMode
+ * @returns {string}
+ */
+function formatJson(payload, jsonMode) {
+  return JSON.stringify(jsonMode === "compact" ? compactJson(payload) : payload, null, 2);
+}
+
+/**
  * @param {string | undefined} value
  * @returns {number | undefined}
  */
@@ -185,7 +227,7 @@ export async function runAppCommand(args, options = {}) {
     const host = parseHost(optionalString(flags, "host"));
     const port = parsePort(optionalString(flags, "port"));
     const open = parseBooleanFlag(flags.open, true);
-    const json = parseBooleanFlag(flags.json, false);
+    const jsonMode = parseJsonFlag(flags.json);
     const smoke = parseBooleanFlag(flags.smoke, false);
     const packageRoot = repoRootFromModule();
     const staticRoot = path.join(packageRoot, "apps/web/dist");
@@ -239,24 +281,19 @@ export async function runAppCommand(args, options = {}) {
       const config = await getJson(`${transport.baseUrl}/app-config.json`);
       const state = await getJson(`${transport.baseUrl}/api/projects/${encodeURIComponent(transport.projectId)}/state`);
       await stopLocalApp();
-      stdout.write(
-        `${JSON.stringify(
-          {
-            ...summary,
-            status: "smoke-pass",
-            html_loaded: html.includes("AOR Operator Console"),
-            config_project_id: config.project_id,
-            state_project_id: state.project_id,
-          },
-          null,
-          2,
-        )}\n`,
-      );
+      const smokeSummary = {
+        ...summary,
+        status: "smoke-pass",
+        html_loaded: html.includes("AOR Operator Console"),
+        config_project_id: config.project_id,
+        state_project_id: state.project_id,
+      };
+      stdout.write(`${formatJson(smokeSummary, jsonMode === "compact" ? "compact" : "full")}\n`);
       return 0;
     }
 
-    if (json) {
-      stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+    if (jsonMode !== "off") {
+      stdout.write(`${formatJson(summary, jsonMode)}\n`);
     } else {
       stdout.write(`AOR Operator Console: ${appUrl}\n`);
       stdout.write(`Project: ${projectRef}\n`);

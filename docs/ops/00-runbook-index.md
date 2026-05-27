@@ -3,15 +3,11 @@
 ## Installed-user rehearsal profiles
 - `live-e2e-target-catalog.md` — canonical target repositories, setup commands, and scenario briefs.
 - `live-e2e-dependency-matrix.md` — canonical dependencies for setup and verification across all live E2E profiles.
-- `live-e2e-regress-short.md` — fast smoke rehearsal on a small public repository.
-- `live-e2e-regress-long.md` — deeper regression rehearsal with stronger verification.
-- `live-e2e-release-short.md` — short release rehearsal that still materializes a release packet.
-- `live-e2e-release-long.md` — long monorepo release rehearsal with stronger gates.
 - `live-e2e-standard-runner.md` — installed-user black-box step-controller runner, manual workflow, step evaluator, qualification loop, and artifact map for catalog profiles.
 - `runtime-permission-runner-certification.md` — post-merge real-runner smoke lane for runtime permission mode mappings and restricted-mode interaction evidence.
 - `installed-user-first-run.md` — public guided install, `aor doctor`, `aor onboard`, local `aor app`, Mission form, `aor next`, and guided proof shortcuts.
 - `live-e2e-learning-loop.md` — repeatable scorecard/incident capture and backlog-quality handoff flow.
-- `live-e2e-w7-governance-closure.md` — integrated W7 governance closure rehearsal and wave-level smoke checks.
+- Historical bounded rehearsal docs remain archived under `docs/ops/`, but they are not current live E2E proof runbooks.
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.
 - `live-run-event-stream.md` — replay-safe stream behavior, reconnect flow, and backpressure baseline.
 

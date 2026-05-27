@@ -812,6 +812,76 @@ test("live E2E observation report loads and enforces status scale", () => {
 
   assert.equal(inProgressSkillAgentValidation.ok, true);
 
+  const inProgressMissingFinalVerdictCandidate = structuredClone(loaded.document);
+  inProgressMissingFinalVerdictCandidate.report_status = "in_progress";
+  delete inProgressMissingFinalVerdictCandidate.final_skill_agent_verdict_file;
+  delete inProgressMissingFinalVerdictCandidate.final_skill_agent_verdict;
+
+  const inProgressMissingFinalVerdictValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: inProgressMissingFinalVerdictCandidate,
+    source: "test://live-e2e-observation-in-progress-missing-final-verdict",
+  });
+
+  assert.equal(inProgressMissingFinalVerdictValidation.ok, true);
+
+  const finalMissingInspectedRefsCandidate = structuredClone(loaded.document);
+  delete finalMissingInspectedRefsCandidate.final_skill_agent_verdict.inspected_evidence_refs;
+
+  const finalMissingInspectedRefsValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: finalMissingInspectedRefsCandidate,
+    source: "test://live-e2e-observation-final-missing-inspected-refs",
+  });
+
+  assert.equal(finalMissingInspectedRefsValidation.ok, false);
+  assert.ok(
+    finalMissingInspectedRefsValidation.issues.some(
+      (problem) =>
+        problem.code === "required_field_missing" &&
+        problem.field === "final_skill_agent_verdict.inspected_evidence_refs",
+    ),
+    "expected final reports without inspected skill-agent evidence refs to be rejected",
+  );
+
+  const finalInvalidVerdictStatusCandidate = structuredClone(loaded.document);
+  finalInvalidVerdictStatusCandidate.final_skill_agent_verdict.status = "green";
+
+  const finalInvalidVerdictStatusValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: finalInvalidVerdictStatusCandidate,
+    source: "test://live-e2e-observation-final-invalid-verdict-status",
+  });
+
+  assert.equal(finalInvalidVerdictStatusValidation.ok, false);
+  assert.ok(
+    finalInvalidVerdictStatusValidation.issues.some(
+      (problem) =>
+        problem.code === "enum_value_invalid" &&
+        problem.field === "final_skill_agent_verdict.status",
+    ),
+    "expected final skill-agent verdict status to use the live E2E status scale",
+  );
+
+  const acceptedStepMissingInspectedRefsCandidate = structuredClone(loaded.document);
+  delete acceptedStepMissingInspectedRefsCandidate.step_journal[0].inspected_evidence_refs;
+
+  const acceptedStepMissingInspectedRefsValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: acceptedStepMissingInspectedRefsCandidate,
+    source: "test://live-e2e-observation-step-missing-inspected-refs",
+  });
+
+  assert.equal(acceptedStepMissingInspectedRefsValidation.ok, false);
+  assert.ok(
+    acceptedStepMissingInspectedRefsValidation.issues.some(
+      (problem) =>
+        problem.code === "required_field_missing" &&
+        problem.field === "step_journal[0].inspected_evidence_refs",
+    ),
+    "expected accepted step decisions without inspected evidence refs to be rejected",
+  );
+
   const missingInstallCandidate = structuredClone(loaded.document);
   delete missingInstallCandidate.aor_installation_proof_file;
 
@@ -899,6 +969,40 @@ test("live E2E observation report loads and enforces status scale", () => {
       (problem) => problem.code === "field_type_mismatch" && problem.field === "setup_journal[0].evidence_refs[0]",
     ),
     "expected setup evidence refs to contain strings only",
+  );
+
+  const malformedFrontendEvidenceCandidate = structuredClone(loaded.document);
+  malformedFrontendEvidenceCandidate.frontend_interactions[0].screenshot_refs = [123];
+
+  const malformedFrontendEvidenceValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: malformedFrontendEvidenceCandidate,
+    source: "test://live-e2e-observation-malformed-frontend-evidence",
+  });
+
+  assert.equal(malformedFrontendEvidenceValidation.ok, false);
+  assert.ok(
+    malformedFrontendEvidenceValidation.issues.some(
+      (problem) => problem.code === "field_type_mismatch" && problem.field === "frontend_interactions[0].screenshot_refs[0]",
+    ),
+    "expected frontend screenshot refs to contain strings only",
+  );
+
+  const missingFrontendVerdictCandidate = structuredClone(loaded.document);
+  delete missingFrontendVerdictCandidate.frontend_interactions[0].agent_verdict_ref;
+
+  const missingFrontendVerdictValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: missingFrontendVerdictCandidate,
+    source: "test://live-e2e-observation-missing-frontend-verdict",
+  });
+
+  assert.equal(missingFrontendVerdictValidation.ok, false);
+  assert.ok(
+    missingFrontendVerdictValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "frontend_interactions[0].agent_verdict_ref",
+    ),
+    "expected passing frontend evidence to require a skill-agent verdict ref",
   );
 
   for (const legacyField of ["step_matrix", "verdict_matrix", "artifact_quality_matrix", "continuation_decisions"]) {

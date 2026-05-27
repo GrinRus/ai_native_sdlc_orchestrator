@@ -2124,9 +2124,9 @@ function validateLiveE2EObservationReport(document, source) {
   }
   const operatorContext = isPlainObject(document.operator_context) ? document.operator_context : {};
   for (const [field, expectedValues] of [
-    ["operator_kind", ["skill-agent", "deterministic-fixture"]],
-    ["decision_policy", ["required", "optional"]],
-    ["answer_policy", ["agent-public-control-plane", "deterministic-fixture-only"]],
+    ["operator_kind", ["skill-agent"]],
+    ["decision_policy", ["required"]],
+    ["answer_policy", ["agent-public-control-plane"]],
     ["target_write_policy", ["aor-runtime-only-before-execution"]],
   ]) {
     const value = operatorContext[field];
@@ -2155,6 +2155,98 @@ function validateLiveE2EObservationReport(document, source) {
       }),
     );
   }
+  if (typeof document.final_skill_agent_verdict_request_file !== "string" || document.final_skill_agent_verdict_request_file.length === 0) {
+    issues.push(
+      issue({
+        code: document.final_skill_agent_verdict_request_file === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "final_skill_agent_verdict_request_file",
+        expected: "non-empty string",
+        actual:
+          document.final_skill_agent_verdict_request_file === undefined
+            ? "missing"
+            : describeActualType(document.final_skill_agent_verdict_request_file),
+        message: "Field 'final_skill_agent_verdict_request_file' is required for skill-agent-only live E2E reports.",
+      }),
+    );
+  }
+  if (
+    reportStatus === "final" &&
+    (typeof document.final_skill_agent_verdict_file !== "string" || document.final_skill_agent_verdict_file.length === 0)
+  ) {
+    issues.push(
+      issue({
+        code: document.final_skill_agent_verdict_file === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "final_skill_agent_verdict_file",
+        expected: "non-empty string",
+        actual:
+          document.final_skill_agent_verdict_file === undefined
+            ? "missing"
+            : describeActualType(document.final_skill_agent_verdict_file),
+        message: "Field 'final_skill_agent_verdict_file' is required for final skill-agent-only live E2E reports.",
+      }),
+    );
+  }
+  if (reportStatus === "final" && !isPlainObject(document.final_skill_agent_verdict)) {
+    issues.push(
+      issue({
+        code: document.final_skill_agent_verdict === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "final_skill_agent_verdict",
+        expected: "object",
+        actual:
+          document.final_skill_agent_verdict === undefined ? "missing" : describeActualType(document.final_skill_agent_verdict),
+        message: "Field 'final_skill_agent_verdict' is required for final skill-agent-only live E2E reports.",
+      }),
+    );
+  }
+  if (isPlainObject(document.final_skill_agent_verdict)) {
+    const finalVerdict = document.final_skill_agent_verdict;
+    validateObservationStatusField({
+      value: finalVerdict.status,
+      source,
+      field: "final_skill_agent_verdict.status",
+      issues,
+    });
+    if (finalVerdict.judge_source !== "skill-agent") {
+      issues.push(
+        issue({
+          code: finalVerdict.judge_source === undefined ? "required_field_missing" : "enum_value_invalid",
+          source,
+          field: "final_skill_agent_verdict.judge_source",
+          expected: "skill-agent",
+          actual: finalVerdict.judge_source === undefined ? "missing" : String(finalVerdict.judge_source),
+          message: "Field 'final_skill_agent_verdict.judge_source' must be skill-agent.",
+        }),
+      );
+    }
+    const inspectedRefs = Array.isArray(finalVerdict.inspected_evidence_refs)
+      ? finalVerdict.inspected_evidence_refs
+      : [];
+    if (inspectedRefs.length === 0) {
+      issues.push(
+        issue({
+          code: finalVerdict.inspected_evidence_refs === undefined ? "required_field_missing" : "array_empty",
+          source,
+          field: "final_skill_agent_verdict.inspected_evidence_refs",
+          expected: "non-empty string array",
+          actual:
+            finalVerdict.inspected_evidence_refs === undefined
+              ? "missing"
+              : describeActualType(finalVerdict.inspected_evidence_refs),
+          message: "Final skill-agent verdict must list inspected evidence refs.",
+        }),
+      );
+    } else {
+      validateStringArrayItems({
+        values: finalVerdict.inspected_evidence_refs,
+        source,
+        field: "final_skill_agent_verdict.inspected_evidence_refs",
+        issues,
+      });
+    }
+  }
   const finalAnalysis = isPlainObject(document.final_analysis)
     ? document.final_analysis
     : {};
@@ -2181,7 +2273,92 @@ function validateLiveE2EObservationReport(document, source) {
     source,
     issues,
   });
+  validateObservationFrontendInteractions({
+    entries: document.frontend_interactions,
+    source,
+    issues,
+  });
   return issues;
+}
+
+/**
+ * @param {{ entries: unknown, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateObservationFrontendInteractions(options) {
+  if (!Array.isArray(options.entries)) return;
+  options.entries.forEach((entry, index) => {
+    const record = isPlainObject(entry) ? entry : {};
+    for (const [field, expectedType] of [
+      ["step_id", "string"],
+      ["surface", "string"],
+      ["evidence_refs", "array"],
+      ["html_ref", "string"],
+      ["screenshot_refs", "array"],
+      ["dom_snapshot_ref", "string"],
+      ["accessibility_summary_ref", "string"],
+      ["task_outcome", "object"],
+      ["ux_findings", "array"],
+      ["status", "string"],
+      ["summary", "string"],
+    ]) {
+      const value = record[field];
+      if (!isExpectedType(value, expectedType)) {
+        options.issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source: options.source,
+            field: `frontend_interactions[${index}].${field}`,
+            expected: value === undefined ? "present" : expectedType,
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Field 'frontend_interactions[${index}].${field}' is required for UI/UX live E2E evidence.`,
+          }),
+        );
+      }
+    }
+    validateStringArrayItems({
+      values: record.evidence_refs,
+      source: options.source,
+      field: `frontend_interactions[${index}].evidence_refs`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: record.screenshot_refs,
+      source: options.source,
+      field: `frontend_interactions[${index}].screenshot_refs`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: record.ux_findings,
+      source: options.source,
+      field: `frontend_interactions[${index}].ux_findings`,
+      issues: options.issues,
+    });
+    validateObservationStatusField({
+      value: record.status,
+      source: options.source,
+      field: `frontend_interactions[${index}].status`,
+      issues: options.issues,
+    });
+    const taskOutcome = isPlainObject(record.task_outcome) ? record.task_outcome : {};
+    validateObservationStatusField({
+      value: taskOutcome.status,
+      source: options.source,
+      field: `frontend_interactions[${index}].task_outcome.status`,
+      issues: options.issues,
+    });
+    if (record.status === "pass" && typeof record.agent_verdict_ref !== "string") {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: `frontend_interactions[${index}].agent_verdict_ref`,
+          expected: "string",
+          actual: record.agent_verdict_ref === undefined ? "missing" : describeActualType(record.agent_verdict_ref),
+          message: "Passing UI/UX live E2E evidence must link the skill-agent UI verdict.",
+        }),
+      );
+    }
+  });
 }
 
 /**
@@ -2420,14 +2597,14 @@ function validateObservationStepJournal(options) {
     const decisionStatus = record.operator_decision_status;
     if (
       typeof decisionStatus === "string" &&
-      !["accepted", "missing", "rejected", "not_required"].includes(decisionStatus)
+      !["accepted", "missing", "rejected"].includes(decisionStatus)
     ) {
       options.issues.push(
         issue({
           code: "enum_value_invalid",
           source: options.source,
           field: `step_journal[${index}].operator_decision_status`,
-          expected: "accepted|missing|rejected|not_required",
+          expected: "accepted|missing|rejected",
           actual: decisionStatus,
           message: "Field 'operator_decision_status' must describe the operator decision state.",
         }),
@@ -2444,6 +2621,31 @@ function validateObservationStepJournal(options) {
           message: "Accepted live E2E operator decisions must carry 'operator_decision_ref'.",
         }),
       );
+    }
+    if (decisionStatus === "accepted") {
+      const inspectedRefs = Array.isArray(record.inspected_evidence_refs) ? record.inspected_evidence_refs : [];
+      if (inspectedRefs.length === 0) {
+        options.issues.push(
+          issue({
+            code: record.inspected_evidence_refs === undefined ? "required_field_missing" : "array_empty",
+            source: options.source,
+            field: `step_journal[${index}].inspected_evidence_refs`,
+            expected: "non-empty string array",
+            actual:
+              record.inspected_evidence_refs === undefined
+                ? "missing"
+                : describeActualType(record.inspected_evidence_refs),
+            message: "Accepted live E2E operator decisions must list inspected evidence refs.",
+          }),
+        );
+      } else {
+        validateStringArrayItems({
+          values: record.inspected_evidence_refs,
+          source: options.source,
+          field: `step_journal[${index}].inspected_evidence_refs`,
+          issues: options.issues,
+        });
+      }
     }
     if (operatorKind === "skill-agent" && decisionPolicy === "required" && finalReport) {
       if (decisionStatus !== "accepted") {

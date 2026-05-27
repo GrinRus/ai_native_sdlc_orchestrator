@@ -379,7 +379,6 @@ function validateProofBundleIntegrity(proof, bundlePath) {
 
 function assertProofBundleIntegrity() {
   const bundlePaths = [
-    "examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json",
     "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json",
   ];
 
@@ -389,29 +388,6 @@ function assertProofBundleIntegrity() {
     if (errors.length > 0) {
       for (const error of errors) console.error(error);
       process.exit(1);
-    }
-  }
-
-  const proof = JSON.parse(read("examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json"));
-  const proofClaimFiles = ["README.md", "docs/ops/live-e2e-standard-runner.md"];
-  if (proof.proof_scope === "coverage_with_findings") {
-    for (const file of proofClaimFiles) {
-      const content = read(file);
-      if (content.includes("pass_with_findings") && !content.includes("coverage_with_findings")) {
-        console.error(`${file} mentions pass_with_findings without coverage_with_findings proof scope.`);
-        process.exit(1);
-      }
-
-      const forbiddenPositiveClaims = [
-        /\bW14\b[^\n.]*\bfull production pass\b/iu,
-        /\bW14\b[^\n.]*\bfull runtime pass\b/iu,
-        /\bW14\b[^\n.]*\bfull product pass\b/iu,
-        /\bW14\b[^\n.]*\bproduction-ready proof\b/iu,
-      ];
-      if (forbiddenPositiveClaims.some((pattern) => pattern.test(content))) {
-        console.error(`${file} overstates W14 coverage proof as production/full-runtime proof.`);
-        process.exit(1);
-      }
     }
   }
 
@@ -1126,10 +1102,9 @@ if (!fs.existsSync(webDistIndex)) {
 
 console.log("web app test bundle ok: local app smoke can serve packaged SPA assets");
 
-const liveE2EProofRunnerTestsPath = path.join(root, "scripts/test/live-e2e-proof-runner.test.mjs");
 const liveE2EStepControllerTestsPath = path.join(root, "scripts/test/live-e2e-step-controller.test.mjs");
 removeFileIfExists(liveE2EContextFile);
-const liveE2EProofRunnerTestRun = spawnSync(process.execPath, ["--test", liveE2EStepControllerTestsPath, liveE2EProofRunnerTestsPath], {
+const liveE2EStepControllerTestRun = spawnSync(process.execPath, ["--test", liveE2EStepControllerTestsPath], {
   cwd: root,
   env: {
     ...process.env,
@@ -1140,17 +1115,12 @@ const liveE2EProofRunnerTestRun = spawnSync(process.execPath, ["--test", liveE2E
   timeout: liveE2ETestSuiteTimeoutMs,
 });
 
-if (liveE2EProofRunnerTestRun.status !== 0) {
-  printLiveE2ETimeoutDiagnostic(liveE2EProofRunnerTestRun, [
-    liveE2EStepControllerTestsPath,
-    liveE2EProofRunnerTestsPath,
-  ]);
-  removeFileIfExists(liveE2EContextFile);
-  process.exit(liveE2EProofRunnerTestRun.status ?? 1);
+if (liveE2EStepControllerTestRun.status !== 0) {
+  process.exit(liveE2EStepControllerTestRun.status ?? 1);
 }
 removeFileIfExists(liveE2EContextFile);
 
-console.log("live-e2e tests ok: online step controller and installed-user black-box proof flow");
+console.log("live-e2e tests ok: online step controller");
 
 const cliTestsPath = path.join(root, "apps/cli/test/cli.test.mjs");
 const cliTestRun = spawnSync(process.execPath, ["--test", cliTestsPath], {

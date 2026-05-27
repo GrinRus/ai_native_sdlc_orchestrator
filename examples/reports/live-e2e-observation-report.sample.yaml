@@ -3,10 +3,10 @@ run_id: live-e2e.sample.run
 profile_id: live-e2e.full-journey.regress.ky
 report_status: final
 operator_context:
-  operator_kind: deterministic-fixture
-  operator_ref: fixture://live-e2e-deterministic-runner
-  decision_policy: optional
-  answer_policy: deterministic-fixture-only
+  operator_kind: skill-agent
+  operator_ref: skill://live-e2e-runner
+  decision_policy: required
+  answer_policy: agent-public-control-plane
   target_write_policy: aor-runtime-only-before-execution
 controller_state_ref: runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
 flow_range:
@@ -49,6 +49,8 @@ aor_installation:
     - runtime://reports/live-e2e-aor-install/03-pnpm-build.json
     - runtime://reports/live-e2e-aor-install/04-pnpm-aor-help.json
 aor_installation_proof_file: runtime://reports/live-e2e-aor-installation-proof-live-e2e.sample.run.json
+final_skill_agent_verdict_request_file: runtime://reports/live-e2e-final-skill-agent-verdict-request-live-e2e.sample.run.json
+final_skill_agent_verdict_file: runtime://reports/live-e2e-final-skill-agent-verdict-live-e2e.sample.run.json
 setup_journal:
   - sequence: 1
     step_id: install
@@ -133,11 +135,15 @@ step_journal:
       recommendation: continue
     semantic_analysis:
       status: pass
-      judge_source: deterministic-fixture
+      judge_source: skill-agent
       findings: []
     agent_decision_request_ref: runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-01-discovery.json
     operator_decision_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-01-discovery.json
     operator_decision_status: accepted
+    inspected_evidence_refs:
+      - runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-01-discovery.json
+      - runtime://reports/live-e2e-step-inspection-live-e2e.sample.run-01-discovery.json
+      - runtime://reports/live-e2e-step-classification-live-e2e.sample.run-01-discovery.json
     requested_interaction: null
     decision:
       action: continue
@@ -168,8 +174,54 @@ final_analysis:
   learning:
     status: not_pass
     evidence_refs: []
+final_skill_agent_verdict:
+  verdict_id: live-e2e.sample.run.final-skill-agent-verdict
+  run_id: live-e2e.sample.run
+  status: warn
+  judge_source: skill-agent
+  accepted_step_count: 1
+  required_steps:
+    - discovery
+  missing_skill_agent_steps: []
+  operator_decision_refs:
+    - runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-01-discovery.json
+  evidence_refs:
+    - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
+  inspected_evidence_refs:
+    - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+    - runtime://reports/live-e2e-step-observation-live-e2e.sample.run-01-discovery.json
+  findings:
+    - post-delivery quality checks produced findings
+  final_recommendation: review findings before acceptance closure
+  created_at: "2026-05-18T00:00:03.000Z"
 interactive_decisions: []
-frontend_interactions: []
+frontend_interactions:
+  - step_id: learning
+    interaction_id: guided-web-smoke
+    surface: web
+    evidence_refs:
+      - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+      - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.html
+      - runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
+      - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+      - runtime://reports/installed-user-guided-web-screenshot-live-e2e.sample.run.svg
+    html_ref: runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.html
+    screenshot_refs:
+      - runtime://reports/installed-user-guided-web-screenshot-live-e2e.sample.run.svg
+    dom_snapshot_ref: runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
+    accessibility_summary_ref: runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+    task_outcome:
+      status: pass
+      checked_tasks:
+        - run-list-rendered
+        - selected-run-detail-rendered
+        - evidence-links-rendered
+        - closure-state-rendered
+    ux_findings: []
+    agent_verdict_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-10-learning.json
+    status: pass
+    summary: Guided frontend smoke interaction completed through the installed-user web surface.
 evidence_refs:
   - runtime://reports/live-e2e-run-summary.json
   - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-final-skill-agent-verdict-live-e2e.sample.run.json

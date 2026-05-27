@@ -644,6 +644,25 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(appSmokePayload.html_loaded, true);
     assert.equal(appSmokePayload.state_project_id, appSmokePayload.project_id);
 
+    const appSmokeCompact = spawnSync(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "app",
+      "--project-ref",
+      projectRoot,
+      "--smoke",
+      "--open",
+      "false",
+      "--json",
+      "compact",
+    ], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+    assert.equal(appSmokeCompact.status, 0, appSmokeCompact.stderr);
+    const appSmokeCompactPayload = JSON.parse(appSmokeCompact.stdout);
+    assert.equal(appSmokeCompactPayload.status, "smoke-pass");
+    assert.equal(appSmokeCompactPayload.html_loaded, true);
+
     const invalidAppPort = spawnSync(process.execPath, [
       path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
       "app",

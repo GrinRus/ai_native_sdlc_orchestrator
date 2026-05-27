@@ -191,6 +191,26 @@ function readJsonIfPresent(filePath) {
 }
 
 /**
+ * @param {string} evidenceRef
+ * @param {string} reportsRoot
+ * @returns {boolean}
+ */
+function localEvidenceRefExists(evidenceRef, reportsRoot) {
+  const ref = asNonEmptyString(evidenceRef);
+  if (!ref) return true;
+  if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(ref)) {
+    if (!ref.startsWith("evidence://")) return true;
+    const evidencePath = ref.slice("evidence://".length);
+    return !path.isAbsolute(evidencePath) || fileExists(evidencePath);
+  }
+  if (path.isAbsolute(ref)) return fileExists(ref);
+  if (ref.startsWith(".") || ref.includes("/") || ref.includes("\\")) {
+    return fileExists(path.resolve(reportsRoot, ref));
+  }
+  return true;
+}
+
+/**
  * @param {Array<Record<string, unknown>>} runtimePermissionDecisions
  * @returns {Record<string, unknown>}
  */
@@ -419,38 +439,6 @@ function buildScorecard(options) {
 }
 
 /**
- * @param {string | null} filePath
- * @returns {Record<string, unknown>}
- */
-function loadAgentJudgeDocument(filePath) {
-  const resolved = asNonEmptyString(filePath);
-  if (!resolved) return {};
-  if (!fileExists(resolved)) {
-    throw new UsageError(`Agent judge file '${resolved}' was not found.`);
-  }
-  return readJson(resolved);
-}
-
-/**
- * @param {Record<string, unknown>} judgeDocument
- * @returns {Map<string, Record<string, unknown>>}
- */
-function indexAgentJudgeEntries(judgeDocument) {
-  const entries = Array.isArray(judgeDocument.step_journal)
-    ? judgeDocument.step_journal
-    : Array.isArray(judgeDocument.steps)
-      ? judgeDocument.steps
-      : [];
-  const indexed = new Map();
-  for (const entry of entries) {
-    const record = asRecord(entry);
-    const stepId = asNonEmptyString(record.step_id) || asNonEmptyString(record.step) || asNonEmptyString(record.flow_stage);
-    if (stepId) indexed.set(stepId, record);
-  }
-  return indexed;
-}
-
-/**
  * @param {Record<string, unknown>} profile
  * @returns {"delivery_default" | "full_lifecycle"}
  */
@@ -511,10 +499,7 @@ function assertInstallModeAllowed(options) {
   const runTier = resolveSummaryRunTier(options.profile);
   const productionProofEnabled = asRecord(options.profile.production_proof).enabled === true;
   const internalTestHooks = asRecord(options.profile.internal_test_hooks);
-  if (
-    internalTestHooks.allow_repo_local_install_for_test === true ||
-    (internalTestHooks.allow_deterministic_operator_for_test === true && runTier !== "production-proof")
-  ) {
+  if (internalTestHooks.allow_repo_local_install_for_test === true) {
     return;
   }
   if (runTier === "acceptance" || runTier === "production-proof" || productionProofEnabled) {
@@ -627,19 +612,54 @@ function resolveInteractiveFinalStepVerdict(requestedInteraction, deterministicF
 
 /**
  * @param {Record<string, unknown>} artifacts
+ * @param {Array<Record<string, unknown>>} stepJournal
  * @returns {Array<Record<string, unknown>>}
  */
-function buildFrontendInteractions(artifacts) {
-  const summaryFile = asNonEmptyString(artifacts.guided_app_smoke_summary_file);
-  if (!summaryFile) return [];
+function buildFrontendInteractions(artifacts, stepJournal = []) {
+  const summaryFile = asNonEmptyString(artifacts.guided_web_smoke_summary_file);
+  const htmlFile = asNonEmptyString(artifacts.guided_web_smoke_html_file);
+  const domSnapshotFile = asNonEmptyString(artifacts.guided_web_dom_snapshot_file);
+  const accessibilitySummaryFile = asNonEmptyString(artifacts.guided_web_accessibility_summary_file);
+  const visualGuardrailFile = asNonEmptyString(artifacts.guided_web_visual_guardrail_file);
+  const screenshotRefs = asStringArray(artifacts.guided_web_screenshot_files);
+  if (!summaryFile && !htmlFile && !domSnapshotFile && !visualGuardrailFile && screenshotRefs.length === 0) return [];
+  const webSmoke = asRecord(artifacts.guided_web_smoke);
+  const taskOutcome = asRecord(webSmoke.task_outcome);
+  const status = toObservationStatus(asNonEmptyString(taskOutcome.status) || "pass");
+  const learningVerdict = stepJournal.find(
+    (entry) =>
+      asNonEmptyString(asRecord(entry).step_id) === "learning" &&
+      asNonEmptyString(asRecord(entry).operator_decision_status) === "accepted" &&
+      asNonEmptyString(asRecord(asRecord(entry).semantic_analysis).judge_source) === "skill-agent",
+  );
+  const agentVerdictRef = asNonEmptyString(asRecord(learningVerdict).operator_decision_ref) || null;
+  const interactionStatus = agentVerdictRef ? status : "blocked";
   return [
     {
       step_id: "learning",
-      interaction_id: "guided-app-smoke",
+      interaction_id: "guided-web-smoke",
       surface: "web",
-      evidence_refs: uniqueStrings([summaryFile]),
-      status: "pass",
-      summary: "Guided app smoke completed through the installed-user web surface.",
+      evidence_refs: uniqueStrings([
+        summaryFile,
+        htmlFile,
+        domSnapshotFile,
+        accessibilitySummaryFile,
+        visualGuardrailFile,
+        ...screenshotRefs,
+      ]),
+      html_ref: htmlFile || asNonEmptyString(webSmoke.html_ref) || null,
+      screenshot_refs: screenshotRefs,
+      dom_snapshot_ref: domSnapshotFile || asNonEmptyString(webSmoke.dom_snapshot_ref) || null,
+      accessibility_summary_ref: accessibilitySummaryFile || asNonEmptyString(webSmoke.accessibility_summary_ref) || null,
+      task_outcome: {
+        status,
+        checked_tasks: asStringArray(taskOutcome.checked_tasks),
+        findings: asStringArray(taskOutcome.findings),
+      },
+      ux_findings: asStringArray(webSmoke.ux_findings),
+      agent_verdict_ref: agentVerdictRef,
+      status: interactionStatus,
+      summary: "Guided frontend smoke interaction completed through the installed-user web surface.",
     },
   ];
 }
@@ -736,14 +756,10 @@ function buildSetupJournal(artifacts) {
   return setupEntries;
 }
 
-/**
- * @param {{ profile: Record<string, unknown>, flowResult: { stageResults: Array<Record<string, unknown>>, commandResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }, agentJudgeDocument: Record<string, unknown> }}
- */
 function buildStepJournal(options) {
   const controllerEntries = Array.isArray(options.flowResult.artifacts.live_e2e_step_journal_entries)
     ? options.flowResult.artifacts.live_e2e_step_journal_entries.map((entry) => asRecord(entry))
     : [];
-  const judgeEntries = indexAgentJudgeEntries(options.agentJudgeDocument);
   const frontendInteractions = buildFrontendInteractions(options.flowResult.artifacts);
 
   return controllerEntries.map((rawEntry, index) => {
@@ -759,10 +775,8 @@ function buildStepJournal(options) {
       LIVE_E2E_OPERATOR_ACTIONS.includes(rawOperatorAction);
     const deterministicAnalysis = asRecord(rawEntry.deterministic_analysis);
     const deterministicStatus = toObservationStatus(asNonEmptyString(deterministicAnalysis.status) || "not_pass");
-    const judgeEntry = judgeEntries.get(step) ?? judgeEntries.get(asNonEmptyString(command?.label));
-    const semanticStatus = judgeEntry
-      ? toObservationStatus(asNonEmptyString(asRecord(judgeEntry.semantic_analysis).status) || asNonEmptyString(judgeEntry.status))
-      : toObservationStatus(asNonEmptyString(asRecord(rawEntry.semantic_analysis).status) || deterministicStatus);
+    const rawSemanticAnalysis = asRecord(rawEntry.semantic_analysis);
+    const semanticStatus = toObservationStatus(asNonEmptyString(rawSemanticAnalysis.status) || deterministicStatus);
     const finalStepVerdict =
       observationSeverity(semanticStatus) > observationSeverity(deterministicStatus) ? semanticStatus : deterministicStatus;
     const requestedInteraction = asRecord(rawEntry.requested_interaction);
@@ -841,15 +855,9 @@ function buildStepJournal(options) {
       },
       semantic_analysis: {
         status: semanticStatus,
-        judge_source:
-          asNonEmptyString(judgeEntry?.judge_source) ||
-          asNonEmptyString(asRecord(judgeEntry?.semantic_analysis).judge_source) ||
-          asNonEmptyString(asRecord(rawEntry.semantic_analysis).judge_source) ||
-          "deterministic-runner",
+        judge_source: asNonEmptyString(rawSemanticAnalysis.judge_source) || "deterministic-runner",
         findings: uniqueStrings([
-          ...asStringArray(asRecord(rawEntry.semantic_analysis).findings),
-          ...asStringArray(judgeEntry?.findings),
-          ...asStringArray(asRecord(judgeEntry?.semantic_analysis).findings),
+          ...asStringArray(rawSemanticAnalysis.findings),
           ...(semanticStatus === "pass" ? [] : [asNonEmptyString(stage.summary) || `${step} did not complete cleanly`]),
         ]),
       },
@@ -996,9 +1004,6 @@ function buildInteractiveDecisions(stepJournal) {
     });
 }
 
-/**
- * @param {{ runId: string, profilePath: string, profile: Record<string, unknown>, flowResult: { stageResults: Array<Record<string, unknown>>, commandResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }, summaryFile: string, agentJudgeDocument: Record<string, unknown> }}
- */
 function buildObservationReport(options) {
   const flowRangePolicy = resolveFlowRangePolicy(options.profile);
   const includedSteps = getIncludedStepsForPolicy(flowRangePolicy);
@@ -1007,12 +1012,9 @@ function buildObservationReport(options) {
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const controllerStop = asRecord(options.flowResult.artifacts.live_e2e_controller_stop);
   const reportStatus = isLiveE2eControllerStopInProgress(controllerStop, includedSteps) ? "in_progress" : "final";
-  const agentJudgeDocument =
-    asNonEmptyString(operatorContext.operator_kind) === "skill-agent" ? {} : options.agentJudgeDocument;
   const stepJournal = buildStepJournal({
     profile: options.profile,
     flowResult: options.flowResult,
-    agentJudgeDocument,
   });
   const finalAnalysis = buildFinalAnalysis({
     stepJournal,
@@ -1041,7 +1043,7 @@ function buildObservationReport(options) {
     step_journal: stepJournal,
     final_analysis: finalAnalysis,
     interactive_decisions: buildInteractiveDecisions(stepJournal),
-    frontend_interactions: buildFrontendInteractions(options.flowResult.artifacts),
+    frontend_interactions: buildFrontendInteractions(options.flowResult.artifacts, stepJournal),
     evidence_refs: uniqueStrings([
       options.summaryFile,
       asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file),
@@ -1054,6 +1056,121 @@ function buildObservationReport(options) {
       asNonEmptyString(options.flowResult.artifacts.runtime_harness_report_file),
       asNonEmptyString(options.flowResult.artifacts.evaluation_report_file),
     ]),
+  };
+}
+
+/**
+ * @param {{ runId: string, reportsRoot: string, observationReport: Record<string, unknown> }}
+ */
+function resolveFinalSkillAgentVerdict(options) {
+  const stepJournal = Array.isArray(options.observationReport.step_journal)
+    ? options.observationReport.step_journal.map((entry) => asRecord(entry))
+    : [];
+  const includedSteps = asStringArray(asRecord(options.observationReport.flow_range).included_steps);
+  const acceptedSkillAgentSteps = stepJournal.filter(
+    (entry) =>
+      asNonEmptyString(entry.operator_decision_status) === "accepted" &&
+      asNonEmptyString(asRecord(entry.semantic_analysis).judge_source) === "skill-agent",
+  );
+  const acceptedStepIds = new Set(acceptedSkillAgentSteps.map((entry) => asNonEmptyString(entry.step_id)).filter(Boolean));
+  const missingSteps = includedSteps.filter((step) => !acceptedStepIds.has(step));
+  const finalAnalysis = asRecord(options.observationReport.final_analysis);
+  const finalAnalysisStatus = toObservationStatus(asNonEmptyString(finalAnalysis.status) || "not_pass");
+  const frontendInteractions = Array.isArray(options.observationReport.frontend_interactions)
+    ? options.observationReport.frontend_interactions.map((entry) => asRecord(entry))
+    : [];
+  const missingFrontendVerdicts = frontendInteractions
+    .filter((entry) => {
+      const status = toObservationStatus(asNonEmptyString(entry.status) || "not_pass");
+      return status === "pass" && !asNonEmptyString(entry.agent_verdict_ref);
+    })
+    .map((entry) => asNonEmptyString(entry.interaction_id) || asNonEmptyString(entry.step_id) || "frontend-interaction");
+  const failedFrontendInteractions = frontendInteractions
+    .filter((entry) => !["pass", "warn"].includes(toObservationStatus(asNonEmptyString(entry.status) || "not_pass")))
+    .map((entry) => asNonEmptyString(entry.interaction_id) || asNonEmptyString(entry.step_id) || "frontend-interaction");
+  const expectedVerdictFile = path.join(
+    options.reportsRoot,
+    `live-e2e-final-skill-agent-verdict-${normalizeId(options.runId)}.json`,
+  );
+  const requestFile = path.join(
+    options.reportsRoot,
+    `live-e2e-final-skill-agent-verdict-request-${normalizeId(options.runId)}.json`,
+  );
+  const requiredEvidenceRefs = uniqueStrings([
+    asNonEmptyString(options.observationReport.controller_state_ref),
+    ...asStringArray(options.observationReport.evidence_refs),
+    ...stepJournal.flatMap((entry) => [
+      asNonEmptyString(entry.observation_ref),
+      asNonEmptyString(entry.operator_decision_ref),
+      ...asStringArray(entry.artifact_refs),
+    ]),
+    ...frontendInteractions.flatMap((entry) => asStringArray(entry.evidence_refs)),
+  ]);
+  const request = {
+    request_id: `${options.runId}.final-skill-agent-verdict-request.v1`,
+    run_id: options.runId,
+    expected_verdict_file: expectedVerdictFile,
+    required_judge_source: "skill-agent",
+    current_deterministic_status: finalAnalysisStatus,
+    required_steps: includedSteps,
+    accepted_step_count: acceptedSkillAgentSteps.length,
+    missing_skill_agent_steps: missingSteps,
+    missing_frontend_agent_verdicts: missingFrontendVerdicts,
+    failed_frontend_interactions: failedFrontendInteractions,
+    required_inspection: [
+      "review the full observation report and step observations",
+      "verify every included step has an accepted skill-agent decision",
+      "verify deterministic classifications and command transcripts",
+      "verify target diff, no-upstream-write evidence, and delivery artifacts",
+      "verify UI/UX evidence for frontend-capable profiles",
+      "emit a final verdict only from skill-agent judgement",
+    ],
+    required_evidence_refs: requiredEvidenceRefs,
+    expected_response_shape: {
+      verdict_id: `${options.runId}.final-skill-agent-verdict.v1`,
+      run_id: options.runId,
+      status: "pass|warn|not_pass|blocked",
+      judge_source: "skill-agent",
+      inspected_evidence_refs: requiredEvidenceRefs.slice(0, 8),
+      findings: [],
+      final_recommendation: "accept|accept_with_findings|reject",
+      created_at: nowIso(),
+    },
+    created_at: nowIso(),
+  };
+  writeJson(requestFile, request);
+  if (!fileExists(expectedVerdictFile)) {
+    return {
+      verdictFile: expectedVerdictFile,
+      verdict: null,
+      requestFile,
+      missingFindings: [
+        `Final skill-agent verdict is missing; write an accepted skill-agent verdict to ${expectedVerdictFile}.`,
+      ],
+    };
+  }
+  const verdict = asRecord(readJson(expectedVerdictFile));
+  const inspectedRefs = asStringArray(verdict.inspected_evidence_refs);
+  const evidenceRefs = uniqueStrings([...asStringArray(verdict.evidence_refs), ...inspectedRefs]);
+  const invalidReasons = [];
+  if (asNonEmptyString(verdict.judge_source) !== "skill-agent") {
+    invalidReasons.push("final verdict judge_source must be skill-agent.");
+  }
+  if (inspectedRefs.length === 0) {
+    invalidReasons.push("final verdict must include non-empty inspected_evidence_refs.");
+  }
+  if (evidenceRefs.length === 0) {
+    invalidReasons.push("final verdict must reference inspected evidence.");
+  }
+  const missingMaterializedRefs = inspectedRefs.filter((ref) => !localEvidenceRefExists(ref, options.reportsRoot));
+  if (missingMaterializedRefs.length > 0) {
+    invalidReasons.push(`final verdict cites missing local evidence refs: ${missingMaterializedRefs.join(", ")}.`);
+  }
+  return {
+    verdictFile: expectedVerdictFile,
+    verdict,
+    requestFile,
+    missingFindings: invalidReasons,
   };
 }
 
@@ -1180,10 +1297,10 @@ function writeAgentArtifactReviewRequest(options) {
           step_id: "discovery",
           semantic_analysis: {
             status: "pass|warn|not_pass|blocked|interaction_required|resumed",
-            judge_source: "agent",
+            judge_source: "skill-agent",
             findings: [],
           },
-          judge_source: "agent",
+          judge_source: "skill-agent",
           artifact_refs: [],
           findings: [],
         },
@@ -1240,8 +1357,6 @@ function writeStepObservationFiles(options) {
  *     artifacts: Record<string, unknown>,
  *   },
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
- *   examplesRoot: string | null,
- *   agentJudgeFile: string | null,
  * }}
  */
 function writeProofRunnerArtifacts(options) {
@@ -1253,7 +1368,6 @@ function writeProofRunnerArtifacts(options) {
     options.layout.reportsRoot,
     `live-e2e-scorecard-target-${normalizeId(options.runId)}.json`,
   );
-  const agentJudgeDocument = loadAgentJudgeDocument(options.agentJudgeFile);
   const productionProofPolicy = buildProductionProofSummary(options.profile);
   const observationReport = buildObservationReport({
     runId: options.runId,
@@ -1261,14 +1375,50 @@ function writeProofRunnerArtifacts(options) {
     profile: options.profile,
     flowResult: options.flowResult,
     summaryFile,
-    agentJudgeDocument,
   });
   const stepObservationFiles = writeStepObservationFiles({
     runId: options.runId,
     reportsRoot: options.layout.reportsRoot,
     stepJournal: observationReport.step_journal,
   });
-  observationReport.evidence_refs = uniqueStrings([...asStringArray(observationReport.evidence_refs), ...stepObservationFiles]);
+  const observationReportFile = path.join(
+    options.layout.reportsRoot,
+    `live-e2e-observation-report-${normalizeId(options.runId)}.json`,
+  );
+  const finalSkillAgentVerdict = resolveFinalSkillAgentVerdict({
+    runId: options.runId,
+    reportsRoot: options.layout.reportsRoot,
+    observationReport,
+  });
+  observationReport.final_skill_agent_verdict_request_file = finalSkillAgentVerdict.requestFile;
+  if (finalSkillAgentVerdict.verdict) {
+    observationReport.final_skill_agent_verdict_file = finalSkillAgentVerdict.verdictFile;
+    observationReport.final_skill_agent_verdict = finalSkillAgentVerdict.verdict;
+  } else {
+    observationReport.report_status = "in_progress";
+  }
+  observationReport.evidence_refs = uniqueStrings([
+    ...asStringArray(observationReport.evidence_refs),
+    ...stepObservationFiles,
+    finalSkillAgentVerdict.requestFile,
+    finalSkillAgentVerdict.verdict ? finalSkillAgentVerdict.verdictFile : null,
+  ]);
+  const finalVerdictStatus =
+    asStringArray(finalSkillAgentVerdict.missingFindings).length > 0
+      ? "blocked"
+      : finalSkillAgentVerdict.verdict
+        ? toObservationStatus(asNonEmptyString(finalSkillAgentVerdict.verdict.status))
+        : "blocked";
+  observationReport.overall_status = worstObservationStatus(observationReport.overall_status, finalVerdictStatus);
+  observationReport.final_analysis = {
+    ...asRecord(observationReport.final_analysis),
+    status: worstObservationStatus(asNonEmptyString(asRecord(observationReport.final_analysis).status), finalVerdictStatus),
+    findings: uniqueStrings([
+      ...asStringArray(asRecord(observationReport.final_analysis).findings),
+      ...asStringArray(asRecord(finalSkillAgentVerdict.verdict).findings),
+      ...asStringArray(finalSkillAgentVerdict.missingFindings),
+    ]),
+  };
   const observationValidation = validateContractDocument({
     family: "live-e2e-observation-report",
     document: observationReport,
@@ -1278,10 +1428,6 @@ function writeProofRunnerArtifacts(options) {
     const issues = observationValidation.issues.map((issue) => issue.message).join("; ");
     throw new Error(`Live E2E observation report failed contract validation: ${issues}`);
   }
-  const observationReportFile = path.join(
-    options.layout.reportsRoot,
-    `live-e2e-observation-report-${normalizeId(options.runId)}.json`,
-  );
   const agentArtifactReviewRequestFile = writeAgentArtifactReviewRequest({
     runId: options.runId,
     reportsRoot: options.layout.reportsRoot,
@@ -1289,6 +1435,9 @@ function writeProofRunnerArtifacts(options) {
   });
   options.flowResult.artifacts.live_e2e_observation_report_file = observationReportFile;
   options.flowResult.artifacts.live_e2e_step_observation_files = stepObservationFiles;
+  options.flowResult.artifacts.final_skill_agent_verdict_request_file = finalSkillAgentVerdict.requestFile;
+  options.flowResult.artifacts.final_skill_agent_verdict_file = finalSkillAgentVerdict.verdictFile;
+  options.flowResult.artifacts.final_skill_agent_verdict = finalSkillAgentVerdict.verdict ?? null;
   options.flowResult.artifacts.agent_artifact_review_request_file = agentArtifactReviewRequestFile;
   options.flowResult.artifacts.live_e2e_observation_overall_status = observationReport.overall_status;
   const productionProof = applyProductionProofEvidence({
@@ -1431,6 +1580,9 @@ function writeProofRunnerArtifacts(options) {
     live_e2e_step_observation_files: stepObservationFiles,
     live_e2e_observation_overall_status: observationReport.overall_status,
     operator_context: observationReport.operator_context,
+    final_skill_agent_verdict_request_file: finalSkillAgentVerdict.requestFile,
+    final_skill_agent_verdict_file: finalSkillAgentVerdict.verdictFile,
+    final_skill_agent_verdict: finalSkillAgentVerdict.verdict ?? null,
     agent_artifact_review_request_file: agentArtifactReviewRequestFile,
     matrix_cell:
       typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
@@ -1440,10 +1592,10 @@ function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.quality_judgement === "object" && options.flowResult.artifacts.quality_judgement
         ? options.flowResult.artifacts.quality_judgement
         : null,
-    agent_operator_assessment:
-      typeof options.flowResult.artifacts.agent_operator_assessment === "object" &&
-      options.flowResult.artifacts.agent_operator_assessment
-        ? options.flowResult.artifacts.agent_operator_assessment
+    runner_quality_summary:
+      typeof options.flowResult.artifacts.runner_quality_summary === "object" &&
+      options.flowResult.artifacts.runner_quality_summary
+        ? options.flowResult.artifacts.runner_quality_summary
         : null,
     production_proof: productionProof,
     proof_scope: productionProof?.proof_scope ?? null,
@@ -1471,7 +1623,7 @@ function writeProofRunnerArtifacts(options) {
     scorecard_files: [scorecardFile],
     control_surfaces: {
       installed_user_proof_runner:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--controller-mode auto|manual|evaluator]",
       manual_live_e2e:
         "node ./scripts/live-e2e/manual-live-e2e.mjs --project-ref <path> --profile <path> --run-id <id>",
       step_evaluator:
@@ -1480,7 +1632,7 @@ function writeProofRunnerArtifacts(options) {
         "node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path>",
       public_cli_sequence: options.flowResult.commandResults.map((result) => result.command_surface).filter(Boolean),
       aor_bin: options.aorLaunch.binaryRef,
-      examples_root: options.examplesRoot,
+      bootstrap_assets_root: path.join(options.hostRoot, "examples"),
     },
     runner_auth_mode: asNonEmptyString(options.flowResult.artifacts.runner_auth_mode) || null,
     runner_auth_source: asNonEmptyString(options.flowResult.artifacts.runner_auth_source) || null,
@@ -1539,7 +1691,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--controller-mode auto|manual|evaluator]",
         "",
         "Installed-user black-box proof runner with online step-controller evaluation.",
       ].join("\n"),
@@ -1562,7 +1714,12 @@ function runCli(rawArgs) {
   const runtimeRoot = resolveOptionalStringFlag(flags["runtime-root"], "runtime-root");
   const aorBin = resolveOptionalStringFlag(flags["aor-bin"], "aor-bin");
   const requestedAorInstallMode = resolveOptionalStringFlag(flags["aor-install-mode"], "aor-install-mode");
-  const agentJudgeFile = resolveOptionalStringFlag(flags["agent-judge-file"], "agent-judge-file");
+  if (Object.prototype.hasOwnProperty.call(flags, "agent-judge-file")) {
+    throw new UsageError("--agent-judge-file is no longer supported; live E2E requires skill-agent operator decisions.");
+  }
+  if (Object.prototype.hasOwnProperty.call(flags, "examples-root")) {
+    throw new UsageError("--examples-root is no longer supported; live E2E uses packaged bootstrap assets only.");
+  }
   const catalogRootOverride = resolveOptionalStringFlag(flags["catalog-root"], "catalog-root");
   const runnerAuthMode = resolveRunnerAuthMode(resolveOptionalStringFlag(flags["runner-auth-mode"], "runner-auth-mode"));
   const runtimeAgentPermissionMode = resolveRuntimeAgentPermissionMode(
@@ -1580,10 +1737,6 @@ function runCli(rawArgs) {
       (runtimeAgentInteractionPolicy === "orchestrator-mediated" ? "conservative" : null),
   );
   const controllerMode = resolveLiveE2eControllerMode(resolveOptionalStringFlag(flags["controller-mode"], "controller-mode"));
-  const explicitExamplesRoot =
-    Object.prototype.hasOwnProperty.call(flags, "examples-root")
-      ? resolveOptionalStringFlag(flags["examples-root"], "examples-root")
-      : null;
   const { profilePath, profile: loadedProfile } = loadProofRunnerProfile({
     hostRoot,
     profileRef,
@@ -1600,16 +1753,7 @@ function runCli(rawArgs) {
     : null;
   const profile = fullJourneyResolution?.resolvedProfile ?? loadedProfile;
   const productionProof = fullJourneyResolution ? buildProductionProofSummary(profile) : null;
-  if (productionProof && explicitExamplesRoot && productionProof.mock_runner_allowed !== true) {
-    throw new UsageError(
-      `Production proof profile '${asNonEmptyString(profile.profile_id) || profileRef}' cannot use --examples-root; packaged bootstrap assets are required to prevent deterministic mock injection.`,
-    );
-  }
-  const examplesRoot = explicitExamplesRoot
-    ? requireDirectory(explicitExamplesRoot)
-    : fullJourneyResolution
-      ? null
-      : requireDirectory(path.join(hostRoot, "examples"));
+  const examplesRoot = requireDirectory(path.join(hostRoot, "examples"));
   const runId =
     resolveOptionalStringFlag(flags["run-id"], "run-id") ??
     `${asNonEmptyString(profile.profile_id) || "live-e2e"}.run-${nowIso().replace(/[^0-9]/g, "").slice(-12)}`;
@@ -1711,8 +1855,7 @@ function runCli(rawArgs) {
             profilePath,
             profile,
             aorLaunch,
-            examplesRoot: examplesRoot ?? path.join(hostRoot, "examples"),
-            examplesRootOverride: explicitExamplesRoot && examplesRoot ? examplesRoot : null,
+            examplesRoot,
             catalogTargetPath: fullJourneyResolution.catalogTargetPath,
             catalogEntry: fullJourneyResolution.catalogEntry,
             mission: fullJourneyResolution.mission,
@@ -1743,11 +1886,7 @@ function runCli(rawArgs) {
             runtimeAgentInteractionPolicy,
             runtimeAgentAutoApprovalProfile,
             stepController,
-            examplesRoot:
-              examplesRoot ??
-              (() => {
-                throw new UsageError("Bounded rehearsal requires bootstrap assets under '--examples-root' or '<project-ref>/examples'.");
-              })(),
+            examplesRoot,
           });
     } catch (error) {
       flowResult = {
@@ -1796,8 +1935,6 @@ function runCli(rawArgs) {
     profile,
     flowResult,
     aorLaunch,
-    examplesRoot,
-    agentJudgeFile,
   });
 
   process.stdout.write(

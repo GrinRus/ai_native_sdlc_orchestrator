@@ -208,7 +208,7 @@ function classifyQualification(summary, observationReport) {
  */
 function buildAnalysis(options) {
   const qualityJudgement = asRecord(options.summary.quality_judgement);
-  const agentAssessment = asRecord(options.summary.agent_operator_assessment);
+  const runnerQualitySummary = asRecord(options.summary.runner_quality_summary);
   const stepJournal = Array.isArray(options.observationReport.step_journal)
     ? options.observationReport.step_journal.map((entry) => asRecord(entry))
     : [];
@@ -232,7 +232,7 @@ function buildAnalysis(options) {
     ["post_run_verification_status", qualityJudgement.post_run_verification_status],
     ["provider_execution_status", qualityJudgement.provider_execution_status],
     ["quality_gate_decision", qualityJudgement.quality_gate_decision],
-    ["mission_satisfaction", agentAssessment.mission_satisfaction],
+    ["mission_satisfaction", runnerQualitySummary.mission_satisfaction],
   ]
     .filter(([, value]) => asNonEmptyString(value) && !["pass", "warn", "accept"].includes(asNonEmptyString(value)))
     .map(([field, value]) => ({ field, value }));

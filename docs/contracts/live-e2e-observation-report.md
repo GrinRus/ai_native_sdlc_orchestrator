@@ -21,6 +21,7 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `overall_status`
 - `aor_installation`
 - `aor_installation_proof_file`
+- `final_skill_agent_verdict_request_file`
 - `setup_journal`
 - `step_journal`
 - `final_analysis`
@@ -98,6 +99,7 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `agent_decision_request_ref`
 - `operator_decision_ref`
 - `operator_decision_status`
+- `inspected_evidence_refs`
 - `requested_interaction`
 - `decision`
 - `resume_result`
@@ -121,14 +123,14 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 
 `semantic_analysis` should preserve:
 - `status`
-- `judge_source` (`skill-agent` for acceptance and production proof; deterministic fixture sources are allowed only for smoke/synthetic profiles)
+- `judge_source` (`skill-agent`)
 - `findings`
 
 `operator_context` should preserve:
-- `operator_kind` (`skill-agent|deterministic-fixture`)
+- `operator_kind` (`skill-agent`)
 - `operator_ref`
-- `decision_policy` (`required|optional`)
-- `answer_policy` (`agent-public-control-plane|deterministic-fixture-only`)
+- `decision_policy` (`required`)
+- `answer_policy` (`agent-public-control-plane`)
 - `target_write_policy`
 
 `report_status` must be `final` or `in_progress`. `in_progress` is only for resumable controller artifacts waiting for an operator decision; it is not an acceptance report and cannot close qualification.
@@ -137,7 +139,6 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `accepted`
 - `missing`
 - `rejected`
-- `not_required`
 
 `interactive_decisions[]` should preserve:
 - `step_id`
@@ -151,6 +152,13 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `step_id`
 - `surface`
 - `evidence_refs`
+- `html_ref`
+- `screenshot_refs`
+- `dom_snapshot_ref`
+- `accessibility_summary_ref`
+- `task_outcome`
+- `ux_findings`
+- `agent_verdict_ref`
 - `status`
 - `summary`
 
@@ -164,9 +172,13 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `release`
 - `learning`
 
+`final_skill_agent_verdict_request_file` must point to the final request packet that tells the skill-agent which evidence to inspect. For `report_status=final`, `final_skill_agent_verdict_file` must point to an accepted skill-agent verdict artifact. A final acceptance/proof report requires every included `step_journal[]` entry to have `operator_decision_status=accepted`, every included step semantic analysis to have `judge_source=skill-agent`, and the final verdict artifact to have `judge_source=skill-agent` plus non-empty `inspected_evidence_refs[]`.
+
+Profiles that declare `live_e2e.frontend_capability` other than `none` must treat `frontend_interactions[]` as first-class proof evidence. Deterministic web smoke output can establish that the installed-user web surface rendered, but final acceptance also requires a linked skill-agent UI/UX verdict through `agent_verdict_ref`. Missing HTML, DOM snapshot, screenshot, accessibility summary, failed `task_outcome`, or missing agent UI verdict blocks acceptance.
+
 ## Notes
 `failed_stages[]` records deterministic stage-level failures that are inside the observed step range or setup/prelude range. Stages outside the active flow range, such as `release` or `learning` in `delivery_default` profiles, may remain outside terminal status accounting unless they are part of `step_journal[]`.
 
-Artifact quality may be judged by the live E2E skill or by the operator running the flow. If no external judge file is supplied, the runner must still write deterministic semantic analysis from public transcripts and artifacts; it must not emit a legacy missing-judge matrix.
+Artifact quality for live E2E proof is judged by the live E2E skill-agent through public artifacts, logs, CLI/API output, and control-plane surfaces. Deterministic runner checks remain guardrails and diagnostics; they are not valid live E2E operator evidence and cannot replace accepted skill-agent decisions.
 
 The journal is not a post-run reconstruction. The controller must persist the step observation and `controller_state_ref` after `plan -> execute -> inspect -> classify -> decide -> persist`, before the next public step is allowed to execute.

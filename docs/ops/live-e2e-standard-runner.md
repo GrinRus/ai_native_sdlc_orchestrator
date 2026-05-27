@@ -1,9 +1,7 @@
 # Runbook: live E2E standard runner
 
 ## Purpose
-Provide one installed-user black-box proof runner for both live E2E layers:
-- bounded rehearsal profiles for fast regression and release smoke;
-- catalog-backed full-journey profiles for mandatory installed-user acceptance on curated repositories and curated feature missions.
+Provide one installed-user black-box proof runner for catalog-backed full-journey profiles and guided installed-user journeys.
 
 Live E2E simulates a user who has installed AOR, initializes or attaches a target repository, walks the public SDLC flow through CLI/API surfaces, and then emits a per-step black-box observation summary. It must not call private runtime internals to repair the run. It proves whether AOR works as a product from the public surface and whether produced artifacts explain each `pass`, `warn`, `not_pass`, block, and missing-evidence gap.
 
@@ -36,13 +34,6 @@ acceptance proof:
 
 ## Canonical profiles
 Use only `scripts/live-e2e/profiles/**`.
-
-Bounded rehearsal profiles:
-- `regress-short.yaml`
-- `regress-long.yaml`
-- `release-short.yaml`
-- `release-long.yaml`
-- `w7-governance-integration.yaml`
 
 Catalog-backed full-journey profiles:
 - `installed-user-guided-journey.yaml`
@@ -124,15 +115,7 @@ node ./scripts/live-e2e/run-profile.mjs \
   --catalog-root ./scripts/live-e2e/catalog
 ```
 
-Bootstrap asset override for deterministic proof or fixture-driven rehearsal only:
-```bash
-node ./scripts/live-e2e/run-profile.mjs \
-  --project-ref . \
-  --profile ./scripts/live-e2e/profiles/full-journey-regress-ky.yaml \
-  --examples-root ./examples
-```
-
-For full-journey acceptance, packaged bootstrap assets are used by default. `--examples-root` is an explicit internal override for proof generation and deterministic fixture-backed runs.
+Bootstrap assets are always loaded from packaged repository assets. The old `--examples-root` override has been removed so live E2E cannot inject fixture-only bootstrap assets.
 
 Production-proof candidate profile:
 
@@ -147,7 +130,7 @@ node ./scripts/live-e2e/run-profile.mjs \
 `full-journey-production-proof-ky-openai.yaml` is stricter than the W14 coverage profiles:
 - it resolves `ky` and `ky-header-regression` from the curated target catalog;
 - it uses the packaged `codex-cli` adapter profile and `external_runner_mode=real-external-process`;
-- it rejects `--examples-root` because production proof cannot use deterministic mock adapter injection;
+- it has no bootstrap asset override path because production proof cannot use deterministic mock adapter injection;
 - it sets `verification.baseline_gate.mode=blocking`, so target verification failures block before provider execution;
 - it keeps `output_policy.write_back_to_remote=false` and `preferred_delivery_mode=patch-only`;
 - it starts from candidate profile metadata, then promotes the run summary to `proof_scope=full_code_changing_runtime` and `real_code_change_proof_complete=true` only when executable evidence proves a real code-changing pass, required target verdicts pass, Runtime Harness/review/delivery evidence exists, and the no-upstream-write assertion passes.
@@ -263,9 +246,9 @@ Production-proof profiles add a fail-closed layer on top of full-journey behavio
 - target setup and verification commands must be declared;
 - baseline target verification must use blocking mode;
 - write-back must remain disabled and delivery mode must be `patch-only` or `local-branch`;
-- deterministic proof-runner `--examples-root` overrides are rejected.
+- proof-runner bootstrap asset overrides are not supported.
 
-Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, and capture app-smoke evidence from the real `aor app --smoke true --open false --json` path. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, app smoke output, and no-upstream-write assertions must be materialized.
+Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, and capture an operator-console web smoke artifact. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, web smoke output, and no-upstream-write assertions must be materialized.
 
 No proof-runner-side `examples/context/project profile` injection is allowed inside the target checkout on the full-journey path.
 
@@ -305,7 +288,9 @@ Full-journey summaries must carry:
 - `live_e2e_step_observation_files`
 - `live_e2e_observation_overall_status`
 - `operator_context`
-- `agent_operator_assessment`
+- `runner_quality_summary`
+- `final_skill_agent_verdict_request_file`
+- `final_skill_agent_verdict_file`
 - `quality_judgement`
 - `canonical_status`
 - `command_status`
@@ -341,7 +326,12 @@ assertion. It intentionally excludes runtime output paths, target checkout conte
 Guided full-journey summaries also carry:
 - `guided_journey`
 - `artifacts.guided_journey_proof_file`
-- `artifacts.guided_app_smoke_summary_file`
+- `artifacts.guided_web_smoke_summary_file`
+- `artifacts.guided_web_smoke_html_file`
+- `artifacts.guided_web_dom_snapshot_file`
+- `artifacts.guided_web_accessibility_summary_file`
+- `artifacts.guided_web_screenshot_files` (empty until real browser-task screenshots are captured)
+- `artifacts.guided_web_visual_guardrail_file` for deterministic app-smoke visual guardrail evidence
 - `artifacts.review_decision_file`
 - `artifacts.release_packet_file`
 - `artifacts.target_head_before` and `artifacts.target_head_after`
@@ -349,7 +339,7 @@ Guided full-journey summaries also carry:
 
 Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for product observation success when required step evidence is missing.
 
-Bounded summaries continue to carry:
+Archived fixture summaries may carry legacy bounded fields, but they are not live E2E acceptance proof:
 - `target_checkout_root`
 - `generated_project_profile_file`
 - `routed_step_result_file`
@@ -384,7 +374,9 @@ Delivery evidence no longer downgrades `not_pass` to `warn`.
 ## Step Analysis
 The runner performs deterministic analysis for every step from public command transcripts and artifact refs, then writes `agent_decision_request_ref` before the next public step can run. Acceptance and production-proof profiles require `operator_context.operator_kind=skill-agent`, `decision_policy=required`, and an accepted `operator_decision_ref` for every observed step.
 
-The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` remains a deterministic fixture aid for smoke profiles only; it is not an acceptance overlay.
+The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent` and non-empty `inspected_evidence_refs[]`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` is removed; live E2E semantic analysis comes only from accepted skill-agent decisions and the final skill-agent verdict artifact.
+
+Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and real screenshot evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not satisfy `browser-task-proof` screenshot requirements.
 
 Judge criteria:
 - traceability to feature request, mission, and previous step;
@@ -393,7 +385,9 @@ Judge criteria:
 - consistency with neighboring artifacts;
 - absence of synthetic or no-op explanations that hide failure.
 
-If a fixture profile does not provide an operator decision, the runner may inject deterministic fixture decisions. Acceptance and production-proof profiles fail closed without the skill-agent decision.
+If a profile does not provide an accepted skill-agent operator decision, the runner stops fail-closed and writes the decision request for manual/evaluator continuation.
+
+For guided installed-user runs, deterministic web smoke is only a render guardrail. Final acceptance requires `frontend_interactions[]` with HTML, DOM, accessibility, screenshot/visual evidence, and an accepted skill-agent UI/UX verdict linked from `agent_verdict_ref`.
 
 ## Quality Judgement
 Full-journey summaries may include `quality_judgement` with target acceptance dimensions:
@@ -409,7 +403,7 @@ Full-journey summaries may include `quality_judgement` with target acceptance di
 - `post_run_verification_status`
 - `post_run_diagnostic_status`
 - `runtime_success`
-- `agent_operator_assessment`
+- `runner_quality_summary`
 - `runtime_harness_decision`
 - `run_start_runtime_harness_decision`
 - `latest_runtime_harness_decision`
@@ -461,7 +455,7 @@ close required acceptance.
 - `review-report.provider_traceability` matches the requested provider variant and adapter path.
 - `review-report.feature_size_fit` stays inside the declared size budget for the mission.
 - `review-report.artifact_quality.verify_summary_ref` points at the post-run `project verify` summary.
-- `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and `agent_operator_assessment` are observed post-delivery dimensions. Runtime Harness can block final quality for missing execution evidence, adapter crashes, unresolved interaction, or blocked runtime state, but it does not fail implementation quality by path whitelist/blacklist rules.
+- `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and `runner_quality_summary` are observed post-delivery dimensions. Runtime Harness can block final quality for missing execution evidence, adapter crashes, unresolved interaction, or blocked runtime state, but it does not fail implementation quality by path whitelist/blacklist rules.
 - `delivery_manifest_file` exists and is anchored to the target checkout.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.
 - Guided proof execution starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; the target repository HEAD must remain unchanged and no remote write commands may be recorded unless an explicit future profile opts into network write-back.
@@ -472,7 +466,7 @@ Canonical profile:
 
 Canonical fixtures:
 - `examples/live-e2e/fixtures/w21-s07/installed-user-guided-proof.sample.json`
-- `examples/live-e2e/fixtures/w21-s07/installed-user-guided-app-smoke.sample.json`
+- `examples/live-e2e/fixtures/w21-s07/installed-user-guided-web-smoke.sample.json`
 - `examples/live-e2e/fixtures/w21-s07/installed-user-guided-blocked-readiness.sample.json`
 
 Run command:
@@ -484,33 +478,19 @@ node ./scripts/live-e2e/run-profile.mjs \
 
 Pass evidence requires all of the following:
 - CLI transcript files for doctor, onboard, app, next, mission create, run execution, review decision, delivery, release, and learning closure.
-- Durable onboarding, intake, next-action, run, review, review-decision, delivery, release, learning, and app smoke artifacts.
+- Durable onboarding, intake, next-action, run, review, review-decision, delivery, release, learning, and web smoke artifacts.
 - Public-repo safety assertions: `write_back_to_remote=false`, `patch-only` delivery mode, unchanged target `HEAD` until controlled execution, runtime state under `.aor/`, and no `.aor-live-e2e` state.
 - Blocked and partial-readiness branches must keep the same no-write defaults visible and must not be marked pass without durable artifacts.
 
-## W14-S07 matrix proof bundle (2026-04-24)
-Observed curated runs:
-- `w14-s07.full-journey-regress-ky`, `w14-s07.full-journey-regress-ky-anthropic`, `w14-s07.full-journey-regress-ky-medium-anthropic-rerun`, and `w14-s07.full-journey-release-ky-medium-openai` exercise all required `ky` cells.
-- `w14-s07.full-journey-regress-httpie`, `w14-s07.full-journey-regress-httpie-anthropic`, `w14-s07.full-journey-repair-httpie-medium-anthropic`, and `w14-s07.full-journey-governance-httpie-medium-openai` exercise all required `httpie/cli` cells plus the repo-level provider-comparison pair.
-- `w14-s07.full-journey-release-nextjs`, `w14-s07.full-journey-release-nextjs-anthropic`, `w14-s07.full-journey-repair-nextjs-medium-anthropic`, and `w14-s07.full-journey-governance-nextjs-large-openai` exercise all required `belgattitude/nextjs-monorepo-example` cells plus the repo-level provider-comparison pair.
-
-Canonical fixtures:
-- `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`
-- `examples/live-e2e/fixtures/w14-s07/`
-
-Evidence note:
-- the committed bundle preserves catalog-backed repo and mission resolution, scenario/provider/size matrix-cell validation, provider-pinned route overrides, public `project init`, mission-generated intake/discovery/spec/handoff artifacts, public `review run`, public `audit runs`, and public `learning handoff` closure artifacts.
-- the bundle remains historical observation evidence. Under the canonical status model, it is tracked as `coverage_with_findings`; required matrix acceptance now needs a current `covered_pass` run on `run_tier=acceptance` or `run_tier=production-proof`.
-- the bundle proves all mandatory scenario families: `regress`, `release`, `repair`, and `governance`.
-- the bundle is explicitly classified as `proof_scope=coverage_with_findings` with `real_code_change_proof_complete=false`; it is coverage evidence, not full code-changing runtime proof.
-- `quality_judgement.overall_status` remains `pass_with_findings` in the committed proof because the deterministic external runner mock does not materialize mission code changes, leaving `review-report.code_quality=warn`.
+## Removed W14-S07 matrix fixture bundle (2026-04-24)
+The old W14-S07 matrix fixture bundle was removed after live E2E moved to skill-agent-only proof. It was historical `coverage_with_findings` evidence backed by deterministic external-runner mock behavior, so it is no longer valid acceptance closure. Current matrix claims need a fresh acceptance or production-proof run with accepted skill-agent decisions.
 
 ## W25-S03 production proof fixture (2026-05-08)
 Canonical fixture:
 - `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`
 
 Evidence note:
-- the fixture is derived from a real `full-journey-production-proof-ky-openai.yaml` run, not from `--examples-root` or a deterministic mock runner.
+- the fixture is derived from a real `full-journey-production-proof-ky-openai.yaml` run, not from a bootstrap asset override or a deterministic mock runner.
 - it covers the required `ky.regress.small.openai` cell with `quality_judgement.overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 - it records meaningful implementation changed paths under `source/utils/merge.ts` and `test/headers.ts`, plus pass summaries for post-run verification, Runtime Harness, review, delivery, and learning-loop closure.
 - it records `delivery_mode=patch-only`, `write_back_to_remote=false`, unchanged target `HEAD`, empty `commit_refs`, and `writeback_results=[patch-materialized]`.

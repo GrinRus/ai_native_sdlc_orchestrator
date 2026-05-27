@@ -266,6 +266,47 @@ export function prepareAorInstallationProof(options) {
 
   const normalizedRunId = normalizeId(options.runId);
   const installRoot = path.join(options.reportsRoot, `live-e2e-aor-install-${normalizedRunId}`);
+  const proofFile = path.join(options.reportsRoot, `live-e2e-aor-installation-proof-${normalizedRunId}.json`);
+  const currentSourceCommit = gitHeadOrNull(options.hostRoot);
+  if (fileExists(proofFile)) {
+    const cachedProof = asRecord(readJson(proofFile));
+    const launcherRef = asNonEmptyString(cachedProof.launcher_ref);
+    const cachedSourceCommit = asNonEmptyString(cachedProof.source_commit_sha);
+    const cachedInstallMode = asNonEmptyString(cachedProof.install_mode);
+    const sourceCommitMatches = !currentSourceCommit || !cachedSourceCommit || currentSourceCommit === cachedSourceCommit;
+    if (
+      asNonEmptyString(cachedProof.status) === "pass" &&
+      sourceCommitMatches &&
+      launcherRef &&
+      fileExists(launcherRef)
+    ) {
+      const cachedProofWithReuse = {
+        ...cachedProof,
+        reused_for_manual_resume: true,
+        reused_at: nowIso(),
+      };
+      writeJson(proofFile, cachedProofWithReuse);
+      const setupEntry = {
+        sequence: 1,
+        step_id: "install",
+        status: "pass",
+        public_surface:
+          cachedInstallMode === "provided-binary" ? "provided aor binary" : "cached pnpm source install",
+        evidence_refs: uniqueStrings([proofFile, ...asStringArray(cachedProof.command_transcripts)]),
+        summary: "AOR installation proof was reused for manual resume because the source proof remained valid.",
+      };
+      return {
+        launch: {
+          command: launcherRef,
+          argsPrefix: [],
+          binaryRef: launcherRef,
+        },
+        proof: cachedProofWithReuse,
+        proofFile,
+        setupEntry,
+      };
+    }
+  }
   fs.mkdirSync(installRoot, { recursive: true });
   const commandTranscripts = [];
   const commandSummaries = [];
@@ -348,6 +389,7 @@ export function prepareAorInstallationProof(options) {
     workspace_root: options.isolatedWorkspaceRoot ?? null,
     runtime_root: options.runtimeRoot ?? null,
     original_source_root: options.hostRoot,
+    source_commit_sha: currentSourceCommit,
     installed_source_root: effectivePolicy === "source-install-required" ? installCwd : null,
     launcher_ref: launcherRef,
     command_transcripts: commandTranscripts,
@@ -355,7 +397,6 @@ export function prepareAorInstallationProof(options) {
     started_at: asNonEmptyString(asRecord(commandSummaries[0]).started_at) || null,
     finished_at: nowIso(),
   };
-  const proofFile = path.join(options.reportsRoot, `live-e2e-aor-installation-proof-${normalizedRunId}.json`);
   writeJson(proofFile, proof);
   const setupEntry = {
     sequence: 1,
@@ -513,56 +554,6 @@ function annotateCommandDiagnosticStep(diagnostic, label, iteration) {
   diagnostic.step_id = step;
   diagnostic.step_instance_id = buildLiveE2eStepInstanceId(step, normalizedIteration);
   diagnostic.iteration = normalizedIteration;
-}
-
-/**
- * @param {Record<string, unknown>} profile
- * @param {Record<string, unknown> | null} requestedInteraction
- * @returns {{ answer: string, reason: string | null } | null}
- */
-function resolveDeterministicInteractionAnswer(profile, requestedInteraction) {
-  if (!requestedInteraction) return null;
-  if (asNonEmptyString(asRecord(profile.live_e2e).interaction_answer_policy) !== "deterministic-fixture") {
-    return null;
-  }
-  const policy = asRecord(profile.interaction_answer_policy);
-  if (asNonEmptyString(policy.mode) !== "deterministic") return null;
-  const interactionId = asNonEmptyString(requestedInteraction.interaction_id);
-  const answers = Array.isArray(policy.answers) ? policy.answers.map((entry) => asRecord(entry)) : [];
-  const matched = answers.find((entry) => asNonEmptyString(entry.interaction_id) === interactionId) ?? {};
-  const answer = asNonEmptyString(matched.answer) || asNonEmptyString(policy.default_answer);
-  if (!answer) return null;
-  return {
-    answer,
-    reason:
-      asNonEmptyString(matched.reason) ||
-      asNonEmptyString(policy.reason) ||
-      "Live E2E deterministic interaction answer policy.",
-  };
-}
-
-/**
- * @param {Record<string, unknown>} diagnostic
- * @param {ReturnType<typeof runAorCommand>} answerResult
- */
-function updateDiagnosticWithInteractionAnswer(diagnostic, answerResult) {
-  const payload = asRecord(answerResult.payload);
-  const interactionAnswer = Object.keys(asRecord(payload.interaction_answer)).length > 0
-    ? asRecord(payload.interaction_answer)
-    : asRecord(payload.interactionAnswer);
-  const continuation = asRecord(diagnostic.interactive_continuation);
-  if (Object.keys(continuation).length === 0 || Object.keys(interactionAnswer).length === 0) return;
-  const answerAuditRef = asNonEmptyString(interactionAnswer.answer_audit_ref);
-  continuation.status = asNonEmptyString(interactionAnswer.interaction_status) || asNonEmptyString(continuation.status);
-  continuation.interaction_status = continuation.status;
-  continuation.answer_audit_refs = uniqueStrings([...asStringArray(continuation.answer_audit_refs), answerAuditRef]);
-  continuation.continuation = {
-    ...asRecord(continuation.continuation),
-    next_action: asNonEmptyString(interactionAnswer.run_control_transition) || "continue_run",
-  };
-  diagnostic.interactive_continuation = continuation;
-  diagnostic.artifact_refs = uniqueStrings([...asStringArray(diagnostic.artifact_refs), answerAuditRef, answerResult.transcriptFile]);
-  diagnostic.recommendation = continuation.status === "resumed" ? "continue" : diagnostic.recommendation;
 }
 
 /**
@@ -911,10 +902,26 @@ function buildGuidedMissionCreateArgs(options) {
  *   env: NodeJS.ProcessEnv,
  * }}
  */
-function runGuidedAppSmoke(options) {
+function runGuidedWebSmoke(options) {
+  const outputHtml = path.join(
+    options.reportsRoot,
+    `installed-user-guided-web-smoke-${normalizeId(options.runId)}.html`,
+  );
   const summaryFile = path.join(
     options.reportsRoot,
-    `installed-user-guided-app-smoke-${normalizeId(options.runId)}.json`,
+    `installed-user-guided-web-smoke-${normalizeId(options.runId)}.json`,
+  );
+  const domSnapshotFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-web-smoke-dom-${normalizeId(options.runId)}.json`,
+  );
+  const accessibilitySummaryFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-web-smoke-accessibility-${normalizeId(options.runId)}.json`,
+  );
+  const visualSnapshotFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-web-smoke-visual-guardrail-${normalizeId(options.runId)}.json`,
   );
   const result = spawnSync(
     options.aorLaunch.command,
@@ -938,20 +945,100 @@ function runGuidedAppSmoke(options) {
     },
   );
   if (result.status !== 0) {
-    throw new Error(`Guided app smoke failed: ${(result.stderr ?? result.stdout ?? "").trim()}`);
+    throw new Error(`Guided web smoke failed: ${(result.stderr ?? result.stdout ?? "").trim()}`);
   }
   /** @type {Record<string, unknown>} */
   let summary;
   try {
     summary = asRecord(JSON.parse(result.stdout));
   } catch {
-    throw new Error("Guided app smoke did not emit JSON summary.");
+    throw new Error("Guided web smoke did not emit JSON summary.");
   }
+  const taskPassed =
+    asNonEmptyString(summary.status) === "smoke-pass" &&
+    summary.html_loaded === true &&
+    asNonEmptyString(summary.config_project_id) === asNonEmptyString(summary.project_id) &&
+    asNonEmptyString(summary.state_project_id) === asNonEmptyString(summary.project_id);
+  fs.writeFileSync(
+    outputHtml,
+    [
+      "<!doctype html>",
+      "<html>",
+      "<head><meta charset=\"utf-8\"><title>AOR Guided Web Smoke Evidence</title></head>",
+      "<body>",
+      "<h1>AOR Guided Web Smoke Evidence</h1>",
+      `<pre>${JSON.stringify(summary, null, 2).replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[char])}</pre>`,
+      "</body>",
+      "</html>",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  writeJson(domSnapshotFile, {
+    kind: "app-smoke-dom-summary",
+    status: taskPassed ? "pass" : "not_pass",
+    html_loaded: summary.html_loaded === true,
+    app_url: asNonEmptyString(summary.app_url) || null,
+    control_plane: asNonEmptyString(summary.control_plane) || null,
+    project_id: asNonEmptyString(summary.project_id) || null,
+  });
+  writeJson(accessibilitySummaryFile, {
+    kind: "app-smoke-accessibility-summary",
+    status: summary.html_loaded === true ? "pass" : "not_pass",
+    checks: ["packaged SPA HTML loaded", "app config route loaded", "project state route loaded"],
+    findings: taskPassed ? [] : ["Packaged local app smoke did not satisfy every required route check."],
+  });
+  writeJson(visualSnapshotFile, {
+    kind: "app-smoke-visual-guardrail",
+    status: taskPassed ? "warn" : "not_pass",
+    surface: "aor app --smoke",
+    app_url: asNonEmptyString(summary.app_url) || null,
+    html_loaded: summary.html_loaded === true,
+    note:
+      "This deterministic app-smoke summary is a guardrail only; it is not browser-task-proof screenshot evidence.",
+  });
+  const browserTaskFindings = [
+    "browser-task-proof requires real browser execution evidence; this run only produced deterministic aor app smoke evidence.",
+  ];
   summary.summary_file = summaryFile;
+  summary.rendered_html_file = asNonEmptyString(summary.rendered_html_file) || outputHtml;
   summary.command = "aor app --smoke true --open false --json";
+  summary.browser_evidence_mode = "guardrail-only";
+  summary.html_ref = summary.rendered_html_file;
+  summary.dom_snapshot_file = domSnapshotFile;
+  summary.accessibility_summary_file = accessibilitySummaryFile;
+  summary.visual_guardrail_file = visualSnapshotFile;
+  summary.screenshot_files = [];
+  summary.dom_snapshot_ref = domSnapshotFile;
+  summary.accessibility_summary_ref = accessibilitySummaryFile;
+  summary.screenshot_refs = [];
+  summary.detached = true;
+  summary.guided_lifecycle_state = asNonEmptyString(summary.status) || null;
+  summary.guided_current_stage_id = "learning";
+  summary.task_outcome = {
+    status: "not_pass",
+    checked_tasks: [
+      "packaged app HTML smoke",
+      "config route smoke",
+      "project state route smoke",
+      "real browser screenshot capture",
+      "operator task interaction",
+    ],
+    findings: taskPassed
+      ? browserTaskFindings
+      : ["Guided app smoke failed one or more route checks.", ...browserTaskFindings],
+  };
+  summary.ux_findings = taskPassed
+    ? browserTaskFindings
+    : ["Installed-user local app smoke did not pass.", ...browserTaskFindings];
   writeJson(summaryFile, summary);
   return {
     summaryFile,
+    htmlFile: outputHtml,
+    domSnapshotFile,
+    accessibilitySummaryFile,
+    screenshotFiles: [],
+    visualGuardrailFile: visualSnapshotFile,
     summary,
   };
 }
@@ -1543,6 +1630,15 @@ function jsonEquivalent(left, right) {
 }
 
 /**
+ * @param {string} cwd
+ * @returns {string | null}
+ */
+function gitHeadOrNull(cwd) {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" });
+  return result.status === 0 ? result.stdout.trim() || null : null;
+}
+
+/**
  * @param {Record<string, unknown>} value
  * @returns {boolean}
  */
@@ -1973,48 +2069,6 @@ export function executeInstalledUserFlow(options) {
         diagnostic.recommendation = "inspect payload quality fields";
       }
       commandResults.push(diagnostic);
-      const requestedInteraction = asRecord(diagnostic.interactive_continuation);
-      const deterministicAnswer =
-        options.stepController?.mode === "manual"
-          ? null
-          : resolveDeterministicInteractionAnswer(options.profile, requestedInteraction);
-      if (result.ok && deterministicAnswer) {
-        const interactionId = asNonEmptyString(requestedInteraction.interaction_id);
-        if (!interactionId) {
-          throw new Error(`Public CLI command '${label}' requested interaction without interaction_id.`);
-        }
-        const answerResult = runAorCommand({
-          launch: options.aorLaunch,
-          cwd: targetCheckout.targetCheckoutRoot,
-          args: [
-            "run",
-            "answer",
-            "--project-ref",
-            ".",
-            "--run-id",
-            options.runId,
-            "--interaction-id",
-            interactionId,
-            "--answer",
-            deterministicAnswer.answer,
-            "--reason",
-            deterministicAnswer.reason ?? "Live E2E deterministic interaction answer policy.",
-          ],
-          env,
-          transcriptsRoot,
-          label: `${label}-interaction-answer`,
-          index: commandIndex,
-        });
-        commandIndex += 1;
-        const answerDiagnostic = buildCommandDiagnostic(answerResult);
-        annotateCommandDiagnosticStep(answerDiagnostic, `${label}-interaction-answer`, iteration);
-        commandResults.push(answerDiagnostic);
-        if (!answerResult.ok) {
-          const stderr = answerResult.stderr.trim() || answerResult.stdout.trim() || "interaction answer command failed";
-          throw new Error(`Public CLI interaction answer for '${label}' failed: ${stderr}`);
-        }
-        updateDiagnosticWithInteractionAnswer(diagnostic, answerResult);
-      }
       if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -2531,7 +2585,6 @@ export function executeInstalledUserFlow(options) {
  *   profile: Record<string, unknown>,
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
  *   examplesRoot: string,
- *   examplesRootOverride: string | null,
  *   catalogTargetPath: string,
  *   catalogEntry: Record<string, unknown>,
  *   mission: Record<string, unknown>,
@@ -2568,10 +2621,6 @@ export function executeFullJourneyFlow(options) {
   env.AOR_RUNTIME_AGENT_PERMISSION_MODE = options.runtimeAgentPermissionMode;
   env.AOR_RUNTIME_AGENT_INTERACTION_POLICY = options.runtimeAgentInteractionPolicy;
   env.AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE = options.runtimeAgentAutoApprovalProfile;
-  if (options.examplesRootOverride) {
-    env.AOR_BOOTSTRAP_ASSETS_ROOT = options.examplesRootOverride;
-    env.AOR_EXAMPLES_ROOT = options.examplesRootOverride;
-  }
 
   const artifacts = {
     host_runtime_root: options.layout.runtimeRoot,
@@ -2709,50 +2758,6 @@ export function executeFullJourneyFlow(options) {
         diagnostic.recommendation = "inspect payload quality fields";
       }
       commandResults.push(diagnostic);
-      const requestedInteraction = asRecord(diagnostic.interactive_continuation);
-      const deterministicAnswer =
-        options.stepController?.mode === "manual"
-          ? null
-          : resolveDeterministicInteractionAnswer(options.profile, requestedInteraction);
-      if (result.ok && deterministicAnswer) {
-        const interactionId = asNonEmptyString(requestedInteraction.interaction_id);
-        if (!interactionId) {
-          throw new Error(`Public CLI command '${label}' requested interaction without interaction_id.`);
-        }
-        const answerResult = runAorCommand({
-          launch: options.aorLaunch,
-          cwd: targetCheckout.targetCheckoutRoot,
-          args: [
-            "run",
-            "answer",
-            "--project-ref",
-            ".",
-            "--runtime-root",
-            ".aor",
-            "--run-id",
-            options.runId,
-            "--interaction-id",
-            interactionId,
-            "--answer",
-            deterministicAnswer.answer,
-            "--reason",
-            deterministicAnswer.reason ?? "Live E2E deterministic interaction answer policy.",
-          ],
-          env,
-          transcriptsRoot,
-          label: `${label}-interaction-answer`,
-          index: commandIndex,
-        });
-        commandIndex += 1;
-        const answerDiagnostic = buildCommandDiagnostic(answerResult);
-        annotateCommandDiagnosticStep(answerDiagnostic, `${label}-interaction-answer`, iteration);
-        commandResults.push(answerDiagnostic);
-        if (!answerResult.ok) {
-          const stderr = answerResult.stderr.trim() || answerResult.stdout.trim() || "interaction answer command failed";
-          throw new Error(`Public CLI interaction answer for '${label}' failed: ${stderr}`);
-        }
-        updateDiagnosticWithInteractionAnswer(diagnostic, answerResult);
-      }
       if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -4044,15 +4049,20 @@ export function executeFullJourneyFlow(options) {
       artifacts.next_action_report_file = getStringField(guidedNextAfterLearning.payload, "next_action_report_file");
       artifacts.guided_next_after_learning_transcript_file = guidedNextAfterLearning.transcriptFile;
 
-      const appSmoke = runGuidedAppSmoke({
+      const webSmoke = runGuidedWebSmoke({
         aorLaunch: options.aorLaunch,
         targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
         runId: options.runId,
         reportsRoot: options.layout.reportsRoot,
         env,
       });
-      artifacts.guided_app_smoke_summary_file = appSmoke.summaryFile;
-      artifacts.guided_app_smoke = appSmoke.summary;
+      artifacts.guided_web_smoke_summary_file = webSmoke.summaryFile;
+      artifacts.guided_web_smoke_html_file = webSmoke.htmlFile;
+      artifacts.guided_web_dom_snapshot_file = webSmoke.domSnapshotFile;
+      artifacts.guided_web_accessibility_summary_file = webSmoke.accessibilitySummaryFile;
+      artifacts.guided_web_screenshot_files = webSmoke.screenshotFiles;
+      artifacts.guided_web_visual_guardrail_file = webSmoke.visualGuardrailFile;
+      artifacts.guided_web_smoke = webSmoke.summary;
     }
     markStage(
       stageMap,
@@ -4144,7 +4154,7 @@ export function executeFullJourneyFlow(options) {
       runId: options.runId,
     });
     artifacts.artifact_consistency = artifactConsistency;
-    const agentOperatorAssessment = {
+    const runnerQualitySummary = {
       mission_satisfaction:
         postRunVerificationStatus === "pass" && realCodeChangeStatus === "pass" && reviewOverallStatus !== "fail"
           ? "pass"
@@ -4162,13 +4172,13 @@ export function executeFullJourneyFlow(options) {
           ? "accept"
           : "reject",
     };
-    artifacts.agent_operator_assessment = agentOperatorAssessment;
+    artifacts.runner_quality_summary = runnerQualitySummary;
     artifacts.quality_gate_decision =
       postRunVerificationStatus === "pass" &&
       postRunDiagnosticStatus !== "fail" &&
       realCodeChangeStatus === "pass" &&
       reviewOverallStatus !== "fail" &&
-      agentOperatorAssessment.mission_satisfaction === "pass"
+      runnerQualitySummary.mission_satisfaction === "pass"
         ? "pass"
         : "fail";
 
@@ -4217,7 +4227,7 @@ export function executeFullJourneyFlow(options) {
       provider_execution_status: providerExecutionProofStatus,
       target_baseline_status: targetBaselineStatus,
       real_code_change_status: realCodeChangeStatus,
-      agent_operator_assessment: agentOperatorAssessment,
+      runner_quality_summary: runnerQualitySummary,
       post_run_verification_status: postRunVerificationStatus,
       post_run_diagnostic_status: postRunDiagnosticStatus,
       discovery_quality:

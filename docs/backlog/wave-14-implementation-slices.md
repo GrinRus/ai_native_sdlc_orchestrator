@@ -225,7 +225,7 @@ Expand catalog-backed full-journey live E2E into a curated matrix across scenari
 
 ### Done evidence
 - refreshed runner skill and runbooks
-- committed W14 proof bundle under `examples/live-e2e/fixtures/w14-s07/` covering all required matrix cells and provider-comparison pairs
+- historical W14 proof bundle removed after the live E2E skill-agent-only migration
 - updated proof-runner tests proving matrix-cell metadata persists into evidence
 
 ### Out of scope
