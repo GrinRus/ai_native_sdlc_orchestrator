@@ -250,17 +250,63 @@ function isOperatorAction(action) {
 }
 
 /**
+ * @param {string} evidenceRef
+ * @param {string} reportsRoot
+ * @returns {boolean}
+ */
+function localEvidenceRefExists(evidenceRef, reportsRoot) {
+  const ref = asNonEmptyString(evidenceRef);
+  if (!ref) return true;
+  if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(ref)) {
+    if (!ref.startsWith("evidence://")) return true;
+    const evidencePath = ref.slice("evidence://".length);
+    return !path.isAbsolute(evidencePath) || fileExists(evidencePath);
+  }
+  if (path.isAbsolute(ref)) return fileExists(ref);
+  if (ref.startsWith(".") || ref.includes("/") || ref.includes("\\")) {
+    return fileExists(path.resolve(reportsRoot, ref));
+  }
+  return true;
+}
+
+/**
+ * @param {Record<string, unknown>} entry
+ * @returns {string[]}
+ */
+function requiredInspectionRefsForEntry(entry) {
+  return uniqueStrings([
+    asNonEmptyString(entry.agent_decision_request_ref),
+    asNonEmptyString(entry.transcript_ref),
+    asNonEmptyString(entry.inspection_ref),
+    asNonEmptyString(entry.classification_ref),
+    ...asStringArray(entry.artifact_refs),
+    ...asStringArray(entry.frontend_interaction_refs),
+  ]);
+}
+
+/**
  * @param {Record<string, unknown>} decision
  * @param {string} action
- * @param {Record<string, unknown>} operatorContext
  * @param {Record<string, unknown>} entry
  * @returns {string | null}
  */
-function rejectInconsistentSkillAgentDecision(decision, action, operatorContext, entry, profile = {}) {
+function rejectInconsistentSkillAgentDecision(decision, action, entry, profile = {}, reportsRoot = "") {
   const semantic = asRecord(decision.semantic_analysis);
   const judgeSource = asNonEmptyString(semantic.judge_source) || asNonEmptyString(decision.judge_source);
   if (judgeSource !== "skill-agent") {
     return "Skill-agent operator decisions must declare semantic_analysis.judge_source=skill-agent.";
+  }
+  const inspectedEvidenceRefs = asStringArray(decision.inspected_evidence_refs);
+  if (inspectedEvidenceRefs.length === 0) {
+    return "Skill-agent operator decisions must include non-empty inspected_evidence_refs.";
+  }
+  const missingInspectionRefs = requiredInspectionRefsForEntry(entry).filter((ref) => !inspectedEvidenceRefs.includes(ref));
+  if (missingInspectionRefs.length > 0) {
+    return `Skill-agent operator decisions must cite required inspected evidence refs: ${missingInspectionRefs.join(", ")}.`;
+  }
+  const missingMaterializedRefs = inspectedEvidenceRefs.filter((ref) => !localEvidenceRefExists(ref, reportsRoot));
+  if (missingMaterializedRefs.length > 0) {
+    return `Skill-agent operator decisions cite missing local evidence refs: ${missingMaterializedRefs.join(", ")}.`;
   }
   const deterministicStatus = toLiveE2eObservationStatus(
     asNonEmptyString(asRecord(entry.deterministic_analysis).status) || asNonEmptyString(entry.final_step_verdict),
@@ -322,9 +368,9 @@ function resolveOperatorDecision(options) {
     const rejectionReason = rejectInconsistentSkillAgentDecision(
       decision,
       action,
-      options.operatorContext,
       options.entry,
       options.profile,
+      options.reportsRoot,
     );
     const stepMatches =
       !asNonEmptyString(decision.step_id) ||
@@ -690,12 +736,14 @@ export function createLiveE2eStepController(options) {
           entry: persistedEntry,
           decisionFile: files.decisionFile,
           operatorContext,
+          reportsRoot: options.reportsRoot,
         });
         const entry = { ...persistedEntry };
         entry.operator_decision_ref = operatorDecision.ref;
         entry.operator_decision_status = operatorDecision.status;
         if (operatorDecision.status === "accepted") {
           const semantic = asRecord(asRecord(operatorDecision.decision).semantic_analysis);
+          entry.inspected_evidence_refs = asStringArray(operatorDecision.decision.inspected_evidence_refs);
           entry.semantic_analysis = {
             status: toLiveE2eObservationStatus(
               asNonEmptyString(semantic.status) || asNonEmptyString(asRecord(entry.semantic_analysis).status),
@@ -794,6 +842,7 @@ export function createLiveE2eStepController(options) {
             asNonEmptyString(input.artifacts.guided_web_smoke_html_file),
             asNonEmptyString(input.artifacts.guided_web_dom_snapshot_file),
             asNonEmptyString(input.artifacts.guided_web_accessibility_summary_file),
+            asNonEmptyString(input.artifacts.guided_web_visual_guardrail_file),
             ...asStringArray(input.artifacts.guided_web_screenshot_files),
           ])
         : [];
@@ -904,13 +953,8 @@ export function createLiveE2eStepController(options) {
       sequence: Number(entry.sequence),
       step: stepInstanceId,
     });
-    const requiredInspectionRefs = uniqueStrings([
-      asNonEmptyString(entry.transcript_ref),
-      asNonEmptyString(entry.inspection_ref),
-      asNonEmptyString(entry.classification_ref),
-      ...asStringArray(entry.artifact_refs),
-      ...asStringArray(entry.frontend_interaction_refs),
-    ]);
+    entry.agent_decision_request_ref = files.requestFile;
+    const requiredInspectionRefs = requiredInspectionRefsForEntry(entry);
     const decisionRequest = {
       request_id: `${options.runId}.${step}.operator-decision-request`,
       run_id: options.runId,
@@ -963,6 +1007,7 @@ export function createLiveE2eStepController(options) {
           judge_source: "skill-agent",
           findings: [],
         },
+        inspected_evidence_refs: requiredInspectionRefs,
         evidence_refs: requiredInspectionRefs,
         ui_ux_analysis:
           asStringArray(entry.frontend_interaction_refs).length > 0
@@ -976,18 +1021,19 @@ export function createLiveE2eStepController(options) {
       created_at: nowIso(),
     };
     writeJson(files.requestFile, decisionRequest);
-    entry.agent_decision_request_ref = files.requestFile;
 
     const operatorDecision = resolveOperatorDecision({
       profile: options.profile,
       entry,
       decisionFile: files.decisionFile,
       operatorContext,
+      reportsRoot: options.reportsRoot,
     });
     entry.operator_decision_ref = operatorDecision.ref;
     entry.operator_decision_status = operatorDecision.status;
     if (operatorDecision.status === "accepted") {
       const semantic = asRecord(asRecord(operatorDecision.decision).semantic_analysis);
+      entry.inspected_evidence_refs = asStringArray(operatorDecision.decision.inspected_evidence_refs);
       entry.semantic_analysis = {
         status: toLiveE2eObservationStatus(asNonEmptyString(semantic.status) || asNonEmptyString(entry.semantic_analysis.status)),
         judge_source:

@@ -2155,7 +2155,25 @@ function validateLiveE2EObservationReport(document, source) {
       }),
     );
   }
-  if (typeof document.final_skill_agent_verdict_file !== "string" || document.final_skill_agent_verdict_file.length === 0) {
+  if (typeof document.final_skill_agent_verdict_request_file !== "string" || document.final_skill_agent_verdict_request_file.length === 0) {
+    issues.push(
+      issue({
+        code: document.final_skill_agent_verdict_request_file === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "final_skill_agent_verdict_request_file",
+        expected: "non-empty string",
+        actual:
+          document.final_skill_agent_verdict_request_file === undefined
+            ? "missing"
+            : describeActualType(document.final_skill_agent_verdict_request_file),
+        message: "Field 'final_skill_agent_verdict_request_file' is required for skill-agent-only live E2E reports.",
+      }),
+    );
+  }
+  if (
+    reportStatus === "final" &&
+    (typeof document.final_skill_agent_verdict_file !== "string" || document.final_skill_agent_verdict_file.length === 0)
+  ) {
     issues.push(
       issue({
         code: document.final_skill_agent_verdict_file === undefined ? "required_field_missing" : "field_type_mismatch",
@@ -2166,12 +2184,31 @@ function validateLiveE2EObservationReport(document, source) {
           document.final_skill_agent_verdict_file === undefined
             ? "missing"
             : describeActualType(document.final_skill_agent_verdict_file),
-        message: "Field 'final_skill_agent_verdict_file' is required for skill-agent-only live E2E reports.",
+        message: "Field 'final_skill_agent_verdict_file' is required for final skill-agent-only live E2E reports.",
+      }),
+    );
+  }
+  if (reportStatus === "final" && !isPlainObject(document.final_skill_agent_verdict)) {
+    issues.push(
+      issue({
+        code: document.final_skill_agent_verdict === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "final_skill_agent_verdict",
+        expected: "object",
+        actual:
+          document.final_skill_agent_verdict === undefined ? "missing" : describeActualType(document.final_skill_agent_verdict),
+        message: "Field 'final_skill_agent_verdict' is required for final skill-agent-only live E2E reports.",
       }),
     );
   }
   if (isPlainObject(document.final_skill_agent_verdict)) {
     const finalVerdict = document.final_skill_agent_verdict;
+    validateObservationStatusField({
+      value: finalVerdict.status,
+      source,
+      field: "final_skill_agent_verdict.status",
+      issues,
+    });
     if (finalVerdict.judge_source !== "skill-agent") {
       issues.push(
         issue({
@@ -2183,6 +2220,31 @@ function validateLiveE2EObservationReport(document, source) {
           message: "Field 'final_skill_agent_verdict.judge_source' must be skill-agent.",
         }),
       );
+    }
+    const inspectedRefs = Array.isArray(finalVerdict.inspected_evidence_refs)
+      ? finalVerdict.inspected_evidence_refs
+      : [];
+    if (inspectedRefs.length === 0) {
+      issues.push(
+        issue({
+          code: finalVerdict.inspected_evidence_refs === undefined ? "required_field_missing" : "array_empty",
+          source,
+          field: "final_skill_agent_verdict.inspected_evidence_refs",
+          expected: "non-empty string array",
+          actual:
+            finalVerdict.inspected_evidence_refs === undefined
+              ? "missing"
+              : describeActualType(finalVerdict.inspected_evidence_refs),
+          message: "Final skill-agent verdict must list inspected evidence refs.",
+        }),
+      );
+    } else {
+      validateStringArrayItems({
+        values: finalVerdict.inspected_evidence_refs,
+        source,
+        field: "final_skill_agent_verdict.inspected_evidence_refs",
+        issues,
+      });
     }
   }
   const finalAnalysis = isPlainObject(document.final_analysis)
@@ -2559,6 +2621,31 @@ function validateObservationStepJournal(options) {
           message: "Accepted live E2E operator decisions must carry 'operator_decision_ref'.",
         }),
       );
+    }
+    if (decisionStatus === "accepted") {
+      const inspectedRefs = Array.isArray(record.inspected_evidence_refs) ? record.inspected_evidence_refs : [];
+      if (inspectedRefs.length === 0) {
+        options.issues.push(
+          issue({
+            code: record.inspected_evidence_refs === undefined ? "required_field_missing" : "array_empty",
+            source: options.source,
+            field: `step_journal[${index}].inspected_evidence_refs`,
+            expected: "non-empty string array",
+            actual:
+              record.inspected_evidence_refs === undefined
+                ? "missing"
+                : describeActualType(record.inspected_evidence_refs),
+            message: "Accepted live E2E operator decisions must list inspected evidence refs.",
+          }),
+        );
+      } else {
+        validateStringArrayItems({
+          values: record.inspected_evidence_refs,
+          source: options.source,
+          field: `step_journal[${index}].inspected_evidence_refs`,
+          issues: options.issues,
+        });
+      }
     }
     if (operatorKind === "skill-agent" && decisionPolicy === "required" && finalReport) {
       if (decisionStatus !== "accepted") {

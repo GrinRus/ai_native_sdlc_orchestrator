@@ -191,6 +191,26 @@ function readJsonIfPresent(filePath) {
 }
 
 /**
+ * @param {string} evidenceRef
+ * @param {string} reportsRoot
+ * @returns {boolean}
+ */
+function localEvidenceRefExists(evidenceRef, reportsRoot) {
+  const ref = asNonEmptyString(evidenceRef);
+  if (!ref) return true;
+  if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(ref)) {
+    if (!ref.startsWith("evidence://")) return true;
+    const evidencePath = ref.slice("evidence://".length);
+    return !path.isAbsolute(evidencePath) || fileExists(evidencePath);
+  }
+  if (path.isAbsolute(ref)) return fileExists(ref);
+  if (ref.startsWith(".") || ref.includes("/") || ref.includes("\\")) {
+    return fileExists(path.resolve(reportsRoot, ref));
+  }
+  return true;
+}
+
+/**
  * @param {Array<Record<string, unknown>>} runtimePermissionDecisions
  * @returns {Record<string, unknown>}
  */
@@ -600,8 +620,9 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
   const htmlFile = asNonEmptyString(artifacts.guided_web_smoke_html_file);
   const domSnapshotFile = asNonEmptyString(artifacts.guided_web_dom_snapshot_file);
   const accessibilitySummaryFile = asNonEmptyString(artifacts.guided_web_accessibility_summary_file);
+  const visualGuardrailFile = asNonEmptyString(artifacts.guided_web_visual_guardrail_file);
   const screenshotRefs = asStringArray(artifacts.guided_web_screenshot_files);
-  if (!summaryFile && !htmlFile && !domSnapshotFile && screenshotRefs.length === 0) return [];
+  if (!summaryFile && !htmlFile && !domSnapshotFile && !visualGuardrailFile && screenshotRefs.length === 0) return [];
   const webSmoke = asRecord(artifacts.guided_web_smoke);
   const taskOutcome = asRecord(webSmoke.task_outcome);
   const status = toObservationStatus(asNonEmptyString(taskOutcome.status) || "pass");
@@ -618,7 +639,14 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
       step_id: "learning",
       interaction_id: "guided-web-smoke",
       surface: "web",
-      evidence_refs: uniqueStrings([summaryFile, htmlFile, domSnapshotFile, accessibilitySummaryFile, ...screenshotRefs]),
+      evidence_refs: uniqueStrings([
+        summaryFile,
+        htmlFile,
+        domSnapshotFile,
+        accessibilitySummaryFile,
+        visualGuardrailFile,
+        ...screenshotRefs,
+      ]),
       html_ref: htmlFile || asNonEmptyString(webSmoke.html_ref) || null,
       screenshot_refs: screenshotRefs,
       dom_snapshot_ref: domSnapshotFile || asNonEmptyString(webSmoke.dom_snapshot_ref) || null,
@@ -1034,7 +1062,7 @@ function buildObservationReport(options) {
 /**
  * @param {{ runId: string, reportsRoot: string, observationReport: Record<string, unknown> }}
  */
-function writeFinalSkillAgentVerdict(options) {
+function resolveFinalSkillAgentVerdict(options) {
   const stepJournal = Array.isArray(options.observationReport.step_journal)
     ? options.observationReport.step_journal.map((entry) => asRecord(entry))
     : [];
@@ -1060,40 +1088,90 @@ function writeFinalSkillAgentVerdict(options) {
   const failedFrontendInteractions = frontendInteractions
     .filter((entry) => !["pass", "warn"].includes(toObservationStatus(asNonEmptyString(entry.status) || "not_pass")))
     .map((entry) => asNonEmptyString(entry.interaction_id) || asNonEmptyString(entry.step_id) || "frontend-interaction");
-  const status =
-    missingSteps.length === 0 && missingFrontendVerdicts.length === 0 && failedFrontendInteractions.length === 0
-      ? finalAnalysisStatus
-      : "blocked";
-  const verdict = {
-    verdict_id: `${options.runId}.final-skill-agent-verdict.v1`,
-    run_id: options.runId,
-    status,
-    judge_source: "skill-agent",
-    accepted_step_count: acceptedSkillAgentSteps.length,
-    required_steps: includedSteps,
-    missing_skill_agent_steps: missingSteps,
-    missing_frontend_agent_verdicts: missingFrontendVerdicts,
-    failed_frontend_interactions: failedFrontendInteractions,
-    operator_decision_refs: uniqueStrings(acceptedSkillAgentSteps.map((entry) => asNonEmptyString(entry.operator_decision_ref))),
-    evidence_refs: uniqueStrings([
-      asNonEmptyString(options.observationReport.controller_state_ref),
-      ...acceptedSkillAgentSteps.flatMap((entry) => asStringArray(entry.artifact_refs)),
-    ]),
-    findings: uniqueStrings([
-      ...asStringArray(finalAnalysis.findings),
-      ...missingSteps.map((step) => `${step} is missing an accepted skill-agent decision.`),
-      ...missingFrontendVerdicts.map((interaction) => `${interaction} is missing an accepted skill-agent UI/UX verdict.`),
-      ...failedFrontendInteractions.map((interaction) => `${interaction} did not pass UI/UX evidence checks.`),
-    ]),
-    final_recommendation: status === "pass" || status === "warn" ? "accept" : "reject",
-    created_at: nowIso(),
-  };
-  const verdictFile = path.join(
+  const expectedVerdictFile = path.join(
     options.reportsRoot,
     `live-e2e-final-skill-agent-verdict-${normalizeId(options.runId)}.json`,
   );
-  writeJson(verdictFile, verdict);
-  return { verdictFile, verdict };
+  const requestFile = path.join(
+    options.reportsRoot,
+    `live-e2e-final-skill-agent-verdict-request-${normalizeId(options.runId)}.json`,
+  );
+  const requiredEvidenceRefs = uniqueStrings([
+    asNonEmptyString(options.observationReport.controller_state_ref),
+    ...asStringArray(options.observationReport.evidence_refs),
+    ...stepJournal.flatMap((entry) => [
+      asNonEmptyString(entry.observation_ref),
+      asNonEmptyString(entry.operator_decision_ref),
+      ...asStringArray(entry.artifact_refs),
+    ]),
+    ...frontendInteractions.flatMap((entry) => asStringArray(entry.evidence_refs)),
+  ]);
+  const request = {
+    request_id: `${options.runId}.final-skill-agent-verdict-request.v1`,
+    run_id: options.runId,
+    expected_verdict_file: expectedVerdictFile,
+    required_judge_source: "skill-agent",
+    current_deterministic_status: finalAnalysisStatus,
+    required_steps: includedSteps,
+    accepted_step_count: acceptedSkillAgentSteps.length,
+    missing_skill_agent_steps: missingSteps,
+    missing_frontend_agent_verdicts: missingFrontendVerdicts,
+    failed_frontend_interactions: failedFrontendInteractions,
+    required_inspection: [
+      "review the full observation report and step observations",
+      "verify every included step has an accepted skill-agent decision",
+      "verify deterministic classifications and command transcripts",
+      "verify target diff, no-upstream-write evidence, and delivery artifacts",
+      "verify UI/UX evidence for frontend-capable profiles",
+      "emit a final verdict only from skill-agent judgement",
+    ],
+    required_evidence_refs: requiredEvidenceRefs,
+    expected_response_shape: {
+      verdict_id: `${options.runId}.final-skill-agent-verdict.v1`,
+      run_id: options.runId,
+      status: "pass|warn|not_pass|blocked",
+      judge_source: "skill-agent",
+      inspected_evidence_refs: requiredEvidenceRefs.slice(0, 8),
+      findings: [],
+      final_recommendation: "accept|accept_with_findings|reject",
+      created_at: nowIso(),
+    },
+    created_at: nowIso(),
+  };
+  writeJson(requestFile, request);
+  if (!fileExists(expectedVerdictFile)) {
+    return {
+      verdictFile: expectedVerdictFile,
+      verdict: null,
+      requestFile,
+      missingFindings: [
+        `Final skill-agent verdict is missing; write an accepted skill-agent verdict to ${expectedVerdictFile}.`,
+      ],
+    };
+  }
+  const verdict = asRecord(readJson(expectedVerdictFile));
+  const inspectedRefs = asStringArray(verdict.inspected_evidence_refs);
+  const evidenceRefs = uniqueStrings([...asStringArray(verdict.evidence_refs), ...inspectedRefs]);
+  const invalidReasons = [];
+  if (asNonEmptyString(verdict.judge_source) !== "skill-agent") {
+    invalidReasons.push("final verdict judge_source must be skill-agent.");
+  }
+  if (inspectedRefs.length === 0) {
+    invalidReasons.push("final verdict must include non-empty inspected_evidence_refs.");
+  }
+  if (evidenceRefs.length === 0) {
+    invalidReasons.push("final verdict must reference inspected evidence.");
+  }
+  const missingMaterializedRefs = inspectedRefs.filter((ref) => !localEvidenceRefExists(ref, options.reportsRoot));
+  if (missingMaterializedRefs.length > 0) {
+    invalidReasons.push(`final verdict cites missing local evidence refs: ${missingMaterializedRefs.join(", ")}.`);
+  }
+  return {
+    verdictFile: expectedVerdictFile,
+    verdict,
+    requestFile,
+    missingFindings: invalidReasons,
+  };
 }
 
 /**
@@ -1219,10 +1297,10 @@ function writeAgentArtifactReviewRequest(options) {
           step_id: "discovery",
           semantic_analysis: {
             status: "pass|warn|not_pass|blocked|interaction_required|resumed",
-            judge_source: "agent",
+            judge_source: "skill-agent",
             findings: [],
           },
-          judge_source: "agent",
+          judge_source: "skill-agent",
           artifact_refs: [],
           findings: [],
         },
@@ -1307,26 +1385,38 @@ function writeProofRunnerArtifacts(options) {
     options.layout.reportsRoot,
     `live-e2e-observation-report-${normalizeId(options.runId)}.json`,
   );
-  const finalSkillAgentVerdict = writeFinalSkillAgentVerdict({
+  const finalSkillAgentVerdict = resolveFinalSkillAgentVerdict({
     runId: options.runId,
     reportsRoot: options.layout.reportsRoot,
     observationReport,
   });
-  observationReport.final_skill_agent_verdict_file = finalSkillAgentVerdict.verdictFile;
-  observationReport.final_skill_agent_verdict = finalSkillAgentVerdict.verdict;
+  observationReport.final_skill_agent_verdict_request_file = finalSkillAgentVerdict.requestFile;
+  if (finalSkillAgentVerdict.verdict) {
+    observationReport.final_skill_agent_verdict_file = finalSkillAgentVerdict.verdictFile;
+    observationReport.final_skill_agent_verdict = finalSkillAgentVerdict.verdict;
+  } else {
+    observationReport.report_status = "in_progress";
+  }
   observationReport.evidence_refs = uniqueStrings([
     ...asStringArray(observationReport.evidence_refs),
     ...stepObservationFiles,
-    finalSkillAgentVerdict.verdictFile,
+    finalSkillAgentVerdict.requestFile,
+    finalSkillAgentVerdict.verdict ? finalSkillAgentVerdict.verdictFile : null,
   ]);
-  const finalVerdictStatus = toObservationStatus(asNonEmptyString(finalSkillAgentVerdict.verdict.status));
+  const finalVerdictStatus =
+    asStringArray(finalSkillAgentVerdict.missingFindings).length > 0
+      ? "blocked"
+      : finalSkillAgentVerdict.verdict
+        ? toObservationStatus(asNonEmptyString(finalSkillAgentVerdict.verdict.status))
+        : "blocked";
   observationReport.overall_status = worstObservationStatus(observationReport.overall_status, finalVerdictStatus);
   observationReport.final_analysis = {
     ...asRecord(observationReport.final_analysis),
     status: worstObservationStatus(asNonEmptyString(asRecord(observationReport.final_analysis).status), finalVerdictStatus),
     findings: uniqueStrings([
       ...asStringArray(asRecord(observationReport.final_analysis).findings),
-      ...asStringArray(finalSkillAgentVerdict.verdict.findings),
+      ...asStringArray(asRecord(finalSkillAgentVerdict.verdict).findings),
+      ...asStringArray(finalSkillAgentVerdict.missingFindings),
     ]),
   };
   const observationValidation = validateContractDocument({
@@ -1345,8 +1435,9 @@ function writeProofRunnerArtifacts(options) {
   });
   options.flowResult.artifacts.live_e2e_observation_report_file = observationReportFile;
   options.flowResult.artifacts.live_e2e_step_observation_files = stepObservationFiles;
+  options.flowResult.artifacts.final_skill_agent_verdict_request_file = finalSkillAgentVerdict.requestFile;
   options.flowResult.artifacts.final_skill_agent_verdict_file = finalSkillAgentVerdict.verdictFile;
-  options.flowResult.artifacts.final_skill_agent_verdict = finalSkillAgentVerdict.verdict;
+  options.flowResult.artifacts.final_skill_agent_verdict = finalSkillAgentVerdict.verdict ?? null;
   options.flowResult.artifacts.agent_artifact_review_request_file = agentArtifactReviewRequestFile;
   options.flowResult.artifacts.live_e2e_observation_overall_status = observationReport.overall_status;
   const productionProof = applyProductionProofEvidence({
@@ -1489,8 +1580,9 @@ function writeProofRunnerArtifacts(options) {
     live_e2e_step_observation_files: stepObservationFiles,
     live_e2e_observation_overall_status: observationReport.overall_status,
     operator_context: observationReport.operator_context,
+    final_skill_agent_verdict_request_file: finalSkillAgentVerdict.requestFile,
     final_skill_agent_verdict_file: finalSkillAgentVerdict.verdictFile,
-    final_skill_agent_verdict: finalSkillAgentVerdict.verdict,
+    final_skill_agent_verdict: finalSkillAgentVerdict.verdict ?? null,
     agent_artifact_review_request_file: agentArtifactReviewRequestFile,
     matrix_cell:
       typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell

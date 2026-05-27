@@ -921,7 +921,7 @@ function runGuidedWebSmoke(options) {
   );
   const visualSnapshotFile = path.join(
     options.reportsRoot,
-    `installed-user-guided-web-smoke-visual-${normalizeId(options.runId)}.json`,
+    `installed-user-guided-web-smoke-visual-guardrail-${normalizeId(options.runId)}.json`,
   );
   const result = spawnSync(
     options.aorLaunch.command,
@@ -989,38 +989,56 @@ function runGuidedWebSmoke(options) {
     findings: taskPassed ? [] : ["Packaged local app smoke did not satisfy every required route check."],
   });
   writeJson(visualSnapshotFile, {
-    kind: "app-smoke-visual-summary",
-    status: taskPassed ? "pass" : "not_pass",
+    kind: "app-smoke-visual-guardrail",
+    status: taskPassed ? "warn" : "not_pass",
     surface: "aor app --smoke",
     app_url: asNonEmptyString(summary.app_url) || null,
     html_loaded: summary.html_loaded === true,
+    note:
+      "This deterministic app-smoke summary is a guardrail only; it is not browser-task-proof screenshot evidence.",
   });
+  const browserTaskFindings = [
+    "browser-task-proof requires real browser execution evidence; this run only produced deterministic aor app smoke evidence.",
+  ];
   summary.summary_file = summaryFile;
   summary.rendered_html_file = asNonEmptyString(summary.rendered_html_file) || outputHtml;
   summary.command = "aor app --smoke true --open false --json";
+  summary.browser_evidence_mode = "guardrail-only";
   summary.html_ref = summary.rendered_html_file;
   summary.dom_snapshot_file = domSnapshotFile;
   summary.accessibility_summary_file = accessibilitySummaryFile;
-  summary.screenshot_files = [visualSnapshotFile];
+  summary.visual_guardrail_file = visualSnapshotFile;
+  summary.screenshot_files = [];
   summary.dom_snapshot_ref = domSnapshotFile;
   summary.accessibility_summary_ref = accessibilitySummaryFile;
-  summary.screenshot_refs = [visualSnapshotFile];
+  summary.screenshot_refs = [];
   summary.detached = true;
   summary.guided_lifecycle_state = asNonEmptyString(summary.status) || null;
   summary.guided_current_stage_id = "learning";
   summary.task_outcome = {
-    status: taskPassed ? "pass" : "not_pass",
-    checked_tasks: ["run list/state route", "selected project state", "packaged app HTML", "config route"],
-    findings: taskPassed ? [] : ["Guided app smoke failed one or more route checks."],
+    status: "not_pass",
+    checked_tasks: [
+      "packaged app HTML smoke",
+      "config route smoke",
+      "project state route smoke",
+      "real browser screenshot capture",
+      "operator task interaction",
+    ],
+    findings: taskPassed
+      ? browserTaskFindings
+      : ["Guided app smoke failed one or more route checks.", ...browserTaskFindings],
   };
-  summary.ux_findings = taskPassed ? [] : ["Installed-user local app smoke did not pass."];
+  summary.ux_findings = taskPassed
+    ? browserTaskFindings
+    : ["Installed-user local app smoke did not pass.", ...browserTaskFindings];
   writeJson(summaryFile, summary);
   return {
     summaryFile,
     htmlFile: outputHtml,
     domSnapshotFile,
     accessibilitySummaryFile,
-    screenshotFiles: [visualSnapshotFile],
+    screenshotFiles: [],
+    visualGuardrailFile: visualSnapshotFile,
     summary,
   };
 }
@@ -4043,6 +4061,7 @@ export function executeFullJourneyFlow(options) {
       artifacts.guided_web_dom_snapshot_file = webSmoke.domSnapshotFile;
       artifacts.guided_web_accessibility_summary_file = webSmoke.accessibilitySummaryFile;
       artifacts.guided_web_screenshot_files = webSmoke.screenshotFiles;
+      artifacts.guided_web_visual_guardrail_file = webSmoke.visualGuardrailFile;
       artifacts.guided_web_smoke = webSmoke.summary;
     }
     markStage(

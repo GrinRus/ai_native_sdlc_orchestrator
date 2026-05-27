@@ -21,8 +21,32 @@ function withTempRoot(callback) {
   }
 }
 
+function normalizeLiveE2eId(value) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function defaultInspectedEvidenceRefs(reportsRoot, runId, sequence, stepInstanceId, extraRefs = []) {
+  const normalizedRunId = normalizeLiveE2eId(runId);
+  const normalizedStep = normalizeLiveE2eId(stepInstanceId);
+  const paddedSequence = String(sequence).padStart(2, "0");
+  return [...new Set([
+    path.join(reportsRoot, `live-e2e-step-plan-${normalizedRunId}-${paddedSequence}-${normalizedStep}.json`),
+    path.join(reportsRoot, `live-e2e-agent-decision-request-${normalizedRunId}-${paddedSequence}-${normalizedStep}.json`),
+    path.join(reportsRoot, `live-e2e-step-inspection-${normalizedRunId}-${paddedSequence}-${normalizedStep}.json`),
+    path.join(reportsRoot, `live-e2e-step-classification-${normalizedRunId}-${paddedSequence}-${normalizedStep}.json`),
+    ...extraRefs,
+  ].filter(Boolean))];
+}
+
 function writeSkillAgentDecision(reportsRoot, runId, sequence, stepInstanceId, options = {}) {
   const stepId = stepInstanceId.split("#")[0];
+  const inspectedEvidenceRefs = defaultInspectedEvidenceRefs(
+    reportsRoot,
+    runId,
+    sequence,
+    stepInstanceId,
+    options.inspectedEvidenceRefs ?? [],
+  );
   const decisionFile = path.join(
     reportsRoot,
     `live-e2e-operator-decision-${runId}-${String(sequence).padStart(2, "0")}-${stepInstanceId.replace("#", "-")}.json`,
@@ -38,6 +62,8 @@ function writeSkillAgentDecision(reportsRoot, runId, sequence, stepInstanceId, o
         action: options.action ?? "continue",
         next_step: options.nextStep,
         reason: options.reason ?? "Skill-agent accepted public evidence.",
+        inspected_evidence_refs: inspectedEvidenceRefs,
+        evidence_refs: options.evidenceRefs ?? inspectedEvidenceRefs,
         semantic_analysis: {
           status: options.semanticStatus ?? "pass",
           judge_source: "skill-agent",
@@ -55,6 +81,7 @@ function writeSkillAgentDecision(reportsRoot, runId, sequence, stepInstanceId, o
 test("live E2E step controller persists observation and state before next step", () => {
   withTempRoot((reportsRoot) => {
     const transcriptFile = path.join(reportsRoot, "01-discovery-run.json");
+    const analysisFile = path.join(reportsRoot, "analysis.json");
     fs.writeFileSync(transcriptFile, "{}\n", "utf8");
     const controller = createLiveE2eStepController({
       reportsRoot,
@@ -62,7 +89,10 @@ test("live E2E step controller persists observation and state before next step",
       profile: { live_e2e: { flow_range_policy: "delivery_default" } },
       mode: "auto",
     });
-    writeSkillAgentDecision(reportsRoot, "controller-pass", 1, "discovery", { nextStep: "spec" });
+    writeSkillAgentDecision(reportsRoot, "controller-pass", 1, "discovery", {
+      nextStep: "spec",
+      inspectedEvidenceRefs: [transcriptFile],
+    });
 
     const result = controller.observeStage({
       stage: "discovery",
@@ -135,7 +165,6 @@ test("live E2E step controller blocks skill-agent profiles until operator decisi
         return true;
       },
     );
-
     const [entry] = controller.getStepJournal();
     assert.equal(entry.operator_decision_status, "missing");
     assert.equal(typeof entry.agent_decision_request_ref, "string");
@@ -172,6 +201,12 @@ test("live E2E step controller rejects inconsistent skill-agent continue decisio
           status: "accepted",
           operator_ref: "skill://live-e2e-runner",
           action: "continue",
+          inspected_evidence_refs: defaultInspectedEvidenceRefs(
+            reportsRoot,
+            "controller-skill-agent-inconsistent",
+            1,
+            "discovery",
+          ),
           semantic_analysis: {
             status: "not_pass",
             judge_source: "skill-agent",
@@ -235,6 +270,12 @@ test("live E2E step controller rejects skill-agent continue when deterministic c
           status: "accepted",
           operator_ref: "skill://live-e2e-runner",
           action: "continue",
+          inspected_evidence_refs: defaultInspectedEvidenceRefs(
+            reportsRoot,
+            "controller-skill-agent-deterministic-fail",
+            1,
+            "execution",
+          ),
           semantic_analysis: {
             status: "pass",
             judge_source: "skill-agent",
@@ -364,6 +405,13 @@ test("live E2E step controller rejects UI-capable decisions without frontend evi
             judge_source: "skill-agent",
             findings: [],
           },
+          inspected_evidence_refs: defaultInspectedEvidenceRefs(reportsRoot, "controller-ui-evidence", 1, "learning", [
+            summaryFile,
+            htmlFile,
+            domFile,
+            accessibilityFile,
+            screenshotFile,
+          ]),
           evidence_refs: [summaryFile],
         },
         null,
@@ -417,6 +465,7 @@ test("live E2E step controller preserves repeated execution and review iteration
       action: "retry_public_step",
       semanticStatus: "warn",
       nextStep: "execution",
+      inspectedEvidenceRefs: [reviewTranscript],
     });
     const reviewResult = controller.observeStage({
       stage: "review",
@@ -442,7 +491,10 @@ test("live E2E step controller preserves repeated execution and review iteration
     assert.equal(reviewResult.action, "retry_public_step");
 
     controller.planCommand({ label: "run-start", commandSurface: "aor run start", iteration: 2 });
-    writeSkillAgentDecision(reportsRoot, "controller-repair-loop", 3, "execution#2", { nextStep: "qa" });
+    writeSkillAgentDecision(reportsRoot, "controller-repair-loop", 3, "execution#2", {
+      nextStep: "qa",
+      inspectedEvidenceRefs: [executionTranscript],
+    });
     controller.observeStage({
       stage: "execution",
       iteration: 2,
@@ -486,7 +538,10 @@ test("live E2E delivery certification does not reuse review cached evidence", ()
     });
 
     controller.planCommand({ label: "review-run", commandSurface: "aor review run", iteration: 1 });
-    writeSkillAgentDecision(reportsRoot, "controller-delivery-cert-cache", 1, "review", { nextStep: "qa" });
+    writeSkillAgentDecision(reportsRoot, "controller-delivery-cert-cache", 1, "review", {
+      nextStep: "qa",
+      inspectedEvidenceRefs: [reviewTranscript],
+    });
     controller.observeStage({
       stage: "review",
       iteration: 1,
@@ -583,6 +638,7 @@ test("live E2E manual resume applies operator decision to observed repair iterat
 
     const [pendingEntry] = first.getStepJournal();
     const decisionRequest = JSON.parse(fs.readFileSync(pendingEntry.agent_decision_request_ref, "utf8"));
+    const requiredEvidenceRefs = decisionRequest.decision_rubric.required_evidence_refs;
     fs.writeFileSync(
       decisionRequest.operator_decision_expected_ref,
       `${JSON.stringify(
@@ -598,7 +654,8 @@ test("live E2E manual resume applies operator decision to observed repair iterat
             judge_source: "skill-agent",
             findings: ["Repair execution evidence accepted."],
           },
-          evidence_refs: [transcriptFile],
+          inspected_evidence_refs: requiredEvidenceRefs,
+          evidence_refs: requiredEvidenceRefs,
         },
         null,
         2,
@@ -924,6 +981,7 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
 test("live E2E step controller exposes cached public command results for completed steps", () => {
   withTempRoot((reportsRoot) => {
     const transcriptFile = path.join(reportsRoot, "01-discovery-run.json");
+    const analysisFile = path.join(reportsRoot, "analysis.json");
     fs.writeFileSync(
       transcriptFile,
       `${JSON.stringify({
@@ -935,13 +993,17 @@ test("live E2E step controller exposes cached public command results for complet
       })}\n`,
       "utf8",
     );
+    fs.writeFileSync(analysisFile, "{}\n", "utf8");
     const first = createLiveE2eStepController({
       reportsRoot,
       runId: "controller-command-cache",
       profile: { live_e2e: { flow_range_policy: "delivery_default" } },
       mode: "auto",
     });
-    writeSkillAgentDecision(reportsRoot, "controller-command-cache", 1, "discovery", { nextStep: "spec" });
+    writeSkillAgentDecision(reportsRoot, "controller-command-cache", 1, "discovery", {
+      nextStep: "spec",
+      inspectedEvidenceRefs: [transcriptFile, analysisFile],
+    });
     first.observeStage({
       stage: "discovery",
       stageResult: { stage: "discovery", status: "pass", evidence_refs: [transcriptFile], summary: "ok" },
@@ -951,11 +1013,11 @@ test("live E2E step controller exposes cached public command results for complet
           command_surface: "aor discovery run",
           status: "pass",
           transcript_file: transcriptFile,
-          artifact_refs: ["analysis.json"],
+          artifact_refs: [analysisFile],
           exit_code: 0,
         },
       ],
-      artifacts: { analysis_report_file: "analysis.json" },
+      artifacts: { analysis_report_file: analysisFile },
     });
 
     const second = createLiveE2eStepController({
@@ -968,7 +1030,7 @@ test("live E2E step controller exposes cached public command results for complet
     assert.equal(second.shouldUseCachedCommand("discovery-run"), true);
     assert.equal(second.shouldUseCachedCommand("spec-build"), false);
     assert.equal(second.getCachedCommandResult("discovery-run").transcript_file, transcriptFile);
-    assert.deepEqual(second.getState().artifacts_snapshot, { analysis_report_file: "analysis.json" });
+    assert.deepEqual(second.getState().artifacts_snapshot, { analysis_report_file: analysisFile });
   });
 });
 

@@ -289,6 +289,7 @@ Full-journey summaries must carry:
 - `live_e2e_observation_overall_status`
 - `operator_context`
 - `runner_quality_summary`
+- `final_skill_agent_verdict_request_file`
 - `final_skill_agent_verdict_file`
 - `quality_judgement`
 - `canonical_status`
@@ -329,7 +330,8 @@ Guided full-journey summaries also carry:
 - `artifacts.guided_web_smoke_html_file`
 - `artifacts.guided_web_dom_snapshot_file`
 - `artifacts.guided_web_accessibility_summary_file`
-- `artifacts.guided_web_screenshot_files`
+- `artifacts.guided_web_screenshot_files` (empty until real browser-task screenshots are captured)
+- `artifacts.guided_web_visual_guardrail_file` for deterministic app-smoke visual guardrail evidence
 - `artifacts.review_decision_file`
 - `artifacts.release_packet_file`
 - `artifacts.target_head_before` and `artifacts.target_head_after`
@@ -372,9 +374,9 @@ Delivery evidence no longer downgrades `not_pass` to `warn`.
 ## Step Analysis
 The runner performs deterministic analysis for every step from public command transcripts and artifact refs, then writes `agent_decision_request_ref` before the next public step can run. Acceptance and production-proof profiles require `operator_context.operator_kind=skill-agent`, `decision_policy=required`, and an accepted `operator_decision_ref` for every observed step.
 
-The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` is removed; live E2E semantic analysis comes only from accepted skill-agent decisions and the final skill-agent verdict artifact.
+The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent` and non-empty `inspected_evidence_refs[]`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` is removed; live E2E semantic analysis comes only from accepted skill-agent decisions and the final skill-agent verdict artifact.
 
-Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision should cite the public transcript/artifact refs it inspected. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and screenshot or visual snapshot before continuation can be accepted.
+Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and real screenshot evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not satisfy `browser-task-proof` screenshot requirements.
 
 Judge criteria:
 - traceability to feature request, mission, and previous step;

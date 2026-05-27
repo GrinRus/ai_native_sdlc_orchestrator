@@ -21,7 +21,7 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `overall_status`
 - `aor_installation`
 - `aor_installation_proof_file`
-- `final_skill_agent_verdict_file`
+- `final_skill_agent_verdict_request_file`
 - `setup_journal`
 - `step_journal`
 - `final_analysis`
@@ -99,6 +99,7 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `agent_decision_request_ref`
 - `operator_decision_ref`
 - `operator_decision_status`
+- `inspected_evidence_refs`
 - `requested_interaction`
 - `decision`
 - `resume_result`
@@ -171,7 +172,7 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `release`
 - `learning`
 
-`final_skill_agent_verdict_file` must point to the final accepted skill-agent verdict artifact. A final acceptance/proof report requires every included `step_journal[]` entry to have `operator_decision_status=accepted`, every included step semantic analysis to have `judge_source=skill-agent`, and the final verdict artifact to have `judge_source=skill-agent`.
+`final_skill_agent_verdict_request_file` must point to the final request packet that tells the skill-agent which evidence to inspect. For `report_status=final`, `final_skill_agent_verdict_file` must point to an accepted skill-agent verdict artifact. A final acceptance/proof report requires every included `step_journal[]` entry to have `operator_decision_status=accepted`, every included step semantic analysis to have `judge_source=skill-agent`, and the final verdict artifact to have `judge_source=skill-agent` plus non-empty `inspected_evidence_refs[]`.
 
 Profiles that declare `live_e2e.frontend_capability` other than `none` must treat `frontend_interactions[]` as first-class proof evidence. Deterministic web smoke output can establish that the installed-user web surface rendered, but final acceptance also requires a linked skill-agent UI/UX verdict through `agent_verdict_ref`. Missing HTML, DOM snapshot, screenshot, accessibility summary, failed `task_outcome`, or missing agent UI verdict blocks acceptance.
 

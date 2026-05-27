@@ -49,6 +49,7 @@ aor_installation:
     - runtime://reports/live-e2e-aor-install/03-pnpm-build.json
     - runtime://reports/live-e2e-aor-install/04-pnpm-aor-help.json
 aor_installation_proof_file: runtime://reports/live-e2e-aor-installation-proof-live-e2e.sample.run.json
+final_skill_agent_verdict_request_file: runtime://reports/live-e2e-final-skill-agent-verdict-request-live-e2e.sample.run.json
 final_skill_agent_verdict_file: runtime://reports/live-e2e-final-skill-agent-verdict-live-e2e.sample.run.json
 setup_journal:
   - sequence: 1
@@ -139,6 +140,10 @@ step_journal:
     agent_decision_request_ref: runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-01-discovery.json
     operator_decision_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-01-discovery.json
     operator_decision_status: accepted
+    inspected_evidence_refs:
+      - runtime://reports/live-e2e-agent-decision-request-live-e2e.sample.run-01-discovery.json
+      - runtime://reports/live-e2e-step-inspection-live-e2e.sample.run-01-discovery.json
+      - runtime://reports/live-e2e-step-classification-live-e2e.sample.run-01-discovery.json
     requested_interaction: null
     decision:
       action: continue
@@ -182,6 +187,9 @@ final_skill_agent_verdict:
     - runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-01-discovery.json
   evidence_refs:
     - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
+  inspected_evidence_refs:
+    - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+    - runtime://reports/live-e2e-step-observation-live-e2e.sample.run-01-discovery.json
   findings:
     - post-delivery quality checks produced findings
   final_recommendation: review findings before acceptance closure
