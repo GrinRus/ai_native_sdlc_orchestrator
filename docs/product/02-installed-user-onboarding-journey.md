@@ -49,6 +49,12 @@ The optional web console mirrors the same stages with these states:
 
 The web app must not invent separate lifecycle state. It reads control-plane state and invokes runtime-owned mutations. Static generated HTML snapshots are not a product console surface.
 
+The accepted flow-centric console design reference is
+`docs/product/03-flow-centric-console-design.md`. That reference freezes the
+target UI direction for the next redesign wave: flow selector, active/completed
+flow boundaries, `New Flow`, closure-to-follow-up behavior, flow-scoped
+evidence views, flow-targeted Ask AOR, and refreshed live E2E proof coverage.
+
 W31-S01 adds the installed-package local app mode:
 - `aor app --project-ref <repo>` starts a foreground loopback server and opens the packaged SPA by default;
 - `/` serves the SPA, `/app-config.json` returns `project_id`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata;
