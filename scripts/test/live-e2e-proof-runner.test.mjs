@@ -106,6 +106,19 @@ test("proof runner rejects removed --agent-judge-file flag before live execution
   assert.match(`${result.stdout}\n${result.stderr}`, /--agent-judge-file is no longer supported/u);
 });
 
+test("proof runner rejects removed --examples-root flag before live execution", () => {
+  const result = spawnSync(
+    process.execPath,
+    [runProfileScript, "--project-ref", repoRoot, "--profile", "scripts/live-e2e/profiles/full-journey-regress-ky.yaml", "--examples-root", "examples"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(`${result.stdout}\n${result.stderr}`, /--examples-root is no longer supported/u);
+});
+
 test("proof runner reuses valid installation proof for manual resume", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");

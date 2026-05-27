@@ -379,7 +379,6 @@ function validateProofBundleIntegrity(proof, bundlePath) {
 
 function assertProofBundleIntegrity() {
   const bundlePaths = [
-    "examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json",
     "examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json",
   ];
 
@@ -389,29 +388,6 @@ function assertProofBundleIntegrity() {
     if (errors.length > 0) {
       for (const error of errors) console.error(error);
       process.exit(1);
-    }
-  }
-
-  const proof = JSON.parse(read("examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json"));
-  const proofClaimFiles = ["README.md", "docs/ops/live-e2e-standard-runner.md"];
-  if (proof.proof_scope === "coverage_with_findings") {
-    for (const file of proofClaimFiles) {
-      const content = read(file);
-      if (content.includes("pass_with_findings") && !content.includes("coverage_with_findings")) {
-        console.error(`${file} mentions pass_with_findings without coverage_with_findings proof scope.`);
-        process.exit(1);
-      }
-
-      const forbiddenPositiveClaims = [
-        /\bW14\b[^\n.]*\bfull production pass\b/iu,
-        /\bW14\b[^\n.]*\bfull runtime pass\b/iu,
-        /\bW14\b[^\n.]*\bfull product pass\b/iu,
-        /\bW14\b[^\n.]*\bproduction-ready proof\b/iu,
-      ];
-      if (forbiddenPositiveClaims.some((pattern) => pattern.test(content))) {
-        console.error(`${file} overstates W14 coverage proof as production/full-runtime proof.`);
-        process.exit(1);
-      }
     }
   }
 

@@ -198,7 +198,7 @@ Add a catalog-backed full-journey live E2E layer that starts from a concrete fea
 - full-journey proof runner mode with curated repo and mission resolution
 - restored `live-e2e-runner` skill plus updated `live-e2e-preflight`
 - updated runbooks and tests showing both bounded and full-journey rehearsal layers
-- committed W13 proof bundle under `examples/live-e2e/fixtures/w13-s06/` covering `ky`, `httpie/cli`, and `nextjs-monorepo-example`
+- historical W13 proof bundle removed after the live E2E skill-agent-only migration
 
 ### Out of scope
 - arbitrary external mission authoring during mandatory acceptance

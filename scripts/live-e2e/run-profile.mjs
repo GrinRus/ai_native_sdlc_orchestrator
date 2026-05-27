@@ -1279,7 +1279,6 @@ function writeStepObservationFiles(options) {
  *     artifacts: Record<string, unknown>,
  *   },
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
- *   examplesRoot: string | null,
  * }}
  */
 function writeProofRunnerArtifacts(options) {
@@ -1532,7 +1531,7 @@ function writeProofRunnerArtifacts(options) {
     scorecard_files: [scorecardFile],
     control_surfaces: {
       installed_user_proof_runner:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--controller-mode auto|manual|evaluator]",
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--controller-mode auto|manual|evaluator]",
       manual_live_e2e:
         "node ./scripts/live-e2e/manual-live-e2e.mjs --project-ref <path> --profile <path> --run-id <id>",
       step_evaluator:
@@ -1541,7 +1540,7 @@ function writeProofRunnerArtifacts(options) {
         "node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path>",
       public_cli_sequence: options.flowResult.commandResults.map((result) => result.command_surface).filter(Boolean),
       aor_bin: options.aorLaunch.binaryRef,
-      examples_root: options.examplesRoot,
+      bootstrap_assets_root: path.join(options.hostRoot, "examples"),
     },
     runner_auth_mode: asNonEmptyString(options.flowResult.artifacts.runner_auth_mode) || null,
     runner_auth_source: asNonEmptyString(options.flowResult.artifacts.runner_auth_source) || null,
@@ -1600,7 +1599,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--controller-mode auto|manual|evaluator]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--controller-mode auto|manual|evaluator]",
         "",
         "Installed-user black-box proof runner with online step-controller evaluation.",
       ].join("\n"),
@@ -1626,6 +1625,9 @@ function runCli(rawArgs) {
   if (Object.prototype.hasOwnProperty.call(flags, "agent-judge-file")) {
     throw new UsageError("--agent-judge-file is no longer supported; live E2E requires skill-agent operator decisions.");
   }
+  if (Object.prototype.hasOwnProperty.call(flags, "examples-root")) {
+    throw new UsageError("--examples-root is no longer supported; live E2E uses packaged bootstrap assets only.");
+  }
   const catalogRootOverride = resolveOptionalStringFlag(flags["catalog-root"], "catalog-root");
   const runnerAuthMode = resolveRunnerAuthMode(resolveOptionalStringFlag(flags["runner-auth-mode"], "runner-auth-mode"));
   const runtimeAgentPermissionMode = resolveRuntimeAgentPermissionMode(
@@ -1643,10 +1645,6 @@ function runCli(rawArgs) {
       (runtimeAgentInteractionPolicy === "orchestrator-mediated" ? "conservative" : null),
   );
   const controllerMode = resolveLiveE2eControllerMode(resolveOptionalStringFlag(flags["controller-mode"], "controller-mode"));
-  const explicitExamplesRoot =
-    Object.prototype.hasOwnProperty.call(flags, "examples-root")
-      ? resolveOptionalStringFlag(flags["examples-root"], "examples-root")
-      : null;
   const { profilePath, profile: loadedProfile } = loadProofRunnerProfile({
     hostRoot,
     profileRef,
@@ -1663,16 +1661,7 @@ function runCli(rawArgs) {
     : null;
   const profile = fullJourneyResolution?.resolvedProfile ?? loadedProfile;
   const productionProof = fullJourneyResolution ? buildProductionProofSummary(profile) : null;
-  if (productionProof && explicitExamplesRoot && productionProof.mock_runner_allowed !== true) {
-    throw new UsageError(
-      `Production proof profile '${asNonEmptyString(profile.profile_id) || profileRef}' cannot use --examples-root; packaged bootstrap assets are required to prevent deterministic mock injection.`,
-    );
-  }
-  const examplesRoot = explicitExamplesRoot
-    ? requireDirectory(explicitExamplesRoot)
-    : fullJourneyResolution
-      ? null
-      : requireDirectory(path.join(hostRoot, "examples"));
+  const examplesRoot = requireDirectory(path.join(hostRoot, "examples"));
   const runId =
     resolveOptionalStringFlag(flags["run-id"], "run-id") ??
     `${asNonEmptyString(profile.profile_id) || "live-e2e"}.run-${nowIso().replace(/[^0-9]/g, "").slice(-12)}`;
@@ -1774,8 +1763,7 @@ function runCli(rawArgs) {
             profilePath,
             profile,
             aorLaunch,
-            examplesRoot: examplesRoot ?? path.join(hostRoot, "examples"),
-            examplesRootOverride: explicitExamplesRoot && examplesRoot ? examplesRoot : null,
+            examplesRoot,
             catalogTargetPath: fullJourneyResolution.catalogTargetPath,
             catalogEntry: fullJourneyResolution.catalogEntry,
             mission: fullJourneyResolution.mission,
@@ -1806,11 +1794,7 @@ function runCli(rawArgs) {
             runtimeAgentInteractionPolicy,
             runtimeAgentAutoApprovalProfile,
             stepController,
-            examplesRoot:
-              examplesRoot ??
-              (() => {
-                throw new UsageError("Bounded rehearsal requires bootstrap assets under '--examples-root' or '<project-ref>/examples'.");
-              })(),
+            examplesRoot,
           });
     } catch (error) {
       flowResult = {
@@ -1859,7 +1843,6 @@ function runCli(rawArgs) {
     profile,
     flowResult,
     aorLaunch,
-    examplesRoot,
   });
 
   process.stdout.write(

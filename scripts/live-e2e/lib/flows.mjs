@@ -2500,7 +2500,6 @@ export function executeInstalledUserFlow(options) {
  *   profile: Record<string, unknown>,
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
  *   examplesRoot: string,
- *   examplesRootOverride: string | null,
  *   catalogTargetPath: string,
  *   catalogEntry: Record<string, unknown>,
  *   mission: Record<string, unknown>,
@@ -2537,10 +2536,6 @@ export function executeFullJourneyFlow(options) {
   env.AOR_RUNTIME_AGENT_PERMISSION_MODE = options.runtimeAgentPermissionMode;
   env.AOR_RUNTIME_AGENT_INTERACTION_POLICY = options.runtimeAgentInteractionPolicy;
   env.AOR_RUNTIME_AGENT_AUTO_APPROVAL_PROFILE = options.runtimeAgentAutoApprovalProfile;
-  if (options.examplesRootOverride) {
-    env.AOR_BOOTSTRAP_ASSETS_ROOT = options.examplesRootOverride;
-    env.AOR_EXAMPLES_ROOT = options.examplesRootOverride;
-  }
 
   const artifacts = {
     host_runtime_root: options.layout.runtimeRoot,

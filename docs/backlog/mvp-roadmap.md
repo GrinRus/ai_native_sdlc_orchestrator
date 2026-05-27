@@ -345,7 +345,7 @@ The authoritative planning model for implementation lives in:
 
 **Detailed slices:** `docs/backlog/wave-14-implementation-slices.md`
 
-**Current status note:** `W14-S07` is now closed with matrix-aware coverage proof under `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`. The refreshed bundle proves all `9/9` required matrix cells, all `3/3` repo-level `openai-primary` / `anthropic-primary` provider-comparison pairs, and all mandatory scenario families (`regress`, `release`, `repair`, `governance`), but it is explicitly `coverage_with_findings` because deterministic external-runner mocks do not materialize mission code changes.
+**Current status note:** `W14-S07` is historical matrix-coverage planning context. Its mock-backed `coverage_with_findings` fixture bundle was removed after the live E2E skill-agent-only migration and must not be used as current acceptance evidence.
 
 ## W15 — readiness hardening and proof integrity
 **Goal:** Remove false readiness signals after W14 by making source-of-truth drift, package/module map drift, and live E2E proof scope machine-checkable.

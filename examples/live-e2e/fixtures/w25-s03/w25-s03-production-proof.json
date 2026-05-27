@@ -8,8 +8,7 @@
   "source_run": {
     "run_id": "w25-s02-real-proof-20260508095950",
     "profile_ref": "scripts/live-e2e/profiles/full-journey-production-proof-ky-openai.yaml",
-    "command": "node ./scripts/live-e2e/run-profile.mjs --project-ref . --profile ./scripts/live-e2e/profiles/full-journey-production-proof-ky-openai.yaml --runner-auth-mode host --runtime-agent-permission-mode full-bypass --run-id w25-s02-real-proof-20260508095950",
-    "examples_root_override": null
+    "command": "node ./scripts/live-e2e/run-profile.mjs --project-ref . --profile ./scripts/live-e2e/profiles/full-journey-production-proof-ky-openai.yaml --runner-auth-mode host --runtime-agent-permission-mode full-bypass --run-id w25-s02-real-proof-20260508095950"
   },
   "proof_method": {
     "internal_harness": "node ./scripts/live-e2e/run-profile.mjs",
@@ -18,7 +17,6 @@
     "adapter_id": "codex-cli",
     "runner_auth_mode": "host",
     "runtime_agent_permission_mode": "full-bypass",
-    "examples_root_override": null,
     "mock_runner_allowed": false,
     "output_policy": {
       "preferred_delivery_mode": "patch-only",

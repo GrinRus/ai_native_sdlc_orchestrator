@@ -115,15 +115,7 @@ node ./scripts/live-e2e/run-profile.mjs \
   --catalog-root ./scripts/live-e2e/catalog
 ```
 
-Bootstrap asset override for deterministic proof or fixture-driven rehearsal only:
-```bash
-node ./scripts/live-e2e/run-profile.mjs \
-  --project-ref . \
-  --profile ./scripts/live-e2e/profiles/full-journey-regress-ky.yaml \
-  --examples-root ./examples
-```
-
-For full-journey acceptance, packaged bootstrap assets are used by default. `--examples-root` is an explicit internal override for proof generation and deterministic fixture-backed runs.
+Bootstrap assets are always loaded from packaged repository assets. The old `--examples-root` override has been removed so live E2E cannot inject fixture-only bootstrap assets.
 
 Production-proof candidate profile:
 
@@ -138,7 +130,7 @@ node ./scripts/live-e2e/run-profile.mjs \
 `full-journey-production-proof-ky-openai.yaml` is stricter than the W14 coverage profiles:
 - it resolves `ky` and `ky-header-regression` from the curated target catalog;
 - it uses the packaged `codex-cli` adapter profile and `external_runner_mode=real-external-process`;
-- it rejects `--examples-root` because production proof cannot use deterministic mock adapter injection;
+- it has no bootstrap asset override path because production proof cannot use deterministic mock adapter injection;
 - it sets `verification.baseline_gate.mode=blocking`, so target verification failures block before provider execution;
 - it keeps `output_policy.write_back_to_remote=false` and `preferred_delivery_mode=patch-only`;
 - it starts from candidate profile metadata, then promotes the run summary to `proof_scope=full_code_changing_runtime` and `real_code_change_proof_complete=true` only when executable evidence proves a real code-changing pass, required target verdicts pass, Runtime Harness/review/delivery evidence exists, and the no-upstream-write assertion passes.
@@ -254,7 +246,7 @@ Production-proof profiles add a fail-closed layer on top of full-journey behavio
 - target setup and verification commands must be declared;
 - baseline target verification must use blocking mode;
 - write-back must remain disabled and delivery mode must be `patch-only` or `local-branch`;
-- deterministic proof-runner `--examples-root` overrides are rejected.
+- proof-runner bootstrap asset overrides are not supported.
 
 Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, and capture an operator-console web smoke artifact. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, web smoke output, and no-upstream-write assertions must be materialized.
 
@@ -488,29 +480,15 @@ Pass evidence requires all of the following:
 - Public-repo safety assertions: `write_back_to_remote=false`, `patch-only` delivery mode, unchanged target `HEAD` until controlled execution, runtime state under `.aor/`, and no `.aor-live-e2e` state.
 - Blocked and partial-readiness branches must keep the same no-write defaults visible and must not be marked pass without durable artifacts.
 
-## W14-S07 matrix proof bundle (2026-04-24)
-Observed curated runs:
-- `w14-s07.full-journey-regress-ky`, `w14-s07.full-journey-regress-ky-anthropic`, `w14-s07.full-journey-regress-ky-medium-anthropic-rerun`, and `w14-s07.full-journey-release-ky-medium-openai` exercise all required `ky` cells.
-- `w14-s07.full-journey-regress-httpie`, `w14-s07.full-journey-regress-httpie-anthropic`, `w14-s07.full-journey-repair-httpie-medium-anthropic`, and `w14-s07.full-journey-governance-httpie-medium-openai` exercise all required `httpie/cli` cells plus the repo-level provider-comparison pair.
-- `w14-s07.full-journey-release-nextjs`, `w14-s07.full-journey-release-nextjs-anthropic`, `w14-s07.full-journey-repair-nextjs-medium-anthropic`, and `w14-s07.full-journey-governance-nextjs-large-openai` exercise all required `belgattitude/nextjs-monorepo-example` cells plus the repo-level provider-comparison pair.
-
-Canonical fixtures:
-- `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`
-- `examples/live-e2e/fixtures/w14-s07/`
-
-Evidence note:
-- the committed bundle preserves catalog-backed repo and mission resolution, scenario/provider/size matrix-cell validation, provider-pinned route overrides, public `project init`, mission-generated intake/discovery/spec/handoff artifacts, public `review run`, public `audit runs`, and public `learning handoff` closure artifacts.
-- the bundle remains historical observation evidence. Under the canonical status model, it is tracked as `coverage_with_findings`; required matrix acceptance now needs a current `covered_pass` run on `run_tier=acceptance` or `run_tier=production-proof`.
-- the bundle proves all mandatory scenario families: `regress`, `release`, `repair`, and `governance`.
-- the bundle is explicitly classified as `proof_scope=coverage_with_findings` with `real_code_change_proof_complete=false`; it is coverage evidence, not full code-changing runtime proof.
-- `quality_judgement.overall_status` remains `pass_with_findings` in the committed proof because the deterministic external runner mock does not materialize mission code changes, leaving `review-report.code_quality=warn`.
+## Removed W14-S07 matrix fixture bundle (2026-04-24)
+The old W14-S07 matrix fixture bundle was removed after live E2E moved to skill-agent-only proof. It was historical `coverage_with_findings` evidence backed by deterministic external-runner mock behavior, so it is no longer valid acceptance closure. Current matrix claims need a fresh acceptance or production-proof run with accepted skill-agent decisions.
 
 ## W25-S03 production proof fixture (2026-05-08)
 Canonical fixture:
 - `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`
 
 Evidence note:
-- the fixture is derived from a real `full-journey-production-proof-ky-openai.yaml` run, not from `--examples-root` or a deterministic mock runner.
+- the fixture is derived from a real `full-journey-production-proof-ky-openai.yaml` run, not from a bootstrap asset override or a deterministic mock runner.
 - it covers the required `ky.regress.small.openai` cell with `quality_judgement.overall_status=pass`, `real_code_change_proof_complete=true`, and `external_runner_mode=real-external-process`.
 - it records meaningful implementation changed paths under `source/utils/merge.ts` and `test/headers.ts`, plus pass summaries for post-run verification, Runtime Harness, review, delivery, and learning-loop closure.
 - it records `delivery_mode=patch-only`, `write_back_to_remote=false`, unchanged target `HEAD`, empty `commit_refs`, and `writeback_results=[patch-materialized]`.

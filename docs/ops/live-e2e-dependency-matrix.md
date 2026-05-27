@@ -51,7 +51,7 @@ Canonical profile:
 
 Fail-closed prerequisites:
 - profile resolves `target_catalog_id=ky` and `feature_mission_id=ky-header-regression`;
-- packaged bootstrap assets are required; `--examples-root` is rejected for this profile;
+- packaged bootstrap assets are required; no bootstrap asset override flag is supported;
 - provider variant `openai-primary` must resolve to the packaged `codex-cli` external process adapter;
 - runner auth probe, edit readiness, and permission readiness must pass before `run start`;
 - `verification.baseline_gate.mode=blocking`, so target verification failure blocks before provider execution;
@@ -86,28 +86,6 @@ Operational rules:
 - `openai-primary` and `anthropic-primary` are mandatory provider variants across comparison coverage; `open-code-primary` is extended candidate coverage until a future real-runner proof promotes it.
 - required matrix coverage closes only for `coverage_status=covered_pass` on `run_tier=acceptance` or `run_tier=production-proof`; warning runs remain `covered_with_findings`.
 
-## W14-S07 refreshed matrix full-journey proof bundle (2026-04-24)
+## Removed W14-S07 matrix fixture bundle (2026-04-24)
 
-Refreshed curated runs:
-- `ky` required cells: `w14-s07.full-journey-regress-ky`, `w14-s07.full-journey-regress-ky-medium-anthropic-rerun`, `w14-s07.full-journey-release-ky-medium-openai`
-- `ky` provider comparison pair: `w14-s07.full-journey-regress-ky` and `w14-s07.full-journey-regress-ky-anthropic`
-- `httpie/cli` required cells: `w14-s07.full-journey-regress-httpie`, `w14-s07.full-journey-repair-httpie-medium-anthropic`, `w14-s07.full-journey-governance-httpie-medium-openai`
-- `httpie/cli` provider comparison pair: `w14-s07.full-journey-regress-httpie` and `w14-s07.full-journey-regress-httpie-anthropic`
-- `nextjs-monorepo-example` required cells: `w14-s07.full-journey-release-nextjs`, `w14-s07.full-journey-repair-nextjs-medium-anthropic`, `w14-s07.full-journey-governance-nextjs-large-openai`
-- `nextjs-monorepo-example` provider comparison pair: `w14-s07.full-journey-release-nextjs` and `w14-s07.full-journey-release-nextjs-anthropic`
-
-Observed prerequisite confirmations:
-- full-journey `project init` preserved target-specific verification commands through public repo command overrides instead of proof-runner-side profile generation;
-- provider-pinned route overrides were materialized for both `codex-cli` and `claude-code` matrix cells;
-- `httpie/cli` bootstrap used `make install`, and its full-journey verification used a bounded CLI pytest slice plus `make codestyle`;
-- `nextjs-monorepo-example` full-journey verification used monorepo `g:lint`, `g:typecheck`, and shared-package unit smoke instead of the broader `g:test-unit` matrix.
-
-Observed artifact and closure guarantees:
-- each run materialized mission-generated feature request, intake packet, discovery analysis, spec step-result, and handoff packet;
-- review verdicts are backed by public `review-report` with `provider_traceability` and `feature_size_fit`;
-- closure is backed by public `audit runs` and `learning handoff`;
-- release-shaped proof keeps `delivery-manifest` and `release-packet` anchored to the target checkout;
-- the committed bundle exercises all `9/9` required matrix cells, all `3/3` catalog provider-comparison pairs, and all mandatory scenario families, but is historical `coverage_with_findings` evidence under the canonical status model. Required acceptance closure needs a current `covered_pass` run on `run_tier=acceptance` or `run_tier=production-proof`.
-
-Canonical fixture bundle:
-- `examples/live-e2e/fixtures/w14-s07/w14-s07-evidence-bundle.json`
+The old W14-S07 matrix fixture bundle was removed after the skill-agent-only migration. It remains historical planning context only; current matrix acceptance requires supported live profiles with accepted skill-agent decisions.
