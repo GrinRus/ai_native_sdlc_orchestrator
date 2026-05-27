@@ -187,7 +187,32 @@ final_skill_agent_verdict:
   final_recommendation: review findings before acceptance closure
   created_at: "2026-05-18T00:00:03.000Z"
 interactive_decisions: []
-frontend_interactions: []
+frontend_interactions:
+  - step_id: learning
+    interaction_id: guided-web-smoke
+    surface: web
+    evidence_refs:
+      - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+      - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.html
+      - runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
+      - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+      - runtime://reports/installed-user-guided-web-screenshot-live-e2e.sample.run.svg
+    html_ref: runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.html
+    screenshot_refs:
+      - runtime://reports/installed-user-guided-web-screenshot-live-e2e.sample.run.svg
+    dom_snapshot_ref: runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
+    accessibility_summary_ref: runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+    task_outcome:
+      status: pass
+      checked_tasks:
+        - run-list-rendered
+        - selected-run-detail-rendered
+        - evidence-links-rendered
+        - closure-state-rendered
+    ux_findings: []
+    agent_verdict_ref: runtime://reports/live-e2e-operator-decision-live-e2e.sample.run-10-learning.json
+    status: pass
+    summary: Guided frontend smoke interaction completed through the installed-user web surface.
 evidence_refs:
   - runtime://reports/live-e2e-run-summary.json
   - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json

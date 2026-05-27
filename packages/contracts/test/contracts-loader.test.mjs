@@ -901,6 +901,40 @@ test("live E2E observation report loads and enforces status scale", () => {
     "expected setup evidence refs to contain strings only",
   );
 
+  const malformedFrontendEvidenceCandidate = structuredClone(loaded.document);
+  malformedFrontendEvidenceCandidate.frontend_interactions[0].screenshot_refs = [123];
+
+  const malformedFrontendEvidenceValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: malformedFrontendEvidenceCandidate,
+    source: "test://live-e2e-observation-malformed-frontend-evidence",
+  });
+
+  assert.equal(malformedFrontendEvidenceValidation.ok, false);
+  assert.ok(
+    malformedFrontendEvidenceValidation.issues.some(
+      (problem) => problem.code === "field_type_mismatch" && problem.field === "frontend_interactions[0].screenshot_refs[0]",
+    ),
+    "expected frontend screenshot refs to contain strings only",
+  );
+
+  const missingFrontendVerdictCandidate = structuredClone(loaded.document);
+  delete missingFrontendVerdictCandidate.frontend_interactions[0].agent_verdict_ref;
+
+  const missingFrontendVerdictValidation = validateContractDocument({
+    family: "live-e2e-observation-report",
+    document: missingFrontendVerdictCandidate,
+    source: "test://live-e2e-observation-missing-frontend-verdict",
+  });
+
+  assert.equal(missingFrontendVerdictValidation.ok, false);
+  assert.ok(
+    missingFrontendVerdictValidation.issues.some(
+      (problem) => problem.code === "required_field_missing" && problem.field === "frontend_interactions[0].agent_verdict_ref",
+    ),
+    "expected passing frontend evidence to require a skill-agent verdict ref",
+  );
+
   for (const legacyField of ["step_matrix", "verdict_matrix", "artifact_quality_matrix", "continuation_decisions"]) {
     const legacyCandidate = structuredClone(loaded.document);
     legacyCandidate[legacyField] = [];

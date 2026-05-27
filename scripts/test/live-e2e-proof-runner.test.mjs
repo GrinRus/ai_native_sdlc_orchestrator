@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { loadProofRunnerProfile } from "../live-e2e/lib/profile-catalog.mjs";
+import { prepareAorInstallationProof } from "../live-e2e/lib/flows.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const runProfileScript = path.join(repoRoot, "scripts/live-e2e/run-profile.mjs");
@@ -84,6 +85,14 @@ test("proof runner profile validation requires agent interaction answers", () =>
   });
 });
 
+test("proof runner profile validation accepts browser task frontend proof", () => {
+  withTempRoot((tempRoot) => {
+    const profilePath = writeProfile(tempRoot, { frontend_capability: "browser-task-proof" });
+    const loaded = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef: profilePath });
+    assert.equal(loaded.profile.live_e2e.frontend_capability, "browser-task-proof");
+  });
+});
+
 test("proof runner rejects removed --agent-judge-file flag before live execution", () => {
   const result = spawnSync(
     process.execPath,
@@ -95,4 +104,46 @@ test("proof runner rejects removed --agent-judge-file flag before live execution
   );
   assert.notEqual(result.status, 0);
   assert.match(`${result.stdout}\n${result.stderr}`, /--agent-judge-file is no longer supported/u);
+});
+
+test("proof runner reuses valid installation proof for manual resume", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const runId = "cached-install-proof";
+    const launcher = path.join(reportsRoot, "aor-session-launcher.sh");
+    fs.writeFileSync(launcher, "#!/bin/sh\nexit 0\n", "utf8");
+    fs.chmodSync(launcher, 0o755);
+    const proofFile = path.join(reportsRoot, `live-e2e-aor-installation-proof-${runId}.json`);
+    fs.writeFileSync(
+      proofFile,
+      `${JSON.stringify(
+        {
+          status: "pass",
+          install_mode: "isolated",
+          launcher_ref: launcher,
+          command_transcripts: [path.join(reportsRoot, "01-help.json")],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const result = prepareAorInstallationProof({
+      hostRoot: repoRoot,
+      reportsRoot,
+      runId,
+      profile: { live_e2e: { installation_policy: "source-install-required" } },
+      aorBinOverride: null,
+      installMode: "isolated",
+      isolatedWorkspaceRoot: path.join(tempRoot, "workspace"),
+      isolatedSourceRoot: path.join(tempRoot, "source"),
+      runtimeRoot: path.join(tempRoot, ".aor"),
+    });
+
+    assert.equal(result.proof.reused_for_manual_resume, true);
+    assert.equal(result.launch.command, launcher);
+    assert.equal(result.setupEntry.public_surface, "cached pnpm source install");
+  });
 });

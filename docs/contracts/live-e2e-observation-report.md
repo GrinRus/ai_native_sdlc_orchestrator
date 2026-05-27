@@ -151,6 +151,13 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `step_id`
 - `surface`
 - `evidence_refs`
+- `html_ref`
+- `screenshot_refs`
+- `dom_snapshot_ref`
+- `accessibility_summary_ref`
+- `task_outcome`
+- `ux_findings`
+- `agent_verdict_ref`
 - `status`
 - `summary`
 
@@ -165,6 +172,8 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `learning`
 
 `final_skill_agent_verdict_file` must point to the final accepted skill-agent verdict artifact. A final acceptance/proof report requires every included `step_journal[]` entry to have `operator_decision_status=accepted`, every included step semantic analysis to have `judge_source=skill-agent`, and the final verdict artifact to have `judge_source=skill-agent`.
+
+Profiles that declare `live_e2e.frontend_capability` other than `none` must treat `frontend_interactions[]` as first-class proof evidence. Deterministic web smoke output can establish that the installed-user web surface rendered, but final acceptance also requires a linked skill-agent UI/UX verdict through `agent_verdict_ref`. Missing HTML, DOM snapshot, screenshot, accessibility summary, failed `task_outcome`, or missing agent UI verdict blocks acceptance.
 
 ## Notes
 `failed_stages[]` records deterministic stage-level failures that are inside the observed step range or setup/prelude range. Stages outside the active flow range, such as `release` or `learning` in `delivery_default` profiles, may remain outside terminal status accounting unless they are part of `step_journal[]`.

@@ -322,6 +322,83 @@ test("live E2E step controller marks execution not_pass when post-run verificati
   });
 });
 
+test("live E2E step controller rejects UI-capable decisions without frontend evidence refs", () => {
+  withTempRoot((reportsRoot) => {
+    const summaryFile = path.join(reportsRoot, "web-smoke.json");
+    const htmlFile = path.join(reportsRoot, "web-smoke.html");
+    const domFile = path.join(reportsRoot, "web-dom.json");
+    const accessibilityFile = path.join(reportsRoot, "web-accessibility.json");
+    const screenshotFile = path.join(reportsRoot, "web-screenshot.svg");
+    for (const file of [summaryFile, htmlFile, domFile, accessibilityFile, screenshotFile]) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-ui-evidence",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "full_lifecycle",
+          frontend_capability: "browser-task-proof",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+        },
+      },
+      mode: "auto",
+    });
+    controller.planCommand({ label: "learning-handoff", commandSurface: "aor learning handoff" });
+    const decisionFile = path.join(
+      reportsRoot,
+      "live-e2e-operator-decision-controller-ui-evidence-01-learning.json",
+    );
+    fs.writeFileSync(
+      decisionFile,
+      `${JSON.stringify(
+        {
+          step_id: "learning",
+          status: "accepted",
+          operator_ref: "skill://live-e2e-runner",
+          action: "continue",
+          semantic_analysis: {
+            status: "pass",
+            judge_source: "skill-agent",
+            findings: [],
+          },
+          evidence_refs: [summaryFile],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "learning",
+          stageResult: { stage: "learning", status: "pass", evidence_refs: [summaryFile], summary: "learning ok" },
+          commandResults: [{ label: "learning-handoff", command_surface: "aor learning handoff", status: "pass" }],
+          artifacts: {
+            guided_web_smoke_summary_file: summaryFile,
+            guided_web_smoke_html_file: htmlFile,
+            guided_web_dom_snapshot_file: domFile,
+            guided_web_accessibility_summary_file: accessibilityFile,
+            guided_web_screenshot_files: [screenshotFile],
+          },
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "block");
+        return true;
+      },
+    );
+
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.operator_decision_status, "rejected");
+    assert.match(entry.semantic_analysis.findings.join("\n"), /Operator decision artifact was rejected/);
+  });
+});
+
 test("live E2E step controller preserves repeated execution and review iterations", () => {
   withTempRoot((reportsRoot) => {
     const reviewTranscript = path.join(reportsRoot, "01-review-run.json");

@@ -23,16 +23,12 @@ pnpm check
 
 | Profile | Required tools | setup_commands | verification.commands | External downloads | Typical failure signature |
 | --- | --- | --- | --- | --- | --- |
-| `regress-short` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | `xo: command not found` (dependencies not installed) or `browserType.launch: Executable doesn't exist` (Playwright browsers not installed) |
-| `release-short` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | `xo: command not found` or Playwright browser executable missing |
-| `w7-governance-integration` | `node >=22`, `npm`, `git`, Playwright runtime support | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries | promotion/learning-loop linkage missing or release rehearsal path fails before closure evidence materialization |
 | `full-journey-production-proof-ky-openai` | `node >=22`, `npm`, `git`, Playwright runtime support, authenticated `codex` CLI with non-interactive edit permissions | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries + external runner auth/config | `not authenticated`, permission/readiness denial, missing `codex`, or blocking target verification failure before `run start` |
-| `regress-long` | `python3`, `make`, `git` | `make install` | `make test`<br>`make codestyle` | Python dependencies from index/mirror | `No module named ...`, `make: *** ... Error` |
-| `release-long` | `node`, `yarn`, `git` | `yarn install --immutable` | `yarn g:lint`<br>`yarn g:typecheck`<br>`yarn workspace @your-org/ts-utils test-unit`<br>`yarn workspace @your-org/core-lib test-unit` | Yarn workspace dependencies | `YN0000/YN...` install errors, workspace script failure |
 | `commander-js` full-journey profiles | `node >=22`, `npm`, `git` | `npm ci` | `npm run test`<br>`npm run check` | npm packages | lockfile install errors, failing parser/help tests, or check script errors |
 | `pluggy` full-journey profiles | `python3 >=3.9`, `pip`, `git` | `python3 -m venv .aor/live-e2e-venv`<br>`.aor/live-e2e-venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage` | `.aor/live-e2e-venv/bin/python -m pytest testing` | Python dependencies from index/mirror | venv creation, editable install, or pytest failure |
 | `cobra` extended target | `go`, `git` | `go mod download` | `go test ./...` | Go module downloads | module download or Go test failure |
 | `date-fns` extended target | `node >=22`, `pnpm`, `git` | `pnpm install` | `pnpm vitest run`<br>`pnpm run lint`<br>`pnpm run types` | pnpm packages | Vitest, lint, or typecheck failure |
+| `installed-user-guided-journey` | `node >=22`, `npm`, `git`, authenticated `codex` CLI, local web runtime support | target catalog commands for `ky` plus operator console static render | target catalog commands plus guided web task proof | npm packages + Playwright browser binaries when the target commands require them | missing auth/permission readiness, failed target verification, missing web HTML/DOM/accessibility/screenshot evidence, or missing skill-agent UI verdict |
 
 `pluggy` full-journey profiles require a full checkout with tags before editable
 install. The target derives its version with `setuptools-scm`; shallow clones
@@ -40,6 +36,7 @@ report a pre-1.0 local version that conflicts with modern `pytest`.
 
 ## Notes
 
+- Supported live proof profiles are full-journey/catalog-backed profiles and `installed-user-guided-journey`. Removed bounded deterministic profiles such as `regress-short`, `release-short`, `regress-long`, `release-long`, and `w7-governance-integration` are archived fixture history, not current live E2E acceptance commands.
 - Profiles declare `verification.setup_commands` and `verification.commands`; the internal `scripts/live-e2e/run-profile.mjs` proof runner executes them from a cloned target workspace as the canonical path.
 - Standard run summaries should expose `target_checkout_root` and `generated_project_profile_file` so target-workspace provenance is machine-checkable.
 - Routed live execution should surface explicit branch signatures: `success`, `missing-command`, `missing-live-runtime`, auth/permission blocks, and policy-blocked (`blocking_reasons` / unsupported-adapter) without mock-only fallthrough.
@@ -69,7 +66,9 @@ Proof-mode fields:
 - promoted run summaries must record `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, passing required target verdicts, Runtime Harness/review/delivery evidence refs, and `no_upstream_write_assertion.status=pass`.
 - the committed W25-S03 fixture lives at `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json`; it is sanitized proof evidence for the `ky.regress.small.openai` production cell only, and proof integrity rejects mock-backed `full_code_changing_runtime` claims.
 
-## W12-S04 refreshed short-profile proof bundle (2026-04-23)
+## Archived W12-S04 short-profile fixture bundle (2026-04-23)
+
+The W12-S04 `regress-short` and `release-short` artifacts are archived fixture integrity evidence only. They must not be used as current live E2E acceptance closure because the supported live flow now requires skill-agent operator decisions and catalog-backed full journeys.
 
 Refreshed target-backed runs:
 - `w12-s04.regress-short` (scenario `ky-regression-smoke`) status `pass`.

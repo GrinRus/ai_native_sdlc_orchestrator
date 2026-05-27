@@ -256,7 +256,7 @@ function isOperatorAction(action) {
  * @param {Record<string, unknown>} entry
  * @returns {string | null}
  */
-function rejectInconsistentSkillAgentDecision(decision, action, operatorContext, entry) {
+function rejectInconsistentSkillAgentDecision(decision, action, operatorContext, entry, profile = {}) {
   const semantic = asRecord(decision.semantic_analysis);
   const judgeSource = asNonEmptyString(semantic.judge_source) || asNonEmptyString(decision.judge_source);
   if (judgeSource !== "skill-agent") {
@@ -271,6 +271,15 @@ function rejectInconsistentSkillAgentDecision(decision, action, operatorContext,
   const semanticStatus = toLiveE2eObservationStatus(asNonEmptyString(semantic.status));
   if (action === "continue" && !["pass", "warn", "resumed"].includes(semanticStatus)) {
     return `Skill-agent operator decision cannot continue with semantic status '${semanticStatus}'.`;
+  }
+  const frontendCapability = asNonEmptyString(asRecord(asRecord(profile).live_e2e).frontend_capability);
+  const frontendRefs = asStringArray(entry.frontend_interaction_refs);
+  if (frontendCapability && frontendCapability !== "none" && frontendRefs.length > 0) {
+    const decisionEvidenceRefs = asStringArray(decision.evidence_refs);
+    const missingFrontendRefs = frontendRefs.filter((ref) => !decisionEvidenceRefs.includes(ref));
+    if (missingFrontendRefs.length > 0) {
+      return `Skill-agent UI/UX decisions must cite frontend evidence refs: ${missingFrontendRefs.join(", ")}.`;
+    }
   }
   return null;
 }
@@ -315,6 +324,7 @@ function resolveOperatorDecision(options) {
       action,
       options.operatorContext,
       options.entry,
+      options.profile,
     );
     const stepMatches =
       !asNonEmptyString(decision.step_id) ||
@@ -780,7 +790,11 @@ export function createLiveE2eStepController(options) {
     const frontendInteractionRefs =
       step === "learning"
         ? uniqueStrings([
-            asNonEmptyString(input.artifacts.guided_app_smoke_summary_file),
+            asNonEmptyString(input.artifacts.guided_web_smoke_summary_file),
+            asNonEmptyString(input.artifacts.guided_web_smoke_html_file),
+            asNonEmptyString(input.artifacts.guided_web_dom_snapshot_file),
+            asNonEmptyString(input.artifacts.guided_web_accessibility_summary_file),
+            ...asStringArray(input.artifacts.guided_web_screenshot_files),
           ])
         : [];
     const entry = {
@@ -890,6 +904,13 @@ export function createLiveE2eStepController(options) {
       sequence: Number(entry.sequence),
       step: stepInstanceId,
     });
+    const requiredInspectionRefs = uniqueStrings([
+      asNonEmptyString(entry.transcript_ref),
+      asNonEmptyString(entry.inspection_ref),
+      asNonEmptyString(entry.classification_ref),
+      ...asStringArray(entry.artifact_refs),
+      ...asStringArray(entry.frontend_interaction_refs),
+    ]);
     const decisionRequest = {
       request_id: `${options.runId}.${step}.operator-decision-request`,
       run_id: options.runId,
@@ -907,6 +928,28 @@ export function createLiveE2eStepController(options) {
       deterministic_analysis: entry.deterministic_analysis,
       requested_interaction: entry.requested_interaction,
       decision_hint: asRecord(input.decisionOverride),
+      decision_rubric: {
+        required_checks: uniqueStrings([
+          "inspect-public-command-transcript",
+          "inspect-materialized-artifact-refs",
+          "inspect-target-diff-and-no-upstream-write-evidence",
+          "inspect-verification-logs-and-quality-gates",
+          "inspect-provider-or-raw-adapter-evidence-when-present",
+          ...(asStringArray(entry.frontend_interaction_refs).length > 0
+            ? [
+                "inspect-installed-web-html",
+                "inspect-ui-dom-snapshot",
+                "inspect-ui-screenshot",
+                "inspect-accessibility-summary",
+                "judge-installed-user-task-outcome",
+              ]
+            : []),
+        ]),
+        required_evidence_refs: requiredInspectionRefs,
+        frontend_evidence_refs: asStringArray(entry.frontend_interaction_refs),
+        continuation_rule:
+          "continue is allowed only when deterministic guardrails pass or warn and semantic_analysis.judge_source is skill-agent",
+      },
       operator_decision_expected_ref: files.decisionFile,
       expected_response_shape: {
         step_id: step,
@@ -920,7 +963,15 @@ export function createLiveE2eStepController(options) {
           judge_source: "skill-agent",
           findings: [],
         },
-        evidence_refs: [],
+        evidence_refs: requiredInspectionRefs,
+        ui_ux_analysis:
+          asStringArray(entry.frontend_interaction_refs).length > 0
+            ? {
+                status: "pass|warn|not_pass|blocked",
+                task_outcome: "pass|warn|not_pass|blocked",
+                findings: [],
+              }
+            : null,
       },
       created_at: nowIso(),
     };

@@ -2211,7 +2211,92 @@ function validateLiveE2EObservationReport(document, source) {
     source,
     issues,
   });
+  validateObservationFrontendInteractions({
+    entries: document.frontend_interactions,
+    source,
+    issues,
+  });
   return issues;
+}
+
+/**
+ * @param {{ entries: unknown, source: string, issues: import("./index.d.ts").ContractValidationIssue[] }} options
+ */
+function validateObservationFrontendInteractions(options) {
+  if (!Array.isArray(options.entries)) return;
+  options.entries.forEach((entry, index) => {
+    const record = isPlainObject(entry) ? entry : {};
+    for (const [field, expectedType] of [
+      ["step_id", "string"],
+      ["surface", "string"],
+      ["evidence_refs", "array"],
+      ["html_ref", "string"],
+      ["screenshot_refs", "array"],
+      ["dom_snapshot_ref", "string"],
+      ["accessibility_summary_ref", "string"],
+      ["task_outcome", "object"],
+      ["ux_findings", "array"],
+      ["status", "string"],
+      ["summary", "string"],
+    ]) {
+      const value = record[field];
+      if (!isExpectedType(value, expectedType)) {
+        options.issues.push(
+          issue({
+            code: value === undefined ? "required_field_missing" : "field_type_mismatch",
+            source: options.source,
+            field: `frontend_interactions[${index}].${field}`,
+            expected: value === undefined ? "present" : expectedType,
+            actual: value === undefined ? "missing" : describeActualType(value),
+            message: `Field 'frontend_interactions[${index}].${field}' is required for UI/UX live E2E evidence.`,
+          }),
+        );
+      }
+    }
+    validateStringArrayItems({
+      values: record.evidence_refs,
+      source: options.source,
+      field: `frontend_interactions[${index}].evidence_refs`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: record.screenshot_refs,
+      source: options.source,
+      field: `frontend_interactions[${index}].screenshot_refs`,
+      issues: options.issues,
+    });
+    validateStringArrayItems({
+      values: record.ux_findings,
+      source: options.source,
+      field: `frontend_interactions[${index}].ux_findings`,
+      issues: options.issues,
+    });
+    validateObservationStatusField({
+      value: record.status,
+      source: options.source,
+      field: `frontend_interactions[${index}].status`,
+      issues: options.issues,
+    });
+    const taskOutcome = isPlainObject(record.task_outcome) ? record.task_outcome : {};
+    validateObservationStatusField({
+      value: taskOutcome.status,
+      source: options.source,
+      field: `frontend_interactions[${index}].task_outcome.status`,
+      issues: options.issues,
+    });
+    if (record.status === "pass" && typeof record.agent_verdict_ref !== "string") {
+      options.issues.push(
+        issue({
+          code: "required_field_missing",
+          source: options.source,
+          field: `frontend_interactions[${index}].agent_verdict_ref`,
+          expected: "string",
+          actual: record.agent_verdict_ref === undefined ? "missing" : describeActualType(record.agent_verdict_ref),
+          message: "Passing UI/UX live E2E evidence must link the skill-agent UI verdict.",
+        }),
+      );
+    }
+  });
 }
 
 /**

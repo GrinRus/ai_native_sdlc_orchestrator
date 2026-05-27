@@ -592,19 +592,46 @@ function resolveInteractiveFinalStepVerdict(requestedInteraction, deterministicF
 
 /**
  * @param {Record<string, unknown>} artifacts
+ * @param {Array<Record<string, unknown>>} stepJournal
  * @returns {Array<Record<string, unknown>>}
  */
-function buildFrontendInteractions(artifacts) {
-  const summaryFile = asNonEmptyString(artifacts.guided_app_smoke_summary_file);
-  if (!summaryFile) return [];
+function buildFrontendInteractions(artifacts, stepJournal = []) {
+  const summaryFile = asNonEmptyString(artifacts.guided_web_smoke_summary_file);
+  const htmlFile = asNonEmptyString(artifacts.guided_web_smoke_html_file);
+  const domSnapshotFile = asNonEmptyString(artifacts.guided_web_dom_snapshot_file);
+  const accessibilitySummaryFile = asNonEmptyString(artifacts.guided_web_accessibility_summary_file);
+  const screenshotRefs = asStringArray(artifacts.guided_web_screenshot_files);
+  if (!summaryFile && !htmlFile && !domSnapshotFile && screenshotRefs.length === 0) return [];
+  const webSmoke = asRecord(artifacts.guided_web_smoke);
+  const taskOutcome = asRecord(webSmoke.task_outcome);
+  const status = toObservationStatus(asNonEmptyString(taskOutcome.status) || "pass");
+  const learningVerdict = stepJournal.find(
+    (entry) =>
+      asNonEmptyString(asRecord(entry).step_id) === "learning" &&
+      asNonEmptyString(asRecord(entry).operator_decision_status) === "accepted" &&
+      asNonEmptyString(asRecord(asRecord(entry).semantic_analysis).judge_source) === "skill-agent",
+  );
+  const agentVerdictRef = asNonEmptyString(asRecord(learningVerdict).operator_decision_ref) || null;
+  const interactionStatus = agentVerdictRef ? status : "blocked";
   return [
     {
       step_id: "learning",
-      interaction_id: "guided-app-smoke",
+      interaction_id: "guided-web-smoke",
       surface: "web",
-      evidence_refs: uniqueStrings([summaryFile]),
-      status: "pass",
-      summary: "Guided app smoke completed through the installed-user web surface.",
+      evidence_refs: uniqueStrings([summaryFile, htmlFile, domSnapshotFile, accessibilitySummaryFile, ...screenshotRefs]),
+      html_ref: htmlFile || asNonEmptyString(webSmoke.html_ref) || null,
+      screenshot_refs: screenshotRefs,
+      dom_snapshot_ref: domSnapshotFile || asNonEmptyString(webSmoke.dom_snapshot_ref) || null,
+      accessibility_summary_ref: accessibilitySummaryFile || asNonEmptyString(webSmoke.accessibility_summary_ref) || null,
+      task_outcome: {
+        status,
+        checked_tasks: asStringArray(taskOutcome.checked_tasks),
+        findings: asStringArray(taskOutcome.findings),
+      },
+      ux_findings: asStringArray(webSmoke.ux_findings),
+      agent_verdict_ref: agentVerdictRef,
+      status: interactionStatus,
+      summary: "Guided frontend smoke interaction completed through the installed-user web surface.",
     },
   ];
 }
@@ -988,7 +1015,7 @@ function buildObservationReport(options) {
     step_journal: stepJournal,
     final_analysis: finalAnalysis,
     interactive_decisions: buildInteractiveDecisions(stepJournal),
-    frontend_interactions: buildFrontendInteractions(options.flowResult.artifacts),
+    frontend_interactions: buildFrontendInteractions(options.flowResult.artifacts, stepJournal),
     evidence_refs: uniqueStrings([
       options.summaryFile,
       asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file),
@@ -1021,7 +1048,22 @@ function writeFinalSkillAgentVerdict(options) {
   const missingSteps = includedSteps.filter((step) => !acceptedStepIds.has(step));
   const finalAnalysis = asRecord(options.observationReport.final_analysis);
   const finalAnalysisStatus = toObservationStatus(asNonEmptyString(finalAnalysis.status) || "not_pass");
-  const status = missingSteps.length === 0 ? finalAnalysisStatus : "blocked";
+  const frontendInteractions = Array.isArray(options.observationReport.frontend_interactions)
+    ? options.observationReport.frontend_interactions.map((entry) => asRecord(entry))
+    : [];
+  const missingFrontendVerdicts = frontendInteractions
+    .filter((entry) => {
+      const status = toObservationStatus(asNonEmptyString(entry.status) || "not_pass");
+      return status === "pass" && !asNonEmptyString(entry.agent_verdict_ref);
+    })
+    .map((entry) => asNonEmptyString(entry.interaction_id) || asNonEmptyString(entry.step_id) || "frontend-interaction");
+  const failedFrontendInteractions = frontendInteractions
+    .filter((entry) => !["pass", "warn"].includes(toObservationStatus(asNonEmptyString(entry.status) || "not_pass")))
+    .map((entry) => asNonEmptyString(entry.interaction_id) || asNonEmptyString(entry.step_id) || "frontend-interaction");
+  const status =
+    missingSteps.length === 0 && missingFrontendVerdicts.length === 0 && failedFrontendInteractions.length === 0
+      ? finalAnalysisStatus
+      : "blocked";
   const verdict = {
     verdict_id: `${options.runId}.final-skill-agent-verdict.v1`,
     run_id: options.runId,
@@ -1030,6 +1072,8 @@ function writeFinalSkillAgentVerdict(options) {
     accepted_step_count: acceptedSkillAgentSteps.length,
     required_steps: includedSteps,
     missing_skill_agent_steps: missingSteps,
+    missing_frontend_agent_verdicts: missingFrontendVerdicts,
+    failed_frontend_interactions: failedFrontendInteractions,
     operator_decision_refs: uniqueStrings(acceptedSkillAgentSteps.map((entry) => asNonEmptyString(entry.operator_decision_ref))),
     evidence_refs: uniqueStrings([
       asNonEmptyString(options.observationReport.controller_state_ref),
@@ -1038,6 +1082,8 @@ function writeFinalSkillAgentVerdict(options) {
     findings: uniqueStrings([
       ...asStringArray(finalAnalysis.findings),
       ...missingSteps.map((step) => `${step} is missing an accepted skill-agent decision.`),
+      ...missingFrontendVerdicts.map((interaction) => `${interaction} is missing an accepted skill-agent UI/UX verdict.`),
+      ...failedFrontendInteractions.map((interaction) => `${interaction} did not pass UI/UX evidence checks.`),
     ]),
     final_recommendation: status === "pass" || status === "warn" ? "accept" : "reject",
     created_at: nowIso(),

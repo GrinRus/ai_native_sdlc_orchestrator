@@ -256,7 +256,7 @@ Production-proof profiles add a fail-closed layer on top of full-journey behavio
 - write-back must remain disabled and delivery mode must be `patch-only` or `local-branch`;
 - deterministic proof-runner `--examples-root` overrides are rejected.
 
-Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, and capture app-smoke evidence from the real `aor app --smoke true --open false --json` path. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, app smoke output, and no-upstream-write assertions must be materialized.
+Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, and capture an operator-console web smoke artifact. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, web smoke output, and no-upstream-write assertions must be materialized.
 
 No proof-runner-side `examples/context/project profile` injection is allowed inside the target checkout on the full-journey path.
 
@@ -333,7 +333,11 @@ assertion. It intentionally excludes runtime output paths, target checkout conte
 Guided full-journey summaries also carry:
 - `guided_journey`
 - `artifacts.guided_journey_proof_file`
-- `artifacts.guided_app_smoke_summary_file`
+- `artifacts.guided_web_smoke_summary_file`
+- `artifacts.guided_web_smoke_html_file`
+- `artifacts.guided_web_dom_snapshot_file`
+- `artifacts.guided_web_accessibility_summary_file`
+- `artifacts.guided_web_screenshot_files`
 - `artifacts.review_decision_file`
 - `artifacts.release_packet_file`
 - `artifacts.target_head_before` and `artifacts.target_head_after`
@@ -378,6 +382,8 @@ The runner performs deterministic analysis for every step from public command tr
 
 The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` is removed; live E2E semantic analysis comes only from accepted skill-agent decisions and the final skill-agent verdict artifact.
 
+Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision should cite the public transcript/artifact refs it inspected. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and screenshot or visual snapshot before continuation can be accepted.
+
 Judge criteria:
 - traceability to feature request, mission, and previous step;
 - completeness for the step;
@@ -386,6 +392,8 @@ Judge criteria:
 - absence of synthetic or no-op explanations that hide failure.
 
 If a profile does not provide an accepted skill-agent operator decision, the runner stops fail-closed and writes the decision request for manual/evaluator continuation.
+
+For guided installed-user runs, deterministic web smoke is only a render guardrail. Final acceptance requires `frontend_interactions[]` with HTML, DOM, accessibility, screenshot/visual evidence, and an accepted skill-agent UI/UX verdict linked from `agent_verdict_ref`.
 
 ## Quality Judgement
 Full-journey summaries may include `quality_judgement` with target acceptance dimensions:
@@ -464,7 +472,7 @@ Canonical profile:
 
 Canonical fixtures:
 - `examples/live-e2e/fixtures/w21-s07/installed-user-guided-proof.sample.json`
-- `examples/live-e2e/fixtures/w21-s07/installed-user-guided-app-smoke.sample.json`
+- `examples/live-e2e/fixtures/w21-s07/installed-user-guided-web-smoke.sample.json`
 - `examples/live-e2e/fixtures/w21-s07/installed-user-guided-blocked-readiness.sample.json`
 
 Run command:
@@ -476,7 +484,7 @@ node ./scripts/live-e2e/run-profile.mjs \
 
 Pass evidence requires all of the following:
 - CLI transcript files for doctor, onboard, app, next, mission create, run execution, review decision, delivery, release, and learning closure.
-- Durable onboarding, intake, next-action, run, review, review-decision, delivery, release, learning, and app smoke artifacts.
+- Durable onboarding, intake, next-action, run, review, review-decision, delivery, release, learning, and web smoke artifacts.
 - Public-repo safety assertions: `write_back_to_remote=false`, `patch-only` delivery mode, unchanged target `HEAD` until controlled execution, runtime state under `.aor/`, and no `.aor-live-e2e` state.
 - Blocked and partial-readiness branches must keep the same no-write defaults visible and must not be marked pass without durable artifacts.
 

@@ -266,6 +266,47 @@ export function prepareAorInstallationProof(options) {
 
   const normalizedRunId = normalizeId(options.runId);
   const installRoot = path.join(options.reportsRoot, `live-e2e-aor-install-${normalizedRunId}`);
+  const proofFile = path.join(options.reportsRoot, `live-e2e-aor-installation-proof-${normalizedRunId}.json`);
+  const currentSourceCommit = gitHeadOrNull(options.hostRoot);
+  if (fileExists(proofFile)) {
+    const cachedProof = asRecord(readJson(proofFile));
+    const launcherRef = asNonEmptyString(cachedProof.launcher_ref);
+    const cachedSourceCommit = asNonEmptyString(cachedProof.source_commit_sha);
+    const cachedInstallMode = asNonEmptyString(cachedProof.install_mode);
+    const sourceCommitMatches = !currentSourceCommit || !cachedSourceCommit || currentSourceCommit === cachedSourceCommit;
+    if (
+      asNonEmptyString(cachedProof.status) === "pass" &&
+      sourceCommitMatches &&
+      launcherRef &&
+      fileExists(launcherRef)
+    ) {
+      const cachedProofWithReuse = {
+        ...cachedProof,
+        reused_for_manual_resume: true,
+        reused_at: nowIso(),
+      };
+      writeJson(proofFile, cachedProofWithReuse);
+      const setupEntry = {
+        sequence: 1,
+        step_id: "install",
+        status: "pass",
+        public_surface:
+          cachedInstallMode === "provided-binary" ? "provided aor binary" : "cached pnpm source install",
+        evidence_refs: uniqueStrings([proofFile, ...asStringArray(cachedProof.command_transcripts)]),
+        summary: "AOR installation proof was reused for manual resume because the source proof remained valid.",
+      };
+      return {
+        launch: {
+          command: launcherRef,
+          argsPrefix: [],
+          binaryRef: launcherRef,
+        },
+        proof: cachedProofWithReuse,
+        proofFile,
+        setupEntry,
+      };
+    }
+  }
   fs.mkdirSync(installRoot, { recursive: true });
   const commandTranscripts = [];
   const commandSummaries = [];
@@ -348,6 +389,7 @@ export function prepareAorInstallationProof(options) {
     workspace_root: options.isolatedWorkspaceRoot ?? null,
     runtime_root: options.runtimeRoot ?? null,
     original_source_root: options.hostRoot,
+    source_commit_sha: currentSourceCommit,
     installed_source_root: effectivePolicy === "source-install-required" ? installCwd : null,
     launcher_ref: launcherRef,
     command_transcripts: commandTranscripts,
@@ -355,7 +397,6 @@ export function prepareAorInstallationProof(options) {
     started_at: asNonEmptyString(asRecord(commandSummaries[0]).started_at) || null,
     finished_at: nowIso(),
   };
-  const proofFile = path.join(options.reportsRoot, `live-e2e-aor-installation-proof-${normalizedRunId}.json`);
   writeJson(proofFile, proof);
   const setupEntry = {
     sequence: 1,
@@ -854,54 +895,65 @@ function buildGuidedMissionCreateArgs(options) {
 
 /**
  * @param {{
- *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
+ *   hostRoot: string,
  *   targetCheckoutRoot: string,
  *   runId: string,
  *   reportsRoot: string,
- *   env: NodeJS.ProcessEnv,
  * }}
  */
-function runGuidedAppSmoke(options) {
+function runGuidedWebSmoke(options) {
+  const outputHtml = path.join(
+    options.reportsRoot,
+    `installed-user-guided-web-smoke-${normalizeId(options.runId)}.html`,
+  );
   const summaryFile = path.join(
     options.reportsRoot,
-    `installed-user-guided-app-smoke-${normalizeId(options.runId)}.json`,
+    `installed-user-guided-web-smoke-${normalizeId(options.runId)}.json`,
   );
   const result = spawnSync(
-    options.aorLaunch.command,
+    process.execPath,
     [
-      ...options.aorLaunch.argsPrefix,
-      "app",
+      path.join(options.hostRoot, "apps/web/scripts/operator-console-smoke.mjs"),
       "--project-ref",
-      ".",
+      options.targetCheckoutRoot,
       "--runtime-root",
       ".aor",
-      "--smoke",
-      "true",
-      "--open",
-      "false",
-      "--json",
+      "--run-id",
+      options.runId,
+      "--output-html",
+      outputHtml,
+      "--max-replay",
+      "20",
     ],
     {
       cwd: options.targetCheckoutRoot,
       encoding: "utf8",
-      env: options.env,
     },
   );
   if (result.status !== 0) {
-    throw new Error(`Guided app smoke failed: ${(result.stderr ?? result.stdout ?? "").trim()}`);
+    throw new Error(`Guided web smoke failed: ${(result.stderr ?? result.stdout ?? "").trim()}`);
   }
   /** @type {Record<string, unknown>} */
   let summary;
   try {
     summary = asRecord(JSON.parse(result.stdout));
   } catch {
-    throw new Error("Guided app smoke did not emit JSON summary.");
+    throw new Error("Guided web smoke did not emit JSON summary.");
   }
   summary.summary_file = summaryFile;
-  summary.command = "aor app --smoke true --open false --json";
+  summary.rendered_html_file = asNonEmptyString(summary.rendered_html_file) || outputHtml;
+  summary.command = "node apps/web/scripts/operator-console-smoke.mjs";
+  summary.html_ref = summary.rendered_html_file;
+  summary.dom_snapshot_ref = asNonEmptyString(summary.dom_snapshot_file) || null;
+  summary.accessibility_summary_ref = asNonEmptyString(summary.accessibility_summary_file) || null;
+  summary.screenshot_refs = asStringArray(summary.screenshot_files);
   writeJson(summaryFile, summary);
   return {
     summaryFile,
+    htmlFile: outputHtml,
+    domSnapshotFile: asNonEmptyString(summary.dom_snapshot_file) || null,
+    accessibilitySummaryFile: asNonEmptyString(summary.accessibility_summary_file) || null,
+    screenshotFiles: asStringArray(summary.screenshot_files),
     summary,
   };
 }
@@ -1490,6 +1542,15 @@ function sortJsonValue(value) {
  */
 function jsonEquivalent(left, right) {
   return JSON.stringify(sortJsonValue(left)) === JSON.stringify(sortJsonValue(right));
+}
+
+/**
+ * @param {string} cwd
+ * @returns {string | null}
+ */
+function gitHeadOrNull(cwd) {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" });
+  return result.status === 0 ? result.stdout.trim() || null : null;
 }
 
 /**
@@ -3908,15 +3969,18 @@ export function executeFullJourneyFlow(options) {
       artifacts.next_action_report_file = getStringField(guidedNextAfterLearning.payload, "next_action_report_file");
       artifacts.guided_next_after_learning_transcript_file = guidedNextAfterLearning.transcriptFile;
 
-      const appSmoke = runGuidedAppSmoke({
-        aorLaunch: options.aorLaunch,
+      const webSmoke = runGuidedWebSmoke({
+        hostRoot: options.hostRoot,
         targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
         runId: options.runId,
         reportsRoot: options.layout.reportsRoot,
-        env,
       });
-      artifacts.guided_app_smoke_summary_file = appSmoke.summaryFile;
-      artifacts.guided_app_smoke = appSmoke.summary;
+      artifacts.guided_web_smoke_summary_file = webSmoke.summaryFile;
+      artifacts.guided_web_smoke_html_file = webSmoke.htmlFile;
+      artifacts.guided_web_dom_snapshot_file = webSmoke.domSnapshotFile;
+      artifacts.guided_web_accessibility_summary_file = webSmoke.accessibilitySummaryFile;
+      artifacts.guided_web_screenshot_files = webSmoke.screenshotFiles;
+      artifacts.guided_web_smoke = webSmoke.summary;
     }
     markStage(
       stageMap,
