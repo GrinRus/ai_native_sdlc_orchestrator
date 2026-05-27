@@ -27,9 +27,22 @@ function validateControllerEvidence(report, state) {
   const issues = [];
   const stepJournal = Array.isArray(report.step_journal) ? report.step_journal.map((entry) => asRecord(entry)) : [];
   const operatorContext = asRecord(report.operator_context);
-  const requiresOperatorDecision =
-    asNonEmptyString(operatorContext.operator_kind) === "skill-agent" &&
-    asNonEmptyString(operatorContext.decision_policy) === "required";
+  if (asNonEmptyString(operatorContext.operator_kind) !== "skill-agent") {
+    issues.push("operator_context.operator_kind must be skill-agent");
+  }
+  if (asNonEmptyString(operatorContext.decision_policy) !== "required") {
+    issues.push("operator_context.decision_policy must be required");
+  }
+  if (asNonEmptyString(operatorContext.answer_policy) !== "agent-public-control-plane") {
+    issues.push("operator_context.answer_policy must be agent-public-control-plane");
+  }
+  if (!asNonEmptyString(report.final_skill_agent_verdict_file)) {
+    issues.push("final_skill_agent_verdict_file is required");
+  }
+  const finalSkillAgentVerdict = asRecord(report.final_skill_agent_verdict);
+  if (asNonEmptyString(finalSkillAgentVerdict.judge_source) !== "skill-agent") {
+    issues.push("final_skill_agent_verdict.judge_source must be skill-agent");
+  }
   if (stepJournal.length === 0) {
     issues.push("step_journal must contain at least one online controller observation");
   }
@@ -56,11 +69,14 @@ function validateControllerEvidence(report, state) {
     if (!asNonEmptyString(entry.agent_decision_request_ref)) {
       issues.push(`${stepId} missing agent_decision_request_ref`);
     }
-    if (requiresOperatorDecision && asNonEmptyString(entry.operator_decision_status) !== "accepted") {
+    if (asNonEmptyString(entry.operator_decision_status) !== "accepted") {
       issues.push(`${stepId} missing accepted skill-agent operator decision`);
     }
-    if (requiresOperatorDecision && !asNonEmptyString(entry.operator_decision_ref)) {
+    if (!asNonEmptyString(entry.operator_decision_ref)) {
       issues.push(`${stepId} missing operator_decision_ref`);
+    }
+    if (asNonEmptyString(asRecord(entry.semantic_analysis).judge_source) !== "skill-agent") {
+      issues.push(`${stepId} semantic_analysis.judge_source must be skill-agent`);
     }
     for (const phase of REQUIRED_PHASES) {
       const phaseFound = phaseHistory.some(

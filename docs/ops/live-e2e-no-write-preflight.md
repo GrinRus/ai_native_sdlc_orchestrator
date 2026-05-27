@@ -254,4 +254,4 @@ Full-journey observation additionally runs target verification again after provi
 - Target catalog: `docs/ops/live-e2e-target-catalog.md`
 - Profiles: `scripts/live-e2e/profiles/*.yaml`
 - Quality rehearsal runbook: `docs/ops/live-e2e-quality-rehearsal.md`
-- Runbooks: `docs/ops/live-e2e-regress-short.md`, `docs/ops/live-e2e-regress-long.md`, `docs/ops/live-e2e-release-short.md`, `docs/ops/live-e2e-release-long.md`
+- Runbooks: `docs/ops/live-e2e-standard-runner.md`, `docs/ops/live-e2e-target-catalog.md`

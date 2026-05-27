@@ -21,6 +21,37 @@ function withTempRoot(callback) {
   }
 }
 
+function writeSkillAgentDecision(reportsRoot, runId, sequence, stepInstanceId, options = {}) {
+  const stepId = stepInstanceId.split("#")[0];
+  const decisionFile = path.join(
+    reportsRoot,
+    `live-e2e-operator-decision-${runId}-${String(sequence).padStart(2, "0")}-${stepInstanceId.replace("#", "-")}.json`,
+  );
+  fs.writeFileSync(
+    decisionFile,
+    `${JSON.stringify(
+      {
+        step_id: stepId,
+        step_instance_id: stepInstanceId,
+        status: "accepted",
+        operator_ref: "skill://live-e2e-runner",
+        action: options.action ?? "continue",
+        next_step: options.nextStep,
+        reason: options.reason ?? "Skill-agent accepted public evidence.",
+        semantic_analysis: {
+          status: options.semanticStatus ?? "pass",
+          judge_source: "skill-agent",
+          findings: options.findings ?? [],
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  return decisionFile;
+}
+
 test("live E2E step controller persists observation and state before next step", () => {
   withTempRoot((reportsRoot) => {
     const transcriptFile = path.join(reportsRoot, "01-discovery-run.json");
@@ -31,6 +62,7 @@ test("live E2E step controller persists observation and state before next step",
       profile: { live_e2e: { flow_range_policy: "delivery_default" } },
       mode: "auto",
     });
+    writeSkillAgentDecision(reportsRoot, "controller-pass", 1, "discovery", { nextStep: "spec" });
 
     const result = controller.observeStage({
       stage: "discovery",
@@ -242,6 +274,54 @@ test("live E2E step controller rejects skill-agent continue when deterministic c
   });
 });
 
+test("live E2E step controller marks execution not_pass when post-run verification fails", () => {
+  withTempRoot((reportsRoot) => {
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-execution-post-run-fail",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+        },
+      },
+      mode: "manual",
+    });
+    controller.planCommand({ label: "run-start", commandSurface: "aor run start" });
+
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "execution",
+          stageResult: {
+            stage: "execution",
+            status: "pass",
+            evidence_refs: [],
+            summary: "Run start completed.",
+          },
+          commandResults: [{ label: "run-start", command_surface: "aor run start", status: "pass", exit_code: 0 }],
+          artifacts: {
+            post_run_verify_status: "fail",
+            post_run_verify_summary_file: path.join(reportsRoot, "verify-summary-post-run-primary.json"),
+          },
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "diagnose");
+        return true;
+      },
+    );
+
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.deterministic_analysis.status, "not_pass");
+    assert.equal(entry.operator_decision_status, "missing");
+    assert.equal(entry.final_step_verdict, "blocked");
+    assert.match(entry.semantic_analysis.findings.join("\n"), /post-run verification reported 'fail'/);
+  });
+});
+
 test("live E2E step controller preserves repeated execution and review iterations", () => {
   withTempRoot((reportsRoot) => {
     const reviewTranscript = path.join(reportsRoot, "01-review-run.json");
@@ -256,6 +336,11 @@ test("live E2E step controller preserves repeated execution and review iteration
     });
 
     controller.planCommand({ label: "review-run", commandSurface: "aor review run", iteration: 1 });
+    writeSkillAgentDecision(reportsRoot, "controller-repair-loop", 1, "review", {
+      action: "retry_public_step",
+      semanticStatus: "warn",
+      nextStep: "execution",
+    });
     const reviewResult = controller.observeStage({
       stage: "review",
       iteration: 1,
@@ -280,6 +365,7 @@ test("live E2E step controller preserves repeated execution and review iteration
     assert.equal(reviewResult.action, "retry_public_step");
 
     controller.planCommand({ label: "run-start", commandSurface: "aor run start", iteration: 2 });
+    writeSkillAgentDecision(reportsRoot, "controller-repair-loop", 3, "execution#2", { nextStep: "qa" });
     controller.observeStage({
       stage: "execution",
       iteration: 2,
@@ -323,6 +409,7 @@ test("live E2E delivery certification does not reuse review cached evidence", ()
     });
 
     controller.planCommand({ label: "review-run", commandSurface: "aor review run", iteration: 1 });
+    writeSkillAgentDecision(reportsRoot, "controller-delivery-cert-cache", 1, "review", { nextStep: "qa" });
     controller.observeStage({
       stage: "review",
       iteration: 1,
@@ -618,6 +705,7 @@ test("live E2E step controller gates manual mode after one completed step", () =
       profile: { live_e2e: { flow_range_policy: "delivery_default" } },
       mode: "manual",
     });
+    writeSkillAgentDecision(reportsRoot, "controller-manual", 1, "discovery", { nextStep: "spec" });
 
     assert.throws(
       () =>
@@ -655,6 +743,7 @@ test("live E2E step controller resumes manual state at the next incomplete step"
         artifacts: {},
       }),
     );
+    writeSkillAgentDecision(reportsRoot, "controller-resume", 1, "discovery", { nextStep: "spec" });
 
     const second = createLiveE2eStepController({
       reportsRoot,
@@ -662,15 +751,21 @@ test("live E2E step controller resumes manual state at the next incomplete step"
       profile: { live_e2e: { flow_range_policy: "delivery_default" } },
       mode: "manual",
     });
-    assert.equal(
-      second.observeStage({
-        stage: "discovery",
-        stageResult: { stage: "discovery", status: "pass", evidence_refs: [], summary: "ok" },
-        commandResults: [{ label: "discovery-run", command_surface: "aor discovery run", status: "pass" }],
-        artifacts: {},
-      }).action,
-      "continue",
+    assert.throws(
+      () =>
+        second.observeStage({
+          stage: "discovery",
+          stageResult: { stage: "discovery", status: "pass", evidence_refs: [], summary: "ok" },
+          commandResults: [{ label: "discovery-run", command_surface: "aor discovery run", status: "pass" }],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "continue");
+        return true;
+      },
     );
+    writeSkillAgentDecision(reportsRoot, "controller-resume", 3, "spec", { nextStep: "planning" });
     assert.throws(
       () =>
         second.observeStage({
@@ -699,6 +794,7 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
       profile,
       mode: "auto",
     });
+    let sequence = 1;
     for (const [stage, label] of [
       ["discovery", "discovery-run"],
       ["spec", "spec-build"],
@@ -708,12 +804,14 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
       ["review", "review-run"],
       ["qa", "eval-run"],
     ]) {
+      writeSkillAgentDecision(reportsRoot, "controller-terminal-manual", sequence, stage);
       prior.observeStage({
         stage,
         stageResult: { stage, status: "pass", evidence_refs: [], summary: "ok" },
         commandResults: [{ label, command_surface: `aor ${stage}`, status: "pass" }],
         artifacts: {},
       });
+      sequence += 2;
     }
 
     const terminal = createLiveE2eStepController({
@@ -722,6 +820,7 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
       profile,
       mode: "manual",
     });
+    writeSkillAgentDecision(reportsRoot, "controller-terminal-manual", 15, "delivery");
     const result = terminal.observeStage({
       stage: "delivery",
       stageResult: { stage: "delivery", status: "pass", evidence_refs: [], summary: "ok" },
@@ -765,6 +864,7 @@ test("live E2E step controller exposes cached public command results for complet
       profile: { live_e2e: { flow_range_policy: "delivery_default" } },
       mode: "auto",
     });
+    writeSkillAgentDecision(reportsRoot, "controller-command-cache", 1, "discovery", { nextStep: "spec" });
     first.observeStage({
       stage: "discovery",
       stageResult: { stage: "discovery", status: "pass", evidence_refs: [transcriptFile], summary: "ok" },
@@ -934,6 +1034,10 @@ test("live E2E step controller does not skip unresolved persisted decisions on r
       profile: { live_e2e: { flow_range_policy: "delivery_default" } },
       mode: "auto",
     });
+    writeSkillAgentDecision(reportsRoot, "controller-unresolved-resume", 1, "spec", {
+      action: "answer",
+      nextStep: "spec",
+    });
     assert.throws(
       () =>
         first.observeStage({
@@ -970,6 +1074,10 @@ test("live E2E step controller does not skip unresolved persisted decisions on r
       runId: "controller-unresolved-resume",
       profile: { live_e2e: { flow_range_policy: "delivery_default" } },
       mode: "auto",
+    });
+    writeSkillAgentDecision(reportsRoot, "controller-unresolved-resume", 2, "spec", {
+      action: "answer",
+      nextStep: "spec",
     });
     assert.throws(
       () =>
@@ -1016,6 +1124,7 @@ test("live E2E step controller continues after a persisted interaction resumes",
       profile: { live_e2e: { flow_range_policy: "delivery_default" } },
       mode: "auto",
     });
+    writeSkillAgentDecision(reportsRoot, "controller-interaction-resumed", 1, "spec", { nextStep: "planning" });
     const result = controller.observeStage({
       stage: "spec",
       stageResult: {
@@ -1054,6 +1163,11 @@ test("live E2E step controller blocks resumed interactions without answer audit 
       runId: "controller-interaction-resumed-missing-audit",
       profile: { live_e2e: { flow_range_policy: "delivery_default" } },
       mode: "auto",
+    });
+    writeSkillAgentDecision(reportsRoot, "controller-interaction-resumed-missing-audit", 1, "spec", {
+      action: "block",
+      semanticStatus: "blocked",
+      findings: ["Answer audit evidence is missing."],
     });
 
     assert.throws(

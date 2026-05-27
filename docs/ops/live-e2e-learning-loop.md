@@ -38,8 +38,8 @@ A run is learning-loop complete when:
 - incident linkage is complete when incident exists;
 - backlog follow-up entry is explicit and traceable to the run id.
 
-## W7 governance closure profile
-For wave-level closure checks in W7, use `scripts/live-e2e/profiles/w7-governance-integration.yaml` and confirm:
+## Governance closure evidence
+For wave-level closure checks, use a catalog-backed full-journey profile and confirm:
 - handoff backlog refs include `docs/backlog/wave-7-implementation-slices.md`;
 - quality evidence includes promotion + harness artifacts;
 - `aor audit runs --run-id <RUN_ID>` returns non-empty `incident_refs` and populated `finance_evidence`.

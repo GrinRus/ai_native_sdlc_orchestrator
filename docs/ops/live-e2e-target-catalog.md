@@ -42,7 +42,6 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - `large`, `governance|repair`
     - broader request lifecycle mission with stricter audit/learning closure
 - Best profiles:
-  - bounded: `regress-short.yaml`, `release-short.yaml`, `w7-governance-integration.yaml`
   - full-journey required cells:
     - `full-journey-regress-ky.yaml` (`regress/small/openai-primary`)
     - `full-journey-regress-ky-medium-anthropic.yaml` (`regress/medium/anthropic-primary`)
@@ -70,7 +69,6 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - `large`, `governance`
     - broader config/audit safe mission with explicit governance evidence
 - Best profiles:
-  - bounded: `regress-long.yaml`
   - full-journey required cells:
     - `full-journey-regress-httpie.yaml` (`regress/small/openai-primary`)
     - `full-journey-repair-httpie-medium-anthropic.yaml` (`repair/medium/anthropic-primary`)
@@ -99,7 +97,6 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - release-shaped mission inside `apps/**` and `packages/**`
     - expected evidence: `delivery-manifest`, `release-packet`, `review-report`
 - Best profiles:
-  - bounded: `release-long.yaml`
   - full-journey required cells:
     - `full-journey-release-nextjs.yaml` (`release/large/openai-primary`)
     - `full-journey-repair-nextjs-medium-anthropic.yaml` (`repair/medium/anthropic-primary`)

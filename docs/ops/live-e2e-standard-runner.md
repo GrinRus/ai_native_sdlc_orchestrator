@@ -1,9 +1,7 @@
 # Runbook: live E2E standard runner
 
 ## Purpose
-Provide one installed-user black-box proof runner for both live E2E layers:
-- bounded rehearsal profiles for fast regression and release smoke;
-- catalog-backed full-journey profiles for mandatory installed-user acceptance on curated repositories and curated feature missions.
+Provide one installed-user black-box proof runner for catalog-backed full-journey profiles and guided installed-user journeys.
 
 Live E2E simulates a user who has installed AOR, initializes or attaches a target repository, walks the public SDLC flow through CLI/API surfaces, and then emits a per-step black-box observation summary. It must not call private runtime internals to repair the run. It proves whether AOR works as a product from the public surface and whether produced artifacts explain each `pass`, `warn`, `not_pass`, block, and missing-evidence gap.
 
@@ -36,13 +34,6 @@ acceptance proof:
 
 ## Canonical profiles
 Use only `scripts/live-e2e/profiles/**`.
-
-Bounded rehearsal profiles:
-- `regress-short.yaml`
-- `regress-long.yaml`
-- `release-short.yaml`
-- `release-long.yaml`
-- `w7-governance-integration.yaml`
 
 Catalog-backed full-journey profiles:
 - `installed-user-guided-journey.yaml`
@@ -305,7 +296,8 @@ Full-journey summaries must carry:
 - `live_e2e_step_observation_files`
 - `live_e2e_observation_overall_status`
 - `operator_context`
-- `agent_operator_assessment`
+- `runner_quality_summary`
+- `final_skill_agent_verdict_file`
 - `quality_judgement`
 - `canonical_status`
 - `command_status`
@@ -349,7 +341,7 @@ Guided full-journey summaries also carry:
 
 Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for product observation success when required step evidence is missing.
 
-Bounded summaries continue to carry:
+Archived fixture summaries may carry legacy bounded fields, but they are not live E2E acceptance proof:
 - `target_checkout_root`
 - `generated_project_profile_file`
 - `routed_step_result_file`
@@ -384,7 +376,7 @@ Delivery evidence no longer downgrades `not_pass` to `warn`.
 ## Step Analysis
 The runner performs deterministic analysis for every step from public command transcripts and artifact refs, then writes `agent_decision_request_ref` before the next public step can run. Acceptance and production-proof profiles require `operator_context.operator_kind=skill-agent`, `decision_policy=required`, and an accepted `operator_decision_ref` for every observed step.
 
-The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` remains a deterministic fixture aid for smoke profiles only; it is not an acceptance overlay.
+The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` is removed; live E2E semantic analysis comes only from accepted skill-agent decisions and the final skill-agent verdict artifact.
 
 Judge criteria:
 - traceability to feature request, mission, and previous step;
@@ -393,7 +385,7 @@ Judge criteria:
 - consistency with neighboring artifacts;
 - absence of synthetic or no-op explanations that hide failure.
 
-If a fixture profile does not provide an operator decision, the runner may inject deterministic fixture decisions. Acceptance and production-proof profiles fail closed without the skill-agent decision.
+If a profile does not provide an accepted skill-agent operator decision, the runner stops fail-closed and writes the decision request for manual/evaluator continuation.
 
 ## Quality Judgement
 Full-journey summaries may include `quality_judgement` with target acceptance dimensions:
@@ -409,7 +401,7 @@ Full-journey summaries may include `quality_judgement` with target acceptance di
 - `post_run_verification_status`
 - `post_run_diagnostic_status`
 - `runtime_success`
-- `agent_operator_assessment`
+- `runner_quality_summary`
 - `runtime_harness_decision`
 - `run_start_runtime_harness_decision`
 - `latest_runtime_harness_decision`
@@ -461,7 +453,7 @@ close required acceptance.
 - `review-report.provider_traceability` matches the requested provider variant and adapter path.
 - `review-report.feature_size_fit` stays inside the declared size budget for the mission.
 - `review-report.artifact_quality.verify_summary_ref` points at the post-run `project verify` summary.
-- `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and `agent_operator_assessment` are observed post-delivery dimensions. Runtime Harness can block final quality for missing execution evidence, adapter crashes, unresolved interaction, or blocked runtime state, but it does not fail implementation quality by path whitelist/blacklist rules.
+- `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and `runner_quality_summary` are observed post-delivery dimensions. Runtime Harness can block final quality for missing execution evidence, adapter crashes, unresolved interaction, or blocked runtime state, but it does not fail implementation quality by path whitelist/blacklist rules.
 - `delivery_manifest_file` exists and is anchored to the target checkout.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.
 - Guided proof execution starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; the target repository HEAD must remain unchanged and no remote write commands may be recorded unless an explicit future profile opts into network write-back.

@@ -130,27 +130,11 @@ export function isLiveE2eControllerStopInProgress(controllerStop, includedSteps)
  */
 export function resolveLiveE2eOperatorContext(profile) {
   const liveE2e = asRecord(profile.live_e2e);
-  const runTier = asNonEmptyString(profile.run_tier);
-  const acceptanceLike =
-    runTier === "acceptance" ||
-    runTier === "production-proof" ||
-    asRecord(profile.production_proof).enabled === true ||
-    asNonEmptyString(profile.journey_mode) === "full-journey" ||
-    Boolean(asNonEmptyString(profile.target_catalog_id));
-  const operatorMode =
-    asNonEmptyString(liveE2e.operator_mode) ||
-    (acceptanceLike ? "skill-agent" : "deterministic-fixture");
-  const agentDecisionPolicy =
-    asNonEmptyString(liveE2e.agent_decision_policy) ||
-    (operatorMode === "skill-agent" ? "required" : "optional");
-  const answerPolicy =
-    asNonEmptyString(liveE2e.interaction_answer_policy) ||
-    (operatorMode === "skill-agent" ? "agent-required" : "deterministic-fixture");
   return {
-    operator_kind: operatorMode === "skill-agent" ? "skill-agent" : "deterministic-fixture",
-    operator_ref: operatorMode === "skill-agent" ? "skill://live-e2e-runner" : "fixture://live-e2e-deterministic-runner",
-    decision_policy: agentDecisionPolicy === "required" ? "required" : "optional",
-    answer_policy: answerPolicy === "agent-required" ? "agent-public-control-plane" : "deterministic-fixture-only",
+    operator_kind: "skill-agent",
+    operator_ref: asNonEmptyString(liveE2e.operator_ref) || "skill://live-e2e-runner",
+    decision_policy: "required",
+    answer_policy: "agent-public-control-plane",
     target_write_policy:
       asNonEmptyString(liveE2e.target_write_policy) || "aor-runtime-only-before-execution",
   };
@@ -273,7 +257,6 @@ function isOperatorAction(action) {
  * @returns {string | null}
  */
 function rejectInconsistentSkillAgentDecision(decision, action, operatorContext, entry) {
-  if (asNonEmptyString(operatorContext.operator_kind) !== "skill-agent") return null;
   const semantic = asRecord(decision.semantic_analysis);
   const judgeSource = asNonEmptyString(semantic.judge_source) || asNonEmptyString(decision.judge_source);
   if (judgeSource !== "skill-agent") {
@@ -323,7 +306,6 @@ function buildStepInstanceId(step, iteration) {
  * @param {{ profile: Record<string, unknown>, entry: Record<string, unknown>, decisionFile: string, operatorContext: Record<string, unknown> }}
  */
 function resolveOperatorDecision(options) {
-  const required = asNonEmptyString(options.operatorContext.decision_policy) === "required";
   if (fileExists(options.decisionFile)) {
     const decision = asRecord(readJson(options.decisionFile));
     const action = asNonEmptyString(decision.action) || asNonEmptyString(asRecord(decision.decision).action);
@@ -358,43 +340,10 @@ function resolveOperatorDecision(options) {
     };
   }
 
-  if (asNonEmptyString(options.operatorContext.operator_kind) === "deterministic-fixture") {
-    const overrideAction = asNonEmptyString(asRecord(options.entry.decision_override).action);
-    const action = isOperatorAction(overrideAction) ? overrideAction : resolveDecisionAction(options.entry);
-    const decision = {
-      decision_id: `${asNonEmptyString(options.entry.step_id)}.deterministic-fixture-decision`,
-      run_id: asNonEmptyString(options.entry.run_id) || null,
-      step_id: asNonEmptyString(options.entry.step_id),
-      step_instance_id: asNonEmptyString(options.entry.step_instance_id) || null,
-      iteration: Number(options.entry.iteration) || 1,
-      status: "accepted",
-      operator_ref: asNonEmptyString(options.operatorContext.operator_ref),
-      action,
-      reason:
-        asNonEmptyString(asRecord(options.entry.decision_override).reason) ||
-        asNonEmptyString(asRecord(options.entry.decision).reason) ||
-        "Deterministic fixture accepted controller evidence.",
-      semantic_analysis: {
-        status: asNonEmptyString(asRecord(options.entry.semantic_analysis).status) || "pass",
-        judge_source: "deterministic-fixture",
-        findings: asStringArray(asRecord(options.entry.semantic_analysis).findings),
-      },
-      evidence_refs: asStringArray(options.entry.artifact_refs),
-      created_at: nowIso(),
-    };
-    writeJson(options.decisionFile, decision);
-    return {
-      status: "accepted",
-      decision,
-      action,
-      ref: options.decisionFile,
-    };
-  }
-
   return {
-    status: required ? "missing" : "not_required",
+    status: "missing",
     decision: {},
-    action: required ? "diagnose" : resolveDecisionAction(options.entry),
+    action: "diagnose",
     ref: null,
   };
 }
@@ -413,6 +362,65 @@ function resolveFinalStepVerdict(requestedInteraction, deterministicStatus) {
   }
   if (interactionStatus === "blocked" || interactionStatus === "resume_failed") return "blocked";
   return "interaction_required";
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {string} key
+ * @param {string} label
+ * @returns {string | null}
+ */
+function failingArtifactGate(artifacts, key, label) {
+  const rawStatus = asNonEmptyString(artifacts[key]);
+  if (!rawStatus) return null;
+  const status = toLiveE2eObservationStatus(rawStatus);
+  if (status === "not_pass" || status === "blocked") return `${label} reported '${rawStatus}'.`;
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {string} key
+ * @param {string} message
+ * @returns {string | null}
+ */
+function artifactBooleanFailure(artifacts, key, message) {
+  return artifacts[key] === true ? message : null;
+}
+
+/**
+ * @param {string} step
+ * @param {Record<string, unknown>} artifacts
+ * @returns {string[]}
+ */
+function resolveStepArtifactGateFailures(step, artifacts) {
+  if (step === "execution") {
+    return uniqueStrings([
+      failingArtifactGate(artifacts, "provider_execution_status", "provider execution"),
+      failingArtifactGate(artifacts, "real_code_change_status", "real code change gate"),
+      failingArtifactGate(artifacts, "post_run_verify_status", "post-run verification"),
+    ]);
+  }
+  if (step === "review") {
+    return uniqueStrings([
+      failingArtifactGate(artifacts, "review_overall_status", "review"),
+      failingArtifactGate(artifacts, "quality_gate_decision", "quality gate"),
+    ]);
+  }
+  if (step === "qa") {
+    return uniqueStrings([
+      failingArtifactGate(artifacts, "evaluation_status", "evaluation"),
+      failingArtifactGate(artifacts, "post_run_verify_status", "post-run verification"),
+      failingArtifactGate(artifacts, "post_run_diagnostic_status", "post-run diagnostic verification"),
+    ]);
+  }
+  if (step === "delivery") {
+    return uniqueStrings([
+      artifactBooleanFailure(artifacts, "delivery_blocking", "delivery prepare was blocked."),
+      failingArtifactGate(artifacts, "delivery_quality_gate_status", "delivery quality gate"),
+    ]);
+  }
+  return [];
 }
 
 export class LiveE2eControllerStop extends Error {
@@ -756,10 +764,9 @@ export function createLiveE2eStepController(options) {
       artifactRefs[0] ||
       asNonEmptyString(planned?.plan_ref) ||
       null;
+    const artifactGateFailures = resolveStepArtifactGateFailures(step, input.artifacts);
     const deterministicStatus =
-      step === "delivery" &&
-      (input.artifacts.delivery_blocking === true ||
-        ["fail", "not_pass"].includes(asNonEmptyString(input.artifacts.delivery_quality_gate_status)))
+      artifactGateFailures.length > 0
         ? "not_pass"
         : toLiveE2eObservationStatus(asNonEmptyString(stage.status) || asNonEmptyString(command.status) || "not_pass");
     const requestedInteraction = Object.keys(command).length > 0 ? extractRequestedInteraction(command) : null;
@@ -817,6 +824,7 @@ export function createLiveE2eStepController(options) {
           analysisStatus === "pass"
             ? []
             : uniqueStrings([
+                ...artifactGateFailures,
                 missingResumeAudit ? "Interaction resume is missing answer audit evidence." : "",
                 asNonEmptyString(stage.summary) || `${step} requires inspection`,
               ]),

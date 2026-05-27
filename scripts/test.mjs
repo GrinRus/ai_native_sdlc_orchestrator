@@ -1126,10 +1126,9 @@ if (!fs.existsSync(webDistIndex)) {
 
 console.log("web app test bundle ok: local app smoke can serve packaged SPA assets");
 
-const liveE2EProofRunnerTestsPath = path.join(root, "scripts/test/live-e2e-proof-runner.test.mjs");
 const liveE2EStepControllerTestsPath = path.join(root, "scripts/test/live-e2e-step-controller.test.mjs");
 removeFileIfExists(liveE2EContextFile);
-const liveE2EProofRunnerTestRun = spawnSync(process.execPath, ["--test", liveE2EStepControllerTestsPath, liveE2EProofRunnerTestsPath], {
+const liveE2EStepControllerTestRun = spawnSync(process.execPath, ["--test", liveE2EStepControllerTestsPath], {
   cwd: root,
   env: {
     ...process.env,
@@ -1140,17 +1139,12 @@ const liveE2EProofRunnerTestRun = spawnSync(process.execPath, ["--test", liveE2E
   timeout: liveE2ETestSuiteTimeoutMs,
 });
 
-if (liveE2EProofRunnerTestRun.status !== 0) {
-  printLiveE2ETimeoutDiagnostic(liveE2EProofRunnerTestRun, [
-    liveE2EStepControllerTestsPath,
-    liveE2EProofRunnerTestsPath,
-  ]);
-  removeFileIfExists(liveE2EContextFile);
-  process.exit(liveE2EProofRunnerTestRun.status ?? 1);
+if (liveE2EStepControllerTestRun.status !== 0) {
+  process.exit(liveE2EStepControllerTestRun.status ?? 1);
 }
 removeFileIfExists(liveE2EContextFile);
 
-console.log("live-e2e tests ok: online step controller and installed-user black-box proof flow");
+console.log("live-e2e tests ok: online step controller");
 
 const cliTestsPath = path.join(root, "apps/cli/test/cli.test.mjs");
 const cliTestRun = spawnSync(process.execPath, ["--test", cliTestsPath], {

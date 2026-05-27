@@ -139,7 +139,7 @@ When closing `W7-S05`, treat one integrated rehearsal as required evidence and k
 3. Finance evidence from promotion or audit surfaces (`finance_signals` or `run_audit_records[].finance_evidence`).
 4. Learning-loop handoff (`learning-loop-handoff-*`) that references both backlog and quality follow-up surfaces.
 
-Use `docs/ops/live-e2e-w7-governance-closure.md` as the canonical closure rehearsal path.
+Use `docs/ops/live-e2e-standard-runner.md` with a catalog-backed full-journey profile as the canonical closure rehearsal path.
 
 ## When creating or changing slices
 

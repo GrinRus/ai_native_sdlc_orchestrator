@@ -516,56 +516,6 @@ function annotateCommandDiagnosticStep(diagnostic, label, iteration) {
 }
 
 /**
- * @param {Record<string, unknown>} profile
- * @param {Record<string, unknown> | null} requestedInteraction
- * @returns {{ answer: string, reason: string | null } | null}
- */
-function resolveDeterministicInteractionAnswer(profile, requestedInteraction) {
-  if (!requestedInteraction) return null;
-  if (asNonEmptyString(asRecord(profile.live_e2e).interaction_answer_policy) !== "deterministic-fixture") {
-    return null;
-  }
-  const policy = asRecord(profile.interaction_answer_policy);
-  if (asNonEmptyString(policy.mode) !== "deterministic") return null;
-  const interactionId = asNonEmptyString(requestedInteraction.interaction_id);
-  const answers = Array.isArray(policy.answers) ? policy.answers.map((entry) => asRecord(entry)) : [];
-  const matched = answers.find((entry) => asNonEmptyString(entry.interaction_id) === interactionId) ?? {};
-  const answer = asNonEmptyString(matched.answer) || asNonEmptyString(policy.default_answer);
-  if (!answer) return null;
-  return {
-    answer,
-    reason:
-      asNonEmptyString(matched.reason) ||
-      asNonEmptyString(policy.reason) ||
-      "Live E2E deterministic interaction answer policy.",
-  };
-}
-
-/**
- * @param {Record<string, unknown>} diagnostic
- * @param {ReturnType<typeof runAorCommand>} answerResult
- */
-function updateDiagnosticWithInteractionAnswer(diagnostic, answerResult) {
-  const payload = asRecord(answerResult.payload);
-  const interactionAnswer = Object.keys(asRecord(payload.interaction_answer)).length > 0
-    ? asRecord(payload.interaction_answer)
-    : asRecord(payload.interactionAnswer);
-  const continuation = asRecord(diagnostic.interactive_continuation);
-  if (Object.keys(continuation).length === 0 || Object.keys(interactionAnswer).length === 0) return;
-  const answerAuditRef = asNonEmptyString(interactionAnswer.answer_audit_ref);
-  continuation.status = asNonEmptyString(interactionAnswer.interaction_status) || asNonEmptyString(continuation.status);
-  continuation.interaction_status = continuation.status;
-  continuation.answer_audit_refs = uniqueStrings([...asStringArray(continuation.answer_audit_refs), answerAuditRef]);
-  continuation.continuation = {
-    ...asRecord(continuation.continuation),
-    next_action: asNonEmptyString(interactionAnswer.run_control_transition) || "continue_run",
-  };
-  diagnostic.interactive_continuation = continuation;
-  diagnostic.artifact_refs = uniqueStrings([...asStringArray(diagnostic.artifact_refs), answerAuditRef, answerResult.transcriptFile]);
-  diagnostic.recommendation = continuation.status === "resumed" ? "continue" : diagnostic.recommendation;
-}
-
-/**
  * @param {Record<string, unknown>} diagnostic
  * @returns {ReturnType<typeof runAorCommand> | null}
  */
@@ -1973,48 +1923,6 @@ export function executeInstalledUserFlow(options) {
         diagnostic.recommendation = "inspect payload quality fields";
       }
       commandResults.push(diagnostic);
-      const requestedInteraction = asRecord(diagnostic.interactive_continuation);
-      const deterministicAnswer =
-        options.stepController?.mode === "manual"
-          ? null
-          : resolveDeterministicInteractionAnswer(options.profile, requestedInteraction);
-      if (result.ok && deterministicAnswer) {
-        const interactionId = asNonEmptyString(requestedInteraction.interaction_id);
-        if (!interactionId) {
-          throw new Error(`Public CLI command '${label}' requested interaction without interaction_id.`);
-        }
-        const answerResult = runAorCommand({
-          launch: options.aorLaunch,
-          cwd: targetCheckout.targetCheckoutRoot,
-          args: [
-            "run",
-            "answer",
-            "--project-ref",
-            ".",
-            "--run-id",
-            options.runId,
-            "--interaction-id",
-            interactionId,
-            "--answer",
-            deterministicAnswer.answer,
-            "--reason",
-            deterministicAnswer.reason ?? "Live E2E deterministic interaction answer policy.",
-          ],
-          env,
-          transcriptsRoot,
-          label: `${label}-interaction-answer`,
-          index: commandIndex,
-        });
-        commandIndex += 1;
-        const answerDiagnostic = buildCommandDiagnostic(answerResult);
-        annotateCommandDiagnosticStep(answerDiagnostic, `${label}-interaction-answer`, iteration);
-        commandResults.push(answerDiagnostic);
-        if (!answerResult.ok) {
-          const stderr = answerResult.stderr.trim() || answerResult.stdout.trim() || "interaction answer command failed";
-          throw new Error(`Public CLI interaction answer for '${label}' failed: ${stderr}`);
-        }
-        updateDiagnosticWithInteractionAnswer(diagnostic, answerResult);
-      }
       if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -2709,50 +2617,6 @@ export function executeFullJourneyFlow(options) {
         diagnostic.recommendation = "inspect payload quality fields";
       }
       commandResults.push(diagnostic);
-      const requestedInteraction = asRecord(diagnostic.interactive_continuation);
-      const deterministicAnswer =
-        options.stepController?.mode === "manual"
-          ? null
-          : resolveDeterministicInteractionAnswer(options.profile, requestedInteraction);
-      if (result.ok && deterministicAnswer) {
-        const interactionId = asNonEmptyString(requestedInteraction.interaction_id);
-        if (!interactionId) {
-          throw new Error(`Public CLI command '${label}' requested interaction without interaction_id.`);
-        }
-        const answerResult = runAorCommand({
-          launch: options.aorLaunch,
-          cwd: targetCheckout.targetCheckoutRoot,
-          args: [
-            "run",
-            "answer",
-            "--project-ref",
-            ".",
-            "--runtime-root",
-            ".aor",
-            "--run-id",
-            options.runId,
-            "--interaction-id",
-            interactionId,
-            "--answer",
-            deterministicAnswer.answer,
-            "--reason",
-            deterministicAnswer.reason ?? "Live E2E deterministic interaction answer policy.",
-          ],
-          env,
-          transcriptsRoot,
-          label: `${label}-interaction-answer`,
-          index: commandIndex,
-        });
-        commandIndex += 1;
-        const answerDiagnostic = buildCommandDiagnostic(answerResult);
-        annotateCommandDiagnosticStep(answerDiagnostic, `${label}-interaction-answer`, iteration);
-        commandResults.push(answerDiagnostic);
-        if (!answerResult.ok) {
-          const stderr = answerResult.stderr.trim() || answerResult.stdout.trim() || "interaction answer command failed";
-          throw new Error(`Public CLI interaction answer for '${label}' failed: ${stderr}`);
-        }
-        updateDiagnosticWithInteractionAnswer(diagnostic, answerResult);
-      }
       if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -4144,7 +4008,7 @@ export function executeFullJourneyFlow(options) {
       runId: options.runId,
     });
     artifacts.artifact_consistency = artifactConsistency;
-    const agentOperatorAssessment = {
+    const runnerQualitySummary = {
       mission_satisfaction:
         postRunVerificationStatus === "pass" && realCodeChangeStatus === "pass" && reviewOverallStatus !== "fail"
           ? "pass"
@@ -4162,13 +4026,13 @@ export function executeFullJourneyFlow(options) {
           ? "accept"
           : "reject",
     };
-    artifacts.agent_operator_assessment = agentOperatorAssessment;
+    artifacts.runner_quality_summary = runnerQualitySummary;
     artifacts.quality_gate_decision =
       postRunVerificationStatus === "pass" &&
       postRunDiagnosticStatus !== "fail" &&
       realCodeChangeStatus === "pass" &&
       reviewOverallStatus !== "fail" &&
-      agentOperatorAssessment.mission_satisfaction === "pass"
+      runnerQualitySummary.mission_satisfaction === "pass"
         ? "pass"
         : "fail";
 
@@ -4217,7 +4081,7 @@ export function executeFullJourneyFlow(options) {
       provider_execution_status: providerExecutionProofStatus,
       target_baseline_status: targetBaselineStatus,
       real_code_change_status: realCodeChangeStatus,
-      agent_operator_assessment: agentOperatorAssessment,
+      runner_quality_summary: runnerQualitySummary,
       post_run_verification_status: postRunVerificationStatus,
       post_run_diagnostic_status: postRunDiagnosticStatus,
       discovery_quality:

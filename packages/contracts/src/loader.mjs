@@ -2124,9 +2124,9 @@ function validateLiveE2EObservationReport(document, source) {
   }
   const operatorContext = isPlainObject(document.operator_context) ? document.operator_context : {};
   for (const [field, expectedValues] of [
-    ["operator_kind", ["skill-agent", "deterministic-fixture"]],
-    ["decision_policy", ["required", "optional"]],
-    ["answer_policy", ["agent-public-control-plane", "deterministic-fixture-only"]],
+    ["operator_kind", ["skill-agent"]],
+    ["decision_policy", ["required"]],
+    ["answer_policy", ["agent-public-control-plane"]],
     ["target_write_policy", ["aor-runtime-only-before-execution"]],
   ]) {
     const value = operatorContext[field];
@@ -2154,6 +2154,36 @@ function validateLiveE2EObservationReport(document, source) {
         message: "Field 'operator_context.operator_ref' must identify the live E2E operator.",
       }),
     );
+  }
+  if (typeof document.final_skill_agent_verdict_file !== "string" || document.final_skill_agent_verdict_file.length === 0) {
+    issues.push(
+      issue({
+        code: document.final_skill_agent_verdict_file === undefined ? "required_field_missing" : "field_type_mismatch",
+        source,
+        field: "final_skill_agent_verdict_file",
+        expected: "non-empty string",
+        actual:
+          document.final_skill_agent_verdict_file === undefined
+            ? "missing"
+            : describeActualType(document.final_skill_agent_verdict_file),
+        message: "Field 'final_skill_agent_verdict_file' is required for skill-agent-only live E2E reports.",
+      }),
+    );
+  }
+  if (isPlainObject(document.final_skill_agent_verdict)) {
+    const finalVerdict = document.final_skill_agent_verdict;
+    if (finalVerdict.judge_source !== "skill-agent") {
+      issues.push(
+        issue({
+          code: finalVerdict.judge_source === undefined ? "required_field_missing" : "enum_value_invalid",
+          source,
+          field: "final_skill_agent_verdict.judge_source",
+          expected: "skill-agent",
+          actual: finalVerdict.judge_source === undefined ? "missing" : String(finalVerdict.judge_source),
+          message: "Field 'final_skill_agent_verdict.judge_source' must be skill-agent.",
+        }),
+      );
+    }
   }
   const finalAnalysis = isPlainObject(document.final_analysis)
     ? document.final_analysis
@@ -2420,14 +2450,14 @@ function validateObservationStepJournal(options) {
     const decisionStatus = record.operator_decision_status;
     if (
       typeof decisionStatus === "string" &&
-      !["accepted", "missing", "rejected", "not_required"].includes(decisionStatus)
+      !["accepted", "missing", "rejected"].includes(decisionStatus)
     ) {
       options.issues.push(
         issue({
           code: "enum_value_invalid",
           source: options.source,
           field: `step_journal[${index}].operator_decision_status`,
-          expected: "accepted|missing|rejected|not_required",
+          expected: "accepted|missing|rejected",
           actual: decisionStatus,
           message: "Field 'operator_decision_status' must describe the operator decision state.",
         }),

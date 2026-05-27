@@ -419,38 +419,6 @@ function buildScorecard(options) {
 }
 
 /**
- * @param {string | null} filePath
- * @returns {Record<string, unknown>}
- */
-function loadAgentJudgeDocument(filePath) {
-  const resolved = asNonEmptyString(filePath);
-  if (!resolved) return {};
-  if (!fileExists(resolved)) {
-    throw new UsageError(`Agent judge file '${resolved}' was not found.`);
-  }
-  return readJson(resolved);
-}
-
-/**
- * @param {Record<string, unknown>} judgeDocument
- * @returns {Map<string, Record<string, unknown>>}
- */
-function indexAgentJudgeEntries(judgeDocument) {
-  const entries = Array.isArray(judgeDocument.step_journal)
-    ? judgeDocument.step_journal
-    : Array.isArray(judgeDocument.steps)
-      ? judgeDocument.steps
-      : [];
-  const indexed = new Map();
-  for (const entry of entries) {
-    const record = asRecord(entry);
-    const stepId = asNonEmptyString(record.step_id) || asNonEmptyString(record.step) || asNonEmptyString(record.flow_stage);
-    if (stepId) indexed.set(stepId, record);
-  }
-  return indexed;
-}
-
-/**
  * @param {Record<string, unknown>} profile
  * @returns {"delivery_default" | "full_lifecycle"}
  */
@@ -511,10 +479,7 @@ function assertInstallModeAllowed(options) {
   const runTier = resolveSummaryRunTier(options.profile);
   const productionProofEnabled = asRecord(options.profile.production_proof).enabled === true;
   const internalTestHooks = asRecord(options.profile.internal_test_hooks);
-  if (
-    internalTestHooks.allow_repo_local_install_for_test === true ||
-    (internalTestHooks.allow_deterministic_operator_for_test === true && runTier !== "production-proof")
-  ) {
+  if (internalTestHooks.allow_repo_local_install_for_test === true) {
     return;
   }
   if (runTier === "acceptance" || runTier === "production-proof" || productionProofEnabled) {
@@ -736,14 +701,10 @@ function buildSetupJournal(artifacts) {
   return setupEntries;
 }
 
-/**
- * @param {{ profile: Record<string, unknown>, flowResult: { stageResults: Array<Record<string, unknown>>, commandResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }, agentJudgeDocument: Record<string, unknown> }}
- */
 function buildStepJournal(options) {
   const controllerEntries = Array.isArray(options.flowResult.artifacts.live_e2e_step_journal_entries)
     ? options.flowResult.artifacts.live_e2e_step_journal_entries.map((entry) => asRecord(entry))
     : [];
-  const judgeEntries = indexAgentJudgeEntries(options.agentJudgeDocument);
   const frontendInteractions = buildFrontendInteractions(options.flowResult.artifacts);
 
   return controllerEntries.map((rawEntry, index) => {
@@ -759,10 +720,8 @@ function buildStepJournal(options) {
       LIVE_E2E_OPERATOR_ACTIONS.includes(rawOperatorAction);
     const deterministicAnalysis = asRecord(rawEntry.deterministic_analysis);
     const deterministicStatus = toObservationStatus(asNonEmptyString(deterministicAnalysis.status) || "not_pass");
-    const judgeEntry = judgeEntries.get(step) ?? judgeEntries.get(asNonEmptyString(command?.label));
-    const semanticStatus = judgeEntry
-      ? toObservationStatus(asNonEmptyString(asRecord(judgeEntry.semantic_analysis).status) || asNonEmptyString(judgeEntry.status))
-      : toObservationStatus(asNonEmptyString(asRecord(rawEntry.semantic_analysis).status) || deterministicStatus);
+    const rawSemanticAnalysis = asRecord(rawEntry.semantic_analysis);
+    const semanticStatus = toObservationStatus(asNonEmptyString(rawSemanticAnalysis.status) || deterministicStatus);
     const finalStepVerdict =
       observationSeverity(semanticStatus) > observationSeverity(deterministicStatus) ? semanticStatus : deterministicStatus;
     const requestedInteraction = asRecord(rawEntry.requested_interaction);
@@ -841,15 +800,9 @@ function buildStepJournal(options) {
       },
       semantic_analysis: {
         status: semanticStatus,
-        judge_source:
-          asNonEmptyString(judgeEntry?.judge_source) ||
-          asNonEmptyString(asRecord(judgeEntry?.semantic_analysis).judge_source) ||
-          asNonEmptyString(asRecord(rawEntry.semantic_analysis).judge_source) ||
-          "deterministic-runner",
+        judge_source: asNonEmptyString(rawSemanticAnalysis.judge_source) || "deterministic-runner",
         findings: uniqueStrings([
-          ...asStringArray(asRecord(rawEntry.semantic_analysis).findings),
-          ...asStringArray(judgeEntry?.findings),
-          ...asStringArray(asRecord(judgeEntry?.semantic_analysis).findings),
+          ...asStringArray(rawSemanticAnalysis.findings),
           ...(semanticStatus === "pass" ? [] : [asNonEmptyString(stage.summary) || `${step} did not complete cleanly`]),
         ]),
       },
@@ -996,9 +949,6 @@ function buildInteractiveDecisions(stepJournal) {
     });
 }
 
-/**
- * @param {{ runId: string, profilePath: string, profile: Record<string, unknown>, flowResult: { stageResults: Array<Record<string, unknown>>, commandResults: Array<Record<string, unknown>>, artifacts: Record<string, unknown> }, summaryFile: string, agentJudgeDocument: Record<string, unknown> }}
- */
 function buildObservationReport(options) {
   const flowRangePolicy = resolveFlowRangePolicy(options.profile);
   const includedSteps = getIncludedStepsForPolicy(flowRangePolicy);
@@ -1007,12 +957,9 @@ function buildObservationReport(options) {
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const controllerStop = asRecord(options.flowResult.artifacts.live_e2e_controller_stop);
   const reportStatus = isLiveE2eControllerStopInProgress(controllerStop, includedSteps) ? "in_progress" : "final";
-  const agentJudgeDocument =
-    asNonEmptyString(operatorContext.operator_kind) === "skill-agent" ? {} : options.agentJudgeDocument;
   const stepJournal = buildStepJournal({
     profile: options.profile,
     flowResult: options.flowResult,
-    agentJudgeDocument,
   });
   const finalAnalysis = buildFinalAnalysis({
     stepJournal,
@@ -1055,6 +1002,52 @@ function buildObservationReport(options) {
       asNonEmptyString(options.flowResult.artifacts.evaluation_report_file),
     ]),
   };
+}
+
+/**
+ * @param {{ runId: string, reportsRoot: string, observationReport: Record<string, unknown> }}
+ */
+function writeFinalSkillAgentVerdict(options) {
+  const stepJournal = Array.isArray(options.observationReport.step_journal)
+    ? options.observationReport.step_journal.map((entry) => asRecord(entry))
+    : [];
+  const includedSteps = asStringArray(asRecord(options.observationReport.flow_range).included_steps);
+  const acceptedSkillAgentSteps = stepJournal.filter(
+    (entry) =>
+      asNonEmptyString(entry.operator_decision_status) === "accepted" &&
+      asNonEmptyString(asRecord(entry.semantic_analysis).judge_source) === "skill-agent",
+  );
+  const acceptedStepIds = new Set(acceptedSkillAgentSteps.map((entry) => asNonEmptyString(entry.step_id)).filter(Boolean));
+  const missingSteps = includedSteps.filter((step) => !acceptedStepIds.has(step));
+  const finalAnalysis = asRecord(options.observationReport.final_analysis);
+  const finalAnalysisStatus = toObservationStatus(asNonEmptyString(finalAnalysis.status) || "not_pass");
+  const status = missingSteps.length === 0 ? finalAnalysisStatus : "blocked";
+  const verdict = {
+    verdict_id: `${options.runId}.final-skill-agent-verdict.v1`,
+    run_id: options.runId,
+    status,
+    judge_source: "skill-agent",
+    accepted_step_count: acceptedSkillAgentSteps.length,
+    required_steps: includedSteps,
+    missing_skill_agent_steps: missingSteps,
+    operator_decision_refs: uniqueStrings(acceptedSkillAgentSteps.map((entry) => asNonEmptyString(entry.operator_decision_ref))),
+    evidence_refs: uniqueStrings([
+      asNonEmptyString(options.observationReport.controller_state_ref),
+      ...acceptedSkillAgentSteps.flatMap((entry) => asStringArray(entry.artifact_refs)),
+    ]),
+    findings: uniqueStrings([
+      ...asStringArray(finalAnalysis.findings),
+      ...missingSteps.map((step) => `${step} is missing an accepted skill-agent decision.`),
+    ]),
+    final_recommendation: status === "pass" || status === "warn" ? "accept" : "reject",
+    created_at: nowIso(),
+  };
+  const verdictFile = path.join(
+    options.reportsRoot,
+    `live-e2e-final-skill-agent-verdict-${normalizeId(options.runId)}.json`,
+  );
+  writeJson(verdictFile, verdict);
+  return { verdictFile, verdict };
 }
 
 /**
@@ -1241,7 +1234,6 @@ function writeStepObservationFiles(options) {
  *   },
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
  *   examplesRoot: string | null,
- *   agentJudgeFile: string | null,
  * }}
  */
 function writeProofRunnerArtifacts(options) {
@@ -1253,7 +1245,6 @@ function writeProofRunnerArtifacts(options) {
     options.layout.reportsRoot,
     `live-e2e-scorecard-target-${normalizeId(options.runId)}.json`,
   );
-  const agentJudgeDocument = loadAgentJudgeDocument(options.agentJudgeFile);
   const productionProofPolicy = buildProductionProofSummary(options.profile);
   const observationReport = buildObservationReport({
     runId: options.runId,
@@ -1261,14 +1252,38 @@ function writeProofRunnerArtifacts(options) {
     profile: options.profile,
     flowResult: options.flowResult,
     summaryFile,
-    agentJudgeDocument,
   });
   const stepObservationFiles = writeStepObservationFiles({
     runId: options.runId,
     reportsRoot: options.layout.reportsRoot,
     stepJournal: observationReport.step_journal,
   });
-  observationReport.evidence_refs = uniqueStrings([...asStringArray(observationReport.evidence_refs), ...stepObservationFiles]);
+  const observationReportFile = path.join(
+    options.layout.reportsRoot,
+    `live-e2e-observation-report-${normalizeId(options.runId)}.json`,
+  );
+  const finalSkillAgentVerdict = writeFinalSkillAgentVerdict({
+    runId: options.runId,
+    reportsRoot: options.layout.reportsRoot,
+    observationReport,
+  });
+  observationReport.final_skill_agent_verdict_file = finalSkillAgentVerdict.verdictFile;
+  observationReport.final_skill_agent_verdict = finalSkillAgentVerdict.verdict;
+  observationReport.evidence_refs = uniqueStrings([
+    ...asStringArray(observationReport.evidence_refs),
+    ...stepObservationFiles,
+    finalSkillAgentVerdict.verdictFile,
+  ]);
+  const finalVerdictStatus = toObservationStatus(asNonEmptyString(finalSkillAgentVerdict.verdict.status));
+  observationReport.overall_status = worstObservationStatus(observationReport.overall_status, finalVerdictStatus);
+  observationReport.final_analysis = {
+    ...asRecord(observationReport.final_analysis),
+    status: worstObservationStatus(asNonEmptyString(asRecord(observationReport.final_analysis).status), finalVerdictStatus),
+    findings: uniqueStrings([
+      ...asStringArray(asRecord(observationReport.final_analysis).findings),
+      ...asStringArray(finalSkillAgentVerdict.verdict.findings),
+    ]),
+  };
   const observationValidation = validateContractDocument({
     family: "live-e2e-observation-report",
     document: observationReport,
@@ -1278,10 +1293,6 @@ function writeProofRunnerArtifacts(options) {
     const issues = observationValidation.issues.map((issue) => issue.message).join("; ");
     throw new Error(`Live E2E observation report failed contract validation: ${issues}`);
   }
-  const observationReportFile = path.join(
-    options.layout.reportsRoot,
-    `live-e2e-observation-report-${normalizeId(options.runId)}.json`,
-  );
   const agentArtifactReviewRequestFile = writeAgentArtifactReviewRequest({
     runId: options.runId,
     reportsRoot: options.layout.reportsRoot,
@@ -1289,6 +1300,8 @@ function writeProofRunnerArtifacts(options) {
   });
   options.flowResult.artifacts.live_e2e_observation_report_file = observationReportFile;
   options.flowResult.artifacts.live_e2e_step_observation_files = stepObservationFiles;
+  options.flowResult.artifacts.final_skill_agent_verdict_file = finalSkillAgentVerdict.verdictFile;
+  options.flowResult.artifacts.final_skill_agent_verdict = finalSkillAgentVerdict.verdict;
   options.flowResult.artifacts.agent_artifact_review_request_file = agentArtifactReviewRequestFile;
   options.flowResult.artifacts.live_e2e_observation_overall_status = observationReport.overall_status;
   const productionProof = applyProductionProofEvidence({
@@ -1431,6 +1444,8 @@ function writeProofRunnerArtifacts(options) {
     live_e2e_step_observation_files: stepObservationFiles,
     live_e2e_observation_overall_status: observationReport.overall_status,
     operator_context: observationReport.operator_context,
+    final_skill_agent_verdict_file: finalSkillAgentVerdict.verdictFile,
+    final_skill_agent_verdict: finalSkillAgentVerdict.verdict,
     agent_artifact_review_request_file: agentArtifactReviewRequestFile,
     matrix_cell:
       typeof options.flowResult.artifacts.matrix_cell === "object" && options.flowResult.artifacts.matrix_cell
@@ -1440,10 +1455,10 @@ function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.quality_judgement === "object" && options.flowResult.artifacts.quality_judgement
         ? options.flowResult.artifacts.quality_judgement
         : null,
-    agent_operator_assessment:
-      typeof options.flowResult.artifacts.agent_operator_assessment === "object" &&
-      options.flowResult.artifacts.agent_operator_assessment
-        ? options.flowResult.artifacts.agent_operator_assessment
+    runner_quality_summary:
+      typeof options.flowResult.artifacts.runner_quality_summary === "object" &&
+      options.flowResult.artifacts.runner_quality_summary
+        ? options.flowResult.artifacts.runner_quality_summary
         : null,
     production_proof: productionProof,
     proof_scope: productionProof?.proof_scope ?? null,
@@ -1471,7 +1486,7 @@ function writeProofRunnerArtifacts(options) {
     scorecard_files: [scorecardFile],
     control_surfaces: {
       installed_user_proof_runner:
-        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
+        "node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--controller-mode auto|manual|evaluator]",
       manual_live_e2e:
         "node ./scripts/live-e2e/manual-live-e2e.mjs --project-ref <path> --profile <path> --run-id <id>",
       step_evaluator:
@@ -1539,7 +1554,7 @@ function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     process.stdout.write(
       [
-        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--agent-judge-file <path>] [--controller-mode auto|manual|evaluator]",
+        "Usage: node ./scripts/live-e2e/run-profile.mjs --project-ref <path> --profile <path> [--run-id <id>] [--runtime-root <path>] [--aor-bin <path>] [--aor-install-mode isolated|repo-local] [--examples-root <path>] [--catalog-root <path>] [--runner-auth-mode host|isolated] [--runtime-agent-permission-mode full-bypass|restricted] [--runtime-agent-interaction-policy fail-closed|ask-all|orchestrator-mediated] [--runtime-agent-auto-approval-profile none|conservative|auto-edit|trusted-run] [--controller-mode auto|manual|evaluator]",
         "",
         "Installed-user black-box proof runner with online step-controller evaluation.",
       ].join("\n"),
@@ -1562,7 +1577,9 @@ function runCli(rawArgs) {
   const runtimeRoot = resolveOptionalStringFlag(flags["runtime-root"], "runtime-root");
   const aorBin = resolveOptionalStringFlag(flags["aor-bin"], "aor-bin");
   const requestedAorInstallMode = resolveOptionalStringFlag(flags["aor-install-mode"], "aor-install-mode");
-  const agentJudgeFile = resolveOptionalStringFlag(flags["agent-judge-file"], "agent-judge-file");
+  if (Object.prototype.hasOwnProperty.call(flags, "agent-judge-file")) {
+    throw new UsageError("--agent-judge-file is no longer supported; live E2E requires skill-agent operator decisions.");
+  }
   const catalogRootOverride = resolveOptionalStringFlag(flags["catalog-root"], "catalog-root");
   const runnerAuthMode = resolveRunnerAuthMode(resolveOptionalStringFlag(flags["runner-auth-mode"], "runner-auth-mode"));
   const runtimeAgentPermissionMode = resolveRuntimeAgentPermissionMode(
@@ -1797,7 +1814,6 @@ function runCli(rawArgs) {
     flowResult,
     aorLaunch,
     examplesRoot,
-    agentJudgeFile,
   });
 
   process.stdout.write(
