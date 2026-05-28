@@ -176,6 +176,10 @@ function assertLiveE2ePolicy(profile, source) {
   const interactionAnswerPolicy = asNonEmptyString(policy.interaction_answer_policy);
   const targetWritePolicy = asNonEmptyString(policy.target_write_policy);
   const implementationLoop = asRecord(profile.implementation_loop);
+  const guidedJourney = asRecord(profile.guided_journey);
+  const proofRequirements = asStringArray(guidedJourney.proof_requirements);
+  const browserTaskProof = asRecord(guidedJourney.browser_task_proof);
+  const flowLoopProof = asRecord(guidedJourney.flow_loop_proof);
   const acceptanceLike =
     ["acceptance", "production-proof"].includes(asNonEmptyString(profile.run_tier)) ||
       asRecord(profile.production_proof).enabled === true ||
@@ -216,6 +220,22 @@ function assertLiveE2ePolicy(profile, source) {
     }
     if (!Number.isInteger(implementationLoop.max_iterations) || Number(implementationLoop.max_iterations) < 1) {
       problems.push("acceptance/production-proof profiles must declare implementation_loop.max_iterations >= 1");
+    }
+  }
+  if (frontendCapability === "browser-task-proof") {
+    if (guidedJourney.enabled !== true) {
+      problems.push("browser-task-proof profiles must declare guided_journey.enabled=true");
+    }
+    if (browserTaskProof.required !== true) {
+      problems.push("browser-task-proof profiles must declare guided_journey.browser_task_proof.required=true");
+    }
+    if (flowLoopProof.enabled !== true) {
+      problems.push("browser-task-proof profiles must declare guided_journey.flow_loop_proof.enabled=true");
+    }
+    for (const required of ["browser-task-proof", "flow-loop-proof", "final-skill-agent-verdict"]) {
+      if (!proofRequirements.includes(required)) {
+        problems.push(`browser-task-proof profiles must include guided_journey.proof_requirements '${required}'`);
+      }
     }
   }
 

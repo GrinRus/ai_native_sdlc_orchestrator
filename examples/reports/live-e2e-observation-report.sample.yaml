@@ -205,9 +205,13 @@ frontend_interactions:
       - runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
       - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
       - runtime://reports/installed-user-guided-web-screenshot-live-e2e.sample.run.svg
+      - runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
     html_ref: runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.html
     screenshot_refs:
       - runtime://reports/installed-user-guided-web-screenshot-live-e2e.sample.run.svg
+    visual_guardrail_refs:
+      - runtime://reports/installed-user-guided-web-visual-guardrail-live-e2e.sample.run.json
+    browser_task_proof_ref: runtime://reports/installed-user-guided-browser-task-proof-live-e2e.sample.run.json
     dom_snapshot_ref: runtime://reports/installed-user-guided-web-dom-live-e2e.sample.run.json
     accessibility_summary_ref: runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
     task_outcome:

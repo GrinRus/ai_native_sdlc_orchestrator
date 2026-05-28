@@ -34,11 +34,38 @@ guided_journey:
   proof_requirements:
     - cli-transcripts
     - web-smoke
+    - browser-task-proof
+    - flow-loop-proof
+    - flow-targeted-operator-request
     - operator-request-no-write-analysis
     - operator-request-patch-only-document-proposal
     - interaction-inbox-answer-audit
     - durable-packets-and-reports
+    - final-skill-agent-verdict
     - no-upstream-write-assertions
+  flow_loop_proof:
+    enabled: true
+    create_follow_up_from_learning: true
+    create_targeted_operator_request: true
+    required_fields:
+      - first_flow_id
+      - first_flow_status
+      - completed_flow_read_only
+      - second_flow_id
+      - follow_up_source_handoff_ref
+      - new_flow_mission_artifact_packet_file
+      - new_flow_next_action_report_file
+      - operator_request.target_flow_id
+  browser_task_proof:
+    required: true
+    required_evidence:
+      - rendered-html
+      - dom-snapshot
+      - accessibility-summary
+      - screenshot-or-visual-guardrail
+      - task-outcome
+      - ux-findings
+      - skill-agent-ui-ux-verdict
 operator_requests:
   enabled: true
   default_delivery_mode: no-write

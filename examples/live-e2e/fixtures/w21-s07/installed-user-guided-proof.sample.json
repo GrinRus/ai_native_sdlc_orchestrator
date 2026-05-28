@@ -31,18 +31,44 @@
     "release-prepare",
     "audit-runs",
     "learning-handoff",
-    "guided-next-after-learning"
+    "guided-next-after-learning",
+    "follow-up-mission-create",
+    "guided-next-after-follow-up",
+    "flow-targeted-request-create"
+  ],
+  "required_command_labels": [
+    "guided-doctor",
+    "guided-onboard",
+    "guided-app",
+    "guided-next-before-mission",
+    "mission-create",
+    "guided-next-after-mission",
+    "run-start",
+    "run-status",
+    "review-run",
+    "guided-next-after-review",
+    "review-decide-approve",
+    "deliver-prepare",
+    "guided-next-after-delivery",
+    "release-prepare",
+    "learning-handoff",
+    "guided-next-after-learning",
+    "follow-up-mission-create",
+    "guided-next-after-follow-up",
+    "flow-targeted-request-create"
   ],
   "command_transcript_files": [
     ".aor/projects/aor-core/reports/live-e2e-command-traces-w21-s07/01-guided-doctor.json",
     ".aor/projects/aor-core/reports/live-e2e-command-traces-w21-s07/02-guided-onboard.json",
-    ".aor/projects/aor-core/reports/live-e2e-command-traces-w21-s07/05-mission-create.json"
+    ".aor/projects/aor-core/reports/live-e2e-command-traces-w21-s07/05-mission-create.json",
+    ".aor/projects/aor-core/reports/live-e2e-command-traces-w21-s07/29-follow-up-mission-create.json",
+    ".aor/projects/aor-core/reports/live-e2e-command-traces-w21-s07/31-flow-targeted-request-create.json"
   ],
   "durable_artifact_files": {
     "onboarding_report_file": ".aor/projects/local-target/reports/onboarding-report.json",
     "mission_artifact_packet_file": ".aor/projects/local-target/artifacts/local-target.artifact.intake.local-mission.v1.json",
     "mission_artifact_packet_body_file": ".aor/projects/local-target/artifacts/local-target.artifact.intake.local-mission.v1.body.json",
-    "next_action_report_file": ".aor/projects/local-target/reports/next-action-report.json",
+    "next_action_report_file": ".aor/projects/local-target/reports/next-action-report-local-mission.json",
     "routed_step_result_file": ".aor/projects/local-target/reports/step-result-w21-s07.installed-user-guided.json",
     "review_report_file": ".aor/projects/local-target/reports/review-report-w21-s07.installed-user-guided.json",
     "review_decision_file": ".aor/projects/local-target/reports/review-decision-w21-s07.installed-user-guided-approve.json",
@@ -51,15 +77,70 @@
     "release_packet_file": ".aor/projects/local-target/reports/release-packet-w21-s07.installed-user-guided.json",
     "learning_loop_scorecard_file": ".aor/projects/local-target/reports/learning-loop-scorecard-w21-s07.installed-user-guided.json",
     "learning_loop_handoff_file": ".aor/projects/local-target/reports/learning-loop-handoff-w21-s07.installed-user-guided.json",
-    "app_smoke_summary_file": ".aor/projects/aor-core/reports/installed-user-guided-app-smoke-w21-s07.json"
+    "web_smoke_summary_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.json",
+    "web_smoke_html_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.html",
+    "web_dom_snapshot_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-dom-w21-s07.json",
+    "web_accessibility_summary_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-accessibility-w21-s07.json",
+    "web_screenshot_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-visual-guardrail-w21-s07.json",
+    "new_flow_mission_artifact_packet_file": ".aor/projects/local-target/artifacts/local-target.artifact.intake.local-mission-follow-up.v1.json",
+    "new_flow_mission_artifact_packet_body_file": ".aor/projects/local-target/artifacts/local-target.artifact.intake.local-mission-follow-up.v1.body.json",
+    "new_flow_next_action_report_file": ".aor/projects/local-target/reports/next-action-report-local-mission-follow-up.json",
+    "flow_targeted_operator_request_file": ".aor/projects/local-target/operator-requests/operator-request-local-mission-follow-up.json"
   },
-  "app_smoke": {
-    "summary_file": ".aor/projects/aor-core/reports/installed-user-guided-app-smoke-w21-s07.json",
-    "mode": "local-spa",
-    "status": "smoke-pass",
-    "html_loaded": true,
-    "config_project_id": "local-target",
-    "state_project_id": "local-target"
+  "web_smoke": {
+    "summary_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.json",
+    "rendered_html_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.html",
+    "dom_snapshot_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-dom-w21-s07.json",
+    "accessibility_summary_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-accessibility-w21-s07.json",
+    "screenshot_files": [],
+    "visual_guardrail_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-visual-guardrail-w21-s07.json",
+    "browser_task_proof_request_file": ".aor/projects/aor-core/reports/installed-user-guided-browser-task-proof-request-w21-s07.json",
+    "browser_task_proof_file": ".aor/projects/aor-core/reports/installed-user-guided-browser-task-proof-w21-s07.json",
+    "task_outcome": {
+      "status": "pass",
+      "checked_tasks": [
+        "flow selector rendered",
+        "completed source flow stayed read-only",
+        "follow-up flow became active",
+        "Ask AOR targeted the selected flow"
+      ],
+      "findings": []
+    },
+    "ux_findings": [
+      "Flow closure controls were visible and did not mutate completed-flow evidence."
+    ],
+    "agent_verdict_ref": ".aor/projects/aor-core/reports/live-e2e-operator-decision-w21-s07-10-learning.json",
+    "guided_lifecycle_state": "smoke-pass",
+    "guided_current_stage_id": "learning",
+    "detached": true
+  },
+  "flow_loop": {
+    "first_flow_id": "flow.local-target.local-mission",
+    "first_flow_status": "completed",
+    "completed_flow_read_only": true,
+    "completed_flow_next_action_report_file": ".aor/projects/local-target/reports/next-action-report-local-mission.json",
+    "second_flow_id": "flow.local-target.local-mission-follow-up",
+    "follow_up_source_handoff_ref": ".aor/projects/local-target/reports/learning-loop-handoff-w21-s07.installed-user-guided.json",
+    "new_flow_mission_artifact_packet_file": ".aor/projects/local-target/artifacts/local-target.artifact.intake.local-mission-follow-up.v1.json",
+    "new_flow_mission_artifact_packet_body_file": ".aor/projects/local-target/artifacts/local-target.artifact.intake.local-mission-follow-up.v1.body.json",
+    "new_flow_next_action_report_file": ".aor/projects/local-target/reports/next-action-report-local-mission-follow-up.json",
+    "operator_request": {
+      "operator_request_file": ".aor/projects/local-target/operator-requests/operator-request-local-mission-follow-up.json",
+      "operator_request_ref": "packet://operator-request@evidence://.aor/projects/local-target/operator-requests/operator-request-local-mission-follow-up.json",
+      "operator_request_id": "operator-request.local-mission-follow-up",
+      "target_flow_id": "flow.local-target.local-mission-follow-up",
+      "target_stage": "discovery",
+      "intent_type": "analyze",
+      "delivery_mode": "no-write"
+    },
+    "evidence_refs": [
+      ".aor/projects/local-target/artifacts/local-target.artifact.intake.local-mission.v1.json",
+      ".aor/projects/local-target/reports/next-action-report-local-mission.json",
+      ".aor/projects/local-target/reports/learning-loop-handoff-w21-s07.installed-user-guided.json",
+      ".aor/projects/local-target/artifacts/local-target.artifact.intake.local-mission-follow-up.v1.json",
+      ".aor/projects/local-target/reports/next-action-report-local-mission-follow-up.json",
+      ".aor/projects/local-target/operator-requests/operator-request-local-mission-follow-up.json"
+    ]
   },
   "no_write_assertions": {
     "output_policy_write_back_to_remote": true,
@@ -72,10 +153,10 @@
     "target_runtime_root": ".aor",
     "runtime_state_under_aor": true,
     "target_uncommitted_changes_without_runtime": [
-      "M src/index.js",
-      "?? project.aor.yaml"
+      "M src/index.js"
     ],
     "target_committed_file_changes": [],
     "target_aor_live_e2e_absent": true
-  }
+  },
+  "generated_at": "2026-05-28T00:00:00.000Z"
 }

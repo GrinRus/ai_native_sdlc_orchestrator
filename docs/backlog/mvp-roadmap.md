@@ -586,7 +586,7 @@ boundaries.
 - Runtime/control-plane surfaces expose flow list, selected-flow details, completed-flow read-only projections, and new-flow lifecycle creation.
 - The packaged local SPA implements the accepted W34 design references for flow selector, active cockpit, advanced views, and learning closure.
 - Ask AOR, Evidence Graph, Runtime Trace, Interactions Inbox, review, delivery, release, and learning surfaces preserve selected-flow boundaries.
-- Live E2E uses `installed-user-guided-journey.yaml` with `live_e2e.frontend_capability=browser-task-proof`, accepted skill-agent decisions, frontend evidence refs, final skill-agent verdict, and no-upstream-write assertions.
+- Live E2E uses `installed-user-guided-journey.yaml` with `live_e2e.frontend_capability=browser-task-proof`, accepted skill-agent decisions, frontend evidence refs, final skill-agent verdict, no-upstream-write assertions, first-flow completion evidence, a distinct follow-up flow, and flow-targeted operator-request proof.
 - Deleted bounded profiles and mock-backed proof bundles remain out of the current proof path.
 
 **Detailed slices:** `docs/backlog/wave-34-implementation-slices.md`

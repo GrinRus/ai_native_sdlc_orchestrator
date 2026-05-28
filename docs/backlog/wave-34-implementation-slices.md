@@ -231,7 +231,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S06 — Installed-user browser-task flow-loop proof
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Live E2E proves the flow-centric console through the hardened installed-user guided journey with browser-task frontend evidence and accepted skill-agent verdicts.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, `apps/cli/**`, tests
 - **Hard dependencies:** W34-S03, W34-S04, W34-S05
@@ -269,7 +269,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S07 — Backlog, docs, and release-gate alignment
 - **Epic:** EPIC-0 Repository development system
-- **State:** blocked
+- **State:** ready
 - **Outcome:** The flow-centric console refactor is release-reviewable with aligned source-of-truth docs, smoke guidance, and root gates.
 - **Primary modules:** `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**`, `scripts/**`, release tests
 - **Hard dependencies:** W34-S06

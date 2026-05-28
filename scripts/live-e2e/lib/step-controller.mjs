@@ -25,7 +25,14 @@ const STEP_COMMAND_LABELS = Object.freeze({
   qa: ["eval-run", "project-verify-post-run-primary"],
   delivery: ["deliver-prepare", "delivery-harness-certify"],
   release: ["release-prepare"],
-  learning: ["learning-handoff", "audit-runs"],
+  learning: [
+    "learning-handoff",
+    "audit-runs",
+    "guided-next-after-learning",
+    "follow-up-mission-create",
+    "guided-next-after-follow-up",
+    "flow-targeted-request-create",
+  ],
 });
 
 const COMMAND_LABEL_STEP = Object.freeze(
@@ -57,7 +64,15 @@ const STEP_EXPECTED_ARTIFACTS = Object.freeze({
   qa: ["evaluation_report_file", "post_run_verify_summary_file", "post_run_diagnostic_verify_summary_file"],
   delivery: ["delivery_manifest_file", "delivery_transcript_file", "delivery_plan_file"],
   release: ["release_packet_file", "release_delivery_manifest_file"],
-  learning: ["learning_loop_scorecard_file", "learning_loop_handoff_file", "run_audit_file", "guided_journey_proof_file"],
+  learning: [
+    "learning_loop_scorecard_file",
+    "learning_loop_handoff_file",
+    "run_audit_file",
+    "guided_journey_proof_file",
+    "new_flow_mission_artifact_packet_file",
+    "new_flow_next_action_report_file",
+    "flow_targeted_operator_request_file",
+  ],
 });
 
 const OPERATOR_ACTIONS = Object.freeze([

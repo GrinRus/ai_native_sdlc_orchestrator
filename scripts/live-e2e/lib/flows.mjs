@@ -832,13 +832,29 @@ function normalizeMissionKpis(value) {
 }
 
 /**
- * @param {{ mission: Record<string, unknown>, featureRequest: ReturnType<typeof materializeFeatureRequestFile>, profile: Record<string, unknown>, projectProfileFile: string }}
+ * @param {{
+ *   mission: Record<string, unknown>,
+ *   featureRequest: ReturnType<typeof materializeFeatureRequestFile>,
+ *   profile: Record<string, unknown>,
+ *   projectProfileFile: string,
+ *   missionIdOverride?: string | null,
+ *   titleOverride?: string | null,
+ *   briefOverride?: string | null,
+ *   deliveryModeOverride?: string | null,
+ *   sourceRefOverride?: string | null,
+ *   followUpSourceHandoffRef?: string | null,
+ * }}
  * @returns {string[]}
  */
 function buildGuidedMissionCreateArgs(options) {
-  const missionId = asNonEmptyString(options.mission.mission_id);
-  const title = asNonEmptyString(options.featureRequest.requestDocument.title) || missionId || "Guided mission";
+  const missionId = asNonEmptyString(options.missionIdOverride) || asNonEmptyString(options.mission.mission_id);
+  const title =
+    asNonEmptyString(options.titleOverride) ||
+    asNonEmptyString(options.featureRequest.requestDocument.title) ||
+    missionId ||
+    "Guided mission";
   const brief =
+    asNonEmptyString(options.briefOverride) ||
     asNonEmptyString(options.featureRequest.requestDocument.brief) ||
     asNonEmptyString(options.mission.brief) ||
     "Prepare one bounded guided mission request.";
@@ -878,11 +894,14 @@ function buildGuidedMissionCreateArgs(options) {
     "--brief",
     brief,
     "--delivery-mode",
-    getPreferredDeliveryMode(options.profile),
+    asNonEmptyString(options.deliveryModeOverride) || getPreferredDeliveryMode(options.profile),
     "--source-kind",
     "local-note",
     "--source-ref",
-    options.featureRequest.requestFile,
+    asNonEmptyString(options.sourceRefOverride) || options.featureRequest.requestFile,
+    ...(asNonEmptyString(options.followUpSourceHandoffRef)
+      ? ["--follow-up-source-handoff-ref", asNonEmptyString(options.followUpSourceHandoffRef)]
+      : []),
     ...((goals.length > 0 ? goals : [brief]).flatMap((entry) => ["--goal", entry])),
     ...constraints.flatMap((entry) => ["--constraint", entry]),
     ...((definitionOfDone.length > 0 ? definitionOfDone : constraints).flatMap((entry) => ["--dod", entry])),
@@ -891,6 +910,70 @@ function buildGuidedMissionCreateArgs(options) {
       `${entry.kpi_id}:${entry.name}:${entry.target}${entry.measurement ? `:${entry.measurement}` : ""}`,
     ]),
   ];
+}
+
+/**
+ * @param {string} targetCheckoutRoot
+ * @param {string | null | undefined} value
+ * @returns {string | null}
+ */
+function resolveTargetEvidencePath(targetCheckoutRoot, value) {
+  const ref = asNonEmptyString(value);
+  if (!ref) return null;
+  if (path.isAbsolute(ref)) return ref;
+  if (ref.startsWith("evidence://")) {
+    const evidencePath = ref.slice("evidence://".length);
+    return evidencePath ? path.resolve(targetCheckoutRoot, evidencePath) : null;
+  }
+  return path.resolve(targetCheckoutRoot, ref);
+}
+
+/**
+ * @param {string} targetCheckoutRoot
+ * @param {string | null | undefined} packetFile
+ * @returns {{ flowId: string | null, projectId: string | null, missionId: string | null }}
+ */
+function resolveFlowIdentityFromPacket(targetCheckoutRoot, packetFile) {
+  const resolvedPacketFile = resolveTargetEvidencePath(targetCheckoutRoot, packetFile);
+  if (!resolvedPacketFile || !fileExists(resolvedPacketFile)) {
+    return { flowId: null, projectId: null, missionId: null };
+  }
+  const packet = asRecord(readJson(resolvedPacketFile));
+  const packetId = asNonEmptyString(packet.packet_id);
+  const marker = ".artifact.intake.";
+  const markerIndex = packetId.indexOf(marker);
+  const projectId = markerIndex > 0 ? packetId.slice(0, markerIndex) : null;
+  const invocationContext = asRecord(packet.invocation_context);
+  const packetMissionId =
+    asNonEmptyString(invocationContext.mission_id) ||
+    (markerIndex > 0 ? packetId.slice(markerIndex + marker.length).replace(/\.v\d+$/u, "") : "");
+  const normalizedMissionId = normalizeId(packetMissionId);
+  return {
+    flowId: projectId && normalizedMissionId ? `flow.${projectId}.${normalizedMissionId}` : null,
+    projectId,
+    missionId: packetMissionId || null,
+  };
+}
+
+/**
+ * @param {string | null | undefined} reportFile
+ * @returns {Record<string, unknown>}
+ */
+function readReportDocument(reportFile) {
+  const ref = asNonEmptyString(reportFile);
+  if (!ref || !fileExists(ref)) return {};
+  return asRecord(readJson(ref));
+}
+
+/**
+ * @param {string | null | undefined} requestFile
+ * @returns {Record<string, unknown>}
+ */
+function readOperatorRequestDocument(requestFile) {
+  const ref = asNonEmptyString(requestFile);
+  if (!ref || !fileExists(ref)) return {};
+  const payload = asRecord(readJson(ref));
+  return asRecord(payload.operator_request ?? payload);
 }
 
 /**
@@ -922,6 +1005,14 @@ function runGuidedWebSmoke(options) {
   const visualSnapshotFile = path.join(
     options.reportsRoot,
     `installed-user-guided-web-smoke-visual-guardrail-${normalizeId(options.runId)}.json`,
+  );
+  const browserTaskProofRequestFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-browser-task-proof-request-${normalizeId(options.runId)}.json`,
+  );
+  const browserTaskProofFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-browser-task-proof-${normalizeId(options.runId)}.json`,
   );
   const result = spawnSync(
     options.aorLaunch.command,
@@ -959,6 +1050,25 @@ function runGuidedWebSmoke(options) {
     summary.html_loaded === true &&
     asNonEmptyString(summary.config_project_id) === asNonEmptyString(summary.project_id) &&
     asNonEmptyString(summary.state_project_id) === asNonEmptyString(summary.project_id);
+  writeJson(browserTaskProofRequestFile, {
+    request_id: `${options.runId}.guided-browser-task-proof-request.v1`,
+    run_id: options.runId,
+    expected_browser_task_proof_file: browserTaskProofFile,
+    required_surface: "installed-user local AOR app",
+    required_evidence: [
+      "rendered HTML",
+      "DOM snapshot",
+      "accessibility summary",
+      "screenshot or visual guardrail",
+      "task outcome",
+      "UX findings",
+      "skill-agent UI/UX verdict ref",
+    ],
+    app_url: asNonEmptyString(summary.app_url) || null,
+    control_plane: asNonEmptyString(summary.control_plane) || null,
+    project_id: asNonEmptyString(summary.project_id) || null,
+    created_at: nowIso(),
+  });
   fs.writeFileSync(
     outputHtml,
     [
@@ -997,48 +1107,85 @@ function runGuidedWebSmoke(options) {
     note:
       "This deterministic app-smoke summary is a guardrail only; it is not browser-task-proof screenshot evidence.",
   });
-  const browserTaskFindings = [
-    "browser-task-proof requires real browser execution evidence; this run only produced deterministic aor app smoke evidence.",
-  ];
+  const browserTaskProof = fileExists(browserTaskProofFile) ? asRecord(readJson(browserTaskProofFile)) : {};
+  const browserTaskOutcome = asRecord(browserTaskProof.task_outcome);
+  const browserTaskStatus =
+    asNonEmptyString(browserTaskOutcome.status) ||
+    asNonEmptyString(browserTaskProof.status);
+  const browserTaskScreenshotFiles = uniqueStrings([
+    ...asStringArray(browserTaskProof.screenshot_files),
+    ...asStringArray(browserTaskProof.screenshot_refs),
+  ]);
+  const browserTaskFindings =
+    Object.keys(browserTaskProof).length > 0
+      ? uniqueStrings([
+          ...asStringArray(browserTaskProof.ux_findings),
+          ...asStringArray(browserTaskOutcome.findings),
+        ])
+      : [
+          `browser-task-proof requires skill-agent browser evidence at ${browserTaskProofFile}; deterministic app smoke is only a guardrail.`,
+        ];
+  const browserTaskPass =
+    Object.keys(browserTaskProof).length > 0 &&
+    taskPassed &&
+    (browserTaskStatus === "pass" || browserTaskStatus === "warn") &&
+    (browserTaskScreenshotFiles.length > 0 || asNonEmptyString(browserTaskProof.visual_guardrail_file));
   summary.summary_file = summaryFile;
-  summary.rendered_html_file = asNonEmptyString(summary.rendered_html_file) || outputHtml;
+  summary.rendered_html_file =
+    asNonEmptyString(browserTaskProof.rendered_html_file) ||
+    asNonEmptyString(browserTaskProof.html_ref) ||
+    asNonEmptyString(summary.rendered_html_file) ||
+    outputHtml;
   summary.command = "aor app --smoke true --open false --json";
-  summary.browser_evidence_mode = "guardrail-only";
+  summary.browser_evidence_mode = browserTaskPass ? "browser-task-proof" : "browser-task-proof-required";
   summary.html_ref = summary.rendered_html_file;
-  summary.dom_snapshot_file = domSnapshotFile;
-  summary.accessibility_summary_file = accessibilitySummaryFile;
+  summary.dom_snapshot_file =
+    asNonEmptyString(browserTaskProof.dom_snapshot_file) ||
+    asNonEmptyString(browserTaskProof.dom_snapshot_ref) ||
+    domSnapshotFile;
+  summary.accessibility_summary_file =
+    asNonEmptyString(browserTaskProof.accessibility_summary_file) ||
+    asNonEmptyString(browserTaskProof.accessibility_summary_ref) ||
+    accessibilitySummaryFile;
   summary.visual_guardrail_file = visualSnapshotFile;
-  summary.screenshot_files = [];
-  summary.dom_snapshot_ref = domSnapshotFile;
-  summary.accessibility_summary_ref = accessibilitySummaryFile;
-  summary.screenshot_refs = [];
+  summary.browser_task_proof_request_file = browserTaskProofRequestFile;
+  summary.browser_task_proof_file = Object.keys(browserTaskProof).length > 0 ? browserTaskProofFile : null;
+  summary.screenshot_files = browserTaskScreenshotFiles;
+  summary.dom_snapshot_ref = summary.dom_snapshot_file;
+  summary.accessibility_summary_ref = summary.accessibility_summary_file;
+  summary.screenshot_refs = browserTaskScreenshotFiles;
+  summary.agent_verdict_ref = asNonEmptyString(browserTaskProof.agent_verdict_ref) || null;
   summary.detached = true;
   summary.guided_lifecycle_state = asNonEmptyString(summary.status) || null;
   summary.guided_current_stage_id = "learning";
   summary.task_outcome = {
-    status: "not_pass",
-    checked_tasks: [
+    status: browserTaskPass ? "pass" : "not_pass",
+    checked_tasks: uniqueStrings([
       "packaged app HTML smoke",
       "config route smoke",
       "project state route smoke",
-      "real browser screenshot capture",
+      "browser-task evidence capture",
       "operator task interaction",
-    ],
+      ...asStringArray(browserTaskOutcome.checked_tasks),
+    ]),
     findings: taskPassed
       ? browserTaskFindings
       : ["Guided app smoke failed one or more route checks.", ...browserTaskFindings],
   };
-  summary.ux_findings = taskPassed
-    ? browserTaskFindings
-    : ["Installed-user local app smoke did not pass.", ...browserTaskFindings];
+  summary.ux_findings =
+    taskPassed
+      ? browserTaskFindings
+      : ["Installed-user local app smoke did not pass.", ...browserTaskFindings];
   writeJson(summaryFile, summary);
   return {
     summaryFile,
-    htmlFile: outputHtml,
-    domSnapshotFile,
-    accessibilitySummaryFile,
-    screenshotFiles: [],
+    htmlFile: summary.rendered_html_file,
+    domSnapshotFile: summary.dom_snapshot_file,
+    accessibilitySummaryFile: summary.accessibility_summary_file,
+    screenshotFiles: browserTaskScreenshotFiles,
     visualGuardrailFile: visualSnapshotFile,
+    browserTaskProofRequestFile,
+    browserTaskProofFile: Object.keys(browserTaskProof).length > 0 ? browserTaskProofFile : null,
     summary,
   };
 }
@@ -4048,6 +4195,100 @@ export function executeFullJourneyFlow(options) {
       ]);
       artifacts.next_action_report_file = getStringField(guidedNextAfterLearning.payload, "next_action_report_file");
       artifacts.guided_next_after_learning_transcript_file = guidedNextAfterLearning.transcriptFile;
+      artifacts.completed_flow_next_action_report_file = artifacts.next_action_report_file;
+      const firstFlowIdentity = resolveFlowIdentityFromPacket(
+        targetCheckout.targetCheckoutRoot,
+        artifacts.intake_artifact_packet_file,
+      );
+      const completedNextActionReport = readReportDocument(artifacts.completed_flow_next_action_report_file);
+      const completedClosureState = asRecord(completedNextActionReport.closure_state);
+      const completedPrimaryAction = asRecord(completedNextActionReport.primary_action);
+      const completedLearningState = asRecord(completedClosureState.learning);
+      artifacts.first_flow_id = firstFlowIdentity.flowId;
+      artifacts.first_flow_status =
+        asNonEmptyString(completedLearningState.status) === "handoff-complete" ||
+        asNonEmptyString(completedPrimaryAction.action_id) === "start-new-flow" ||
+        asNonEmptyString(completedPrimaryAction.action_id) === "closure-complete"
+          ? "completed"
+          : "active";
+      artifacts.completed_flow_read_only = artifacts.first_flow_status === "completed";
+      artifacts.follow_up_source_handoff_ref = asNonEmptyString(artifacts.learning_loop_handoff_file);
+
+      const followUpMissionId = `${asNonEmptyString(firstFlowIdentity.missionId) || "guided-flow"}-follow-up-${normalizeId(options.runId)}`;
+      const followUpMissionCreate = runCommand("follow-up-mission-create", buildGuidedMissionCreateArgs({
+        mission: options.mission,
+        featureRequest,
+        profile: options.profile,
+        projectProfileFile: generatedProfile.generatedProjectProfileFile,
+        missionIdOverride: followUpMissionId,
+        titleOverride: `${asNonEmptyString(featureRequest.requestDocument.title) || followUpMissionId} follow-up`,
+        briefOverride: "Start a fresh follow-up flow from the completed learning handoff while keeping the source flow read-only.",
+        deliveryModeOverride: "no-write",
+        sourceRefOverride: asNonEmptyString(artifacts.learning_loop_handoff_file),
+        followUpSourceHandoffRef: asNonEmptyString(artifacts.follow_up_source_handoff_ref),
+      }));
+      artifacts.new_flow_mission_artifact_packet_file = getStringField(followUpMissionCreate.payload, "artifact_packet_file");
+      artifacts.new_flow_mission_artifact_packet_body_file = getStringField(
+        followUpMissionCreate.payload,
+        "artifact_packet_body_file",
+      );
+      artifacts.guided_follow_up_mission_create_transcript_file = followUpMissionCreate.transcriptFile;
+      const secondFlowIdentity = resolveFlowIdentityFromPacket(
+        targetCheckout.targetCheckoutRoot,
+        artifacts.new_flow_mission_artifact_packet_file,
+      );
+      artifacts.second_flow_id = secondFlowIdentity.flowId;
+      if (!asNonEmptyString(artifacts.second_flow_id)) {
+        throw new Error("Guided follow-up mission did not materialize a second flow id.");
+      }
+
+      const guidedNextAfterFollowUp = runCommand("guided-next-after-follow-up", [
+        "next",
+        "--project-ref",
+        ".",
+        "--runtime-root",
+        ".aor",
+        "--json",
+      ]);
+      artifacts.new_flow_next_action_report_file = getStringField(guidedNextAfterFollowUp.payload, "next_action_report_file");
+      artifacts.guided_next_after_follow_up_transcript_file = guidedNextAfterFollowUp.transcriptFile;
+      if (
+        !asNonEmptyString(artifacts.new_flow_mission_artifact_packet_file) ||
+        !asNonEmptyString(artifacts.new_flow_next_action_report_file)
+      ) {
+        throw new Error("Guided follow-up flow did not materialize fresh intake and next-action evidence.");
+      }
+
+      const flowTargetedRequest = runCommand("flow-targeted-request-create", [
+        "request",
+        "create",
+        "--project-ref",
+        ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
+        "--runtime-root",
+        ".aor",
+        "--stage",
+        "discovery",
+        "--intent",
+        "analyze",
+        "--request",
+        "Inspect the fresh follow-up flow evidence and confirm the next action remains no-write.",
+        "--target-flow-id",
+        asNonEmptyString(artifacts.second_flow_id),
+        "--target-ref",
+        asNonEmptyString(artifacts.new_flow_mission_artifact_packet_file),
+        "--target-ref",
+        asNonEmptyString(artifacts.new_flow_next_action_report_file),
+        "--delivery-mode",
+        "no-write",
+      ]);
+      artifacts.flow_targeted_operator_request_file = getStringField(flowTargetedRequest.payload, "operator_request_file");
+      artifacts.flow_targeted_operator_request_ref = getStringField(flowTargetedRequest.payload, "operator_request_ref");
+      artifacts.flow_targeted_operator_request_id = getStringField(flowTargetedRequest.payload, "operator_request_id");
+      artifacts.flow_targeted_operator_request_target_flow_id = asNonEmptyString(artifacts.second_flow_id);
+      artifacts.flow_targeted_operator_request = readOperatorRequestDocument(artifacts.flow_targeted_operator_request_file);
+      artifacts.guided_flow_targeted_request_transcript_file = flowTargetedRequest.transcriptFile;
 
       const webSmoke = runGuidedWebSmoke({
         aorLaunch: options.aorLaunch,
@@ -4062,6 +4303,8 @@ export function executeFullJourneyFlow(options) {
       artifacts.guided_web_accessibility_summary_file = webSmoke.accessibilitySummaryFile;
       artifacts.guided_web_screenshot_files = webSmoke.screenshotFiles;
       artifacts.guided_web_visual_guardrail_file = webSmoke.visualGuardrailFile;
+      artifacts.guided_browser_task_proof_request_file = webSmoke.browserTaskProofRequestFile;
+      artifacts.guided_browser_task_proof_file = webSmoke.browserTaskProofFile;
       artifacts.guided_web_smoke = webSmoke.summary;
     }
     markStage(

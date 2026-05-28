@@ -277,7 +277,7 @@ Production-proof profiles add a fail-closed layer on top of full-journey behavio
 - write-back must remain disabled and delivery mode must be `patch-only` or `local-branch`;
 - proof-runner bootstrap asset overrides are not supported.
 
-Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, and capture an operator-console web smoke artifact. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, web smoke output, and no-upstream-write assertions must be materialized.
+Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the first product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, create a follow-up mission with `--follow-up-source-handoff-ref`, refresh `next` for the second flow, and create a flow-targeted `request create --target-flow-id`. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, flow-loop fields, browser-task/frontend evidence refs, and no-upstream-write assertions must be materialized.
 
 No proof-runner-side `examples/context/project profile` injection is allowed inside the target checkout on the full-journey path.
 
@@ -361,6 +361,16 @@ Guided full-journey summaries also carry:
 - `artifacts.guided_web_accessibility_summary_file`
 - `artifacts.guided_web_screenshot_files` (empty until real browser-task screenshots are captured)
 - `artifacts.guided_web_visual_guardrail_file` for deterministic app-smoke visual guardrail evidence
+- `artifacts.guided_browser_task_proof_request_file`
+- `artifacts.guided_browser_task_proof_file`
+- `artifacts.first_flow_id`
+- `artifacts.first_flow_status=completed`
+- `artifacts.completed_flow_read_only=true`
+- `artifacts.second_flow_id`
+- `artifacts.follow_up_source_handoff_ref`
+- `artifacts.new_flow_mission_artifact_packet_file`
+- `artifacts.new_flow_next_action_report_file`
+- `artifacts.flow_targeted_operator_request_file`
 - `artifacts.review_decision_file`
 - `artifacts.release_packet_file`
 - `artifacts.target_head_before` and `artifacts.target_head_after`
@@ -416,7 +426,7 @@ Judge criteria:
 
 If a profile does not provide an accepted skill-agent operator decision, the runner stops fail-closed and writes the decision request for manual/evaluator continuation.
 
-For guided installed-user runs, deterministic web smoke is only a render guardrail. Final acceptance requires `frontend_interactions[]` with HTML, DOM, accessibility, screenshot/visual evidence, and an accepted skill-agent UI/UX verdict linked from `agent_verdict_ref`.
+For guided installed-user runs, deterministic web smoke is only a render guardrail. Final acceptance requires `frontend_interactions[]` with HTML, DOM, accessibility, screenshot or visual-guardrail evidence, and an accepted skill-agent UI/UX verdict linked from `agent_verdict_ref`. The guided proof must also include `flow_loop.first_flow_id`, `flow_loop.first_flow_status=completed`, `flow_loop.completed_flow_read_only=true`, a distinct `flow_loop.second_flow_id`, `flow_loop.follow_up_source_handoff_ref`, fresh second-flow intake/next-action files, and `flow_loop.operator_request.target_flow_id` pointing at the second flow.
 
 ## Quality Judgement
 Full-journey summaries may include `quality_judgement` with target acceptance dimensions:

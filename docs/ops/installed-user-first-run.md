@@ -150,6 +150,6 @@ node ./scripts/live-e2e/run-profile.mjs \
   --profile ./scripts/live-e2e/profiles/installed-user-guided-journey.yaml
 ```
 
-The proof starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; captures `aor mission create`; then follows execution, review decision, delivery, release, and learning closure through public CLI subprocesses. It also runs `aor app --smoke true --open false --json` and records local app evidence.
+The proof starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; captures `aor mission create`; then follows execution, review decision, delivery, release, and learning closure through public CLI subprocesses. After learning closure it creates a follow-up mission with `--follow-up-source-handoff-ref`, refreshes `next` for the second flow, and creates a flow-targeted `request create --target-flow-id` record. It also runs `aor app --smoke true --open false --json` as a render guardrail and requires browser-task/frontend evidence refs for final acceptance.
 
-The generated `guided_journey` summary is passable only when CLI transcripts, app smoke output, durable packets/reports, unchanged target `HEAD`, `.aor/` runtime ownership, and `write_back_to_remote=false` assertions are all present.
+The generated `guided_journey` summary is passable only when CLI transcripts, flow-loop fields, browser-task/frontend evidence refs, durable packets/reports, unchanged target `HEAD`, `.aor/` runtime ownership, and `write_back_to_remote=false` assertions are all present.

@@ -621,8 +621,17 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
   const domSnapshotFile = asNonEmptyString(artifacts.guided_web_dom_snapshot_file);
   const accessibilitySummaryFile = asNonEmptyString(artifacts.guided_web_accessibility_summary_file);
   const visualGuardrailFile = asNonEmptyString(artifacts.guided_web_visual_guardrail_file);
+  const browserTaskProofRequestFile = asNonEmptyString(artifacts.guided_browser_task_proof_request_file);
+  const browserTaskProofFile = asNonEmptyString(artifacts.guided_browser_task_proof_file);
   const screenshotRefs = asStringArray(artifacts.guided_web_screenshot_files);
-  if (!summaryFile && !htmlFile && !domSnapshotFile && !visualGuardrailFile && screenshotRefs.length === 0) return [];
+  if (
+    !summaryFile &&
+    !htmlFile &&
+    !domSnapshotFile &&
+    !visualGuardrailFile &&
+    !browserTaskProofFile &&
+    screenshotRefs.length === 0
+  ) return [];
   const webSmoke = asRecord(artifacts.guided_web_smoke);
   const taskOutcome = asRecord(webSmoke.task_outcome);
   const status = toObservationStatus(asNonEmptyString(taskOutcome.status) || "pass");
@@ -632,7 +641,10 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
       asNonEmptyString(asRecord(entry).operator_decision_status) === "accepted" &&
       asNonEmptyString(asRecord(asRecord(entry).semantic_analysis).judge_source) === "skill-agent",
   );
-  const agentVerdictRef = asNonEmptyString(asRecord(learningVerdict).operator_decision_ref) || null;
+  const agentVerdictRef =
+    asNonEmptyString(webSmoke.agent_verdict_ref) ||
+    asNonEmptyString(asRecord(learningVerdict).operator_decision_ref) ||
+    null;
   const interactionStatus = agentVerdictRef ? status : "blocked";
   return [
     {
@@ -645,10 +657,14 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
         domSnapshotFile,
         accessibilitySummaryFile,
         visualGuardrailFile,
+        browserTaskProofRequestFile,
+        browserTaskProofFile,
         ...screenshotRefs,
       ]),
       html_ref: htmlFile || asNonEmptyString(webSmoke.html_ref) || null,
       screenshot_refs: screenshotRefs,
+      visual_guardrail_refs: uniqueStrings([visualGuardrailFile]),
+      browser_task_proof_ref: browserTaskProofFile || null,
       dom_snapshot_ref: domSnapshotFile || asNonEmptyString(webSmoke.dom_snapshot_ref) || null,
       accessibility_summary_ref: accessibilitySummaryFile || asNonEmptyString(webSmoke.accessibility_summary_ref) || null,
       task_outcome: {
