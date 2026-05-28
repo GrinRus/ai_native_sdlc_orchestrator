@@ -723,6 +723,45 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       const flowDetailPayload = await flowDetailResponse.json();
       assert.equal(flowDetailPayload.latest_next_action_report_ref.includes("next-action-report"), true);
 
+      const targetedRequestResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/operator-requests`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          target_flow_id: selectedFlowPayload.flow_id,
+          target_stage: "discovery",
+          intent_type: "analyze",
+          request_text: "RAW WEB FLOW TARGET TEXT",
+          target_refs: [flowDetailPayload.intake_packet_ref],
+          delivery_mode: "no-write",
+        }),
+      });
+      assert.equal(targetedRequestResponse.status, 201);
+      const targetedRequestPayload = await targetedRequestResponse.json();
+      assert.equal(targetedRequestPayload.operator_request.document.target_flow_id, selectedFlowPayload.flow_id);
+      assert.equal(Object.hasOwn(targetedRequestPayload.operator_request.document, "request_text"), false);
+
+      const evidenceGraphResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}/evidence-graph`,
+      );
+      assert.equal(evidenceGraphResponse.status, 200);
+      const evidenceGraphPayload = await evidenceGraphResponse.json();
+      assert.equal(evidenceGraphPayload.flow_id, selectedFlowPayload.flow_id);
+      assert.equal(evidenceGraphPayload.isolation.excludes_unrelated_flows, true);
+      assert.equal(JSON.stringify(evidenceGraphPayload).includes("request_text"), false);
+      assert.ok(
+        evidenceGraphPayload.nodes.some(
+          (node) => node.family === "operator-request" && node.target_flow_id === selectedFlowPayload.flow_id,
+        ),
+      );
+
+      const runtimeTraceResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}/runtime-trace`,
+      );
+      assert.equal(runtimeTraceResponse.status, 200);
+      const runtimeTracePayload = await runtimeTraceResponse.json();
+      assert.equal(runtimeTracePayload.flow_id, selectedFlowPayload.flow_id);
+      assert.equal(runtimeTracePayload.read_only, true);
+
       const runtimeLayout = missionPayload.lifecycle_command.command_output.runtime_layout;
       assert.equal(typeof runtimeLayout.reportsRoot, "string");
       assert.equal(typeof runtimeLayout.artifactsRoot, "string");

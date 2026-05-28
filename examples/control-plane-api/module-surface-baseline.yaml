@@ -75,6 +75,24 @@ read_operations:
     output_contract_families:
       - artifact-packet
       - next-action-report
+  - operation_id: read.flow-evidence-graph
+    operation_family: read
+    output_contract_families:
+      - artifact-packet
+      - next-action-report
+      - operator-request
+      - step-result
+      - runtime-harness-report
+      - delivery-manifest
+      - release-packet
+  - operation_id: read.flow-runtime-trace
+    operation_family: read
+    output_contract_families:
+      - live-run-event
+      - step-result
+      - runtime-harness-report
+      - delivery-manifest
+      - release-packet
 
 run_control_operations:
   - operation_id: run.start
@@ -156,6 +174,16 @@ flow_projection_contract:
       route_status: implemented
       route: GET /api/projects/:projectId/flows/:flowId
       returns: flow_detail
+    - operation_id: read.flow-evidence-graph
+      route_status: implemented
+      route: GET /api/projects/:projectId/flows/:flowId/evidence-graph
+      returns: flow_evidence_graph
+      isolation: selected-flow-only
+    - operation_id: read.flow-runtime-trace
+      route_status: implemented
+      route: GET /api/projects/:projectId/flows/:flowId/runtime-trace
+      returns: flow_runtime_trace
+      isolation: selected-flow-only
     - operation_id: read.selected-flow
       route_status: implemented
       route: GET /api/projects/:projectId/flows/selected
@@ -372,6 +400,8 @@ deferred_transport:
     - GET /api/projects/:projectId/flows
     - GET /api/projects/:projectId/flows/selected
     - GET /api/projects/:projectId/flows/:flowId
+    - GET /api/projects/:projectId/flows/:flowId/evidence-graph
+    - GET /api/projects/:projectId/flows/:flowId/runtime-trace
     - GET /api/projects/:projectId/operator-requests
     - GET /api/projects/:projectId/packets
     - GET /api/projects/:projectId/step-results

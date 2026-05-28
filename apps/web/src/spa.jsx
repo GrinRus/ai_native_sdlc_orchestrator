@@ -106,7 +106,7 @@ function resolveUiStageId(nextAction) {
 
 function statusTone(state) {
   const normalized = String(state ?? "").toLowerCase();
-  if (["connected", "ready", "pass", "completed", "active", "no-write", "detached", "enforced"].includes(normalized)) return "safe";
+  if (["connected", "ready", "pass", "completed", "active", "isolated", "no-write", "detached", "enforced"].includes(normalized)) return "safe";
   if (normalized.includes("connected") || normalized.includes("active") || normalized.includes("safe")) return "safe";
   if (normalized.includes("completed") || normalized.includes("enforced")) return "safe";
   if (["blocked", "fail", "failed", "error"].includes(normalized)) return "danger";
@@ -306,7 +306,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft }
   );
 }
 
-function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk, title = "Start New Flow", description = "Create a fresh mission/intake packet, then let AOR resolve the first next action." }) {
+function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk, askDisabled = false, title = "Start New Flow", description = "Create a fresh mission/intake packet, then let AOR resolve the first next action." }) {
   return (
     <form className="mission-form" aria-label="Mission intake" onSubmit={submitMission}>
       <div className="form-header">
@@ -318,7 +318,7 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
           <button className="secondary" type="button" onClick={applyTemplate} disabled={busy}>
             Load template
           </button>
-          <button className="secondary" type="button" onClick={onAsk} disabled={busy}>
+          <button className="secondary" type="button" onClick={onAsk} disabled={busy || askDisabled}>
             <Icon name="target" />
             Ask AOR
           </button>
@@ -675,6 +675,86 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
   );
 }
 
+function EvidenceGraphPanel({ graph }) {
+  const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+  const edges = Array.isArray(graph?.edges) ? graph.edges : [];
+  return (
+    <section className="work-card graph-panel">
+      <div className="work-heading compact-heading">
+        <div>
+          <h3>Evidence Graph</h3>
+          <p>Selected-flow evidence only. Unrelated flow refs are excluded.</p>
+        </div>
+        <StatusPill state={graph?.isolation?.excludes_unrelated_flows ? "isolated" : "loading"} />
+      </div>
+      <div className="graph-summary">
+        <div>
+          <span>Nodes</span>
+          <strong>{nodes.length}</strong>
+        </div>
+        <div>
+          <span>Edges</span>
+          <strong>{edges.length}</strong>
+        </div>
+        <div>
+          <span>Mode</span>
+          <strong>{graph?.isolation?.mode ?? "selected-flow-only"}</strong>
+        </div>
+      </div>
+      <div className="graph-node-list">
+        {nodes.length === 0 ? (
+          <p className="empty-state">No flow graph loaded.</p>
+        ) : nodes.slice(0, 8).map((node) => (
+          <div className="graph-node" key={node.node_id}>
+            <span>{node.family}</span>
+            <strong>{node.label ?? node.ref}</strong>
+            <code>{node.ref}</code>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function RuntimeTracePanel({ trace }) {
+  const items = Array.isArray(trace?.trace_items) ? trace.trace_items : [];
+  return (
+    <section className="work-card trace-panel">
+      <div className="work-heading compact-heading">
+        <div>
+          <h3>Runtime Trace</h3>
+          <p>Run events, step results, harness decisions, and delivery artifacts for this flow.</p>
+        </div>
+        <StatusPill state={`${items.length} items`} />
+      </div>
+      <div className="table-wrap trace-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Run</th>
+              <th>Status</th>
+              <th>Ref</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0 ? (
+              <tr><td colSpan="4">No runtime trace yet</td></tr>
+            ) : items.slice(0, 10).map((item) => (
+              <tr key={item.trace_id}>
+                <td>{item.event_type ?? item.kind}</td>
+                <td>{Array.isArray(item.run_ids) ? item.run_ids.join(", ") : ""}</td>
+                <td>{item.status ?? "read"}</td>
+                <td><code>{item.ref ?? item.trace_id}</code></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose, onRun }) {
   const drawerRef = useRef(null);
 
@@ -688,12 +768,18 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
   const completed = isCompletedFlow(flow);
   const targetStep = form.targetStep || STAGE_TO_TARGET_STEP[stage.id] || "discovery";
   const scopeMissing = form.deliveryMode !== "no-write" && form.allowedPaths.trim().length === 0;
+  const targetRefsMissing = splitRefs(form.targetRefs).length === 0;
+  const flowMissing = !flow?.flow_id;
   const readOnlyAllowed = !completed || (form.deliveryMode === "no-write" && READ_ONLY_INSPECTION_INTENTS.has(form.intent));
   const requestPreview =
-    completed && !readOnlyAllowed
+    flowMissing
+      ? "Select an existing flow before creating an operator request."
+      : targetRefsMissing
+        ? "Add at least one target ref so the request is auditable and flow-scoped."
+        : completed && !readOnlyAllowed
       ? "Completed flows are read-only. Use a no-write analyze, explain, review, or validate request, or start a new flow."
       : form.deliveryMode === "patch-only"
-      ? `AOR will compile this request into the ${targetStep} step, run in no-silent-mutation mode, and create proposal plus patch evidence inside allowed paths.`
+        ? `AOR will compile this request into the ${targetStep} step, run in no-silent-mutation mode, and create proposal plus patch evidence inside allowed paths.`
       : form.deliveryMode === "no-write"
         ? `AOR will compile this request into the ${targetStep} step and create no-write analysis/proposal evidence.`
         : `AOR will record the requested ${form.deliveryMode} mode, validate explicit scope, and create proposal evidence; v1 will not silently mutate files.`;
@@ -718,7 +804,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
           <span>Target flow</span>
           <strong>{flowDisplayName(flow)}</strong>
           <code>{flow?.flow_id ?? "new-flow-draft"}</code>
-          <p>{completed ? "Read-only inspection only. Mutation requests are blocked by the control plane." : "Requests are scoped to the selected active flow."}</p>
+          <p>{flowMissing ? "Ask AOR requires a selected flow." : completed ? "Read-only inspection only. Mutation requests are blocked by the control plane." : "Requests are scoped to the selected active flow."}</p>
         </div>
         <Field label="Intent">
           <select name="request-intent" value={form.intent} onChange={(event) => setForm({ ...form, intent: event.target.value })}>
@@ -769,7 +855,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
           <span>What runtime will do</span>
           <p>{scopeMissing ? `${requestPreview} Add allowed paths before running this non-no-write request.` : requestPreview}</p>
         </div>
-        <button className="primary drawer-submit" type="button" onClick={onRun} disabled={busy || form.requestText.trim().length === 0 || scopeMissing || !readOnlyAllowed}>
+        <button className="primary drawer-submit" type="button" onClick={onRun} disabled={busy || flowMissing || targetRefsMissing || form.requestText.trim().length === 0 || scopeMissing || !readOnlyAllowed}>
           <Icon name="play" />
           {completed ? "Create no-write inspection request" : "Create and run request"}
         </button>
@@ -818,6 +904,8 @@ function App() {
   const [selectedFlow, setSelectedFlow] = useState(null);
   const [selectedFlowId, setSelectedFlowId] = useState(null);
   const [newFlowDraft, setNewFlowDraft] = useState(false);
+  const [flowEvidenceGraph, setFlowEvidenceGraph] = useState(null);
+  const [flowRuntimeTrace, setFlowRuntimeTrace] = useState(null);
   const [packets, setPackets] = useState([]);
   const [stepResults, setStepResults] = useState([]);
   const [operatorRequests, setOperatorRequests] = useState([]);
@@ -906,6 +994,21 @@ function App() {
     setActivity((current) => [{ id: `${Date.now()}-${Math.random()}`, label, detail }, ...current.slice(0, 9)]);
   }
 
+  async function loadFlowWorkbench(base, flow) {
+    if (!flow?.flow_id) {
+      setFlowEvidenceGraph(null);
+      setFlowRuntimeTrace(null);
+      return;
+    }
+    const encodedFlowId = encodeURIComponent(flow.flow_id);
+    const [graph, trace] = await Promise.all([
+      readJson(`${base}/flows/${encodedFlowId}/evidence-graph`).catch(() => null),
+      readJson(`${base}/flows/${encodedFlowId}/runtime-trace`).catch(() => null),
+    ]);
+    setFlowEvidenceGraph(graph);
+    setFlowRuntimeTrace(trace);
+  }
+
   async function refresh() {
     setError("");
     const appConfig = config ?? (await readJson("/app-config.json"));
@@ -935,6 +1038,9 @@ function App() {
     if (!newFlowDraft) {
       setSelectedFlow(refreshedSelectedFlow);
       setSelectedFlowId(refreshedSelectedFlow?.flow_id ?? null);
+      await loadFlowWorkbench(base, refreshedSelectedFlow);
+    } else {
+      await loadFlowWorkbench(base, null);
     }
     setPackets(Array.isArray(packetList) ? packetList : []);
     setStepResults(Array.isArray(stepList) ? stepList : []);
@@ -959,6 +1065,8 @@ function App() {
     setNewFlowDraft(true);
     setSelectedFlow(null);
     setSelectedFlowId(null);
+    setFlowEvidenceGraph(null);
+    setFlowRuntimeTrace(null);
     setSelectedStage("mission");
     setForm(SAFE_TEMPLATE);
     setRequestDrawerOpen(false);
@@ -975,14 +1083,22 @@ function App() {
     setSelectedFlow(flow);
     setSelectedFlowId(flow?.flow_id ?? null);
     setSelectedStage(flowStageId(flow, nextAction, projectState));
+    if (apiProjectBase) {
+      loadFlowWorkbench(apiProjectBase, flow).catch((err) => setError(err instanceof Error ? err.message : String(err)));
+    }
   }
 
   function openRequestDrawer(prefillRef = "") {
     const completed = isCompletedFlow(selectedFlow);
     const currentText = requestForm.requestText || `Analyze the ${activeStage.label} stage and recommend the next bounded action.`;
+    const defaultTargetRef =
+      selectedFlow?.latest_next_action_report_ref ??
+      selectedFlow?.intake_packet_ref ??
+      selectedFlow?.evidence_refs?.[0] ??
+      "";
     const refs = prefillRef
       ? Array.from(new Set([...splitRefs(requestForm.targetRefs), prefillRef])).join("\n")
-      : requestForm.targetRefs;
+      : requestForm.targetRefs || defaultTargetRef;
     setRequestForm({
       ...requestForm,
       intent: completed && !READ_ONLY_INSPECTION_INTENTS.has(requestForm.intent) ? "analyze" : requestForm.intent,
@@ -1222,6 +1338,7 @@ function App() {
               submitMission={submitMission}
               applyTemplate={() => setForm(SAFE_TEMPLATE)}
               onAsk={() => openRequestDrawer()}
+              askDisabled={!selectedFlow}
             />
           </section>
         ) : (
@@ -1269,6 +1386,11 @@ function App() {
       </section>
 
       <section className="workbench-row">
+        <EvidenceGraphPanel graph={flowEvidenceGraph} />
+        <RuntimeTracePanel trace={flowRuntimeTrace} />
+      </section>
+
+      <section className="workbench-row secondary-workbench-row">
         <EvidenceWorkbench
           rows={flowEvidenceRows}
           selectedRef={selectedRef}

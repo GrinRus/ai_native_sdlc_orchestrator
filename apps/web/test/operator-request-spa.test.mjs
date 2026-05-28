@@ -17,6 +17,9 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /Ask AOR/u);
   assert.match(source, /FlowSelector/u);
   assert.match(source, /One Recommended Action/u);
+  assert.match(source, /EvidenceGraphPanel/u);
+  assert.match(source, /RuntimeTracePanel/u);
+  assert.match(source, /targetRefsMissing/u);
   assert.match(source, /completed_read_only/u);
   assert.match(source, /target_flow_id/u);
   assert.match(source, /READ_ONLY_INSPECTION_INTENTS/u);

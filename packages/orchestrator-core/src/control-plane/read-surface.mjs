@@ -14,8 +14,10 @@ export {
 
 export {
   assertFlowMutationAllowed,
+  readFlowEvidenceGraph,
   listFlowProjections,
   readFlowProjection,
+  readFlowRuntimeTrace,
   readSelectedFlowProjection,
 } from "./flow-projections.mjs";
 

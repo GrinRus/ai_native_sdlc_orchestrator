@@ -2,7 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { initializeProjectRuntime } from "../project-init.mjs";
-import { applyReadModelLimit, listJsonFiles, toEvidenceRef } from "./read-artifact-readers.mjs";
+import {
+  applyReadModelLimit,
+  listJsonFiles,
+  listOperatorRequests,
+  listPacketArtifacts,
+  listQualityArtifacts,
+  listRunControlAudits,
+  listStepResults,
+  toEvidenceRef,
+} from "./read-artifact-readers.mjs";
+import { readRunEvents } from "./live-event-stream.mjs";
 
 const INTAKE_PACKET_REGEX = /^.+\.artifact\.intake\..+\.json$/u;
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/u;
@@ -413,6 +423,416 @@ export function readFlowProjection(options) {
   const flowId = asString(options.flowId);
   if (!flowId) return null;
   return listFlowProjections(options).flows.find((flow) => flow.flow_id === flowId) ?? null;
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @returns {string | null}
+ */
+function resolveDocumentRunId(document) {
+  return (
+    asString(document.run_id) ??
+    asString(asRecord(document.runtime_harness).run_id) ??
+    asString(asRecord(document.closure_state).run_id)
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @returns {string[]}
+ */
+function resolveDocumentRunRefs(document) {
+  return uniqueStrings([
+    resolveDocumentRunId(document),
+    ...asStringArray(document.run_refs),
+    ...asStringArray(asRecord(document.evidence_lineage).run_refs),
+  ]).map((ref) => ref.startsWith("run://") ? ref.slice("run://".length) : ref);
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @returns {string | null}
+ */
+function resolveDocumentStatus(document) {
+  return (
+    asString(document.status) ??
+    asString(document.overall_status) ??
+    asString(document.overall_decision) ??
+    asString(document.decision) ??
+    asString(asRecord(document.delivery_gate).status)
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} document
+ * @returns {string | null}
+ */
+function resolveDocumentStage(document) {
+  return (
+    asString(document.stage) ??
+    asString(document.step_class) ??
+    asString(document.target_stage) ??
+    asString(document.step_id)?.split(".")[0] ??
+    null
+  );
+}
+
+/**
+ * @param {{ family?: string, artifact_ref?: string, operator_request_ref?: string, document?: Record<string, unknown> }} entry
+ * @returns {string[]}
+ */
+function entryRefs(entry) {
+  return uniqueStrings([entry.artifact_ref, entry.operator_request_ref]);
+}
+
+/**
+ * @param {string} ref
+ * @returns {string}
+ */
+function comparableEvidencePath(ref) {
+  return ref
+    .replace(/^packet:\/\/operator-request@/u, "")
+    .replace(/^evidence:\/\//u, "")
+    .replace(/^\.aor\/projects\/[^/]+\//u, "");
+}
+
+/**
+ * @param {string} left
+ * @param {string} right
+ * @returns {boolean}
+ */
+function evidenceRefsMatch(left, right) {
+  if (left === right) return true;
+  const normalizedLeft = comparableEvidencePath(left);
+  const normalizedRight = comparableEvidencePath(right);
+  return normalizedLeft === normalizedRight || normalizedLeft.endsWith(normalizedRight) || normalizedRight.endsWith(normalizedLeft);
+}
+
+/**
+ * @param {Record<string, unknown>} flow
+ * @param {{ family?: string, artifact_ref?: string, operator_request_ref?: string, document?: Record<string, unknown> }} entry
+ * @returns {boolean}
+ */
+function entryBelongsToFlow(flow, entry) {
+  const flowRefs = asStringArray(flow.evidence_refs);
+  const refs = entryRefs(entry);
+  if (refs.some((ref) => flowRefs.some((flowRef) => evidenceRefsMatch(ref, flowRef)))) {
+    return true;
+  }
+  const document = asRecord(entry.document);
+  return asString(document.target_flow_id) === asString(flow.flow_id);
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   limit?: number,
+ * }} options
+ * @param {Record<string, unknown>} flow
+ */
+function listFlowScopedEntries(options, flow) {
+  const entries = [
+    ...listPacketArtifacts(options),
+    ...listStepResults(options),
+    ...listQualityArtifacts(options),
+    ...listRunControlAudits(options),
+    ...listOperatorRequests(options),
+  ];
+  const byRef = new Map();
+  for (const entry of entries) {
+    if (!entryBelongsToFlow(flow, entry)) continue;
+    for (const ref of entryRefs(entry)) {
+      byRef.set(ref, entry);
+    }
+  }
+  return Array.from(new Set(byRef.values()));
+}
+
+/**
+ * @param {{ family?: string, artifact_ref?: string, operator_request_ref?: string, document?: Record<string, unknown> }} entry
+ * @param {string} preferredRef
+ */
+function buildEvidenceNode(entry, preferredRef) {
+  const document = asRecord(entry.document);
+  return {
+    node_id: preferredRef,
+    ref: preferredRef,
+    family: asString(entry.family) ?? "evidence",
+    label:
+      asString(document.packet_id) ??
+      asString(document.request_id) ??
+      asString(document.step_result_id) ??
+      asString(document.report_id) ??
+      asString(document.manifest_id) ??
+      asString(document.packet_id) ??
+      path.basename(preferredRef),
+    status: resolveDocumentStatus(document),
+    stage: resolveDocumentStage(document),
+    run_ids: resolveDocumentRunRefs(document),
+    target_flow_id: asString(document.target_flow_id),
+    summary:
+      asString(document.request_summary) ??
+      asString(document.summary) ??
+      asString(document.title) ??
+      asString(document.reason) ??
+      null,
+  };
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   limit?: number,
+ *   flowId: string,
+ * }} options
+ */
+export function readFlowEvidenceGraph(options) {
+  const flow = readFlowProjection(options);
+  if (!flow) return null;
+  const flowRefs = asStringArray(flow.evidence_refs);
+  const entries = listFlowScopedEntries(options, flow);
+  const entriesByRef = new Map();
+  for (const entry of entries) {
+    for (const ref of entryRefs(entry)) {
+      entriesByRef.set(ref, entry);
+      for (const flowRef of flowRefs) {
+        if (evidenceRefsMatch(ref, flowRef)) {
+          entriesByRef.set(flowRef, entry);
+        }
+      }
+    }
+  }
+
+  const nodes = [
+    {
+      node_id: flow.flow_id,
+      ref: flow.flow_id,
+      family: "flow",
+      label: flow.mission_id,
+      status: flow.status,
+      stage: flow.selected_stage,
+      run_ids: [],
+      target_flow_id: flow.flow_id,
+      summary: flow.completed_read_only ? "Completed read-only flow." : "Active mutable flow.",
+    },
+  ];
+  const seenNodeIds = new Set([flow.flow_id]);
+  const edges = [];
+
+  for (const ref of flowRefs) {
+    const entry = entriesByRef.get(ref);
+    const node = entry
+      ? buildEvidenceNode(entry, ref)
+      : {
+          node_id: ref,
+          ref,
+          family: "flow-evidence",
+          label: ref,
+          status: "ready",
+          stage: null,
+          run_ids: [],
+          target_flow_id: null,
+          summary: "Evidence ref projected onto the selected flow.",
+        };
+    if (!seenNodeIds.has(node.node_id)) {
+      nodes.push(node);
+      seenNodeIds.add(node.node_id);
+    }
+    edges.push({ from: flow.flow_id, to: ref, relation: "contains" });
+  }
+
+  for (const entry of entries) {
+    const document = asRecord(entry.document);
+    const refs = entryRefs(entry);
+    const sourceRef = refs.find((ref) => flowRefs.some((flowRef) => evidenceRefsMatch(ref, flowRef))) ?? refs[0];
+    if (!sourceRef) continue;
+    if (!seenNodeIds.has(sourceRef)) {
+      const node = buildEvidenceNode(entry, sourceRef);
+      nodes.push(node);
+      seenNodeIds.add(sourceRef);
+      edges.push({ from: flow.flow_id, to: sourceRef, relation: "targets-flow" });
+    }
+    for (const nestedRef of collectNestedRefs(document)) {
+      const matchingFlowRef = flowRefs.find((flowRef) => evidenceRefsMatch(nestedRef, flowRef));
+      if (matchingFlowRef) {
+        edges.push({ from: sourceRef, to: matchingFlowRef, relation: "references" });
+      }
+    }
+  }
+
+  return {
+    project_id: options.projectRef ? initializeProjectRuntime(options).projectId : listFlowProjections(options).project_id,
+    flow_id: flow.flow_id,
+    status: flow.status,
+    read_only: true,
+    evidence_refs: flowRefs,
+    nodes: applyReadModelLimit(nodes, options.limit),
+    edges: applyReadModelLimit(edges, options.limit),
+    isolation: {
+      mode: "selected-flow-only",
+      included_refs: flowRefs.length,
+      excludes_unrelated_flows: true,
+    },
+  };
+}
+
+/**
+ * @param {{ family?: string, artifact_ref?: string, operator_request_ref?: string, document?: Record<string, unknown> }} entry
+ * @returns {Array<Record<string, unknown>>}
+ */
+function buildTraceItemsForEntry(entry) {
+  const document = asRecord(entry.document);
+  const refs = entryRefs(entry);
+  const primaryRef = refs[0] ?? "unknown";
+  const family = asString(entry.family) ?? "evidence";
+  const runIds = resolveDocumentRunRefs(document);
+  return [
+    {
+      trace_id: `${family}:${primaryRef}`,
+      kind: family,
+      ref: primaryRef,
+      run_ids: runIds,
+      stage: resolveDocumentStage(document),
+      status: resolveDocumentStatus(document),
+      step_id: asString(document.step_id),
+      event_type:
+        family === "step-result"
+          ? "step-result"
+          : family === "runtime-harness-report"
+            ? "runtime-harness-decision"
+            : family === "delivery-manifest" || family === "release-packet"
+              ? "delivery-release-artifact"
+              : family,
+      summary:
+        asString(document.request_summary) ??
+        asString(document.summary) ??
+        asString(document.reason) ??
+        asString(document.decision) ??
+        null,
+    },
+  ];
+}
+
+/**
+ * @param {string} ref
+ * @returns {string}
+ */
+function inferFamilyFromEvidenceRef(ref) {
+  const base = path.basename(comparableEvidencePath(ref));
+  if (base.startsWith("step-result-")) return "step-result";
+  if (base.startsWith("runtime-harness-report-")) return "runtime-harness-report";
+  if (base.startsWith("review-report-")) return "review-report";
+  if (base.startsWith("review-decision-")) return "review-decision";
+  if (base.startsWith("delivery-manifest-")) return "delivery-manifest";
+  if (base.startsWith("delivery-plan-")) return "delivery-plan";
+  if (base.startsWith("release-packet-")) return "release-packet";
+  if (base.startsWith("learning-loop-handoff-")) return "learning-loop-handoff";
+  if (base.startsWith("learning-loop-scorecard-")) return "learning-loop-scorecard";
+  if (base.startsWith("next-action-report")) return "next-action-report";
+  return "flow-evidence";
+}
+
+/**
+ * @param {string} family
+ * @returns {string}
+ */
+function traceEventTypeForFamily(family) {
+  if (family === "step-result") return "step-result";
+  if (family === "runtime-harness-report") return "runtime-harness-decision";
+  if (family === "delivery-manifest" || family === "release-packet" || family === "delivery-plan") {
+    return "delivery-release-artifact";
+  }
+  return family;
+}
+
+/**
+ * @param {string} ref
+ * @returns {string[]}
+ */
+function inferRunIdsFromEvidenceRef(ref) {
+  const stem = path.basename(comparableEvidencePath(ref)).replace(/\.json$/u, "");
+  const candidates = [
+    stem.replace(/^step-result-/u, ""),
+    stem.replace(/^runtime-harness-report-/u, ""),
+    stem.replace(/^review-report-/u, ""),
+    stem.replace(/^delivery-plan-/u, ""),
+    stem.replace(/^delivery-manifest-/u, ""),
+    stem.replace(/^release-packet-/u, ""),
+    stem.replace(/^learning-loop-scorecard-/u, ""),
+    stem.replace(/^learning-loop-handoff-/u, ""),
+    stem.replace(/^review-decision-/u, "").replace(/-(approve|request-repair|hold)$/u, ""),
+  ];
+  return uniqueStrings(candidates.filter((candidate) => candidate.startsWith("run.")));
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   limit?: number,
+ *   flowId: string,
+ * }} options
+ */
+export function readFlowRuntimeTrace(options) {
+  const flow = readFlowProjection(options);
+  if (!flow) return null;
+  const entries = listFlowScopedEntries(options, flow);
+  const traceItems = entries.flatMap((entry) => buildTraceItemsForEntry(entry));
+  for (const ref of asStringArray(flow.evidence_refs)) {
+    if (traceItems.some((item) => typeof item.ref === "string" && evidenceRefsMatch(item.ref, ref))) {
+      continue;
+    }
+    const family = inferFamilyFromEvidenceRef(ref);
+    traceItems.push({
+      trace_id: `${family}:${ref}`,
+      kind: family,
+      ref,
+      run_ids: inferRunIdsFromEvidenceRef(ref),
+      stage: null,
+      status: "referenced",
+      step_id: null,
+      event_type: traceEventTypeForFamily(family),
+      summary: "Flow-projected evidence ref.",
+    });
+  }
+  const runIds = uniqueStrings(traceItems.flatMap((item) => asStringArray(item.run_ids)));
+  for (const runId of runIds) {
+    for (const event of readRunEvents({ ...options, runId })) {
+      traceItems.push({
+        trace_id: `live-event:${asString(event.event_id) ?? `${runId}:${traceItems.length}`}`,
+        kind: "live-event",
+        ref: asString(event.event_id),
+        run_ids: [runId],
+        stage: null,
+        status: null,
+        step_id: null,
+        event_type: asString(event.event_type) ?? "live-event",
+        summary: asString(asRecord(event.payload).summary) ?? asString(event.message),
+      });
+    }
+  }
+
+  return {
+    project_id: options.projectRef ? initializeProjectRuntime(options).projectId : listFlowProjections(options).project_id,
+    flow_id: flow.flow_id,
+    status: flow.status,
+    read_only: true,
+    run_ids: runIds,
+    trace_items: applyReadModelLimit(traceItems, options.limit),
+    inspected_evidence_refs: asStringArray(flow.evidence_refs),
+    isolation: {
+      mode: "selected-flow-only",
+      excludes_unrelated_flows: true,
+    },
+  };
 }
 
 /**

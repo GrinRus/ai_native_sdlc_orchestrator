@@ -387,6 +387,90 @@
         }
       }
     },
+    "/api/projects/{projectId}/flows/{flowId}/evidence-graph": {
+      "get": {
+        "operationId": "getFlowEvidenceGraph",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flow-evidence-graph",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowEvidenceGraph"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/runtime-trace": {
+      "get": {
+        "operationId": "getFlowRuntimeTrace",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flow-runtime-trace",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowRuntimeTrace"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/flows/{flowId}": {
       "get": {
         "operationId": "getFlow",
@@ -1043,6 +1127,26 @@
           }
         }
       },
+      "FlowEvidenceGraph": {
+        "description": "Flow-scoped evidence graph. Nodes and edges are limited to the selected flow evidence refs and matching target-flow operator requests.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/FlowEvidenceGraphResponse"
+            }
+          }
+        }
+      },
+      "FlowRuntimeTrace": {
+        "description": "Flow-scoped runtime trace linking run events, step results, harness decisions, and delivery or release artifacts.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/FlowRuntimeTraceResponse"
+            }
+          }
+        }
+      },
       "Runs": {
         "description": "Read-only run summary list built from filesystem runtime artifacts.",
         "content": {
@@ -1405,6 +1509,246 @@
           },
           "updated_at_ref": {
             "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowEvidenceGraphResponse": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "flow_id",
+          "status",
+          "read_only",
+          "evidence_refs",
+          "nodes",
+          "edges",
+          "isolation"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "flow_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowEvidenceNode"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowEvidenceEdge"
+            }
+          },
+          "isolation": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowEvidenceNode": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "ref",
+          "family"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "target_flow_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowEvidenceEdge": {
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "relation"
+        ],
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowRuntimeTraceResponse": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "flow_id",
+          "status",
+          "read_only",
+          "run_ids",
+          "trace_items",
+          "inspected_evidence_refs",
+          "isolation"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "flow_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          },
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trace_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowRuntimeTraceItem"
+            }
+          },
+          "inspected_evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isolation": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowRuntimeTraceItem": {
+        "type": "object",
+        "required": [
+          "trace_id",
+          "kind",
+          "event_type"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "additionalProperties": true

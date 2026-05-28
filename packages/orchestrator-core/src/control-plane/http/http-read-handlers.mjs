@@ -10,7 +10,9 @@ import {
   listQualityArtifacts,
   listRuns,
   readFinanceMonitoringSnapshot,
+  readFlowEvidenceGraph,
   readFlowProjection,
+  readFlowRuntimeTrace,
   readNextActionReport,
   listStepResults,
   readPlannerMetrics,
@@ -93,6 +95,30 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
     case "selected-flow":
       sendJson(response, 200, readSelectedFlowProjection(runtimeOptions));
       return;
+    case "flow-evidence-graph": {
+      const graph = readFlowEvidenceGraph({
+        ...withReadModelLimit(runtimeOptions, requestUrl.searchParams),
+        flowId: params.flowId,
+      });
+      if (!graph) {
+        sendError(response, 404, "flow.not_found", `Flow '${params.flowId}' was not found.`);
+        return;
+      }
+      sendJson(response, 200, graph);
+      return;
+    }
+    case "flow-runtime-trace": {
+      const trace = readFlowRuntimeTrace({
+        ...withReadModelLimit(runtimeOptions, requestUrl.searchParams),
+        flowId: params.flowId,
+      });
+      if (!trace) {
+        sendError(response, 404, "flow.not_found", `Flow '${params.flowId}' was not found.`);
+        return;
+      }
+      sendJson(response, 200, trace);
+      return;
+    }
     case "flow-detail": {
       const flow = readFlowProjection({
         ...runtimeOptions,

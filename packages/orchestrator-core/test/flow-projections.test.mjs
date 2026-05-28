@@ -7,10 +7,14 @@ import test from "node:test";
 import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
 import {
   listFlowProjections,
+  readFlowEvidenceGraph,
   readFlowProjection,
+  readFlowRuntimeTrace,
   readSelectedFlowProjection,
 } from "../src/control-plane/flow-projections.mjs";
+import { appendRunEvent } from "../src/control-plane/live-event-stream.mjs";
 import { resolveNextAction } from "../src/next-action.mjs";
+import { createOperatorRequest } from "../src/operator-request.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 
 /**
@@ -229,5 +233,77 @@ test("flow projections keep completed evidence read-only while new flow selectio
       flowId: checkoutFlowId,
     });
     assert.equal(detail?.latest_next_action_report_ref?.includes("next-action-report-checkout-risk.json"), true);
+  });
+});
+
+test("flow evidence graph and runtime trace stay scoped and sanitized", () => {
+  withCleanRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeMission(init, "checkout-risk", "patch-only");
+    resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
+    writeCompletedClosure(init, "run.checkout-risk");
+    appendRunEvent({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      runId: "run.checkout-risk",
+      eventType: "run.terminal",
+      payload: { summary: "Runtime completed checkout-risk." },
+      timestamp: "2026-05-28T00:01:00.000Z",
+    });
+    resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
+
+    writeMission(init, "follow-up-risk", "no-write");
+    resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
+
+    const completedFlowId = `flow.${init.projectId}.checkout-risk`;
+    const activeFlowId = `flow.${init.projectId}.follow-up-risk`;
+    createOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      targetFlowId: completedFlowId,
+      targetStage: "review",
+      intentType: "analyze",
+      requestText: "RAW SECRET completed flow analysis text",
+      targetRefs: ["README.md"],
+      deliveryMode: "no-write",
+    });
+    createOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      targetFlowId: activeFlowId,
+      targetStage: "discovery",
+      intentType: "analyze",
+      requestText: "RAW SECRET active flow analysis text",
+      targetRefs: ["README.md"],
+      deliveryMode: "no-write",
+    });
+
+    const graph = readFlowEvidenceGraph({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      flowId: completedFlowId,
+    });
+    assert.ok(graph);
+    const serializedGraph = JSON.stringify(graph);
+    assert.equal(graph.isolation.excludes_unrelated_flows, true);
+    assert.equal(serializedGraph.includes("follow-up-risk"), false);
+    assert.equal(serializedGraph.includes("request_text"), false);
+    assert.ok(graph.nodes.some((node) => node.family === "operator-request" && node.target_flow_id === completedFlowId));
+    assert.ok(graph.nodes.some((node) => node.ref.includes("learning-loop-handoff-run.checkout-risk")));
+
+    const trace = readFlowRuntimeTrace({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      flowId: completedFlowId,
+    });
+    assert.ok(trace);
+    const kinds = trace.trace_items.map((item) => item.kind);
+    assert.ok(kinds.includes("step-result"));
+    assert.ok(kinds.includes("runtime-harness-report"));
+    assert.ok(kinds.includes("delivery-manifest"));
+    assert.ok(kinds.includes("release-packet"));
+    assert.ok(kinds.includes("live-event"));
+    assert.deepEqual(trace.run_ids, ["run.checkout-risk"]);
+    assert.equal(JSON.stringify(trace).includes("request_text"), false);
   });
 });

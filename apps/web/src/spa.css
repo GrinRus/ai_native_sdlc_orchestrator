@@ -35,7 +35,7 @@ button:disabled {
 .app-shell {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr) 310px;
-  grid-template-rows: minmax(58px, auto) minmax(520px, auto) auto auto;
+  grid-template-rows: minmax(58px, auto) minmax(520px, auto) auto auto auto;
   min-height: 100vh;
 }
 
@@ -747,9 +747,51 @@ th {
   padding: 0 14px 18px;
 }
 
+.secondary-workbench-row {
+  grid-row: 5;
+  padding-top: 0;
+}
+
 .evidence-workbench,
-.inbox {
+.inbox,
+.graph-panel,
+.trace-panel {
   min-height: 240px;
+}
+
+.graph-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.graph-summary > div,
+.graph-node {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e4eaef;
+  border-radius: 6px;
+  background: #f9fbfc;
+}
+
+.graph-summary span,
+.graph-node span {
+  color: #65717d;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.graph-node-list {
+  display: grid;
+  gap: 8px;
+}
+
+.trace-table {
+  max-height: 310px;
 }
 
 .evidence-grid {
@@ -925,7 +967,7 @@ code {
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 220px minmax(0, 1fr);
-    grid-template-rows: auto auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto auto;
   }
 
   .topbar {
@@ -951,12 +993,16 @@ code {
   .workbench-row {
     grid-row: 5;
   }
+
+  .secondary-workbench-row {
+    grid-row: 6;
+  }
 }
 
 @media (max-width: 860px) {
   .app-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto auto auto;
   }
 
   .topbar {
@@ -1016,11 +1062,16 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .secondary-workbench-row {
+    grid-row: 7;
+  }
+
   .form-grid,
   .form-grid.compact,
   .stage-summary-grid,
   .action-grid,
   .flow-snapshot-grid,
+  .graph-summary,
   .readiness-grid,
   .evidence-grid,
   .interaction-row {

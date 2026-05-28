@@ -5,9 +5,9 @@
 This document freezes the accepted product direction and W34 contract baseline
 for the next AOR local console iteration. W34-S01 defines the runtime-owned flow
 semantics; W34-S02 implements the control-plane/runtime flow projections; W34-S03
-renders the packaged flow-first local web shell while later W34 slices add
-advanced flow workbench behavior, closure-to-new-flow shortcuts, and live E2E
-proof.
+renders the packaged flow-first local web shell; W34-S04 adds flow-scoped
+evidence graph, runtime trace, interaction, and Ask AOR targeting behavior
+while later W34 slices add closure-to-new-flow shortcuts and live E2E proof.
 
 The design keeps AOR headless-first and runtime-owned: the web app renders
 control-plane read models, invokes bounded runtime mutations, and never owns
@@ -108,6 +108,26 @@ The packaged SPA now treats the flow as the primary object:
 - Ask AOR submissions include `target_flow_id` for the selected flow; completed
   flows only allow no-write inspection intents.
 - The stage rail remains flow-scoped navigation, not lifecycle state ownership.
+
+## W34-S04 implementation trace
+
+The advanced workbench is flow-scoped:
+
+- Evidence Graph reads use
+  `GET /api/projects/:projectId/flows/:flowId/evidence-graph` and render only
+  selected-flow refs plus sanitized operator requests that target the selected
+  flow.
+- Runtime Trace reads use
+  `GET /api/projects/:projectId/flows/:flowId/runtime-trace` and link run
+  events, step results, Runtime Harness decisions, delivery/release artifacts,
+  learning artifacts, and operator requests for the selected flow.
+- Ask AOR requires a selected flow and target refs before creating a request;
+  request creation sends `target_flow_id`, target stage, intent, delivery mode,
+  allowed paths, and target refs.
+- Runtime-requested interactions remain in the Interactions Inbox and continue
+  through the public `/interactions/answers` control-plane mutation.
+- Sanitized read payloads omit raw operator request text while preserving
+  summaries and refs.
 
 ## Live E2E implications
 

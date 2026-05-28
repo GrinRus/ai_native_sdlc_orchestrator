@@ -161,7 +161,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S04 — Flow-scoped evidence, trace, and interaction workbench
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Advanced console views show evidence, runtime traces, operator requests, and runtime interactions in the selected-flow context.
 - **Primary modules:** `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, tests
 - **Hard dependencies:** W34-S02

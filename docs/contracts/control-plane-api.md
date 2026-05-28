@@ -154,6 +154,14 @@ Implemented detached read routes:
   projection or `null`.
 - `GET /api/projects/:projectId/flows/:flowId` returns one flow projection or
   `404`.
+- `GET /api/projects/:projectId/flows/:flowId/evidence-graph` returns a
+  selected-flow-only evidence graph. Nodes and edges are built only from the
+  flow projection `evidence_refs[]` and sanitized operator requests whose
+  `target_flow_id` matches the selected flow.
+- `GET /api/projects/:projectId/flows/:flowId/runtime-trace` returns a
+  selected-flow-only trace that links live run events, step results, Runtime
+  Harness decisions, delivery manifests, release packets, learning artifacts,
+  and operator requests that belong to the selected flow.
 
 Flow list and detail reads must be deterministic and must not create artifacts.
 `New Flow` is a lifecycle action through `mission create` plus `next`; it
@@ -163,6 +171,11 @@ inspectable. Operator-request create/read payloads may include `target_flow_id`
 so Ask AOR can stay scoped to the selected flow. Mutations against completed
 flows are blocked with `operator_request.completed_flow_read_only` unless the
 request is a `delivery_mode=no-write` read-only inspection intent.
+
+Flow evidence graph and runtime trace reads are sanitized read models. They must
+not include raw `operator-request.request_text`; summaries, refs, target flow,
+stage, intent, delivery mode, allowed paths, run ids, and evidence refs remain
+queryable.
 
 ## Connected lifecycle mutations (W18 baseline)
 
