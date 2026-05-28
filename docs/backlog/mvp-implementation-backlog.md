@@ -311,5 +311,16 @@ This is the master index for the implementation slices across all defined waves.
 | W33-S09 | Runtime read-model scale and pagination baseline | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, tests | W33-S02 |
 | W33-S10 | Web app smoke module cleanup and console surface simplification | EPIC-6 | done | `apps/web/**`, tests | W33-S06 |
 
+## W34 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W34-S01 | Flow product and contract baseline | EPIC-6 | ready | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `examples/**`, `docs/backlog/**` | W33-S10, W32-S01, W21-S07 |
+| W34-S02 | Runtime and control-plane flow projections | EPIC-6 | blocked | `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, `docs/contracts/**`, `examples/control-plane-api/**`, tests | W34-S01 |
+| W34-S03 | Flow-first local web shell | EPIC-6 | blocked | `apps/web/**`, `apps/cli/**`, `docs/product/assets/w34-flow-centric-console/**`, tests | W34-S02 |
+| W34-S04 | Flow-scoped evidence, trace, and interaction workbench | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, tests | W34-S02 |
+| W34-S05 | Closure-to-new-flow UX | EPIC-6 | blocked | `packages/orchestrator-core/**`, `apps/web/**`, `docs/product/**`, `docs/contracts/**`, tests | W34-S02 |
+| W34-S06 | Installed-user browser-task flow-loop proof | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, `apps/cli/**`, tests | W34-S03, W34-S04, W34-S05 |
+| W34-S07 | Backlog, docs, and release-gate alignment | EPIC-0 | blocked | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**`, `scripts/**`, release tests | W34-S06 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

@@ -307,7 +307,7 @@ self-hosted CLI/API mode documented in this repository. Internal evaluation and
 proof fixtures exist for maintainers, but they are not a public onboarding path
 and are intentionally not part of the README workflow.
 
-The current roadmap source of truth extends through W33 in
+The current roadmap source of truth extends through W34 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -419,7 +419,7 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current alpha distribution is tracked through `W33` and focuses on:
+The current alpha distribution is tracked through `W34` and focuses on:
 
 - Safer operator onboarding.
 - Stronger runner-adapter coverage.
@@ -434,6 +434,8 @@ The current alpha distribution is tracked through `W33` and focuses on:
   patch evidence, and next-action refresh from CLI, API, or web.
 - Console source-of-truth alignment around `aor app` and app-smoke proof,
   without a generated static HTML console.
+- Flow-centric console refactor planning for runtime-owned active/completed
+  flows and explicit `New Flow` behavior.
 
 ## Contributing
 

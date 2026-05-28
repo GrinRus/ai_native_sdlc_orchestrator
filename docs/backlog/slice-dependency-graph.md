@@ -171,6 +171,13 @@ graph TD
   W33S08[W33-S08 Control-plane OpenAPI payload schema depth]
   W33S09[W33-S09 Runtime read-model scale and pagination baseline]
   W33S10[W33-S10 Web app smoke module cleanup and console surface simplification]
+  W34S01[W34-S01 Flow product and contract baseline]
+  W34S02[W34-S02 Runtime and control-plane flow projections]
+  W34S03[W34-S03 Flow-first local web shell]
+  W34S04[W34-S04 Flow-scoped evidence, trace, and interaction workbench]
+  W34S05[W34-S05 Closure-to-new-flow UX]
+  W34S06[W34-S06 Installed-user browser-task flow-loop proof]
+  W34S07[W34-S07 Backlog, docs, and release-gate alignment]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -431,6 +438,17 @@ graph TD
   W33S02 --> W33S08
   W33S02 --> W33S09
   W33S06 --> W33S10
+  W33S10 --> W34S01
+  W32S01 --> W34S01
+  W21S07 --> W34S01
+  W34S01 --> W34S02
+  W34S02 --> W34S03
+  W34S02 --> W34S04
+  W34S02 --> W34S05
+  W34S03 --> W34S06
+  W34S04 --> W34S06
+  W34S05 --> W34S06
+  W34S06 --> W34S07
 ```
 
 ## W0 hard dependencies
@@ -736,6 +754,17 @@ graph TD
 | W33-S09 | W33-S02 |
 | W33-S10 | W33-S06 |
 
+## W34 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W34-S01 | W33-S10, W32-S01, W21-S07 |
+| W34-S02 | W34-S01 |
+| W34-S03 | W34-S02 |
+| W34-S04 | W34-S02 |
+| W34-S05 | W34-S02 |
+| W34-S06 | W34-S03, W34-S04, W34-S05 |
+| W34-S07 | W34-S06 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -904,6 +933,13 @@ graph TD
 165. W33-S08
 166. W33-S09
 167. W33-S10
+168. W34-S01
+169. W34-S02
+170. W34-S03
+171. W34-S04
+172. W34-S05
+173. W34-S06
+174. W34-S07
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

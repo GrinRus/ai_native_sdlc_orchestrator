@@ -14,8 +14,8 @@ orchestration state.
 
 - Design name: AOR Flow-Centric Operator Console v1.
 - Baseline date: 2026-05-27.
-- Intended follow-up backlog wave: W34 - flow-centric console redesign and live
-  E2E proof refresh.
+- Owning backlog wave: W34 - flow-centric console refactor and browser-task
+  proof.
 - Product scope: installed-user local console launched through `aor app`.
 - Runtime scope: flow projections over existing mission, next-action,
   operator-request, run, review, delivery, release, and learning evidence.
@@ -70,16 +70,21 @@ The primary object in the console is a flow.
 
 ## Live E2E implications
 
-The installed-user guided proof should be refreshed so it proves the full
-flow-centric loop:
+The installed-user guided proof should be refreshed through the current
+skill-agent-only live E2E model so it proves the full flow-centric loop:
 
-1. Launch `aor app` and validate the app smoke path.
+1. Launch `aor app` and validate the browser-task frontend proof path.
 2. Create and complete the first flow through durable evidence.
 3. Render the completed flow as read-only.
 4. Start a second flow from learning closure or the flow selector.
 5. Prove that the second flow writes a new mission/intake packet.
 6. Prove that operator-request targeting includes the selected flow.
 7. Preserve the existing no-upstream-write default.
+8. Preserve frontend evidence refs for rendered HTML, DOM snapshot,
+   accessibility summary, screenshot or visual evidence, task outcome, UX
+   findings, and accepted skill-agent UI/UX verdict.
+9. Preserve the final skill-agent verdict request, accepted final verdict, and
+   non-empty inspected evidence refs.
 
 ## Out of scope
 

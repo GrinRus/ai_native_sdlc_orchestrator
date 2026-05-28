@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-33-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-34-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -44,6 +44,7 @@ The authoritative planning model for implementation lives in:
 | W31 | Launch the packaged local app for installed users and make first Mission intake understandable through the UI. | 1 | EPIC-6 | `docs/backlog/wave-31-implementation-slices.md` |
 | W32 | Add runtime-owned interactive operator requests across CLI, API, and the local app for bounded artifact analysis and change proposals. | 1 | EPIC-6 | `docs/backlog/wave-32-implementation-slices.md` |
 | W33 | Align the post-rebase console source of truth around `aor app`, remove the static snapshot surface, and preserve local-alpha stabilization fixes without adding security/hosted scope. | 10 | EPIC-0, EPIC-6 | `docs/backlog/wave-33-implementation-slices.md` |
+| W34 | Refactor the local console around runtime-owned flows and prove the flow loop through browser-task live E2E evidence. | 7 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-34-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -155,6 +156,13 @@ The authoritative planning model for implementation lives in:
 | W33-S08 | local-alpha OpenAPI payload clarity repair (no direct story closure) |
 | W33-S09 | local-alpha runtime read-model scale repair (no direct story closure) |
 | W33-S10 | local-alpha web maintainability repair (no direct story closure) |
+| W34-S01 | flow-centric UI refactor target: PBO-09, OPS-01, OPS-11 |
+| W34-S02 | flow-centric control-plane target: PBO-09, OPS-01, OPS-11 |
+| W34-S03 | flow-first local console target: PBO-09, OPS-01, OPS-10 |
+| W34-S04 | flow-scoped evidence and interaction target: OPS-02, OPS-03, OPS-11, DEV-06, DEV-07 |
+| W34-S05 | closure-to-new-flow target: PSO-05, OPS-04, DTX-07, INC-06 |
+| W34-S06 | browser-task guided proof target: OPS-06, OPS-07, PBO-09, OPS-11 |
+| W34-S07 | source-of-truth alignment and release-gate evidence (no direct story closure) |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -568,6 +576,20 @@ boundaries.
 - Security, CORS/preflight, hosted deployment, SSO, and production contour hardening remain out of scope.
 
 **Detailed slices:** `docs/backlog/wave-33-implementation-slices.md`
+
+## W34 - flow-centric console refactor and browser-task proof
+**Goal:** Refactor the installed-user local console around runtime-owned flow selection, active/completed flow boundaries, closure-to-new-flow behavior, and flow-scoped evidence views, then prove the loop through the current skill-agent-only browser-task live E2E path.
+
+**Exit criteria:**
+- W34 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
+- Flow product and contract docs define selected, active, completed, and follow-up flows without UI-owned orchestration state.
+- Runtime/control-plane surfaces expose flow list, selected-flow details, completed-flow read-only projections, and new-flow lifecycle creation.
+- The packaged local SPA implements the accepted W34 design references for flow selector, active cockpit, advanced views, and learning closure.
+- Ask AOR, Evidence Graph, Runtime Trace, Interactions Inbox, review, delivery, release, and learning surfaces preserve selected-flow boundaries.
+- Live E2E uses `installed-user-guided-journey.yaml` with `live_e2e.frontend_capability=browser-task-proof`, accepted skill-agent decisions, frontend evidence refs, final skill-agent verdict, and no-upstream-write assertions.
+- Deleted bounded profiles and mock-backed proof bundles remain out of the current proof path.
+
+**Detailed slices:** `docs/backlog/wave-34-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

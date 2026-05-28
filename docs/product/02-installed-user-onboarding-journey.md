@@ -53,7 +53,8 @@ The accepted flow-centric console design reference is
 `docs/product/03-flow-centric-console-design.md`. That reference freezes the
 target UI direction for the next redesign wave: flow selector, active/completed
 flow boundaries, `New Flow`, closure-to-follow-up behavior, flow-scoped
-evidence views, flow-targeted Ask AOR, and refreshed live E2E proof coverage.
+evidence views, flow-targeted Ask AOR, and browser-task live E2E proof
+coverage with accepted skill-agent UI/UX verdicts.
 
 W31-S01 adds the installed-package local app mode:
 - `aor app --project-ref <repo>` starts a foreground loopback server and opens the packaged SPA by default;
