@@ -162,6 +162,8 @@ flow_projection_contract:
     - latest_next_action_report_ref
     - evidence_refs
     - writeback_policy
+    - mission_settings
+    - closure_state
     - completed_read_only
     - follow_up_source_handoff_ref
   read_models:
@@ -200,7 +202,9 @@ flow_projection_contract:
       mutates_completed_source_flow: false
     follow_up_flow:
       lineage_field: follow_up_source_handoff_ref
+      lifecycle_flag: --follow-up-source-handoff-ref
       source_flow_read_only: true
+      duplicate_settings_create_fresh_intake: true
   example_payloads:
     flow_list:
       selected_flow_id: flow.aor-core.checkout-risk
@@ -225,6 +229,19 @@ flow_projection_contract:
           intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness.v1.json
           latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness.json
           completed_read_only: true
+          closure_state:
+            status: completed
+            completed: true
+            completed_read_only: true
+            follow_up_eligible: true
+            source_run_id: run.release-readiness
+            source_learning_handoff_refs:
+              - evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+            recommended_follow_up_source_handoff_ref: evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+          mission_settings:
+            title: Release readiness
+            delivery_mode: no-write
+            allowed_paths: []
           writeback_policy:
             mode: no-write
             upstream_writes_default: false
@@ -239,6 +256,17 @@ flow_projection_contract:
       evidence_refs:
         - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
         - evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json
+      mission_settings:
+        title: Checkout risk
+        delivery_mode: patch-only
+        allowed_paths:
+          - apps/web/**
+      closure_state:
+        status: active
+        completed: false
+        completed_read_only: false
+        follow_up_eligible: false
+        source_learning_handoff_refs: []
       writeback_policy:
         mode: patch-only
         upstream_writes_default: false
@@ -256,6 +284,19 @@ flow_projection_contract:
         - evidence://.aor/projects/aor-core/reports/review-report-run.release-readiness.json
         - evidence://.aor/projects/aor-core/artifacts/release-packet-run.release-readiness.json
         - evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+      closure_state:
+        status: completed
+        completed: true
+        completed_read_only: true
+        follow_up_eligible: true
+        source_run_id: run.release-readiness
+        source_learning_handoff_refs:
+          - evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+        recommended_follow_up_source_handoff_ref: evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+      mission_settings:
+        title: Release readiness
+        delivery_mode: no-write
+        allowed_paths: []
       writeback_policy:
         mode: no-write
         upstream_writes_default: false
@@ -269,6 +310,17 @@ flow_projection_contract:
       intake_body_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness-follow-up.v1.body.json
       latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness-follow-up.json
       follow_up_source_handoff_ref: evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+      closure_state:
+        status: active
+        completed: false
+        completed_read_only: false
+        follow_up_eligible: false
+        source_learning_handoff_refs: []
+        follow_up_source_handoff_ref: evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+      mission_settings:
+        title: Release readiness follow-up
+        delivery_mode: no-write
+        allowed_paths: []
       evidence_refs:
         - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness-follow-up.v1.json
         - evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness-follow-up.json

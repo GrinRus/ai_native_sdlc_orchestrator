@@ -66,3 +66,9 @@ must not invent a second next-action decision.
 After `New Flow`, runtime must create fresh mission/intake evidence and then run
 `next` so the new flow points at a new `next-action-report`. Completed source
 flows keep their existing report and closure evidence as read-only history.
+
+When learning closure is complete, `primary_action` should guide the operator to
+start a fresh flow with `mission create` rather than reopening the completed
+flow. If a learning handoff ref exists, the command should include
+`--follow-up-source-handoff-ref` so the next intake records lineage while
+preserving `upstream_writes_default=false`.

@@ -7,7 +7,7 @@ for the next AOR local console iteration. W34-S01 defines the runtime-owned flow
 semantics; W34-S02 implements the control-plane/runtime flow projections; W34-S03
 renders the packaged flow-first local web shell; W34-S04 adds flow-scoped
 evidence graph, runtime trace, interaction, and Ask AOR targeting behavior
-while later W34 slices add closure-to-new-flow shortcuts and live E2E proof.
+while later W34 slices add live E2E proof.
 
 The design keeps AOR headless-first and runtime-owned: the web app renders
 control-plane read models, invokes bounded runtime mutations, and never owns
@@ -128,6 +128,23 @@ The advanced workbench is flow-scoped:
   through the public `/interactions/answers` control-plane mutation.
 - Sanitized read payloads omit raw operator request text while preserving
   summaries and refs.
+
+## W34-S05 implementation trace
+
+Learning closure now provides an explicit safe transition into the next flow:
+
+- Completed flow projections expose `closure_state.follow_up_eligible`,
+  `source_learning_handoff_refs[]`, `recommended_follow_up_source_handoff_ref`,
+  and duplicate-safe `mission_settings`.
+- `aor next` resolves completed learning closure to a `start-new-flow` primary
+  action backed by `mission create --follow-up-source-handoff-ref <ref>` when a
+  learning handoff exists.
+- The web closure cockpit keeps completed evidence read-only and offers
+  `Start New Flow`, `Create follow-up from learning handoff`, and
+  `Duplicate mission settings`.
+- Follow-up and duplicate submissions still go through the public lifecycle
+  command mutation, create fresh mission/intake packets, run `next`, and keep
+  `upstream_writes_default=false`.
 
 ## Live E2E implications
 

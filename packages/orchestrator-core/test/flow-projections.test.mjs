@@ -44,8 +44,9 @@ function writeRuntimeJson(filePath, document) {
  * @param {ReturnType<typeof initializeProjectRuntime>} init
  * @param {string} missionId
  * @param {string} deliveryMode
+ * @param {{ followUpSourceHandoffRef?: string }} options
  */
-function writeMission(init, missionId, deliveryMode = "patch-only") {
+function writeMission(init, missionId, deliveryMode = "patch-only", options = {}) {
   return materializeIntakeArtifactPacket({
     projectId: init.projectId,
     projectRoot: init.projectRoot,
@@ -70,6 +71,7 @@ function writeMission(init, missionId, deliveryMode = "patch-only") {
     deliveryMode,
     sourceKind: "local-note",
     sourceRef: `docs/${missionId}.md`,
+    followUpSourceHandoffRef: options.followUpSourceHandoffRef ?? null,
   });
 }
 
@@ -209,10 +211,15 @@ test("flow projections keep completed evidence read-only while new flow selectio
     assert.ok(completedFlow);
     assert.equal(completedFlow.status, "completed");
     assert.equal(completedFlow.completed_read_only, true);
+    assert.equal(completedFlow.closure_state.completed, true);
+    assert.equal(completedFlow.closure_state.follow_up_eligible, true);
     assert.ok(completedFlow.evidence_refs.some((ref) => ref.includes("learning-loop-handoff-run.checkout-risk")));
+    const sourceHandoffRef = completedFlow.closure_state.recommended_follow_up_source_handoff_ref;
+    assert.ok(sourceHandoffRef.includes("learning-loop-handoff-run.checkout-risk"));
 
-    writeMission(init, "follow-up-risk", "no-write");
-    resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
+    writeMission(init, "follow-up-risk", "no-write", { followUpSourceHandoffRef: sourceHandoffRef });
+    const followUpNext = resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
+    assert.equal(followUpNext.nextActionReport.primary_action.action_id, "discovery-run");
 
     const beforeRead = runtimeJsonSnapshot(init);
     const selectedOnce = readSelectedFlowProjection({ cwd: repoRoot, projectRef: repoRoot });
@@ -226,6 +233,10 @@ test("flow projections keep completed evidence read-only while new flow selectio
     assert.ok(flowList.active_flow_ids.includes(followUpFlowId));
     assert.ok(flowList.completed_flow_ids.includes(checkoutFlowId));
     assert.equal(flowList.selected_flow_id, followUpFlowId);
+    const followUpFlow = flowList.flows.find((flow) => flow.flow_id === followUpFlowId);
+    assert.equal(followUpFlow?.follow_up_source_handoff_ref, sourceHandoffRef);
+    assert.equal(followUpFlow?.closure_state.follow_up_source_handoff_ref, sourceHandoffRef);
+    assert.equal(followUpFlow?.mission_settings.title, "Mission follow-up-risk");
 
     const detail = readFlowProjection({
       cwd: repoRoot,

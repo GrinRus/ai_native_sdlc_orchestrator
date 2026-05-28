@@ -316,6 +316,62 @@ function resolveFollowUpSourceHandoffRef(body) {
 }
 
 /**
+ * @param {Record<string, unknown>} body
+ * @returns {Record<string, unknown>}
+ */
+function buildMissionSettingsProjection(body) {
+  const featureRequest = asRecord(body.feature_request);
+  const productIntake = asRecord(body.product_intake);
+  const writebackPolicy = resolveWritebackPolicy(body, null);
+  return {
+    title: asString(featureRequest.title),
+    brief: asString(featureRequest.brief),
+    goals: asStringArray(productIntake.goals),
+    constraints: asStringArray(productIntake.constraints),
+    kpis: Array.isArray(productIntake.kpis) ? productIntake.kpis.filter((entry) => typeof entry === "object" && entry !== null) : [],
+    definition_of_done: asStringArray(productIntake.definition_of_done),
+    delivery_mode: writebackPolicy.mode,
+    allowed_paths: writebackPolicy.allowed_paths,
+    forbidden_paths: writebackPolicy.forbidden_paths,
+  };
+}
+
+/**
+ * @param {Record<string, unknown> | null} report
+ * @returns {string[]}
+ */
+function resolveSourceLearningHandoffRefs(report) {
+  const closureState = asRecord(report?.closure_state);
+  const learning = asRecord(closureState.learning);
+  return uniqueStrings([
+    asString(learning.handoff_ref),
+    ...asStringArray(learning.linked_evidence_refs).filter((ref) => ref.includes("learning-loop-handoff")),
+    ...collectNestedRefs(closureState).filter((ref) => ref.includes("learning-loop-handoff")),
+  ]);
+}
+
+/**
+ * @param {{ report: Record<string, unknown> | null, status: "active" | "completed", followUpSourceHandoffRef: string | null }} options
+ * @returns {Record<string, unknown>}
+ */
+function buildClosureProjection(options) {
+  const closureState = asRecord(options.report?.closure_state);
+  const learning = asRecord(closureState.learning);
+  const sourceLearningHandoffRefs = resolveSourceLearningHandoffRefs(options.report);
+  return {
+    status: options.status,
+    completed: options.status === "completed",
+    completed_read_only: options.status === "completed",
+    follow_up_eligible: options.status === "completed" && sourceLearningHandoffRefs.length > 0,
+    learning_status: asString(learning.status),
+    source_run_id: asString(closureState.run_id),
+    source_learning_handoff_refs: sourceLearningHandoffRefs,
+    recommended_follow_up_source_handoff_ref: sourceLearningHandoffRefs[0] ?? null,
+    follow_up_source_handoff_ref: options.followUpSourceHandoffRef,
+  };
+}
+
+/**
  * @param {{
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   seed: ReturnType<typeof loadIntakeFlowSeeds>[number],
@@ -329,6 +385,7 @@ function buildFlowProjection({ init, seed, reportEntry }) {
   const closureState = asRecord(report?.closure_state);
   const closureBelongsToFlow = reportClosureBelongsToFlow(report, seed);
   const status = resolveFlowStatus(report, seed);
+  const followUpSourceHandoffRef = resolveFollowUpSourceHandoffRef(seed.body);
   const evidenceRefs = uniqueStrings([
     seed.packetRef,
     seed.bodyRef,
@@ -351,8 +408,10 @@ function buildFlowProjection({ init, seed, reportEntry }) {
     latest_next_action_report_ref: reportEntry?.artifactRef ?? null,
     evidence_refs: evidenceRefs,
     writeback_policy: resolveWritebackPolicy(seed.body, report),
+    mission_settings: buildMissionSettingsProjection(seed.body),
+    closure_state: buildClosureProjection({ report, status, followUpSourceHandoffRef }),
     completed_read_only: status === "completed",
-    follow_up_source_handoff_ref: resolveFollowUpSourceHandoffRef(seed.body),
+    follow_up_source_handoff_ref: followUpSourceHandoffRef,
     updated_at_ref: reportEntry?.artifactRef ?? seed.packetRef,
   };
 }

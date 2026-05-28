@@ -47,6 +47,8 @@ Guided mission intake in W21 must populate these same product-intake fields inst
 
 W34 flow creation reuses this contract. `New Flow` and follow-up flow creation
 must write a fresh intake-request body rather than editing a completed flow's
-intake evidence. Follow-up lineage belongs in the control-plane flow projection
-through `follow_up_source_handoff_ref`; this body still owns only the new
-flow's product acceptance evidence.
+intake evidence. Follow-up lineage may be recorded in
+`mission_traceability.coverage_follow_up.follow_up_source_handoff_ref` by the
+runtime-owned `mission create --follow-up-source-handoff-ref <ref>` path, and is
+then projected through the control-plane `follow_up_source_handoff_ref` field.
+The body still owns only the new flow's product acceptance evidence.

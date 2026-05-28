@@ -659,6 +659,8 @@ test("control-plane API baseline documents W34 flow projection examples", () => 
   assert.equal(contract?.status, "implemented-read-baseline");
   assert.ok(contract?.projection_fields?.includes("flow_id"), "expected stable flow id field");
   assert.ok(contract?.projection_fields?.includes("follow_up_source_handoff_ref"), "expected follow-up lineage field");
+  assert.ok(contract?.projection_fields?.includes("closure_state"), "expected closure projection field");
+  assert.ok(contract?.projection_fields?.includes("mission_settings"), "expected duplicate mission settings field");
   assert.ok(
     contract?.read_models?.some((entry) => entry.route === "GET /api/projects/:projectId/flows"),
     "expected implemented flow list route",
@@ -667,10 +669,12 @@ test("control-plane API baseline documents W34 flow projection examples", () => 
   assert.equal(contract?.lifecycle_semantics?.new_flow?.archives_mission_next_action_report, true);
   assert.equal(contract?.lifecycle_semantics?.new_flow?.mutates_completed_source_flow, false);
   assert.equal(contract?.lifecycle_semantics?.follow_up_flow?.source_flow_read_only, true);
+  assert.equal(contract?.lifecycle_semantics?.follow_up_flow?.duplicate_settings_create_fresh_intake, true);
 
   const examples = contract?.example_payloads ?? {};
   assert.equal(examples.active_flow?.status, "active");
   assert.equal(examples.completed_flow?.completed_read_only, true);
+  assert.equal(examples.completed_flow?.closure_state?.follow_up_eligible, true);
   assert.ok(
     examples.follow_up_flow?.follow_up_source_handoff_ref,
     "expected follow-up flow example to cite source handoff",

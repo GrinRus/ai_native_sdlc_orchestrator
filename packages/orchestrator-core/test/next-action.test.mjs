@@ -384,9 +384,12 @@ test("resolveNextAction routes release-ready evidence to learning handoff and cl
 
     assert.equal(report.status, "ready");
     assert.equal(report.project_state.stage, "learning");
-    assert.equal(report.primary_action.action_id, "closure-complete");
+    assert.equal(report.primary_action.action_id, "start-new-flow");
+    assert.match(report.primary_action.command, /mission create/u);
+    assert.match(report.primary_action.command, /--follow-up-source-handoff-ref/u);
     assert.equal(report.closure_state.learning.status, "handoff-complete");
     assert.ok(report.closure_state.evidence_chain.some((ref) => ref.includes("learning-loop-handoff")));
+    assert.equal(report.bounded_execution.upstream_writes_default, false);
   });
 });
 

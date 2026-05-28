@@ -197,7 +197,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S05 — Closure-to-new-flow UX
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Learning closure gives the operator an explicit, safe path to start a second flow while preserving the completed first flow as audit evidence.
 - **Primary modules:** `packages/orchestrator-core/**`, `apps/web/**`, `docs/product/**`, `docs/contracts/**`, tests
 - **Hard dependencies:** W34-S02
@@ -231,7 +231,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S06 — Installed-user browser-task flow-loop proof
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Live E2E proves the flow-centric console through the hardened installed-user guided journey with browser-task frontend evidence and accepted skill-agent verdicts.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, `apps/cli/**`, tests
 - **Hard dependencies:** W34-S03, W34-S04, W34-S05

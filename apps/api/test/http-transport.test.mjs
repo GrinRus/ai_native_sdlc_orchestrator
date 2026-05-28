@@ -666,6 +666,7 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
           allowed_path: "apps/web/**",
           forbidden_path: "secrets/**",
           delivery_mode: "patch-only",
+          "follow-up-source-handoff-ref": "evidence://reports/learning-loop-handoff-run.previous.json",
           source_kind: "local-note",
           source_ref: "docs/ops/ui-attach-detach.md",
         },
@@ -674,7 +675,18 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       const missionPayload = await missionResponse.json();
       assert.equal(missionPayload.lifecycle_command.command, "mission create");
       assert.equal(missionPayload.lifecycle_command.blocked, false);
+      assert.equal(
+        missionPayload.lifecycle_command.command_output.follow_up_source_handoff_ref,
+        "evidence://reports/learning-loop-handoff-run.previous.json",
+      );
       assert.equal(missionPayload.lifecycle_command.command_output.product_intake_completeness.status, "complete");
+      const missionBody = JSON.parse(
+        fs.readFileSync(missionPayload.lifecycle_command.command_output.artifact_packet_body_file, "utf8"),
+      );
+      assert.equal(
+        missionBody.mission_traceability.coverage_follow_up.follow_up_source_handoff_ref,
+        "evidence://reports/learning-loop-handoff-run.previous.json",
+      );
 
       const packetsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/packets`);
       assert.equal(packetsResponse.status, 200);

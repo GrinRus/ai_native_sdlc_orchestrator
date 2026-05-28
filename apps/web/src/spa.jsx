@@ -78,6 +78,11 @@ function splitRefs(value) {
     .filter(Boolean);
 }
 
+function missionIdFromTitle(title) {
+  const base = String(title ?? "flow").toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
+  return `${base || "flow"}-${Date.now().toString(36)}`;
+}
+
 function interactionKey(interaction) {
   return `${interaction.run_id ?? "run"}:${interaction.interaction_id ?? "interaction"}`;
 }
@@ -207,6 +212,29 @@ function isCompletedFlow(flow) {
   return flow?.completed_read_only === true || flow?.status === "completed";
 }
 
+function formatKpiForForm(kpi) {
+  if (!kpi || typeof kpi !== "object") return "";
+  return [kpi.kpi_id, kpi.name, kpi.target, kpi.measurement].filter(Boolean).join(":");
+}
+
+function formFromFlowSettings(flow, { followUp = false } = {}) {
+  const settings = flow?.mission_settings ?? {};
+  const title = settings.title ?? flowDisplayName(flow);
+  return {
+    templateId: followUp ? "follow-up-from-closure" : "duplicate-mission-settings",
+    title: followUp ? `${title} follow-up` : title,
+    brief:
+      settings.brief ??
+      (followUp ? `Continue from completed flow ${flowDisplayName(flow)}.` : "Duplicate mission settings into a fresh flow."),
+    goals: Array.isArray(settings.goals) ? settings.goals.join("\n") : "",
+    constraints: Array.isArray(settings.constraints) ? settings.constraints.join("\n") : "",
+    kpi: Array.isArray(settings.kpis) ? settings.kpis.map(formatKpiForForm).filter(Boolean).join("\n") : "",
+    dod: Array.isArray(settings.definition_of_done) ? settings.definition_of_done.join("\n") : "",
+    deliveryMode: settings.delivery_mode ?? flow?.writeback_policy?.mode ?? "no-write",
+    allowedPaths: Array.isArray(settings.allowed_paths) ? settings.allowed_paths.join(",") : "",
+  };
+}
+
 function toUiStageId(stageId) {
   return PROJECT_STAGE_TO_UI_STAGE[stageId] ?? stageId ?? "mission";
 }
@@ -306,7 +334,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft }
   );
 }
 
-function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk, askDisabled = false, title = "Start New Flow", description = "Create a fresh mission/intake packet, then let AOR resolve the first next action." }) {
+function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk, askDisabled = false, title = "Start New Flow", description = "Create a fresh mission/intake packet, then let AOR resolve the first next action.", followUpSourceHandoffRef = null }) {
   return (
     <form className="mission-form" aria-label="Mission intake" onSubmit={submitMission}>
       <div className="form-header">
@@ -324,6 +352,15 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
           </button>
         </div>
       </div>
+      {followUpSourceHandoffRef ? (
+        <div className="follow-up-lineage">
+          <Icon name="lock" />
+          <div>
+            <span>Follow-up source handoff</span>
+            <code>{followUpSourceHandoffRef}</code>
+          </div>
+        </div>
+      ) : null}
       <Field label="Title">
         <input name="mission-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
       </Field>
@@ -358,7 +395,7 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
         </Field>
       </div>
       <button className="primary" type="submit" disabled={busy}>
-        Create Mission Packet & Resolve Next Action
+        {followUpSourceHandoffRef ? "Create Follow-up Mission & Resolve Next Action" : "Create Mission Packet & Resolve Next Action"}
         <Icon name="target" />
       </button>
     </form>
@@ -384,7 +421,22 @@ function FlowTimeline({ currentStage, completed }) {
   );
 }
 
-function FlowCockpit({ flow, stage, currentStage, nextAction, projectState, config, busy, onResolveNext, onRefresh, onAsk, initializeProject }) {
+function FlowCockpit({
+  flow,
+  stage,
+  currentStage,
+  nextAction,
+  projectState,
+  config,
+  busy,
+  onResolveNext,
+  onRefresh,
+  onAsk,
+  onStartNewFlow,
+  onCreateFollowUp,
+  onDuplicateMission,
+  initializeProject,
+}) {
   if (!flow && stage.id === "readiness") {
     return (
       <section className="work-card stage-work">
@@ -410,6 +462,7 @@ function FlowCockpit({ flow, stage, currentStage, nextAction, projectState, conf
   }
 
   const completed = isCompletedFlow(flow);
+  const followUpEligible = flow?.closure_state?.follow_up_eligible === true;
   const blockers = Array.isArray(nextAction?.blockers) && !completed ? nextAction.blockers : [];
   const evidenceRefs = Array.isArray(flow?.evidence_refs) && flow.evidence_refs.length > 0
     ? flow.evidence_refs
@@ -422,7 +475,9 @@ function FlowCockpit({ flow, stage, currentStage, nextAction, projectState, conf
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
   const nextPrimary = completed
-    ? {
+    ? nextAction?.primary_action?.action_id === "start-new-flow"
+      ? nextAction.primary_action
+      : {
         command: "read-only evidence inspection",
         reason: "This flow is closed. Its evidence chain remains available for audit and follow-up planning.",
       }
@@ -455,6 +510,18 @@ function FlowCockpit({ flow, stage, currentStage, nextAction, projectState, conf
           <div>
             <strong>Flow completed - evidence locked</strong>
             <p>Mutation controls are replaced by no-write inspection actions. Start New Flow to continue work.</p>
+          </div>
+          <div className="closure-actions">
+            <button className="primary" type="button" onClick={onStartNewFlow} disabled={busy}>
+              <Icon name="plus" />
+              Start New Flow
+            </button>
+            <button className="secondary" type="button" onClick={onCreateFollowUp} disabled={busy || !followUpEligible}>
+              Create follow-up from learning handoff
+            </button>
+            <button className="secondary" type="button" onClick={onDuplicateMission} disabled={busy}>
+              Duplicate mission settings
+            </button>
           </div>
         </div>
       ) : null}
@@ -522,7 +589,9 @@ function FlowCockpit({ flow, stage, currentStage, nextAction, projectState, conf
 function RightRail({ nextAction, selectedFlow, projectState, config, operatorRequests }) {
   const completed = isCompletedFlow(selectedFlow);
   const nextPrimary = completed
-    ? { command: "read-only evidence inspection", reason: "Completed flow evidence remains inspectable." }
+    ? nextAction?.primary_action?.action_id === "start-new-flow"
+      ? nextAction.primary_action
+      : { command: "read-only evidence inspection", reason: "Completed flow evidence remains inspectable." }
     : nextAction?.primary_action ?? {};
   const blockers = Array.isArray(nextAction?.blockers) && !completed ? nextAction.blockers : [];
   const evidenceRefs = Array.isArray(selectedFlow?.evidence_refs) && selectedFlow.evidence_refs.length > 0
@@ -904,6 +973,8 @@ function App() {
   const [selectedFlow, setSelectedFlow] = useState(null);
   const [selectedFlowId, setSelectedFlowId] = useState(null);
   const [newFlowDraft, setNewFlowDraft] = useState(false);
+  const [draftSourceFlow, setDraftSourceFlow] = useState(null);
+  const [draftFollowUpHandoffRef, setDraftFollowUpHandoffRef] = useState(null);
   const [flowEvidenceGraph, setFlowEvidenceGraph] = useState(null);
   const [flowRuntimeTrace, setFlowRuntimeTrace] = useState(null);
   const [packets, setPackets] = useState([]);
@@ -1009,7 +1080,7 @@ function App() {
     setFlowRuntimeTrace(trace);
   }
 
-  async function refresh() {
+  async function refresh(options = {}) {
     setError("");
     const appConfig = config ?? (await readJson("/app-config.json"));
     setConfig(appConfig);
@@ -1025,7 +1096,11 @@ function App() {
     ]);
     const nextReport = next?.document ?? next;
     const flows = Array.isArray(flowPayload?.flows) ? flowPayload.flows : [];
-    const preferredFlowId = newFlowDraft ? null : selectedFlowId ?? flowPayload?.selected_flow_id ?? selectedFlowPayload?.flow_id ?? null;
+    const draftMode = typeof options.newFlowDraft === "boolean" ? options.newFlowDraft : newFlowDraft;
+    const preferredSelectedFlowId = Object.prototype.hasOwnProperty.call(options, "selectedFlowId")
+      ? options.selectedFlowId
+      : selectedFlowId;
+    const preferredFlowId = draftMode ? null : preferredSelectedFlowId ?? flowPayload?.selected_flow_id ?? selectedFlowPayload?.flow_id ?? null;
     const refreshedSelectedFlow =
       flows.find((flow) => flow.flow_id === preferredFlowId) ??
       flows.find((flow) => flow.flow_id === selectedFlowPayload?.flow_id) ??
@@ -1035,7 +1110,7 @@ function App() {
     setProjectState(state);
     setNextAction(nextReport?.primary_action ? nextReport : null);
     setFlowList({ ...flowPayload, flows });
-    if (!newFlowDraft) {
+    if (!draftMode) {
       setSelectedFlow(refreshedSelectedFlow);
       setSelectedFlowId(refreshedSelectedFlow?.flow_id ?? null);
       await loadFlowWorkbench(base, refreshedSelectedFlow);
@@ -1046,7 +1121,7 @@ function App() {
     setStepResults(Array.isArray(stepList) ? stepList : []);
     setOperatorRequests(Array.isArray(requestList) ? requestList : []);
     if (!didAutoSelectStage.current && !didChooseStage.current) {
-      setSelectedStage(newFlowDraft ? "mission" : flowStageId(refreshedSelectedFlow, nextReport?.primary_action ? nextReport : null, state));
+      setSelectedStage(draftMode ? "mission" : flowStageId(refreshedSelectedFlow, nextReport?.primary_action ? nextReport : null, state));
       didAutoSelectStage.current = true;
     }
     pushActivity("control-plane.connected", refreshedSelectedFlow?.flow_id ?? nextReport?.primary_action?.command ?? "state refreshed");
@@ -1061,16 +1136,27 @@ function App() {
     setSelectedStage(stageId);
   }
 
-  function startNewFlow() {
+  function startNewFlow({ sourceFlow = null, followUp = false, duplicate = false } = {}) {
+    const sourceHandoffRef =
+      followUp
+        ? sourceFlow?.closure_state?.recommended_follow_up_source_handoff_ref ??
+          sourceFlow?.closure_state?.source_learning_handoff_refs?.[0] ??
+          null
+        : null;
     setNewFlowDraft(true);
     setSelectedFlow(null);
     setSelectedFlowId(null);
+    setDraftSourceFlow(sourceFlow);
+    setDraftFollowUpHandoffRef(sourceHandoffRef);
     setFlowEvidenceGraph(null);
     setFlowRuntimeTrace(null);
     setSelectedStage("mission");
-    setForm(SAFE_TEMPLATE);
+    setForm(sourceFlow && (followUp || duplicate) ? formFromFlowSettings(sourceFlow, { followUp }) : SAFE_TEMPLATE);
     setRequestDrawerOpen(false);
-    pushActivity("flow.new-draft", "mission intake pending");
+    pushActivity(
+      followUp ? "flow.follow-up-draft" : duplicate ? "flow.duplicate-draft" : "flow.new-draft",
+      sourceHandoffRef ?? "mission intake pending",
+    );
   }
 
   function selectFlow(flowId) {
@@ -1080,6 +1166,8 @@ function App() {
     }
     const flow = flowOptions.find((candidate) => candidate.flow_id === flowId) ?? null;
     setNewFlowDraft(false);
+    setDraftSourceFlow(null);
+    setDraftFollowUpHandoffRef(null);
     setSelectedFlow(flow);
     setSelectedFlowId(flow?.flow_id ?? null);
     setSelectedStage(flowStageId(flow, nextAction, projectState));
@@ -1163,6 +1251,7 @@ function App() {
     setBusy(true);
     try {
       const flags = {
+        "mission-id": missionIdFromTitle(form.title),
         title: form.title,
         brief: form.brief,
         goal: splitLines(form.goals),
@@ -1174,11 +1263,16 @@ function App() {
       if (form.allowedPaths.trim()) {
         flags["allowed-path"] = form.allowedPaths;
       }
+      if (draftFollowUpHandoffRef) {
+        flags["follow-up-source-handoff-ref"] = draftFollowUpHandoffRef;
+      }
       await runLifecycle("mission create", flags);
       await runLifecycle("next", { json: true });
       setNewFlowDraft(false);
+      setDraftSourceFlow(null);
+      setDraftFollowUpHandoffRef(null);
       setSelectedFlowId(null);
-      await refresh();
+      await refresh({ newFlowDraft: false, selectedFlowId: null });
       setSelectedStage("discovery");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1339,6 +1433,13 @@ function App() {
               applyTemplate={() => setForm(SAFE_TEMPLATE)}
               onAsk={() => openRequestDrawer()}
               askDisabled={!selectedFlow}
+              title={draftFollowUpHandoffRef ? "Create Follow-up Flow" : "Start New Flow"}
+              description={
+                draftSourceFlow
+                  ? "Create fresh mission/intake evidence from completed-flow settings; the source flow remains read-only."
+                  : "Create a fresh mission/intake packet, then let AOR resolve the first next action."
+              }
+              followUpSourceHandoffRef={draftFollowUpHandoffRef}
             />
           </section>
         ) : (
@@ -1353,6 +1454,9 @@ function App() {
             onResolveNext={resolveNextForSelectedFlow}
             onRefresh={() => refresh().catch((err) => setError(err.message))}
             onAsk={() => openRequestDrawer()}
+            onStartNewFlow={() => startNewFlow()}
+            onCreateFollowUp={() => startNewFlow({ sourceFlow: selectedFlow, followUp: true })}
+            onDuplicateMission={() => startNewFlow({ sourceFlow: selectedFlow, duplicate: true })}
             initializeProject={initializeProject}
           />
         )}

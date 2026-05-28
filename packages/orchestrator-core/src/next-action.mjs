@@ -146,12 +146,16 @@ function findLatestRunDocument(init, runId, family, matcher, root) {
 
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {{ notBeforeMs?: number }} options
  * @returns {{ runId: string, evidenceRef: string } | null}
  */
-function findLatestRunEvidence(init) {
+function findLatestRunEvidence(init, options = {}) {
   /** @type {Array<{ runId: string, evidenceRef: string, file: string }>} */
   const candidates = [];
   const addCandidate = (filePath, document) => {
+    if (typeof options.notBeforeMs === "number" && fs.statSync(filePath).mtimeMs < options.notBeforeMs) {
+      return;
+    }
     const runId = asString(document.run_id);
     if (runId) {
       candidates.push({ runId, evidenceRef: toEvidenceRef(init.projectRoot, filePath), file: filePath });
@@ -636,15 +640,21 @@ function resolveClosureAction(options) {
     };
   }
 
+  const learningHandoffRef = asString(learning.handoff_ref);
+  const followUpCommand = [
+    `${projectCommand("mission create", options.projectRoot)} --delivery-mode no-write`,
+    ...(learningHandoffRef ? [`--follow-up-source-handoff-ref ${shellQuote(learningHandoffRef)}`] : []),
+  ].join(" ");
+
   return {
     status: "ready",
     stage: "learning",
     blockers: [],
     primaryAction: {
-      action_id: "closure-complete",
-      command: `${projectCommand("evidence show", options.projectRoot)} --run-id ${shellQuote(options.runId)}`,
-      reason: "Review, delivery, release, and learning evidence are linked; inspect the closure evidence chain.",
-      low_level_command: "evidence show",
+      action_id: "start-new-flow",
+      command: followUpCommand,
+      reason: "Review, delivery, release, and learning evidence are linked; start a fresh follow-up flow while keeping the completed flow read-only.",
+      low_level_command: "mission create",
       evidence_refs: evidenceRefs,
     },
   };
@@ -962,7 +972,7 @@ export function resolveNextAction(options = {}) {
           };
         } else {
           const discoveryReport = findDiscoveryReport(init);
-          const runEvidence = findLatestRunEvidence(init);
+          const runEvidence = findLatestRunEvidence(init, { notBeforeMs: fs.statSync(intake.packetFile).mtimeMs });
           if (runEvidence) {
             closureState = buildClosureState({
               init,

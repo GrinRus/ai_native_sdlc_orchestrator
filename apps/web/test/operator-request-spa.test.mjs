@@ -20,6 +20,9 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /EvidenceGraphPanel/u);
   assert.match(source, /RuntimeTracePanel/u);
   assert.match(source, /targetRefsMissing/u);
+  assert.match(source, /draftFollowUpHandoffRef/u);
+  assert.match(source, /follow-up-source-handoff-ref/u);
+  assert.match(source, /Create follow-up from learning handoff/u);
   assert.match(source, /completed_read_only/u);
   assert.match(source, /target_flow_id/u);
   assert.match(source, /READ_ONLY_INSPECTION_INTENTS/u);

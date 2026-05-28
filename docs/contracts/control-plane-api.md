@@ -142,6 +142,10 @@ Flow projections are additive read models over existing durable artifacts:
 - `evidence_refs[]` contains only refs belonging to the selected flow.
 - `writeback_policy` mirrors mission scope and delivery evidence, including
   `upstream_writes_default=false` for installed-user guided flows.
+- `mission_settings` provides duplicate-safe mission intake defaults for
+  follow-up flow creation; submitting them still creates a new intake packet.
+- `closure_state` exposes completed-flow status, follow-up eligibility,
+  source run id, and learning handoff refs for closure-to-new-flow UX.
 - `completed_read_only=true` is required for completed flows.
 - `follow_up_source_handoff_ref` may cite a learning handoff from a completed
   source flow when a new follow-up flow is created.
@@ -167,10 +171,13 @@ Flow list and detail reads must be deterministic and must not create artifacts.
 `New Flow` is a lifecycle action through `mission create` plus `next`; it
 creates fresh mission/intake evidence, refreshes `next-action-report`, and
 archives mission-specific next-action evidence so a completed source flow remains
-inspectable. Operator-request create/read payloads may include `target_flow_id`
-so Ask AOR can stay scoped to the selected flow. Mutations against completed
-flows are blocked with `operator_request.completed_flow_read_only` unless the
-request is a `delivery_mode=no-write` read-only inspection intent.
+inspectable. Follow-up creation passes
+`--follow-up-source-handoff-ref <ref>` through the lifecycle command mutation and
+records the lineage on the new intake body/projection. Operator-request
+create/read payloads may include `target_flow_id` so Ask AOR can stay scoped to
+the selected flow. Mutations against completed flows are blocked with
+`operator_request.completed_flow_read_only` unless the request is a
+`delivery_mode=no-write` read-only inspection intent.
 
 Flow evidence graph and runtime trace reads are sanitized read models. They must
 not include raw `operator-request.request_text`; summaries, refs, target flow,

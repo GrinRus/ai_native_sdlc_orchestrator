@@ -84,6 +84,7 @@ button:disabled {
 .preview-pane span,
 .runtime-preview span,
 .target-flow-card span,
+.follow-up-lineage span,
 .action-grid span,
 .flow-snapshot-grid span,
 .stage-summary-grid span,
@@ -587,6 +588,28 @@ svg {
   border: 1px solid #9fd2b8;
   border-radius: 6px;
   background: #effaf4;
+}
+
+.closure-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.follow-up-lineage {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #d8e9df;
+  border-radius: 6px;
+  background: #f6fbf8;
+}
+
+.follow-up-lineage code {
+  overflow-wrap: anywhere;
 }
 
 .flow-lock-banner svg {

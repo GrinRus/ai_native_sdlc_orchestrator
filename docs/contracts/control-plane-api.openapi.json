@@ -1455,6 +1455,8 @@
           "latest_next_action_report_ref",
           "evidence_refs",
           "writeback_policy",
+          "mission_settings",
+          "closure_state",
           "completed_read_only"
         ],
         "properties": {
@@ -1498,6 +1500,12 @@
           "writeback_policy": {
             "$ref": "#/components/schemas/FlowWritebackPolicy"
           },
+          "mission_settings": {
+            "$ref": "#/components/schemas/FlowMissionSettings"
+          },
+          "closure_state": {
+            "$ref": "#/components/schemas/FlowClosureState"
+          },
           "completed_read_only": {
             "type": "boolean"
           },
@@ -1509,6 +1517,123 @@
           },
           "updated_at_ref": {
             "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowMissionSettings": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "brief": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "goals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "kpis": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "definition_of_done": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "delivery_mode": {
+            "type": "string"
+          },
+          "allowed_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forbidden_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowClosureState": {
+        "type": "object",
+        "required": [
+          "status",
+          "completed",
+          "completed_read_only",
+          "follow_up_eligible",
+          "source_learning_handoff_refs"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "completed_read_only": {
+            "type": "boolean"
+          },
+          "follow_up_eligible": {
+            "type": "boolean"
+          },
+          "learning_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_run_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_learning_handoff_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommended_follow_up_source_handoff_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "follow_up_source_handoff_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "additionalProperties": true
