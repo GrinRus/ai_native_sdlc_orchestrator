@@ -3,9 +3,9 @@
 ## Purpose
 
 This document freezes the accepted product direction and W34 contract baseline
-for the next AOR local console iteration. It is not an implementation claim:
-W34-S01 defines the runtime-owned flow semantics, while later W34 slices add
-runtime projections, web rendering, and live E2E proof.
+for the next AOR local console iteration. W34-S01 defines the runtime-owned flow
+semantics; W34-S02 implements the control-plane/runtime flow projections while
+later W34 slices add web rendering and live E2E proof.
 
 The design keeps AOR headless-first and runtime-owned: the web app renders
 control-plane read models, invokes bounded runtime mutations, and never owns

@@ -123,7 +123,7 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 | Web lifecycle | `control-plane-api`, `live-run-event` | W21-S05 maps guided stages to read models and lifecycle mutations without UI-owned orchestration; W31-S01 adds the packaged local SPA launcher and app-config route. |
 | Operator intervention | `operator-request`, `compiled-context-artifact`, `step-result` | W32-S01 adds runtime-owned Ask AOR/request flow across CLI, API, and web without creating a chat-only bypass. |
 | Closure | `next-action-report`, `review-decision`, `delivery-plan`, `delivery-manifest`, `release-packet`, `learning-loop-handoff` | W21-S06 exposes final-stage decisions, blockers, evidence refs, and exact next actions consistently across CLI/API/web. |
-| Flow projection | `control-plane-api`, `intake-request-body`, `next-action-report`, `operator-request`, closure artifacts | W34-S01 defines active/completed flow projections, stable flow ids, selected stage, flow-scoped evidence refs, `New Flow` lifecycle semantics, and follow-up handoff lineage without adding UI-owned state. |
+| Flow projection | `control-plane-api`, `intake-request-body`, `next-action-report`, `operator-request`, closure artifacts | W34-S01 defines active/completed flow semantics; W34-S02 implements runtime/control-plane flow list/detail/selected reads, `New Flow` evidence preservation, and completed-flow read-only request guards without adding UI-owned state. |
 | Proof | Live E2E profiles and observation reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, app smoke evidence, durable closure artifacts, and no-upstream-write assertions. |
 
 ## Out of scope for the guided journey contract

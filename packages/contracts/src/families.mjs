@@ -987,6 +987,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       version: "number",
       source_surface: "string",
       target_stage: "string",
+      target_flow_id: "string",
       intent_type: "string",
       request_text: "string",
       request_summary: "string",

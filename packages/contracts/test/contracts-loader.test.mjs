@@ -655,11 +655,16 @@ test("control-plane API baseline documents W34 flow projection examples", () => 
   assert.equal(loaded.ok, true, "fixture should load before assertions");
 
   const contract = loaded.document.flow_projection_contract;
-  assert.equal(contract?.owning_slice, "W34-S01");
-  assert.equal(contract?.implementation_slice, "W34-S02");
+  assert.equal(contract?.owning_slice, "W34-S02");
+  assert.equal(contract?.status, "implemented-read-baseline");
   assert.ok(contract?.projection_fields?.includes("flow_id"), "expected stable flow id field");
   assert.ok(contract?.projection_fields?.includes("follow_up_source_handoff_ref"), "expected follow-up lineage field");
+  assert.ok(
+    contract?.read_models?.some((entry) => entry.route === "GET /api/projects/:projectId/flows"),
+    "expected implemented flow list route",
+  );
   assert.equal(contract?.lifecycle_semantics?.new_flow?.creates_fresh_intake, true);
+  assert.equal(contract?.lifecycle_semantics?.new_flow?.archives_mission_next_action_report, true);
   assert.equal(contract?.lifecycle_semantics?.new_flow?.mutates_completed_source_flow, false);
   assert.equal(contract?.lifecycle_semantics?.follow_up_flow?.source_flow_read_only, true);
 
@@ -671,6 +676,7 @@ test("control-plane API baseline documents W34 flow projection examples", () => 
     "expected follow-up flow example to cite source handoff",
   );
   assert.equal(examples.flow_targeted_operator_request_summary?.target_flow_id, examples.active_flow?.flow_id);
+  assert.equal(examples.completed_flow_mutation_block?.error_code, "operator_request.completed_flow_read_only");
 });
 
 test("operator-request examples may target a W34 flow projection", () => {

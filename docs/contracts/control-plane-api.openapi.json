@@ -330,6 +330,102 @@
         }
       }
     },
+    "/api/projects/{projectId}/flows": {
+      "get": {
+        "operationId": "listFlows",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flows",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowList"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/selected": {
+      "get": {
+        "operationId": "getSelectedFlow",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "selected-flow",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowDetail"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}": {
+      "get": {
+        "operationId": "getFlow",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flow-detail",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowDetail"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/operator-requests": {
       "get": {
         "operationId": "listOperatorRequests",
@@ -920,6 +1016,33 @@
           }
         }
       },
+      "FlowList": {
+        "description": "Read-only runtime flow projection list built from mission, next-action, and closure evidence.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/FlowListResponse"
+            }
+          }
+        }
+      },
+      "FlowDetail": {
+        "description": "Read-only runtime flow projection or null when no selected flow exists.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FlowProjection"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
       "Runs": {
         "description": "Read-only run summary list built from filesystem runtime artifacts.",
         "content": {
@@ -1165,6 +1288,161 @@
           },
           "logs_root": {
             "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowListResponse": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "selected_flow_id",
+          "active_flow_ids",
+          "completed_flow_ids",
+          "flows",
+          "read_only"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "selected_flow_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "active_flow_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "completed_flow_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "flows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowProjection"
+            }
+          },
+          "generated_from": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowProjection": {
+        "type": "object",
+        "required": [
+          "flow_id",
+          "status",
+          "selected_stage",
+          "mission_id",
+          "intake_packet_ref",
+          "latest_next_action_report_ref",
+          "evidence_refs",
+          "writeback_policy",
+          "completed_read_only"
+        ],
+        "properties": {
+          "flow_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "selected_stage": {
+            "type": "string"
+          },
+          "mission_id": {
+            "type": "string"
+          },
+          "intake_packet_ref": {
+            "type": "string"
+          },
+          "intake_body_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latest_next_action_report_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "writeback_policy": {
+            "$ref": "#/components/schemas/FlowWritebackPolicy"
+          },
+          "completed_read_only": {
+            "type": "boolean"
+          },
+          "follow_up_source_handoff_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at_ref": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowWritebackPolicy": {
+        "type": "object",
+        "required": [
+          "mode",
+          "upstream_writes_default",
+          "requires_explicit_review"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "no-write",
+              "patch-only",
+              "local-branch",
+              "fork-first-pr"
+            ]
+          },
+          "upstream_writes_default": {
+            "type": "boolean"
+          },
+          "requires_explicit_review": {
+            "type": "boolean"
+          },
+          "allowed_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forbidden_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": true

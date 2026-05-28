@@ -703,6 +703,26 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(nextReportPayload.document.primary_action.action_id, "discovery-run");
       assert.equal(nextReportPayload.document.closure_state.run_id, null);
 
+      const flowsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows`);
+      assert.equal(flowsResponse.status, 200);
+      const flowsPayload = await flowsResponse.json();
+      assert.equal(flowsPayload.read_only, true);
+      assert.ok(flowsPayload.active_flow_ids.includes(`flow.${transport.projectId}.web-guided-flow`));
+      assert.equal(flowsPayload.completed_flow_ids.length, 0);
+
+      const selectedFlowResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows/selected`);
+      assert.equal(selectedFlowResponse.status, 200);
+      const selectedFlowPayload = await selectedFlowResponse.json();
+      assert.equal(selectedFlowPayload.flow_id, `flow.${transport.projectId}.web-guided-flow`);
+      assert.equal(selectedFlowPayload.status, "active");
+
+      const flowDetailResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}`,
+      );
+      assert.equal(flowDetailResponse.status, 200);
+      const flowDetailPayload = await flowDetailResponse.json();
+      assert.equal(flowDetailPayload.latest_next_action_report_ref.includes("next-action-report"), true);
+
       const runtimeLayout = missionPayload.lifecycle_command.command_output.runtime_layout;
       assert.equal(typeof runtimeLayout.reportsRoot, "string");
       assert.equal(typeof runtimeLayout.artifactsRoot, "string");

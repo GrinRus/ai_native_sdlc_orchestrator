@@ -90,7 +90,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S02 — Runtime and control-plane flow projections
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** CLI/API/web can read selected-flow state, list active and completed flows, create a new flow through existing lifecycle commands, and keep completed evidence read-only.
 - **Primary modules:** `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, `docs/contracts/**`, `examples/control-plane-api/**`, tests
 - **Hard dependencies:** W34-S01
@@ -126,7 +126,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S03 — Flow-first local web shell
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** The packaged local SPA implements the accepted flow-centric shell with project/runtime context, flow selector, active cockpit, stage rail, and safety/evidence right rail.
 - **Primary modules:** `apps/web/**`, `apps/cli/**`, `docs/product/assets/w34-flow-centric-console/**`, tests
 - **Hard dependencies:** W34-S02
@@ -161,7 +161,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S04 — Flow-scoped evidence, trace, and interaction workbench
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Advanced console views show evidence, runtime traces, operator requests, and runtime interactions in the selected-flow context.
 - **Primary modules:** `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/**`, tests
 - **Hard dependencies:** W34-S02
@@ -197,7 +197,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S05 — Closure-to-new-flow UX
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Learning closure gives the operator an explicit, safe path to start a second flow while preserving the completed first flow as audit evidence.
 - **Primary modules:** `packages/orchestrator-core/**`, `apps/web/**`, `docs/product/**`, `docs/contracts/**`, tests
 - **Hard dependencies:** W34-S02

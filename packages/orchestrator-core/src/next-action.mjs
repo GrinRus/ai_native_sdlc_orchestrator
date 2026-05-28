@@ -55,6 +55,14 @@ function shellQuote(value) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeForFileName(value) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
+}
+
+/**
  * @param {string} projectRoot
  * @param {string} filePath
  * @returns {string}
@@ -1042,12 +1050,20 @@ export function resolveNextAction(options = {}) {
     const issueSummary = validation.issues.map((issue) => issue.message).join("; ");
     throw new Error(`Generated next-action report failed contract validation: ${issueSummary}`);
   }
+  const archiveSuffix =
+    normalizeForFileName(asString(missionState.mission_id) ?? path.basename(asString(missionState.intake_packet_ref) ?? "current", ".json")) ||
+    "current";
+  const archiveReportFile = path.join(init.runtimeLayout.reportsRoot, `next-action-report-${archiveSuffix}.json`);
+  if (archiveReportFile !== reportFile) {
+    fs.writeFileSync(archiveReportFile, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  }
   fs.writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
   return {
     ...init,
     nextActionReport: report,
     nextActionReportFile: reportFile,
+    nextActionReportArchiveFile: archiveReportFile,
     nextActionReportId: report.report_id,
   };
 }

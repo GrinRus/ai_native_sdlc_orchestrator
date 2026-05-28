@@ -16,7 +16,7 @@ the accepted alpha transport boundary. A future NestJS-backed transport requires
 a new ADR before implementation work changes this contract.
 
 Implemented operation families:
-- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report;
+- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report, flow projections;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
 - operator requests: create/list/run bounded operator-initiated runtime interventions with sanitized read payloads;
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
@@ -124,11 +124,10 @@ Project bootstrap baseline:
 - finance monitoring snapshots
 - next-action reports
 
-## Flow projection baseline (W34-S01)
+## Flow projection baseline (W34-S02)
 
-W34 adds a contract baseline for flow-centric read models without expanding the
-implemented OpenAPI route set in this slice. W34-S02 owns implementation and
-route-level OpenAPI alignment.
+W34 adds implemented flow-centric read models over existing runtime artifacts
+without making the browser an orchestration owner.
 
 Flow projections are additive read models over existing durable artifacts:
 - `flow_id` is stable for one mission/intake lineage.
@@ -147,12 +146,23 @@ Flow projections are additive read models over existing durable artifacts:
 - `follow_up_source_handoff_ref` may cite a learning handoff from a completed
   source flow when a new follow-up flow is created.
 
-Flow list reads must distinguish active and completed flows and expose
-`selected_flow_id` without creating artifacts. Flow details must be deterministic
-reads. `New Flow` is a lifecycle action that creates fresh mission/intake
-evidence and refreshes `next-action-report`; it must not mutate a completed
-source flow. Operator-request read summaries may include `target_flow_id` so Ask
-AOR can stay scoped to the selected flow.
+Implemented detached read routes:
+- `GET /api/projects/:projectId/flows` returns the bounded flow list with
+  `selected_flow_id`, `active_flow_ids`, `completed_flow_ids`, and flow
+  projections.
+- `GET /api/projects/:projectId/flows/selected` returns the selected flow
+  projection or `null`.
+- `GET /api/projects/:projectId/flows/:flowId` returns one flow projection or
+  `404`.
+
+Flow list and detail reads must be deterministic and must not create artifacts.
+`New Flow` is a lifecycle action through `mission create` plus `next`; it
+creates fresh mission/intake evidence, refreshes `next-action-report`, and
+archives mission-specific next-action evidence so a completed source flow remains
+inspectable. Operator-request create/read payloads may include `target_flow_id`
+so Ask AOR can stay scoped to the selected flow. Mutations against completed
+flows are blocked with `operator_request.completed_flow_read_only` unless the
+request is a `delivery_mode=no-write` read-only inspection intent.
 
 ## Connected lifecycle mutations (W18 baseline)
 
@@ -202,8 +212,14 @@ Operator-initiated runtime work uses first-class request artifacts rather than
 
 Create payload fields:
 - `target_stage`, `intent_type`, `request_text`;
-- optional `target_refs[]`, `allowed_paths[]`, and `delivery_mode`;
+- optional `target_flow_id`, `target_refs[]`, `allowed_paths[]`, and `delivery_mode`;
 - `delivery_mode` defaults to `no-write`; non-`no-write` modes require explicit allowed paths.
+
+When `target_flow_id` points to a completed flow, operator-request creation and
+execution must preserve completed-flow read-only behavior. Read-only inspection
+intents (`analyze`, `explain`, `review`, `validate`) are allowed only with
+`delivery_mode=no-write`; write/proposal intents or any non-`no-write` delivery
+mode fail with an explicit completed-flow read-only error.
 
 Run responses include `operator_request_ref`, `run_id`,
 `routed_step_result_file`, `compiled_context_ref`, `proposal_refs`,

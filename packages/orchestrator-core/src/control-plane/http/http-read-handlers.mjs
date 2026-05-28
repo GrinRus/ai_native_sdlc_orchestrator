@@ -1,7 +1,8 @@
-import { readQueryInteger, sendJson } from "./http-utils.mjs";
+import { readQueryInteger, sendError, sendJson } from "./http-utils.mjs";
 import {
   listCompilerRevisionStatuses,
   listDeliveryManifests,
+  listFlowProjections,
   listMultirepoCoordinationStatuses,
   listOperatorRequests,
   listPacketArtifacts,
@@ -9,12 +10,14 @@ import {
   listQualityArtifacts,
   listRuns,
   readFinanceMonitoringSnapshot,
+  readFlowProjection,
   readNextActionReport,
   listStepResults,
   readPlannerMetrics,
   readProjectState,
   readRunEventHistory,
   readRunPolicyHistory,
+  readSelectedFlowProjection,
   readStrategicSnapshot,
 } from "../read-surface.mjs";
 
@@ -84,6 +87,24 @@ export function handleReadRoute({ routeId, params, requestUrl, response, runtime
     case "next-action-report":
       sendJson(response, 200, readNextActionReport(withReadModelLimit(runtimeOptions, requestUrl.searchParams)));
       return;
+    case "flows":
+      sendJson(response, 200, listFlowProjections(withReadModelLimit(runtimeOptions, requestUrl.searchParams)));
+      return;
+    case "selected-flow":
+      sendJson(response, 200, readSelectedFlowProjection(runtimeOptions));
+      return;
+    case "flow-detail": {
+      const flow = readFlowProjection({
+        ...runtimeOptions,
+        flowId: params.flowId,
+      });
+      if (!flow) {
+        sendError(response, 404, "flow.not_found", `Flow '${params.flowId}' was not found.`);
+        return;
+      }
+      sendJson(response, 200, flow);
+      return;
+    }
     case "operator-requests":
       sendJson(response, 200, listOperatorRequests(withReadModelLimit(runtimeOptions, requestUrl.searchParams)));
       return;

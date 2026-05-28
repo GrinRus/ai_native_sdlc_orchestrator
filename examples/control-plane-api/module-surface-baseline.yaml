@@ -14,6 +14,8 @@ openapi_contract:
     query_parameter: limit
   typed_payload_schemas:
     - ProjectStateResponse
+    - FlowListResponse
+    - FlowDetailResponse
     - RunsResponse
     - RunEventHistoryResponse
     - RunControlActionRequest
@@ -62,6 +64,17 @@ read_operations:
     operation_family: read
     output_contract_families:
       - operator-request
+  - operation_id: read.flow-list
+    operation_family: read
+    output_contract_families:
+      - artifact-packet
+      - next-action-report
+      - operator-request
+  - operation_id: read.flow-detail
+    operation_family: read
+    output_contract_families:
+      - artifact-packet
+      - next-action-report
 
 run_control_operations:
   - operation_id: run.start
@@ -116,9 +129,8 @@ operator_request_operations:
     raw_request_text_storage: omitted-from-read-surface
 
 flow_projection_contract:
-  owning_slice: W34-S01
-  status: contract-baseline
-  implementation_slice: W34-S02
+  owning_slice: W34-S02
+  status: implemented-read-baseline
   source_of_truth:
     product: docs/product/03-flow-centric-console-design.md
     contract: docs/contracts/control-plane-api.md
@@ -134,18 +146,29 @@ flow_projection_contract:
     - writeback_policy
     - completed_read_only
     - follow_up_source_handoff_ref
-  planned_read_models:
+  read_models:
     - operation_id: read.flow-list
-      route_status: planned-w34-s02
+      route_status: implemented
+      route: GET /api/projects/:projectId/flows
       returns: flow_list
+      bounded_by: limit
     - operation_id: read.flow-detail
-      route_status: planned-w34-s02
+      route_status: implemented
+      route: GET /api/projects/:projectId/flows/:flowId
+      returns: flow_detail
+    - operation_id: read.selected-flow
+      route_status: implemented
+      route: GET /api/projects/:projectId/flows/selected
       returns: selected_flow
   lifecycle_semantics:
     new_flow:
       route_family: lifecycle-command
+      command_sequence:
+        - mission create
+        - next
       creates_fresh_intake: true
       refreshes_next_action_report: true
+      archives_mission_next_action_report: true
       mutates_completed_source_flow: false
     follow_up_flow:
       lineage_field: follow_up_source_handoff_ref
@@ -234,6 +257,18 @@ flow_projection_contract:
       status: completed
       evidence_refs:
         - packet://operator-request@evidence://reports/operator-request-aor-core-checkout-risk-1.json
+    completed_flow_mutation_block:
+      target_flow_id: flow.aor-core.release-readiness
+      requested_delivery_mode: patch-only
+      allowed: false
+      error_code: operator_request.completed_flow_read_only
+      read_only_inspection_allowed:
+        intent_types:
+          - analyze
+          - explain
+          - review
+          - validate
+        delivery_mode: no-write
 
 lifecycle_command_operations:
   owning_slice: W18-S02
@@ -334,6 +369,9 @@ deferred_transport:
     - GET /api/projects/:projectId/planner-metrics
     - GET /api/projects/:projectId/finance-monitoring
     - GET /api/projects/:projectId/next-action-report
+    - GET /api/projects/:projectId/flows
+    - GET /api/projects/:projectId/flows/selected
+    - GET /api/projects/:projectId/flows/:flowId
     - GET /api/projects/:projectId/operator-requests
     - GET /api/projects/:projectId/packets
     - GET /api/projects/:projectId/step-results

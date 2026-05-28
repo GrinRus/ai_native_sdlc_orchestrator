@@ -1031,6 +1031,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--stage <stage>",
       "--intent <analyze|explain|revise-document|create-document|repair|validate|plan|implement|review>",
       "--request <text>",
+      "--target-flow-id <flow_id> (optional)",
       "--target-ref <ref[,ref...]> (optional, repeatable)",
       "--allowed-path <glob[,glob...]> (optional, repeatable)",
       "--delivery-mode <no-write|patch-only|local-branch|fork-first-pr> (optional, defaults to no-write)",

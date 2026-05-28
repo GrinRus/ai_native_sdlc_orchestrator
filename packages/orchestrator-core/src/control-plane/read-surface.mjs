@@ -13,6 +13,13 @@ export {
 } from "./read-artifact-readers.mjs";
 
 export {
+  assertFlowMutationAllowed,
+  listFlowProjections,
+  readFlowProjection,
+  readSelectedFlowProjection,
+} from "./flow-projections.mjs";
+
+export {
   readFinanceMonitoringSnapshot,
   listRuns,
   readPlannerMetrics,
