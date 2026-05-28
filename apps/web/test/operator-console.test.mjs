@@ -27,14 +27,21 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
 
   for (const required of [
     "safe-walkthrough",
-    "Create mission",
+    "Create Mission Packet & Resolve Next Action",
     "Mission intake",
+    "Flow selector",
+    "Active flows",
+    "Completed flows (read-only)",
+    "Flow completed - evidence locked",
     "Next action",
     "Evidence refs",
     "No upstream writes",
+    "/flows/selected",
     "lifecycle-command/actions",
     "operator-requests",
+    "target_flow_id",
     "Create and run request",
+    "Create no-write inspection request",
     "operator-request.completed",
     "mission create",
     "next",
@@ -43,7 +50,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     assert.ok(source.includes(required), `SPA source should include '${required}'`);
   }
   assert.ok(css.includes(".app-shell"), "SPA CSS should define app shell layout");
-  assert.ok(css.includes(".stage-rail"), "SPA CSS should define guided stage rail layout");
+  assert.ok(css.includes(".flow-selector"), "SPA CSS should define flow selector layout");
+  assert.ok(css.includes(".flow-cockpit"), "SPA CSS should define flow-first cockpit layout");
+  assert.ok(css.includes(".stage-rail"), "SPA CSS should define flow-scoped stage rail layout");
   assert.ok(css.includes(".right-rail"), "SPA CSS should define evidence rail layout");
 });
 

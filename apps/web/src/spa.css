@@ -35,7 +35,7 @@ button:disabled {
 .app-shell {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr) 310px;
-  grid-template-rows: 44px minmax(520px, auto) auto auto;
+  grid-template-rows: minmax(58px, auto) minmax(520px, auto) auto auto;
   min-height: 100vh;
 }
 
@@ -43,10 +43,11 @@ button:disabled {
   grid-column: 1 / -1;
   grid-row: 1;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   min-width: 0;
-  padding: 6px 14px;
+  padding: 8px 14px;
   border-bottom: 1px solid #dfe5ea;
   background: #ffffff;
 }
@@ -55,7 +56,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 9px;
-  min-width: 220px;
+  min-width: 210px;
 }
 
 .brand-mark {
@@ -77,10 +78,14 @@ button:disabled {
 
 .brand span,
 .top-context span,
+.flow-selector span,
 .field span,
 .rail-title span,
 .preview-pane span,
 .runtime-preview span,
+.target-flow-card span,
+.action-grid span,
+.flow-snapshot-grid span,
 .stage-summary-grid span,
 .readiness-grid span {
   color: #65717d;
@@ -90,15 +95,48 @@ button:disabled {
 
 .top-context {
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
+.top-context span {
+  white-space: nowrap;
+}
+
 .top-context code {
-  max-width: 360px;
+  max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-context code {
+  max-width: 220px;
+}
+
+.flow-selector {
+  display: grid;
+  grid-template-columns: minmax(230px, 320px) auto;
+  flex: 1 1 390px;
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
+.flow-selector label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.flow-selector select {
+  height: 34px;
+}
+
+.new-flow-button,
+.utility-button {
   white-space: nowrap;
 }
 
@@ -204,6 +242,21 @@ button:disabled {
   background: #0f766e;
 }
 
+.rail-note {
+  display: grid;
+  gap: 5px;
+  margin: 14px;
+  padding: 12px;
+  border: 1px solid #dbe7ee;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.rail-note strong,
+.flow-snapshot-grid strong {
+  overflow-wrap: anywhere;
+}
+
 .main {
   grid-column: 2;
   grid-row: 2;
@@ -282,6 +335,16 @@ p {
 .stage-work {
   display: grid;
   gap: 12px;
+}
+
+.flow-cockpit {
+  display: grid;
+  gap: 14px;
+}
+
+.flow-cockpit.read-only {
+  border-color: #bdd6c9;
+  background: #fbfefc;
 }
 
 .form-grid {
@@ -392,10 +455,16 @@ svg {
 }
 
 .stage-summary-grid,
-.readiness-grid {
+.readiness-grid,
+.action-grid,
+.flow-snapshot-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.action-grid {
+  grid-template-columns: minmax(260px, 1.4fr) minmax(150px, 0.8fr);
 }
 
 .readiness-grid {
@@ -404,7 +473,10 @@ svg {
 
 .stage-summary-grid > div,
 .readiness-grid > div,
+.action-grid > div,
+.flow-snapshot-grid > div,
 .runtime-preview,
+.target-flow-card,
 .run-result,
 .preview-pane {
   display: grid;
@@ -414,6 +486,139 @@ svg {
   border: 1px solid #e4eaef;
   border-radius: 6px;
   background: #f9fbfc;
+}
+
+.target-flow-card.read-only {
+  border-color: #9fd2b8;
+  background: #f3fbf6;
+}
+
+.heading-line,
+.action-header,
+.cockpit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.flow-timeline {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(86px, 1fr));
+  gap: 0;
+  overflow-x: auto;
+  padding: 12px;
+  border: 1px solid #e4eaef;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.timeline-step {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  min-width: 86px;
+  color: #51606d;
+  text-align: center;
+}
+
+.timeline-step::before {
+  content: "";
+  position: absolute;
+  top: 13px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #d9e1e8;
+  z-index: 0;
+}
+
+.timeline-step:first-child::before {
+  left: 50%;
+}
+
+.timeline-step:last-child::before {
+  right: 50%;
+}
+
+.timeline-step span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  z-index: 1;
+  border: 1px solid #b9c5cf;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #24313c;
+  font-weight: 850;
+}
+
+.timeline-step.done span,
+.timeline-step.current span {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.timeline-step.done::before,
+.timeline-step.current::before {
+  background: #0f766e;
+}
+
+.timeline-step strong {
+  font-size: 11px;
+}
+
+.timeline-step em {
+  color: #65717d;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.flow-lock-banner {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #9fd2b8;
+  border-radius: 6px;
+  background: #effaf4;
+}
+
+.flow-lock-banner svg {
+  width: 24px;
+  height: 24px;
+  color: #047857;
+}
+
+.recommended-action {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #b9d8d6;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.command-panel {
+  background: #0f1d2b !important;
+}
+
+.command-panel span,
+.command-panel p {
+  color: #d6e4ef;
+}
+
+.command-panel code {
+  color: #ffffff;
+}
+
+.cockpit-actions {
+  justify-content: flex-start;
 }
 
 .rail-card {
@@ -720,7 +925,16 @@ code {
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 220px minmax(0, 1fr);
-    grid-template-rows: 44px auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+  }
+
+  .flow-selector {
+    grid-template-columns: minmax(220px, 1fr) auto;
+    flex: 1 1 420px;
   }
 
   .right-rail {
@@ -752,6 +966,15 @@ code {
 
   .brand {
     min-width: 180px;
+  }
+
+  .flow-selector {
+    grid-template-columns: 1fr;
+    flex-basis: 100%;
+  }
+
+  .new-flow-button {
+    width: 100%;
   }
 
   .stage-rail {
@@ -796,10 +1019,16 @@ code {
   .form-grid,
   .form-grid.compact,
   .stage-summary-grid,
+  .action-grid,
+  .flow-snapshot-grid,
   .readiness-grid,
   .evidence-grid,
   .interaction-row {
     grid-template-columns: 1fr;
+  }
+
+  .flow-timeline {
+    grid-template-columns: repeat(7, 106px);
   }
 
   .form-header {

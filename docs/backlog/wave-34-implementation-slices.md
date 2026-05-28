@@ -126,7 +126,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S03 — Flow-first local web shell
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** The packaged local SPA implements the accepted flow-centric shell with project/runtime context, flow selector, active cockpit, stage rail, and safety/evidence right rail.
 - **Primary modules:** `apps/web/**`, `apps/cli/**`, `docs/product/assets/w34-flow-centric-console/**`, tests
 - **Hard dependencies:** W34-S02

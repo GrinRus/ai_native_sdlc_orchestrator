@@ -4,8 +4,10 @@
 
 This document freezes the accepted product direction and W34 contract baseline
 for the next AOR local console iteration. W34-S01 defines the runtime-owned flow
-semantics; W34-S02 implements the control-plane/runtime flow projections while
-later W34 slices add web rendering and live E2E proof.
+semantics; W34-S02 implements the control-plane/runtime flow projections; W34-S03
+renders the packaged flow-first local web shell while later W34 slices add
+advanced flow workbench behavior, closure-to-new-flow shortcuts, and live E2E
+proof.
 
 The design keeps AOR headless-first and runtime-owned: the web app renders
 control-plane read models, invokes bounded runtime mutations, and never owns
@@ -90,6 +92,22 @@ flow's learning handoff, but the completed source flow remains read-only.
   interactions inbox, and Ask AOR request targeting.
 - The design must remain usable without hosted services, SSO, SaaS deployment,
   CORS expansion, or upstream writes by default.
+
+## W34-S03 implementation trace
+
+The packaged SPA now treats the flow as the primary object:
+
+- The top bar exposes project identity, selected flow, runtime root, connection
+  status, no-write safety status, refresh, and `New Flow`.
+- `New Flow` opens mission intake as a draft and still creates durable evidence
+  only through `mission create` followed by `next`.
+- Active flows render an active cockpit with one recommended action, blockers,
+  evidence refs, runtime root, write-back mode, and safety status.
+- Completed flows render as read-only closure/evidence views with mutation
+  controls disabled or replaced by no-write inspection actions.
+- Ask AOR submissions include `target_flow_id` for the selected flow; completed
+  flows only allow no-write inspection intents.
+- The stage rail remains flow-scoped navigation, not lifecycle state ownership.
 
 ## Live E2E implications
 
