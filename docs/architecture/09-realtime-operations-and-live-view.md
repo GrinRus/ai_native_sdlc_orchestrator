@@ -54,6 +54,19 @@ and must show sanitized summaries and refs, not raw request text. Successful
 runs refresh/materialize `next-action-report` so the right rail and headless
 CLI/API surfaces converge on the same next action.
 
+## Flow-centric local view
+
+The W34 local console uses flow projections from the control plane instead of
+browser-owned lifecycle state. The flow selector, active-flow cockpit,
+completed-flow history, and flow-scoped advanced views all read stable
+`flow_id`, `status`, `selected_stage`, evidence refs, and write-back policy
+from runtime artifacts.
+
+Connected UI actions may select a flow, create an operator request for that
+flow, or start `New Flow` through lifecycle-command mutations. They must not
+mutate completed flow evidence, infer a selected flow from local storage, or
+create a follow-up without durable mission/intake and next-action evidence.
+
 ## Interactive continuation
 When a runner asks a question, AOR treats it as a run continuation boundary:
 - the routed step persists `step-result.requested_interaction` with a query-safe summary and evidence refs;

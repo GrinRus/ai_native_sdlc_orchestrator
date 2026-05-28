@@ -31,6 +31,19 @@ Guided commands and web stages are an overlay on the canonical flow:
 
 The overlay must not change the orchestration owner. CLI, API, and web surfaces should all point back to the same runtime-owned commands, control-plane mutations, and durable evidence refs.
 
+## Flow-centric overlay
+
+W34 adds a flow projection over the canonical flow without changing the
+canonical artifact owners. A flow groups one mission/intake lineage, the latest
+next-action report, run/review/delivery/release/learning evidence, and
+operator-request summaries under one stable `flow_id`.
+
+Active flows remain mutable only through runtime-owned commands and
+control-plane mutations. Completed flows are read-only evidence chains. Starting
+`New Flow` creates a new mission/intake packet and refreshes `next`; if it is a
+follow-up, it cites the completed source flow's learning handoff instead of
+reopening or editing the completed flow.
+
 ## Why bootstrap is a first-class stage
 AOR cannot safely run against a repository until it knows:
 - its topology,

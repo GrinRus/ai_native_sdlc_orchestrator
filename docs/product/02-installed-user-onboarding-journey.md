@@ -56,6 +56,14 @@ flow boundaries, `New Flow`, closure-to-follow-up behavior, flow-scoped
 evidence views, flow-targeted Ask AOR, and browser-task live E2E proof
 coverage with accepted skill-agent UI/UX verdicts.
 
+W34-S01 promotes that direction into the product contract baseline. A flow is a
+runtime/control-plane projection over mission/intake, next-action,
+operator-request, run, review, delivery, release, and learning evidence.
+Active flows can invoke runtime-owned lifecycle mutations. Completed flows are
+read-only evidence chains. `New Flow` creates fresh mission/intake evidence and
+refreshes `next`; follow-up flows may cite a completed learning handoff without
+mutating the completed source flow.
+
 W31-S01 adds the installed-package local app mode:
 - `aor app --project-ref <repo>` starts a foreground loopback server and opens the packaged SPA by default;
 - `/` serves the SPA, `/app-config.json` returns `project_id`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata;
@@ -115,6 +123,7 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 | Web lifecycle | `control-plane-api`, `live-run-event` | W21-S05 maps guided stages to read models and lifecycle mutations without UI-owned orchestration; W31-S01 adds the packaged local SPA launcher and app-config route. |
 | Operator intervention | `operator-request`, `compiled-context-artifact`, `step-result` | W32-S01 adds runtime-owned Ask AOR/request flow across CLI, API, and web without creating a chat-only bypass. |
 | Closure | `next-action-report`, `review-decision`, `delivery-plan`, `delivery-manifest`, `release-packet`, `learning-loop-handoff` | W21-S06 exposes final-stage decisions, blockers, evidence refs, and exact next actions consistently across CLI/API/web. |
+| Flow projection | `control-plane-api`, `intake-request-body`, `next-action-report`, `operator-request`, closure artifacts | W34-S01 defines active/completed flow projections, stable flow ids, selected stage, flow-scoped evidence refs, `New Flow` lifecycle semantics, and follow-up handoff lineage without adding UI-owned state. |
 | Proof | Live E2E profiles and observation reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, app smoke evidence, durable closure artifacts, and no-upstream-write assertions. |
 
 ## Out of scope for the guided journey contract

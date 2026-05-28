@@ -54,3 +54,15 @@ Delivery statuses are `waiting-for-review`, `blocked-review-required`, `ready-to
 Learning statuses are `waiting-for-release`, `ready-for-handoff`, or `handoff-complete`.
 
 Risky delivery and release recommendations must use `--require-review-decision` and must not be selected while `review.status` is anything other than `approved`.
+
+## Flow projection usage (W34-S01)
+
+Flow-centric UI and control-plane reads consume `next-action-report` as input
+evidence; this contract remains the owner of the single safe next action. A
+flow projection may copy the latest report ref, selected stage, blockers,
+evidence refs, closure state, and bounded execution/write-back policy, but it
+must not invent a second next-action decision.
+
+After `New Flow`, runtime must create fresh mission/intake evidence and then run
+`next` so the new flow points at a new `next-action-report`. Completed source
+flows keep their existing report and closure evidence as read-only history.

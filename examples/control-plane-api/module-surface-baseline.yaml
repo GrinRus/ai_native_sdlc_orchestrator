@@ -115,6 +115,126 @@ operator_request_operations:
     route: GET /api/projects/:projectId/operator-requests
     raw_request_text_storage: omitted-from-read-surface
 
+flow_projection_contract:
+  owning_slice: W34-S01
+  status: contract-baseline
+  implementation_slice: W34-S02
+  source_of_truth:
+    product: docs/product/03-flow-centric-console-design.md
+    contract: docs/contracts/control-plane-api.md
+  projection_fields:
+    - flow_id
+    - status
+    - selected_stage
+    - mission_id
+    - intake_packet_ref
+    - intake_body_ref
+    - latest_next_action_report_ref
+    - evidence_refs
+    - writeback_policy
+    - completed_read_only
+    - follow_up_source_handoff_ref
+  planned_read_models:
+    - operation_id: read.flow-list
+      route_status: planned-w34-s02
+      returns: flow_list
+    - operation_id: read.flow-detail
+      route_status: planned-w34-s02
+      returns: selected_flow
+  lifecycle_semantics:
+    new_flow:
+      route_family: lifecycle-command
+      creates_fresh_intake: true
+      refreshes_next_action_report: true
+      mutates_completed_source_flow: false
+    follow_up_flow:
+      lineage_field: follow_up_source_handoff_ref
+      source_flow_read_only: true
+  example_payloads:
+    flow_list:
+      selected_flow_id: flow.aor-core.checkout-risk
+      active_flow_ids:
+        - flow.aor-core.checkout-risk
+      completed_flow_ids:
+        - flow.aor-core.release-readiness
+      flows:
+        - flow_id: flow.aor-core.checkout-risk
+          status: active
+          selected_stage: discovery
+          mission_id: checkout-risk
+          intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+          latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json
+          writeback_policy:
+            mode: patch-only
+            upstream_writes_default: false
+        - flow_id: flow.aor-core.release-readiness
+          status: completed
+          selected_stage: learning
+          mission_id: release-readiness
+          intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness.v1.json
+          latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness.json
+          completed_read_only: true
+          writeback_policy:
+            mode: no-write
+            upstream_writes_default: false
+    active_flow:
+      flow_id: flow.aor-core.checkout-risk
+      status: active
+      selected_stage: discovery
+      mission_id: checkout-risk
+      intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+      intake_body_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.body.json
+      latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json
+      evidence_refs:
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+        - evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json
+      writeback_policy:
+        mode: patch-only
+        upstream_writes_default: false
+        requires_explicit_review: true
+    completed_flow:
+      flow_id: flow.aor-core.release-readiness
+      status: completed
+      selected_stage: learning
+      mission_id: release-readiness
+      intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness.v1.json
+      intake_body_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness.v1.body.json
+      latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness.json
+      completed_read_only: true
+      evidence_refs:
+        - evidence://.aor/projects/aor-core/reports/review-report-run.release-readiness.json
+        - evidence://.aor/projects/aor-core/artifacts/release-packet-run.release-readiness.json
+        - evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+      writeback_policy:
+        mode: no-write
+        upstream_writes_default: false
+        requires_explicit_review: false
+    follow_up_flow:
+      flow_id: flow.aor-core.release-readiness-follow-up
+      status: active
+      selected_stage: mission
+      mission_id: release-readiness-follow-up
+      intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness-follow-up.v1.json
+      intake_body_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness-follow-up.v1.body.json
+      latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness-follow-up.json
+      follow_up_source_handoff_ref: evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+      evidence_refs:
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness-follow-up.v1.json
+        - evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness-follow-up.json
+      writeback_policy:
+        mode: no-write
+        upstream_writes_default: false
+        requires_explicit_review: false
+    flow_targeted_operator_request_summary:
+      request_id: operator-request.aor-core.checkout-risk.1
+      target_flow_id: flow.aor-core.checkout-risk
+      target_stage: discovery
+      request_summary: Explain checkout-risk blockers from the selected flow evidence.
+      delivery_mode: no-write
+      status: completed
+      evidence_refs:
+        - packet://operator-request@evidence://reports/operator-request-aor-core-checkout-risk-1.json
+
 lifecycle_command_operations:
   owning_slice: W18-S02
   status: implemented-bounded-subset

@@ -112,6 +112,7 @@ Project bootstrap baseline:
 ## Query families
 - projects
 - packets
+- flow projections
 - runs
 - step results
 - validation and evaluation reports
@@ -122,6 +123,36 @@ Project bootstrap baseline:
 - planner metric snapshots
 - finance monitoring snapshots
 - next-action reports
+
+## Flow projection baseline (W34-S01)
+
+W34 adds a contract baseline for flow-centric read models without expanding the
+implemented OpenAPI route set in this slice. W34-S02 owns implementation and
+route-level OpenAPI alignment.
+
+Flow projections are additive read models over existing durable artifacts:
+- `flow_id` is stable for one mission/intake lineage.
+- `status` is `active` for mutable in-progress flows or `completed` for
+  read-only evidence chains.
+- `selected_stage` is derived from the latest `next-action-report` and closure
+  artifacts.
+- `mission_id`, `intake_packet_ref`, and `intake_body_ref` point to existing
+  mission evidence.
+- `latest_next_action_report_ref` points to the report that selected the next
+  action or closure state.
+- `evidence_refs[]` contains only refs belonging to the selected flow.
+- `writeback_policy` mirrors mission scope and delivery evidence, including
+  `upstream_writes_default=false` for installed-user guided flows.
+- `completed_read_only=true` is required for completed flows.
+- `follow_up_source_handoff_ref` may cite a learning handoff from a completed
+  source flow when a new follow-up flow is created.
+
+Flow list reads must distinguish active and completed flows and expose
+`selected_flow_id` without creating artifacts. Flow details must be deterministic
+reads. `New Flow` is a lifecycle action that creates fresh mission/intake
+evidence and refreshes `next-action-report`; it must not mutate a completed
+source flow. Operator-request read summaries may include `target_flow_id` so Ask
+AOR can stay scoped to the selected flow.
 
 ## Connected lifecycle mutations (W18 baseline)
 

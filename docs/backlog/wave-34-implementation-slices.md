@@ -53,7 +53,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S01 — Flow product and contract baseline
 - **Epic:** EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Product, architecture, and contracts define a runtime-owned flow projection that can be implemented by CLI/API/web without inventing browser-only orchestration state.
 - **Primary modules:** `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `examples/**`, `docs/backlog/**`
 - **Hard dependencies:** W33-S10, W32-S01, W21-S07
@@ -90,7 +90,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S02 — Runtime and control-plane flow projections
 - **Epic:** EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** CLI/API/web can read selected-flow state, list active and completed flows, create a new flow through existing lifecycle commands, and keep completed evidence read-only.
 - **Primary modules:** `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, `docs/contracts/**`, `examples/control-plane-api/**`, tests
 - **Hard dependencies:** W34-S01

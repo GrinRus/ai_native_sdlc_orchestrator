@@ -11,6 +11,8 @@ An operator request is not a direct chat transcript. The request is stored as a 
 - `version`: contract version, currently `1`.
 - `source_surface`: source surface such as `cli`, `api`, or `web`.
 - `target_stage`: AOR flow stage the request belongs to.
+- `target_flow_id`: optional W34 flow projection id when the request is scoped
+  to a selected flow.
 - `intent_type`: one of `analyze`, `explain`, `revise-document`, `create-document`, `repair`, `validate`, `plan`, `implement`, `review`.
 - `request_text`: durable raw operator request text. Read/live surfaces must prefer `request_summary`.
 - `request_summary`: sanitized short summary for UI/API lists.
@@ -29,6 +31,11 @@ An operator request is not a direct chat transcript. The request is stored as a 
 `delivery_mode=no-write` is the default and produces analysis/proposal evidence only. `patch-only` may produce patch evidence, but v1 must not silently mutate target project files; direct mutation remains gated by existing delivery modes, policy checks, and future explicit writeback flows.
 
 The context compiler receives the request as an input packet reference. Runtime prompt selection stays based on the requested target step class, with the additional `operator-intervention` context bundle/rule describing how to treat the request as a bounded intervention.
+
+When `target_flow_id` is present, the request must be interpreted as belonging
+to that runtime/control-plane flow projection. It does not grant permission to
+mutate completed flow evidence; completed-flow requests are read-only unless a
+later runtime-owned lifecycle command creates a separate follow-up flow.
 
 ## Read Surface Safety
 

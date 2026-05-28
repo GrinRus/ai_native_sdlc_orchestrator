@@ -1,10 +1,11 @@
-# Flow-centric operator console design reference
+# Flow-centric operator console product baseline
 
 ## Purpose
 
-This document freezes the accepted product design reference for the next AOR
-local console iteration. It is a product/design baseline, not an implementation
-claim.
+This document freezes the accepted product direction and W34 contract baseline
+for the next AOR local console iteration. It is not an implementation claim:
+W34-S01 defines the runtime-owned flow semantics, while later W34 slices add
+runtime projections, web rendering, and live E2E proof.
 
 The design keeps AOR headless-first and runtime-owned: the web app renders
 control-plane read models, invokes bounded runtime mutations, and never owns
@@ -37,6 +38,28 @@ The primary object in the console is a flow.
   and target refs.
 - Runtime-initiated interactions stay separate from operator-initiated Ask AOR
   requests.
+
+## Flow projection baseline
+
+A flow is a runtime/control-plane projection over durable AOR evidence. It is
+not a browser session object and it is not a replacement for mission, intake,
+next-action, run, review, delivery, release, or learning contracts.
+
+The minimum projected fields are:
+- `flow_id`, stable for one mission/intake lineage.
+- `status`, with `active` for a mutable in-progress flow and `completed` for a
+  read-only evidence chain.
+- `selected_stage`, derived from the latest next-action and closure evidence.
+- `mission_id`, `intake_packet_ref`, and `intake_body_ref`.
+- `latest_next_action_report_ref`.
+- `evidence_refs[]`, the flow-scoped evidence chain visible to CLI/API/web.
+- `writeback_policy`, copied from mission scope and delivery evidence.
+- `follow_up_source_handoff_ref`, present only when a new flow starts from a
+  completed learning handoff.
+
+Creating a new flow always creates fresh mission/intake evidence and then
+refreshes `next-action-report`. A follow-up flow may cite a completed source
+flow's learning handoff, but the completed source flow remains read-only.
 
 ## Screen references
 

@@ -649,6 +649,38 @@ test("control-plane API baseline documents production hardening metadata", () =>
   );
 });
 
+test("control-plane API baseline documents W34 flow projection examples", () => {
+  const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
+  assert.equal(loaded.ok, true, "fixture should load before assertions");
+
+  const contract = loaded.document.flow_projection_contract;
+  assert.equal(contract?.owning_slice, "W34-S01");
+  assert.equal(contract?.implementation_slice, "W34-S02");
+  assert.ok(contract?.projection_fields?.includes("flow_id"), "expected stable flow id field");
+  assert.ok(contract?.projection_fields?.includes("follow_up_source_handoff_ref"), "expected follow-up lineage field");
+  assert.equal(contract?.lifecycle_semantics?.new_flow?.creates_fresh_intake, true);
+  assert.equal(contract?.lifecycle_semantics?.new_flow?.mutates_completed_source_flow, false);
+  assert.equal(contract?.lifecycle_semantics?.follow_up_flow?.source_flow_read_only, true);
+
+  const examples = contract?.example_payloads ?? {};
+  assert.equal(examples.active_flow?.status, "active");
+  assert.equal(examples.completed_flow?.completed_read_only, true);
+  assert.ok(
+    examples.follow_up_flow?.follow_up_source_handoff_ref,
+    "expected follow-up flow example to cite source handoff",
+  );
+  assert.equal(examples.flow_targeted_operator_request_summary?.target_flow_id, examples.active_flow?.flow_id);
+});
+
+test("operator-request examples may target a W34 flow projection", () => {
+  const source = path.join(workspaceRoot, "examples/reports/operator-request.flow-target.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "operator-request" });
+  assert.equal(loaded.ok, true, "expected flow-targeted operator-request example to load");
+  assert.equal(loaded.document.target_flow_id, "flow.aor-core.checkout-risk");
+  assert.equal(loaded.document.delivery_mode, "no-write");
+});
+
 test("control-plane API contract rejects invalid binding mode", () => {
   const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
   const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
