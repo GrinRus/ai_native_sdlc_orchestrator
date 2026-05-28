@@ -76,7 +76,7 @@ test("web package no longer exports static operator snapshot modules", () => {
   assert.equal(fs.existsSync(path.join(workspaceRoot, "apps/web/src", oldSourceDir)), false);
 });
 
-test("aor app smoke verifies the real packaged SPA, config, and state routes", () => {
+test("aor app smoke verifies the real flow-centric packaged SPA, config, and state routes", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
     const runtimeRoot = path.join(projectRoot, ".aor");
@@ -106,6 +106,8 @@ test("aor app smoke verifies the real packaged SPA, config, and state routes", (
     assert.equal(payload.mode, "local-spa");
     assert.equal(payload.status, "smoke-pass");
     assert.equal(payload.html_loaded, true);
+    assert.equal(payload.flow_selector_loaded, true);
+    assert.equal(payload.new_flow_action_loaded, true);
     assert.equal(payload.config_project_id, payload.project_id);
     assert.equal(payload.state_project_id, payload.project_id);
     assert.equal(payload.runtime_root, runtimeRoot);

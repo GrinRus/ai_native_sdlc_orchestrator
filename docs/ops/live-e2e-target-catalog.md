@@ -403,6 +403,6 @@ All targets reuse the same baseline before execution-style stages:
 5. verify
 6. continue only when no-write safety gates pass
 
-For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. For bounded profiles, the default is `blocking`. Post-run verification remains mandatory quality evidence for full-journey observation and contributes directly to the step journal and final analysis.
+For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. Historical bounded summaries used a blocking baseline gate, but bounded deterministic profiles are not current live E2E acceptance inputs. Post-run verification remains mandatory quality evidence for full-journey observation and contributes directly to the step journal and final analysis.
 
 See `docs/ops/live-e2e-no-write-preflight.md` for the reusable bounded procedure.

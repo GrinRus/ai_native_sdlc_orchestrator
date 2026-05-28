@@ -43,6 +43,8 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
   flow-scoped evidence, and completed-flow read-only projections.
 - The local React/Vite console implements the accepted design references under
   `docs/product/assets/w34-flow-centric-console/`.
+- App smoke proves the packaged flow-centric bundle exposes the flow selector
+  and `New Flow` markers in addition to SPA/config/state route health.
 - Ask AOR, Evidence Graph, Runtime Trace, Interactions Inbox, review, delivery,
   release, and learning closure views respect selected-flow boundaries.
 - The installed-user guided proof validates first-flow closure, completed-flow
@@ -269,7 +271,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 
 ## W34-S07 — Backlog, docs, and release-gate alignment
 - **Epic:** EPIC-0 Repository development system
-- **State:** ready
+- **State:** done
 - **Outcome:** The flow-centric console refactor is release-reviewable with aligned source-of-truth docs, smoke guidance, and root gates.
 - **Primary modules:** `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**`, `scripts/**`, release tests
 - **Hard dependencies:** W34-S06
@@ -291,7 +293,7 @@ proof path must preserve `final_skill_agent_verdict_request_file`,
 ### Done evidence
 - README and ops updates
 - backlog source-of-truth alignment
-- release smoke updates
+- release smoke updates for flow selector and `New Flow`
 - root check output
 
 ### Out of scope

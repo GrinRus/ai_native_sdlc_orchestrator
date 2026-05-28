@@ -1048,6 +1048,8 @@ function runGuidedWebSmoke(options) {
   const taskPassed =
     asNonEmptyString(summary.status) === "smoke-pass" &&
     summary.html_loaded === true &&
+    summary.flow_selector_loaded === true &&
+    summary.new_flow_action_loaded === true &&
     asNonEmptyString(summary.config_project_id) === asNonEmptyString(summary.project_id) &&
     asNonEmptyString(summary.state_project_id) === asNonEmptyString(summary.project_id);
   writeJson(browserTaskProofRequestFile, {
@@ -1088,14 +1090,22 @@ function runGuidedWebSmoke(options) {
     kind: "app-smoke-dom-summary",
     status: taskPassed ? "pass" : "not_pass",
     html_loaded: summary.html_loaded === true,
+    flow_selector_loaded: summary.flow_selector_loaded === true,
+    new_flow_action_loaded: summary.new_flow_action_loaded === true,
     app_url: asNonEmptyString(summary.app_url) || null,
     control_plane: asNonEmptyString(summary.control_plane) || null,
     project_id: asNonEmptyString(summary.project_id) || null,
   });
   writeJson(accessibilitySummaryFile, {
     kind: "app-smoke-accessibility-summary",
-    status: summary.html_loaded === true ? "pass" : "not_pass",
-    checks: ["packaged SPA HTML loaded", "app config route loaded", "project state route loaded"],
+    status: taskPassed ? "pass" : "not_pass",
+    checks: [
+      "packaged SPA HTML loaded",
+      "app config route loaded",
+      "project state route loaded",
+      "flow selector bundle marker loaded",
+      "New Flow bundle marker loaded",
+    ],
     findings: taskPassed ? [] : ["Packaged local app smoke did not satisfy every required route check."],
   });
   writeJson(visualSnapshotFile, {
@@ -1104,6 +1114,8 @@ function runGuidedWebSmoke(options) {
     surface: "aor app --smoke",
     app_url: asNonEmptyString(summary.app_url) || null,
     html_loaded: summary.html_loaded === true,
+    flow_selector_loaded: summary.flow_selector_loaded === true,
+    new_flow_action_loaded: summary.new_flow_action_loaded === true,
     note:
       "This deterministic app-smoke summary is a guardrail only; it is not browser-task-proof screenshot evidence.",
   });

@@ -57,6 +57,13 @@ W32 extends the source checkout and package smoke expectations with
 `aor request create --json`, `aor request run --json`, and sanitized
 operator-request API coverage so the packaged CLI proves bounded interactive
 runtime work without changing target files outside `.aor/`.
+W34 extends the app smoke expectation so `aor app --smoke --open false --json`
+must also prove the packaged flow-centric bundle still contains the flow
+selector and `New Flow` markers. This remains a deterministic release guardrail;
+installed-user live E2E acceptance still comes from
+`installed-user-guided-journey.yaml` with `browser-task-proof`, flow-loop
+fields, accepted skill-agent decisions, a final skill-agent verdict, and
+no-upstream-write assertions.
 
 W30 alpha hardening also requires the production-readiness gate to verify the
 ADR index, OpenAPI 3.1 control-plane route contract, self-hosted operations

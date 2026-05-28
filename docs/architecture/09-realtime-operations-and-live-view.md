@@ -43,8 +43,9 @@ continuation, review decisions, or delivery gates.
 
 Release and live E2E smoke for the web surface uses
 `aor app --smoke true --open false --json`, which loads the real SPA,
-`/app-config.json`, and control-plane state route. A generated static HTML
-snapshot is not a supported operator console or proof path.
+`/app-config.json`, control-plane state route, and the flow selector / `New
+Flow` bundle markers. A generated static HTML snapshot is not a supported
+operator console or proof path.
 
 The app can also submit operator-initiated interventions through
 `POST /api/projects/:projectId/operator-requests` and run them through

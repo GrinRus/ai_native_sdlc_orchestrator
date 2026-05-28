@@ -149,6 +149,8 @@ try {
     appSmoke.command !== "app" ||
     appSmoke.status !== "smoke-pass" ||
     appSmoke.html_loaded !== true ||
+    appSmoke.flow_selector_loaded !== true ||
+    appSmoke.new_flow_action_loaded !== true ||
     appSmoke.config_project_id !== appSmoke.project_id ||
     appSmoke.state_project_id !== appSmoke.project_id
   ) {
@@ -156,7 +158,7 @@ try {
   }
 
   assertOnlyRuntimeStateChanged(targetRepo);
-  process.stdout.write(`release smoke ok: installed ${tarballName} and ran no-write onboarding plus local app smoke\n`);
+  process.stdout.write(`release smoke ok: installed ${tarballName} and ran no-write onboarding plus flow-centric local app smoke\n`);
 } catch (error) {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exit(1);

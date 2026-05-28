@@ -95,8 +95,10 @@ Run AOR against a local target repository. The safest first path uses the npm
 CLI, initializes `.aor/` with `aor onboard .`, and then launches the local UI
 with `aor app`. The UI opens the Mission form, offers a safe walkthrough
 template, submits the existing `mission create` command through the control
-plane, and immediately refreshes `next` so the right rail shows the current
-next action, blockers, evidence refs, and runtime root.
+plane, and immediately refreshes `next` for the selected runtime-owned flow.
+The local console is flow-centric: the top bar shows the flow selector and
+`New Flow`, active flows can continue through lifecycle commands, and completed
+flows remain read-only evidence chains.
 
 This path keeps `delivery-mode no-write` by default and stores runtime state
 under the target repository. It intentionally lets AOR generate a bundled
@@ -133,14 +135,14 @@ intake fields: title, brief, goal, constraint, KPI, Definition of Done, and
 `delivery-mode=no-write`. Riskier delivery modes stay visible but require an
 explicit user selection and the existing policy gates.
 
-From any UI stage, use **Ask AOR** to create a durable operator request. This
-is not a direct chat with a runner: the request is stored as an
+From any selected flow stage, use **Ask AOR** to create a durable operator
+request. This is not a direct chat with a runner: the request is stored as an
 `operator-request` artifact, validated against target refs, allowed paths, and
-delivery mode, compiled into the selected runtime step context, and run through
-the same routed runtime path as CLI/API execution. The default is still
-`delivery-mode=no-write`, which produces analysis/proposal evidence only.
-`patch-only` creates patch evidence inside explicit `allowed_paths` without
-silently mutating project files.
+delivery mode, compiled into the selected runtime step context with
+`target_flow_id`, and run through the same routed runtime path as CLI/API
+execution. The default is still `delivery-mode=no-write`, which produces
+analysis/proposal evidence only. `patch-only` creates patch evidence inside
+explicit `allowed_paths` without silently mutating project files.
 
 For a headless source checkout or CI-style first run, the equivalent command
 sequence remains:
@@ -198,6 +200,11 @@ For release or CI smoke, use the packaged app route without opening a browser:
 aor app --project-ref "$TARGET_REPO" --runtime-root "$AOR_RUNTIME" --smoke --open false --json
 ```
 
+The smoke JSON must report `status=smoke-pass`, `html_loaded=true`,
+`flow_selector_loaded=true`, `new_flow_action_loaded=true`, and matching
+`config_project_id` / `state_project_id` values. This deterministic app smoke
+is a release guardrail, not a hosted-service or production-automation claim.
+
 Use a disposable local checkout or branch until you understand the generated
 state. Runtime output under `.aor/` can contain project metadata, reports, and
 operational evidence; keep it out of commits.
@@ -223,9 +230,12 @@ it creates target-repo files outside `.aor/`.
   JSON output.
 - `aor app` serves the packaged SPA at `/`, app config at `/app-config.json`,
   and the same-origin control-plane API under `/api/projects/:projectId/**`.
+- the local UI shows the flow selector, active/completed flow boundaries,
+  flow-scoped stage rail, and `New Flow` draft intake while keeping the flow as
+  the primary operator object.
 - `Ask AOR` and `aor request create/run/status` write durable operator-request
   evidence, proposal refs, optional patch refs, compiled-context refs, and a
-  refreshed next-action report.
+  refreshed next-action report scoped to the selected flow.
 - `delivery_mode=no-write` and `upstream_writes_default=false` remain the safe
   defaults for the first local workflow.
 - `.aor/` is ignored runtime state and must not be committed.
@@ -290,8 +300,8 @@ claim.
 | Guided target onboarding | Implemented baseline | `pnpm aor onboard ... --json`. |
 | No-write mission intake | Implemented baseline | `pnpm aor mission create ... --delivery-mode no-write --json`. |
 | Next-action reporting | Implemented baseline | `pnpm aor next ... --json`. |
-| Local installed-user UI | Implemented baseline | `aor app --project-ref <repo>` launches the packaged SPA. |
-| Operator requests | Implemented baseline | `aor request create/run/status` routes bounded Ask AOR work through runtime evidence. |
+| Local installed-user UI | Implemented flow-centric baseline | `aor app --project-ref <repo>` launches the packaged SPA with flow selector, active/completed flow views, and `New Flow`. |
+| Operator requests | Implemented flow-scoped baseline | `aor request create/run/status` routes bounded Ask AOR work through runtime evidence and `target_flow_id`. |
 | CLI/API/web baselines | Implemented baseline | See `apps/*`, `packages/*`, and the command catalog. |
 | Production-readiness gate | Implemented bounded gate | `pnpm production:ready --json`. |
 
@@ -434,8 +444,9 @@ The current alpha distribution is tracked through `W34` and focuses on:
   patch evidence, and next-action refresh from CLI, API, or web.
 - Console source-of-truth alignment around `aor app` and app-smoke proof,
   without a generated static HTML console.
-- Flow-centric console refactor planning for runtime-owned active/completed
-  flows and explicit `New Flow` behavior.
+- Flow-centric console refactor implementation for runtime-owned
+  active/completed flows, explicit `New Flow` behavior, closure-to-follow-up
+  flow creation, and browser-task guided proof evidence.
 
 ## Contributing
 

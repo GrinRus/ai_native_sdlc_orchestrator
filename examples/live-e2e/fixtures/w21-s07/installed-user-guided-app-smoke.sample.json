@@ -3,6 +3,8 @@
   "mode": "local-spa",
   "status": "smoke-pass",
   "html_loaded": true,
+  "flow_selector_loaded": true,
+  "new_flow_action_loaded": true,
   "project_id": "local-target",
   "config_project_id": "local-target",
   "state_project_id": "local-target",

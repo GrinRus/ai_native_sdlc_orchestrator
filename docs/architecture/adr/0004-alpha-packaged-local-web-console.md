@@ -38,7 +38,8 @@ policy gates.
 - Release packaging must include `apps/web/dist` and the shared launcher/runtime
   files.
 - Release smoke can run `aor app --smoke --open false --json` against a
-  temporary project and assert that only `.aor/` changes.
+  temporary project, prove the flow selector and `New Flow` bundle markers, and
+  assert that only `.aor/` changes.
 - The UI safe walkthrough template only fills existing Mission intake fields
   and defaults delivery mode to `no-write`.
 

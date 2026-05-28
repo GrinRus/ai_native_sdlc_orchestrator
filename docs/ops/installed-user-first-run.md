@@ -18,12 +18,16 @@ default, and prints the URL. Press `Ctrl+C` in that terminal to stop it.
 The UI first-run path is:
 1. open Readiness and confirm the project/runtime root;
 2. if onboarding has not run, use Initialize project;
-3. open Mission;
-4. apply the safe walkthrough template;
-5. submit Mission;
-6. inspect the refreshed right rail for next action, blockers, evidence refs, and runtime root;
-7. optionally use Ask AOR on any stage to create a bounded operator request
-   against selected evidence or document refs.
+3. inspect the top-bar flow selector and confirm no completed flow is being mutated;
+4. open Mission or `New Flow`;
+5. apply the safe walkthrough template;
+6. submit Mission;
+7. inspect the selected active flow for next action, blockers, evidence refs,
+   runtime root, and no-write safety;
+8. use `New Flow` only when starting fresh mission/intake evidence or a
+   follow-up from learning closure;
+9. optionally use Ask AOR on any selected flow stage to create a bounded
+   operator request against selected evidence or document refs.
 
 Guided shortcuts default to human-readable output. Pass `--json` when automation needs stable fields such as `guided_status`, `guided_actionable_blockers`, `resolved_project_ref`, and `resolved_runtime_root`.
 
@@ -74,6 +78,8 @@ validate, plan, implement, or review a bounded artifact without starting a
 free-form chat. In the UI, open a stage, select **Ask AOR**, attach evidence or
 document refs from the Evidence & Documents workbench, keep delivery mode
 `no-write` unless a patch proposal is explicitly needed, and run the request.
+The UI sends the selected flow as `target_flow_id`; completed flows allow only
+read-only inspection requests.
 
 Headless equivalent:
 ```sh
@@ -81,6 +87,7 @@ aor request create \
   --project-ref <repo> \
   --runtime-root <repo>/.aor \
   --stage discovery \
+  --target-flow-id <flow_id> \
   --intent analyze \
   --request "Explain the current blocker and suggest the next safe action." \
   --target-ref evidence://.aor/projects/<project_id>/reports/next-action-report.json \
@@ -100,6 +107,7 @@ aor request create \
   --project-ref <repo> \
   --runtime-root <repo>/.aor \
   --stage review \
+  --target-flow-id <flow_id> \
   --intent revise-document \
   --request "Propose edits that make the onboarding runbook clearer." \
   --target-ref docs/ops/installed-user-first-run.md \
@@ -112,6 +120,7 @@ Expected request evidence:
 - the request artifact under `.aor/projects/<project_id>/reports/`;
 - sanitized CLI/API/web summaries that omit raw request text;
 - a routed step result with `operator_request_ref`;
+- `target_flow_id` linking the request to the selected active flow;
 - proposal refs for no-write and patch-only modes;
 - patch refs for patch-only mode;
 - a refreshed `next-action-report`.
@@ -130,6 +139,8 @@ aor app \
 Expected JSON:
 - `status: "smoke-pass"`;
 - `html_loaded: true`;
+- `flow_selector_loaded: true`;
+- `new_flow_action_loaded: true`;
 - `config_project_id` matches `project_id`;
 - `state_project_id` matches `project_id`.
 
@@ -137,19 +148,19 @@ Expected JSON:
 The CLI test fixture `apps/cli/test/fixtures/installed-user-first-run-transcript.json` records the expected first-run command sequence:
 1. `doctor` reports ready status and no blockers on a valid temp repository.
 2. `onboard` dispatches through `project init`, writes runtime state plus `onboarding-report.json` under `.aor/`, and does not copy example registries unless materialization is explicit.
-3. `app` reports an optional, non-mandatory local web surface and the installed-package smoke path verifies the packaged SPA/config/API routes.
+3. `app` reports an optional, non-mandatory local web surface and the installed-package smoke path verifies the packaged SPA/config/API routes plus the flow selector and `New Flow` bundle markers.
 4. `next` points to a safe low-level follow-up after onboarding.
 
 No upstream writes are part of this first-run shortcut layer.
 
 ## Guided journey proof
-The W21-S07 proof profile rehearses the installed-user sequence on a clean catalog target:
+The `installed-user-guided-journey.yaml` proof profile rehearses the installed-user sequence on a clean catalog target; W34-S06 hardens that profile with browser-task and flow-loop evidence:
 ```sh
 node ./scripts/live-e2e/run-profile.mjs \
   --project-ref . \
   --profile ./scripts/live-e2e/profiles/installed-user-guided-journey.yaml
 ```
 
-The proof starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; captures `aor mission create`; then follows execution, review decision, delivery, release, and learning closure through public CLI subprocesses. After learning closure it creates a follow-up mission with `--follow-up-source-handoff-ref`, refreshes `next` for the second flow, and creates a flow-targeted `request create --target-flow-id` record. It also runs `aor app --smoke true --open false --json` as a render guardrail and requires browser-task/frontend evidence refs for final acceptance.
+The proof starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; captures `aor mission create`; then follows execution, review decision, delivery, release, and learning closure through public CLI subprocesses. After learning closure it creates a follow-up mission with `--follow-up-source-handoff-ref`, refreshes `next` for the second flow, and creates a flow-targeted `request create --target-flow-id` record. It also runs `aor app --smoke true --open false --json` as a release/render guardrail that must include the flow selector and `New Flow` markers, but final acceptance still requires browser-task/frontend evidence refs and accepted skill-agent verdicts.
 
 The generated `guided_journey` summary is passable only when CLI transcripts, flow-loop fields, browser-task/frontend evidence refs, durable packets/reports, unchanged target `HEAD`, `.aor/` runtime ownership, and `write_back_to_remote=false` assertions are all present.

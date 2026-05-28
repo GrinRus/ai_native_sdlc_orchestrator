@@ -25,9 +25,11 @@ W14 extends the full-journey layer into a curated matrix across:
 - `feature_size`
 
 Current summaries also preserve `run_tier` so coverage is not confused with
-acceptance proof:
+acceptance proof. `bounded-live` can appear only as legacy classification on
+historical summaries; it is not a current profile family or live acceptance
+input:
 - `readme-smoke`: installed-user no-write bootstrap path;
-- `bounded-live`: fast fail-closed provider proof;
+- `bounded-live`: historical fast fail-closed provider proof tier;
 - `full-journey-observation`: delivery-reaching observation with findings allowed;
 - `acceptance`: required matrix closure, fail-closed for artifact and verification gates;
 - `production-proof`: real external process, no mock, no upstream write, strict evidence.
@@ -244,10 +246,11 @@ Record mode applies the same medium-or-larger and pass/fix/block classification 
 The launching agent performs the fix and commit. Final qualification requires at least five full positive medium-or-larger runs across provider variants: at least two `openai-primary`, at least two `anthropic-primary`, and at least one `open-code-primary`.
 
 ## Layer behavior
-Bounded rehearsal layer:
-- clones the target checkout;
-- materializes run-scoped bootstrap assets and generated project profile on the AOR side under `.aor/`;
-- proves one bounded black-box execution path quickly.
+Legacy bounded rehearsal summaries:
+- may still appear in archived evidence and backlog history;
+- are not supported live E2E acceptance inputs;
+- must not be cited instead of catalog-backed full journeys,
+  `installed-user-guided-journey`, or the W25 production-proof fixture.
 
 Full-journey layer:
 - resolves `target_catalog_id`, `feature_mission_id`, `scenario_family`, and `provider_variant_id` from the curated internal catalog;
@@ -267,7 +270,7 @@ Full-journey layer:
 - bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Timeout failures are preserved as failed step-result evidence; for full-journey baseline diagnostics they are interpreted through the same diagnostic/blocking gate rules as other target verification failures.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - gates continuation after every observed public step by the online live E2E controller decision.
-- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, must execute them as ordinary observed steps.
+- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; supported full-lifecycle profiles must execute them as ordinary observed steps.
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
 - runner auth probe is required;
@@ -359,7 +362,7 @@ Guided full-journey summaries also carry:
 - `artifacts.guided_web_smoke_html_file`
 - `artifacts.guided_web_dom_snapshot_file`
 - `artifacts.guided_web_accessibility_summary_file`
-- `artifacts.guided_web_screenshot_files` (empty until real browser-task screenshots are captured)
+- `artifacts.guided_web_screenshot_files` when browser-task proof provides screenshots
 - `artifacts.guided_web_visual_guardrail_file` for deterministic app-smoke visual guardrail evidence
 - `artifacts.guided_browser_task_proof_request_file`
 - `artifacts.guided_browser_task_proof_file`
@@ -415,7 +418,7 @@ The runner performs deterministic analysis for every step from public command tr
 
 The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent` and non-empty `inspected_evidence_refs[]`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` is removed; live E2E semantic analysis comes only from accepted skill-agent decisions and the final skill-agent verdict artifact.
 
-Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and real screenshot evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not satisfy `browser-task-proof` screenshot requirements.
+Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and screenshot or visual evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not replace `browser-task-proof` evidence.
 
 Judge criteria:
 - traceability to feature request, mission, and previous step;
@@ -505,7 +508,7 @@ Canonical profile:
 
 Canonical fixtures:
 - `examples/live-e2e/fixtures/w21-s07/installed-user-guided-proof.sample.json`
-- `examples/live-e2e/fixtures/w21-s07/installed-user-guided-web-smoke.sample.json`
+- `examples/live-e2e/fixtures/w21-s07/installed-user-guided-app-smoke.sample.json`
 - `examples/live-e2e/fixtures/w21-s07/installed-user-guided-blocked-readiness.sample.json`
 
 Run command:
@@ -517,7 +520,7 @@ node ./scripts/live-e2e/run-profile.mjs \
 
 Pass evidence requires all of the following:
 - CLI transcript files for doctor, onboard, app, next, mission create, run execution, review decision, delivery, release, and learning closure.
-- Durable onboarding, intake, next-action, run, review, review-decision, delivery, release, learning, and web smoke artifacts.
+- Durable onboarding, intake, next-action, run, review, review-decision, delivery, release, learning, and web smoke artifacts, including flow selector and `New Flow` smoke markers.
 - Public-repo safety assertions: `write_back_to_remote=false`, `patch-only` delivery mode, unchanged target `HEAD` until controlled execution, runtime state under `.aor/`, and no `.aor-live-e2e` state.
 - Blocked and partial-readiness branches must keep the same no-write defaults visible and must not be marked pass without durable artifacts.
 
