@@ -51,6 +51,15 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /graph-context-tabs/u);
   assert.match(source, /selected-node-panel/u);
   assert.match(source, /trace-timeline-strip/u);
+  assert.match(source, /Initialize Project Runtime/u);
+  assert.match(source, /No active flow/u);
+  assert.match(source, /Readiness prepares the runtime before a flow is created/u);
+  assert.match(source, /selectedStageRuntimeState/u);
+  assert.match(source, /Upcoming stage\. The current recommended action remains scoped/u);
+  assert.match(source, /Recommended action context/u);
+  assert.match(source, /Command provenance/u);
+  assert.match(source, /Flow inventory/u);
+  assert.match(source, /stage-status-badge/u);
   assert.match(source, /Interaction Detail/u);
   assert.match(source, /interactions-layout/u);
   assert.match(source, /READ_ONLY_INSPECTION_INTENTS/u);

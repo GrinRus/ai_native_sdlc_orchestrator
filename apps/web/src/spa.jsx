@@ -113,6 +113,26 @@ const DELIVERY_CHECK_ROWS = [
   { label: "Learning handoff", tokens: ["learning-loop-handoff", "LEARN-HND"] },
 ];
 
+const STAGE_EXPECTED_OUTPUTS = {
+  readiness: ["Runtime policy verified", "Project state initialized", "No-write defaults visible"],
+  mission: ["Mission packet", "Intake body", "First next-action report"],
+  discovery: ["Dependency graph", "Evidence inventory", "Discovery report"],
+  implement: ["Routed step result", "Runtime Harness report", "Patch/proposal evidence"],
+  review: ["Validation report", "Evaluation report", "Review decision"],
+  delivery: ["Delivery manifest", "Release packet", "Promotion guardrails"],
+  learning: ["Learning handoff", "Closure summary", "Follow-up source ref"],
+};
+
+const STAGE_SCOPE_SUMMARY = {
+  readiness: "Runtime setup only",
+  mission: "Mission -> Discovery",
+  discovery: "Discovery -> Spec -> Plan",
+  implement: "Execution -> Review",
+  review: "Review -> Delivery",
+  delivery: "Delivery -> Release",
+  learning: "Learning -> New Flow",
+};
+
 function splitLines(value) {
   return value
     .split("\n")
@@ -179,7 +199,7 @@ function resolveUiStageId(nextAction) {
 
 function statusTone(state) {
   const normalized = String(state ?? "").toLowerCase();
-  if (["connected", "ready", "pass", "completed", "active", "isolated", "no-write", "detached", "enforced", "read-only"].includes(normalized)) return "safe";
+  if (["connected", "ready", "pass", "complete", "completed", "active", "isolated", "no-write", "detached", "enforced", "read-only"].includes(normalized)) return "safe";
   if (normalized.includes("connected") || normalized.includes("active") || normalized.includes("safe")) return "safe";
   if (normalized.includes("completed") || normalized.includes("enforced")) return "safe";
   if (["blocked", "fail", "failed", "error"].includes(normalized)) return "danger";
@@ -189,6 +209,22 @@ function statusTone(state) {
 
 function StatusPill({ state }) {
   return <span className={`status-pill ${statusTone(state)}`}>{state}</span>;
+}
+
+function selectedStageRuntimeState(stage, currentStage, completed) {
+  if (completed) return "Completed";
+  if (stage.id === currentStage) return "Active";
+  const stageIndex = STAGES.findIndex((candidate) => candidate.id === stage.id);
+  const currentIndex = STAGES.findIndex((candidate) => candidate.id === currentStage);
+  if (stageIndex >= 0 && currentIndex >= 0 && stageIndex < currentIndex) return "Complete";
+  return "Pending";
+}
+
+function selectedStageRuntimeCopy(stage, actionStage, state, completed) {
+  if (completed) return "Completed artifacts are immutable, read-only evidence.";
+  if (state === "Active") return stage.hint;
+  if (state === "Complete") return "Completed stage evidence is available for this selected flow.";
+  return `Upcoming stage. The current recommended action remains scoped to ${actionStage.label}.`;
 }
 
 function Icon({ name }) {
@@ -332,6 +368,7 @@ function actionCommandTitle(action) {
 
 function flowStageId(flow, nextAction, projectState) {
   if (flow?.selected_stage) return toUiStageId(flow.selected_stage);
+  if (!flow) return resolveUiStageId(nextAction) ?? "readiness";
   return resolveUiStageId(nextAction) ?? (projectState?.state_file ? "mission" : "readiness");
 }
 
@@ -425,7 +462,7 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
         <span>Flow</span>
         <select name="flow-selector" value={value} aria-label="Flow selector" onChange={(event) => onSelectFlow(event.target.value)}>
           {newFlowDraft ? <option value="__new__">New flow draft</option> : null}
-          {flows.length === 0 ? <option value="">No flows yet</option> : null}
+          {flows.length === 0 ? <option value="">No active flow</option> : null}
           {activeFlows.length > 0 ? (
             <optgroup label="Active flows">
               {activeFlows.map((flow) => (
@@ -457,6 +494,14 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
 function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft }) {
   const currentIndex = Math.max(0, STAGES.findIndex((stage) => stage.id === currentStage));
   const completed = isCompletedFlow(flow);
+  const railTitle = newFlowDraft ? "New flow draft" : flow ? flowDisplayName(flow) : "No active flow";
+  const railDescription = newFlowDraft
+    ? "Draft mission settings are not durable evidence until submitted."
+    : completed
+      ? "Closed flow evidence is immutable and read-only."
+      : flow
+        ? "Navigation is scoped to the selected flow."
+        : "Readiness prepares the runtime before a flow is created.";
   return (
     <aside className="stage-rail">
       <div className="rail-title">
@@ -468,6 +513,21 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft }
           const active = selectedStage === stage.id;
           const done = completed ? index <= currentIndex : index < currentIndex;
           const current = currentStage === stage.id;
+          const statusLabel = newFlowDraft
+            ? current
+              ? "Current"
+              : done
+                ? "Complete"
+                : "Pending"
+            : !flow && current
+              ? "Current"
+            : completed
+              ? "Complete"
+              : current
+                ? "Active"
+                : done
+                  ? "Complete"
+                  : "Pending";
           return (
             <button
               key={stage.id}
@@ -480,14 +540,15 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft }
                 <strong>{stage.label}</strong>
                 <em>{stage.hint}</em>
               </span>
+              <span className={`stage-status-badge ${statusLabel.toLowerCase()}`}>{statusLabel}</span>
               <span className="stage-dot" />
             </button>
           );
         })}
       </nav>
       <div className="rail-note">
-        <strong>{flowDisplayName(flow)}</strong>
-        <p>{completed ? "Closed flow evidence is immutable and read-only." : "Navigation is scoped to the selected flow."}</p>
+        <strong>{railTitle}</strong>
+        <p>{railDescription}</p>
       </div>
     </aside>
   );
@@ -613,6 +674,44 @@ function FlowTimeline({ currentStage, completed }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function ActionContextGrid({ stage, action, evidenceRefs, blockers, deliveryMode }) {
+  const expectedOutputs = STAGE_EXPECTED_OUTPUTS[stage.id] ?? ["Evidence artifact", "Policy decision", "Next-action report"];
+  const command = actionCommandLabel(action);
+  const riskLevel = blockers.length > 0 ? "Blocked" : deliveryMode === "no-write" ? "Low" : "Gated";
+  return (
+    <div className="action-detail-grid" aria-label="Recommended action context">
+      <div>
+        <span>Expected outputs</span>
+        <ul>
+          {expectedOutputs.map((output) => (
+            <li key={output}><span className="check-dot complete-dot" />{output}</li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <span>Scope</span>
+        <strong>{STAGE_SCOPE_SUMMARY[stage.id] ?? stage.label}</strong>
+        <p>{deliveryMode === "no-write" ? "No upstream writes. Analysis and evidence only." : "Explicit allowed paths and review gates required."}</p>
+      </div>
+      <div>
+        <span>Risk level</span>
+        <strong>{riskLevel}</strong>
+        <p>{blockers.length > 0 ? blockers[0]?.summary ?? blockers[0]?.code : "No blockers for this visible step."}</p>
+      </div>
+      <div>
+        <span>Command provenance</span>
+        <strong>AOR runtime</strong>
+        <p>Generated from selected-flow evidence and latest next-action state.</p>
+      </div>
+      <div>
+        <span>Dry-run preview</span>
+        <code>{command.includes("--dry-run") ? command : `${command} --dry-run`}</code>
+        <p>{evidenceRefs.length} selected-flow refs available before execution.</p>
+      </div>
     </div>
   );
 }
@@ -784,27 +883,69 @@ function FlowCockpit({
   initializeProject,
 }) {
   if (!flow && stage.id === "readiness") {
+    const runtimeRoot = projectState?.runtime_root ?? config?.runtime_root ?? ".aor";
+    const stateReady = Boolean(projectState?.state_file);
     return (
-      <section className="work-card stage-work">
+      <section className="work-card stage-work readiness-cockpit">
         <div className="work-heading">
           <div>
-            <h2>Readiness</h2>
-            <p>Initialize `.aor/`, confirm guardrails, and materialize next-action evidence.</p>
+            <div className="heading-line">
+              <h2>Readiness</h2>
+              <StatusPill state="First launch" />
+            </div>
+            <p>Validate the local runtime, safety policy, and project context before creating a flow.</p>
           </div>
-          <button className="secondary" type="button" onClick={onAsk} disabled>
-            <Icon name="target" />
-            Ask AOR
+          <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
+            <Icon name="refresh" />
+            Refresh readiness
           </button>
         </div>
-        <div className="readiness-grid">
+
+        <div className="readiness-check-list">
+          <div className={stateReady ? "ready" : "pending"}>
+            <span className="check-dot" />
+            <div>
+              <strong>Project runtime</strong>
+              <p>{stateReady ? "Runtime state is reachable." : "Runtime folders and state evidence are not initialized yet."}</p>
+            </div>
+            <code>{projectState?.state_file ?? "state file pending"}</code>
+          </div>
+          <div className="ready">
+            <span className="check-dot" />
+            <div>
+              <strong>Runtime root policy</strong>
+              <p>No-write safety and local control-plane defaults stay visible before any flow exists.</p>
+            </div>
+            <code>{runtimeRoot}</code>
+          </div>
+          <div className="pending">
+            <span className="check-dot" />
+            <div>
+              <strong>Flow model</strong>
+              <p>No active flow is selected. Use New Flow after readiness to create mission/intake evidence.</p>
+            </div>
+            <code>no active flow</code>
+          </div>
+        </div>
+
+        <div className="readiness-action">
           <div>
-            <span>Recommended action</span>
-            <strong>Initialize project runtime</strong>
-            <p>Creates runtime folders and onboarding evidence under `.aor/`.</p>
+            <Icon name="play" />
+            <div>
+              <h3>Initialize Project Runtime</h3>
+              <p>This does not create a flow. It prepares local runtime evidence and safety controls.</p>
+            </div>
           </div>
           <button className="primary" type="button" onClick={initializeProject} disabled={busy}>
-            Initialize
+            Initialize Project Runtime
           </button>
+        </div>
+
+        <div className="flow-lifecycle-preview" aria-label="Flow lifecycle after readiness">
+          <div className="complete"><span className="check-dot" /><strong>Initialize project</strong><p>Prepare runtime and policy</p></div>
+          <div><span className="check-dot" /><strong>Start first flow</strong><p>Create a new mission</p></div>
+          <div><span className="check-dot" /><strong>Create mission packet</strong><p>Define intent and targets</p></div>
+          <div><span className="check-dot" /><strong>Resolve next action</strong><p>Let AOR recommend the safest step</p></div>
         </div>
       </section>
     );
@@ -834,6 +975,9 @@ function FlowCockpit({
         command: "aor next",
         reason: "Resolve the next deterministic action for the selected flow.",
       };
+  const actionStage = STAGES.find((candidate) => candidate.id === currentStage) ?? stage;
+  const stageRuntimeState = selectedStageRuntimeState(stage, currentStage, completed);
+  const stageRuntimeCopy = selectedStageRuntimeCopy(stage, actionStage, stageRuntimeState, completed);
 
   return (
     <section className={`work-card flow-cockpit ${completed ? "read-only" : "active"}`}>
@@ -841,9 +985,9 @@ function FlowCockpit({
         <div>
           <div className="heading-line">
             <h2>{completed ? "Learning / Closure" : stage.label}</h2>
-            <StatusPill state={completed ? "Completed" : "Active"} />
+            <StatusPill state={stageRuntimeState} />
           </div>
-          <p>{completed ? "Completed artifacts are immutable, read-only evidence." : stage.hint}</p>
+          <p>{stageRuntimeCopy}</p>
         </div>
         <button className="secondary" type="button" onClick={onAsk}>
           <Icon name={completed ? "eye" : "target"} />
@@ -914,6 +1058,14 @@ function FlowCockpit({
         </div>
       </div>
 
+      <ActionContextGrid
+        stage={actionStage}
+        action={nextPrimary}
+        evidenceRefs={evidenceRefs}
+        blockers={blockers}
+        deliveryMode={deliveryMode}
+      />
+
       <div className="flow-snapshot-grid">
         <div>
           <span>Blockers</span>
@@ -981,10 +1133,18 @@ function DraftFlowRail({ form }) {
   );
 }
 
-function RightRail({ nextAction, selectedFlow, projectState, config, operatorRequests, newFlowDraft = false, missionDraft = null }) {
+function RightRail({ nextAction, selectedFlow, projectState, config, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null }) {
   const completed = isCompletedFlow(selectedFlow);
+  const activeFlows = flows.filter((flow) => flow.status === "active");
+  const completedFlows = flows.filter((flow) => flow.status === "completed");
   let nextPrimary = nextAction?.primary_action ?? {};
-  if (newFlowDraft) {
+  if (!selectedFlow && !newFlowDraft) {
+    nextPrimary = {
+      low_level_command: "project init",
+      command: "aor project init",
+      reason: "Prepare the local runtime and safety controls. This does not create a flow.",
+    };
+  } else if (newFlowDraft) {
     nextPrimary = {
       low_level_command: "mission create",
       command: "aor mission create",
@@ -1046,6 +1206,27 @@ function RightRail({ nextAction, selectedFlow, projectState, config, operatorReq
         ) : (
           <p>No operator request yet.</p>
         )}
+      </section>
+      <section className="rail-card flow-inventory-card">
+        <h3>Flow inventory <span>{flows.length}</span></h3>
+        {newFlowDraft ? (
+          <div className="flow-inventory-row selected">
+            <strong>New flow draft</strong>
+            <span>Draft</span>
+          </div>
+        ) : null}
+        {selectedFlow ? (
+          <div className="flow-inventory-row selected">
+            <strong>{flowDisplayName(selectedFlow)}</strong>
+            <span>{completed ? "Completed" : "Active"}</span>
+          </div>
+        ) : (
+          <p>No active flow selected.</p>
+        )}
+        <div className="flow-inventory-counts">
+          <span>Active {activeFlows.length}</span>
+          <span>Completed {completedFlows.length}</span>
+        </div>
       </section>
     </aside>
   );
@@ -1473,7 +1654,7 @@ function App() {
   const [stepResults, setStepResults] = useState([]);
   const [operatorRequests, setOperatorRequests] = useState([]);
   const [activity, setActivity] = useState([]);
-  const [selectedStage, setSelectedStage] = useState("mission");
+  const [selectedStage, setSelectedStage] = useState("readiness");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState(SAFE_TEMPLATE);
@@ -1491,7 +1672,7 @@ function App() {
   }, [config]);
 
   const activeStage = STAGES.find((stage) => stage.id === selectedStage) ?? STAGES[1];
-  const draftSurface = newFlowDraft || (!selectedFlow && selectedStage === "mission");
+  const draftSurface = newFlowDraft;
   const currentStage = draftSurface ? "mission" : flowStageId(selectedFlow, nextAction, projectState);
   const flowOptions = Array.isArray(flowList?.flows) ? flowList.flows : [];
 
@@ -1899,7 +2080,7 @@ function App() {
           <span>Runtime root</span>
           <code>{projectState?.runtime_root ?? config?.runtime_root ?? ".aor"}</code>
         </div>
-        <StatusPill state={draftSurface ? "Draft flow" : selectedFlow?.status ?? "No flow"} />
+        <StatusPill state={draftSurface ? "Draft flow" : selectedFlow?.status ?? "No active flow"} />
         <div className="topbar-spacer" />
         <StatusPill state={config ? "connected" : "loading"} />
         <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
@@ -1967,6 +2148,7 @@ function App() {
         projectState={projectState}
         config={config}
         operatorRequests={operatorRequests}
+        flows={flowOptions}
         newFlowDraft={draftSurface}
         missionDraft={draftSurface ? form : null}
       />
