@@ -28,6 +28,12 @@ pnpm check
 | `pluggy` full-journey profiles | `python3 >=3.9`, `pip`, `git` | `python3 -m venv .aor/live-e2e-venv`<br>`.aor/live-e2e-venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage` | `.aor/live-e2e-venv/bin/python -m pytest testing` | Python dependencies from index/mirror | venv creation, editable install, or pytest failure |
 | `cobra` extended target | `go`, `git` | `go mod download` | `go test ./...` | Go module downloads | module download or Go test failure |
 | `date-fns` extended target | `node >=22`, `pnpm`, `git` | `pnpm install` | `pnpm vitest run`<br>`pnpm run lint`<br>`pnpm run types` | pnpm packages | Vitest, lint, or typecheck failure |
+| `zod` extended target | `node >=22`, `pnpm`, `git` | `pnpm install` | `pnpm run build`<br>`pnpm test`<br>`pnpm run lint:check` | pnpm packages | workspace install, Vitest, build, or Biome lint failure |
+| `httpx` extended target | `python3 >=3.9`, `pip`, `git` | `python3 -m venv .aor/live-e2e-venv`<br>`.aor/live-e2e-venv/bin/python -m pip install -U pip`<br>`.aor/live-e2e-venv/bin/python -m pip install -r requirements.txt` | `./scripts/sync-version`<br>`.aor/live-e2e-venv/bin/python -m pytest tests/test_timeouts.py`<br>`.aor/live-e2e-venv/bin/ruff check httpx tests`<br>`.aor/live-e2e-venv/bin/mypy httpx tests` | Python dependencies from index/mirror | venv creation, requirements install, sync-version, targeted pytest, Ruff, or mypy failure |
+| `eslint` extended target | `node ^20.19.0 \|\| ^22.13.0 \|\| >=24`, `npm`, `git` | `npm install` | `npm run test:cli`<br>`npm run lint:rule-types`<br>`npm run lint:types` | npm packages | dependency install, Mocha rule tests, rule metadata, or type-package lint failure |
+| `fastify` extended target | `node >=22`, `npm`, `git` | `npm install` | `npm run test:ci`<br>`npm run lint` | npm packages | dependency install, unit/type tests, or ESLint failure |
+| `prettier` extended target | `node >=22`, `yarn >=4`, `git` | `yarn install --immutable` | `yarn lint:typecheck`<br>`yarn lint:eslint`<br>`yarn test tests/format/typescript tests/format/markdown` | Yarn packages | immutable install, TypeScript, ESLint, or focused snapshot test failure |
+| `ruff` extended target | `rust/cargo`, `git` | `cargo fetch` | `cargo test -p ruff_linter`<br>`cargo test -p ruff_python_formatter` | Cargo crate downloads | cargo fetch, Rust compile, targeted crate test, or snapshot-related failure |
 | `installed-user-guided-journey` | `node >=22`, `npm`, `git`, authenticated `codex` CLI, local web runtime support | target catalog commands for `ky` plus `aor app --smoke --open false --json` | target catalog commands plus guided web task proof | npm packages + Playwright browser binaries when the target commands require them | missing auth/permission readiness, failed target verification, missing web HTML/DOM/accessibility/screenshot evidence, or missing skill-agent UI verdict |
 
 `pluggy` full-journey profiles require a full checkout with tags before editable
@@ -43,6 +49,10 @@ report a pre-1.0 local version that conflicts with modern `pytest`.
 - Release-shaped runs should anchor `delivery-manifest.repo_deliveries[].repo_root` and `release-packet.source_provenance.delivery_execution_root` to the same target checkout root.
 - Public-repo rehearsals keep `write_back_to_remote=false` by default.
 - If an external CDN/network dependency is unavailable (for example Playwright browser download), mark the run as external `inconclusive` for smoke tracking.
+- New extended candidate targets are runnable catalog-backed profiles, but do not
+  close required matrix acceptance until their baseline setup, provider execution,
+  post-run verification, and no-upstream-write evidence are promoted by a
+  passing acceptance or production-proof run.
 
 ## W25-S01 production-proof candidate profile
 

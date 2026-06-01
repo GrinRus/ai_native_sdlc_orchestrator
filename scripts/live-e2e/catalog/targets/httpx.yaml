@@ -1,0 +1,84 @@
+catalog_id: httpx
+repo:
+  repo_id: encode/httpx
+  repo_url: https://github.com/encode/httpx.git
+  ref: master
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - python3 -m venv .aor/live-e2e-venv
+    - .aor/live-e2e-venv/bin/python -m pip install -U pip
+    - .aor/live-e2e-venv/bin/python -m pip install -r requirements.txt
+  commands:
+    - ./scripts/sync-version
+    - .aor/live-e2e-venv/bin/python -m pytest tests/test_timeouts.py
+    - .aor/live-e2e-venv/bin/ruff check httpx tests
+    - .aor/live-e2e-venv/bin/mypy httpx tests
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: httpx.regress.medium.openai
+    scenario_family: regress
+    feature_size: medium
+    feature_mission_id: httpx-timeout-transport-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
+provider_comparison_pairs: []
+feature_missions:
+  - mission_id: httpx-timeout-transport-regression
+    title: Preserve timeout and transport regression behavior
+    brief: Add or repair one bounded sync/async timeout or transport edge case
+      with focused pytest coverage and static quality evidence.
+    feature_size: medium
+    goals:
+      - Preserve one timeout or transport behavior across the HTTPX client
+        boundary.
+      - Keep the targeted pytest, Ruff, and mypy evidence green.
+    kpis:
+      - kpi_id: httpx-timeout-transport-green
+        name: HTTPX timeout transport gate
+        target: targeted timeout pytest plus Ruff and mypy checks pass after the
+          change
+        measurement: post-run primary verification
+    definition_of_done:
+      - Focused pytest coverage demonstrates the fixed timeout or transport edge
+        case.
+      - Sync and async behavior are considered when the touched surface supports
+        both.
+      - Review and delivery evidence remain anchored to the target checkout.
+    expected_evidence: &evidence
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the change inside HTTPX runtime/tests and local tooling surfaces
+      - preserve targeted pytest, Ruff, and mypy evidence
+      - avoid real external network dependencies in the regression
+      - avoid any upstream write-back
+    post_run_quality:
+      primary_commands:
+        - ./scripts/sync-version
+        - .aor/live-e2e-venv/bin/python -m pytest tests/test_timeouts.py
+        - .aor/live-e2e-venv/bin/ruff check httpx tests
+        - .aor/live-e2e-venv/bin/mypy httpx tests
+      diagnostic_commands:
+        - .aor/live-e2e-venv/bin/python -m pytest tests
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - regress
+      - repair
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 10
+      max_added_lines: 380
+    size_rationale: Medium HTTPX work may cross client behavior, transport
+      tests, and typing checks but should stay inside one network semantics
+      surface.
+    change_budget:
+      max_changed_files: 10
+      max_added_lines: 380
+    quality_evidence: *evidence

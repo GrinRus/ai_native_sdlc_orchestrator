@@ -1,0 +1,76 @@
+catalog_id: zod
+repo:
+  repo_id: colinhacks/zod
+  repo_url: https://github.com/colinhacks/zod.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - pnpm install
+  commands:
+    - pnpm run build
+    - pnpm test
+    - pnpm run lint:check
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: zod.regress.medium.openai
+    scenario_family: regress
+    feature_size: medium
+    feature_mission_id: zod-json-schema-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
+provider_comparison_pairs: []
+feature_missions:
+  - mission_id: zod-json-schema-regression
+    title: Preserve JSON Schema conversion regression behavior
+    brief: Add or repair one bounded JSON Schema conversion edge case with runtime
+      coverage and the smallest public type-surface adjustment needed to keep
+      schema inference coherent.
+    feature_size: medium
+    goals:
+      - Preserve one JSON Schema conversion behavior without broad parser or
+        package rewrites.
+      - Keep runtime tests, build output, and lint evidence green.
+    kpis:
+      - kpi_id: zod-json-schema-regression-green
+        name: Zod JSON Schema regression gate
+        target: pnpm run build, pnpm test, and pnpm run lint:check pass after the
+          change
+        measurement: post-run primary verification
+    definition_of_done:
+      - The regression is covered by Vitest.
+      - The public type surface remains coherent for the changed schema behavior.
+      - Review and delivery evidence remain anchored to the target checkout.
+    expected_evidence: &evidence
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the change inside the Zod package runtime, tests, and type surface
+      - preserve build, test, and lint evidence
+      - avoid any upstream write-back
+    post_run_quality:
+      primary_commands:
+        - pnpm run build
+        - pnpm test
+        - pnpm run lint:check
+      diagnostic_commands: []
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - regress
+      - repair
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 8
+      max_added_lines: 320
+    size_rationale: Medium Zod work may cross runtime behavior, tests, and type
+      declarations but should stay inside one schema-conversion surface.
+    change_budget:
+      max_changed_files: 8
+      max_added_lines: 320
+    quality_evidence: *evidence
