@@ -1,0 +1,77 @@
+catalog_id: prettier
+repo:
+  repo_id: prettier/prettier
+  repo_url: https://github.com/prettier/prettier.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - yarn install --immutable
+  commands:
+    - yarn lint:typecheck
+    - yarn lint:eslint
+    - yarn test tests/format/typescript tests/format/markdown
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: prettier.regress.medium.openai
+    scenario_family: regress
+    feature_size: medium
+    feature_mission_id: prettier-typescript-format-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
+provider_comparison_pairs: []
+feature_missions:
+  - mission_id: prettier-typescript-format-regression
+    title: Preserve TypeScript formatting regression behavior
+    brief: Add or repair one bounded TypeScript or Markdown formatting edge case
+      with snapshot evidence and parser/printer checks.
+    feature_size: medium
+    goals:
+      - Preserve one deterministic formatting behavior without broad snapshot
+        churn.
+      - Keep typecheck, ESLint, and focused format snapshot evidence green.
+    kpis:
+      - kpi_id: prettier-typescript-format-green
+        name: Prettier TypeScript format gate
+        target: focused format tests plus typecheck and ESLint pass after the
+          change
+        measurement: post-run primary verification
+    definition_of_done:
+      - Snapshot changes are limited to the intended parser/printer behavior.
+      - The changed formatter behavior is covered by focused tests.
+      - Review and delivery evidence remain anchored to the target checkout.
+    expected_evidence: &evidence
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the change inside one parser/printer surface, tests, and snapshots
+      - preserve typecheck, ESLint, and focused snapshot evidence
+      - avoid broad unrelated snapshot churn
+      - avoid any upstream write-back
+    post_run_quality:
+      primary_commands:
+        - yarn lint:typecheck
+        - yarn lint:eslint
+        - yarn test tests/format/typescript tests/format/markdown
+      diagnostic_commands:
+        - yarn lint
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - regress
+      - repair
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 10
+      max_added_lines: 360
+    size_rationale: Medium Prettier work may touch a parser/printer and snapshot
+      fixtures but should avoid broad formatting churn.
+    change_budget:
+      max_changed_files: 10
+      max_added_lines: 360
+    quality_evidence: *evidence

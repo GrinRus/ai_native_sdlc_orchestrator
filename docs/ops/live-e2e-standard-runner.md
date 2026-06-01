@@ -40,6 +40,7 @@ Catalog-backed full-journey profiles:
 - `full-journey-production-proof-ky-openai.yaml`
 - `full-journey-regress-ky.yaml`
 - `full-journey-regress-ky-anthropic.yaml`
+- `full-journey-regress-ky-open-code.yaml`
 - `full-journey-regress-ky-medium-anthropic.yaml`
 - `full-journey-regress-ky-medium-open-code.yaml`
 - `full-journey-release-ky-medium-openai.yaml`
@@ -61,11 +62,39 @@ Catalog-backed full-journey profiles:
 - `full-journey-repair-nextjs-medium-anthropic.yaml`
 - `full-journey-governance-nextjs-large-openai.yaml`
 - `full-journey-regress-nextjs-small-openai.yaml`
+- `full-journey-regress-zod-medium-openai.yaml`
+- `full-journey-regress-httpx-medium-openai.yaml`
+- `full-journey-regress-eslint-medium-openai.yaml`
+- `full-journey-repair-fastify-medium-openai.yaml`
+- `full-journey-regress-prettier-medium-openai.yaml`
+- `full-journey-regress-ruff-large-openai.yaml`
 
 The human catalog stays in `docs/ops/live-e2e-target-catalog.md`; machine-readable matrix definitions live under:
 - `scripts/live-e2e/catalog/targets/*.yaml`
 - `scripts/live-e2e/catalog/scenarios/*.yaml`
 - `scripts/live-e2e/catalog/providers/*.yaml`
+
+## Target and mission rotation
+For routine qualification, regression, and success-rate analysis, prefer a fresh
+product and feature mission for each new live E2E run. Do not repeatedly prove
+success on the same `target_catalog_id` plus `feature_mission_id` pair unless the
+run is explicitly a reproduction, repair confirmation, production-proof rerun,
+or provider A/B comparison for that exact matrix cell.
+
+When selecting the next profile:
+- rotate across target products first, then across feature missions inside the
+  same product;
+- include different scenario families and feature sizes when the current
+  question is overall live E2E success, not a single adapter or target debug;
+- record the chosen `target_catalog_id`, `feature_mission_id`,
+  `scenario_family`, `provider_variant_id`, `feature_size`, and `run_tier` in
+  the run summary or qualification notes;
+- keep repeated same-cell runs linked to a concrete reason such as
+  `reproduce-failure`, `verify-repair`, `provider-comparison`, or
+  `production-proof`.
+
+This rotation rule makes the observed success rate reflect product breadth
+instead of overfitting to one familiar repository or one easy feature seam.
 
 ## Start
 ```bash

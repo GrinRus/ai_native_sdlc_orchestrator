@@ -1,0 +1,79 @@
+catalog_id: ruff
+repo:
+  repo_id: astral-sh/ruff
+  repo_url: https://github.com/astral-sh/ruff.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - cargo fetch
+  commands:
+    - cargo test -p ruff_linter
+    - cargo test -p ruff_python_formatter
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: ruff.regress.large.openai
+    scenario_family: regress
+    feature_size: large
+    feature_mission_id: ruff-rule-autofix-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
+provider_comparison_pairs: []
+feature_missions:
+  - mission_id: ruff-rule-autofix-regression
+    title: Preserve one Ruff rule autofix regression
+    brief: Add or repair one bounded Python lint rule or autofix edge case with
+      Rust test and fixture evidence while avoiding broad formatter or rule
+      churn.
+    feature_size: large
+    goals:
+      - Preserve one lint rule or autofix behavior with focused fixture evidence.
+      - Keep the relevant Rust crate tests green.
+      - Treat this target as extended until build and snapshot costs are proven
+        stable in live E2E.
+    kpis:
+      - kpi_id: ruff-rule-autofix-green
+        name: Ruff rule autofix gate
+        target: ruff_linter and formatter crate tests pass after the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - Rule fixture or snapshot evidence demonstrates the fixed behavior.
+      - The changed rule avoids unrelated diagnostics or formatting churn.
+      - Review and delivery evidence remain anchored to the target checkout.
+    expected_evidence: &evidence
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the change inside one lint rule, fixture, snapshot, or supporting
+        diagnostic surface
+      - preserve relevant Rust crate test evidence
+      - avoid broad generated documentation or schema churn unless the rule
+        change explicitly requires it
+      - avoid any upstream write-back
+    post_run_quality:
+      primary_commands:
+        - cargo test -p ruff_linter
+        - cargo test -p ruff_python_formatter
+      diagnostic_commands:
+        - cargo clippy -p ruff_linter --all-targets -- -D warnings
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - regress
+      - repair
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 14
+      max_added_lines: 520
+    size_rationale: Ruff rule/autofix work can cross Rust rule logic, fixtures,
+      snapshots, and generated metadata, so it stays large and extended until
+      live baseline cost is proven stable.
+    change_budget:
+      max_changed_files: 14
+      max_added_lines: 520
+    quality_evidence: *evidence

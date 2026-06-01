@@ -1,0 +1,76 @@
+catalog_id: eslint
+repo:
+  repo_id: eslint/eslint
+  repo_url: https://github.com/eslint/eslint.git
+  ref: main
+  checkout_strategy: shallow
+verification:
+  setup_commands:
+    - npm install
+  commands:
+    - npm run test:cli
+    - npm run lint:rule-types
+    - npm run lint:types
+safety_defaults:
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+required_matrix_cells:
+  - cell_id: eslint.regress.medium.openai
+    scenario_family: regress
+    feature_size: medium
+    feature_mission_id: eslint-rule-autofix-regression
+    provider_variant_id: openai-primary
+    coverage_tier: extended
+provider_comparison_pairs: []
+feature_missions:
+  - mission_id: eslint-rule-autofix-regression
+    title: Preserve one rule autofix regression
+    brief: Add or repair one bounded ESLint rule or autofix edge case with
+      RuleTester coverage and rule/type metadata checks.
+    feature_size: medium
+    goals:
+      - Preserve one AST rule or autofix behavior without changing unrelated
+        rule semantics.
+      - Keep CLI rule tests and rule metadata checks green.
+    kpis:
+      - kpi_id: eslint-rule-autofix-green
+        name: ESLint rule autofix gate
+        target: CLI rule test coverage plus rule metadata/type checks pass after
+          the change
+        measurement: post-run primary verification
+    definition_of_done:
+      - RuleTester coverage demonstrates the autofix or rule behavior.
+      - Generated rule metadata remains coherent.
+      - Review and delivery evidence remain anchored to the target checkout.
+    expected_evidence: &evidence
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+    acceptance_checks:
+      - keep the change inside one ESLint rule surface, fixtures, tests, and
+        required metadata
+      - preserve rule test and metadata/type evidence
+      - avoid any upstream write-back
+    post_run_quality:
+      primary_commands:
+        - npm run test:cli
+        - npm run lint:rule-types
+        - npm run lint:types
+      diagnostic_commands: []
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - regress
+      - repair
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 10
+      max_added_lines: 360
+    size_rationale: Medium ESLint rule work may touch one rule, tests, fixtures,
+      and metadata but should avoid broader config or CLI rewrites.
+    change_budget:
+      max_changed_files: 10
+      max_added_lines: 360
+    quality_evidence: *evidence

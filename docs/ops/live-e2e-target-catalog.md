@@ -141,9 +141,141 @@ For canonical setup and verification dependency details per profile, use `docs/o
   `setuptools-scm`; shallow checkouts produce an invalid local version and break
   pytest dependency resolution.
 
+## Candidate Target 6 — `colinhacks/zod`
+- Catalog id: `zod`
+- Shape: TypeScript schema validation package with runtime parsing, type inference,
+  and JSON Schema conversion.
+- Why it is useful: exercises runtime semantics plus public type-surface coherence
+  in a compact package.
+- Curated missions:
+  - `zod-json-schema-regression`
+    - `medium`, `regress|repair`, `extended`
+    - bounded JSON Schema conversion mission across runtime behavior, tests, and
+      type surface
+    - expected evidence: `verify-summary`, `routed-step-result`, `review-report`,
+      `delivery-manifest`
+    - post-run primary gate: `pnpm run build`, `pnpm test`, `pnpm run lint:check`
+- Best profile:
+  - `full-journey-regress-zod-medium-openai.yaml`
+- Failure-safe defaults:
+  - `write_back_to_remote=false`
+  - preferred delivery mode: `patch-only`
+
+## Candidate Target 7 — `encode/httpx`
+- Catalog id: `httpx`
+- Shape: Python HTTP client with sync/async APIs, strict timeouts, transports, and
+  typing.
+- Why it is useful: adds network/runtime semantics without requiring real external
+  services for the regression path.
+- Curated missions:
+  - `httpx-timeout-transport-regression`
+    - `medium`, `regress|repair`, `extended`
+    - bounded timeout or transport behavior mission with focused pytest, Ruff, and
+      mypy evidence
+    - expected evidence: `verify-summary`, `routed-step-result`, `review-report`,
+      `delivery-manifest`
+    - post-run primary gate: `./scripts/sync-version`,
+      `.aor/live-e2e-venv/bin/python -m pytest tests/test_timeouts.py`,
+      `.aor/live-e2e-venv/bin/ruff check httpx tests`, and
+      `.aor/live-e2e-venv/bin/mypy httpx tests`
+- Best profile:
+  - `full-journey-regress-httpx-medium-openai.yaml`
+- Failure-safe defaults:
+  - `write_back_to_remote=false`
+  - preferred delivery mode: `patch-only`
+
+## Candidate Target 8 — `eslint/eslint`
+- Catalog id: `eslint`
+- Shape: JavaScript lint rule engine with AST analysis, autofix behavior, CLI tests,
+  and rule metadata.
+- Why it is useful: exercises code-analysis semantics, fixture-driven regression,
+  and generated metadata consistency.
+- Curated missions:
+  - `eslint-rule-autofix-regression`
+    - `medium`, `regress|repair`, `extended`
+    - bounded rule or autofix mission with RuleTester coverage and rule/type
+      metadata checks
+    - expected evidence: `verify-summary`, `routed-step-result`, `review-report`,
+      `delivery-manifest`
+    - post-run primary gate: `npm run test:cli`, `npm run lint:rule-types`,
+      and `npm run lint:types`
+- Best profile:
+  - `full-journey-regress-eslint-medium-openai.yaml`
+- Failure-safe defaults:
+  - `write_back_to_remote=false`
+  - preferred delivery mode: `patch-only`
+
+## Candidate Target 9 — `fastify/fastify`
+- Catalog id: `fastify`
+- Shape: Node.js web framework with routing, validation, hooks, plugins, and type
+  tests.
+- Why it is useful: adds framework lifecycle and schema/plugin repair behavior
+  beyond CLI and library targets.
+- Curated missions:
+  - `fastify-schema-plugin-repair`
+    - `medium`, `repair|regress`, `extended`
+    - bounded schema validation, plugin registration, or lifecycle hook repair
+      with tests and type evidence
+    - expected evidence: `verify-summary`, `routed-step-result`, `review-report`,
+      `delivery-manifest`
+    - post-run primary gate: `npm run test:ci`, `npm run lint`
+- Best profile:
+  - `full-journey-repair-fastify-medium-openai.yaml`
+- Failure-safe defaults:
+  - `write_back_to_remote=false`
+  - preferred delivery mode: `patch-only`
+
+## Candidate Target 10 — `prettier/prettier`
+- Catalog id: `prettier`
+- Shape: JavaScript/TypeScript formatter with parser/printer behavior and snapshot
+  fixtures.
+- Why it is useful: deterministic formatter output makes reviewable regression
+  evidence, while snapshot churn keeps the target meaningfully strict.
+- Curated missions:
+  - `prettier-typescript-format-regression`
+    - `medium`, `regress|repair`, `extended`
+    - bounded TypeScript or Markdown formatting mission with focused snapshot
+      evidence
+    - expected evidence: `verify-summary`, `routed-step-result`, `review-report`,
+      `delivery-manifest`
+    - post-run primary gate: `yarn lint:typecheck`, `yarn lint:eslint`, and
+      `yarn test tests/format/typescript tests/format/markdown`
+- Best profile:
+  - `full-journey-regress-prettier-medium-openai.yaml`
+- Failure-safe defaults:
+  - `write_back_to_remote=false`
+  - preferred delivery mode: `patch-only`
+
+## Candidate Target 11 — `astral-sh/ruff`
+- Catalog id: `ruff`
+- Shape: Rust monorepo for Python linting and formatting.
+- Why it is useful: exercises Rust implementation, Python lint rule semantics,
+  autofix fixtures, and formatter-adjacent regression evidence.
+- Curated missions:
+  - `ruff-rule-autofix-regression`
+    - `large`, `regress|repair`, `extended`
+    - bounded lint rule or autofix mission with Rust test and fixture evidence
+    - expected evidence: `verify-summary`, `routed-step-result`, `review-report`,
+      `delivery-manifest`
+    - post-run primary gate: `cargo test -p ruff_linter`,
+      `cargo test -p ruff_python_formatter`
+- Best profile:
+  - `full-journey-regress-ruff-large-openai.yaml`
+- Failure-safe defaults:
+  - `write_back_to_remote=false`
+  - preferred delivery mode: `patch-only`
+- Operational note: keep this as extended/manual or overnight coverage until the
+  Rust build and snapshot costs are proven stable in live runs.
+
 ## Extended candidate targets
 - `spf13/cobra` (`cobra`): Go CLI framework, extended small regress cell, `go mod download`, `go test ./...`.
 - `date-fns/date-fns` (`date-fns`): TypeScript utility library, extended small regress cell, `pnpm install`, `pnpm vitest run`, `pnpm run lint`, `pnpm run types`.
+- `colinhacks/zod` (`zod`): TypeScript schema validator, extended medium JSON Schema regression cell, `pnpm install`, `pnpm run build`, `pnpm test`, `pnpm run lint:check`.
+- `encode/httpx` (`httpx`): Python HTTP client, extended medium timeout/transport regression cell, `.aor` venv install, targeted pytest, Ruff, and mypy.
+- `eslint/eslint` (`eslint`): JavaScript lint rule engine, extended medium autofix regression cell, `npm install`, rule tests, and rule/type metadata checks.
+- `fastify/fastify` (`fastify`): Node.js web framework, extended medium schema/plugin repair cell, `npm install`, `npm run test:ci`, `npm run lint`.
+- `prettier/prettier` (`prettier`): formatter snapshot target, extended medium TypeScript formatting regression cell, `yarn install --immutable`, typecheck, ESLint, and focused format tests.
+- `astral-sh/ruff` (`ruff`): Rust Python linter/formatter, extended large rule/autofix regression cell, `cargo fetch`, targeted crate tests.
 
 ## Why these targets
 Together these targets cover:
@@ -151,6 +283,12 @@ Together these targets cover:
 - deeper CLI regressions;
 - monorepo release-shaped delivery;
 - more than one language/runtime;
+- schema/type-surface regressions;
+- sync/async network semantics;
+- AST rule/autofix behavior;
+- web framework lifecycle repair;
+- formatter snapshot governance;
+- Rust rule and formatter-adjacent test surfaces;
 - both bounded rehearsal and full-journey mission-driven acceptance;
 - all mandatory scenario families: `regress`, `release`, `repair`, `governance`;
 - provider comparison pairs between `openai-primary` and `anthropic-primary`.
@@ -166,6 +304,25 @@ Mandatory full-journey live E2E is valid only when:
 7. provider execution attempts a real code-changing run;
 8. post-run target verification, Runtime Harness, review, QA, and delivery artifacts are present;
 9. the resulting observation report preserves the same matrix cell and records post-delivery code/artifact findings without turning quality failures into hard runner failures.
+
+## Run selection and product rotation
+For live E2E success-rate analysis, choose different products and different
+feature missions across successive runs. A repeated `target_catalog_id` plus
+`feature_mission_id` pair is useful for reproducing a failure, confirming a
+repair, comparing providers, or proving production-readiness for the same matrix
+cell, but it should not be the default sampling strategy.
+
+Preferred run selection order:
+1. pick a target product that was not used in the most recent comparable run;
+2. pick a feature mission that was not used in the most recent run for that
+   target;
+3. vary `scenario_family`, `feature_size`, and `provider_variant_id` when the
+   objective is broad live E2E quality evidence;
+4. record the reason when intentionally repeating the same target and mission.
+
+This keeps catalog evidence representative across libraries, CLIs, frameworks,
+formatters, monorepos, and Rust/Python/TypeScript stacks instead of optimizing
+the runner around one known-good repository.
 
 ## W14 matrix expectations
 Required coverage matrix:
@@ -198,6 +355,12 @@ Extended candidate cells:
 - `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)
 - `cobra.regress.small.openai`
 - `date-fns.regress.small.openai`
+- `zod.regress.medium.openai` (`zod-json-schema-regression`)
+- `httpx.regress.medium.openai` (`httpx-timeout-transport-regression`)
+- `eslint.regress.medium.openai` (`eslint-rule-autofix-regression`)
+- `fastify.repair.medium.openai` (`fastify-schema-plugin-repair`)
+- `prettier.regress.medium.openai` (`prettier-typescript-format-regression`)
+- `ruff.regress.large.openai` (`ruff-rule-autofix-regression`)
 
 Provider comparison rule:
 - every curated repo must prove at least one equivalent mission class on both `openai-primary` and `anthropic-primary`.
