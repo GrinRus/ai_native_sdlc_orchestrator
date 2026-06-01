@@ -55,6 +55,18 @@ const SAFE_TEMPLATE = {
   allowedPaths: "",
 };
 
+const EMPTY_TEMPLATE = {
+  ...SAFE_TEMPLATE,
+  templateId: "blank-mission",
+  title: "",
+  brief: "",
+  goals: "",
+  constraints: "",
+  kpi: "",
+  dod: "",
+  allowedPaths: "",
+};
+
 const DEFAULT_REQUEST = {
   intent: "analyze",
   requestText: "",
@@ -62,7 +74,44 @@ const DEFAULT_REQUEST = {
   allowedPaths: "",
   deliveryMode: "no-write",
   targetStep: "",
+  requestStageId: "",
+  targetFlowId: "",
 };
+
+const DELIVERY_MODE_OPTIONS = [
+  { value: "no-write", label: "No-Write (Safe)", summary: "Analyze and recommend only.", risk: "Low", icon: "shield" },
+  { value: "patch-only", label: "Patch-Only (Gated)", summary: "Apply patch to working tree only.", risk: "Low", icon: "lock" },
+  { value: "local-branch", label: "Local Branch (Gated)", summary: "Create local branch via VCS.", risk: "Medium", icon: "target" },
+  { value: "fork-first-pr", label: "Fork-First PR (Gated)", summary: "Create fork and open PR.", risk: "Medium", icon: "target" },
+];
+
+const REQUEST_INTENT_OPTIONS = [
+  { value: "analyze", label: "Analyze", readOnly: true },
+  { value: "explain", label: "Explain", readOnly: true },
+  { value: "plan", label: "Plan", readOnly: false },
+  { value: "repair", label: "Repair", readOnly: false },
+  { value: "validate", label: "Validate", readOnly: true },
+  { value: "review", label: "Review", readOnly: true },
+  { value: "revise-document", label: "Revise Doc", readOnly: false },
+  { value: "create-document", label: "Create Doc", readOnly: false },
+  { value: "implement", label: "Implement", readOnly: false },
+];
+
+const REVIEW_GATE_ROWS = [
+  { label: "Runtime Harness Report", tokens: ["runtime-harness-report", "REP-RTH"] },
+  { label: "Validation Report", tokens: ["validation-report", "REP-VAL", "VAL-"] },
+  { label: "Evaluation Report", tokens: ["evaluation-report", "REP-EVAL", "EVAL-"] },
+  { label: "Review Decision", tokens: ["review-decision", "DEC-REV"] },
+  { label: "Delivery Gate Readiness", tokens: ["delivery-plan", "delivery-manifest", "GATE-READY"] },
+];
+
+const DELIVERY_CHECK_ROWS = [
+  { label: "Approved review handoff", tokens: ["review-decision", "DEC-REV"] },
+  { label: "Runtime Harness pass", tokens: ["runtime-harness-report", "REP-RTH"] },
+  { label: "Delivery manifest", tokens: ["delivery-manifest", "DLV-", "manifest"] },
+  { label: "Release packet", tokens: ["release-packet", "PKT-REL"] },
+  { label: "Learning handoff", tokens: ["learning-loop-handoff", "LEARN-HND"] },
+];
 
 function splitLines(value) {
   return value
@@ -76,6 +125,25 @@ function splitRefs(value) {
     .split(/[,\n]/u)
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function comparableEvidenceRef(ref) {
+  return String(ref ?? "")
+    .replace(/^packet:\/\/operator-request@/u, "")
+    .replace(/^evidence:\/\//u, "")
+    .replace(/^\.aor\/projects\/[^/]+\//u, "");
+}
+
+function evidenceRefsMatch(left, right) {
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const normalizedLeft = comparableEvidenceRef(left);
+  const normalizedRight = comparableEvidenceRef(right);
+  return (
+    normalizedLeft === normalizedRight ||
+    normalizedLeft.endsWith(normalizedRight) ||
+    normalizedRight.endsWith(normalizedLeft)
+  );
 }
 
 function missionIdFromTitle(title) {
@@ -111,7 +179,7 @@ function resolveUiStageId(nextAction) {
 
 function statusTone(state) {
   const normalized = String(state ?? "").toLowerCase();
-  if (["connected", "ready", "pass", "completed", "active", "isolated", "no-write", "detached", "enforced"].includes(normalized)) return "safe";
+  if (["connected", "ready", "pass", "completed", "active", "isolated", "no-write", "detached", "enforced", "read-only"].includes(normalized)) return "safe";
   if (normalized.includes("connected") || normalized.includes("active") || normalized.includes("safe")) return "safe";
   if (normalized.includes("completed") || normalized.includes("enforced")) return "safe";
   if (["blocked", "fail", "failed", "error"].includes(normalized)) return "danger";
@@ -203,6 +271,17 @@ function Field({ label, children }) {
   );
 }
 
+function missionChecklistItems(form) {
+  return [
+    { label: "Mission Title", complete: String(form?.title ?? "").trim().length > 0 },
+    { label: "Mission Brief", complete: String(form?.brief ?? "").trim().length > 0 },
+    { label: "Goals", complete: splitLines(form?.goals ?? "").length > 0 },
+    { label: "KPI", complete: splitLines(form?.kpi ?? "").length > 0 },
+    { label: "Definition of Done", complete: splitLines(form?.dod ?? "").length > 0 },
+    { label: "Delivery Mode", complete: String(form?.deliveryMode ?? "").trim().length > 0 },
+  ];
+}
+
 function flowDisplayName(flow) {
   if (!flow) return "New flow draft";
   return flow.mission_id ?? flow.flow_id ?? "selected flow";
@@ -239,21 +318,101 @@ function toUiStageId(stageId) {
   return PROJECT_STAGE_TO_UI_STAGE[stageId] ?? stageId ?? "mission";
 }
 
+function actionCommandLabel(action, fallback = "Run aor next") {
+  const lowLevelCommand = String(action?.low_level_command ?? "").trim();
+  if (lowLevelCommand) {
+    return lowLevelCommand.startsWith("aor ") ? lowLevelCommand : `aor ${lowLevelCommand}`;
+  }
+  return action?.command ?? fallback;
+}
+
+function actionCommandTitle(action) {
+  return action?.command ?? actionCommandLabel(action);
+}
+
 function flowStageId(flow, nextAction, projectState) {
   if (flow?.selected_stage) return toUiStageId(flow.selected_stage);
   return resolveUiStageId(nextAction) ?? (projectState?.state_file ? "mission" : "readiness");
 }
 
-function evidenceRowsForFlow(flow, rows) {
-  if (!flow?.evidence_refs?.length) return rows;
+function evidenceRefMatchesTokens(ref, tokens) {
+  const normalized = comparableEvidenceRef(ref).toLowerCase();
+  return tokens.some((token) => normalized.includes(token.toLowerCase()));
+}
+
+function evidenceRefForTokens(refs, tokens) {
+  return (Array.isArray(refs) ? refs : []).find((ref) => evidenceRefMatchesTokens(ref, tokens)) ?? null;
+}
+
+function evidenceGateStatus(refs, tokens, fallback = "Pending") {
+  return evidenceRefForTokens(refs, tokens) ? "Ready" : fallback;
+}
+
+function evidenceRowsForFlow(flow, rows, { draft = false } = {}) {
+  if (draft) return [];
+  if (!flow?.flow_id) return [];
+  const evidenceRefs = Array.isArray(flow.evidence_refs) ? flow.evidence_refs : [];
   const byRef = new Map(rows.map((row) => [row.ref, row]));
-  return flow.evidence_refs.map((ref) => byRef.get(ref) ?? {
-    kind: "flow-evidence",
-    ref,
-    label: "flow evidence",
-    status: "ready",
-    summary: "Evidence linked to the selected flow projection.",
+  const scopedRows = rows.filter((row) => {
+    return row.targetFlowId === flow.flow_id || evidenceRefs.some((ref) => evidenceRefsMatch(row.ref, ref));
   });
+  const merged = evidenceRefs.map((ref) => {
+    const matchedRow = byRef.get(ref) ?? rows.find((row) => evidenceRefsMatch(row.ref, ref));
+    return matchedRow
+      ? { ...matchedRow, ref }
+      : {
+          kind: "flow-evidence",
+          ref,
+          label: "flow evidence",
+          status: "ready",
+          summary: "Evidence linked to the selected flow projection.",
+        };
+  });
+  const seenRefs = new Set(merged.map((row) => comparableEvidenceRef(row.ref)));
+  for (const row of scopedRows) {
+    const normalizedRef = comparableEvidenceRef(row.ref);
+    if (!seenRefs.has(normalizedRef)) {
+      merged.push(row);
+      seenRefs.add(normalizedRef);
+    }
+  }
+  return merged;
+}
+
+function latestRequestForFlow(operatorRequests, selectedFlow, { draft = false } = {}) {
+  if (draft) return null;
+  if (!selectedFlow?.flow_id) return null;
+  return operatorRequests.find((request) => request.document?.target_flow_id === selectedFlow.flow_id)?.document ?? null;
+}
+
+function flowScopedInteractions(stepResults, selectedFlow, runtimeTrace, { draft = false } = {}) {
+  if (draft) return [];
+  if (!selectedFlow?.flow_id) return [];
+  const flowRefs = new Set(Array.isArray(selectedFlow?.evidence_refs) ? selectedFlow.evidence_refs : []);
+  const flowRunIds = new Set(
+    (Array.isArray(runtimeTrace?.trace_items) ? runtimeTrace.trace_items : [])
+      .flatMap((item) => (Array.isArray(item.run_ids) ? item.run_ids : []))
+      .filter(Boolean),
+  );
+  return stepResults
+    .map((step) => {
+      const requested = step.document?.requested_interaction;
+      if (!requested?.requested) return null;
+      const status = requested.status ?? "requested";
+      if (status !== "requested" && status !== "blocked") return null;
+      return {
+        run_id: step.document?.run_id,
+        interaction_id: requested.interaction_id,
+        prompt_summary: requested.prompt_summary ?? requested.summary,
+        step_result_ref: step.artifact_ref ?? step.file,
+        interaction_type: requested.interaction_type,
+      };
+    })
+    .filter(Boolean)
+    .filter((interaction) => {
+      const matchesFlowRef = Array.from(flowRefs).some((ref) => evidenceRefsMatch(interaction.step_result_ref, ref));
+      return matchesFlowRef || flowRunIds.has(interaction.run_id);
+    });
 }
 
 function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNewFlow }) {
@@ -335,6 +494,8 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft }
 }
 
 function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk, askDisabled = false, title = "Start New Flow", description = "Create a fresh mission/intake packet, then let AOR resolve the first next action.", followUpSourceHandoffRef = null }) {
+  const selectedDeliveryMode = form.deliveryMode || "no-write";
+
   return (
     <form className="mission-form" aria-label="Mission intake" onSubmit={submitMission}>
       <div className="form-header">
@@ -351,6 +512,28 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
             Ask AOR
           </button>
         </div>
+      </div>
+      <div className="template-grid" aria-label="New flow templates">
+        <button className={`template-card ${form.templateId === "blank-mission" ? "selected" : ""}`} type="button" onClick={() => setForm(EMPTY_TEMPLATE)} disabled={busy}>
+          <Icon name="plus" />
+          <span>Blank mission</span>
+          <p>Start from scratch</p>
+        </button>
+        <button className={`template-card ${form.templateId === SAFE_TEMPLATE_ID ? "selected" : ""}`} type="button" onClick={applyTemplate} disabled={busy}>
+          <Icon name="shield" />
+          <span>Safe walkthrough template</span>
+          <p>Guided, best-practice path</p>
+        </button>
+        <button className={`template-card ${followUpSourceHandoffRef ? "selected" : ""}`} type="button" disabled>
+          <Icon name="lock" />
+          <span>From learning handoff</span>
+          <p>{followUpSourceHandoffRef ? "Captured guidance attached" : "Available from closed flows"}</p>
+        </button>
+        <button className="template-card" type="button" disabled>
+          <Icon name="target" />
+          <span>From selected evidence / ref</span>
+          <p>Attach evidence after a flow exists</p>
+        </button>
       </div>
       {followUpSourceHandoffRef ? (
         <div className="follow-up-lineage">
@@ -382,17 +565,30 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
         </Field>
       </div>
       <div className="form-grid compact">
-        <Field label="Delivery mode">
-          <select name="mission-delivery-mode" value={form.deliveryMode} onChange={(event) => setForm({ ...form, deliveryMode: event.target.value })}>
-            <option value="no-write">Safe-walkthrough (no-write)</option>
-            <option value="patch-only">Patch-only</option>
-            <option value="local-branch">Local branch</option>
-            <option value="fork-first-pr">Fork-first PR</option>
-          </select>
-        </Field>
         <Field label="Allowed paths">
           <input name="mission-allowed-paths" value={form.allowedPaths} placeholder="apps/web/**, docs/**" onChange={(event) => setForm({ ...form, allowedPaths: event.target.value })} />
         </Field>
+      </div>
+      <div className="field">
+        <span>Delivery Mode</span>
+        <div className="delivery-mode-grid" role="radiogroup" aria-label="Delivery mode">
+          {DELIVERY_MODE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              className={`delivery-mode-card ${selectedDeliveryMode === option.value ? "selected" : ""}`}
+              type="button"
+              role="radio"
+              aria-checked={selectedDeliveryMode === option.value}
+              onClick={() => setForm({ ...form, deliveryMode: option.value })}
+              disabled={busy}
+            >
+              <Icon name={option.icon} />
+              <strong>{option.label}</strong>
+              <p>{option.summary}</p>
+              <span>Risk: {option.risk}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <button className="primary" type="submit" disabled={busy}>
         {followUpSourceHandoffRef ? "Create Follow-up Mission & Resolve Next Action" : "Create Mission Packet & Resolve Next Action"}
@@ -421,6 +617,156 @@ function FlowTimeline({ currentStage, completed }) {
   );
 }
 
+function StageSpecificPanel({ stage, completed, flow, evidenceRefs, blockers, deliveryMode }) {
+  const closureState = flow?.closure_state ?? {};
+  if (completed || stage.id === "learning") {
+    const sourceHandoffRefs = Array.isArray(closureState.source_learning_handoff_refs)
+      ? closureState.source_learning_handoff_refs
+      : [];
+    const handoffRef =
+      closureState.recommended_follow_up_source_handoff_ref ??
+      sourceHandoffRefs[0] ??
+      evidenceRefForTokens(evidenceRefs, ["learning-loop-handoff", "LEARN-HND"]);
+    return (
+      <div className="stage-specific-panel learning-panel">
+        <div className="panel-heading">
+          <div>
+            <h3>Learning Closure / Start New Flow</h3>
+            <p>Completed evidence stays locked; new work starts from fresh mission evidence.</p>
+          </div>
+          <StatusPill state={completed ? "read-only" : "active"} />
+        </div>
+        <div className="closure-state-grid">
+          <div>
+            <span>Closure state</span>
+            <strong>{completed ? "Flow Closed" : "Awaiting closure"}</strong>
+            <p>{completed ? "Immutable evidence chain is available for audit." : "Learning evidence will appear after release closure."}</p>
+          </div>
+          <div>
+            <span>Follow-up source</span>
+            <strong>{handoffRef ? "Available" : "Not captured yet"}</strong>
+            <code>{handoffRef ?? "learning handoff pending"}</code>
+          </div>
+          <div>
+            <span>New-flow path</span>
+            <strong>Runtime-owned</strong>
+            <p><code>mission create</code> writes fresh intake evidence, then <code>next</code> resolves the first step.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage.id === "review") {
+    return (
+      <div className="stage-specific-panel review-gate-panel">
+        <div className="panel-heading">
+          <div>
+            <h3>Review Gate Matrix</h3>
+            <p>Validation precedes evaluation; downstream delivery remains gated by durable review evidence.</p>
+          </div>
+          <StatusPill state={blockers.length > 0 ? "blocked" : "ready"} />
+        </div>
+        <div className="stage-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Gate</th><th>Status</th><th>Evidence ref</th></tr>
+            </thead>
+            <tbody>
+              {REVIEW_GATE_ROWS.map((row) => {
+                const ref = evidenceRefForTokens(evidenceRefs, row.tokens);
+                return (
+                  <tr key={row.label}>
+                    <td>{row.label}</td>
+                    <td>{ref ? "Ready" : "Pending"}</td>
+                    <td><code>{ref ?? "awaiting evidence"}</code></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage.id === "delivery") {
+    return (
+      <div className="stage-specific-panel delivery-panel">
+        <div className="panel-heading">
+          <div>
+            <h3>Delivery / Release Finalization</h3>
+            <p>Write-back remains policy-gated; no upstream writes are implied by the web console.</p>
+          </div>
+          <StatusPill state={deliveryMode === "no-write" ? "no-write" : deliveryMode} />
+        </div>
+        <div className="delivery-readiness-grid">
+          {DELIVERY_CHECK_ROWS.map((row) => {
+            const ref = evidenceRefForTokens(evidenceRefs, row.tokens);
+            return (
+              <div key={row.label} className={ref ? "ready" : "pending"}>
+                <span className="check-dot" />
+                <strong>{row.label}</strong>
+                <code>{ref ?? "pending"}</code>
+              </div>
+            );
+          })}
+        </div>
+        <div className="delivery-mode-grid readonly">
+          {DELIVERY_MODE_OPTIONS.map((option) => (
+            <div key={option.value} className={`delivery-mode-card ${deliveryMode === option.value ? "selected" : ""}`}>
+              <Icon name={option.icon} />
+              <strong>{option.label}</strong>
+              <p>{option.summary}</p>
+              <span>Risk: {option.risk}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (stage.id === "implement") {
+    return (
+      <div className="stage-specific-panel execution-panel">
+        <div className="panel-heading">
+          <div>
+            <h3>Execution Boundary</h3>
+            <p>Runtime trace, permission requests, and requested interactions remain scoped to this flow.</p>
+          </div>
+          <StatusPill state={evidenceGateStatus(evidenceRefs, ["step-result", "run"], "waiting")} />
+        </div>
+        <div className="stage-signal-grid">
+          <div><span>Runtime evidence</span><strong>{evidenceRefs.filter((ref) => evidenceRefMatchesTokens(ref, ["step-result", "runtime-harness-report"])).length}</strong></div>
+          <div><span>Open blockers</span><strong>{blockers.length}</strong></div>
+          <div><span>Write-back mode</span><strong>{deliveryMode}</strong></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage.id === "discovery") {
+    return (
+      <div className="stage-specific-panel discovery-panel">
+        <div className="panel-heading">
+          <div>
+            <h3>Discovery / Spec / Plan Evidence</h3>
+            <p>Planning evidence is read from the selected flow, then used to justify the single next action.</p>
+          </div>
+          <StatusPill state={evidenceGateStatus(evidenceRefs, ["next-action-report"], "waiting")} />
+        </div>
+        <div className="stage-signal-grid">
+          <div><span>Next-action refs</span><strong>{evidenceRefs.filter((ref) => evidenceRefMatchesTokens(ref, ["next-action-report"])).length}</strong></div>
+          <div><span>Mission refs</span><strong>{evidenceRefs.filter((ref) => evidenceRefMatchesTokens(ref, ["intake", "mission"])).length}</strong></div>
+          <div><span>Scope policy</span><strong>{deliveryMode === "no-write" ? "No upstream writes" : "Explicit paths required"}</strong></div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 function FlowCockpit({
   flow,
   stage,
@@ -445,7 +791,10 @@ function FlowCockpit({
             <h2>Readiness</h2>
             <p>Initialize `.aor/`, confirm guardrails, and materialize next-action evidence.</p>
           </div>
-          <button className="secondary" type="button" onClick={onAsk}>Ask AOR</button>
+          <button className="secondary" type="button" onClick={onAsk} disabled>
+            <Icon name="target" />
+            Ask AOR
+          </button>
         </div>
         <div className="readiness-grid">
           <div>
@@ -537,7 +886,7 @@ function FlowCockpit({
         <div className="action-grid">
           <div className="command-panel">
             <span>Command</span>
-            <code>{nextPrimary.command}</code>
+            <code title={actionCommandTitle(nextPrimary)}>{actionCommandLabel(nextPrimary)}</code>
             <p>{nextPrimary.reason}</p>
           </div>
           <div>
@@ -582,17 +931,68 @@ function FlowCockpit({
           <p>{flow?.flow_id ?? "Mission packet will create the flow identity."}</p>
         </div>
       </div>
+
+      <StageSpecificPanel
+        stage={stage}
+        completed={completed}
+        flow={flow}
+        evidenceRefs={evidenceRefs}
+        blockers={blockers}
+        deliveryMode={deliveryMode}
+      />
     </section>
   );
 }
 
-function RightRail({ nextAction, selectedFlow, projectState, config, operatorRequests }) {
+function DraftFlowRail({ form }) {
+  const checklist = missionChecklistItems(form ?? SAFE_TEMPLATE);
+  const completeCount = checklist.filter((item) => item.complete).length;
+  return (
+    <>
+      <section className="rail-card draft-preview-card">
+        <h3>New Flow Preview <span>{completeCount}/{checklist.length}</span></h3>
+        <ul>
+          <li><Icon name="folder" /> Mission/Intake Packet <span>Draft</span></li>
+          <li><Icon name="target" /> Next-Action Report <span>Planned</span></li>
+          <li><Icon name="target" /> Operator Request <span>If needed</span></li>
+          <li><Icon name="shield" /> Runtime-Harness Report <span>Planned</span></li>
+        </ul>
+      </section>
+      <section className="rail-card completeness-card">
+        <h3>Completeness Checklist <span>{checklist.length - completeCount} left</span></h3>
+        <ul>
+          {checklist.map((item) => (
+            <li key={item.label} className={item.complete ? "complete" : "missing"}>
+              <span className="check-dot" />
+              {item.label}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="rail-card safety-preview-card">
+        <h3>Safety Preview</h3>
+        <ul>
+          <li className="complete"><span className="check-dot" /> No upstream writes <strong>Enforced</strong></li>
+          <li className="complete"><span className="check-dot" /> PII redaction <strong>Enabled</strong></li>
+          <li className="complete"><span className="check-dot" /> Explicit scope <strong>Required</strong></li>
+        </ul>
+      </section>
+    </>
+  );
+}
+
+function RightRail({ nextAction, selectedFlow, projectState, config, operatorRequests, newFlowDraft = false, missionDraft = null }) {
   const completed = isCompletedFlow(selectedFlow);
-  const nextPrimary = completed
-    ? nextAction?.primary_action?.action_id === "start-new-flow"
-      ? nextAction.primary_action
-      : { command: "read-only evidence inspection", reason: "Completed flow evidence remains inspectable." }
-    : nextAction?.primary_action ?? {};
+  let nextPrimary = nextAction?.primary_action ?? {};
+  if (newFlowDraft) {
+    nextPrimary = {
+      low_level_command: "mission create",
+      command: "aor mission create",
+      reason: "Submit the mission form to create a new flow, then resolve the first next action.",
+    };
+  } else if (completed && nextAction?.primary_action?.action_id !== "start-new-flow") {
+    nextPrimary = { command: "read-only evidence inspection", reason: "Completed flow evidence remains inspectable." };
+  }
   const blockers = Array.isArray(nextAction?.blockers) && !completed ? nextAction.blockers : [];
   const evidenceRefs = Array.isArray(selectedFlow?.evidence_refs) && selectedFlow.evidence_refs.length > 0
     ? selectedFlow.evidence_refs
@@ -604,15 +1004,16 @@ function RightRail({ nextAction, selectedFlow, projectState, config, operatorReq
     nextAction?.bounded_execution?.requested_delivery_mode ??
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
-  const latestRequest = operatorRequests.find((request) => request.document?.target_flow_id === selectedFlow?.flow_id)?.document ?? operatorRequests[0]?.document;
+  const latestRequest = latestRequestForFlow(operatorRequests, selectedFlow, { draft: newFlowDraft });
 
   return (
     <aside className="right-rail">
       <section className="rail-card next-card">
-        <h3>Next action <span>{completed ? "read-only" : "single step"}</span></h3>
-        <p className="command">{nextPrimary.command ?? "Run aor next"}</p>
+        <h3>Next action <span>{newFlowDraft ? "draft" : completed ? "read-only" : "single step"}</span></h3>
+        <p className="command" title={actionCommandTitle(nextPrimary)}>{actionCommandLabel(nextPrimary)}</p>
         <p>{nextPrimary.reason ?? "No next-action report has been materialized yet."}</p>
       </section>
+      {newFlowDraft ? <DraftFlowRail form={missionDraft} /> : null}
       <section className="rail-card">
         <h3>Blockers <span>{blockers.length}</span></h3>
         <ul>
@@ -706,6 +1107,7 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
 }
 
 function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, busy }) {
+  const selectedInteraction = interactions[0] ?? null;
   return (
     <section className="work-card inbox">
       <div className="work-heading compact-heading">
@@ -716,30 +1118,61 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
       </div>
       {interactions.length === 0 ? (
         <p className="empty-state">No requested interactions.</p>
-      ) : interactions.map((interaction) => {
-        const key = interactionKey(interaction);
-        const answer = answers[key] ?? { answer: "", decision: "" };
-        const canSend = (answer.answer ?? "").trim().length > 0 || (answer.decision ?? "").length > 0;
-        return (
-          <div className="interaction-row" key={key}>
-            <div>
-              <strong>{interaction.prompt_summary ?? "Runtime requested input"}</strong>
-              <span>{interaction.run_id}</span>
-              <code>{interaction.step_result_ref}</code>
-            </div>
-            <select name="interaction-decision" value={answer.decision} onChange={(event) => setAnswers({ ...answers, [key]: { ...answer, decision: event.target.value } })}>
-              <option value="">answer</option>
-              <option value="approve_once">approve_once</option>
-              <option value="deny">deny</option>
-              <option value="approve_for_run">approve_for_run</option>
-            </select>
-            <input name="interaction-answer" value={answer.answer} placeholder="Answer or reason" onChange={(event) => setAnswers({ ...answers, [key]: { ...answer, answer: event.target.value } })} />
-            <button className="secondary" type="button" onClick={() => submitAnswer(interaction)} disabled={busy || !canSend}>
-              Send
-            </button>
+      ) : (
+        <div className="interactions-layout">
+          <div className="interaction-list">
+            {interactions.map((interaction) => (
+              <div className="interaction-summary-row" key={interactionKey(interaction)}>
+                <strong>{interaction.prompt_summary ?? "Runtime requested input"}</strong>
+                <span>{interaction.run_id}</span>
+                <code>{interaction.step_result_ref}</code>
+              </div>
+            ))}
           </div>
-        );
-      })}
+          {selectedInteraction ? (() => {
+            const key = interactionKey(selectedInteraction);
+            const answer = answers[key] ?? { answer: "", decision: "" };
+            const canSend = (answer.answer ?? "").trim().length > 0 || (answer.decision ?? "").length > 0;
+            return (
+              <div className="interaction-detail-panel">
+                <div className="panel-heading">
+                  <div>
+                    <h3>Interaction Detail</h3>
+                    <p>Runtime-initiated request, separate from Ask AOR operator requests.</p>
+                  </div>
+                  <StatusPill state="Awaiting answer" />
+                </div>
+                <dl>
+                  <dt>Run</dt>
+                  <dd><code>{selectedInteraction.run_id}</code></dd>
+                  <dt>Interaction</dt>
+                  <dd><code>{selectedInteraction.interaction_id}</code></dd>
+                  <dt>Evidence</dt>
+                  <dd><code>{selectedInteraction.step_result_ref}</code></dd>
+                </dl>
+                <div className="allowed-answer-types">
+                  <span>Allowed answer types</span>
+                  <strong>approve_once</strong>
+                  <strong>approve_for_run</strong>
+                  <strong>deny</strong>
+                </div>
+                <div className="interaction-row">
+                  <select name="interaction-decision" value={answer.decision} onChange={(event) => setAnswers({ ...answers, [key]: { ...answer, decision: event.target.value } })}>
+                    <option value="">answer</option>
+                    <option value="approve_once">approve_once</option>
+                    <option value="deny">deny</option>
+                    <option value="approve_for_run">approve_for_run</option>
+                  </select>
+                  <input name="interaction-answer" value={answer.answer} placeholder="Answer or reason" onChange={(event) => setAnswers({ ...answers, [key]: { ...answer, answer: event.target.value } })} />
+                  <button className="secondary" type="button" onClick={() => submitAnswer(selectedInteraction)} disabled={busy || !canSend}>
+                    Submit Answer
+                  </button>
+                </div>
+              </div>
+            );
+          })() : null}
+        </div>
+      )}
     </section>
   );
 }
@@ -747,6 +1180,7 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
 function EvidenceGraphPanel({ graph }) {
   const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
   const edges = Array.isArray(graph?.edges) ? graph.edges : [];
+  const selectedNode = nodes[nodes.length - 1] ?? nodes[0] ?? null;
   return (
     <section className="work-card graph-panel">
       <div className="work-heading compact-heading">
@@ -755,6 +1189,11 @@ function EvidenceGraphPanel({ graph }) {
           <p>Selected-flow evidence only. Unrelated flow refs are excluded.</p>
         </div>
         <StatusPill state={graph?.isolation?.excludes_unrelated_flows ? "isolated" : "loading"} />
+      </div>
+      <div className="graph-context-tabs" aria-label="Evidence graph context">
+        <button className="selected" type="button">Current Flow</button>
+        <button type="button" disabled>Completed Flows</button>
+        <button type="button" disabled>Cross-flow Lineage</button>
       </div>
       <div className="graph-summary">
         <div>
@@ -774,13 +1213,32 @@ function EvidenceGraphPanel({ graph }) {
         {nodes.length === 0 ? (
           <p className="empty-state">No flow graph loaded.</p>
         ) : nodes.slice(0, 8).map((node) => (
-          <div className="graph-node" key={node.node_id}>
-            <span>{node.family}</span>
+          <div className="graph-node" key={node.node_id ?? node.ref}>
+            <span>{node.family ?? node.kind ?? "evidence"}</span>
             <strong>{node.label ?? node.ref}</strong>
             <code>{node.ref}</code>
           </div>
         ))}
       </div>
+      {nodes.length > 0 ? (
+        <div className="graph-flow-canvas" aria-label="Selected flow evidence graph">
+          {nodes.slice(0, 10).map((node, index) => (
+            <div className="graph-flow-node" key={node.node_id ?? node.ref}>
+              <span>{index + 1}</span>
+              <strong>{node.label ?? node.family ?? "Evidence"}</strong>
+              <em>{node.status ?? node.family ?? "linked"}</em>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {selectedNode ? (
+        <div className="selected-node-panel">
+          <span>Selected node</span>
+          <strong>{selectedNode.label ?? selectedNode.family ?? "Evidence"}</strong>
+          <code>{selectedNode.ref}</code>
+          <p>{selectedNode.summary ?? "Selected-flow evidence node."}</p>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -795,6 +1253,17 @@ function RuntimeTracePanel({ trace }) {
           <p>Run events, step results, harness decisions, and delivery artifacts for this flow.</p>
         </div>
         <StatusPill state={`${items.length} items`} />
+      </div>
+      <div className="trace-timeline-strip" aria-label="Trace timeline">
+        {items.length === 0 ? (
+          <span>No trace events yet</span>
+        ) : items.slice(0, 8).map((item, index) => (
+          <div className="trace-timeline-event" key={`${item.trace_id}-timeline`}>
+            <span>{index + 1}</span>
+            <strong>{item.event_type ?? item.kind}</strong>
+            <em>{item.status ?? "read"}</em>
+          </div>
+        ))}
       </div>
       <div className="table-wrap trace-table">
         <table>
@@ -840,6 +1309,9 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
   const targetRefsMissing = splitRefs(form.targetRefs).length === 0;
   const flowMissing = !flow?.flow_id;
   const readOnlyAllowed = !completed || (form.deliveryMode === "no-write" && READ_ONLY_INSPECTION_INTENTS.has(form.intent));
+  const deliveryModes = completed
+    ? DELIVERY_MODE_OPTIONS.filter((option) => option.value === "no-write")
+    : DELIVERY_MODE_OPTIONS;
   const requestPreview =
     flowMissing
       ? "Select an existing flow before creating an operator request."
@@ -875,19 +1347,27 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
           <code>{flow?.flow_id ?? "new-flow-draft"}</code>
           <p>{flowMissing ? "Ask AOR requires a selected flow." : completed ? "Read-only inspection only. Mutation requests are blocked by the control plane." : "Requests are scoped to the selected active flow."}</p>
         </div>
-        <Field label="Intent">
-          <select name="request-intent" value={form.intent} onChange={(event) => setForm({ ...form, intent: event.target.value })}>
-            <option value="analyze">analyze</option>
-            <option value="explain">explain</option>
-            <option value="revise-document" disabled={completed}>revise-document</option>
-            <option value="create-document" disabled={completed}>create-document</option>
-            <option value="repair" disabled={completed}>repair</option>
-            <option value="validate">validate</option>
-            <option value="plan" disabled={completed}>plan</option>
-            <option value="implement" disabled={completed}>implement</option>
-            <option value="review">review</option>
-          </select>
-        </Field>
+        <div className="field">
+          <span>Intent</span>
+          <div className="request-intent-segment segmented-control" role="tablist" aria-label="Request intent">
+            {REQUEST_INTENT_OPTIONS.map((option) => {
+              const disabled = completed && !option.readOnly;
+              return (
+                <button
+                  key={option.value}
+                  className={form.intent === option.value ? "selected" : ""}
+                  type="button"
+                  role="tab"
+                  aria-selected={form.intent === option.value}
+                  onClick={() => setForm({ ...form, intent: option.value })}
+                  disabled={disabled}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <Field label="Request">
           <textarea name="request-text" value={form.requestText} placeholder="Ask for analysis, explanation, proposal, patch, validation, or review." onChange={(event) => setForm({ ...form, requestText: event.target.value })} />
         </Field>
@@ -897,15 +1377,27 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
         <Field label="Allowed paths">
           <input name="request-allowed-paths" value={form.allowedPaths} placeholder="docs/**, apps/web/**" onChange={(event) => setForm({ ...form, allowedPaths: event.target.value })} />
         </Field>
+        <div className="field">
+          <span>Delivery Mode</span>
+          <div className="request-mode-grid" role="radiogroup" aria-label="Request delivery mode">
+            {deliveryModes.map((option) => (
+              <button
+                key={option.value}
+                className={`delivery-mode-card compact ${form.deliveryMode === option.value ? "selected" : ""}`}
+                type="button"
+                role="radio"
+                aria-checked={form.deliveryMode === option.value}
+                onClick={() => setForm({ ...form, deliveryMode: option.value })}
+                disabled={busy}
+              >
+                <Icon name={option.icon} />
+                <strong>{option.label}</strong>
+                <p>{option.summary}</p>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="form-grid">
-          <Field label="Delivery mode">
-            <select name="request-delivery-mode" value={form.deliveryMode} onChange={(event) => setForm({ ...form, deliveryMode: event.target.value })}>
-              <option value="no-write">no-write</option>
-              <option value="patch-only" disabled={completed}>patch-only</option>
-              <option value="local-branch" disabled={completed}>local-branch</option>
-              <option value="fork-first-pr" disabled={completed}>fork-first-pr</option>
-            </select>
-          </Field>
           <Field label="Target step">
             <select name="request-target-step" value={form.targetStep} onChange={(event) => setForm({ ...form, targetStep: event.target.value })}>
               <option value="">stage default</option>
@@ -999,7 +1491,8 @@ function App() {
   }, [config]);
 
   const activeStage = STAGES.find((stage) => stage.id === selectedStage) ?? STAGES[1];
-  const currentStage = newFlowDraft ? "mission" : flowStageId(selectedFlow, nextAction, projectState);
+  const draftSurface = newFlowDraft || (!selectedFlow && selectedStage === "mission");
+  const currentStage = draftSurface ? "mission" : flowStageId(selectedFlow, nextAction, projectState);
   const flowOptions = Array.isArray(flowList?.flows) ? flowList.flows : [];
 
   const evidenceRows = useMemo(() => {
@@ -1023,6 +1516,7 @@ function App() {
       label: request.document?.request_id ?? "operator-request",
       status: request.document?.status,
       summary: request.document?.request_summary ?? "Operator request metadata.",
+      targetFlowId: request.document?.target_flow_id,
     }));
     const nextRows = (Array.isArray(nextAction?.evidence_refs) ? nextAction.evidence_refs : []).map((ref) => ({
       kind: "next-action-ref",
@@ -1034,32 +1528,24 @@ function App() {
     return [...requestRows, ...packetRows, ...stepRows, ...nextRows].filter((row) => typeof row.ref === "string");
   }, [packets, stepResults, operatorRequests, nextAction]);
 
-  const flowEvidenceRows = useMemo(() => evidenceRowsForFlow(selectedFlow, evidenceRows), [selectedFlow, evidenceRows]);
+  const flowEvidenceRows = useMemo(
+    () => evidenceRowsForFlow(selectedFlow, evidenceRows, { draft: draftSurface }),
+    [selectedFlow, evidenceRows, draftSurface],
+  );
 
   useEffect(() => {
-    if (flowEvidenceRows.length === 0) return;
+    if (flowEvidenceRows.length === 0) {
+      if (selectedRef) setSelectedRef("");
+      return;
+    }
     if (!selectedRef || !flowEvidenceRows.some((row) => row.ref === selectedRef)) {
       setSelectedRef(flowEvidenceRows[0].ref);
     }
   }, [flowEvidenceRows, selectedRef]);
 
   const interactions = useMemo(() => {
-    return stepResults
-      .map((step) => {
-        const requested = step.document?.requested_interaction;
-        if (!requested?.requested) return null;
-        const status = requested.status ?? "requested";
-        if (status !== "requested" && status !== "blocked") return null;
-        return {
-          run_id: step.document?.run_id,
-          interaction_id: requested.interaction_id,
-          prompt_summary: requested.prompt_summary ?? requested.summary,
-          step_result_ref: step.artifact_ref ?? step.file,
-          interaction_type: requested.interaction_type,
-        };
-      })
-      .filter(Boolean);
-  }, [stepResults]);
+    return flowScopedInteractions(stepResults, selectedFlow, flowRuntimeTrace, { draft: draftSurface });
+  }, [stepResults, selectedFlow, flowRuntimeTrace, draftSurface]);
 
   function pushActivity(label, detail) {
     setActivity((current) => [{ id: `${Date.now()}-${Math.random()}`, label, detail }, ...current.slice(0, 9)]);
@@ -1125,6 +1611,7 @@ function App() {
       didAutoSelectStage.current = true;
     }
     pushActivity("control-plane.connected", refreshedSelectedFlow?.flow_id ?? nextReport?.primary_action?.command ?? "state refreshed");
+    return { projectState: state, nextAction: nextReport?.primary_action ? nextReport : null, selectedFlow: refreshedSelectedFlow };
   }
 
   useEffect(() => {
@@ -1178,23 +1665,32 @@ function App() {
 
   function openRequestDrawer(prefillRef = "") {
     const completed = isCompletedFlow(selectedFlow);
-    const currentText = requestForm.requestText || `Analyze the ${activeStage.label} stage and recommend the next bounded action.`;
+    const targetFlowId = selectedFlow?.flow_id ?? "";
+    const sameFlow = requestForm.targetFlowId === targetFlowId;
+    const sameStage = requestForm.requestStageId === activeStage.id;
+    const defaultRequestText = `Analyze the ${activeStage.label} stage and recommend the next bounded action.`;
+    const currentText = sameFlow && sameStage && requestForm.requestText ? requestForm.requestText : defaultRequestText;
+    const defaultTargetStep = STAGE_TO_TARGET_STEP[activeStage.id] || "discovery";
     const defaultTargetRef =
       selectedFlow?.latest_next_action_report_ref ??
       selectedFlow?.intake_packet_ref ??
       selectedFlow?.evidence_refs?.[0] ??
       "";
     const refs = prefillRef
-      ? Array.from(new Set([...splitRefs(requestForm.targetRefs), prefillRef])).join("\n")
-      : requestForm.targetRefs || defaultTargetRef;
+      ? Array.from(new Set([...(sameFlow ? splitRefs(requestForm.targetRefs) : []), prefillRef])).join("\n")
+      : sameFlow && requestForm.targetRefs
+        ? requestForm.targetRefs
+        : defaultTargetRef;
     setRequestForm({
       ...requestForm,
+      requestStageId: activeStage.id,
+      targetFlowId,
       intent: completed && !READ_ONLY_INSPECTION_INTENTS.has(requestForm.intent) ? "analyze" : requestForm.intent,
       requestText: currentText,
       targetRefs: refs,
       deliveryMode: completed ? "no-write" : requestForm.deliveryMode,
       allowedPaths: completed ? "" : requestForm.allowedPaths,
-      targetStep: requestForm.targetStep || STAGE_TO_TARGET_STEP[activeStage.id] || "discovery",
+      targetStep: sameFlow && sameStage && requestForm.targetStep ? requestForm.targetStep : defaultTargetStep,
     });
     setRequestResult(null);
     setRequestDrawerOpen(true);
@@ -1286,8 +1782,8 @@ function App() {
     setBusy(true);
     try {
       await runLifecycle("next", { json: true });
-      await refresh();
-      setSelectedStage(flowStageId(selectedFlow, nextAction, projectState));
+      const refreshed = await refresh();
+      setSelectedStage(flowStageId(refreshed?.selectedFlow, refreshed?.nextAction, refreshed?.projectState));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1395,7 +1891,7 @@ function App() {
         <FlowSelector
           flows={flowOptions}
           selectedFlowId={selectedFlowId}
-          newFlowDraft={newFlowDraft}
+          newFlowDraft={draftSurface}
           onSelectFlow={selectFlow}
           onNewFlow={startNewFlow}
         />
@@ -1403,10 +1899,13 @@ function App() {
           <span>Runtime root</span>
           <code>{projectState?.runtime_root ?? config?.runtime_root ?? ".aor"}</code>
         </div>
-        <StatusPill state={newFlowDraft ? "Draft flow" : selectedFlow?.status ?? "No flow"} />
+        <StatusPill state={draftSurface ? "Draft flow" : selectedFlow?.status ?? "No flow"} />
         <div className="topbar-spacer" />
         <StatusPill state={config ? "connected" : "loading"} />
         <StatusPill state={deliveryMode === "no-write" ? "NO-WRITE SAFETY: ON" : deliveryMode} />
+        <button className="utility-button topbar-ask-button" type="button" onClick={() => openRequestDrawer()} disabled={busy || !selectedFlow}>
+          <Icon name="target" />Ask AOR
+        </button>
         <IconButton label="Refresh" onClick={() => refresh().catch((err) => setError(err.message))} disabled={busy}><Icon name="refresh" /></IconButton>
         <button className="utility-button" type="button" onClick={() => copyRef(projectState?.runtime_root ?? config?.runtime_root ?? ".aor")}>
           <Icon name="folder" />Copy runtime path
@@ -1418,12 +1917,12 @@ function App() {
         currentStage={currentStage}
         onSelect={chooseStage}
         flow={selectedFlow}
-        newFlowDraft={newFlowDraft}
+        newFlowDraft={draftSurface}
       />
 
       <main className="main">
         {error ? <div className="alert" role="alert">{error}</div> : null}
-        {newFlowDraft || (!selectedFlow && selectedStage === "mission") ? (
+        {draftSurface ? (
           <section className="work-card">
             <MissionForm
               form={form}
@@ -1462,7 +1961,15 @@ function App() {
         )}
       </main>
 
-      <RightRail nextAction={newFlowDraft ? null : nextAction} selectedFlow={selectedFlow} projectState={projectState} config={config} operatorRequests={operatorRequests} />
+      <RightRail
+        nextAction={draftSurface ? null : nextAction}
+        selectedFlow={selectedFlow}
+        projectState={projectState}
+        config={config}
+        operatorRequests={operatorRequests}
+        newFlowDraft={draftSurface}
+        missionDraft={draftSurface ? form : null}
+      />
 
       <section className="bottom-bar">
         <div className="activity-table">
@@ -1481,15 +1988,15 @@ function App() {
           <table>
             <thead><tr><th>Ref</th><th>Status</th></tr></thead>
             <tbody>
-              {evidenceRows.length === 0 ? (
-                <tr><td colSpan="2">No artifacts yet</td></tr>
+              {flowEvidenceRows.length === 0 ? (
+                <tr><td colSpan="2">{draftSurface ? "Draft flow has no artifacts yet" : "No selected-flow artifacts yet"}</td></tr>
               ) : flowEvidenceRows.slice(0, 5).map((row) => <tr key={row.ref}><td><code>{row.ref}</code></td><td>{row.status ?? "ready"}</td></tr>)}
             </tbody>
           </table>
         </div>
       </section>
 
-      <section className="workbench-row">
+      <section className="workbench-row graph-trace-row">
         <EvidenceGraphPanel graph={flowEvidenceGraph} />
         <RuntimeTracePanel trace={flowRuntimeTrace} />
       </section>
