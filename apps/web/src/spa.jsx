@@ -612,7 +612,7 @@ function actionCommandTitle(action) {
 
 function flowStageId(flow, nextAction, projectState) {
   if (flow?.selected_stage) return toUiStageId(flow.selected_stage);
-  if (!flow) return resolveUiStageId(nextAction) ?? "readiness";
+  if (!flow) return "readiness";
   return resolveUiStageId(nextAction) ?? (projectState?.state_file ? "mission" : "readiness");
 }
 
@@ -764,7 +764,7 @@ function decisionHelperCommand(requestRef, action) {
   ].join(" ");
 }
 
-function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNewFlow }) {
+function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNewFlow, newFlowDisabled = false }) {
   const activeFlows = flows.filter((flow) => flow.status === "active");
   const completedFlows = flows.filter((flow) => flow.status === "completed");
   const value = newFlowDraft ? "__new__" : selectedFlowId ?? "";
@@ -795,7 +795,13 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
           ) : null}
         </select>
       </label>
-      <button className="secondary new-flow-button" type="button" onClick={onNewFlow}>
+      <button
+        className="secondary new-flow-button"
+        type="button"
+        onClick={onNewFlow}
+        disabled={newFlowDisabled}
+        title={newFlowDisabled ? "Initialize the project runtime before starting a flow." : undefined}
+      >
         <Icon name="plus" />
         New Flow
       </button>
@@ -1259,7 +1265,7 @@ function FlowCockpit({
   providerStepStatus = null,
   evidenceRows = [],
 }) {
-  if (!flow && stage.id === "readiness") {
+  if (!flow) {
     const projectRef = activeProject?.project_ref ?? config?.project_ref ?? "loading";
     const runtimeRoot = projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor";
     const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
@@ -1506,7 +1512,7 @@ function FlowCockpit({
           </div>
           <div>
             <span>Runtime root</span>
-            <code>{projectState?.runtime_root ?? config?.runtime_root ?? ".aor"}</code>
+            <code>{projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor"}</code>
           </div>
           <div>
             <span>Write-back mode</span>
@@ -1606,17 +1612,25 @@ function DraftFlowRail({ form }) {
   );
 }
 
-function RightRail({ nextAction, selectedFlow, projectState, config, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [] }) {
+function RightRail({ nextAction, selectedFlow, projectState, config, activeProject = null, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [] }) {
   const completed = isCompletedFlow(selectedFlow);
   const activeFlows = flows.filter((flow) => flow.status === "active");
   const completedFlows = flows.filter((flow) => flow.status === "completed");
+  const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
+  const runtimeReady = Boolean(projectState?.state_file) || onboarding.initialized === true || onboarding.state_exists === true;
   let nextPrimary = nextAction?.primary_action ?? {};
   if (!selectedFlow && !newFlowDraft) {
-    nextPrimary = {
-      low_level_command: "project init",
-      command: "aor project init",
-      reason: "Prepare the local runtime and safety controls. This does not create a flow.",
-    };
+    nextPrimary = runtimeReady
+      ? {
+        low_level_command: "mission create",
+        command: "aor mission create",
+        reason: "Create the first no-write mission packet, then resolve the first next action.",
+      }
+      : {
+        low_level_command: "project init",
+        command: "aor project init",
+        reason: "Prepare the local runtime and safety controls. This does not create a flow.",
+      };
   } else if (newFlowDraft) {
     nextPrimary = {
       low_level_command: "mission create",
@@ -1673,7 +1687,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, operatorReq
       </section>
       <section className="rail-card">
         <h3>Runtime root</h3>
-        <p><code>{projectState?.runtime_root ?? config?.runtime_root ?? ".aor"}</code></p>
+        <p><code>{projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor"}</code></p>
         <div className="meter"><span /></div>
       </section>
       <section className="rail-card">
@@ -2446,6 +2460,11 @@ function App() {
     projectOptions.find((project) => project.project_id === config?.project_id) ??
     projectOptions[0] ??
     null;
+  const activeProjectOnboarding = activeProject?.onboarding_summary ?? {};
+  const activeProjectRuntimeReady =
+    Boolean(projectState?.state_file)
+    || activeProjectOnboarding.initialized === true
+    || activeProjectOnboarding.state_exists === true;
 
   const evidenceRows = useMemo(() => {
     const fromSummary = (summary, overrides = {}) => artifactRowFromSummary(summary, overrides);
@@ -2785,6 +2804,7 @@ function App() {
         await refresh({ projectId: nextProjectId, selectionVersion: flowSelectionVersion.current });
       }
       setAddProjectResult({ status: "ok", message: resultMessage });
+      setAddProjectDrawerOpen(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setAddProjectResult({ status: "error", message });
@@ -2795,6 +2815,11 @@ function App() {
   }
 
   function startNewFlow({ sourceFlow = null, followUp = false, duplicate = false } = {}) {
+    if (!activeProjectRuntimeReady) {
+      setSelectedStage("readiness");
+      pushActivity("flow.new-blocked", "Initialize the project runtime before starting a flow.");
+      return;
+    }
     flowSelectionVersion.current += 1;
     const sourceHandoffRef =
       followUp
@@ -3124,6 +3149,7 @@ function App() {
           newFlowDraft={draftSurface}
           onSelectFlow={selectFlow}
           onNewFlow={startNewFlow}
+          newFlowDisabled={!activeProjectRuntimeReady || busy}
         />
         <div className="top-context runtime-context">
           <span>Runtime root</span>
@@ -3219,6 +3245,7 @@ function App() {
         selectedFlow={selectedFlow}
         projectState={projectState}
         config={config}
+        activeProject={activeProject}
         operatorRequests={operatorRequests}
         flows={flowOptions}
         newFlowDraft={draftSurface}

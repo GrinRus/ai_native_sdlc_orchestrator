@@ -531,8 +531,28 @@ function readLatestProviderStepStatus(init) {
  * }} options
  */
 export function readProjectState(options = {}) {
-  const init = initializeProjectRuntime(options);
   const preview = previewProjectRuntime({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+  });
+  if (!preview.stateExists) {
+    return {
+      project_id: preview.projectId,
+      display_name: preview.displayName,
+      project_root: preview.projectRoot,
+      project_profile_ref: preview.projectProfileRef,
+      runtime_root: preview.runtimeRoot,
+      runtime_layout: preview.runtimeLayout,
+      state_file: null,
+      onboarding_summary: buildOnboardingSummary(preview),
+      provider_step_status: null,
+      artifact_display_summaries: [],
+    };
+  }
+  const init = initializeProjectRuntime(options);
+  const initializedPreview = previewProjectRuntime({
     cwd: options.cwd,
     projectRef: init.projectRoot,
     projectProfile: options.projectProfile,
@@ -546,7 +566,7 @@ export function readProjectState(options = {}) {
     runtime_root: init.runtimeRoot,
     runtime_layout: init.state.runtime_layout,
     state_file: init.stateFile,
-    onboarding_summary: buildOnboardingSummary(preview),
+    onboarding_summary: buildOnboardingSummary(initializedPreview),
     provider_step_status: readLatestProviderStepStatus(init),
     artifact_display_summaries: listArtifactDisplaySummaries({ ...options, limit: options.limit ?? 50 }),
   };

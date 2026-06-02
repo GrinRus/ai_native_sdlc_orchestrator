@@ -91,6 +91,9 @@ test("detached control-plane source checkout smoke command verifies local API tr
     assert.match(payload.base_url, /^http:\/\/127\.0\.0\.1:\d+$/u);
     assert.match(payload.state_url, /^http:\/\/127\.0\.0\.1:\d+\/api\/projects\/[^/]+\/state$/u);
     assert.equal(payload.serve, false);
+    assert.equal(payload.preview_initialized, false);
+    assert.equal(payload.init_blocked, false);
+    assert.equal(payload.initialized, true);
     assert.equal(fs.existsSync(path.join(runtimeRoot, "projects", payload.project_id, "state", "project-init-state.json")), true);
   });
 });
@@ -1182,6 +1185,17 @@ test("local app project index and add-project action keep project runtimes isola
         assert.equal(typeof added.project.runtime_project_id, "string");
         assert.equal(fs.existsSync(secondRuntimeRoot), false, "adding a project must not initialize runtime state");
 
+        const secondPreviewResponse = await getJson(`${transport.baseUrl}/api/projects/${added.project.project_id}/state`);
+        assert.equal(secondPreviewResponse.status, 200);
+        const secondPreview = await secondPreviewResponse.json();
+        assert.equal(secondPreview.project_id, added.project.runtime_project_id);
+        assert.equal(secondPreview.runtime_root, secondRuntimeRoot);
+        assert.equal(secondPreview.state_file, null);
+        assert.equal(secondPreview.onboarding_summary.initialized, false);
+        assert.equal(secondPreview.onboarding_summary.recommended_action, "initialize-runtime");
+        assert.deepEqual(secondPreview.artifact_display_summaries, []);
+        assert.equal(fs.existsSync(secondRuntimeRoot), false, "project state preview must not initialize runtime state");
+
         const secondInitResponse = await postJson(
           `${transport.baseUrl}/api/projects/${added.project.project_id}/lifecycle-command/actions`,
           {
@@ -1206,6 +1220,9 @@ test("local app project index and add-project action keep project runtimes isola
         const firstState = await firstStateResponse.json();
         assert.equal(firstState.project_id, transport.projectId);
         assert.equal(firstState.runtime_root, firstRuntimeRoot);
+        assert.equal(firstState.state_file, null);
+        assert.equal(firstState.onboarding_summary.initialized, false);
+        assert.equal(fs.existsSync(firstRuntimeRoot), false, "default project state preview must not initialize runtime state");
       } finally {
         await transport.close();
       }
