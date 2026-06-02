@@ -6,7 +6,7 @@ repo:
   checkout_strategy: shallow
 verification:
   setup_commands:
-    - npm install
+    - npm install --prefer-offline --no-audit --no-fund
     - npx playwright install
   commands:
     - npm test
@@ -43,6 +43,18 @@ required_matrix_cells:
     feature_size: medium
     feature_mission_id: ky-fetch-options-regression
     provider_variant_id: open-code-primary
+    coverage_tier: extended
+  - cell_id: ky.regress.small.qwen
+    scenario_family: regress
+    feature_size: small
+    feature_mission_id: ky-header-regression
+    provider_variant_id: qwen-primary
+    coverage_tier: extended
+  - cell_id: ky.regress.medium.qwen
+    scenario_family: regress
+    feature_size: medium
+    feature_mission_id: ky-fetch-options-regression
+    provider_variant_id: qwen-primary
     coverage_tier: extended
   - cell_id: ky.governance.large.openai
     scenario_family: governance
@@ -83,6 +95,10 @@ feature_missions:
       - keep changes inside source and test folders only
       - preserve npm test as full-suite diagnostic evidence
       - pass the mission-scoped headers regression gate
+    change_evidence:
+      required_path_prefixes:
+        - source/
+        - test/
     post_run_quality:
       primary_commands:
         - npx xo
@@ -97,6 +113,7 @@ feature_missions:
       - openai-primary
       - anthropic-primary
       - open-code-primary
+      - qwen-primary
     size_budget:
       max_changed_files: 6
       max_added_lines: 220
@@ -133,6 +150,11 @@ feature_missions:
       - keep the fix inside source, tests, and type surface only
       - preserve npm test as full-suite diagnostic evidence
       - keep delivery evidence anchored to the target checkout
+    change_evidence:
+      required_path_prefixes:
+        - source/
+        - test/
+        - index.d.ts
     post_run_quality:
       primary_commands:
         - npx xo
@@ -148,6 +170,7 @@ feature_missions:
       - openai-primary
       - anthropic-primary
       - open-code-primary
+      - qwen-primary
     size_budget:
       max_changed_files: 8
       max_added_lines: 300
@@ -189,6 +212,11 @@ feature_missions:
     acceptance_checks:
       - keep release evidence anchored to the target checkout
       - avoid any upstream write-back
+    change_evidence:
+      required_path_prefixes:
+        - source/
+        - test/
+        - index.d.ts
     post_run_quality:
       primary_commands:
         - npx xo
@@ -242,6 +270,11 @@ feature_missions:
       - preserve repo-local request lifecycle boundaries
       - keep governance and audit evidence linked to the target checkout
       - avoid any upstream write-back
+    change_evidence:
+      required_path_prefixes:
+        - source/
+        - test/
+        - index.d.ts
     post_run_quality:
       primary_commands:
         - npx xo

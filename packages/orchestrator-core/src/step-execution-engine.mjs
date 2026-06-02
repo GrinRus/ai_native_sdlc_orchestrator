@@ -16,6 +16,7 @@ import { initializeProjectRuntime, resolveProjectRegistryRoots } from "./project
 import { analyzeProjectRuntime } from "./project-analysis.mjs";
 import {
   filterNonBootstrapChangedPaths,
+  filterRunnerOwnedStatePaths,
   listChangedPaths,
   loadMissionScope,
   resolveMissionScopedChanges,
@@ -26,6 +27,7 @@ import {
   resolveRuntimeMissionProfile,
   synthesizeRepairAttempts,
 } from "./runtime-harness-report.mjs";
+import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { refreshRuntimeHarnessReportForStep } from "./runtime-harness-refresh.mjs";
 import { invokeStepAdapterForStep } from "./step-adapter-invocation.mjs";
 import { resolveStepPolicyForStep } from "./policy-resolution.mjs";
@@ -133,6 +135,26 @@ function readJsonFile(filePath) {
   } catch {
     return null;
   }
+}
+
+/**
+ * @param {string | null | undefined} filePath
+ * @param {Record<string, unknown>} patch
+ * @returns {Record<string, unknown> | null}
+ */
+function updateRunControlProviderStepStatus(filePath, patch) {
+  if (typeof filePath !== "string" || filePath.trim().length === 0) return null;
+  const stateFile = filePath.trim();
+  const existingState = readJsonFile(stateFile) ?? {};
+  const status = mergeProviderStepStatus(asRecord(existingState.provider_step_status), patch);
+  const nextState = {
+    ...existingState,
+    provider_step_status: status,
+    updated_at: status.updated_at,
+  };
+  fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+  fs.writeFileSync(stateFile, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+  return status;
 }
 
 /**
@@ -843,6 +865,7 @@ function writeRuntimeRepairInput(options) {
  *   coordinationEvidenceRefs?: string[],
  *   runtimeEvidenceRefs?: string[],
  *   operatorRequestRef?: string,
+ *   providerStepStatusStateFile?: string,
  * }} options
  */
 export function executeRoutedStep(options) {
@@ -1192,6 +1215,35 @@ export function executeRoutedStep(options) {
       });
       compiledContextRef = `compiled-context://${compiledContextId}`;
 
+      const routeProfile = asRecord(routeResolution.route_profile);
+      const routePrimary = asRecord(routeProfile.primary);
+      const adapterProfile = asRecord(asRecord(adapterResolution).adapter);
+      const resolvedBounds = asRecord(policyResolution.resolved_bounds);
+      const timeoutSec = asRecord(resolvedBounds.budget).timeout_sec;
+      const timeoutBudgetMs =
+        typeof timeoutSec === "number" && Number.isFinite(timeoutSec) && timeoutSec > 0
+          ? Math.floor(timeoutSec * 1000)
+          : null;
+      const planReady =
+        deliveryPlanResult?.deliveryPlan?.status === "ready" && deliveryPlanResult.deliveryPlan.writeback_allowed === true;
+      const providerStepStatusBase = {
+        provider: asString(routePrimary.provider),
+        adapter: asString(adapterProfile.adapter_id),
+        route_id: asString(routeResolution.resolved_route_id),
+        step_id: stepId,
+        status: "running",
+        timeout_budget_ms: timeoutBudgetMs,
+        remaining_budget_ms: timeoutBudgetMs,
+        last_output_at: null,
+        last_artifact_update_at: null,
+        current_command_label: "external-provider-runner",
+        recommended_action: "Provider is still running.",
+      };
+      const providerStepStatus =
+        !dryRun && planReady
+          ? updateRunControlProviderStepStatus(options.providerStepStatusStateFile, providerStepStatusBase)
+          : null;
+
       adapterRequest = createAdapterRequestEnvelope({
         request_id: `${stepResultId}.request`,
         run_id: runId,
@@ -1217,6 +1269,12 @@ export function executeRoutedStep(options) {
           skill_refs: compiled.compiled_context.skill_refs,
           provenance: compiled.compiled_context.provenance,
         },
+        provider_step_status: providerStepStatus
+          ? {
+              ...providerStepStatus,
+              state_file: options.providerStepStatusStateFile,
+            }
+          : null,
       });
 
       const invocation = invokeStepAdapterForStep({
@@ -1233,6 +1291,20 @@ export function executeRoutedStep(options) {
       status = invocation.status;
       summary = invocation.summary;
       blockedNextStep = invocation.blockedNextStep;
+      if (providerStepStatus) {
+        const adapterOutput = asRecord(adapterResponse.output);
+        const externalRunner = asRecord(adapterOutput.external_runner);
+        updateRunControlProviderStepStatus(options.providerStepStatusStateFile, {
+          ...providerStepStatusBase,
+          status: invocation.status === "passed" ? "completed" : "failed",
+          last_artifact_update_at: asString(externalRunner.raw_evidence_ref) ? new Date().toISOString() : null,
+          recommended_action:
+            invocation.status === "passed"
+              ? "Continue with post-run verification."
+              : "Inspect provider evidence and failure summary.",
+          finished_at: new Date().toISOString(),
+        });
+      }
 
       evidenceRefs = [
         ...new Set([
@@ -1265,6 +1337,8 @@ export function executeRoutedStep(options) {
       : [];
   const nonBootstrapChangedPaths = filterNonBootstrapChangedPaths(changedPathStatusAfter.changedPaths);
   const nonBootstrapChangedPathsDuringStep = filterNonBootstrapChangedPaths(changedPathsDuringStep);
+  const runnerOwnedStatePaths = filterRunnerOwnedStatePaths(changedPathStatusAfter.changedPaths);
+  const runnerOwnedStatePathsDuringStep = filterRunnerOwnedStatePaths(changedPathsDuringStep);
   const missionScope = loadMissionScope(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const missionProfile = resolveRuntimeMissionProfile(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const missionScopedChanges = resolveMissionScopedChanges(nonBootstrapChangedPaths, missionScope);
@@ -1365,6 +1439,8 @@ export function executeRoutedStep(options) {
       non_bootstrap_changed_paths_during_step: nonBootstrapChangedPathsDuringStep,
       non_input_changed_paths: missionScopedChanges.nonInputChangedPaths,
       meaningful_changed_paths: missionScopedChanges.meaningfulChangedPaths,
+      runner_owned_state_paths: runnerOwnedStatePaths,
+      runner_owned_state_paths_during_step: runnerOwnedStatePathsDuringStep,
       ignored_input_files: missionScopedChanges.ignoredInputFiles,
       strict_code_changing_noop: strictCodeChangingNoop,
       mission_type: missionProfile.missionType,
@@ -1379,6 +1455,7 @@ export function executeRoutedStep(options) {
     strictCodeChangingNoop,
     nonBootstrapChangedPaths,
     meaningfulChangedPaths: missionScopedChanges.meaningfulChangedPaths,
+    runnerOwnedStatePaths,
   });
   let runtimePermissionRequest = null;
   let runtimePermissionDecision = null;

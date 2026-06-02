@@ -19,6 +19,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W26:** `W26-S01` Production readiness gate; `W26-S02` Maintainability stabilization
 - **W30:** `W30-S01` Post-W29 alpha-hardening planning source of truth; `W30-S02` Alpha architecture decision records; `W30-S05` Alpha readiness gate expansion
 - **W33:** `W33-S01` Console flow source-of-truth and static snapshot removal; `W33-S02` Reliable root gates and live E2E timeout bounds
+- **W34:** `W34-S07` Backlog, docs, and release-gate alignment
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -107,6 +108,8 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W31:** `W31-S01` Installed-user local app launch and onboarding UI
 - **W32:** `W32-S01` Operator-request interactive runtime flow
 - **W33:** `W33-S03` Failure-safe run start durable state; `W33-S04` Guided runtime-root fidelity; `W33-S05` Control-plane launch and port guidance alignment; `W33-S06` App-smoke console boundary and static snapshot removal; `W33-S07` CLI operator output ergonomics; `W33-S08` Control-plane OpenAPI payload schema depth; `W33-S09` Runtime read-model scale and pagination baseline; `W33-S10` Web app smoke module cleanup and console surface simplification
+- **W34:** `W34-S01` Flow product and contract baseline; `W34-S02` Runtime and control-plane flow projections; `W34-S03` Flow-first local web shell; `W34-S04` Flow-scoped evidence, trace, and interaction workbench; `W34-S05` Closure-to-new-flow UX
+- **W35:** `W35-S01` Provider heartbeat and long-running step status; `W35-S02` User-facing artifact reference renderer; `W35-S04` Execution evidence panel and interruption controls
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -135,3 +138,5 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W27:** `W27-S01` Step-journal observation contract; `W27-S03` Live E2E step controller output; `W27-S04` Profile and skill migration; `W27-S05` Legacy cleanup and proof alignment
 - **W28:** `W28-S01` AOR install proof and setup journal; `W28-S02` Full-lifecycle and interaction gap closure; `W28-S03` Matrix target expansion
 - **W30:** `W30-S04` Self-hosted operations hardening docs
+- **W34:** `W34-S06` Installed-user browser-task flow-loop proof
+- **W35:** `W35-S03` Operator decision helper and decision UX; `W35-S05` Codex/Qwen live E2E UX proof and runbook closure

@@ -14,6 +14,10 @@ openapi_contract:
     query_parameter: limit
   typed_payload_schemas:
     - ProjectStateResponse
+    - ArtifactDisplaySummary
+    - ExecutionEvidenceSummary
+    - FlowListResponse
+    - FlowDetailResponse
     - RunsResponse
     - RunEventHistoryResponse
     - RunControlActionRequest
@@ -62,6 +66,35 @@ read_operations:
     operation_family: read
     output_contract_families:
       - operator-request
+  - operation_id: read.flow-list
+    operation_family: read
+    output_contract_families:
+      - artifact-packet
+      - next-action-report
+      - operator-request
+  - operation_id: read.flow-detail
+    operation_family: read
+    output_contract_families:
+      - artifact-packet
+      - next-action-report
+  - operation_id: read.flow-evidence-graph
+    operation_family: read
+    output_contract_families:
+      - artifact-packet
+      - next-action-report
+      - operator-request
+      - step-result
+      - runtime-harness-report
+      - delivery-manifest
+      - release-packet
+  - operation_id: read.flow-runtime-trace
+    operation_family: read
+    output_contract_families:
+      - live-run-event
+      - step-result
+      - runtime-harness-report
+      - delivery-manifest
+      - release-packet
 
 run_control_operations:
   - operation_id: run.start
@@ -114,6 +147,211 @@ operator_request_operations:
     operation_id: operator-request.status
     route: GET /api/projects/:projectId/operator-requests
     raw_request_text_storage: omitted-from-read-surface
+
+flow_projection_contract:
+  owning_slice: W34-S02
+  status: implemented-read-baseline
+  source_of_truth:
+    product: docs/product/03-flow-centric-console-design.md
+    contract: docs/contracts/control-plane-api.md
+  projection_fields:
+    - flow_id
+    - status
+    - selected_stage
+    - mission_id
+    - intake_packet_ref
+    - intake_body_ref
+    - latest_next_action_report_ref
+    - evidence_refs
+    - artifact_display_summaries
+    - writeback_policy
+    - mission_settings
+    - closure_state
+    - completed_read_only
+    - follow_up_source_handoff_ref
+  read_models:
+    - operation_id: read.flow-list
+      route_status: implemented
+      route: GET /api/projects/:projectId/flows
+      returns: flow_list
+      bounded_by: limit
+    - operation_id: read.flow-detail
+      route_status: implemented
+      route: GET /api/projects/:projectId/flows/:flowId
+      returns: flow_detail
+    - operation_id: read.flow-evidence-graph
+      route_status: implemented
+      route: GET /api/projects/:projectId/flows/:flowId/evidence-graph
+      returns: flow_evidence_graph
+      isolation: selected-flow-only
+    - operation_id: read.flow-runtime-trace
+      route_status: implemented
+      route: GET /api/projects/:projectId/flows/:flowId/runtime-trace
+      returns: flow_runtime_trace
+      isolation: selected-flow-only
+    - operation_id: read.selected-flow
+      route_status: implemented
+      route: GET /api/projects/:projectId/flows/selected
+      returns: selected_flow
+  lifecycle_semantics:
+    new_flow:
+      route_family: lifecycle-command
+      command_sequence:
+        - mission create
+        - next
+      creates_fresh_intake: true
+      refreshes_next_action_report: true
+      archives_mission_next_action_report: true
+      mutates_completed_source_flow: false
+    follow_up_flow:
+      lineage_field: follow_up_source_handoff_ref
+      lifecycle_flag: --follow-up-source-handoff-ref
+      source_flow_read_only: true
+      duplicate_settings_create_fresh_intake: true
+  example_payloads:
+    flow_list:
+      selected_flow_id: flow.aor-core.checkout-risk
+      active_flow_ids:
+        - flow.aor-core.checkout-risk
+      completed_flow_ids:
+        - flow.aor-core.release-readiness
+      flows:
+        - flow_id: flow.aor-core.checkout-risk
+          status: active
+          selected_stage: discovery
+          mission_id: checkout-risk
+          intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+          latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json
+          writeback_policy:
+            mode: patch-only
+            upstream_writes_default: false
+        - flow_id: flow.aor-core.release-readiness
+          status: completed
+          selected_stage: learning
+          mission_id: release-readiness
+          intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness.v1.json
+          latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness.json
+          completed_read_only: true
+          closure_state:
+            status: completed
+            completed: true
+            completed_read_only: true
+            follow_up_eligible: true
+            source_run_id: run.release-readiness
+            source_learning_handoff_refs:
+              - evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+            recommended_follow_up_source_handoff_ref: evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+          mission_settings:
+            title: Release readiness
+            delivery_mode: no-write
+            allowed_paths: []
+          writeback_policy:
+            mode: no-write
+            upstream_writes_default: false
+    active_flow:
+      flow_id: flow.aor-core.checkout-risk
+      status: active
+      selected_stage: discovery
+      mission_id: checkout-risk
+      intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+      intake_body_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.body.json
+      latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json
+      evidence_refs:
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.checkout-risk.v1.json
+        - evidence://.aor/projects/aor-core/reports/next-action-report-checkout-risk.json
+      mission_settings:
+        title: Checkout risk
+        delivery_mode: patch-only
+        allowed_paths:
+          - apps/web/**
+      closure_state:
+        status: active
+        completed: false
+        completed_read_only: false
+        follow_up_eligible: false
+        source_learning_handoff_refs: []
+      writeback_policy:
+        mode: patch-only
+        upstream_writes_default: false
+        requires_explicit_review: true
+    completed_flow:
+      flow_id: flow.aor-core.release-readiness
+      status: completed
+      selected_stage: learning
+      mission_id: release-readiness
+      intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness.v1.json
+      intake_body_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness.v1.body.json
+      latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness.json
+      completed_read_only: true
+      evidence_refs:
+        - evidence://.aor/projects/aor-core/reports/review-report-run.release-readiness.json
+        - evidence://.aor/projects/aor-core/artifacts/release-packet-run.release-readiness.json
+        - evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+      closure_state:
+        status: completed
+        completed: true
+        completed_read_only: true
+        follow_up_eligible: true
+        source_run_id: run.release-readiness
+        source_learning_handoff_refs:
+          - evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+        recommended_follow_up_source_handoff_ref: evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+      mission_settings:
+        title: Release readiness
+        delivery_mode: no-write
+        allowed_paths: []
+      writeback_policy:
+        mode: no-write
+        upstream_writes_default: false
+        requires_explicit_review: false
+    follow_up_flow:
+      flow_id: flow.aor-core.release-readiness-follow-up
+      status: active
+      selected_stage: mission
+      mission_id: release-readiness-follow-up
+      intake_packet_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness-follow-up.v1.json
+      intake_body_ref: evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness-follow-up.v1.body.json
+      latest_next_action_report_ref: evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness-follow-up.json
+      follow_up_source_handoff_ref: evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+      closure_state:
+        status: active
+        completed: false
+        completed_read_only: false
+        follow_up_eligible: false
+        source_learning_handoff_refs: []
+        follow_up_source_handoff_ref: evidence://.aor/projects/aor-core/reports/learning-loop-handoff-run.release-readiness.json
+      mission_settings:
+        title: Release readiness follow-up
+        delivery_mode: no-write
+        allowed_paths: []
+      evidence_refs:
+        - evidence://.aor/projects/aor-core/artifacts/aor-core.artifact.intake.release-readiness-follow-up.v1.json
+        - evidence://.aor/projects/aor-core/reports/next-action-report-release-readiness-follow-up.json
+      writeback_policy:
+        mode: no-write
+        upstream_writes_default: false
+        requires_explicit_review: false
+    flow_targeted_operator_request_summary:
+      request_id: operator-request.aor-core.checkout-risk.1
+      target_flow_id: flow.aor-core.checkout-risk
+      target_stage: discovery
+      request_summary: Explain checkout-risk blockers from the selected flow evidence.
+      delivery_mode: no-write
+      status: completed
+      evidence_refs:
+        - packet://operator-request@evidence://reports/operator-request-aor-core-checkout-risk-1.json
+    completed_flow_mutation_block:
+      target_flow_id: flow.aor-core.release-readiness
+      requested_delivery_mode: patch-only
+      allowed: false
+      error_code: operator_request.completed_flow_read_only
+      read_only_inspection_allowed:
+        intent_types:
+          - analyze
+          - explain
+          - review
+          - validate
+        delivery_mode: no-write
 
 lifecycle_command_operations:
   owning_slice: W18-S02
@@ -214,6 +452,11 @@ deferred_transport:
     - GET /api/projects/:projectId/planner-metrics
     - GET /api/projects/:projectId/finance-monitoring
     - GET /api/projects/:projectId/next-action-report
+    - GET /api/projects/:projectId/flows
+    - GET /api/projects/:projectId/flows/selected
+    - GET /api/projects/:projectId/flows/:flowId
+    - GET /api/projects/:projectId/flows/:flowId/evidence-graph
+    - GET /api/projects/:projectId/flows/:flowId/runtime-trace
     - GET /api/projects/:projectId/operator-requests
     - GET /api/projects/:projectId/packets
     - GET /api/projects/:projectId/step-results
@@ -286,3 +529,61 @@ production_hardening:
       - live-run-event JSONL payloads
       - run-control audit records
     replacement: "[REDACTED]"
+
+artifact_display_summary_contract:
+  owning_slice: W35-S02
+  status: implemented-read-baseline
+  source_of_truth:
+    contract: docs/contracts/control-plane-api.md
+    openapi: docs/contracts/control-plane-api.openapi.json
+  read_payload_fields:
+    - ProjectStateResponse.artifact_display_summaries
+    - RunSummary.artifact_display_summaries
+    - FlowProjection.artifact_display_summaries
+    - artifact_entry.display_summary
+  required_summary_fields:
+    - type
+    - stage
+    - label
+    - status
+    - severity
+    - description
+    - raw_ref
+    - actions
+  debug_boundary:
+    raw_ref_primary_ui: false
+    copy_raw_ref_action: required
+    missing_refs_render_as: status=missing
+
+execution_evidence_summary_contract:
+  owning_slice: W35-S04
+  status: implemented-read-baseline
+  source_of_truth:
+    contract: docs/contracts/control-plane-api.md
+    openapi: docs/contracts/control-plane-api.openapi.json
+    product: docs/product/03-flow-centric-console-design.md
+    runbook: docs/ops/live-e2e-standard-runner.md
+  read_payload_fields:
+    - RunSummary.execution_evidence
+  status_fields:
+    - provider_execution_status
+    - runtime_harness_decision
+    - real_code_change_status
+    - post_run_verification_status
+    - review_status
+    - delivery_readiness_status
+    - no_upstream_write_status
+  changed_path_groups:
+    - mission-relevant
+    - runtime-owned
+    - runner-owned-leak
+    - scratch-unrelated
+  public_action_surfaces:
+    - aor run cancel
+    - aor run status --json
+    - manual-live-e2e --prepare-decision --action diagnose
+    - manual-live-e2e --prepare-decision --action retry_public_step
+  interruption_semantics:
+    stop_status: operator-stopped
+    provider_step_status: interrupted
+    pass_on_interruption: false

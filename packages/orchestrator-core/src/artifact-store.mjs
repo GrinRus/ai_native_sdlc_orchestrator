@@ -380,6 +380,7 @@ export function materializeBootstrapArtifactPacket(options) {
  *  requestFile?: string | null,
  *  sourceKind?: string | null,
  *  sourceRef?: string | null,
+ *  followUpSourceHandoffRef?: string | null,
  * }} options
  */
 export function materializeIntakeArtifactPacket(options) {
@@ -431,6 +432,25 @@ export function materializeIntakeArtifactPacket(options) {
     normalizeDeliveryMode(requestDocument.delivery_mode) ??
     normalizeDeliveryMode(requestDocument.write_mode) ??
     "no-write";
+  const requestCoverageFollowUp =
+    typeof requestDocument.coverage_follow_up === "object" &&
+    requestDocument.coverage_follow_up !== null &&
+    !Array.isArray(requestDocument.coverage_follow_up)
+      ? /** @type {Record<string, unknown>} */ (requestDocument.coverage_follow_up)
+      : {};
+  const followUpSourceHandoffRef =
+    typeof options.followUpSourceHandoffRef === "string" && options.followUpSourceHandoffRef.trim().length > 0
+      ? options.followUpSourceHandoffRef.trim()
+      : null;
+  const coverageFollowUp = {
+    ...requestCoverageFollowUp,
+    ...(followUpSourceHandoffRef
+      ? {
+          follow_up_source_handoff_ref: followUpSourceHandoffRef,
+          source_handoff_ref: followUpSourceHandoffRef,
+        }
+      : {}),
+  };
 
   const packetBody = {
     generated_from: {
@@ -457,12 +477,7 @@ export function materializeIntakeArtifactPacket(options) {
         !Array.isArray(requestDocument.matrix_cell)
           ? requestDocument.matrix_cell
           : null,
-      coverage_follow_up:
-        typeof requestDocument.coverage_follow_up === "object" &&
-        requestDocument.coverage_follow_up !== null &&
-        !Array.isArray(requestDocument.coverage_follow_up)
-          ? requestDocument.coverage_follow_up
-          : null,
+      coverage_follow_up: Object.keys(coverageFollowUp).length > 0 ? coverageFollowUp : null,
     },
     product_intake: productIntake,
     product_intake_completeness: completeness,

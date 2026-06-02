@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
@@ -15,6 +17,27 @@ import {
   readYamlDocument,
   writeJson,
 } from "./common.mjs";
+
+const LIVE_E2E_STEP_POLICY_CLASSES = Object.freeze({
+  discovery: "artifact",
+  research: "artifact",
+  spec: "artifact",
+  planning: "planner",
+  implement: "runner",
+  review: "runner",
+  qa: "runner",
+  repair: "repair",
+  eval: "eval",
+  harness: "harness",
+});
+const LIVE_E2E_POLICY_SOURCE_FILES = Object.freeze({
+  artifact: "step-artifact-default.yaml",
+  planner: "step-planner-default.yaml",
+  runner: "step-runner-default.yaml",
+  repair: "step-repair-default.yaml",
+  eval: "step-eval-default.yaml",
+  harness: "step-harness-default.yaml",
+});
 
 /**
  * @param {{
@@ -41,6 +64,7 @@ export function materializeFeatureRequestFile(options) {
     brief: asNonEmptyString(options.mission.brief) || "Catalog-backed full-journey feature request.",
     expected_evidence: asStringArray(options.mission.expected_evidence),
     acceptance_checks: asStringArray(options.mission.acceptance_checks),
+    change_evidence: asRecord(options.mission.change_evidence),
     scenario_family: options.scenarioFamily,
     provider_variant_id: options.providerVariantId,
     feature_size: options.featureSize,
@@ -101,6 +125,29 @@ function runGitChecked(options) {
 
 /**
  * @param {{
+ *   layout: ReturnType<typeof ensureRuntimeLayout>,
+ *   profile: Record<string, unknown>,
+ *   runId: string,
+ *   targetRepoId: string,
+ * }} options
+ */
+function resolveTargetCheckoutRoot(options) {
+  const livePolicy = asRecord(options.profile.live_e2e);
+  const targetRepo = asRecord(options.profile.target_repo);
+  const checkoutRootMode =
+    asNonEmptyString(livePolicy.target_checkout_root_mode) || asNonEmptyString(targetRepo.checkout_root_mode);
+  if (checkoutRootMode !== "short-physical") {
+    return path.join(options.layout.targetCheckoutsRoot, `${normalizeId(options.targetRepoId)}-${normalizeId(options.runId)}`);
+  }
+  const digest = createHash("sha256")
+    .update(`${options.runId}:${options.targetRepoId}`)
+    .digest("hex")
+    .slice(0, 16);
+  return path.join(os.tmpdir(), "aor-target-checkouts", `x-${digest}`, normalizeId(options.targetRepoId));
+}
+
+/**
+ * @param {{
  *   targetRoot: string,
  *   liveRoot: string,
  *   relativePath: string,
@@ -125,10 +172,12 @@ export function materializeTargetCheckout(options) {
     throw new Error("Proof runner profile must declare target_repo.repo_url.");
   }
 
-  const targetCheckoutRoot = path.join(
-    options.layout.targetCheckoutsRoot,
-    `${normalizeId(targetRepoId)}-${normalizeId(options.runId)}`,
-  );
+  const targetCheckoutRoot = resolveTargetCheckoutRoot({
+    layout: options.layout,
+    profile: options.profile,
+    runId: options.runId,
+    targetRepoId,
+  });
   if (options.reuseExistingCheckout === true && fileExists(path.join(targetCheckoutRoot, ".git"))) {
     return {
       targetCheckoutRoot,
@@ -138,6 +187,7 @@ export function materializeTargetCheckout(options) {
     };
   }
   fs.rmSync(targetCheckoutRoot, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(targetCheckoutRoot), { recursive: true });
 
   /** @type {string[]} */
   const cloneArgs = ["clone"];
@@ -214,6 +264,7 @@ export function normalizeDeliveryMode(value) {
  *   profilePath: string,
  *   profile: Record<string, unknown>,
  *   catalogEntry?: Record<string, unknown>,
+ *   providerVariant?: Record<string, unknown>,
  *   runId: string,
  *   targetCheckout: ReturnType<typeof materializeTargetCheckout>,
  *   generatedAssetsRoot: string,
@@ -269,6 +320,10 @@ export function materializeGeneratedProjectProfile(options) {
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);
   runtimeDefaults.runtime_root = ".aor";
   runtimeDefaults.workspace_mode = asNonEmptyString(asRecord(options.profile.runtime).mode) || "ephemeral";
+  runtimeDefaults.verification_command_timeout_sec =
+    Number(runtimeDefaults.verification_command_timeout_sec) > 0
+      ? runtimeDefaults.verification_command_timeout_sec
+      : 1800;
   generatedProjectProfile.runtime_defaults = runtimeDefaults;
 
   const registryRoots = asRecord(generatedProjectProfile.registry_roots);
@@ -280,6 +335,21 @@ export function materializeGeneratedProjectProfile(options) {
     registryRoots[key] = path.join(options.generatedAssetsRoot, relative);
   }
   generatedProjectProfile.registry_roots = registryRoots;
+
+  const pinnedProvider = asNonEmptyString(asRecord(options.providerVariant).provider);
+  const pinnedAdapter = asNonEmptyString(asRecord(options.providerVariant).primary_adapter);
+  if (pinnedProvider) {
+    generatedProjectProfile.allowed_providers = Array.from(new Set([
+      ...asStringArray(generatedProjectProfile.allowed_providers),
+      pinnedProvider,
+    ]));
+  }
+  if (pinnedAdapter) {
+    generatedProjectProfile.allowed_adapters = Array.from(new Set([
+      ...asStringArray(generatedProjectProfile.allowed_adapters),
+      pinnedAdapter,
+    ]));
+  }
 
   const writebackPolicy = asRecord(generatedProjectProfile.writeback_policy);
   writebackPolicy.default_delivery_mode = normalizeDeliveryMode(
@@ -315,10 +385,28 @@ function cloneRouteDocument(route) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function asNonNegativeInteger(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.floor(number) : null;
+}
+
+/**
+ * @param {Record<string, unknown>} policy
+ * @returns {Record<string, unknown>}
+ */
+function clonePolicyDocument(policy) {
+  return /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(policy)));
+}
+
+/**
  * @param {{
  *   routesRoot: string,
  *   providerVariant: Record<string, unknown>,
  *   providerVariantId: string,
+ *   profile?: Record<string, unknown>,
  * }} options
  */
 export function materializeProviderPinnedRouteOverrides(options) {
@@ -359,6 +447,13 @@ export function materializeProviderPinnedRouteOverrides(options) {
     pinnedRoute.primary = primary;
     pinnedRoute.fallback = [];
     pinnedRoute.route_id = `${originalRouteId}.${normalizeId(options.providerVariantId)}`;
+    const stepTimeouts = asRecord(asRecord(options.profile).live_e2e).provider_step_timeouts_sec;
+    const stepTimeoutSec = Number(asRecord(stepTimeouts)[step]);
+    if (Number.isFinite(stepTimeoutSec) && stepTimeoutSec > 0) {
+      const constraints = asRecord(pinnedRoute.constraints);
+      constraints.timeout_sec = Math.floor(stepTimeoutSec);
+      pinnedRoute.constraints = constraints;
+    }
 
     const validation = validateContractDocument({
       family: "provider-route-profile",
@@ -379,5 +474,84 @@ export function materializeProviderPinnedRouteOverrides(options) {
   return {
     routeOverrides,
     routeFiles,
+  };
+}
+
+/**
+ * @param {{
+ *   policiesRoot: string,
+ *   providerVariantId: string,
+ *   profile?: Record<string, unknown>,
+ * }} options
+ */
+export function materializeProviderPinnedPolicyOverrides(options) {
+  const policiesRoot = options.policiesRoot;
+  if (!fileExists(policiesRoot) || !fs.statSync(policiesRoot).isDirectory()) {
+    throw new Error(`Policies root '${policiesRoot}' was not found for provider override materialization.`);
+  }
+
+  const livePolicy = asRecord(asRecord(options.profile).live_e2e);
+  const retryLimits = asRecord(livePolicy.provider_step_retry_max_attempts);
+  const repairLimits = asRecord(livePolicy.provider_step_repair_max_attempts);
+  const steps = [...new Set([...Object.keys(retryLimits), ...Object.keys(repairLimits)])]
+    .map((step) => asNonEmptyString(step))
+    .filter(Boolean);
+
+  /** @type {Record<string, string>} */
+  const policyOverrides = {};
+  /** @type {string[]} */
+  const policyFiles = [];
+
+  for (const step of steps) {
+    const stepClass = LIVE_E2E_STEP_POLICY_CLASSES[step];
+    if (!stepClass) {
+      continue;
+    }
+    const retryMaxAttempts = asNonNegativeInteger(retryLimits[step]);
+    const repairMaxAttempts = asNonNegativeInteger(repairLimits[step]);
+    if (retryMaxAttempts === null && repairMaxAttempts === null) {
+      continue;
+    }
+
+    const sourceFile = LIVE_E2E_POLICY_SOURCE_FILES[stepClass];
+    const sourcePath = path.join(policiesRoot, sourceFile);
+    if (!fileExists(sourcePath)) {
+      throw new Error(`Base step policy '${sourcePath}' was not found for provider override materialization.`);
+    }
+    const basePolicy = asRecord(readYamlDocument(sourcePath));
+    const pinnedPolicy = clonePolicyDocument(basePolicy);
+    const originalPolicyId = asNonEmptyString(basePolicy.policy_id) || `policy.step.${stepClass}.default`;
+    pinnedPolicy.policy_id = `${originalPolicyId}.${normalizeId(options.providerVariantId)}.${normalizeId(step)}.bounded`;
+
+    if (retryMaxAttempts !== null) {
+      const retry = asRecord(pinnedPolicy.retry);
+      retry.max_attempts = retryMaxAttempts;
+      pinnedPolicy.retry = retry;
+    }
+    if (repairMaxAttempts !== null) {
+      const repair = asRecord(pinnedPolicy.repair);
+      repair.max_attempts = repairMaxAttempts;
+      pinnedPolicy.repair = repair;
+    }
+
+    const validation = validateContractDocument({
+      family: "step-policy-profile",
+      document: pinnedPolicy,
+      source: `runtime://provider-policy-override/${normalizeId(options.providerVariantId)}/${step}`,
+    });
+    if (!validation.ok) {
+      const issues = validation.issues.map((issue) => issue.message).join("; ");
+      throw new Error(`Generated provider-pinned policy for step '${step}' failed validation: ${issues}`);
+    }
+
+    const policyFile = path.join(policiesRoot, `${step}-${normalizeId(options.providerVariantId)}-policy.yaml`);
+    fs.writeFileSync(policyFile, stringifyYaml(pinnedPolicy), "utf8");
+    policyOverrides[step] = /** @type {string} */ (pinnedPolicy.policy_id);
+    policyFiles.push(policyFile);
+  }
+
+  return {
+    policyOverrides,
+    policyFiles,
   };
 }

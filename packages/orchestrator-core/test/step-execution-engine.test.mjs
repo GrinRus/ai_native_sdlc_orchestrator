@@ -10,7 +10,11 @@ import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 import { executeRoutedStep, executeRuntimeHarnessControlledStep } from "../src/step-execution-engine.mjs";
 import { classifyRuntimeStepOutcome, materializeRuntimeHarnessReport } from "../src/runtime-harness-report.mjs";
-import { filterNonBootstrapChangedPaths, listChangedPaths } from "../src/shared/mission-scope.mjs";
+import {
+  filterNonBootstrapChangedPaths,
+  filterRunnerOwnedStatePaths,
+  listChangedPaths,
+} from "../src/shared/mission-scope.mjs";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
@@ -65,6 +69,27 @@ test("changed path parsing strips git quoting before bootstrap-owned filtering",
 
     const changedPaths = listChangedPaths(repoRoot).changedPaths;
     assert.ok(changedPaths.includes(".aor/cache/ms-playwright/chromium/Google Chrome for Testing.app/Contents/Info.plist"));
+    assert.equal(
+      filterNonBootstrapChangedPaths(changedPaths).some((entry) => entry.startsWith(".aor/")),
+      false,
+    );
+  });
+});
+
+test("runner-owned state paths are tracked outside bootstrap-owned runtime paths", () => {
+  withTempRepo((repoRoot) => {
+    const qwenSkillPath = path.join(repoRoot, ".qwen/skills/aor-implement-regression-fix/SKILL.md");
+    const aorRuntimePath = path.join(repoRoot, ".aor/projects/demo/reports/runtime.json");
+    fs.mkdirSync(path.dirname(qwenSkillPath), { recursive: true });
+    fs.mkdirSync(path.dirname(aorRuntimePath), { recursive: true });
+    fs.writeFileSync(qwenSkillPath, "runner-local skill state\n", "utf8");
+    fs.writeFileSync(aorRuntimePath, "{}\n", "utf8");
+
+    const changedPaths = listChangedPaths(repoRoot).changedPaths;
+
+    assert.deepEqual(filterRunnerOwnedStatePaths(changedPaths), [
+      ".qwen/skills/aor-implement-regression-fix/SKILL.md",
+    ]);
     assert.equal(
       filterNonBootstrapChangedPaths(changedPaths).some((entry) => entry.startsWith(".aor/")),
       false,
@@ -1505,6 +1530,67 @@ test("Runtime Harness does not fail strict runs by path alone", () => {
 
     assert.equal(report.report.overall_decision, "pass");
     assert.equal(report.report.step_decisions[0].failure_class, "none");
+  });
+});
+
+test("Runtime Harness blocks runner-owned state leaks in live runner output", () => {
+  withTempRepo((repoRoot) => {
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const fs=require('node:fs');",
+          "const path=require('node:path');",
+          "fs.mkdirSync('src',{recursive:true});",
+          "fs.mkdirSync(path.join('.qwen','skills','aor-implement-regression-fix'),{recursive:true});",
+          "fs.writeFileSync(path.join('src','index.js'),'export const fixed = true;\\n');",
+          "fs.writeFileSync(path.join('.qwen','skills','aor-implement-regression-fix','SKILL.md'),'runner-local skill state\\n');",
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'external runner wrote code and runner-local skill state',",
+          "output:{runner:'node-inline'},",
+          "evidence_refs:['evidence://external-runner/runner-state-leak'],",
+          "tool_traces:[{phase:'invoke_adapter',kind:'external-runner-mock',detail:'node-inline-runner-state-leak'}]",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    const step = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId: "runtime-harness-runner-state-leak",
+      stepId: "run.start.implement",
+      approvedHandoffRef: "evidence://handoff/approved-runner-state-leak",
+      promotionEvidenceRefs: ["evidence://promotion/pass-runner-state-leak"],
+      executionRoot: repoRoot,
+    });
+
+    assert.equal(step.stepResult.failure_class, "runner-owned-state-leak");
+    assert.equal(step.stepResult.runtime_harness_decision, "block");
+    assert.equal(step.stepResult.mission_outcome, "not_satisfied");
+    assert.deepEqual(step.stepResult.mission_semantics.runner_owned_state_paths, [
+      ".qwen/skills/aor-implement-regression-fix/SKILL.md",
+    ]);
+    assert.deepEqual(step.stepResult.mission_semantics.runner_owned_state_paths_during_step, [
+      ".qwen/skills/aor-implement-regression-fix/SKILL.md",
+    ]);
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId: "runtime-harness-runner-state-leak",
+    });
+
+    assert.equal(report.report.overall_decision, "fail");
+    assert.equal(report.report.step_decisions[0].failure_class, "runner-owned-state-leak");
+    assert.equal(report.report.step_decisions[0].runtime_harness_decision, "block");
+    assert.deepEqual(report.report.step_decisions[0].mission_semantics.runner_owned_state_paths, [
+      ".qwen/skills/aor-implement-regression-fix/SKILL.md",
+    ]);
   });
 });
 

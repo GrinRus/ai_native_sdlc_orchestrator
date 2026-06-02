@@ -76,6 +76,7 @@ function readState(stateFile) {
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
+ *   projectProfile?: string,
  *   runtimeRoot?: string,
  * }} options
  */
@@ -98,6 +99,7 @@ export function readUiLifecycleState(options) {
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
+ *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   runId?: string,
  *   controlPlane?: string,

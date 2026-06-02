@@ -52,6 +52,7 @@ export function handleRequestCommand(context) {
         targetStage: resolveOptionalStringFlag("stage", flags.stage) ?? "",
         intentType: resolveOptionalStringFlag("intent", flags.intent) ?? "",
         requestText: resolveOptionalStringFlag("request", flags.request) ?? "",
+        targetFlowId: resolveOptionalStringFlag("target-flow-id", flags["target-flow-id"]),
         targetRefs: resolveOptionalCsvFlag("target-ref", flags["target-ref"]),
         allowedPaths: resolveOptionalCsvFlag("allowed-path", flags["allowed-path"]),
         deliveryMode: resolveOptionalStringFlag("delivery-mode", flags["delivery-mode"]),

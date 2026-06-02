@@ -384,9 +384,48 @@ test("resolveNextAction routes release-ready evidence to learning handoff and cl
 
     assert.equal(report.status, "ready");
     assert.equal(report.project_state.stage, "learning");
-    assert.equal(report.primary_action.action_id, "closure-complete");
+    assert.equal(report.primary_action.action_id, "start-new-flow");
+    assert.match(report.primary_action.command, /mission create/u);
+    assert.match(report.primary_action.command, /--follow-up-source-handoff-ref/u);
     assert.equal(report.closure_state.learning.status, "handoff-complete");
     assert.ok(report.closure_state.evidence_chain.some((ref) => ref.includes("learning-loop-handoff")));
+    assert.equal(report.bounded_execution.upstream_writes_default, false);
+  });
+
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeExecutionEvidence(init, "run.closure.complete");
+    writeReviewEvidence(init, "run.closure.complete");
+    writeReviewDecision(init, "run.closure.complete", "approve");
+    writeDeliveryPlan(init, "run.closure.complete");
+    writeReleaseEvidence(init, "run.closure.complete");
+    writeLearningHandoff(init, "run.closure.complete");
+    writeExecutionEvidence(init, "run.post-run-diagnostic");
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+
+    assert.equal(report.project_state.stage, "learning");
+    assert.equal(report.primary_action.action_id, "start-new-flow");
+    assert.equal(report.closure_state.run_id, "run.closure.complete");
+    assert.equal(report.closure_state.learning.status, "handoff-complete");
+  });
+
+  withCleanRepo((tempRoot) => {
+    const init = initializeProjectRuntime({ cwd: tempRoot, projectRef: tempRoot });
+    writeMission(init);
+    writeExecutionEvidence(init, "run.learning.partial-release");
+    writeReviewEvidence(init, "run.learning.partial-release");
+    writeReviewDecision(init, "run.learning.partial-release", "approve");
+    writeDeliveryPlan(init, "run.learning.partial-release");
+    writeLearningHandoff(init, "run.learning.partial-release");
+
+    const report = resolveNextAction({ cwd: tempRoot, projectRef: tempRoot }).nextActionReport;
+
+    assert.equal(report.project_state.stage, "learning");
+    assert.equal(report.primary_action.action_id, "start-new-flow");
+    assert.equal(report.closure_state.delivery.status, "delivery-plan-ready");
+    assert.equal(report.closure_state.learning.status, "handoff-complete");
   });
 });
 

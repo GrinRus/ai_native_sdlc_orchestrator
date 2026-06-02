@@ -2,6 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { buildFinanceMonitoringSnapshot, buildPlannerMetricsSnapshot } from "../../../observability/src/index.mjs";
+import { uniqueArtifactDisplaySummaries } from "../artifact-display-summary.mjs";
+import { buildExecutionEvidenceSummary } from "../execution-evidence-summary.mjs";
+import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
 import { readRunEvents } from "./live-event-stream.mjs";
 import {
@@ -57,6 +60,23 @@ function asNumber(value) {
  */
 function asString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+/**
+ * @param {Array<{ document?: Record<string, unknown> } | Record<string, unknown>>} stepResults
+ * @returns {string[]}
+ */
+function collectRequiredPathPrefixes(stepResults) {
+  return Array.from(new Set(stepResults.flatMap((stepResult) => {
+    const document = asRecord(asRecord(stepResult).document ?? stepResult);
+    const routedExecution = asRecord(document.routed_execution);
+    const featureTraceability = asRecord(routedExecution.feature_traceability);
+    const changeEvidence = asRecord(featureTraceability.change_evidence);
+    return [
+      ...asStringArray(featureTraceability.required_path_prefixes),
+      ...asStringArray(changeEvidence.required_path_prefixes),
+    ];
+  })));
 }
 
 /**
@@ -429,27 +449,31 @@ function classifyRunRisk(run) {
  * }} options
  * @returns {string[]}
  */
-function listRunControlStateIds(options = {}) {
+function listRunControlStateRecords(options = {}) {
   const init = initializeProjectRuntime(options);
   const stateFiles = applyReadModelLimit(
     listJsonFiles(init.runtimeLayout.stateRoot).filter((filePath) => RUN_CONTROL_STATE_REGEX.test(path.basename(filePath))),
     options.limit,
   );
 
-  /** @type {string[]} */
-  const runIds = [];
+  /** @type {Array<{ runId: string, file: string, state: Record<string, unknown> }>} */
+  const records = [];
   for (const filePath of stateFiles) {
     try {
       const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
       if (typeof parsed?.run_id === "string" && parsed.run_id.trim().length > 0) {
-        runIds.push(parsed.run_id.trim());
+        records.push({
+          runId: parsed.run_id.trim(),
+          file: filePath,
+          state: asRecord(parsed),
+        });
       }
     } catch {
       // Ignore malformed runtime state snapshots.
     }
   }
 
-  return applyReadModelLimit(runIds, options.limit);
+  return applyReadModelLimit(records, options.limit);
 }
 
 /**
@@ -464,7 +488,6 @@ export function listRuns(options = {}) {
   const packets = listPacketArtifacts(options);
   const stepResults = listStepResults(options);
   const quality = listQualityArtifacts(options);
-  const runControlStateIds = listRunControlStateIds(options);
 
   /**
    * @typedef {{
@@ -504,7 +527,7 @@ export function listRuns(options = {}) {
    *     governance_reason_codes: string[],
    *     approval_required: boolean,
    *   },
-   *   context_lifecycle: {
+ *   context_lifecycle: {
    *     context_asset_refs: string[],
    *     provenance_refs: string[],
    *     decision_trail: Array<{
@@ -518,10 +541,20 @@ export function listRuns(options = {}) {
    *       update_status: string | null,
    *       security_gate_status: string | null,
    *       created_at: string | null,
-   *     }>,
-   *   },
-   * }} RunSummaryEntry
-   */
+ *     }>,
+ *   },
+ *   run_control_state: Record<string, unknown> | null,
+ *   provider_step_status: Record<string, unknown> | null,
+ *   execution_documents: {
+ *     step_results: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *     runtime_harness_reports: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *     verification_reports: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *     review_reports: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *     delivery_manifests: Array<{ artifact_ref: string, document: Record<string, unknown> }>,
+ *   },
+ *   artifact_display_summaries: Record<string, unknown>[],
+ * }} RunSummaryEntry
+ */
 
   /** @type {Map<string, RunSummaryEntry>} */
   const runMap = new Map();
@@ -565,6 +598,16 @@ export function listRuns(options = {}) {
           provenance_refs: [],
           decision_trail: [],
         },
+        run_control_state: null,
+        provider_step_status: null,
+        execution_documents: {
+          step_results: [],
+          runtime_harness_reports: [],
+          verification_reports: [],
+          review_reports: [],
+          delivery_manifests: [],
+        },
+        artifact_display_summaries: [],
       });
     }
     return /** @type {RunSummaryEntry} */ (runMap.get(runId));
@@ -578,6 +621,14 @@ export function listRuns(options = {}) {
     for (const runRef of runRefs) {
       const run = ensureRun(runRef);
       run.packet_refs.push(packet.artifact_ref);
+      run.artifact_display_summaries.push(...(packet.artifact_display_summaries ?? []));
+
+      if (packet.family === "delivery-manifest") {
+        run.execution_documents.delivery_manifests.push({
+          artifact_ref: packet.artifact_ref,
+          document: packet.document,
+        });
+      }
 
       if (packet.family !== "delivery-plan") {
         continue;
@@ -609,6 +660,11 @@ export function listRuns(options = {}) {
     if (!runId) continue;
     const run = ensureRun(normalizeRunRef(runId));
     run.step_result_refs.push(stepResult.artifact_ref);
+    run.artifact_display_summaries.push(...(stepResult.artifact_display_summaries ?? []));
+    run.execution_documents.step_results.push({
+      artifact_ref: stepResult.artifact_ref,
+      document: stepResult.document,
+    });
 
     const routedExecution = asRecord(stepResult.document.routed_execution);
     const routeResolution = asRecord(routedExecution.route_resolution);
@@ -684,8 +740,27 @@ export function listRuns(options = {}) {
     for (const runId of runIds) {
       const run = ensureRun(runId);
       run.quality_refs.push(artifact.artifact_ref);
+      run.artifact_display_summaries.push(...(artifact.artifact_display_summaries ?? []));
 
       if (artifact.family !== "promotion-decision") {
+        if (artifact.family === "runtime-harness-report") {
+          run.execution_documents.runtime_harness_reports.push({
+            artifact_ref: artifact.artifact_ref,
+            document: artifact.document,
+          });
+        }
+        if (artifact.family === "validation-report" || artifact.family === "evaluation-report") {
+          run.execution_documents.verification_reports.push({
+            artifact_ref: artifact.artifact_ref,
+            document: artifact.document,
+          });
+        }
+        if (artifact.family === "review-report") {
+          run.execution_documents.review_reports.push({
+            artifact_ref: artifact.artifact_ref,
+            document: artifact.document,
+          });
+        }
         continue;
       }
 
@@ -763,8 +838,19 @@ export function listRuns(options = {}) {
     }
   }
 
-  for (const runId of runControlStateIds) {
-    ensureRun(normalizeRunRef(runId));
+  for (const record of listRunControlStateRecords(options)) {
+    const run = ensureRun(normalizeRunRef(record.runId));
+    run.run_control_state = {
+      run_id: asString(record.state.run_id),
+      status: asString(record.state.status),
+      current_step: asString(record.state.current_step),
+      last_action: asString(record.state.last_action),
+      started_at: asString(record.state.started_at),
+      updated_at: asString(record.state.updated_at),
+      action_sequence: asNumber(record.state.action_sequence),
+      state_file: record.file,
+    };
+    run.provider_step_status = normalizeProviderStepStatus(asRecord(record.state.provider_step_status));
   }
 
   return applyReadModelLimit([...runMap.values()], options.limit).map((entry) => {
@@ -823,6 +909,20 @@ export function listRuns(options = {}) {
         provenance_refs: Array.from(new Set(entry.context_lifecycle.provenance_refs)),
         decision_trail: decisionTrail,
       },
+      run_control_state: entry.run_control_state,
+      provider_step_status: entry.provider_step_status,
+      execution_evidence: buildExecutionEvidenceSummary({
+        runId: entry.run_id,
+        stepResults: entry.execution_documents.step_results,
+        runtimeHarnessReports: entry.execution_documents.runtime_harness_reports,
+        verificationReports: entry.execution_documents.verification_reports,
+        reviewReports: entry.execution_documents.review_reports,
+        deliveryManifests: entry.execution_documents.delivery_manifests,
+        providerStepStatus: entry.provider_step_status,
+        requiredPathPrefixes: collectRequiredPathPrefixes(entry.execution_documents.step_results),
+        policyContext: entry.policy_context,
+      }),
+      artifact_display_summaries: uniqueArtifactDisplaySummaries(entry.artifact_display_summaries),
     };
   });
 }

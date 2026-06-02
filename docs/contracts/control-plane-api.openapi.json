@@ -330,6 +330,186 @@
         }
       }
     },
+    "/api/projects/{projectId}/flows": {
+      "get": {
+        "operationId": "listFlows",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flows",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowList"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/selected": {
+      "get": {
+        "operationId": "getSelectedFlow",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "selected-flow",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowDetail"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/evidence-graph": {
+      "get": {
+        "operationId": "getFlowEvidenceGraph",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flow-evidence-graph",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowEvidenceGraph"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}/runtime-trace": {
+      "get": {
+        "operationId": "getFlowRuntimeTrace",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flow-runtime-trace",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "$ref": "#/components/parameters/readModelLimit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowRuntimeTrace"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/flows/{flowId}": {
+      "get": {
+        "operationId": "getFlow",
+        "tags": [
+          "read"
+        ],
+        "x-aor-route-id": "flow-detail",
+        "x-aor-permission": "read",
+        "x-aor-kind": "read",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/projectId"
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FlowDetail"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "403": {
+            "$ref": "#/components/responses/AuthError"
+          },
+          "404": {
+            "$ref": "#/components/responses/JsonError"
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/operator-requests": {
       "get": {
         "operationId": "listOperatorRequests",
@@ -920,6 +1100,53 @@
           }
         }
       },
+      "FlowList": {
+        "description": "Read-only runtime flow projection list built from mission, next-action, and closure evidence.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/FlowListResponse"
+            }
+          }
+        }
+      },
+      "FlowDetail": {
+        "description": "Read-only runtime flow projection or null when no selected flow exists.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FlowProjection"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "FlowEvidenceGraph": {
+        "description": "Flow-scoped evidence graph. Nodes and edges are limited to the selected flow evidence refs and matching target-flow operator requests.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/FlowEvidenceGraphResponse"
+            }
+          }
+        }
+      },
+      "FlowRuntimeTrace": {
+        "description": "Flow-scoped runtime trace linking run events, step results, harness decisions, and delivery or release artifacts.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/FlowRuntimeTraceResponse"
+            }
+          }
+        }
+      },
       "Runs": {
         "description": "Read-only run summary list built from filesystem runtime artifacts.",
         "content": {
@@ -1128,9 +1355,377 @@
           },
           "state_file": {
             "type": "string"
+          },
+          "provider_step_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderStepStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "description": "User-facing summaries for recent readable artifact refs. Raw refs remain available only inside each summary raw_ref/debug action.",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
+            }
           }
         },
         "additionalProperties": true
+      },
+      "ArtifactDisplaySummary": {
+        "type": "object",
+        "description": "User-facing artifact reference summary for rendering evidence without making long paths or packet URIs the primary label.",
+        "required": [
+          "type",
+          "stage",
+          "label",
+          "status",
+          "severity",
+          "description",
+          "raw_ref",
+          "actions"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "critical"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "raw_ref": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplayAction"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ArtifactDisplayAction": {
+        "type": "object",
+        "required": [
+          "action_id",
+          "label",
+          "kind"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExecutionEvidenceSummary": {
+        "type": "object",
+        "description": "Operator-facing execution evidence summary derived from public read surfaces. It classifies changed paths, fail-closed blockers, provider execution state, verification status, and public recovery actions.",
+        "required": [
+          "status",
+          "provider_execution_status",
+          "runtime_harness_decision",
+          "real_code_change_status",
+          "post_run_verification_status",
+          "review_status",
+          "delivery_readiness_status",
+          "no_upstream_write_status",
+          "changed_path_groups",
+          "blockers",
+          "actions"
+        ],
+        "properties": {
+          "run_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "provider_execution_status": {
+            "type": "string"
+          },
+          "runtime_harness_decision": {
+            "type": "string"
+          },
+          "real_code_change_status": {
+            "type": "string"
+          },
+          "post_run_verification_status": {
+            "type": "string"
+          },
+          "review_status": {
+            "type": "string"
+          },
+          "delivery_readiness_status": {
+            "type": "string"
+          },
+          "no_upstream_write_status": {
+            "type": "string"
+          },
+          "required_path_prefixes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changed_path_groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionChangedPathGroup"
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionEvidenceAction"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExecutionChangedPathGroup": {
+        "type": "object",
+        "required": [
+          "group_id",
+          "label",
+          "status",
+          "severity",
+          "paths",
+          "count",
+          "description"
+        ],
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "enum": [
+              "mission-relevant",
+              "runtime-owned",
+              "runner-owned-leak",
+              "scratch-unrelated"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "critical"
+            ]
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExecutionEvidenceAction": {
+        "type": "object",
+        "required": [
+          "action_id",
+          "label",
+          "enabled",
+          "command_surface",
+          "reason"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "enum": [
+              "stop_provider",
+              "save_partial_evidence",
+              "diagnose_current_step",
+              "retry_public_step"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "command_surface": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProviderStepStatus": {
+        "type": "object",
+        "description": "Public, query-safe heartbeat for a routed external provider step. Raw process commands and secrets are not exposed here.",
+        "required": [
+          "status",
+          "elapsed_ms",
+          "current_command_label",
+          "recommended_action"
+        ],
+        "properties": {
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adapter": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "route_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "starting",
+              "running",
+              "silent-running",
+              "artifact-updated",
+              "timeout-risk",
+              "completed",
+              "interrupted",
+              "failed"
+            ]
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "timeout_budget_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "remaining_budget_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "last_output_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_artifact_update_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "current_command_label": {
+            "type": "string"
+          },
+          "recommended_action": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
       },
       "RuntimeLayout": {
         "type": "object",
@@ -1165,6 +1760,532 @@
           },
           "logs_root": {
             "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowListResponse": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "selected_flow_id",
+          "active_flow_ids",
+          "completed_flow_ids",
+          "flows",
+          "read_only"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "selected_flow_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "active_flow_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "completed_flow_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "flows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowProjection"
+            }
+          },
+          "generated_from": {
+            "$ref": "#/components/schemas/JsonObject"
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowProjection": {
+        "type": "object",
+        "required": [
+          "flow_id",
+          "status",
+          "selected_stage",
+          "mission_id",
+          "intake_packet_ref",
+          "latest_next_action_report_ref",
+          "evidence_refs",
+          "writeback_policy",
+          "mission_settings",
+          "closure_state",
+          "completed_read_only"
+        ],
+        "properties": {
+          "flow_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "selected_stage": {
+            "type": "string"
+          },
+          "mission_id": {
+            "type": "string"
+          },
+          "intake_packet_ref": {
+            "type": "string"
+          },
+          "intake_body_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latest_next_action_report_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
+            }
+          },
+          "writeback_policy": {
+            "$ref": "#/components/schemas/FlowWritebackPolicy"
+          },
+          "mission_settings": {
+            "$ref": "#/components/schemas/FlowMissionSettings"
+          },
+          "closure_state": {
+            "$ref": "#/components/schemas/FlowClosureState"
+          },
+          "completed_read_only": {
+            "type": "boolean"
+          },
+          "follow_up_source_handoff_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at_ref": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowMissionSettings": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "brief": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "goals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "kpis": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "definition_of_done": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "delivery_mode": {
+            "type": "string"
+          },
+          "allowed_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forbidden_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowClosureState": {
+        "type": "object",
+        "required": [
+          "status",
+          "completed",
+          "completed_read_only",
+          "follow_up_eligible",
+          "source_learning_handoff_refs"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "completed_read_only": {
+            "type": "boolean"
+          },
+          "follow_up_eligible": {
+            "type": "boolean"
+          },
+          "learning_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_run_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_learning_handoff_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommended_follow_up_source_handoff_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "follow_up_source_handoff_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowEvidenceGraphResponse": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "flow_id",
+          "status",
+          "read_only",
+          "evidence_refs",
+          "nodes",
+          "edges",
+          "isolation"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "flow_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowEvidenceNode"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowEvidenceEdge"
+            }
+          },
+          "isolation": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowEvidenceNode": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "ref",
+          "family"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "target_flow_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowEvidenceEdge": {
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "relation"
+        ],
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowRuntimeTraceResponse": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "flow_id",
+          "status",
+          "read_only",
+          "run_ids",
+          "trace_items",
+          "inspected_evidence_refs",
+          "isolation"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "flow_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed"
+            ]
+          },
+          "read_only": {
+            "type": "boolean",
+            "const": true
+          },
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trace_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowRuntimeTraceItem"
+            }
+          },
+          "inspected_evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isolation": {
+            "$ref": "#/components/schemas/JsonObject"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowRuntimeTraceItem": {
+        "type": "object",
+        "required": [
+          "trace_id",
+          "kind",
+          "event_type"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "FlowWritebackPolicy": {
+        "type": "object",
+        "required": [
+          "mode",
+          "upstream_writes_default",
+          "requires_explicit_review"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "no-write",
+              "patch-only",
+              "local-branch",
+              "fork-first-pr"
+            ]
+          },
+          "upstream_writes_default": {
+            "type": "boolean"
+          },
+          "requires_explicit_review": {
+            "type": "boolean"
+          },
+          "allowed_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forbidden_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": true
@@ -1223,6 +2344,25 @@
                 "type": "null"
               }
             ]
+          },
+          "provider_step_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderStepStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution_evidence": {
+            "$ref": "#/components/schemas/ExecutionEvidenceSummary"
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
+            }
           }
         },
         "additionalProperties": true

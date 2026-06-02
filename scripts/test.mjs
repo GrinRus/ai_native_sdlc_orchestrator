@@ -1220,6 +1220,9 @@ if (harnessTestRun.status !== 0) {
 console.log("harness tests ok: scorer interface plus capture-format compatibility helpers");
 
 const orchestratorCoreTests = [
+  path.join(root, "packages/orchestrator-core/test/artifact-display-summary.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/provider-step-status.test.mjs"),
+  path.join(root, "packages/orchestrator-core/test/execution-evidence-summary.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/project-init.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/next-action.test.mjs"),
   path.join(root, "packages/orchestrator-core/test/handoff-packets.test.mjs"),

@@ -44,3 +44,11 @@ External SaaS ingestion such as live Jira, GitHub Issues, Gmail, or Outlook conn
 The artifact packet owns packet identity and lifecycle status. This body owns product acceptance evidence and source-material traceability.
 
 Guided mission intake in W21 must populate these same product-intake fields instead of creating a parallel mission schema. Missing goals, constraints, KPIs, Definition of Done, or source refs should remain explicit through `product_intake_completeness` so `aor next` and guided web stages can report blockers deterministically. Delivery mode is an execution boundary, not a product acceptance substitute.
+
+W34 flow creation reuses this contract. `New Flow` and follow-up flow creation
+must write a fresh intake-request body rather than editing a completed flow's
+intake evidence. Follow-up lineage may be recorded in
+`mission_traceability.coverage_follow_up.follow_up_source_handoff_ref` by the
+runtime-owned `mission create --follow-up-source-handoff-ref <ref>` path, and is
+then projected through the control-plane `follow_up_source_handoff_ref` field.
+The body still owns only the new flow's product acceptance evidence.

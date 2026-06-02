@@ -666,6 +666,7 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
           allowed_path: "apps/web/**",
           forbidden_path: "secrets/**",
           delivery_mode: "patch-only",
+          "follow-up-source-handoff-ref": "evidence://reports/learning-loop-handoff-run.previous.json",
           source_kind: "local-note",
           source_ref: "docs/ops/ui-attach-detach.md",
         },
@@ -674,7 +675,18 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       const missionPayload = await missionResponse.json();
       assert.equal(missionPayload.lifecycle_command.command, "mission create");
       assert.equal(missionPayload.lifecycle_command.blocked, false);
+      assert.equal(
+        missionPayload.lifecycle_command.command_output.follow_up_source_handoff_ref,
+        "evidence://reports/learning-loop-handoff-run.previous.json",
+      );
       assert.equal(missionPayload.lifecycle_command.command_output.product_intake_completeness.status, "complete");
+      const missionBody = JSON.parse(
+        fs.readFileSync(missionPayload.lifecycle_command.command_output.artifact_packet_body_file, "utf8"),
+      );
+      assert.equal(
+        missionBody.mission_traceability.coverage_follow_up.follow_up_source_handoff_ref,
+        "evidence://reports/learning-loop-handoff-run.previous.json",
+      );
 
       const packetsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/packets`);
       assert.equal(packetsResponse.status, 200);
@@ -702,6 +714,65 @@ test("detached control-plane transport invokes bounded lifecycle command mutatio
       assert.equal(nextReportPayload.family, "next-action-report");
       assert.equal(nextReportPayload.document.primary_action.action_id, "discovery-run");
       assert.equal(nextReportPayload.document.closure_state.run_id, null);
+
+      const flowsResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows`);
+      assert.equal(flowsResponse.status, 200);
+      const flowsPayload = await flowsResponse.json();
+      assert.equal(flowsPayload.read_only, true);
+      assert.ok(flowsPayload.active_flow_ids.includes(`flow.${transport.projectId}.web-guided-flow`));
+      assert.equal(flowsPayload.completed_flow_ids.length, 0);
+
+      const selectedFlowResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/flows/selected`);
+      assert.equal(selectedFlowResponse.status, 200);
+      const selectedFlowPayload = await selectedFlowResponse.json();
+      assert.equal(selectedFlowPayload.flow_id, `flow.${transport.projectId}.web-guided-flow`);
+      assert.equal(selectedFlowPayload.status, "active");
+
+      const flowDetailResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}`,
+      );
+      assert.equal(flowDetailResponse.status, 200);
+      const flowDetailPayload = await flowDetailResponse.json();
+      assert.equal(flowDetailPayload.latest_next_action_report_ref.includes("next-action-report"), true);
+
+      const targetedRequestResponse = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/operator-requests`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          target_flow_id: selectedFlowPayload.flow_id,
+          target_stage: "discovery",
+          intent_type: "analyze",
+          request_text: "RAW WEB FLOW TARGET TEXT",
+          target_refs: [flowDetailPayload.intake_packet_ref],
+          delivery_mode: "no-write",
+        }),
+      });
+      assert.equal(targetedRequestResponse.status, 201);
+      const targetedRequestPayload = await targetedRequestResponse.json();
+      assert.equal(targetedRequestPayload.operator_request.document.target_flow_id, selectedFlowPayload.flow_id);
+      assert.equal(Object.hasOwn(targetedRequestPayload.operator_request.document, "request_text"), false);
+
+      const evidenceGraphResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}/evidence-graph`,
+      );
+      assert.equal(evidenceGraphResponse.status, 200);
+      const evidenceGraphPayload = await evidenceGraphResponse.json();
+      assert.equal(evidenceGraphPayload.flow_id, selectedFlowPayload.flow_id);
+      assert.equal(evidenceGraphPayload.isolation.excludes_unrelated_flows, true);
+      assert.equal(JSON.stringify(evidenceGraphPayload).includes("request_text"), false);
+      assert.ok(
+        evidenceGraphPayload.nodes.some(
+          (node) => node.family === "operator-request" && node.target_flow_id === selectedFlowPayload.flow_id,
+        ),
+      );
+
+      const runtimeTraceResponse = await fetch(
+        `${transport.baseUrl}/api/projects/${transport.projectId}/flows/${encodeURIComponent(selectedFlowPayload.flow_id)}/runtime-trace`,
+      );
+      assert.equal(runtimeTraceResponse.status, 200);
+      const runtimeTracePayload = await runtimeTraceResponse.json();
+      assert.equal(runtimeTracePayload.flow_id, selectedFlowPayload.flow_id);
+      assert.equal(runtimeTracePayload.read_only, true);
 
       const runtimeLayout = missionPayload.lifecycle_command.command_output.runtime_layout;
       assert.equal(typeof runtimeLayout.reportsRoot, "string");

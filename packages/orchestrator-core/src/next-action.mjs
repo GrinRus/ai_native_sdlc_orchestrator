@@ -55,6 +55,14 @@ function shellQuote(value) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeForFileName(value) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
+}
+
+/**
  * @param {string} projectRoot
  * @param {string} filePath
  * @returns {string}
@@ -138,15 +146,19 @@ function findLatestRunDocument(init, runId, family, matcher, root) {
 
 /**
  * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @param {{ notBeforeMs?: number }} options
  * @returns {{ runId: string, evidenceRef: string } | null}
  */
-function findLatestRunEvidence(init) {
-  /** @type {Array<{ runId: string, evidenceRef: string, file: string }>} */
+function findLatestRunEvidence(init, options = {}) {
+  /** @type {Array<{ runId: string, evidenceRef: string, file: string, priority: number }>} */
   const candidates = [];
-  const addCandidate = (filePath, document) => {
+  const addCandidate = (filePath, document, priority) => {
+    if (typeof options.notBeforeMs === "number" && fs.statSync(filePath).mtimeMs < options.notBeforeMs) {
+      return;
+    }
     const runId = asString(document.run_id);
     if (runId) {
-      candidates.push({ runId, evidenceRef: toEvidenceRef(init.projectRoot, filePath), file: filePath });
+      candidates.push({ runId, evidenceRef: toEvidenceRef(init.projectRoot, filePath), file: filePath, priority });
       return;
     }
     const runRef = asStringArray(document.run_refs)[0];
@@ -155,6 +167,7 @@ function findLatestRunEvidence(init) {
         runId: runRef.startsWith("run://") ? runRef.slice("run://".length) : runRef,
         evidenceRef: toEvidenceRef(init.projectRoot, filePath),
         file: filePath,
+        priority,
       });
     }
   };
@@ -162,36 +175,51 @@ function findLatestRunEvidence(init) {
   for (const filePath of listJsonFiles(init.runtimeLayout.stateRoot)) {
     if (!path.basename(filePath).startsWith("run-control-state-")) continue;
     const state = readJsonFile(filePath);
-    if (state) addCandidate(filePath, state);
+    if (state) addCandidate(filePath, state, 30);
   }
 
   for (const filePath of listJsonFiles(init.runtimeLayout.reportsRoot)) {
-    if (
-      !/^step-result-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^review-report.*\.json$/u.test(path.basename(filePath)) &&
-      !/^review-decision-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^runtime-harness-report.*\.json$/u.test(path.basename(filePath)) &&
-      !/^learning-loop-(?:scorecard|handoff)-.*\.json$/u.test(path.basename(filePath))
-    ) {
+    const basename = path.basename(filePath);
+    const priority =
+      /^learning-loop-handoff-.*\.json$/u.test(basename)
+        ? 95
+        : /^learning-loop-scorecard-.*\.json$/u.test(basename)
+          ? 90
+          : /^review-decision-.*\.json$/u.test(basename)
+            ? 65
+            : /^review-report.*\.json$/u.test(basename) || /^runtime-harness-report.*\.json$/u.test(basename)
+              ? 60
+              : /^step-result-.*\.json$/u.test(basename)
+                ? 40
+                : 0;
+    if (priority === 0) {
       continue;
     }
     const document = readJsonFile(filePath);
-    if (document) addCandidate(filePath, document);
+    if (document) addCandidate(filePath, document, priority);
   }
 
   for (const filePath of listJsonFiles(init.runtimeLayout.artifactsRoot)) {
-    if (
-      !/^delivery-plan-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^delivery-manifest-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^release-packet-.*\.json$/u.test(path.basename(filePath))
-    ) {
+    const basename = path.basename(filePath);
+    const priority =
+      /^release-packet-.*\.json$/u.test(basename)
+        ? 85
+        : /^delivery-manifest-.*\.json$/u.test(basename)
+          ? 80
+          : /^delivery-plan-.*\.json$/u.test(basename)
+            ? 75
+            : 0;
+    if (priority === 0) {
       continue;
     }
     const document = readJsonFile(filePath);
-    if (document) addCandidate(filePath, document);
+    if (document) addCandidate(filePath, document, priority);
   }
 
-  candidates.sort((left, right) => fs.statSync(right.file).mtimeMs - fs.statSync(left.file).mtimeMs);
+  candidates.sort((left, right) => {
+    if (right.priority !== left.priority) return right.priority - left.priority;
+    return fs.statSync(right.file).mtimeMs - fs.statSync(left.file).mtimeMs;
+  });
   const latest = candidates[0] ?? null;
   return latest ? { runId: latest.runId, evidenceRef: latest.evidenceRef } : null;
 }
@@ -559,6 +587,27 @@ function resolveClosureAction(options) {
     };
   }
 
+  if (learningStatus === "handoff-complete") {
+    const learningHandoffRef = asString(learning.handoff_ref);
+    const followUpCommand = [
+      `${projectCommand("mission create", options.projectRoot)} --delivery-mode no-write`,
+      ...(learningHandoffRef ? [`--follow-up-source-handoff-ref ${shellQuote(learningHandoffRef)}`] : []),
+    ].join(" ");
+
+    return {
+      status: "ready",
+      stage: "learning",
+      blockers: [],
+      primaryAction: {
+        action_id: "start-new-flow",
+        command: followUpCommand,
+        reason: "Review, delivery, release, and learning evidence are linked; start a fresh follow-up flow while keeping the completed flow read-only.",
+        low_level_command: "mission create",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
   if (deliveryStatus === "blocked") {
     const nextCommand = `${projectCommand("deliver prepare", options.projectRoot)} --run-id ${shellQuote(options.runId)} --require-review-decision`;
     return {
@@ -628,15 +677,21 @@ function resolveClosureAction(options) {
     };
   }
 
+  const learningHandoffRef = asString(learning.handoff_ref);
+  const followUpCommand = [
+    `${projectCommand("mission create", options.projectRoot)} --delivery-mode no-write`,
+    ...(learningHandoffRef ? [`--follow-up-source-handoff-ref ${shellQuote(learningHandoffRef)}`] : []),
+  ].join(" ");
+
   return {
     status: "ready",
     stage: "learning",
     blockers: [],
     primaryAction: {
-      action_id: "closure-complete",
-      command: `${projectCommand("evidence show", options.projectRoot)} --run-id ${shellQuote(options.runId)}`,
-      reason: "Review, delivery, release, and learning evidence are linked; inspect the closure evidence chain.",
-      low_level_command: "evidence show",
+      action_id: "start-new-flow",
+      command: followUpCommand,
+      reason: "Review, delivery, release, and learning evidence are linked; start a fresh follow-up flow while keeping the completed flow read-only.",
+      low_level_command: "mission create",
       evidence_refs: evidenceRefs,
     },
   };
@@ -954,7 +1009,7 @@ export function resolveNextAction(options = {}) {
           };
         } else {
           const discoveryReport = findDiscoveryReport(init);
-          const runEvidence = findLatestRunEvidence(init);
+          const runEvidence = findLatestRunEvidence(init, { notBeforeMs: fs.statSync(intake.packetFile).mtimeMs });
           if (runEvidence) {
             closureState = buildClosureState({
               init,
@@ -1042,12 +1097,20 @@ export function resolveNextAction(options = {}) {
     const issueSummary = validation.issues.map((issue) => issue.message).join("; ");
     throw new Error(`Generated next-action report failed contract validation: ${issueSummary}`);
   }
+  const archiveSuffix =
+    normalizeForFileName(asString(missionState.mission_id) ?? path.basename(asString(missionState.intake_packet_ref) ?? "current", ".json")) ||
+    "current";
+  const archiveReportFile = path.join(init.runtimeLayout.reportsRoot, `next-action-report-${archiveSuffix}.json`);
+  if (archiveReportFile !== reportFile) {
+    fs.writeFileSync(archiveReportFile, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  }
   fs.writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
   return {
     ...init,
     nextActionReport: report,
     nextActionReportFile: reportFile,
+    nextActionReportArchiveFile: archiveReportFile,
     nextActionReportId: report.report_id,
   };
 }

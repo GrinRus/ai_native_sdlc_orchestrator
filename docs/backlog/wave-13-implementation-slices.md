@@ -177,7 +177,7 @@ Add a catalog-backed full-journey live E2E layer that starts from a concrete fea
 ## W13-S06 — Full-journey proof runner and restored runner skill
 - **Epic:** EPIC-7 Live E2E and rehearsal
 - **State:** done
-- **Outcome:** Update the installed-user proof runner for curated full-journey runs, keep bounded profiles, and restore a dedicated runner skill that prepares feature missions and assembles a verdict matrix.
+- **Outcome:** Update the installed-user proof runner for curated full-journey runs and restore a dedicated runner skill that prepares feature missions and assembles a verdict matrix. Historical bounded profiles from this wave are not current live E2E acceptance inputs after the later skill-agent-only migration.
 - **Primary modules:** `scripts/live-e2e/**`, `.agents/skills/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/cli/test/**`
 - **Hard dependencies:** W13-S05
 - **Primary user-story surfaces:** operator / SRE, reviewer / QA, delivery engineer
@@ -192,12 +192,12 @@ Add a catalog-backed full-journey live E2E layer that starts from a concrete fea
 1. Full-journey proof runner mode rejects uncataloged repos and missing missions.
 2. Full-journey proof runner mode prepares a mission-linked feature request and discovery path before execution.
 3. The restored runner skill reports verdicts across target selection, feature request quality, discovery quality, runtime success, artifact quality, code quality, delivery/release quality, and learning-loop closure.
-4. Bounded profiles remain usable as fast rehearsal coverage.
+4. Historical bounded profiles remained usable as fast rehearsal coverage at W13 time; current acceptance must use catalog-backed full journeys, `installed-user-guided-journey`, or production-proof evidence.
 
 ### Done evidence
 - full-journey proof runner mode with curated repo and mission resolution
 - restored `live-e2e-runner` skill plus updated `live-e2e-preflight`
-- updated runbooks and tests showing both bounded and full-journey rehearsal layers
+- updated runbooks and tests showing the W13 bounded and full-journey rehearsal layers, with later waves superseding bounded profile acceptance
 - historical W13 proof bundle removed after the live E2E skill-agent-only migration
 
 ### Out of scope

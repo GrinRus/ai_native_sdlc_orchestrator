@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const webRoot = path.resolve(path.dirname(currentFilePath), "..");
 
-test("operator console SPA exposes Ask AOR drawer, evidence workbench, and interactions inbox", () => {
+test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence workbench, and interactions inbox", () => {
   const source = fs.readFileSync(path.join(webRoot, "src/spa.jsx"), "utf8");
 
   for (const stage of ["readiness", "mission", "discovery", "implement", "review", "delivery", "learning"]) {
@@ -15,8 +15,78 @@ test("operator console SPA exposes Ask AOR drawer, evidence workbench, and inter
   }
 
   assert.match(source, /Ask AOR/u);
+  assert.match(source, /FlowSelector/u);
+  assert.match(source, /One Recommended Action/u);
+  assert.match(source, /EvidenceGraphPanel/u);
+  assert.match(source, /RuntimeTracePanel/u);
+  assert.match(source, /targetRefsMissing/u);
+  assert.match(source, /draftFollowUpHandoffRef/u);
+  assert.match(source, /follow-up-source-handoff-ref/u);
+  assert.match(source, /Create follow-up from learning handoff/u);
+  assert.match(source, /completed_read_only/u);
+  assert.match(source, /target_flow_id/u);
+  assert.match(source, /targetFlowId/u);
+  assert.match(source, /requestStageId/u);
+  assert.match(source, /sameFlow/u);
+  assert.match(source, /sameStage/u);
+  assert.match(source, /comparableEvidenceRef/u);
+  assert.match(source, /evidenceRefsMatch/u);
+  assert.match(source, /latestRequestForFlow/u);
+  assert.match(source, /flowScopedInteractions/u);
+  assert.match(source, /actionCommandLabel/u);
+  assert.match(source, /topbar-ask-button/u);
+  assert.match(source, /draft: newFlowDraft/u);
+  assert.match(source, /draftSurface/u);
+  assert.match(source, /currentStage = draftSurface \? "mission"/u);
+  assert.match(source, /Draft flow has no artifacts yet/u);
+  assert.match(source, /New Flow Preview/u);
+  assert.match(source, /Completeness Checklist/u);
+  assert.match(source, /flowSelectionVersion/u);
+  assert.match(source, /selectionApplied/u);
+  assert.match(source, /refresh\(\{ newFlowDraft: false, selectedFlowId: fallbackFlowId, selectionVersion: cancelSelectionVersion \}\)/u);
+  assert.match(source, /request-intent-segment/u);
+  assert.match(source, /request-scope-card/u);
+  assert.match(source, /graph-flow-canvas/u);
+  assert.match(source, /graph-trace-row/u);
+  assert.match(source, /StageSpecificPanel/u);
+  assert.match(source, /Review Gate Matrix/u);
+  assert.match(source, /Delivery \/ Release Finalization/u);
+  assert.match(source, /Learning Closure \/ Start New Flow/u);
+  assert.match(source, /graph-context-tabs/u);
+  assert.match(source, /selected-node-panel/u);
+  assert.match(source, /trace-timeline-strip/u);
+  assert.match(source, /Initialize Project Runtime/u);
+  assert.match(source, /No active flow/u);
+  assert.match(source, /Readiness prepares the runtime before a flow is created/u);
+  assert.match(source, /selectedStageRuntimeState/u);
+  assert.match(source, /Upcoming stage\. The current recommended action remains scoped/u);
+  assert.match(source, /Recommended action context/u);
+  assert.match(source, /Command provenance/u);
+  assert.match(source, /Flow inventory/u);
+  assert.match(source, /stage-status-badge/u);
+  assert.match(source, /Interaction Detail/u);
+  assert.match(source, /interactions-layout/u);
+  assert.match(source, /READ_ONLY_INSPECTION_INTENTS/u);
+  assert.match(source, /No upstream writes/u);
   assert.match(source, /Evidence & Documents/u);
   assert.match(source, /Interactions Inbox/u);
+  assert.match(source, /Operator Decision/u);
+  assert.match(source, /operatorDecisionRequestsForFlow/u);
+  assert.match(source, /supportedDecisionActionsFromRecord/u);
+  assert.match(source, /decisionHelperCommand/u);
+  assert.match(source, /Prepare corrected draft/u);
+  assert.match(source, /Execution Evidence/u);
+  assert.match(source, /executionEvidenceForFlow/u);
+  assert.match(source, /execution_evidence/u);
+  assert.match(source, /Provider execution/u);
+  assert.match(source, /Real code change/u);
+  assert.match(source, /runner-owned-leak/u);
+  assert.match(source, /scratch-unrelated/u);
+  assert.match(source, /Stop provider/u);
+  assert.match(source, /Save partial evidence/u);
+  assert.match(source, /Diagnose current step/u);
+  assert.match(source, /Retry public step/u);
+  assert.match(source, /aor run cancel/u);
   assert.match(source, /operator-requests/u);
   assert.match(source, /interactions\/answers/u);
   assert.match(source, /Create and run request/u);

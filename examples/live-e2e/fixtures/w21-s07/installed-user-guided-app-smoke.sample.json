@@ -3,8 +3,32 @@
   "mode": "local-spa",
   "status": "smoke-pass",
   "html_loaded": true,
+  "flow_selector_loaded": true,
+  "new_flow_action_loaded": true,
   "project_id": "local-target",
   "config_project_id": "local-target",
   "state_project_id": "local-target",
-  "summary_file": ".aor/projects/aor-core/reports/installed-user-guided-app-smoke-w21-s07.json"
+  "summary_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.json",
+  "rendered_html_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-w21-s07.html",
+  "dom_snapshot_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-dom-w21-s07.json",
+  "accessibility_summary_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-accessibility-w21-s07.json",
+  "visual_guardrail_file": ".aor/projects/aor-core/reports/installed-user-guided-web-smoke-visual-guardrail-w21-s07.json",
+  "browser_task_proof_request_file": ".aor/projects/aor-core/reports/installed-user-guided-browser-task-proof-request-w21-s07.json",
+  "browser_task_proof_file": ".aor/projects/aor-core/reports/installed-user-guided-browser-task-proof-w21-s07.json",
+  "browser_evidence_mode": "browser-task-proof",
+  "screenshot_files": [],
+  "task_outcome": {
+    "status": "pass",
+    "checked_tasks": [
+      "flow selector rendered",
+      "completed source flow stayed read-only",
+      "follow-up flow became active",
+      "Ask AOR targeted the selected flow"
+    ],
+    "findings": []
+  },
+  "ux_findings": [
+    "Flow closure controls were visible and did not mutate completed-flow evidence."
+  ],
+  "agent_verdict_ref": ".aor/projects/aor-core/reports/live-e2e-operator-decision-w21-s07-10-learning.json"
 }

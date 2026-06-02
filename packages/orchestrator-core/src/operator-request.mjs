@@ -6,6 +6,7 @@ import { loadContractFile, validateContractDocument } from "../../contracts/src/
 import { executeRoutedStep } from "./step-execution-engine.mjs";
 import { initializeProjectRuntime } from "./project-init.mjs";
 import { resolveNextAction } from "./next-action.mjs";
+import { assertFlowMutationAllowed } from "./control-plane/flow-projections.mjs";
 
 export const OPERATOR_REQUEST_INTENTS = Object.freeze([
   "analyze",
@@ -449,6 +450,7 @@ function resolveTargetStep(intentType, targetStage) {
  *   targetRefs?: string[],
  *   allowedPaths?: string[],
  *   deliveryMode?: string,
+ *   targetFlowId?: string,
  * }} options
  */
 export function createOperatorRequest(options) {
@@ -458,6 +460,7 @@ export function createOperatorRequest(options) {
   const requestText = asString(options.requestText);
   const sourceSurface = asString(options.sourceSurface) ?? "cli";
   const deliveryMode = asString(options.deliveryMode) ?? "no-write";
+  const targetFlowId = asString(options.targetFlowId);
   const targetRefs = uniqueStrings(options.targetRefs ?? []);
   const allowedPaths = uniqueStrings(options.allowedPaths ?? []);
 
@@ -492,6 +495,23 @@ export function createOperatorRequest(options) {
     allowedPaths,
     deliveryMode,
   });
+  try {
+    assertFlowMutationAllowed({
+      projectRef: init.projectRoot,
+      cwd: init.projectRoot,
+      runtimeRoot: init.runtimeRoot,
+      projectProfile: init.projectProfilePath,
+      targetFlowId,
+      intentType,
+      deliveryMode,
+    });
+  } catch (error) {
+    throw new OperatorRequestError(
+      error instanceof Error && "code" in error ? String(error.code) : "operator_request.target_flow_invalid",
+      error instanceof Error ? error.message : String(error),
+      error instanceof Error && "statusCode" in error ? Number(error.statusCode) : 409,
+    );
+  }
 
   const timestamp = new Date().toISOString();
   const suffix = normalizeForId(`${targetStage}-${intentType}-${timestamp}`) || String(Date.now());
@@ -504,6 +524,7 @@ export function createOperatorRequest(options) {
     version: 1,
     source_surface: sourceSurface,
     target_stage: targetStage,
+    ...(targetFlowId ? { target_flow_id: targetFlowId } : {}),
     intent_type: intentType,
     request_text: requestText,
     request_summary: summarizeOperatorRequest(requestText),
@@ -645,6 +666,7 @@ export function runOperatorRequest(options) {
   const deliveryMode = asString(request.delivery_mode) ?? "no-write";
   const intentType = asString(request.intent_type) ?? "analyze";
   const targetStage = asString(request.target_stage) ?? "discovery";
+  const targetFlowId = asString(request.target_flow_id);
   const targetStep = asString(options.targetStep) ?? resolveTargetStep(intentType, targetStage);
   const operatorRequestRef = loaded.operator_request_ref;
   assertSupportedTargetStep(targetStep);
@@ -655,6 +677,22 @@ export function runOperatorRequest(options) {
     allowedPaths: asStringArray(request.allowed_paths),
     deliveryMode,
   });
+  try {
+    assertFlowMutationAllowed({
+      projectRef: loaded.init.projectRoot,
+      cwd: loaded.init.projectRoot,
+      runtimeRoot: loaded.init.runtimeRoot,
+      targetFlowId,
+      intentType,
+      deliveryMode,
+    });
+  } catch (error) {
+    throw new OperatorRequestError(
+      error instanceof Error && "code" in error ? String(error.code) : "operator_request.target_flow_invalid",
+      error instanceof Error ? error.message : String(error),
+      error instanceof Error && "statusCode" in error ? Number(error.statusCode) : 409,
+    );
+  }
 
   const runningDocument = updateOperatorRequest({
     init: loaded.init,

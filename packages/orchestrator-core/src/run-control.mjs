@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { redactSensitiveValue } from "../../observability/src/index.mjs";
+import { mergeProviderStepStatus } from "./provider-step-status.mjs";
 import { initializeProjectRuntime, loadProjectProfileForRuntime } from "./project-init.mjs";
 
 const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
@@ -472,6 +473,14 @@ export function applyRunControlAction(options) {
     guardrails: guardrails.decision,
     approval_ref: approvalRef,
     blocking_evidence_refs: asStringArray(preflightBlock.evidenceRefs),
+    provider_interruption:
+      action === "cancel" && !blocked
+        ? {
+            status: "operator-stopped",
+            provider_step_status: "interrupted",
+            reason: reason ?? "Run canceled by operator.",
+          }
+        : null,
     evidence_root: init.runtimeLayout.reportsRoot,
     state_file: stateFile,
     timestamp: eventTimestamp,
@@ -492,6 +501,18 @@ export function applyRunControlAction(options) {
       approvalRefs.push(approvalRef);
     }
 
+    const providerStepStatus =
+      action === "cancel" && !blocked
+        ? mergeProviderStepStatus(asRecord(stateBefore?.provider_step_status), {
+            status: "interrupted",
+            finished_at: eventTimestamp,
+            last_artifact_update_at: eventTimestamp,
+            recommended_action: "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
+          })
+        : Object.keys(asRecord(stateBefore?.provider_step_status)).length > 0
+          ? asRecord(stateBefore?.provider_step_status)
+          : null;
+
     const auditRefs = stateBefore ? asStringArray(stateBefore.audit_refs) : [];
     const auditRef = toEvidenceRef(init.projectRoot, auditFile);
     if (!auditRefs.includes(auditRef)) {
@@ -511,6 +532,7 @@ export function applyRunControlAction(options) {
       action_sequence: actionSequence,
       approval_refs: approvalRefs,
       audit_refs: auditRefs,
+      provider_step_status: providerStepStatus,
       evidence_root: init.runtimeLayout.reportsRoot,
     };
 

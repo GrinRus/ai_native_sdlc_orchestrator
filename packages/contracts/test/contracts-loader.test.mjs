@@ -649,6 +649,48 @@ test("control-plane API baseline documents production hardening metadata", () =>
   );
 });
 
+test("control-plane API baseline documents W34 flow projection examples", () => {
+  const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
+  assert.equal(loaded.ok, true, "fixture should load before assertions");
+
+  const contract = loaded.document.flow_projection_contract;
+  assert.equal(contract?.owning_slice, "W34-S02");
+  assert.equal(contract?.status, "implemented-read-baseline");
+  assert.ok(contract?.projection_fields?.includes("flow_id"), "expected stable flow id field");
+  assert.ok(contract?.projection_fields?.includes("follow_up_source_handoff_ref"), "expected follow-up lineage field");
+  assert.ok(contract?.projection_fields?.includes("closure_state"), "expected closure projection field");
+  assert.ok(contract?.projection_fields?.includes("mission_settings"), "expected duplicate mission settings field");
+  assert.ok(
+    contract?.read_models?.some((entry) => entry.route === "GET /api/projects/:projectId/flows"),
+    "expected implemented flow list route",
+  );
+  assert.equal(contract?.lifecycle_semantics?.new_flow?.creates_fresh_intake, true);
+  assert.equal(contract?.lifecycle_semantics?.new_flow?.archives_mission_next_action_report, true);
+  assert.equal(contract?.lifecycle_semantics?.new_flow?.mutates_completed_source_flow, false);
+  assert.equal(contract?.lifecycle_semantics?.follow_up_flow?.source_flow_read_only, true);
+  assert.equal(contract?.lifecycle_semantics?.follow_up_flow?.duplicate_settings_create_fresh_intake, true);
+
+  const examples = contract?.example_payloads ?? {};
+  assert.equal(examples.active_flow?.status, "active");
+  assert.equal(examples.completed_flow?.completed_read_only, true);
+  assert.equal(examples.completed_flow?.closure_state?.follow_up_eligible, true);
+  assert.ok(
+    examples.follow_up_flow?.follow_up_source_handoff_ref,
+    "expected follow-up flow example to cite source handoff",
+  );
+  assert.equal(examples.flow_targeted_operator_request_summary?.target_flow_id, examples.active_flow?.flow_id);
+  assert.equal(examples.completed_flow_mutation_block?.error_code, "operator_request.completed_flow_read_only");
+});
+
+test("operator-request examples may target a W34 flow projection", () => {
+  const source = path.join(workspaceRoot, "examples/reports/operator-request.flow-target.yaml");
+  const loaded = loadContractFile({ filePath: source, family: "operator-request" });
+  assert.equal(loaded.ok, true, "expected flow-targeted operator-request example to load");
+  assert.equal(loaded.document.target_flow_id, "flow.aor-core.checkout-risk");
+  assert.equal(loaded.document.delivery_mode, "no-write");
+});
+
 test("control-plane API contract rejects invalid binding mode", () => {
   const source = path.join(workspaceRoot, "examples/control-plane-api/module-surface-baseline.yaml");
   const loaded = loadContractFile({ filePath: source, family: "control-plane-api" });
@@ -1132,6 +1174,17 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
     }),
     "field_type_mismatch",
     "findings[0].evidence_refs",
+  );
+  const invalidReviewTraceability = structuredClone(reviewReport.document);
+  invalidReviewTraceability.feature_traceability.required_path_prefixes = ["source/", 42];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-report",
+      document: invalidReviewTraceability,
+      source: "test://w35-review-report-invalid-required-path-prefix",
+    }),
+    "field_type_mismatch",
+    "feature_traceability.required_path_prefixes[1]",
   );
 
   const liveRunEvent = loadContractFile({

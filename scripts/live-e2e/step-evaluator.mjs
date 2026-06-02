@@ -62,6 +62,26 @@ function validateControllerEvidence(report, state) {
   if (stepJournal.length === 0) {
     issues.push("step_journal must contain at least one online controller observation");
   }
+  const frontendInteractions = Array.isArray(report.frontend_interactions)
+    ? report.frontend_interactions.map((entry) => asRecord(entry))
+    : [];
+  for (const entry of frontendInteractions) {
+    const interactionId = asNonEmptyString(entry.interaction_id) || asNonEmptyString(entry.step_id) || "frontend";
+    for (const field of ["html_ref", "dom_snapshot_ref", "accessibility_summary_ref", "agent_verdict_ref"]) {
+      if (!asNonEmptyString(entry[field])) {
+        issues.push(`${interactionId} missing ${field}`);
+      }
+    }
+    if (asStringArray(entry.evidence_refs).length === 0) {
+      issues.push(`${interactionId} missing frontend evidence_refs`);
+    }
+    if (asStringArray(entry.screenshot_refs).length === 0 && asStringArray(entry.visual_guardrail_refs).length === 0) {
+      issues.push(`${interactionId} missing screenshot or visual guardrail refs`);
+    }
+    if (!["pass", "warn"].includes(asNonEmptyString(asRecord(entry.task_outcome).status))) {
+      issues.push(`${interactionId} task_outcome did not pass or warn`);
+    }
+  }
   const phaseHistory = Array.isArray(state.phase_history) ? state.phase_history.map((entry) => asRecord(entry)) : [];
   for (const entry of stepJournal) {
     const stepId = asNonEmptyString(entry.step_id);

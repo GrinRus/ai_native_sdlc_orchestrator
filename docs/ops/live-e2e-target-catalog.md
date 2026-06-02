@@ -44,9 +44,15 @@ For canonical setup and verification dependency details per profile, use `docs/o
 - Best profiles:
   - full-journey required cells:
     - `full-journey-regress-ky.yaml` (`regress/small/openai-primary`)
+    - `full-journey-regress-ky-small-codex.yaml` (`regress/small/openai-primary`, codex-cli)
+    - `full-journey-regress-ky-medium-codex.yaml` (`regress/medium/openai-primary`, codex-cli)
     - `full-journey-regress-ky-medium-anthropic.yaml` (`regress/medium/anthropic-primary`)
     - `full-journey-regress-ky-medium-open-code.yaml` (`regress/medium/open-code-primary`)
+    - `full-journey-regress-ky-small-qwen.yaml` (`regress/small/qwen-primary`, extended)
+    - `full-journey-regress-ky-medium-qwen.yaml` (`regress/medium/qwen-primary`, extended)
     - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`)
+  - installed-user browser-task candidate:
+    - `installed-user-guided-journey-qwen.yaml` (`regress/small/qwen-primary`, extended)
   - production-proof candidate:
     - `full-journey-production-proof-ky-openai.yaml` (`regress/small/openai-primary`, real external process, blocking target verification)
 - Failure-safe defaults:
@@ -349,7 +355,11 @@ Required coverage matrix:
   - `governance/medium/open-code-primary` (extended)
 
 Extended candidate cells:
+- `ky.regress.small.openai.codex` (`ky-header-regression`)
+- `ky.regress.medium.openai.codex` (`ky-fetch-options-regression`)
 - `ky.governance.large.openai` (`ky-retry-hooks-governance`)
+- `ky.regress.small.qwen` (`ky-header-regression`)
+- `ky.regress.medium.qwen` (`ky-fetch-options-regression`)
 - `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)
 - `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)
@@ -366,6 +376,16 @@ Provider comparison rule:
 - every curated repo must prove at least one equivalent mission class on both `openai-primary` and `anthropic-primary`.
 - `openai-primary` and `anthropic-primary` are mandatory provider variants for W14 matrix coverage.
 - `open-code-primary` remains extended candidate coverage after W22-S03, including the cataloged `ky.regress.small.open-code`, `ky.regress.medium.open-code`, and `pluggy.governance.medium.open-code` cells. A 2026-05-25 local runtime permission smoke confirmed OpenCode full-bypass and restricted interaction evidence, and a same-day `ky.regress.medium.open-code` full-journey attempt reached real `open-code` execution before blocking on provider timeout. Required OpenCode baseline certification still awaits a passing committed full-journey real-runner proof.
+- `qwen-primary` is extended candidate coverage for local operator proof runs. It is limited to Qwen full-bypass/Yolo execution until restricted/default permission behavior and a passing committed full-journey proof promote the adapter. Candidate qwen external steps use the one-hour real-runner cap because shorter local proof budgets have produced false provider-timeout evidence on full lifecycle implementation requests. The Qwen adapter uses explicit headless auth selection plus an `env_from` host alias for setups that expose `ANTHROPIC_AUTH_TOKEN` but require `ANTHROPIC_API_KEY` at the Qwen CLI boundary. Candidate runs use Qwen `--bare` plus `--exclude-tools skill`, and Runtime Harness blocks any `.qwen/` runner-owned state that still appears inside the target checkout.
+
+Ky feature missions also declare `change_evidence.required_path_prefixes` so
+`real_code_change_status` can distinguish mission-relevant source changes from
+provider scratch output. Small header regressions require evidence under
+`source/` or `test/`; medium, release, and governance missions may also satisfy
+the evidence gate through the public type surface `index.d.ts`. These prefixes
+are not delivery path allowlists or blocklists; they are the minimum surfaces
+that can prove the provider changed the target in a way that could satisfy the
+selected mission.
 
 Feature-size taxonomy:
 - `small`: one focused behavior surface, usually 1-2 files and one targeted regression.
@@ -386,7 +406,10 @@ Required matrix closure rule:
 - `coverage_status=attempted_failed` means the matrix cell was attempted and did not close.
 
 Canonical matrix-cell examples:
-- `small/regress/openai-primary`: `full-journey-regress-ky.yaml`
+- `small/regress/openai-primary`: `full-journey-regress-ky-small-codex.yaml`
+- `medium/regress/openai-primary`: `full-journey-regress-ky-medium-codex.yaml`
+- `small/regress/qwen-primary`: `full-journey-regress-ky-small-qwen.yaml`
+- `medium/regress/qwen-primary`: `full-journey-regress-ky-medium-qwen.yaml`
 - `medium/repair/anthropic-primary`: `full-journey-repair-httpie-medium-anthropic.yaml`
 - `large/release/openai-primary`: `full-journey-release-nextjs.yaml`
 
@@ -403,6 +426,6 @@ All targets reuse the same baseline before execution-style stages:
 5. verify
 6. continue only when no-write safety gates pass
 
-For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. For bounded profiles, the default is `blocking`. Post-run verification remains mandatory quality evidence for full-journey observation and contributes directly to the step journal and final analysis.
+For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. Historical bounded summaries used a blocking baseline gate, but bounded deterministic profiles are not current live E2E acceptance inputs. Post-run verification remains mandatory quality evidence for full-journey observation and contributes directly to the step journal and final analysis.
 
 See `docs/ops/live-e2e-no-write-preflight.md` for the reusable bounded procedure.

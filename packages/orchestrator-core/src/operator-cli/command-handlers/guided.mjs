@@ -354,6 +354,8 @@ export function handleGuidedCommand(context) {
       requestFile: requestFile ?? null,
       sourceKind: resolveOptionalStringFlag("source-kind", flags["source-kind"]) ?? null,
       sourceRef: resolveOptionalStringFlag("source-ref", flags["source-ref"]) ?? null,
+      followUpSourceHandoffRef:
+        resolveOptionalStringFlag("follow-up-source-handoff-ref", flags["follow-up-source-handoff-ref"]) ?? null,
     });
     const completeness = intakePacket.packetBody.product_intake_completeness;
     const complete = completeness.status === "complete";
@@ -370,6 +372,8 @@ export function handleGuidedCommand(context) {
     outputState.productIntakeCompleteness = completeness;
     outputState.productIntakeSourceRefs = intakePacket.packetBody.product_intake.source_refs;
     outputState.deliveryMode = deliveryMode;
+    outputState.followUpSourceHandoffRef =
+      resolveOptionalStringFlag("follow-up-source-handoff-ref", flags["follow-up-source-handoff-ref"]) ?? null;
     outputState.guidedCommand = "aor mission create";
     outputState.guidedStage = "mission-intake";
     outputState.guidedStatus = complete ? "ready" : "blocked";

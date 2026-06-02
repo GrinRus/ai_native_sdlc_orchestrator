@@ -591,6 +591,8 @@ export function findLatestRuntimeHarnessReportForRun(options) {
  */
 export function finalizeRunControlState(options) {
   const terminalStatus = options.stepStatus === "passed" ? "completed" : "failed";
+  const stateFileSnapshot = fs.existsSync(options.stateFile) ? readJson(options.stateFile) : {};
+  const providerStepStatus = asPlainObject(stateFileSnapshot.provider_step_status);
   const previousAuditRefs = asStringArray(options.previousState?.audit_refs);
   const previousEvidenceRefs = asStringArray(options.previousState?.step_result_refs);
   const stepResultRef = toEvidenceRef(options.projectRoot, options.stepResultFile);
@@ -615,6 +617,7 @@ export function finalizeRunControlState(options) {
     step_result_refs: nextStepResultRefs,
     evidence_root:
       typeof options.previousState?.evidence_root === "string" ? options.previousState.evidence_root : path.dirname(options.stateFile),
+    ...(Object.keys(providerStepStatus).length > 0 ? { provider_step_status: providerStepStatus } : {}),
   };
   writeJson(options.stateFile, nextState);
   return nextState;
@@ -631,6 +634,8 @@ export function finalizeRunControlState(options) {
  * @returns {Record<string, unknown>}
  */
 export function finalizeRunControlFailure(options) {
+  const stateFileSnapshot = fs.existsSync(options.stateFile) ? readJson(options.stateFile) : {};
+  const providerStepStatus = asPlainObject(stateFileSnapshot.provider_step_status);
   const nextState = {
     schema_version: 1,
     run_id: typeof options.previousState?.run_id === "string" ? options.previousState.run_id : null,
@@ -655,6 +660,7 @@ export function finalizeRunControlFailure(options) {
     },
     evidence_root:
       typeof options.previousState?.evidence_root === "string" ? options.previousState.evidence_root : path.dirname(options.stateFile),
+    ...(Object.keys(providerStepStatus).length > 0 ? { provider_step_status: providerStepStatus } : {}),
   };
   writeJson(options.stateFile, nextState);
   return nextState;

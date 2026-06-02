@@ -187,6 +187,7 @@ export async function handleOperatorRequestCreate({ request, response, runtimeOp
       targetStage: asString(payload.target_stage) ?? "",
       intentType: asString(payload.intent_type) ?? "",
       requestText: asString(payload.request_text) ?? asString(payload.request) ?? "",
+      targetFlowId: asString(payload.target_flow_id) ?? undefined,
       targetRefs: asStringArray(payload.target_refs),
       allowedPaths: asStringArray(payload.allowed_paths),
       deliveryMode: asString(payload.delivery_mode) ?? undefined,

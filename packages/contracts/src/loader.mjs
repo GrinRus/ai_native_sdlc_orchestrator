@@ -10,7 +10,7 @@ const DELIVERY_MODE_VALUES = ["no-write", "patch-only", "local-branch", "fork-fi
 const INTERACTION_STATUS_VALUES = ["requested", "answered", "resumed", "resume_failed", "blocked"];
 const INTERACTION_TYPE_VALUES = ["permission_request", "clarification_question", "auth_required"];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
-const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
+const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary", "qwen-primary"];
 const LIVE_E2E_REQUIRED_SETUP_STEPS = ["install", "target_checkout", "project_bootstrap", "intake", "readiness"];
 const VALIDATION_STATUS_VALUES = ["pass", "warn", "fail", "blocked"];
 const REVIEW_STATUS_VALUES = ["pass", "warn", "fail"];
@@ -864,7 +864,14 @@ function validateStepResult(document, source) {
         );
       }
     }
-    for (const field of ["changed_paths", "meaningful_changed_paths", "non_bootstrap_changed_paths", "ignored_request_input_files"]) {
+    for (const field of [
+      "changed_paths",
+      "meaningful_changed_paths",
+      "non_bootstrap_changed_paths",
+      "runner_owned_state_paths",
+      "runner_owned_state_paths_during_step",
+      "ignored_request_input_files",
+    ]) {
       validateOptionalStringArrayField({
         record: missionSemantics,
         source,
@@ -1005,6 +1012,12 @@ function validateFeatureTraceability(value, source, issues) {
       required: false,
     });
   }
+  validateOptionalStringArrayField({
+    record: value,
+    source,
+    field: "feature_traceability.required_path_prefixes",
+    issues,
+  });
 
   const matrixCell = validateOptionalObjectField({
     record: value,

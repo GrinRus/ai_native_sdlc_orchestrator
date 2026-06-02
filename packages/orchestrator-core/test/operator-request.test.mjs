@@ -7,7 +7,9 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { validateContractDocument } from "../../contracts/src/index.mjs";
+import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
 import { createControlPlaneHttpServer } from "../src/control-plane/http/http-transport.mjs";
+import { initializeProjectRuntime } from "../src/project-init.mjs";
 import {
   createOperatorRequest,
   getOperatorRequestStatus,
@@ -36,6 +38,128 @@ async function withTempRepo(callback) {
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toEvidenceRef(projectRoot, filePath) {
+  return `evidence://${path.relative(projectRoot, filePath).replace(/\\/g, "/")}`;
+}
+
+/**
+ * @param {string} filePath
+ * @param {Record<string, unknown>} document
+ */
+function writeRuntimeJson(filePath, document) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+}
+
+/**
+ * @param {string} repoRoot
+ */
+function seedCompletedFlow(repoRoot) {
+  const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+  const intake = materializeIntakeArtifactPacket({
+    projectId: init.projectId,
+    projectRoot: init.projectRoot,
+    projectProfileRef: init.projectProfileRef,
+    runtimeLayout: init.runtimeLayout,
+    command: "aor mission create",
+    missionId: "completed-flow",
+    requestTitle: "Completed flow",
+    requestBrief: "Completed flow for operator request guard.",
+    requestConstraints: ["Keep completed evidence read-only."],
+    goals: ["Inspect completed evidence."],
+    kpis: [{ kpi_id: "completed-flow", name: "Completed flow", target: "Read-only guard passes." }],
+    definitionOfDone: ["Completed flow stays immutable."],
+    allowedPaths: ["docs/**"],
+    deliveryMode: "patch-only",
+    sourceKind: "local-note",
+    sourceRef: "docs/guide.md",
+  });
+  const handoffRef = `evidence://.aor/projects/${init.projectId}/reports/learning-loop-handoff-run.completed-flow.json`;
+  writeRuntimeJson(path.join(init.runtimeLayout.reportsRoot, "next-action-report-completed-flow.json"), {
+    report_id: `${init.projectId}.next-action.completed-flow.v1`,
+    project_id: init.projectId,
+    version: 1,
+    generated_from: {
+      command: "aor next",
+      project_root: init.projectRoot,
+      project_profile_ref: init.projectProfileRef,
+    },
+    project_state: {
+      stage: "learning",
+      runtime_root: init.runtimeRoot,
+      runtime_state_file: init.stateFile,
+      onboarding_report_ref: null,
+      active_run_ref: null,
+    },
+    mission_state: {
+      intake_packet_ref: toEvidenceRef(init.projectRoot, intake.packetFile),
+      intake_body_ref: toEvidenceRef(init.projectRoot, intake.packetBodyFile),
+      completeness_status: "complete",
+      missing_fields: [],
+      mission_id: "completed-flow",
+      delivery_mode: "patch-only",
+      allowed_paths: ["docs/**"],
+      forbidden_paths: [],
+    },
+    closure_state: {
+      run_id: "run.completed-flow",
+      learning: {
+        status: "handoff-complete",
+        handoff_ref: handoffRef,
+        linked_evidence_refs: [handoffRef],
+      },
+      evidence_chain: [handoffRef],
+    },
+    primary_action: {
+      action_id: "closure-complete",
+      command: "aor next",
+      reason: "Completed flow fixture.",
+      low_level_command: "next",
+      evidence_refs: [handoffRef],
+    },
+    blockers: [],
+    bounded_execution: {
+      requested_delivery_mode: "patch-only",
+      upstream_writes_default: false,
+      delivery_capable_mode: true,
+      allowed_paths: ["docs/**"],
+      forbidden_paths: [],
+      requires_review_before_writeback: true,
+    },
+    evidence_refs: [toEvidenceRef(init.projectRoot, intake.packetFile), toEvidenceRef(init.projectRoot, intake.packetBodyFile), handoffRef],
+    status: "ready",
+    created_at: "2026-05-28T00:00:00.000Z",
+  });
+  return {
+    init,
+    flowId: `flow.${init.projectId}.completed-flow`,
+  };
+}
+
+/**
+ * @param {string} repoRoot
+ * @param {string} projectId
+ * @returns {string}
+ */
+function writeExplicitProjectProfile(repoRoot, projectId) {
+  const templatePath = path.join(repoRoot, "examples/project.aor.yaml");
+  const profilePath = path.join(repoRoot, `${projectId}.aor.yaml`);
+  const template = fs.readFileSync(templatePath, "utf8");
+  fs.writeFileSync(
+    profilePath,
+    template
+      .replace(/^project_id: .+$/mu, `project_id: ${projectId}`)
+      .replace(/^display_name: .+$/mu, `display_name: ${projectId}`),
+    "utf8",
+  );
+  return profilePath;
 }
 
 test("operator-request contract validates supported enums and rejects invalid intent deterministically", () => {
@@ -318,5 +442,128 @@ test("operator request CLI and HTTP routes create query-safe requests and run th
     } finally {
       await transport.close();
     }
+  });
+});
+
+test("target-flow operator requests preserve completed-flow read-only guardrails", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const { flowId } = seedCompletedFlow(repoRoot);
+
+    assert.throws(
+      () =>
+        createOperatorRequest({
+          cwd: repoRoot,
+          projectRef: repoRoot,
+          targetFlowId: flowId,
+          targetStage: "spec",
+          intentType: "revise-document",
+          requestText: "Revise completed flow evidence.",
+          targetRefs: ["README.md"],
+          allowedPaths: ["docs/**"],
+          deliveryMode: "patch-only",
+        }),
+      (error) => error instanceof Error && error.code === "operator_request.completed_flow_read_only",
+    );
+
+    const created = createOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      targetFlowId: flowId,
+      targetStage: "review",
+      intentType: "analyze",
+      requestText: "Inspect completed flow evidence without writing.",
+      targetRefs: ["README.md"],
+      deliveryMode: "no-write",
+    });
+    assert.equal(created.operatorRequest.target_flow_id, flowId);
+
+    const cli = spawnSync(
+      process.execPath,
+      [
+        cliPath,
+        "request",
+        "create",
+        "--project-ref",
+        repoRoot,
+        "--stage",
+        "review",
+        "--intent",
+        "explain",
+        "--request",
+        "Explain completed flow evidence from CLI.",
+        "--target-flow-id",
+        flowId,
+        "--target-ref",
+        "README.md",
+        "--json",
+      ],
+      { cwd: workspaceRoot, encoding: "utf8" },
+    );
+    assert.equal(cli.status, 0, cli.stderr || cli.stdout);
+    const cliPayload = JSON.parse(cli.stdout);
+    assert.equal(cliPayload.operator_request.target_flow_id, flowId);
+
+    const transport = await createControlPlaneHttpServer({ cwd: repoRoot, projectRef: repoRoot, host: "127.0.0.1", port: 0 });
+    try {
+      const blocked = await fetch(`${transport.baseUrl}/api/projects/${transport.projectId}/operator-requests`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          target_flow_id: flowId,
+          target_stage: "implement",
+          intent_type: "implement",
+          request_text: "Implement against completed flow.",
+          target_refs: ["README.md"],
+          allowed_paths: ["docs/**"],
+          delivery_mode: "patch-only",
+        }),
+      });
+      assert.equal(blocked.status, 409);
+      const blockedPayload = await blocked.json();
+      assert.equal(blockedPayload.error.code, "operator_request.completed_flow_read_only");
+    } finally {
+      await transport.close();
+    }
+  });
+});
+
+test("target-flow operator requests validate flows against the explicit project profile", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const projectProfile = writeExplicitProjectProfile(repoRoot, "profile-flow-project");
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot, projectProfile });
+    materializeIntakeArtifactPacket({
+      projectId: init.projectId,
+      projectRoot: init.projectRoot,
+      projectProfileRef: init.projectProfileRef,
+      runtimeLayout: init.runtimeLayout,
+      command: "aor mission create",
+      missionId: "profile-follow-up",
+      requestTitle: "Profile follow-up",
+      requestBrief: "Create an active flow under an explicit project profile.",
+      requestConstraints: ["Keep the request scoped to the explicit profile."],
+      goals: ["Inspect the active profile flow."],
+      kpis: [{ kpi_id: "profile-follow-up", name: "Profile follow-up", target: "Target flow guard passes." }],
+      definitionOfDone: ["A flow-targeted request can be created."],
+      allowedPaths: ["docs/**"],
+      deliveryMode: "no-write",
+      sourceKind: "local-note",
+      sourceRef: "docs/guide.md",
+    });
+
+    const flowId = `flow.${init.projectId}.profile-follow-up`;
+    const created = createOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      projectProfile,
+      targetFlowId: flowId,
+      targetStage: "discovery",
+      intentType: "analyze",
+      requestText: "Inspect explicit profile flow evidence.",
+      targetRefs: ["README.md"],
+      deliveryMode: "no-write",
+    });
+
+    assert.equal(created.operatorRequest.project_id, init.projectId);
+    assert.equal(created.operatorRequest.target_flow_id, flowId);
   });
 });

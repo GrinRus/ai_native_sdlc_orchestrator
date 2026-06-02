@@ -16,7 +16,7 @@ the accepted alpha transport boundary. A future NestJS-backed transport requires
 a new ADR before implementation work changes this contract.
 
 Implemented operation families:
-- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report;
+- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report, flow projections;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
 - operator requests: create/list/run bounded operator-initiated runtime interventions with sanitized read payloads;
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
@@ -112,6 +112,7 @@ Project bootstrap baseline:
 ## Query families
 - projects
 - packets
+- flow projections
 - runs
 - step results
 - validation and evaluation reports
@@ -122,6 +123,160 @@ Project bootstrap baseline:
 - planner metric snapshots
 - finance monitoring snapshots
 - next-action reports
+
+## Flow projection baseline (W34-S02)
+
+W34 adds implemented flow-centric read models over existing runtime artifacts
+without making the browser an orchestration owner.
+
+Flow projections are additive read models over existing durable artifacts:
+- `flow_id` is stable for one mission/intake lineage.
+- `status` is `active` for mutable in-progress flows or `completed` for
+  read-only evidence chains.
+- `selected_stage` is derived from the latest `next-action-report` and closure
+  artifacts.
+- `mission_id`, `intake_packet_ref`, and `intake_body_ref` point to existing
+  mission evidence.
+- `latest_next_action_report_ref` points to the report that selected the next
+  action or closure state.
+- `evidence_refs[]` contains only refs belonging to the selected flow.
+- `writeback_policy` mirrors mission scope and delivery evidence, including
+  `upstream_writes_default=false` for installed-user guided flows.
+- `mission_settings` provides duplicate-safe mission intake defaults for
+  follow-up flow creation; submitting them still creates a new intake packet.
+- `closure_state` exposes completed-flow status, follow-up eligibility,
+  source run id, and learning handoff refs for closure-to-new-flow UX.
+- `completed_read_only=true` is required for completed flows.
+- `follow_up_source_handoff_ref` may cite a learning handoff from a completed
+  source flow when a new follow-up flow is created.
+
+Implemented detached read routes:
+- `GET /api/projects/:projectId/flows` returns the bounded flow list with
+  `selected_flow_id`, `active_flow_ids`, `completed_flow_ids`, and flow
+  projections.
+- `GET /api/projects/:projectId/flows/selected` returns the selected flow
+  projection or `null`.
+- `GET /api/projects/:projectId/flows/:flowId` returns one flow projection or
+  `404`.
+- `GET /api/projects/:projectId/flows/:flowId/evidence-graph` returns a
+  selected-flow-only evidence graph. Nodes and edges are built only from the
+  flow projection `evidence_refs[]` and sanitized operator requests whose
+  `target_flow_id` matches the selected flow.
+- `GET /api/projects/:projectId/flows/:flowId/runtime-trace` returns a
+  selected-flow-only trace that links live run events, step results, Runtime
+  Harness decisions, delivery manifests, release packets, learning artifacts,
+  and operator requests that belong to the selected flow.
+
+Flow list and detail reads must be deterministic and must not create artifacts.
+`New Flow` is a lifecycle action through `mission create` plus `next`; it
+creates fresh mission/intake evidence, refreshes `next-action-report`, and
+archives mission-specific next-action evidence so a completed source flow remains
+inspectable. Follow-up creation passes
+`--follow-up-source-handoff-ref <ref>` through the lifecycle command mutation and
+records the lineage on the new intake body/projection. Operator-request
+create/read payloads may include `target_flow_id` so Ask AOR can stay scoped to
+the selected flow. Mutations against completed flows are blocked with
+`operator_request.completed_flow_read_only` unless the request is a
+`delivery_mode=no-write` read-only inspection intent.
+
+Flow evidence graph and runtime trace reads are sanitized read models. They must
+not include raw `operator-request.request_text`; summaries, refs, target flow,
+stage, intent, delivery mode, allowed paths, run ids, and evidence refs remain
+queryable.
+
+## Provider step status heartbeat (W35-S01)
+
+Long-running external provider execution is exposed through the query-safe
+`provider_step_status` read model. It is additive on:
+- `GET /api/projects/:projectId/state` as the latest provider heartbeat across
+  local run-control state files;
+- `GET /api/projects/:projectId/runs` as each run summary's current provider
+  heartbeat.
+
+`provider_step_status` preserves:
+- `provider`, `adapter`, `route_id`, `step_id`;
+- `status`:
+  `starting`, `running`, `silent-running`, `artifact-updated`,
+  `timeout-risk`, `completed`, `interrupted`, or `failed`;
+- `elapsed_ms`, `timeout_budget_ms`, `remaining_budget_ms`;
+- `last_output_at`, `last_artifact_update_at`;
+- `current_command_label`;
+- `recommended_action`;
+- `started_at`, `updated_at`, and optional `finished_at`.
+
+The field is a public control-plane signal, not process inspection. Runtime code
+updates it before and during external adapter execution, and read surfaces
+normalize elapsed and timeout budget values when queried. User-facing payloads
+must keep `current_command_label` compact and must not expose raw process
+commands, command args, environment variables, bearer tokens, auth tokens, or
+provider secrets. Raw provider evidence remains available only through explicit
+debug/evidence refs.
+
+## Execution evidence summaries (W35-S04)
+
+Run summaries expose additive `execution_evidence` for operator-facing live E2E
+debugging without terminal/process inspection. The field is returned by
+`GET /api/projects/:projectId/runs` and is derived only from public runtime
+artifacts, run-control state, Runtime Harness reports, review reports, delivery
+manifests, and provider heartbeat state.
+
+`execution_evidence` includes:
+- `status`, `provider_execution_status`, `runtime_harness_decision`,
+  `real_code_change_status`, `post_run_verification_status`, `review_status`,
+  `delivery_readiness_status`, and `no_upstream_write_status`;
+- `changed_path_groups[]` with `mission-relevant`, `runtime-owned`,
+  `runner-owned-leak`, and `scratch-unrelated` grouping;
+- `blockers[]` with readable reasons for fail-closed operator handling;
+- `actions[]` for public continuation surfaces only.
+
+Scratch-only output must stay visible as `scratch-unrelated` and must not make
+`real_code_change_status` pass. Runner-owned state under `.qwen/`, `.codex/`,
+`.claude/`, or `.opencode/` inside the target checkout is surfaced as
+`runner-owned-leak` with critical severity and blocks delivery proof. Runtime
+files such as `.aor/` and `project.aor.yaml` are grouped as `runtime-owned` so
+operators do not mistake runtime evidence for target implementation changes.
+
+Execution actions are descriptive public surfaces, not private process control:
+- `stop_provider` maps to `aor run cancel`;
+- `save_partial_evidence` maps to `aor run status --json`;
+- `diagnose_current_step` maps to
+  `manual-live-e2e --prepare-decision --action diagnose`;
+- `retry_public_step` maps to
+  `manual-live-e2e --prepare-decision --action retry_public_step`.
+
+Stopping a running provider must write durable interrupted/operator-stopped
+evidence in run-control audit/state. The interrupted run is not a pass and must
+preserve partial evidence for diagnosis or retry through public manual live E2E
+surfaces.
+
+## Artifact display summaries (W35-S02)
+
+Artifact refs remain canonical evidence identifiers, but UI and operator-report
+surfaces must not use long filesystem paths or packet/evidence URIs as the
+primary visible label. The control plane exposes additive
+`artifact_display_summaries[]` arrays on project state, run summaries, and flow
+projections, and per-artifact read entries include a `display_summary`.
+
+Each artifact display summary includes:
+- `type`, such as `command-trace`, `step-observation`,
+  `runtime-harness-report`, `routed-step-result`, `provider-raw-evidence`,
+  `verification`, `target-diff`, `delivery-manifest`, `release-packet`, or
+  `learning-handoff`;
+- `stage`, such as `mission`, `planning`, `execution`, `runtime-harness`,
+  `verification`, `review`, `delivery`, or `learning`;
+- `label`, `status`, `severity`, `description`, and optional `timestamp`;
+- `source_ref` and `raw_ref` for audit/debug use;
+- `actions[]`, including `copy_raw_ref` for explicit debug copying.
+
+Missing or unreadable refs are represented as summaries with
+`status=missing` and `severity=critical` rather than disappearing from the
+read model. Existing live E2E step-observation artifacts that are waiting for
+the skill-agent operator decision use `status=awaiting-decision` and
+`severity=warning`; they must not be rendered as missing evidence. Web renderers
+group summaries by flow/stage and may filter them by `Failed`, `Warnings`,
+`Provider`, `Runtime Harness`, `Verification`, `Diff`, `Delivery`, and
+`Learning`. Raw refs stay available for skill-agent evidence and debugging, but
+the user-facing primary text is the summary label/type.
 
 ## Connected lifecycle mutations (W18 baseline)
 
@@ -171,8 +326,14 @@ Operator-initiated runtime work uses first-class request artifacts rather than
 
 Create payload fields:
 - `target_stage`, `intent_type`, `request_text`;
-- optional `target_refs[]`, `allowed_paths[]`, and `delivery_mode`;
+- optional `target_flow_id`, `target_refs[]`, `allowed_paths[]`, and `delivery_mode`;
 - `delivery_mode` defaults to `no-write`; non-`no-write` modes require explicit allowed paths.
+
+When `target_flow_id` points to a completed flow, operator-request creation and
+execution must preserve completed-flow read-only behavior. Read-only inspection
+intents (`analyze`, `explain`, `review`, `validate`) are allowed only with
+`delivery_mode=no-write`; write/proposal intents or any non-`no-write` delivery
+mode fail with an explicit completed-flow read-only error.
 
 Run responses include `operator_request_ref`, `run_id`,
 `routed_step_result_file`, `compiled_context_ref`, `proposal_refs`,

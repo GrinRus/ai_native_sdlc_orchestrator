@@ -191,6 +191,90 @@ function readJsonIfPresent(filePath) {
 }
 
 /**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} webSmoke
+ * @returns {string}
+ */
+function resolveBrowserTaskProofFile(artifacts, webSmoke) {
+  const directProofFile =
+    asNonEmptyString(artifacts.guided_browser_task_proof_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_file);
+  if (directProofFile && fileExists(directProofFile)) return directProofFile;
+  const requestFile =
+    asNonEmptyString(artifacts.guided_browser_task_proof_request_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_request_file);
+  const request = readJsonIfPresent(requestFile);
+  const expectedProofFile = asNonEmptyString(request.expected_browser_task_proof_file);
+  return expectedProofFile && fileExists(expectedProofFile) ? expectedProofFile : directProofFile;
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} webSmoke
+ * @returns {Record<string, unknown>}
+ */
+function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
+  const browserTaskProofFile = resolveBrowserTaskProofFile(artifacts, webSmoke);
+  if (!browserTaskProofFile || !fileExists(browserTaskProofFile)) return webSmoke;
+  const proof = readJsonIfPresent(browserTaskProofFile);
+  const proofOutcome = asRecord(proof.task_outcome);
+  const proofStatus = asNonEmptyString(proofOutcome.status) || asNonEmptyString(proof.status);
+  const screenshotFiles = uniqueStrings([
+    ...asStringArray(webSmoke.screenshot_files),
+    ...asStringArray(proof.screenshot_files),
+    ...asStringArray(proof.screenshot_refs),
+  ]);
+  const proofHasVisualEvidence = screenshotFiles.length > 0 || Boolean(asNonEmptyString(proof.visual_guardrail_file));
+  const proofPasses = (proofStatus === "pass" || proofStatus === "warn") && proofHasVisualEvidence;
+  if (!proofPasses) return { ...webSmoke, browser_task_proof_file: browserTaskProofFile };
+  return {
+    ...webSmoke,
+    rendered_html_file:
+      asNonEmptyString(proof.rendered_html_file) ||
+      asNonEmptyString(proof.html_ref) ||
+      asNonEmptyString(webSmoke.rendered_html_file),
+    html_ref:
+      asNonEmptyString(proof.html_ref) ||
+      asNonEmptyString(proof.rendered_html_file) ||
+      asNonEmptyString(webSmoke.html_ref),
+    dom_snapshot_file:
+      asNonEmptyString(proof.dom_snapshot_file) ||
+      asNonEmptyString(proof.dom_snapshot_ref) ||
+      asNonEmptyString(webSmoke.dom_snapshot_file),
+    dom_snapshot_ref:
+      asNonEmptyString(proof.dom_snapshot_ref) ||
+      asNonEmptyString(proof.dom_snapshot_file) ||
+      asNonEmptyString(webSmoke.dom_snapshot_ref),
+    accessibility_summary_file:
+      asNonEmptyString(proof.accessibility_summary_file) ||
+      asNonEmptyString(proof.accessibility_summary_ref) ||
+      asNonEmptyString(webSmoke.accessibility_summary_file),
+    accessibility_summary_ref:
+      asNonEmptyString(proof.accessibility_summary_ref) ||
+      asNonEmptyString(proof.accessibility_summary_file) ||
+      asNonEmptyString(webSmoke.accessibility_summary_ref),
+    visual_guardrail_file:
+      asNonEmptyString(proof.visual_guardrail_file) ||
+      asNonEmptyString(webSmoke.visual_guardrail_file),
+    browser_task_proof_file: browserTaskProofFile,
+    screenshot_files: screenshotFiles,
+    screenshot_refs: screenshotFiles,
+    task_outcome: {
+      status: "pass",
+      checked_tasks: uniqueStrings([
+        ...asStringArray(asRecord(webSmoke.task_outcome).checked_tasks),
+        ...asStringArray(proofOutcome.checked_tasks),
+      ]),
+      findings: asStringArray(proofOutcome.findings),
+    },
+    ux_findings: uniqueStrings([...asStringArray(webSmoke.ux_findings), ...asStringArray(proof.ux_findings)]),
+    agent_verdict_ref:
+      asNonEmptyString(proof.agent_verdict_ref) ||
+      asNonEmptyString(webSmoke.agent_verdict_ref),
+  };
+}
+
+/**
  * @param {string} evidenceRef
  * @param {string} reportsRoot
  * @returns {boolean}
@@ -616,14 +700,37 @@ function resolveInteractiveFinalStepVerdict(requestedInteraction, deterministicF
  * @returns {Array<Record<string, unknown>>}
  */
 function buildFrontendInteractions(artifacts, stepJournal = []) {
+  const webSmoke = mergeBrowserTaskProofIntoWebSmoke(artifacts, asRecord(artifacts.guided_web_smoke));
   const summaryFile = asNonEmptyString(artifacts.guided_web_smoke_summary_file);
-  const htmlFile = asNonEmptyString(artifacts.guided_web_smoke_html_file);
-  const domSnapshotFile = asNonEmptyString(artifacts.guided_web_dom_snapshot_file);
-  const accessibilitySummaryFile = asNonEmptyString(artifacts.guided_web_accessibility_summary_file);
-  const visualGuardrailFile = asNonEmptyString(artifacts.guided_web_visual_guardrail_file);
-  const screenshotRefs = asStringArray(artifacts.guided_web_screenshot_files);
-  if (!summaryFile && !htmlFile && !domSnapshotFile && !visualGuardrailFile && screenshotRefs.length === 0) return [];
-  const webSmoke = asRecord(artifacts.guided_web_smoke);
+  const htmlFile =
+    asNonEmptyString(webSmoke.rendered_html_file) ||
+    asNonEmptyString(artifacts.guided_web_smoke_html_file);
+  const domSnapshotFile =
+    asNonEmptyString(webSmoke.dom_snapshot_file) ||
+    asNonEmptyString(artifacts.guided_web_dom_snapshot_file);
+  const accessibilitySummaryFile =
+    asNonEmptyString(webSmoke.accessibility_summary_file) ||
+    asNonEmptyString(artifacts.guided_web_accessibility_summary_file);
+  const visualGuardrailFile =
+    asNonEmptyString(webSmoke.visual_guardrail_file) ||
+    asNonEmptyString(artifacts.guided_web_visual_guardrail_file);
+  const browserTaskProofRequestFile = asNonEmptyString(artifacts.guided_browser_task_proof_request_file);
+  const browserTaskProofFile =
+    asNonEmptyString(webSmoke.browser_task_proof_file) ||
+    asNonEmptyString(artifacts.guided_browser_task_proof_file);
+  const screenshotRefs = uniqueStrings([
+    ...asStringArray(artifacts.guided_web_screenshot_files),
+    ...asStringArray(webSmoke.screenshot_files),
+    ...asStringArray(webSmoke.screenshot_refs),
+  ]);
+  if (
+    !summaryFile &&
+    !htmlFile &&
+    !domSnapshotFile &&
+    !visualGuardrailFile &&
+    !browserTaskProofFile &&
+    screenshotRefs.length === 0
+  ) return [];
   const taskOutcome = asRecord(webSmoke.task_outcome);
   const status = toObservationStatus(asNonEmptyString(taskOutcome.status) || "pass");
   const learningVerdict = stepJournal.find(
@@ -632,7 +739,10 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
       asNonEmptyString(asRecord(entry).operator_decision_status) === "accepted" &&
       asNonEmptyString(asRecord(asRecord(entry).semantic_analysis).judge_source) === "skill-agent",
   );
-  const agentVerdictRef = asNonEmptyString(asRecord(learningVerdict).operator_decision_ref) || null;
+  const agentVerdictRef =
+    asNonEmptyString(webSmoke.agent_verdict_ref) ||
+    asNonEmptyString(asRecord(learningVerdict).operator_decision_ref) ||
+    null;
   const interactionStatus = agentVerdictRef ? status : "blocked";
   return [
     {
@@ -645,10 +755,14 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
         domSnapshotFile,
         accessibilitySummaryFile,
         visualGuardrailFile,
+        browserTaskProofRequestFile,
+        browserTaskProofFile,
         ...screenshotRefs,
       ]),
       html_ref: htmlFile || asNonEmptyString(webSmoke.html_ref) || null,
       screenshot_refs: screenshotRefs,
+      visual_guardrail_refs: uniqueStrings([visualGuardrailFile]),
+      browser_task_proof_ref: browserTaskProofFile || null,
       dom_snapshot_ref: domSnapshotFile || asNonEmptyString(webSmoke.dom_snapshot_ref) || null,
       accessibility_summary_ref: accessibilitySummaryFile || asNonEmptyString(webSmoke.accessibility_summary_ref) || null,
       task_outcome: {
@@ -1208,8 +1322,6 @@ function commandCompletedForCanonicalStatus(diagnostic) {
  * }}
  */
 function resolveSummaryCanonicalStatus(options) {
-  const existing = asRecord(options.flowResult.artifacts.canonical_status);
-  if (Object.keys(existing).length > 0) return existing;
   const qualityJudgement = asRecord(options.flowResult.artifacts.quality_judgement);
   const commandStatus =
     options.flowResult.commandResults.length > 0 &&
@@ -1846,67 +1958,24 @@ function runCli(rawArgs) {
       },
     };
   } else {
-    try {
-      flowResult = fullJourneyResolution
-        ? executeFullJourneyFlow({
-            hostRoot,
-            layout,
-            runId,
-            profilePath,
-            profile,
-            aorLaunch,
-            examplesRoot,
-            catalogTargetPath: fullJourneyResolution.catalogTargetPath,
-            catalogEntry: fullJourneyResolution.catalogEntry,
-            mission: fullJourneyResolution.mission,
-            scenarioPolicyPath: fullJourneyResolution.scenarioPolicyPath,
-            scenarioPolicy: fullJourneyResolution.scenarioPolicy,
-            providerVariantPath: fullJourneyResolution.providerVariantPath,
-            providerVariant: fullJourneyResolution.providerVariant,
-            featureSize: fullJourneyResolution.featureSize,
-            matrixCell: fullJourneyResolution.matrixCell,
-            coverageFollowUp: fullJourneyResolution.coverageFollowUp,
-            coverageTier: fullJourneyResolution.coverageTier,
-            runnerAuthMode,
-            runtimeAgentPermissionMode,
-            runtimeAgentInteractionPolicy,
-            runtimeAgentAutoApprovalProfile,
-            authProbeRequired: resolveAuthProbeRequired(profile),
-            stepController,
-          })
-        : executeInstalledUserFlow({
-            hostRoot,
-            layout,
-            runId,
-            profilePath,
-            profile,
-            aorLaunch,
-            runnerAuthMode,
-            runtimeAgentPermissionMode,
-            runtimeAgentInteractionPolicy,
-            runtimeAgentAutoApprovalProfile,
-            stepController,
-            examplesRoot,
-          });
-    } catch (error) {
+    const pendingOperatorDecision = stepController.applyPendingOperatorDecision?.();
+    if (asRecord(pendingOperatorDecision).applied === true) {
       flowResult = {
         startedAt: nowIso(),
         finishedAt: nowIso(),
         status: "fail",
-        stageResults: [
-          {
-            stage: "bootstrap",
-            status: "fail",
-            evidence_refs: [],
-            summary: error instanceof Error ? error.message : String(error),
-          },
-        ],
+        stageResults: [],
         commandResults: [],
         artifacts: {
           host_runtime_root: layout.runtimeRoot,
           host_reports_root: layout.reportsRoot,
           live_e2e_controller_state_file: stepController.stateFile,
           live_e2e_step_journal_entries: stepController.getStepJournal(),
+          live_e2e_controller_stop: {
+            reason: `Live E2E controller applied pending operator decision '${asNonEmptyString(asRecord(pendingOperatorDecision).action)}'.`,
+            state: asRecord(pendingOperatorDecision).state,
+            decision: asRecord(pendingOperatorDecision).decision,
+          },
           aor_installation: aorInstallation.proof,
           aor_installation_proof_file: aorInstallation.proofFile,
           live_e2e_setup_journal_entries: [aorInstallation.setupEntry],
@@ -1915,6 +1984,105 @@ function runCli(rawArgs) {
           runtime_agent_auto_approval_profile: runtimeAgentAutoApprovalProfile,
         },
       };
+    } else {
+      const persistedControllerStop = stepController.getPersistedControllerStop?.();
+      if (asRecord(persistedControllerStop).persisted === true) {
+        flowResult = {
+          startedAt: nowIso(),
+          finishedAt: nowIso(),
+          status: "fail",
+          stageResults: [],
+          commandResults: [],
+          artifacts: {
+            host_runtime_root: layout.runtimeRoot,
+            host_reports_root: layout.reportsRoot,
+            live_e2e_controller_state_file: stepController.stateFile,
+            live_e2e_step_journal_entries: stepController.getStepJournal(),
+            live_e2e_controller_stop: {
+              reason: `Live E2E controller resumed persisted decision '${asNonEmptyString(asRecord(persistedControllerStop).action)}'.`,
+              state: asRecord(persistedControllerStop).state,
+              decision: asRecord(persistedControllerStop).decision,
+            },
+            aor_installation: aorInstallation.proof,
+            aor_installation_proof_file: aorInstallation.proofFile,
+            live_e2e_setup_journal_entries: [aorInstallation.setupEntry],
+            runtime_agent_permission_mode: runtimeAgentPermissionMode,
+            runtime_agent_interaction_policy: runtimeAgentInteractionPolicy,
+            runtime_agent_auto_approval_profile: runtimeAgentAutoApprovalProfile,
+          },
+        };
+      } else {
+        try {
+          flowResult = fullJourneyResolution
+            ? executeFullJourneyFlow({
+                hostRoot,
+                layout,
+                runId,
+                profilePath,
+                profile,
+                aorLaunch,
+                examplesRoot,
+                catalogTargetPath: fullJourneyResolution.catalogTargetPath,
+                catalogEntry: fullJourneyResolution.catalogEntry,
+                mission: fullJourneyResolution.mission,
+                scenarioPolicyPath: fullJourneyResolution.scenarioPolicyPath,
+                scenarioPolicy: fullJourneyResolution.scenarioPolicy,
+                providerVariantPath: fullJourneyResolution.providerVariantPath,
+                providerVariant: fullJourneyResolution.providerVariant,
+                featureSize: fullJourneyResolution.featureSize,
+                matrixCell: fullJourneyResolution.matrixCell,
+                coverageFollowUp: fullJourneyResolution.coverageFollowUp,
+                coverageTier: fullJourneyResolution.coverageTier,
+                runnerAuthMode,
+                runtimeAgentPermissionMode,
+                runtimeAgentInteractionPolicy,
+                runtimeAgentAutoApprovalProfile,
+                authProbeRequired: resolveAuthProbeRequired(profile),
+                stepController,
+              })
+            : executeInstalledUserFlow({
+                hostRoot,
+                layout,
+                runId,
+                profilePath,
+                profile,
+                aorLaunch,
+                runnerAuthMode,
+                runtimeAgentPermissionMode,
+                runtimeAgentInteractionPolicy,
+                runtimeAgentAutoApprovalProfile,
+                stepController,
+                examplesRoot,
+              });
+        } catch (error) {
+          flowResult = {
+            startedAt: nowIso(),
+            finishedAt: nowIso(),
+            status: "fail",
+            stageResults: [
+              {
+                stage: "bootstrap",
+                status: "fail",
+                evidence_refs: [],
+                summary: error instanceof Error ? error.message : String(error),
+              },
+            ],
+            commandResults: [],
+            artifacts: {
+              host_runtime_root: layout.runtimeRoot,
+              host_reports_root: layout.reportsRoot,
+              live_e2e_controller_state_file: stepController.stateFile,
+              live_e2e_step_journal_entries: stepController.getStepJournal(),
+              aor_installation: aorInstallation.proof,
+              aor_installation_proof_file: aorInstallation.proofFile,
+              live_e2e_setup_journal_entries: [aorInstallation.setupEntry],
+              runtime_agent_permission_mode: runtimeAgentPermissionMode,
+              runtime_agent_interaction_policy: runtimeAgentInteractionPolicy,
+              runtime_agent_auto_approval_profile: runtimeAgentAutoApprovalProfile,
+            },
+          };
+        }
+      }
     }
   }
   flowResult.artifacts.aor_installation = aorInstallation.proof;
@@ -1951,6 +2119,10 @@ function runCli(rawArgs) {
         aor_installation_proof_file: written.summary.aor_installation_proof_file,
         live_e2e_controller_state_file: written.summary.live_e2e_controller_state_file,
         live_e2e_step_observation_files: written.summary.live_e2e_step_observation_files,
+        final_skill_agent_verdict_request_file: written.summary.final_skill_agent_verdict_request_file,
+        final_skill_agent_verdict_file: written.summary.final_skill_agent_verdict_file,
+        final_skill_agent_verdict_status:
+          asNonEmptyString(asRecord(written.summary.final_skill_agent_verdict).status) || null,
         agent_artifact_review_request_file: written.summary.agent_artifact_review_request_file,
         live_e2e_scorecard_files: [written.scorecardFile],
         learning_loop_scorecard_file: written.learningLoop?.scorecardFile ?? null,

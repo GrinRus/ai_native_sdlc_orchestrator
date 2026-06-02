@@ -4,6 +4,7 @@ import path from "node:path";
 
 const BOOTSTRAP_OWNED_PREFIXES = ["examples/", "context/", ".aor/"];
 const BOOTSTRAP_OWNED_FILES = new Set(["project.aor.yaml"]);
+const RUNNER_OWNED_STATE_PREFIXES = [".codex/", ".claude/", ".qwen/", ".opencode/"];
 
 /**
  * @param {unknown} value
@@ -132,6 +133,25 @@ export function isTransientBackupPath(candidate) {
  */
 export function filterMeaningfulCodeChangedPaths(changedPaths) {
   return changedPaths.filter((candidate) => !isTransientBackupPath(candidate));
+}
+
+/**
+ * @param {string} candidate
+ * @returns {boolean}
+ */
+export function isRunnerOwnedStatePath(candidate) {
+  const normalized = candidate.replace(/\\/g, "/").replace(/^\.\//u, "");
+  return RUNNER_OWNED_STATE_PREFIXES.some(
+    (prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix),
+  );
+}
+
+/**
+ * @param {string[]} changedPaths
+ * @returns {string[]}
+ */
+export function filterRunnerOwnedStatePaths(changedPaths) {
+  return changedPaths.filter((candidate) => isRunnerOwnedStatePath(candidate));
 }
 
 /**

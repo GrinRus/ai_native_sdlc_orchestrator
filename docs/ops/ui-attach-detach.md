@@ -30,6 +30,8 @@ aor app --project-ref <repo> --runtime-root <repo>/.aor --smoke --open false --j
 Expected smoke outcome:
 - `status="smoke-pass"`;
 - `html_loaded=true`;
+- `flow_selector_loaded=true`;
+- `new_flow_action_loaded=true`;
 - `config_project_id` and `state_project_id` match `project_id`;
 - only `.aor/` runtime state changes in the target repository.
 
@@ -121,6 +123,8 @@ aor app \
 Expected smoke outcome:
 - JSON summary reports `mode="local-spa"` and `status="smoke-pass"`;
 - `html_loaded=true`;
+- `flow_selector_loaded=true`;
+- `new_flow_action_loaded=true`;
 - `config_project_id` and `state_project_id` match `project_id`;
 - CLI/API/headless surfaces remain available when the app process exits.
 
@@ -198,10 +202,11 @@ aor app \
 ```
 
 Expected full-flow console evidence:
-- app smoke loads the packaged SPA, `/app-config.json`, and `GET /api/projects/:projectId/state`;
-- connected stage mutations use `POST /api/projects/:projectId/lifecycle-command/actions`; the SPA Mission form creates guided intake evidence and `next` refreshes the durable next-action report;
-- Ask AOR/request-change actions use `POST /api/projects/:projectId/operator-requests` and `POST /api/projects/:projectId/operator-requests/:requestId/actions`;
-- Evidence & Documents lets operators copy refs and attach refs as operator-request targets without opening raw mutable files;
+- app smoke loads the packaged SPA, `/app-config.json`, `GET /api/projects/:projectId/state`, the flow selector marker, and the `New Flow` marker;
+- connected stage mutations use `POST /api/projects/:projectId/lifecycle-command/actions`; the SPA Mission form creates guided intake evidence and `next` refreshes the durable next-action report for the selected flow;
+- `New Flow` creates fresh mission/intake evidence and never mutates a completed flow;
+- Ask AOR/request-change actions use `POST /api/projects/:projectId/operator-requests` and `POST /api/projects/:projectId/operator-requests/:requestId/actions` with the selected `target_flow_id`;
+- Evidence Graph, Runtime Trace, and Evidence & Documents stay scoped to the selected flow; refs can be copied or attached as operator-request targets without opening raw mutable files;
 - pending runner questions are derived from `step-result.requested_interaction`;
 - submitted answers return `interaction_answer.answer_audit_ref` and live/event-history payloads reference that audit ref without raw answer text;
 - detaching the session stops web follow capture only; run state and evidence remain queryable through CLI/API.
@@ -212,9 +217,10 @@ Closure branch checks:
 - `hold` and `request-repair` decisions set `guided_lifecycle.state=blocked` and preserve the review-decision ref in stage evidence;
 - delivery and release recommendations include `--require-review-decision`;
 - release-ready evidence selects `aor learning handoff --run-id <RUN_ID>`;
-- completed learning handoff changes the primary action to evidence inspection rather than another mutation.
+- completed learning handoff changes the primary action to evidence inspection or explicit follow-up flow creation rather than mutating the completed flow.
 
 Read-only checks:
+- completed flows stay inspectable but mutation controls are disabled or replaced by no-write inspection actions;
 - use CLI/API reads when mutation transport is unavailable or intentionally disabled;
 - stage evidence, blockers, policy history, live/event history, and next-action report refs remain visible through headless commands;
 - the local app must not become the only way to discover the exact CLI command an operator can run headlessly.

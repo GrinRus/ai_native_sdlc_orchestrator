@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-33-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-35-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -44,6 +44,8 @@ The authoritative planning model for implementation lives in:
 | W31 | Launch the packaged local app for installed users and make first Mission intake understandable through the UI. | 1 | EPIC-6 | `docs/backlog/wave-31-implementation-slices.md` |
 | W32 | Add runtime-owned interactive operator requests across CLI, API, and the local app for bounded artifact analysis and change proposals. | 1 | EPIC-6 | `docs/backlog/wave-32-implementation-slices.md` |
 | W33 | Align the post-rebase console source of truth around `aor app`, remove the static snapshot surface, and preserve local-alpha stabilization fixes without adding security/hosted scope. | 10 | EPIC-0, EPIC-6 | `docs/backlog/wave-33-implementation-slices.md` |
+| W34 | Refactor the local console around runtime-owned flows and prove the flow loop through browser-task live E2E evidence. | 7 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-34-implementation-slices.md` |
+| W35 | Harden live E2E operator UX for long-running providers, decision helper automation, readable artifacts, execution evidence, and Codex/Qwen proof. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-35-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -155,6 +157,18 @@ The authoritative planning model for implementation lives in:
 | W33-S08 | local-alpha OpenAPI payload clarity repair (no direct story closure) |
 | W33-S09 | local-alpha runtime read-model scale repair (no direct story closure) |
 | W33-S10 | local-alpha web maintainability repair (no direct story closure) |
+| W34-S01 | flow-centric UI refactor target: PBO-09, OPS-01, OPS-11 |
+| W34-S02 | flow-centric control-plane target: PBO-09, OPS-01, OPS-11 |
+| W34-S03 | flow-first local console target: PBO-09, OPS-01, OPS-10 |
+| W34-S04 | flow-scoped evidence and interaction target: OPS-02, OPS-03, OPS-11, DEV-06, DEV-07 |
+| W34-S05 | closure-to-new-flow target: PSO-05, OPS-04, DTX-07, INC-06 |
+| W34-S06 | browser-task guided proof target: OPS-06, OPS-07, PBO-09, OPS-11 |
+| W34-S07 | source-of-truth alignment and release-gate evidence (no direct story closure) |
+| W35-S01 | long-running provider heartbeat target: OPS-01, OPS-06, OPS-07, OPS-11 |
+| W35-S02 | readable evidence artifact target: OPS-02, OPS-03, OPS-11, DEV-06, DEV-07 |
+| W35-S03 | skill-agent decision helper target: OPS-04, OPS-06, OPS-07, OPS-11 |
+| W35-S04 | execution evidence and interruption target: OPS-01, OPS-04, OPS-06, OPS-07, OPS-11, DEV-05, RQA-02 |
+| W35-S05 | Codex/Qwen UX proof target: OPS-06, OPS-07, OPS-11, PBO-09 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -568,6 +582,38 @@ boundaries.
 - Security, CORS/preflight, hosted deployment, SSO, and production contour hardening remain out of scope.
 
 **Detailed slices:** `docs/backlog/wave-33-implementation-slices.md`
+
+## W34 - flow-centric console refactor and browser-task proof
+**Goal:** Refactor the installed-user local console around runtime-owned flow selection, active/completed flow boundaries, closure-to-new-flow behavior, and flow-scoped evidence views, then prove the loop through the current skill-agent-only browser-task live E2E path.
+
+**Exit criteria:**
+- W34 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
+- Flow product and contract docs define selected, active, completed, and follow-up flows without UI-owned orchestration state.
+- Runtime/control-plane surfaces expose flow list, selected-flow details, completed-flow read-only projections, and new-flow lifecycle creation.
+- The packaged local SPA implements the accepted W34 design references for flow selector, active cockpit, advanced views, and learning closure.
+- Ask AOR, Evidence Graph, Runtime Trace, Interactions Inbox, review, delivery, release, and learning surfaces preserve selected-flow boundaries.
+- Release smoke for `aor app --smoke --open false --json` proves the packaged flow-centric bundle still exposes the flow selector and `New Flow` markers.
+- Live E2E uses `installed-user-guided-journey.yaml` with `live_e2e.frontend_capability=browser-task-proof`, accepted skill-agent decisions, frontend evidence refs, final skill-agent verdict, no-upstream-write assertions, first-flow completion evidence, a distinct follow-up flow, and flow-targeted operator-request proof.
+- Deleted bounded profiles and mock-backed proof bundles remain out of the current proof path.
+
+**Detailed slices:** `docs/backlog/wave-34-implementation-slices.md`
+
+## W35 - live E2E operator UX hardening
+**Goal:** Make real Codex/Qwen live E2E operation understandable from the console and operator reports by showing long-running provider heartbeat, automating skill-agent decision artifacts, rendering evidence refs in user-facing form, and proving safe interruption/retry behavior.
+
+**Exit criteria:**
+- W35 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
+- Long-running provider steps expose provider, adapter, step, elapsed time, timeout budget, last output, last artifact update, and recommended safe action in UI and operator reports.
+- Silent provider execution is visible as `silent-running` rather than appearing hung.
+- Skill-agent operator decisions can be prepared through a helper/UI path that auto-cites required inspected evidence refs.
+- Rejected decisions show readable correction guidance and do not require raw JSON editing for the normal path.
+- Artifact refs render as concise evidence summaries grouped by flow stage and status, with raw refs available for copy/debug.
+- Execution evidence distinguishes mission-relevant changed paths, runtime-owned artifacts, runner-owned state leaks, scratch files, Runtime Harness status, verification status, and no-upstream-write state.
+- Stop, diagnose, and retry controls use public control-plane surfaces and preserve partial evidence.
+- Codex/Qwen live E2E UX proof uses current skill-agent-only profiles and does not reintroduce removed bounded or mock-backed proof paths.
+- W35-S05 proof closure includes the silent-provider UX fixture and requires any Qwen non-pass to be recorded as clear provider-quality/environment blocker evidence, not as product success.
+
+**Detailed slices:** `docs/backlog/wave-35-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

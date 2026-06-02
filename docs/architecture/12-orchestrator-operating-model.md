@@ -37,6 +37,9 @@ Quality boundaries are explicit:
 - **Project profile** — persistent project defaults.
 - **Project analysis report** — repeatable onboarding knowledge.
 - **Packet chain** — discovery through release.
+- **Flow projection** — control-plane view over one mission/intake lineage,
+  latest next action, run/review/delivery/release/learning evidence, and
+  operator-request summaries.
 - **Run and step results** — normalized execution state.
 - **Operator request** — durable operator-initiated intervention intent that can be compiled into a routed step without becoming direct chat.
 - **Quality evidence** — validation, eval, harness, logs, traces, and diffs.
@@ -61,7 +64,8 @@ Quality boundaries are explicit:
 1. load the project profile and target repository information;
 2. analyze or verify the project if required;
 3. optionally launch the local packaged UI with `aor app` for readiness, Mission intake, next-action, and evidence inspection;
-4. materialize the next packet boundary;
+4. materialize the next packet boundary and, for W34 flow-centric surfaces,
+   derive the selected flow from runtime/control-plane evidence;
 5. request human approval if the policy requires it;
 6. if the operator asks for analysis, document changes, repair, validation, planning, implementation, or review, persist an `operator-request` with target refs, allowed paths, delivery mode, and source surface before any runtime work starts;
 7. prepare the routed step by resolving route, wrapper, prompt bundle, context assets, step policy, and compiled context. Operator-request runs add `packet://operator-request@...` to input packet refs and overlay `context-bundle://context.bundle.operator-intervention@v1`;
@@ -78,6 +82,11 @@ Quality boundaries are explicit:
 18. if the flow fails materially, open or update an incident path.
 
 The local app path is an operator surface, not a runtime dependency. It serves `/`, `/app-config.json`, and same-origin `/api/projects/:projectId/**` routes from the CLI-launched process, then invokes the same lifecycle-command handlers as the CLI. Stopping the app server must not stop runs or mutate workflow state beyond the explicit commands the operator submitted.
+
+Flow projections are read models, not a new orchestration owner. Active flows
+can advance only through the existing runtime command path. Completed flows
+remain read-only. Follow-up flows start from fresh mission/intake evidence and
+may cite a learning handoff from the completed source flow.
 
 Operator requests are explicit runtime inputs, not free-form steering. The default `delivery_mode=no-write` produces analysis or proposal evidence only. `patch-only` requires explicit `allowed_paths` and produces patch evidence without silently mutating source files in v1. Higher delivery modes remain governed by the existing delivery plan, review, promotion, and writeback gates.
 

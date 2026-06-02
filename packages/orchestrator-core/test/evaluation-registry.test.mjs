@@ -39,6 +39,33 @@ test("loadEvaluationRegistry discovers datasets and suites deterministically", (
   });
 });
 
+test("loadEvaluationRegistry keeps external examples sources addressable", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-eval-workspace-"));
+  const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-eval-examples-"));
+  fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
+  fs.cpSync(path.join(workspaceRoot, "examples"), externalRoot, { recursive: true });
+
+  try {
+    const registry = loadEvaluationRegistry({
+      workspaceRoot: repoRoot,
+      examplesRoot: externalRoot,
+    });
+
+    assert.equal(registry.ok, true);
+    assert.ok(registry.suites.length > 0);
+    assert.ok(registry.datasets.length > 0);
+    assert.ok(registry.suites.every((suite) => path.isAbsolute(suite.source)));
+    assert.ok(registry.datasets.every((dataset) => path.isAbsolute(dataset.source)));
+    assert.ok(registry.suites.every((suite) => fs.existsSync(suite.source)));
+    assert.ok(registry.datasets.every((dataset) => fs.existsSync(dataset.source)));
+    assert.ok(registry.suites.every((suite) => !suite.source.startsWith("../")));
+    assert.ok(registry.datasets.every((dataset) => !dataset.source.startsWith("../")));
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+    fs.rmSync(externalRoot, { recursive: true, force: true });
+  }
+});
+
 test("resolveSuiteWithDataset resolves suite and dataset by suite ref", () => {
   withTempRepo((repoRoot) => {
     const registry = loadEvaluationRegistry({ workspaceRoot: repoRoot });

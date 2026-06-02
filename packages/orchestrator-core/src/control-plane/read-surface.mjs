@@ -1,4 +1,5 @@
 export {
+  listArtifactDisplaySummaries,
   listCompilerRevisionStatuses,
   listDeliveryManifests,
   listMultirepoCoordinationStatuses,
@@ -11,6 +12,15 @@ export {
   readNextActionReport,
   readProjectState,
 } from "./read-artifact-readers.mjs";
+
+export {
+  assertFlowMutationAllowed,
+  readFlowEvidenceGraph,
+  listFlowProjections,
+  readFlowProjection,
+  readFlowRuntimeTrace,
+  readSelectedFlowProjection,
+} from "./flow-projections.mjs";
 
 export {
   readFinanceMonitoringSnapshot,

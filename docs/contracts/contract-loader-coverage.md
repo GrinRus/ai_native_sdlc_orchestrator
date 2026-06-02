@@ -50,7 +50,7 @@ This table maps documented contracts to loader coverage for `W0-S02`.
 | Operations | `live-e2e-provider-variant.md` | `live-e2e-provider-variant` | `scripts/live-e2e/catalog/providers/*.yaml` | implemented | Required fields + closed-set `provider_variant_id` checks for W14 matrix variants. |
 | Operations | `live-e2e-scenario-policy.md` | `live-e2e-scenario-policy` | `scripts/live-e2e/catalog/scenarios/*.yaml` | implemented | Required fields + closed-set `scenario_family` checks for live E2E scenario policy. |
 | Operations | `live-e2e-target-catalog.md` | `live-e2e-target-catalog` | `scripts/live-e2e/catalog/targets/*.yaml` | implemented | Required fields + top-level type checks for target safety, matrix, provider pairs, and missions. |
-| Operations | `control-plane-api.md` | `control-plane-api` | `examples/control-plane-api/*.yaml` | implemented | Loader validates the hybrid module + detached HTTP/SSE baseline for read/follow plus bounded run-control/ui-lifecycle mutation families; the example also carries W18 interactive-continuation target metadata, W20 production-hardening metadata, and W23 explicit production permission semantics. |
+| Operations | `control-plane-api.md` | `control-plane-api` | `examples/control-plane-api/*.yaml` | implemented | Loader validates the hybrid module + detached HTTP/SSE baseline for read/follow plus bounded run-control/ui-lifecycle mutation families; the example also carries W18 interactive-continuation target metadata, W20 production-hardening metadata, W23 explicit production permission semantics, and W34 flow-projection baseline examples. |
 
 ## Reference integrity and compatibility checks (W3-S01)
 

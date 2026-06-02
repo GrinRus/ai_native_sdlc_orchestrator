@@ -15,6 +15,7 @@ import {
   createMockAdapter,
   resolveAdapterForRoute,
   resolveAdapterMatrix,
+  resolveExternalRuntimeNativeTimeoutArgs,
   resolveExternalRuntimePermissionPolicy,
 } from "../src/index.mjs";
 import { resolveRouteForStep, resolveRouteMatrix } from "../../provider-routing/src/route-resolution.mjs";
@@ -48,6 +49,10 @@ function withTempRepo(callback) {
  *   requestTransport?: string,
  *   requestFile?: Record<string, unknown>,
  *   requestViaStdin?: boolean,
+ *   executionRootMode?: string,
+ *   env?: Record<string, string>,
+ *   envFrom?: Record<string, string>,
+ *   nativeTimeoutArg?: Record<string, unknown>,
  * }} options
  */
 function buildExternalRunnerProfile(options) {
@@ -76,6 +81,18 @@ function buildExternalRunnerProfile(options) {
   }
   if (options.requestFile) {
     execution.external_runtime.request_file = options.requestFile;
+  }
+  if (options.executionRootMode) {
+    execution.external_runtime.execution_root_mode = options.executionRootMode;
+  }
+  if (options.env) {
+    execution.external_runtime.env = options.env;
+  }
+  if (options.envFrom) {
+    execution.external_runtime.env_from = options.envFrom;
+  }
+  if (options.nativeTimeoutArg) {
+    execution.external_runtime.native_timeout_arg = options.nativeTimeoutArg;
   }
   if (options.handler !== null) {
     execution.handler = options.handler ?? "codex-cli-external-runner";
@@ -174,6 +191,14 @@ test("adapter request and response envelopes enforce stable required fields", ()
     policy_bundle: { policy_id: "policy.step.runner.default" },
     input_packet_refs: ["packet://handoff"],
     dry_run: true,
+    provider_step_status: {
+      provider: "codex",
+      adapter: "codex-cli",
+      route_id: "route.implement.default",
+      step_id: "run.start.implement",
+      status: "running",
+      current_command_label: "external-provider-runner",
+    },
     context: {
       compiled_context_ref: "compiled-context://compiled-context.aor-core.implement.runner-default",
       packet_refs: ["packet://handoff"],
@@ -184,6 +209,7 @@ test("adapter request and response envelopes enforce stable required fields", ()
   assert.equal(request.dry_run, true);
   assert.deepEqual(request.input_packet_refs, ["packet://handoff"]);
   assert.equal(request.context.compiled_context_ref, "compiled-context://compiled-context.aor-core.implement.runner-default");
+  assert.equal(request.provider_step_status.current_command_label, "external-provider-runner");
 
   const response = createAdapterResponseEnvelope({
     request_id: "req-1",
@@ -270,6 +296,22 @@ test("external runtime permission policy resolves env-selected mode args before 
   assert.equal(invalid.ok, false);
   assert.equal(invalid.permissionMode, "missing");
   assert.equal(invalid.failureKind, "permission-policy-invalid");
+});
+
+test("external runtime native timeout args are derived from the resolved request timeout", () => {
+  assert.deepEqual(
+    resolveExternalRuntimeNativeTimeoutArgs({
+      externalRuntime: {
+        native_timeout_arg: {
+          flag: "--max-wall-time",
+          format: "duration-seconds",
+          reserve_ms: 5000,
+        },
+      },
+      timeoutMs: 300000,
+    }),
+    ["--max-wall-time", "295s"],
+  );
 });
 
 test("external runner failure classifier ignores benign permission words on successful output", () => {
@@ -543,6 +585,66 @@ test("live adapter executes external runner path for supported codex-cli request
     );
   } finally {
     fs.rmSync(evidenceRoot, { recursive: true, force: true });
+  }
+});
+
+test("live adapter can invoke external runners through a short execution root alias", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-adapter-short-root-"));
+  const longSegment = "live-e2e-installed-user-guided-journey-qwen-final-ui-1780348266";
+  const executionRoot = path.join(tempRoot, longSegment, "runtime", "projects", "aor-core", "target-checkouts", `ky-${longSegment}`);
+  const evidenceRoot = path.join(tempRoot, "reports");
+  fs.mkdirSync(executionRoot, { recursive: true });
+  fs.mkdirSync(evidenceRoot, { recursive: true });
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "qwen-code",
+      adapterProfile: {
+        runner_family: "qwen",
+        ...buildExternalRunnerProfile({
+          command: process.execPath,
+          executionRootMode: "short-symlink",
+          args: [
+            "-e",
+            [
+              "const fs=require('node:fs');",
+              "process.stdout.write(JSON.stringify({",
+              "status:'success',",
+              "output:{cwd:process.cwd(),real_cwd:fs.realpathSync(process.cwd())}",
+              "}));",
+            ].join(""),
+          ],
+          handler: null,
+        }),
+      },
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: executionRoot,
+      executionRoot,
+    });
+
+    const response = adapter.execute({
+      request_id: "req-short-execution-root",
+      run_id: "run-short-execution-root",
+      step_id: "step-short-execution-root",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.execution_root_mode, "short-symlink");
+    assert.notEqual(response.output.external_runner.execution_root, executionRoot);
+    assert.ok(
+      response.output.external_runner.execution_root.length < executionRoot.length,
+      "expected the external runner cwd to be shorter than the canonical checkout root",
+    );
+    assert.equal(fs.realpathSync(response.output.external_runner.execution_root), fs.realpathSync(executionRoot));
+    assert.equal(fs.realpathSync(response.output.runner_output.cwd), fs.realpathSync(executionRoot));
+    assert.equal(fs.realpathSync(response.output.runner_output.real_cwd), fs.realpathSync(executionRoot));
+    assert.equal(response.output.external_runner.canonical_execution_root, fs.realpathSync(executionRoot));
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
 
@@ -864,6 +966,101 @@ test("live adapter baseline accepts non-codex adapter ids when an external runne
   assert.equal(response.status, "success");
   assert.equal(response.adapter_id, "open-code");
   assert.equal(response.tool_traces[0].kind, "open-code-external-runner");
+});
+
+test("live adapter applies env_from aliases without exposing secret values in evidence", () => {
+  const previousSource = process.env.AOR_TEST_SOURCE_SECRET;
+  const previousTarget = process.env.AOR_TEST_TARGET_SECRET;
+  process.env.AOR_TEST_SOURCE_SECRET = "secret-from-env-from";
+  delete process.env.AOR_TEST_TARGET_SECRET;
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "qwen-code",
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "fs.readFileSync(0,'utf8');",
+            "if(!process.env.AOR_TEST_TARGET_SECRET||process.env.AOR_TEST_TARGET_SECRET!==process.env.AOR_TEST_SOURCE_SECRET){process.stderr.write('missing env alias');process.exit(1);}",
+            "process.stdout.write(JSON.stringify({status:'success',summary:'env alias ok',output:{target_present:true}}));",
+          ].join(""),
+        ],
+        handler: null,
+        envFrom: {
+          AOR_TEST_TARGET_SECRET: "AOR_TEST_SOURCE_SECRET",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-qwen-env-from",
+      run_id: "run-qwen-env-from",
+      step_id: "step-qwen-env-from",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+    });
+
+    assert.equal(response.status, "success");
+    assert.deepEqual(response.output.external_runner.env_from_applied, [
+      { target: "AOR_TEST_TARGET_SECRET", source: "AOR_TEST_SOURCE_SECRET" },
+    ]);
+    assert.equal(JSON.stringify(response).includes("secret-from-env-from"), false);
+  } finally {
+    if (previousSource === undefined) {
+      delete process.env.AOR_TEST_SOURCE_SECRET;
+    } else {
+      process.env.AOR_TEST_SOURCE_SECRET = previousSource;
+    }
+    if (previousTarget === undefined) {
+      delete process.env.AOR_TEST_TARGET_SECRET;
+    } else {
+      process.env.AOR_TEST_TARGET_SECRET = previousTarget;
+    }
+  }
+});
+
+test("live adapter appends native timeout args before invoking an external runner", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "const timeoutIndex=process.argv.indexOf('--max-wall-time');",
+          "if(timeoutIndex<0||process.argv[timeoutIndex+1]!=='25s'){process.stderr.write('missing native timeout');process.exit(1);}",
+          "process.stdout.write(JSON.stringify({status:'success',summary:'native timeout ok'}));",
+        ].join(""),
+        "--",
+      ],
+      handler: null,
+      timeoutMs: 30000,
+      nativeTimeoutArg: {
+        flag: "--max-wall-time",
+        format: "duration-seconds",
+        reserve_ms: 5000,
+      },
+    }),
+  });
+
+  const response = adapter.execute({
+    request_id: "req-qwen-native-timeout",
+    run_id: "run-qwen-native-timeout",
+    step_id: "step-qwen-native-timeout",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.deepEqual(response.output.external_runner.args.slice(-2), ["--max-wall-time", "25s"]);
 });
 
 test("live adapter supports file-attached request transport for argv prompt runners", () => {

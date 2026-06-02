@@ -11,6 +11,7 @@ import {
   isLiveE2eControllerStopInProgress,
   isLiveE2eControllerStop,
 } from "../live-e2e/lib/step-controller.mjs";
+import { prepareOperatorDecisionArtifact } from "../live-e2e/lib/decision-helper.mjs";
 
 function withTempRoot(callback) {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-controller-"));
@@ -172,6 +173,151 @@ test("live E2E step controller blocks skill-agent profiles until operator decisi
   });
 });
 
+test("live E2E decision helper prepares accepted continue decisions with all required refs", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "11-discovery-run.json");
+    const analysisFile = path.join(reportsRoot, "discovery-analysis.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    fs.writeFileSync(analysisFile, "{}\n", "utf8");
+    const runId = "controller-decision-helper";
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+        target_write_policy: "aor-runtime-only-before-execution",
+      },
+    };
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "manual",
+    });
+    controller.planCommand({ label: "discovery-run", commandSurface: "aor discovery run" });
+
+    assert.throws(
+      () =>
+        controller.observeStage({
+          stage: "discovery",
+          stageResult: {
+            stage: "discovery",
+            status: "pass",
+            evidence_refs: [analysisFile],
+            summary: "Discovery passed.",
+          },
+          commandResults: [
+            {
+              label: "discovery-run",
+              command_surface: "aor discovery run",
+              status: "pass",
+              transcript_file: transcriptFile,
+              artifact_refs: [analysisFile],
+              exit_code: 0,
+            },
+          ],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "diagnose");
+        return true;
+      },
+    );
+
+    const [pendingEntry] = controller.getStepJournal();
+    const decisionRequest = JSON.parse(fs.readFileSync(pendingEntry.agent_decision_request_ref, "utf8"));
+    const summary = prepareOperatorDecisionArtifact({
+      requestFile: pendingEntry.agent_decision_request_ref,
+      action: "continue",
+      findings: ["Required public evidence refs were inspected."],
+    });
+    const preparedDecision = JSON.parse(fs.readFileSync(summary.output_ref, "utf8"));
+    assert.deepEqual(preparedDecision.inspected_evidence_refs, decisionRequest.decision_rubric.required_evidence_refs);
+    assert.deepEqual(summary.validation_preview.missing_required_inspected_evidence_refs, []);
+    assert.equal(summary.validation_preview.rejection_risks.length, 0);
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "auto",
+    });
+    const applied = resumed.applyPendingOperatorDecision();
+    assert.equal(applied.applied, true);
+    assert.equal(applied.action, "continue");
+    const [acceptedEntry] = resumed.getStepJournal();
+    assert.equal(acceptedEntry.operator_decision_status, "accepted");
+    assert.equal(acceptedEntry.operator_decision_rejection_reason, undefined);
+    assert.equal(acceptedEntry.decision.action, "continue");
+    assert.deepEqual(acceptedEntry.inspected_evidence_refs, decisionRequest.decision_rubric.required_evidence_refs);
+  });
+});
+
+test("live E2E decision helper preserves frontend evidence refs in the draft", () => {
+  withTempRoot((reportsRoot) => {
+    const requestFile = path.join(reportsRoot, "live-e2e-agent-decision-request-ui.json");
+    const expectedDecisionFile = path.join(reportsRoot, "live-e2e-operator-decision-ui.json");
+    const requiredRefs = [
+      path.join(reportsRoot, "live-e2e-step-plan-ui.json"),
+      path.join(reportsRoot, "live-e2e-agent-decision-request-ui.json"),
+      path.join(reportsRoot, "live-e2e-step-inspection-ui.json"),
+    ];
+    const frontendRefs = [
+      path.join(reportsRoot, "guided-web-dom.json"),
+      path.join(reportsRoot, "guided-web-accessibility.json"),
+      path.join(reportsRoot, "guided-web-screenshot.png"),
+    ];
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify(
+        {
+          request_id: "ui.operator-decision-request",
+          run_id: "ui",
+          step_id: "learning",
+          step_instance_id: "learning",
+          iteration: 1,
+          operator_context: { operator_ref: "skill://live-e2e-runner" },
+          deterministic_analysis: { status: "pass" },
+          decision_rubric: {
+            required_evidence_refs: requiredRefs,
+            frontend_evidence_refs: frontendRefs,
+          },
+          operator_decision_expected_ref: expectedDecisionFile,
+          expected_response_shape: {
+            action: "continue|frontend_interact|diagnose|block",
+            inspected_evidence_refs: requiredRefs,
+            evidence_refs: requiredRefs,
+            ui_ux_analysis: {
+              status: "pass|warn|not_pass|blocked",
+              task_outcome: "pass|warn|not_pass|blocked",
+              findings: [],
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const summary = prepareOperatorDecisionArtifact({
+      requestFile,
+      action: "continue",
+      findings: ["Frontend proof evidence inspected."],
+    });
+    const preparedDecision = JSON.parse(fs.readFileSync(summary.output_ref, "utf8"));
+    assert.deepEqual(preparedDecision.inspected_evidence_refs, requiredRefs);
+    for (const frontendRef of frontendRefs) {
+      assert.equal(preparedDecision.evidence_refs.includes(frontendRef), true);
+      assert.equal(preparedDecision.frontend_evidence_refs.includes(frontendRef), true);
+      assert.equal(preparedDecision.ui_ux_analysis.frontend_evidence_refs.includes(frontendRef), true);
+    }
+    assert.deepEqual(summary.validation_preview.missing_frontend_evidence_refs, []);
+  });
+});
+
 test("live E2E step controller rejects inconsistent skill-agent continue decisions", () => {
   withTempRoot((reportsRoot) => {
     const controller = createLiveE2eStepController({
@@ -238,6 +384,75 @@ test("live E2E step controller rejects inconsistent skill-agent continue decisio
     assert.equal(entry.operator_decision_status, "rejected");
     assert.equal(entry.decision.action, "block");
     assert.equal(entry.final_step_verdict, "blocked");
+    assert.match(
+      entry.operator_decision_rejection_reason,
+      /semantic status 'not_pass'/,
+    );
+    assert.match(entry.decision.reason, /semantic status 'not_pass'/);
+    assert.match(entry.semantic_analysis.findings.join("\n"), /semantic status 'not_pass'/);
+  });
+});
+
+test("live E2E step controller does not require non-materialized source doc refs in operator decisions", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "11-discovery-run.json");
+    const analysisFile = path.join(reportsRoot, "discovery-research-report.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    fs.writeFileSync(analysisFile, "{}\n", "utf8");
+    const runId = "controller-doc-ref-filter";
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      mode: "auto",
+    });
+    controller.planCommand({ label: "discovery-run", commandSurface: "aor discovery run" });
+    writeSkillAgentDecision(reportsRoot, runId, 1, "discovery", {
+      nextStep: "spec",
+      inspectedEvidenceRefs: [transcriptFile, analysisFile],
+    });
+
+    const result = controller.observeStage({
+      stage: "discovery",
+      stageResult: {
+        stage: "discovery",
+        status: "pass",
+        evidence_refs: [analysisFile, "docs/contracts/discovery-research-report.md"],
+        summary: "Discovery passed.",
+      },
+      commandResults: [
+        {
+          label: "discovery-run",
+          command_surface: "aor discovery run",
+          status: "pass",
+          transcript_file: transcriptFile,
+          artifact_refs: [analysisFile, "docs/architecture/12-orchestrator-operating-model.md"],
+          exit_code: 0,
+        },
+      ],
+      artifacts: {},
+    });
+
+    assert.equal(result.action, "continue");
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.operator_decision_status, "accepted");
+    assert.equal(entry.inspected_evidence_refs.includes(analysisFile), true);
+    assert.equal(entry.inspected_evidence_refs.some((ref) => ref.startsWith("docs/")), false);
+    const request = JSON.parse(fs.readFileSync(entry.agent_decision_request_ref, "utf8"));
+    assert.equal(entry.artifact_refs.some((ref) => ref.startsWith("docs/")), false);
+    assert.equal(request.artifact_refs.some((ref) => ref.startsWith("docs/")), false);
+    assert.equal(
+      request.decision_rubric.required_evidence_refs.some((ref) => ref.startsWith("docs/")),
+      false,
+    );
   });
 });
 
@@ -357,9 +572,12 @@ test("live E2E step controller marks execution not_pass when post-run verificati
 
     const [entry] = controller.getStepJournal();
     assert.equal(entry.deterministic_analysis.status, "not_pass");
+    assert.equal(entry.deterministic_analysis.recommendation, "diagnose");
     assert.equal(entry.operator_decision_status, "missing");
     assert.equal(entry.final_step_verdict, "blocked");
     assert.match(entry.semantic_analysis.findings.join("\n"), /post-run verification reported 'fail'/);
+    const decisionRequest = JSON.parse(fs.readFileSync(entry.agent_decision_request_ref, "utf8"));
+    assert.equal(decisionRequest.deterministic_analysis.recommendation, "diagnose");
   });
 });
 
@@ -443,7 +661,8 @@ test("live E2E step controller rejects UI-capable decisions without frontend evi
 
     const [entry] = controller.getStepJournal();
     assert.equal(entry.operator_decision_status, "rejected");
-    assert.match(entry.semantic_analysis.findings.join("\n"), /Operator decision artifact was rejected/);
+    assert.match(entry.semantic_analysis.findings.join("\n"), /frontend evidence refs/);
+    assert.match(entry.operator_decision_rejection_reason, /frontend evidence refs/);
   });
 });
 
@@ -523,6 +742,72 @@ test("live E2E step controller preserves repeated execution and review iteration
     assert.equal(journal.every((entry) => fs.existsSync(entry.plan_ref)), true);
     assert.equal(journal.every((entry) => fs.existsSync(entry.inspection_ref)), true);
     assert.equal(journal.every((entry) => fs.existsSync(entry.classification_ref)), true);
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-repair-loop",
+      profile: { live_e2e: { flow_range_policy: "delivery_default" } },
+      mode: "auto",
+    });
+    assert.equal(resumed.shouldUseCachedCommand("review-run", 1), true);
+    assert.equal(resumed.shouldUseCachedCommand("run-start", 2), true);
+  });
+});
+
+test("live E2E auto resume reuses cached setup commands after persisted progress", () => {
+  withTempRoot((reportsRoot) => {
+    const setupTranscript = path.join(reportsRoot, "01-guided-doctor.json");
+    const discoveryTranscript = path.join(reportsRoot, "02-discovery-run.json");
+    fs.writeFileSync(setupTranscript, "{}\n", "utf8");
+    fs.writeFileSync(discoveryTranscript, "{}\n", "utf8");
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-setup-cache",
+      profile: { live_e2e: { flow_range_policy: "delivery_default" } },
+      mode: "auto",
+    });
+
+    writeSkillAgentDecision(reportsRoot, "controller-setup-cache", 1, "discovery", {
+      nextStep: "spec",
+      inspectedEvidenceRefs: [discoveryTranscript],
+    });
+    controller.observeStage({
+      stage: "discovery",
+      stageResult: {
+        stage: "discovery",
+        status: "pass",
+        evidence_refs: [discoveryTranscript],
+        summary: "Discovery passed.",
+      },
+      commandResults: [
+        {
+          label: "guided-doctor",
+          command_surface: "aor doctor",
+          status: "pass",
+          transcript_file: setupTranscript,
+          artifact_refs: [setupTranscript],
+          exit_code: 0,
+        },
+        {
+          label: "discovery-run",
+          command_surface: "aor discovery run",
+          status: "pass",
+          transcript_file: discoveryTranscript,
+          artifact_refs: [discoveryTranscript],
+          exit_code: 0,
+        },
+      ],
+      artifacts: {},
+    });
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-setup-cache",
+      profile: { live_e2e: { flow_range_policy: "delivery_default" } },
+      mode: "auto",
+    });
+    assert.equal(resumed.shouldUseCachedCommand("guided-doctor"), true);
+    assert.equal(resumed.getCachedCommandResult("guided-doctor").transcript_file, setupTranscript);
   });
 });
 
@@ -695,6 +980,399 @@ test("live E2E manual resume applies operator decision to observed repair iterat
     const [acceptedEntry] = second.getStepJournal();
     assert.equal(acceptedEntry.operator_decision_status, "accepted");
     assert.equal(acceptedEntry.deterministic_analysis.status, "pass");
+    assert.equal(acceptedEntry.decision.action, "continue");
+    assert.equal(acceptedEntry.decision.reason, "Skill-agent operator decision accepted.");
+  });
+});
+
+test("live E2E manual resume can replace a rejected operator decision", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "11-discovery-run.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    const runId = "controller-rejected-decision-resume";
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+      },
+    };
+    const first = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "manual",
+    });
+    first.planCommand({ label: "discovery-run", commandSurface: "aor discovery run" });
+    writeSkillAgentDecision(reportsRoot, runId, 1, "discovery", {
+      inspectedEvidenceRefs: [transcriptFile],
+      semanticStatus: "not_pass",
+      findings: ["Bad operator decision."],
+    });
+
+    assert.throws(
+      () =>
+        first.observeStage({
+          stage: "discovery",
+          stageResult: {
+            stage: "discovery",
+            status: "pass",
+            evidence_refs: [transcriptFile],
+            summary: "Discovery passed.",
+          },
+          commandResults: [
+            {
+              label: "discovery-run",
+              command_surface: "aor discovery run",
+              status: "pass",
+              transcript_file: transcriptFile,
+              artifact_refs: [transcriptFile],
+              exit_code: 0,
+            },
+          ],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "block");
+        return true;
+      },
+    );
+
+    const [rejectedEntry] = first.getStepJournal();
+    assert.equal(rejectedEntry.operator_decision_status, "rejected");
+    const decisionRequest = JSON.parse(fs.readFileSync(rejectedEntry.agent_decision_request_ref, "utf8"));
+    fs.writeFileSync(
+      decisionRequest.operator_decision_expected_ref,
+      `${JSON.stringify(
+        {
+          step_id: "discovery",
+          step_instance_id: "discovery",
+          iteration: 1,
+          status: "accepted",
+          operator_ref: "skill://live-e2e-runner",
+          action: "continue",
+          semantic_analysis: {
+            status: "pass",
+            judge_source: "skill-agent",
+            findings: [],
+          },
+          inspected_evidence_refs: decisionRequest.expected_response_shape.inspected_evidence_refs,
+          evidence_refs: decisionRequest.expected_response_shape.evidence_refs,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "manual",
+    });
+    assert.equal(resumed.shouldUseCachedCommand("discovery-run", 1), true);
+    assert.throws(
+      () =>
+        resumed.observeStage({
+          stage: "discovery",
+          stageResult: {
+            stage: "discovery",
+            status: "not_pass",
+            evidence_refs: [],
+            summary: "Recomputed evidence must not replace the persisted decision gate.",
+          },
+          commandResults: [{ label: "discovery-run", command_surface: "aor discovery run", status: "pass" }],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "continue");
+        return true;
+      },
+    );
+
+    const [acceptedEntry] = resumed.getStepJournal();
+    assert.equal(acceptedEntry.operator_decision_status, "accepted");
+    assert.equal(acceptedEntry.operator_decision_rejection_reason, undefined);
+    assert.equal(acceptedEntry.deterministic_analysis.status, "pass");
+    assert.equal(acceptedEntry.final_step_verdict, "pass");
+    assert.deepEqual(acceptedEntry.semantic_analysis.findings, []);
+  });
+});
+
+test("live E2E manual resume exposes persisted terminal decisions before provider execution", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "11-run-start.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    const runId = "controller-terminal-stop-resume";
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+      },
+    };
+    const first = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "manual",
+    });
+    first.planCommand({ label: "run-start", commandSurface: "aor run start" });
+    writeSkillAgentDecision(reportsRoot, runId, 1, "execution", {
+      action: "block",
+      semanticStatus: "blocked",
+      inspectedEvidenceRefs: [transcriptFile],
+      findings: ["Provider execution timed out."],
+    });
+
+    assert.throws(
+      () =>
+        first.observeStage({
+          stage: "execution",
+          stageResult: {
+            stage: "execution",
+            status: "fail",
+            evidence_refs: [transcriptFile],
+            summary: "Provider timed out.",
+          },
+          commandResults: [
+            {
+              label: "run-start",
+              command_surface: "aor run start",
+              status: "fail",
+              transcript_file: transcriptFile,
+              artifact_refs: [transcriptFile],
+              exit_code: 0,
+            },
+          ],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "block");
+        return true;
+      },
+    );
+    const [blockedEntry] = first.getStepJournal();
+    const persistedBlockedEntry = JSON.parse(fs.readFileSync(blockedEntry.observation_ref, "utf8"));
+    persistedBlockedEntry.semantic_analysis.findings.push(
+      "Skill-agent operator decisions must cite required inspected evidence refs: stale-ref.json.",
+    );
+    fs.writeFileSync(blockedEntry.observation_ref, `${JSON.stringify(persistedBlockedEntry, null, 2)}\n`, "utf8");
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "manual",
+    });
+    const stop = resumed.getPersistedControllerStop();
+    assert.equal(stop.action, "block");
+    assert.equal(stop.decision.action, "block");
+    const sanitizedFindings = resumed.getStepJournal()[0].semantic_analysis.findings;
+    assert.equal(sanitizedFindings.includes("Provider execution timed out."), true);
+    assert.equal(sanitizedFindings.some((finding) => finding.includes("required inspected evidence refs")), false);
+    assert.equal(resumed.shouldUseCachedCommand("run-start", 1), true);
+    assert.equal(resumed.getCachedCommandResult("run-start", 1).transcript_file, transcriptFile);
+  });
+});
+
+test("live E2E manual resume validates against the persisted decision request", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "11-spec-build.json");
+    const firstArtifact = path.join(reportsRoot, "step-result-spec-attempt-1.json");
+    const laterArtifact = path.join(reportsRoot, "step-result-spec-attempt-2.json");
+    for (const file of [transcriptFile, firstArtifact, laterArtifact]) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+    const runId = "controller-stable-decision-request";
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+      },
+    };
+    const first = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "manual",
+    });
+    first.planCommand({ label: "spec-build", commandSurface: "aor spec build" });
+    assert.throws(
+      () =>
+        first.observeStage({
+          stage: "spec",
+          stageResult: {
+            stage: "spec",
+            status: "pass",
+            evidence_refs: [firstArtifact],
+            summary: "Spec passed.",
+          },
+          commandResults: [
+            {
+              label: "spec-build",
+              command_surface: "aor spec build",
+              status: "pass",
+              transcript_file: transcriptFile,
+              artifact_refs: [firstArtifact],
+              exit_code: 0,
+            },
+          ],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        return true;
+      },
+    );
+
+    const [pendingEntry] = first.getStepJournal();
+    const decisionRequest = JSON.parse(fs.readFileSync(pendingEntry.agent_decision_request_ref, "utf8"));
+    const mutatedEntry = {
+      ...pendingEntry,
+      artifact_refs: [...pendingEntry.artifact_refs, laterArtifact],
+    };
+    fs.writeFileSync(pendingEntry.observation_ref, `${JSON.stringify(mutatedEntry, null, 2)}\n`, "utf8");
+    fs.writeFileSync(
+      decisionRequest.operator_decision_expected_ref,
+      `${JSON.stringify(
+        {
+          step_id: "spec",
+          step_instance_id: "spec",
+          iteration: 1,
+          status: "accepted",
+          operator_ref: "skill://live-e2e-runner",
+          action: "continue",
+          semantic_analysis: {
+            status: "pass",
+            judge_source: "skill-agent",
+            findings: [],
+          },
+          inspected_evidence_refs: decisionRequest.expected_response_shape.inspected_evidence_refs,
+          evidence_refs: decisionRequest.expected_response_shape.evidence_refs,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "manual",
+    });
+    assert.throws(
+      () =>
+        resumed.observeStage({
+          stage: "spec",
+          stageResult: {
+            stage: "spec",
+            status: "not_pass",
+            evidence_refs: [laterArtifact],
+            summary: "Later diagnostic should not move the decision target.",
+          },
+          commandResults: [{ label: "spec-build", command_surface: "aor spec build", status: "pass" }],
+          artifacts: {},
+        }),
+      (error) => {
+        assert.equal(isLiveE2eControllerStop(error), true);
+        assert.equal(error.decision.action, "continue");
+        return true;
+      },
+    );
+
+    const [acceptedEntry] = resumed.getStepJournal();
+    assert.equal(acceptedEntry.operator_decision_status, "accepted");
+    assert.equal(acceptedEntry.inspected_evidence_refs.includes(firstArtifact), true);
+    assert.equal(acceptedEntry.inspected_evidence_refs.includes(laterArtifact), false);
+  });
+});
+
+test("live E2E resume can apply pending decisions before commands run", () => {
+  withTempRoot((reportsRoot) => {
+    const transcriptFile = path.join(reportsRoot, "11-spec-build.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    const runId = "controller-pre-command-decision";
+    const profile = {
+      live_e2e: {
+        flow_range_policy: "delivery_default",
+        operator_mode: "skill-agent",
+        agent_decision_policy: "required",
+        interaction_answer_policy: "agent-required",
+      },
+    };
+    const first = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "manual",
+    });
+    first.planCommand({ label: "spec-build", commandSurface: "aor spec build" });
+    assert.throws(() =>
+      first.observeStage({
+        stage: "spec",
+        stageResult: { stage: "spec", status: "pass", evidence_refs: [transcriptFile], summary: "Spec passed." },
+        commandResults: [
+          {
+            label: "spec-build",
+            command_surface: "aor spec build",
+            status: "pass",
+            transcript_file: transcriptFile,
+            artifact_refs: [transcriptFile],
+            exit_code: 0,
+          },
+        ],
+        artifacts: {},
+      }),
+    );
+
+    const [pendingEntry] = first.getStepJournal();
+    const decisionRequest = JSON.parse(fs.readFileSync(pendingEntry.agent_decision_request_ref, "utf8"));
+    fs.writeFileSync(
+      decisionRequest.operator_decision_expected_ref,
+      `${JSON.stringify(
+        {
+          step_id: "spec",
+          step_instance_id: "spec",
+          iteration: 1,
+          status: "accepted",
+          operator_ref: "skill://live-e2e-runner",
+          action: "continue",
+          semantic_analysis: {
+            status: "pass",
+            judge_source: "skill-agent",
+            findings: [],
+          },
+          inspected_evidence_refs: decisionRequest.expected_response_shape.inspected_evidence_refs,
+          evidence_refs: decisionRequest.expected_response_shape.evidence_refs,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const resumed = createLiveE2eStepController({
+      reportsRoot,
+      runId,
+      profile,
+      mode: "auto",
+    });
+    const applied = resumed.applyPendingOperatorDecision();
+    assert.equal(applied.applied, true);
+    assert.equal(applied.action, "continue");
+    const [acceptedEntry] = resumed.getStepJournal();
+    assert.equal(acceptedEntry.operator_decision_status, "accepted");
     assert.equal(acceptedEntry.decision.action, "continue");
   });
 });

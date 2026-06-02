@@ -8,6 +8,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Inspect installed-user environment and repository readiness without mutating runtime state.",
     inputs: [
       "--project-ref <path> (optional, defaults to cwd)",
+      "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--json (optional)",
       "--help",
@@ -87,6 +88,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Launch the optional local web console while keeping headless CLI/API operation valid.",
     inputs: [
       "--project-ref <path> (optional, defaults to cwd)",
+      "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--host <host> (optional, default 127.0.0.1)",
       "--port <number> (optional, default 0)",
@@ -98,6 +100,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     outputs: [
       "resolved_project_ref",
       "resolved_runtime_root",
+      "project_profile_ref",
       "guided_command",
       "guided_stage",
       "guided_status",
@@ -176,6 +179,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--request-file <path> (optional)",
       "--source-kind <local-issue|local-prd|local-rfc|local-note|local-mail> (optional)",
       "--source-ref <path|ref> (optional)",
+      "--follow-up-source-handoff-ref <ref> (optional)",
       "--json (optional)",
       "--help",
     ],
@@ -192,6 +196,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "product_intake_completeness",
       "product_intake_source_refs",
       "delivery_mode",
+      "follow_up_source_handoff_ref",
       "guided_command",
       "guided_stage",
       "guided_status",
@@ -1031,6 +1036,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
       "--stage <stage>",
       "--intent <analyze|explain|revise-document|create-document|repair|validate|plan|implement|review>",
       "--request <text>",
+      "--target-flow-id <flow_id> (optional)",
       "--target-ref <ref[,ref...]> (optional, repeatable)",
       "--allowed-path <glob[,glob...]> (optional, repeatable)",
       "--delivery-mode <no-write|patch-only|local-branch|fork-first-pr> (optional, defaults to no-write)",

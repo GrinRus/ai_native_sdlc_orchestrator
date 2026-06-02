@@ -71,7 +71,11 @@ function asRecord(value) {
  * @returns {string}
  */
 function toProjectRelativePath(projectRoot, filePath) {
-  return path.relative(projectRoot, filePath).replace(/\\/g, "/") || ".";
+  const relative = path.relative(projectRoot, filePath).replace(/\\/g, "/");
+  if (relative && !relative.startsWith("../") && !path.isAbsolute(relative)) {
+    return relative;
+  }
+  return filePath;
 }
 
 /**

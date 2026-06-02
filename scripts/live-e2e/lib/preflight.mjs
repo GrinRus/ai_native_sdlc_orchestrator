@@ -4,7 +4,10 @@ import process from "node:process";
 
 import {
   classifyExternalRunnerFailure,
+  resolveExternalRuntimeEnvironment,
+  resolveExternalRuntimeNativeTimeoutArgs,
   runExternalRuntimeProcessSync,
+  resolveExternalRuntimeExecutionRoot,
   resolveExternalRuntimePermissionPolicy,
 } from "../../../packages/adapter-sdk/src/index.mjs";
 import { loadContractFile } from "../../../packages/contracts/src/index.mjs";
@@ -13,7 +16,6 @@ import {
   asNonEmptyString,
   asPositiveInteger,
   asRecord,
-  asStringMap,
   fileExists,
   normalizeId,
   nowIso,
@@ -211,11 +213,11 @@ export function runLiveAdapterPreflight(options) {
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
   const probeTimeoutMs = asPositiveInteger(externalRuntime.preflight_timeout_ms, Math.min(timeoutMs, 120000));
   const requestTransport = resolvePreflightRequestTransport(externalRuntime);
-  const envOverrides = asStringMap(externalRuntime.env);
-  const runnerEnv = {
-    ...options.env,
-    ...envOverrides,
-  };
+  const runtimeEnvironment = resolveExternalRuntimeEnvironment({
+    externalRuntime,
+    baseEnv: options.env,
+  });
+  const runnerEnv = runtimeEnvironment.env;
   const requestedPermissionMode =
     asNonEmptyString(runnerEnv.AOR_RUNTIME_AGENT_PERMISSION_MODE) || options.runtimeAgentPermissionMode;
   const runtimeInvocation = resolveExternalRuntimePermissionPolicy({
@@ -234,6 +236,12 @@ export function runLiveAdapterPreflight(options) {
       request_transport: requestTransport,
       permission_mode: runtimeInvocation.permissionMode,
       permission_mode_source: runtimeInvocation.source,
+      env_from_applied: runtimeEnvironment.applied,
+      env_from_missing: runtimeEnvironment.missing,
+      native_timeout_args: resolveExternalRuntimeNativeTimeoutArgs({
+        externalRuntime,
+        timeoutMs: probeTimeoutMs,
+      }),
     },
   };
 
@@ -280,7 +288,27 @@ export function runLiveAdapterPreflight(options) {
     );
   }
 
-  const resolvedCommand = resolveCommandForPreflight(runtimeCommand, runnerEnv, options.targetCheckoutRoot);
+  let executionRootBinding;
+  try {
+    executionRootBinding = resolveExternalRuntimeExecutionRoot({
+      externalRuntime,
+      executionRoot: options.targetCheckoutRoot,
+    });
+  } catch (error) {
+    return fail(
+      "execution-root-alias-failed",
+      `Adapter '${adapterId}' live runtime could not prepare its execution root: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      runtimeReport,
+    );
+  }
+
+  runtimeReport.external_runtime.execution_root = executionRootBinding.executionRoot;
+  runtimeReport.external_runtime.execution_root_mode = executionRootBinding.mode;
+  runtimeReport.external_runtime.canonical_execution_root = executionRootBinding.canonicalExecutionRoot;
+
+  const resolvedCommand = resolveCommandForPreflight(runtimeCommand, runnerEnv, executionRootBinding.executionRoot);
   if (!resolvedCommand) {
     return fail(
       "missing-command",
@@ -290,7 +318,7 @@ export function runLiveAdapterPreflight(options) {
   }
 
   const permissionProbeRoot = path.join(
-    options.targetCheckoutRoot,
+    executionRootBinding.executionRoot,
     ".aor",
     "live-e2e-preflight",
     normalizeId(options.runId),
@@ -317,7 +345,13 @@ export function runLiveAdapterPreflight(options) {
   })}\n`;
   const runProbeAttempt = (kind, attempt, objective, extraRequest = {}) => {
     const probeInput = buildProbeInput(kind, objective, extraRequest);
-    let probeArgs = [...runtimeInvocation.args];
+    let probeArgs = [
+      ...runtimeInvocation.args,
+      ...resolveExternalRuntimeNativeTimeoutArgs({
+        externalRuntime,
+        timeoutMs: probeTimeoutMs,
+      }),
+    ];
     let probeStdin = undefined;
     if (requestTransport === "stdin-json") {
       probeStdin = probeInput;
@@ -336,7 +370,7 @@ export function runLiveAdapterPreflight(options) {
     const probe = runExternalRuntimeProcessSync({
       command: resolvedCommand,
       args: probeArgs,
-      cwd: options.targetCheckoutRoot,
+      cwd: executionRootBinding.executionRoot,
       env: runnerEnv,
       input: probeStdin,
       timeout: probeTimeoutMs,

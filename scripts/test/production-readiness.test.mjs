@@ -72,6 +72,11 @@ test("control-plane OpenAPI documents typed local-alpha read and mutation payloa
 
   const responseRefs = {
     projectState: openApi.paths["/api/projects/{projectId}/state"].get.responses["200"].$ref,
+    flows: openApi.paths["/api/projects/{projectId}/flows"].get.responses["200"].$ref,
+    selectedFlow: openApi.paths["/api/projects/{projectId}/flows/selected"].get.responses["200"].$ref,
+    flowDetail: openApi.paths["/api/projects/{projectId}/flows/{flowId}"].get.responses["200"].$ref,
+    flowEvidenceGraph: openApi.paths["/api/projects/{projectId}/flows/{flowId}/evidence-graph"].get.responses["200"].$ref,
+    flowRuntimeTrace: openApi.paths["/api/projects/{projectId}/flows/{flowId}/runtime-trace"].get.responses["200"].$ref,
     runs: openApi.paths["/api/projects/{projectId}/runs"].get.responses["200"].$ref,
     eventHistory: openApi.paths["/api/projects/{projectId}/runs/{runId}/events/history"].get.responses["200"].$ref,
     runControl: openApi.paths["/api/projects/{projectId}/run-control/actions"].post.responses["200"].$ref,
@@ -85,6 +90,11 @@ test("control-plane OpenAPI documents typed local-alpha read and mutation payloa
 
   assert.deepEqual(responseRefs, {
     projectState: "#/components/responses/ProjectState",
+    flows: "#/components/responses/FlowList",
+    selectedFlow: "#/components/responses/FlowDetail",
+    flowDetail: "#/components/responses/FlowDetail",
+    flowEvidenceGraph: "#/components/responses/FlowEvidenceGraph",
+    flowRuntimeTrace: "#/components/responses/FlowRuntimeTrace",
     runs: "#/components/responses/Runs",
     eventHistory: "#/components/responses/RunEventHistory",
     runControl: "#/components/responses/RunControlAction",
@@ -103,6 +113,8 @@ test("control-plane OpenAPI documents typed local-alpha read and mutation payloa
 
   for (const responseName of [
     "ProjectState",
+    "FlowList",
+    "FlowDetail",
     "Runs",
     "RunEventHistory",
     "RunControlAction",
@@ -127,6 +139,8 @@ test("control-plane OpenAPI documents typed local-alpha read and mutation payloa
 
   for (const schemaName of [
     "ProjectStateResponse",
+    "FlowListResponse",
+    "FlowProjection",
     "RunsResponse",
     "RunSummary",
     "RunEventHistoryResponse",
@@ -159,6 +173,9 @@ test("control-plane OpenAPI documents bounded read-model limit parameters", () =
     "/api/projects/{projectId}/strategic-snapshot",
     "/api/projects/{projectId}/planner-metrics",
     "/api/projects/{projectId}/finance-monitoring",
+    "/api/projects/{projectId}/flows",
+    "/api/projects/{projectId}/flows/{flowId}/evidence-graph",
+    "/api/projects/{projectId}/flows/{flowId}/runtime-trace",
     "/api/projects/{projectId}/multirepo-coordination",
     "/api/projects/{projectId}/compiler-revisions",
     "/api/projects/{projectId}/runs",
