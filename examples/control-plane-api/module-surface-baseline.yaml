@@ -14,6 +14,8 @@ openapi_contract:
     query_parameter: limit
   typed_payload_schemas:
     - ProjectStateResponse
+    - ArtifactDisplaySummary
+    - ExecutionEvidenceSummary
     - FlowListResponse
     - FlowDetailResponse
     - RunsResponse
@@ -161,6 +163,7 @@ flow_projection_contract:
     - intake_body_ref
     - latest_next_action_report_ref
     - evidence_refs
+    - artifact_display_summaries
     - writeback_policy
     - mission_settings
     - closure_state
@@ -526,3 +529,61 @@ production_hardening:
       - live-run-event JSONL payloads
       - run-control audit records
     replacement: "[REDACTED]"
+
+artifact_display_summary_contract:
+  owning_slice: W35-S02
+  status: implemented-read-baseline
+  source_of_truth:
+    contract: docs/contracts/control-plane-api.md
+    openapi: docs/contracts/control-plane-api.openapi.json
+  read_payload_fields:
+    - ProjectStateResponse.artifact_display_summaries
+    - RunSummary.artifact_display_summaries
+    - FlowProjection.artifact_display_summaries
+    - artifact_entry.display_summary
+  required_summary_fields:
+    - type
+    - stage
+    - label
+    - status
+    - severity
+    - description
+    - raw_ref
+    - actions
+  debug_boundary:
+    raw_ref_primary_ui: false
+    copy_raw_ref_action: required
+    missing_refs_render_as: status=missing
+
+execution_evidence_summary_contract:
+  owning_slice: W35-S04
+  status: implemented-read-baseline
+  source_of_truth:
+    contract: docs/contracts/control-plane-api.md
+    openapi: docs/contracts/control-plane-api.openapi.json
+    product: docs/product/03-flow-centric-console-design.md
+    runbook: docs/ops/live-e2e-standard-runner.md
+  read_payload_fields:
+    - RunSummary.execution_evidence
+  status_fields:
+    - provider_execution_status
+    - runtime_harness_decision
+    - real_code_change_status
+    - post_run_verification_status
+    - review_status
+    - delivery_readiness_status
+    - no_upstream_write_status
+  changed_path_groups:
+    - mission-relevant
+    - runtime-owned
+    - runner-owned-leak
+    - scratch-unrelated
+  public_action_surfaces:
+    - aor run cancel
+    - aor run status --json
+    - manual-live-e2e --prepare-decision --action diagnose
+    - manual-live-e2e --prepare-decision --action retry_public_step
+  interruption_semantics:
+    stop_status: operator-stopped
+    provider_step_status: interrupted
+    pass_on_interruption: false

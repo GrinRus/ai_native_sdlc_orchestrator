@@ -270,6 +270,7 @@ export function handleRunControlCommand(context) {
           promotionEvidenceRefs,
           routeOverrides,
           policyOverrides,
+          providerStepStatusStateFile: controlResult.stateFile,
         });
       } catch (error) {
         const message = errorMessage(error);

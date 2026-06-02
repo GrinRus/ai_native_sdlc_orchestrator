@@ -21,6 +21,7 @@ import { readProjectState } from "../read-surface.mjs";
  * @param {{
  *   cwd?: string,
  *   projectRef: string,
+ *   projectProfile?: string,
  *   runtimeRoot?: string,
  *   host?: string,
  *   port?: number,
@@ -48,10 +49,12 @@ export function createControlPlaneHttpServer(options) {
   const runtimeOptions = {
     cwd: options.cwd,
     projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
     runtimeRoot: options.runtimeRoot,
   };
   const state = readProjectState(runtimeOptions);
   const projectId = state.project_id;
+  const projectProfileRef = state.project_profile_ref;
   const appStaticRoot = asString(options.app?.staticRoot);
   const appIndexFile = appStaticRoot ? path.join(appStaticRoot, "index.html") : null;
   if (appStaticRoot && !fs.existsSync(appIndexFile ?? "")) {
@@ -198,6 +201,7 @@ export function createControlPlaneHttpServer(options) {
         port: resolvedPort,
         baseUrl,
         projectId,
+        projectProfileRef,
         async close() {
           if (!server.listening) {
             return;
@@ -263,6 +267,7 @@ function serveAppRoute(options) {
           app: "aor-operator-console",
           version: options.packageVersion,
           project_id: options.projectState.project_id,
+          project_profile_ref: options.projectState.project_profile_ref,
           project_ref: options.projectState.project_root,
           runtime_root: options.projectState.runtime_root,
           api_base_url: options.baseUrl,

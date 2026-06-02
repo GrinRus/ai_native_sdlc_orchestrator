@@ -91,7 +91,7 @@ function parseHost(value) {
   return host;
 }
 
-const APP_FLAGS = new Set(["project-ref", "runtime-root", "host", "port", "open", "json", "smoke"]);
+const APP_FLAGS = new Set(["project-ref", "project-profile", "runtime-root", "host", "port", "open", "json", "smoke"]);
 
 /**
  * @param {string[]} args
@@ -258,6 +258,7 @@ export async function runAppCommand(args, options = {}) {
     const flags = parseAppFlags(args);
     const cwd = options.cwd ?? process.cwd();
     const projectRef = path.resolve(cwd, optionalString(flags, "project-ref") ?? ".");
+    const projectProfile = optionalString(flags, "project-profile");
     if (!fs.existsSync(projectRef) || !fs.statSync(projectRef).isDirectory()) {
       throw new Error(`Project path '${projectRef}' does not exist or is not a directory.`);
     }
@@ -275,6 +276,7 @@ export async function runAppCommand(args, options = {}) {
     const transport = await createControlPlaneHttpServer({
       cwd,
       projectRef,
+      projectProfile,
       runtimeRoot: runtimeRootInput,
       host,
       port,
@@ -286,6 +288,7 @@ export async function runAppCommand(args, options = {}) {
     attachUiLifecycle({
       cwd,
       projectRef,
+      projectProfile,
       runtimeRoot: runtimeRootInput,
       controlPlane: transport.baseUrl,
     });
@@ -307,6 +310,7 @@ export async function runAppCommand(args, options = {}) {
       app_url: appUrl,
       control_plane: transport.baseUrl,
       project_id: transport.projectId,
+      project_profile_ref: transport.projectProfileRef,
       project_ref: projectRef,
       runtime_root: runtimeRootInput ? path.resolve(cwd, runtimeRootInput) : path.join(projectRef, ".aor"),
       host: transport.host,
@@ -328,7 +332,9 @@ export async function runAppCommand(args, options = {}) {
         flow_selector_loaded: packagedSpa.flowSelectorLoaded,
         new_flow_action_loaded: packagedSpa.newFlowActionLoaded,
         config_project_id: config.project_id,
+        config_project_profile_ref: config.project_profile_ref,
         state_project_id: state.project_id,
+        state_project_profile_ref: state.project_profile_ref,
       };
       stdout.write(`${formatJson(smokeSummary, jsonMode === "compact" ? "compact" : "full")}\n`);
       return 0;

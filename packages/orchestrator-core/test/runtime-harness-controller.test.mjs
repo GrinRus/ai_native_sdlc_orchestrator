@@ -120,6 +120,7 @@ test("run-level Runtime Harness controller blocks interactive continuation evide
     assert.equal(result.stepResult.failure_class, "interactive-question-requested");
     assert.equal(result.runController.runDecision.terminal_status, "blocked");
     assert.equal(result.runController.runDecision.overall_decision, "block");
+    assert.equal(result.runtimeHarness.report.overall_decision, "block");
     assert.equal(result.runtimeHarness.report.run_controller.status, "blocked");
     assert.equal(result.runtimeHarness.report.run_transitions.at(-1).stage, "block");
   });
@@ -206,6 +207,7 @@ test("run-level Runtime Harness controller records exhausted-repair ownership", 
     assert.equal(result.stepResult.repair_status, "exhausted");
     assert.equal(result.runController.runDecision.terminal_status, "blocked");
     assert.equal(result.runController.runDecision.overall_decision, "block");
+    assert.equal(result.runtimeHarness.report.overall_decision, "block");
     assert.equal(result.runtimeHarness.report.run_decision.repair_status, "exhausted");
     assert.equal(result.runtimeHarness.report.run_transitions.some((transition) => transition.stage === "repair"), true);
   });

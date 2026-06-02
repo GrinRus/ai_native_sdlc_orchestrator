@@ -7,6 +7,7 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 import {
   filterMeaningfulCodeChangedPaths,
   filterNonBootstrapChangedPaths,
+  filterRunnerOwnedStatePaths,
   listChangedPaths,
   loadMissionScope,
   resolveMissionScopedChanges,
@@ -403,7 +404,7 @@ function runtimePermissionDecisionOutcome(stepResult) {
 
 /**
  * @param {Record<string, unknown>} stepResult
- * @param {{ gitStatusAvailable?: boolean, strictCodeChangingNoop?: boolean, nonBootstrapChangedPaths?: string[], meaningfulChangedPaths?: string[] }} [options]
+ * @param {{ gitStatusAvailable?: boolean, strictCodeChangingNoop?: boolean, nonBootstrapChangedPaths?: string[], meaningfulChangedPaths?: string[], runnerOwnedStatePaths?: string[] }} [options]
  * @returns {{ failureClass: string, decision: "pass" | "retry" | "repair" | "escalate" | "block" | "fail", missionOutcome: string }}
  */
 export function classifyRuntimeStepOutcome(stepResult, options = {}) {
@@ -418,9 +419,14 @@ export function classifyRuntimeStepOutcome(stepResult, options = {}) {
   const existingOutcome = asString(stepResult.mission_outcome);
   const stepClass = asString(stepResult.step_class);
   const executionMode = asString(routedExecution.mode);
+  const stepMissionSemantics = asRecord(stepResult.mission_semantics);
+  const stepRunnerOwnedStatePaths = asStringArray(stepMissionSemantics.runner_owned_state_paths);
   const meaningfulChangedPaths = Array.isArray(options.meaningfulChangedPaths)
     ? options.meaningfulChangedPaths
     : options.nonBootstrapChangedPaths;
+  const runnerOwnedStatePaths = Array.isArray(options.runnerOwnedStatePaths)
+    ? options.runnerOwnedStatePaths
+    : stepRunnerOwnedStatePaths;
   const runtimePermissionOutcome = runtimePermissionDecisionOutcome(stepResult);
 
   if (runtimePermissionOutcome) {
@@ -432,6 +438,15 @@ export function classifyRuntimeStepOutcome(stepResult, options = {}) {
   }
   if (permissionFailureKind === "edit-denied") {
     return { failureClass: "edit-denied", decision: "repair", missionOutcome: "not_satisfied" };
+  }
+
+  if (
+    stepClass === "runner" &&
+    executionMode === "execute" &&
+    options.gitStatusAvailable !== false &&
+    runnerOwnedStatePaths.length > 0
+  ) {
+    return { failureClass: "runner-owned-state-leak", decision: "block", missionOutcome: "not_satisfied" };
   }
 
   if (
@@ -586,7 +601,7 @@ export function synthesizeRepairAttempts(stepResult, classification, artifactRef
 /**
  * @param {Record<string, unknown>} stepResult
  * @param {string} artifactRef
- * @param {{ gitStatusAvailable: boolean, changedPaths: string[], nonBootstrapChangedPaths: string[], meaningfulChangedPaths: string[], nonInputChangedPaths: string[], ignoredInputFiles: string[], strictCodeChangingNoop: boolean }} missionSemantics
+ * @param {{ gitStatusAvailable: boolean, changedPaths: string[], nonBootstrapChangedPaths: string[], meaningfulChangedPaths: string[], nonInputChangedPaths: string[], runnerOwnedStatePaths?: string[], ignoredInputFiles: string[], strictCodeChangingNoop: boolean }} missionSemantics
  */
 function buildStepDecision(stepResult, artifactRef, missionSemantics) {
   const routedExecution = asRecord(stepResult.routed_execution);
@@ -597,6 +612,7 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
     strictCodeChangingNoop: missionSemantics.strictCodeChangingNoop,
     nonBootstrapChangedPaths: missionSemantics.nonBootstrapChangedPaths,
     meaningfulChangedPaths: missionSemantics.meaningfulChangedPaths,
+    runnerOwnedStatePaths: missionSemantics.runnerOwnedStatePaths,
   });
   const startedAt = asString(routedExecution.started_at);
   const finishedAt = asString(routedExecution.finished_at);
@@ -622,6 +638,7 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
       non_bootstrap_changed_paths: missionSemantics.nonBootstrapChangedPaths,
       non_input_changed_paths: missionSemantics.nonInputChangedPaths,
       meaningful_changed_paths: missionSemantics.meaningfulChangedPaths,
+      runner_owned_state_paths: asStringArray(missionSemantics.runnerOwnedStatePaths),
       ignored_input_files: missionSemantics.ignoredInputFiles,
       strict_code_changing_noop: missionSemantics.strictCodeChangingNoop,
     },
@@ -853,9 +870,14 @@ function loadRunDeliveryArtifacts(options) {
 /**
  * @param {Array<{ severity: string }>} findings
  * @param {Array<Record<string, unknown>>} stepDecisions
+ * @param {Record<string, unknown>} [runDecision]
  * @returns {"pass" | "retry" | "repair" | "escalate" | "block" | "fail"}
  */
-function resolveOverallDecision(findings, stepDecisions) {
+function resolveOverallDecision(findings, stepDecisions, runDecision = {}) {
+  const controllerDecision = asString(runDecision.overall_decision);
+  if (controllerDecision && RUNTIME_HARNESS_DECISIONS.has(controllerDecision)) {
+    return /** @type {"pass" | "retry" | "repair" | "escalate" | "block" | "fail"} */ (controllerDecision);
+  }
   if (findings.some((finding) => finding.severity === "fail")) return "fail";
   const decisions = stepDecisions.map((decision) => asString(decision.runtime_harness_decision));
   if (decisions.includes("fail")) return "fail";
@@ -1015,6 +1037,7 @@ export function materializeRuntimeHarnessReport(options) {
   const strictnessProfile = options.strictnessProfile ?? missionProfile.strictnessProfile;
   const changedPathStatus = listChangedPaths(init.projectRoot);
   const nonBootstrapChangedPaths = filterNonBootstrapChangedPaths(changedPathStatus.changedPaths);
+  const runnerOwnedStatePaths = filterRunnerOwnedStatePaths(changedPathStatus.changedPaths);
   const missionScope = loadMissionScope(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const missionScopedChanges = resolveMissionScopedChanges(nonBootstrapChangedPaths, missionScope);
   const strictCodeChangingNoop = missionType === "code-changing" || missionType === "release";
@@ -1024,6 +1047,7 @@ export function materializeRuntimeHarnessReport(options) {
     nonBootstrapChangedPaths,
     nonInputChangedPaths: missionScopedChanges.nonInputChangedPaths,
     meaningfulChangedPaths: missionScopedChanges.meaningfulChangedPaths,
+    runnerOwnedStatePaths,
     ignoredInputFiles: missionScopedChanges.ignoredInputFiles,
     strictCodeChangingNoop,
   };
@@ -1057,6 +1081,7 @@ export function materializeRuntimeHarnessReport(options) {
         strictCodeChangingNoop: missionSemantics.strictCodeChangingNoop,
         nonBootstrapChangedPaths: missionSemantics.nonBootstrapChangedPaths,
         meaningfulChangedPaths: missionSemantics.meaningfulChangedPaths,
+        runnerOwnedStatePaths: missionSemantics.runnerOwnedStatePaths,
       }).decision === "pass"
         ? []
         : extractImpactedAssetRefs(artifact.document),
@@ -1097,6 +1122,14 @@ export function materializeRuntimeHarnessReport(options) {
     ? previousReport.run_transitions
     : null;
   const previousRunDecision = asRecord(previousReport?.run_decision);
+  const activeRunDecision =
+    options.runDecision && Object.keys(asRecord(options.runDecision)).length > 0
+      ? asRecord(options.runDecision)
+      : previousRunDecision;
+  const activeRunController =
+    options.runController && Object.keys(asRecord(options.runController)).length > 0
+      ? asRecord(options.runController)
+      : previousRunController;
 
   const report = {
     report_id: `${options.runId}.runtime-harness-report.v1`,
@@ -1105,7 +1138,7 @@ export function materializeRuntimeHarnessReport(options) {
     generated_at: new Date().toISOString(),
     mission_type: missionType,
     strictness_profile: strictnessProfile,
-    overall_decision: resolveOverallDecision(runFindings, stepDecisions),
+    overall_decision: resolveOverallDecision(runFindings, stepDecisions, activeRunDecision),
     step_decisions: stepDecisions,
     runtime_permission_summary: runtimePermissionSummary,
     runtime_permission_decisions: runtimePermissionDecisions,
@@ -1116,20 +1149,16 @@ export function materializeRuntimeHarnessReport(options) {
     unresolved_gaps: unresolvedGaps,
     evidence_refs: evidenceRefs,
   };
-  if (options.runController && Object.keys(asRecord(options.runController)).length > 0) {
-    report.run_controller = cloneJson(options.runController);
-  } else if (Object.keys(previousRunController).length > 0) {
-    report.run_controller = cloneJson(previousRunController);
+  if (Object.keys(activeRunController).length > 0) {
+    report.run_controller = cloneJson(activeRunController);
   }
   if (Array.isArray(options.runTransitions)) {
     report.run_transitions = cloneJson(options.runTransitions);
   } else if (previousRunTransitions) {
     report.run_transitions = cloneJson(previousRunTransitions);
   }
-  if (options.runDecision && Object.keys(asRecord(options.runDecision)).length > 0) {
-    report.run_decision = cloneJson(options.runDecision);
-  } else if (Object.keys(previousRunDecision).length > 0) {
-    report.run_decision = cloneJson(previousRunDecision);
+  if (Object.keys(activeRunDecision).length > 0) {
+    report.run_decision = cloneJson(activeRunDecision);
   }
 
   const validation = validateContractDocument({

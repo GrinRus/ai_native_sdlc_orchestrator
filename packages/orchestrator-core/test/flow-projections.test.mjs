@@ -200,7 +200,8 @@ test("flow projections keep completed evidence read-only while new flow selectio
     const activeNext = resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
     assert.equal(fs.existsSync(activeNext.nextActionReportArchiveFile), true);
 
-    writeCompletedClosure(init, "run.checkout-risk");
+    const proofRunId = "live-e2e-proof";
+    writeCompletedClosure(init, proofRunId);
     const completedNext = resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });
     assert.match(completedNext.nextActionReportArchiveFile, /next-action-report-checkout-risk\.json$/u);
 
@@ -213,9 +214,9 @@ test("flow projections keep completed evidence read-only while new flow selectio
     assert.equal(completedFlow.completed_read_only, true);
     assert.equal(completedFlow.closure_state.completed, true);
     assert.equal(completedFlow.closure_state.follow_up_eligible, true);
-    assert.ok(completedFlow.evidence_refs.some((ref) => ref.includes("learning-loop-handoff-run.checkout-risk")));
+    assert.ok(completedFlow.evidence_refs.some((ref) => ref.includes(`learning-loop-handoff-${proofRunId}`)));
     const sourceHandoffRef = completedFlow.closure_state.recommended_follow_up_source_handoff_ref;
-    assert.ok(sourceHandoffRef.includes("learning-loop-handoff-run.checkout-risk"));
+    assert.ok(sourceHandoffRef.includes(`learning-loop-handoff-${proofRunId}`));
 
     writeMission(init, "follow-up-risk", "no-write", { followUpSourceHandoffRef: sourceHandoffRef });
     const followUpNext = resolveNextAction({ cwd: repoRoot, projectRef: repoRoot });

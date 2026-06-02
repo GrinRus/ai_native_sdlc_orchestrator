@@ -12,6 +12,44 @@
     "quality_refs": [
       "evidence://.aor/projects/aor-core/reports/validation-report-runtime.json",
       "evidence://.aor/projects/aor-core/reports/evaluation-report-runtime.json"
+    ],
+    "artifact_display_summaries": [
+      {
+        "type": "routed-step-result",
+        "stage": "execution",
+        "label": "Routed Implement Step Result",
+        "status": "pass",
+        "severity": "success",
+        "description": "Routed implementation step result for the run.",
+        "timestamp": null,
+        "source_ref": "evidence://.aor/projects/aor-core/reports/step-result-routed-implement.json",
+        "raw_ref": "evidence://.aor/projects/aor-core/reports/step-result-routed-implement.json",
+        "actions": [
+          {
+            "action_id": "copy_raw_ref",
+            "label": "Copy raw ref",
+            "kind": "debug"
+          }
+        ]
+      },
+      {
+        "type": "delivery-manifest",
+        "stage": "delivery",
+        "label": "Patch-only Delivery Manifest",
+        "status": "submitted",
+        "severity": "success",
+        "description": "Delivery manifest summary for the run.",
+        "timestamp": null,
+        "source_ref": "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-run.api.read.v1.json",
+        "raw_ref": "evidence://.aor/projects/aor-core/artifacts/delivery-manifest-patch-only-run.api.read.v1.json",
+        "actions": [
+          {
+            "action_id": "copy_raw_ref",
+            "label": "Copy raw ref",
+            "kind": "debug"
+          }
+        ]
+      }
     ]
   }
 ]

@@ -160,6 +160,33 @@ test("initializeProjectRuntime materializes profile and assets only when materia
   }
 });
 
+test("initializeProjectRuntime preserves external explicit profile refs as absolute paths", () => {
+  withTempRepo((tempRoot) => {
+    const externalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-profile-root-"));
+    const externalProfile = path.join(externalRoot, "project-live-e2e.aor.yaml");
+    fs.copyFileSync(path.join(tempRoot, "examples/project.aor.yaml"), externalProfile);
+
+    try {
+      const result = initializeProjectRuntime({
+        cwd: tempRoot,
+        projectRef: tempRoot,
+        projectProfile: externalProfile,
+      });
+
+      assert.equal(result.projectProfileRef, externalProfile);
+      assert.equal(result.projectProfileRef.startsWith("../"), false);
+
+      const state = JSON.parse(fs.readFileSync(result.stateFile, "utf8"));
+      const report = JSON.parse(fs.readFileSync(result.onboardingReportFile, "utf8"));
+      assert.equal(state.selected_profile_ref, externalProfile);
+      assert.equal(report.generated_from.selected_profile_ref, externalProfile);
+      assert.equal(report.project_state.project_profile_ref, externalProfile);
+    } finally {
+      fs.rmSync(externalRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 test("initializeProjectRuntime merges bundled bootstrap assets when a target examples directory already exists", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-w21-s03-existing-examples-"));
   fs.mkdirSync(path.join(tempRoot, ".git"), { recursive: true });

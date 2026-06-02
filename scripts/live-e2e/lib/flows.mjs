@@ -32,6 +32,7 @@ import {
   materializeFeatureRequestFile,
   materializeGeneratedProjectProfile,
   materializeHostLiveE2eAssets,
+  materializeProviderPinnedPolicyOverrides,
   materializeProviderPinnedRouteOverrides,
   materializeTargetCheckout,
   normalizeDeliveryMode,
@@ -46,6 +47,17 @@ function serializeRouteOverrides(routeOverrides) {
   const pairs = Object.entries(routeOverrides)
     .filter(([, routeId]) => typeof routeId === "string" && routeId.length > 0)
     .map(([step, routeId]) => `${step}=${routeId}`);
+  return pairs.length > 0 ? pairs.join(",") : null;
+}
+
+/**
+ * @param {Record<string, string>} policyOverrides
+ * @returns {string | null}
+ */
+function serializePolicyOverrides(policyOverrides) {
+  const pairs = Object.entries(policyOverrides)
+    .filter(([, policyId]) => typeof policyId === "string" && policyId.length > 0)
+    .map(([step, policyId]) => `${step}=${policyId}`);
   return pairs.length > 0 ? pairs.join(",") : null;
 }
 
@@ -517,6 +529,8 @@ function buildCommandDiagnostic(result) {
   const payload = asRecord(result.payload);
   const lifecycleCommand = asRecord(payload.lifecycle_command);
   const commandOutput = asRecord(lifecycleCommand.command_output);
+  const runControlState = asRecord(payload.run_control_state);
+  const providerStepStatus = asRecord(runControlState.provider_step_status);
   const interactiveContinuation =
     asRecord(payload.interactive_continuation).requested === true
       ? asRecord(payload.interactive_continuation)
@@ -539,6 +553,7 @@ function buildCommandDiagnostic(result) {
     missing_evidence: [],
     recommendation: result.ok ? "continue" : "inspect transcript and command stderr",
     interactive_continuation: interactiveContinuation,
+    provider_step_status: Object.keys(providerStepStatus).length > 0 ? providerStepStatus : null,
   };
 }
 
@@ -966,6 +981,34 @@ function readReportDocument(reportFile) {
 }
 
 /**
+ * @param {string} targetRoot
+ * @param {{ projectId: string | null, missionId: string | null }} identity
+ * @returns {string | null}
+ */
+export function archivedNextActionReportForMission(targetRoot, identity) {
+  const projectId = asNonEmptyString(identity.projectId);
+  const missionId = normalizeId(asNonEmptyString(identity.missionId) || "");
+  if (!projectId || !missionId) return null;
+  const reportFile = path.join(targetRoot, ".aor", "projects", projectId, "reports", `next-action-report-${missionId}.json`);
+  return fileExists(reportFile) ? reportFile : null;
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @returns {boolean}
+ */
+export function nextActionReportClosesFlow(report) {
+  const closureState = asRecord(report.closure_state);
+  const learningState = asRecord(closureState.learning);
+  const primaryAction = asRecord(report.primary_action);
+  return (
+    asNonEmptyString(learningState.status) === "handoff-complete" ||
+    asNonEmptyString(primaryAction.action_id) === "start-new-flow" ||
+    asNonEmptyString(primaryAction.action_id) === "closure-complete"
+  );
+}
+
+/**
  * @param {string | null | undefined} requestFile
  * @returns {Record<string, unknown>}
  */
@@ -983,6 +1026,7 @@ function readOperatorRequestDocument(requestFile) {
  *   runId: string,
  *   reportsRoot: string,
  *   env: NodeJS.ProcessEnv,
+ *   projectProfileFile?: string,
  * }}
  */
 function runGuidedWebSmoke(options) {
@@ -1021,6 +1065,9 @@ function runGuidedWebSmoke(options) {
       "app",
       "--project-ref",
       ".",
+      ...(asNonEmptyString(options.projectProfileFile)
+        ? ["--project-profile", asNonEmptyString(options.projectProfileFile)]
+        : []),
       "--runtime-root",
       ".aor",
       "--smoke",
@@ -1221,6 +1268,18 @@ function normalizeRuntimeHarnessDecisionStatus(value) {
   const normalized = asNonEmptyString(value).toLowerCase();
   if (normalized === "pass" || normalized === "passed" || normalized === "success") return "pass";
   if (normalized === "warn" || normalized === "warning" || normalized === "pass_with_findings") return "warn";
+  return "fail";
+}
+
+/**
+ * @param {{ existingStageStatus?: unknown, runtimeHarnessDecision?: unknown }} options
+ * @returns {"pass" | "warn" | "fail"}
+ */
+export function resolveExecutionStageStatusForRuntimeHarnessDecision(options) {
+  if (asNonEmptyString(options.existingStageStatus) === "fail") return "fail";
+  const runtimeHarnessStageStatus = normalizeRuntimeHarnessDecisionStatus(options.runtimeHarnessDecision);
+  if (runtimeHarnessStageStatus === "pass") return "pass";
+  if (runtimeHarnessStageStatus === "warn") return "warn";
   return "fail";
 }
 
@@ -1593,23 +1652,74 @@ function buildVerifyOverrideArgs(options) {
 }
 
 /**
- * @param {string | null | undefined} reportFile
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeChangedPath(value) {
+  return value.replace(/\\/g, "/").replace(/^\.\//u, "");
+}
+
+/**
+ * @param {Record<string, unknown>} mission
+ * @returns {string[]}
+ */
+function missionRequiredChangePathPrefixes(mission) {
+  const changeEvidence = asRecord(mission.change_evidence);
+  return uniqueStrings(asStringArray(changeEvidence.required_path_prefixes).map(normalizeChangedPath));
+}
+
+/**
+ * @param {string} changedPath
+ * @param {string} prefix
  * @returns {boolean}
  */
-function runtimeHarnessReportHasMeaningfulChanges(reportFile) {
+function changedPathMatchesRequiredPrefix(changedPath, prefix) {
+  const normalizedPath = normalizeChangedPath(changedPath);
+  const normalizedPrefix = normalizeChangedPath(prefix);
+  if (!normalizedPrefix) return false;
+  if (normalizedPrefix.endsWith("/")) {
+    return normalizedPath.startsWith(normalizedPrefix);
+  }
+  return normalizedPath === normalizedPrefix || normalizedPath.startsWith(`${normalizedPrefix}/`);
+}
+
+/**
+ * @param {string | null | undefined} reportFile
+ * @returns {string[]}
+ */
+function collectRuntimeHarnessChangedPaths(reportFile) {
   const resolvedReportFile = asNonEmptyString(reportFile);
   if (!resolvedReportFile || !fileExists(resolvedReportFile)) {
-    return false;
+    return [];
   }
   const report = asRecord(readJson(resolvedReportFile));
   const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
-  return stepDecisions.some((entry) => {
+  return uniqueStrings(stepDecisions.flatMap((entry) => {
     const semantics = asRecord(asRecord(entry).mission_semantics);
-    return (
-      asStringArray(semantics.meaningful_changed_paths).length > 0 ||
-      asStringArray(semantics.non_bootstrap_changed_paths).length > 0
-    );
-  });
+    return [
+      ...asStringArray(semantics.meaningful_changed_paths),
+      ...asStringArray(semantics.non_bootstrap_changed_paths),
+    ].map(normalizeChangedPath);
+  }));
+}
+
+/**
+ * @param {string | null | undefined} reportFile
+ * @param {Record<string, unknown>} [mission]
+ * @returns {boolean}
+ */
+export function runtimeHarnessReportHasMissionRelevantChanges(reportFile, mission = {}) {
+  const changedPaths = collectRuntimeHarnessChangedPaths(reportFile);
+  if (changedPaths.length === 0) {
+    return false;
+  }
+  const requiredPrefixes = missionRequiredChangePathPrefixes(mission);
+  if (requiredPrefixes.length === 0) {
+    return true;
+  }
+  return changedPaths.some((changedPath) =>
+    requiredPrefixes.some((prefix) => changedPathMatchesRequiredPrefix(changedPath, prefix)),
+  );
 }
 
 /**
@@ -2160,6 +2270,7 @@ export function executeInstalledUserFlow(options) {
       profilePath: options.profilePath,
       profile: options.profile,
       catalogEntry: options.catalogEntry,
+      providerVariant: options.providerVariant,
       runId: options.runId,
       targetCheckout,
       generatedAssetsRoot: hostAssets.assetsRoot,
@@ -2310,13 +2421,12 @@ export function executeInstalledUserFlow(options) {
 
     const executionAlreadyObserved = controllerObservedStep(options.stepController, "execution");
     const cachedPreflightSummaryPath = asNonEmptyString(artifacts.verify_summary_file);
-    const canReusePreExecutionReadiness =
-      executionAlreadyObserved &&
+    const hasReusablePreExecutionReadiness =
       cachedPreflightSummaryPath &&
       fileExists(cachedPreflightSummaryPath) &&
       asNonEmptyString(artifacts.target_cleanliness_before_execution_file) &&
       fileExists(asNonEmptyString(artifacts.target_cleanliness_before_execution_file));
-    if (executionAlreadyObserved && !canReusePreExecutionReadiness) {
+    if (executionAlreadyObserved && !hasReusablePreExecutionReadiness) {
       const summary = "Observed execution cannot resume without preserved pre-execution readiness evidence.";
       markStageRaw(stageMap, "execution", "fail", [], summary);
       throw new Error(summary);
@@ -2328,7 +2438,7 @@ export function executeInstalledUserFlow(options) {
       ...asStringArray(artifacts.preflight_step_result_files),
       asNonEmptyString(artifacts.target_cleanliness_before_execution_file),
     ]);
-    if (!executionAlreadyObserved) {
+    if (!hasReusablePreExecutionReadiness) {
       const verifyPreflight = runCommand("project-verify-preflight", [
         "project",
         "verify",
@@ -2984,6 +3094,7 @@ export function executeFullJourneyFlow(options) {
       profilePath: options.profilePath,
       profile: options.profile,
       catalogEntry: options.catalogEntry,
+      providerVariant: options.providerVariant,
       runId: options.runId,
       targetCheckout,
       generatedAssetsRoot: hostAssets.assetsRoot,
@@ -3009,10 +3120,19 @@ export function executeFullJourneyFlow(options) {
       routesRoot: hostAssets.routesRoot,
       providerVariant: options.providerVariant,
       providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
+      profile: options.profile,
     });
     artifacts.provider_route_override_files = providerRoutes.routeFiles;
     artifacts.provider_route_overrides = providerRoutes.routeOverrides;
     const routeOverridesFlag = serializeRouteOverrides(providerRoutes.routeOverrides);
+    const providerPolicies = materializeProviderPinnedPolicyOverrides({
+      policiesRoot: path.join(hostAssets.assetsRoot, "policies"),
+      providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
+      profile: options.profile,
+    });
+    artifacts.provider_policy_override_files = providerPolicies.policyFiles;
+    artifacts.provider_policy_overrides = providerPolicies.policyOverrides;
+    const policyOverridesFlag = serializePolicyOverrides(providerPolicies.policyOverrides);
     const liveAdapterPreflight = runLiveAdapterPreflight({
       targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
       adapterProfileRoot: path.join(hostAssets.assetsRoot, "adapters"),
@@ -3052,6 +3172,7 @@ export function executeFullJourneyFlow(options) {
         browserCachePreflight.reportFile,
         ...collectStringRefs(projectInit.payload),
         ...providerRoutes.routeFiles,
+        ...providerPolicies.policyFiles,
       ]),
       "Public bootstrap initialized target .aor while live E2E assets and provider-pinned routes stayed in host runtime state.",
     );
@@ -3097,6 +3218,8 @@ export function executeFullJourneyFlow(options) {
         "next",
         "--project-ref",
         ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--json",
@@ -3115,6 +3238,7 @@ export function executeFullJourneyFlow(options) {
       "--runtime-root",
       ".aor",
       ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
+      ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
     ]);
     artifacts.analysis_report_file = getStringField(analyze.payload, "analysis_report_file");
 
@@ -3144,8 +3268,7 @@ export function executeFullJourneyFlow(options) {
       cachedTargetCleanlinessFile,
       cachedExecutionReadinessFile,
     ]);
-    const canReusePreExecutionReadiness =
-      executionAlreadyObserved &&
+    const hasReusablePreExecutionReadiness =
       baselineVerifySummaryPath &&
       fileExists(baselineVerifySummaryPath) &&
       Object.keys(baselineGateDecision).length > 0 &&
@@ -3153,12 +3276,12 @@ export function executeFullJourneyFlow(options) {
       fileExists(cachedTargetCleanlinessFile) &&
       cachedExecutionReadinessFile &&
       fileExists(cachedExecutionReadinessFile);
-    if (executionAlreadyObserved && !canReusePreExecutionReadiness) {
+    if (executionAlreadyObserved && !hasReusablePreExecutionReadiness) {
       const summary = "Observed execution cannot resume without preserved pre-execution readiness evidence.";
       markStageRaw(stageMap, "execution", "fail", [], summary);
       throw new Error(summary);
     }
-    if (!executionAlreadyObserved) {
+    if (!hasReusablePreExecutionReadiness) {
       const verifyPreflight = runCommand("project-verify-preflight", [
         "project",
         "verify",
@@ -3175,6 +3298,7 @@ export function executeFullJourneyFlow(options) {
         "--routed-dry-run-step",
         "implement",
         ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
+        ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
       ]);
       baselineVerifySummaryPath = getStringField(verifyPreflight.payload, "verify_summary_file");
       artifacts.baseline_verify_summary_file = baselineVerifySummaryPath;
@@ -3295,6 +3419,7 @@ export function executeFullJourneyFlow(options) {
       "--input-packet",
       /** @type {string} */ (artifacts.intake_artifact_packet_file),
       ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
+      ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
     ]);
     artifacts.discovery_analysis_report_file = getStringField(discovery.payload, "analysis_report_file");
     markStage(
@@ -3320,6 +3445,7 @@ export function executeFullJourneyFlow(options) {
       "--runtime-root",
       ".aor",
       ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
+      ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
     ]);
     artifacts.spec_step_result_file = getStringField(specBuild.payload, "routed_step_result_file");
     if (internalTestHooks.drop_spec_step_result_after_spec_build === true && artifacts.spec_step_result_file) {
@@ -3476,6 +3602,7 @@ export function executeFullJourneyFlow(options) {
           ? ["--promotion-evidence-refs", latestPromotionEvidenceRefs.join(",")]
           : []),
         ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
+        ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
       ], { iteration });
       artifacts.routed_step_result_file = getStringField(runStart.payload, "routed_step_result_file");
       artifacts.routed_step_result_id = getStringField(runStart.payload, "routed_step_result_id");
@@ -3583,14 +3710,14 @@ export function executeFullJourneyFlow(options) {
       const postRunVerifySummary = readJson(postRunVerifySummaryPath);
       artifacts.post_run_verify_status = asNonEmptyString(postRunVerifySummary.status) === "passed" ? "pass" : "fail";
       const runtimeHarnessStageStatus = normalizeRuntimeHarnessDecisionStatus(artifacts.run_start_runtime_harness_decision);
-      const executionStageStatus =
-        stageMap.execution?.status === "fail"
-          ? "fail"
-          : runtimeHarnessStageStatus === "pass"
-            ? "pass"
-            : "warn";
+      const executionStageStatus = resolveExecutionStageStatusForRuntimeHarnessDecision({
+        existingStageStatus: stageMap.execution?.status,
+        runtimeHarnessDecision: artifacts.run_start_runtime_harness_decision,
+      });
       const executionStageSummary =
-        executionStageStatus === "fail"
+        executionStageStatus === "fail" && runtimeHarnessStageStatus === "fail"
+          ? `Runtime Harness blocked execution with decision '${asNonEmptyString(artifacts.run_start_runtime_harness_decision) || "unknown"}'.`
+          : executionStageStatus === "fail"
           ? "Execution health evidence failed before post-run quality could be judged."
           : executionStageStatus === "warn"
             ? "Runtime Harness recorded execution findings; final quality is judged from agent assessment, review, and post-run verification."
@@ -3764,6 +3891,8 @@ export function executeFullJourneyFlow(options) {
         "next",
         "--project-ref",
         ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--json",
@@ -3996,6 +4125,8 @@ export function executeFullJourneyFlow(options) {
         "next",
         "--project-ref",
         ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--json",
@@ -4201,28 +4332,32 @@ export function executeFullJourneyFlow(options) {
         "next",
         "--project-ref",
         ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--json",
       ]);
       artifacts.next_action_report_file = getStringField(guidedNextAfterLearning.payload, "next_action_report_file");
       artifacts.guided_next_after_learning_transcript_file = guidedNextAfterLearning.transcriptFile;
-      artifacts.completed_flow_next_action_report_file = artifacts.next_action_report_file;
       const firstFlowIdentity = resolveFlowIdentityFromPacket(
         targetCheckout.targetCheckoutRoot,
         artifacts.intake_artifact_packet_file,
       );
+      const completedFlowArchiveFile =
+        archivedNextActionReportForMission(targetCheckout.targetCheckoutRoot, firstFlowIdentity);
+      const genericCompletedFlowReportFile = asNonEmptyString(artifacts.next_action_report_file);
+      const archivedCompletedFlowReport = readReportDocument(completedFlowArchiveFile);
+      const genericCompletedFlowReport = readReportDocument(genericCompletedFlowReportFile);
+      artifacts.completed_flow_next_action_report_file =
+        nextActionReportClosesFlow(archivedCompletedFlowReport)
+          ? completedFlowArchiveFile
+          : nextActionReportClosesFlow(genericCompletedFlowReport)
+            ? genericCompletedFlowReportFile
+            : completedFlowArchiveFile || genericCompletedFlowReportFile;
       const completedNextActionReport = readReportDocument(artifacts.completed_flow_next_action_report_file);
-      const completedClosureState = asRecord(completedNextActionReport.closure_state);
-      const completedPrimaryAction = asRecord(completedNextActionReport.primary_action);
-      const completedLearningState = asRecord(completedClosureState.learning);
       artifacts.first_flow_id = firstFlowIdentity.flowId;
-      artifacts.first_flow_status =
-        asNonEmptyString(completedLearningState.status) === "handoff-complete" ||
-        asNonEmptyString(completedPrimaryAction.action_id) === "start-new-flow" ||
-        asNonEmptyString(completedPrimaryAction.action_id) === "closure-complete"
-          ? "completed"
-          : "active";
+      artifacts.first_flow_status = nextActionReportClosesFlow(completedNextActionReport) ? "completed" : "active";
       artifacts.completed_flow_read_only = artifacts.first_flow_status === "completed";
       artifacts.follow_up_source_handoff_ref = asNonEmptyString(artifacts.learning_loop_handoff_file);
 
@@ -4258,6 +4393,8 @@ export function executeFullJourneyFlow(options) {
         "next",
         "--project-ref",
         ".",
+        "--project-profile",
+        generatedProfile.generatedProjectProfileFile,
         "--runtime-root",
         ".aor",
         "--json",
@@ -4308,6 +4445,7 @@ export function executeFullJourneyFlow(options) {
         runId: options.runId,
         reportsRoot: options.layout.reportsRoot,
         env,
+        projectProfileFile: generatedProfile.generatedProjectProfileFile,
       });
       artifacts.guided_web_smoke_summary_file = webSmoke.summaryFile;
       artifacts.guided_web_smoke_html_file = webSmoke.htmlFile;
@@ -4388,7 +4526,7 @@ export function executeFullJourneyFlow(options) {
       asNonEmptyString(artifacts.delivery_runtime_harness_report_file),
       asNonEmptyString(artifacts.runtime_harness_report_file),
       asNonEmptyString(artifacts.run_start_runtime_harness_report_file),
-    ].some((reportFile) => reportFile && runtimeHarnessReportHasMeaningfulChanges(reportFile))
+    ].some((reportFile) => reportFile && runtimeHarnessReportHasMissionRelevantChanges(reportFile, options.mission))
       ? "pass"
       : "fail";
     const providerExecutionProofStatus = evidenceRefMaterialized(

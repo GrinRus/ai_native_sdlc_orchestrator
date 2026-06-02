@@ -42,8 +42,8 @@ Results:
 | Claude Code | `restricted` | `--permission-mode auto` | `interaction_required` | Permission readiness failed with `permission-mode-blocked`; marker missing. |
 | OpenCode | `full-bypass` | `opencode run --format json --dangerously-skip-permissions` | `pass` | Auth, edit readiness, and permission readiness passed; marker written. |
 | OpenCode | `restricted` | `opencode run --format json` | `interaction_required` | Permission readiness failed with `permission-mode-blocked`; marker missing. |
-| Qwen Code | `full-bypass` | `qwen --output-format json --approval-mode yolo` | `pass` | Auth, edit readiness, and permission readiness passed; marker written. |
-| Qwen Code | `restricted` | `qwen --output-format json --approval-mode default` | `pending` | Edit-readiness probe timed out with no structured denial output; keep candidate status. |
+| Qwen Code | `full-bypass` | `qwen --bare --auth-type anthropic --output-format json --approval-mode yolo --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with `ANTHROPIC_API_KEY` supplied directly or through `env_from: ANTHROPIC_AUTH_TOKEN` | `pass` | Auth, edit readiness, and permission readiness passed in local smoke; full-journey candidate proof still must close target changes without runner-owned `.qwen` state leaks. |
+| Qwen Code | `restricted` | `qwen --bare --auth-type anthropic --output-format json --approval-mode default --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with the same auth env bridge | `pending` | Edit-readiness probe can time out or complete without write evidence; keep candidate status. |
 
 ## Qwen Restricted Investigation
 Follow-up smoke on 2026-05-25 narrowed the pending Qwen path:
@@ -57,7 +57,7 @@ Follow-up smoke on 2026-05-25 narrowed the pending Qwen path:
 | `json`/`stream-json` + `default` + argv AOR request JSON | timeout, marker missing | Passing the raw AOR envelope as a positional prompt does not avoid the restricted-mode hang. |
 | `json` + `auto-edit` + positional write prompt | `pass`, marker written | `auto-edit` restores write capability and is not a restricted/manual approval proof. |
 | `json` + `yolo` + stdin or argv AOR request JSON | `pass`, marker written | Full-bypass mapping remains usable. |
-| `--bare --auth-type ...` | auth/config failure before permission flow | Bare mode is not a certification workaround in the current host auth setup. |
+| missing `--auth-type` or missing Qwen API-key alias | auth/config failure before permission flow | Preflight must fail before full live execution when the host has only `ANTHROPIC_AUTH_TOKEN` and no `ANTHROPIC_API_KEY`. |
 
 ## OpenCode Full-Journey Attempt
 Follow-up acceptance proof on 2026-05-25 exercised the real OpenCode runner beyond permission preflight:

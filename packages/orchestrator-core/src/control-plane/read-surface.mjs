@@ -1,4 +1,5 @@
 export {
+  listArtifactDisplaySummaries,
   listCompilerRevisionStatuses,
   listDeliveryManifests,
   listMultirepoCoordinationStatuses,

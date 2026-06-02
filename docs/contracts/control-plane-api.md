@@ -184,6 +184,97 @@ not include raw `operator-request.request_text`; summaries, refs, target flow,
 stage, intent, delivery mode, allowed paths, run ids, and evidence refs remain
 queryable.
 
+## Provider step status heartbeat (W35-S01)
+
+Long-running external provider execution is exposed through the query-safe
+`provider_step_status` read model. It is additive on:
+- `GET /api/projects/:projectId/state` as the latest provider heartbeat across
+  local run-control state files;
+- `GET /api/projects/:projectId/runs` as each run summary's current provider
+  heartbeat.
+
+`provider_step_status` preserves:
+- `provider`, `adapter`, `route_id`, `step_id`;
+- `status`:
+  `starting`, `running`, `silent-running`, `artifact-updated`,
+  `timeout-risk`, `completed`, `interrupted`, or `failed`;
+- `elapsed_ms`, `timeout_budget_ms`, `remaining_budget_ms`;
+- `last_output_at`, `last_artifact_update_at`;
+- `current_command_label`;
+- `recommended_action`;
+- `started_at`, `updated_at`, and optional `finished_at`.
+
+The field is a public control-plane signal, not process inspection. Runtime code
+updates it before and during external adapter execution, and read surfaces
+normalize elapsed and timeout budget values when queried. User-facing payloads
+must keep `current_command_label` compact and must not expose raw process
+commands, command args, environment variables, bearer tokens, auth tokens, or
+provider secrets. Raw provider evidence remains available only through explicit
+debug/evidence refs.
+
+## Execution evidence summaries (W35-S04)
+
+Run summaries expose additive `execution_evidence` for operator-facing live E2E
+debugging without terminal/process inspection. The field is returned by
+`GET /api/projects/:projectId/runs` and is derived only from public runtime
+artifacts, run-control state, Runtime Harness reports, review reports, delivery
+manifests, and provider heartbeat state.
+
+`execution_evidence` includes:
+- `status`, `provider_execution_status`, `runtime_harness_decision`,
+  `real_code_change_status`, `post_run_verification_status`, `review_status`,
+  `delivery_readiness_status`, and `no_upstream_write_status`;
+- `changed_path_groups[]` with `mission-relevant`, `runtime-owned`,
+  `runner-owned-leak`, and `scratch-unrelated` grouping;
+- `blockers[]` with readable reasons for fail-closed operator handling;
+- `actions[]` for public continuation surfaces only.
+
+Scratch-only output must stay visible as `scratch-unrelated` and must not make
+`real_code_change_status` pass. Runner-owned state under `.qwen/`, `.codex/`,
+`.claude/`, or `.opencode/` inside the target checkout is surfaced as
+`runner-owned-leak` with critical severity and blocks delivery proof. Runtime
+files such as `.aor/` and `project.aor.yaml` are grouped as `runtime-owned` so
+operators do not mistake runtime evidence for target implementation changes.
+
+Execution actions are descriptive public surfaces, not private process control:
+- `stop_provider` maps to `aor run cancel`;
+- `save_partial_evidence` maps to `aor run status --json`;
+- `diagnose_current_step` maps to
+  `manual-live-e2e --prepare-decision --action diagnose`;
+- `retry_public_step` maps to
+  `manual-live-e2e --prepare-decision --action retry_public_step`.
+
+Stopping a running provider must write durable interrupted/operator-stopped
+evidence in run-control audit/state. The interrupted run is not a pass and must
+preserve partial evidence for diagnosis or retry through public manual live E2E
+surfaces.
+
+## Artifact display summaries (W35-S02)
+
+Artifact refs remain canonical evidence identifiers, but UI and operator-report
+surfaces must not use long filesystem paths or packet/evidence URIs as the
+primary visible label. The control plane exposes additive
+`artifact_display_summaries[]` arrays on project state, run summaries, and flow
+projections, and per-artifact read entries include a `display_summary`.
+
+Each artifact display summary includes:
+- `type`, such as `command-trace`, `step-observation`,
+  `runtime-harness-report`, `routed-step-result`, `provider-raw-evidence`,
+  `verification`, `target-diff`, `delivery-manifest`, `release-packet`, or
+  `learning-handoff`;
+- `stage`, such as `mission`, `planning`, `execution`, `runtime-harness`,
+  `verification`, `review`, `delivery`, or `learning`;
+- `label`, `status`, `severity`, `description`, and optional `timestamp`;
+- `source_ref` and `raw_ref` for audit/debug use;
+- `actions[]`, including `copy_raw_ref` for explicit debug copying.
+
+Missing or unreadable refs are represented as summaries with
+`status=missing` and `severity=critical` rather than disappearing from the
+read model. Web renderers group summaries by flow/stage and may filter them by
+`Failed`, `Warnings`, `Provider`, `Runtime Harness`, `Verification`, `Diff`,
+`Delivery`, and `Learning`. Raw refs stay available for skill-agent evidence
+and debugging, but the user-facing primary text is the summary label/type.
+
 ## Connected lifecycle mutations (W18 baseline)
 
 W18 closes the first connected-web gap between the bounded run-control/UI mutation baseline and a web surface that can drive the approved lifecycle through the control plane. This is a bounded lifecycle subset, not a full CLI-over-HTTP parity claim.

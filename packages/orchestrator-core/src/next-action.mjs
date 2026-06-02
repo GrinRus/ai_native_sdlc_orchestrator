@@ -150,15 +150,15 @@ function findLatestRunDocument(init, runId, family, matcher, root) {
  * @returns {{ runId: string, evidenceRef: string } | null}
  */
 function findLatestRunEvidence(init, options = {}) {
-  /** @type {Array<{ runId: string, evidenceRef: string, file: string }>} */
+  /** @type {Array<{ runId: string, evidenceRef: string, file: string, priority: number }>} */
   const candidates = [];
-  const addCandidate = (filePath, document) => {
+  const addCandidate = (filePath, document, priority) => {
     if (typeof options.notBeforeMs === "number" && fs.statSync(filePath).mtimeMs < options.notBeforeMs) {
       return;
     }
     const runId = asString(document.run_id);
     if (runId) {
-      candidates.push({ runId, evidenceRef: toEvidenceRef(init.projectRoot, filePath), file: filePath });
+      candidates.push({ runId, evidenceRef: toEvidenceRef(init.projectRoot, filePath), file: filePath, priority });
       return;
     }
     const runRef = asStringArray(document.run_refs)[0];
@@ -167,6 +167,7 @@ function findLatestRunEvidence(init, options = {}) {
         runId: runRef.startsWith("run://") ? runRef.slice("run://".length) : runRef,
         evidenceRef: toEvidenceRef(init.projectRoot, filePath),
         file: filePath,
+        priority,
       });
     }
   };
@@ -174,36 +175,51 @@ function findLatestRunEvidence(init, options = {}) {
   for (const filePath of listJsonFiles(init.runtimeLayout.stateRoot)) {
     if (!path.basename(filePath).startsWith("run-control-state-")) continue;
     const state = readJsonFile(filePath);
-    if (state) addCandidate(filePath, state);
+    if (state) addCandidate(filePath, state, 30);
   }
 
   for (const filePath of listJsonFiles(init.runtimeLayout.reportsRoot)) {
-    if (
-      !/^step-result-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^review-report.*\.json$/u.test(path.basename(filePath)) &&
-      !/^review-decision-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^runtime-harness-report.*\.json$/u.test(path.basename(filePath)) &&
-      !/^learning-loop-(?:scorecard|handoff)-.*\.json$/u.test(path.basename(filePath))
-    ) {
+    const basename = path.basename(filePath);
+    const priority =
+      /^learning-loop-handoff-.*\.json$/u.test(basename)
+        ? 95
+        : /^learning-loop-scorecard-.*\.json$/u.test(basename)
+          ? 90
+          : /^review-decision-.*\.json$/u.test(basename)
+            ? 65
+            : /^review-report.*\.json$/u.test(basename) || /^runtime-harness-report.*\.json$/u.test(basename)
+              ? 60
+              : /^step-result-.*\.json$/u.test(basename)
+                ? 40
+                : 0;
+    if (priority === 0) {
       continue;
     }
     const document = readJsonFile(filePath);
-    if (document) addCandidate(filePath, document);
+    if (document) addCandidate(filePath, document, priority);
   }
 
   for (const filePath of listJsonFiles(init.runtimeLayout.artifactsRoot)) {
-    if (
-      !/^delivery-plan-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^delivery-manifest-.*\.json$/u.test(path.basename(filePath)) &&
-      !/^release-packet-.*\.json$/u.test(path.basename(filePath))
-    ) {
+    const basename = path.basename(filePath);
+    const priority =
+      /^release-packet-.*\.json$/u.test(basename)
+        ? 85
+        : /^delivery-manifest-.*\.json$/u.test(basename)
+          ? 80
+          : /^delivery-plan-.*\.json$/u.test(basename)
+            ? 75
+            : 0;
+    if (priority === 0) {
       continue;
     }
     const document = readJsonFile(filePath);
-    if (document) addCandidate(filePath, document);
+    if (document) addCandidate(filePath, document, priority);
   }
 
-  candidates.sort((left, right) => fs.statSync(right.file).mtimeMs - fs.statSync(left.file).mtimeMs);
+  candidates.sort((left, right) => {
+    if (right.priority !== left.priority) return right.priority - left.priority;
+    return fs.statSync(right.file).mtimeMs - fs.statSync(left.file).mtimeMs;
+  });
   const latest = candidates[0] ?? null;
   return latest ? { runId: latest.runId, evidenceRef: latest.evidenceRef } : null;
 }
@@ -566,6 +582,27 @@ function resolveClosureAction(options) {
         command: nextCommand,
         reason: "Downstream delivery is blocked until the review decision gate passes.",
         low_level_command: "review decide",
+        evidence_refs: evidenceRefs,
+      },
+    };
+  }
+
+  if (learningStatus === "handoff-complete") {
+    const learningHandoffRef = asString(learning.handoff_ref);
+    const followUpCommand = [
+      `${projectCommand("mission create", options.projectRoot)} --delivery-mode no-write`,
+      ...(learningHandoffRef ? [`--follow-up-source-handoff-ref ${shellQuote(learningHandoffRef)}`] : []),
+    ].join(" ");
+
+    return {
+      status: "ready",
+      stage: "learning",
+      blockers: [],
+      primaryAction: {
+        action_id: "start-new-flow",
+        command: followUpCommand,
+        reason: "Review, delivery, release, and learning evidence are linked; start a fresh follow-up flow while keeping the completed flow read-only.",
+        low_level_command: "mission create",
         evidence_refs: evidenceRefs,
       },
     };

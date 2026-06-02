@@ -88,6 +88,9 @@ flow's learning handoff, but the completed source flow remains read-only.
   closure.
 - Safety gates, blockers, write-back mode, runtime root, evidence refs, and
   latest operator request status must stay visible in the main cockpit.
+- Long-running external provider steps must show a query-safe heartbeat in the
+  stage rail and active cockpit: provider, adapter, route, step, elapsed time,
+  timeout budget, remaining time, last update, and recommended action.
 - Advanced views must be flow-scoped: evidence graph, runtime trace,
   interactions inbox, and Ask AOR request targeting.
 - The design must remain usable without hosted services, SSO, SaaS deployment,
@@ -102,7 +105,27 @@ The packaged SPA now treats the flow as the primary object:
 - `New Flow` opens mission intake as a draft and still creates durable evidence
   only through `mission create` followed by `next`.
 - Active flows render an active cockpit with one recommended action, blockers,
-  evidence refs, runtime root, write-back mode, and safety status.
+  evidence artifacts, runtime root, write-back mode, and safety status.
+- The stage rail and active cockpit render `provider_step_status` from public
+  control-plane read models. `silent-running` states explicitly say the provider
+  has no output yet but is still running, without exposing raw process commands
+  or secrets.
+- Evidence lists render `artifact_display_summaries[]` as user-facing
+  artifact chips, grouped rows, and graph/trace labels. Long raw filesystem
+  paths, packet URIs, and evidence URIs are not primary visible text; raw refs
+  stay available only through copy/debug actions.
+- The Operator Decision drawer is action-first: `Continue`, `Diagnose`,
+  `Block`, `Retry public step`, `Answer`, and `Frontend interact` prepare the
+  same manual live E2E decision-helper path from `agent_decision_request_ref`.
+  Rejection reasons are shown as readable copy, while raw request refs and
+  helper command text remain behind copy/debug actions.
+- The Execution Evidence panel renders `RunSummary.execution_evidence` for the
+  selected flow: provider status, Runtime Harness decision, real-code-change
+  status, post-run verification, review, delivery readiness,
+  no-upstream-write status, changed-path relevance groups, blockers, and public
+  stop/save/diagnose/retry controls. Scratch-only output is explicitly
+  non-passing, while `.qwen/`, `.codex/`, `.claude/`, and `.opencode/` target
+  checkout state is shown as blocking runner-owned leakage.
 - Completed flows render as read-only closure/evidence views with mutation
   controls disabled or replaced by no-write inspection actions.
 - Ask AOR submissions include `target_flow_id` for the selected flow; completed

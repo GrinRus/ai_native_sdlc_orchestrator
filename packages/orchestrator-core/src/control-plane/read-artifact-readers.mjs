@@ -2,6 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadContractFile } from "../../../contracts/src/index.mjs";
+import {
+  buildArtifactDisplaySummary,
+  uniqueArtifactDisplaySummaries,
+} from "../artifact-display-summary.mjs";
+import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
 
 const ARTIFACT_PACKET_REGEX = /^.+\.artifact\..+\.json$/;
@@ -24,6 +29,7 @@ const INCIDENT_BACKFILL_PROPOSAL_REGEX = /^incident-backfill-proposal-.*\.json$/
 const LEARNING_LOOP_SCORECARD_REGEX = /^learning-loop-scorecard-.*\.json$/;
 const LEARNING_LOOP_HANDOFF_REGEX = /^learning-loop-handoff-.*\.json$/;
 const RUN_CONTROL_AUDIT_REGEX = /^run-control-event-.*\.json$/;
+const RUN_CONTROL_STATE_REGEX = /^run-control-state-.*\.json$/;
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/;
 const OPERATOR_REQUEST_REGEX = /^operator-request-.*\.json$/;
 
@@ -37,6 +43,14 @@ function asNonNegativeInteger(value) {
     return undefined;
   }
   return Math.floor(parsed);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown>}
+ */
+function asRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
 }
 
 /**
@@ -68,6 +82,38 @@ function toPosix(value) {
  */
 export function toEvidenceRef(init, filePath) {
   return `evidence://${toPosix(path.relative(init.projectRoot, filePath))}`;
+}
+
+/**
+ * @param {{
+ *   family: string,
+ *   file: string,
+ *   artifact_ref: string,
+ *   document: Record<string, unknown>,
+ * }} entry
+ * @returns {Record<string, unknown>}
+ */
+function displaySummaryForEntry(entry) {
+  return buildArtifactDisplaySummary({
+    family: entry.family,
+    file: entry.file,
+    artifactRef: entry.artifact_ref,
+    document: entry.document,
+  });
+}
+
+/**
+ * @template {{ family: string, file: string, artifact_ref: string, document: Record<string, unknown> }} T
+ * @param {T} entry
+ * @returns {T & { display_summary: Record<string, unknown>, artifact_display_summaries: Record<string, unknown>[] }}
+ */
+function withDisplaySummary(entry) {
+  const displaySummary = displaySummaryForEntry(entry);
+  return {
+    ...entry,
+    display_summary: displaySummary,
+    artifact_display_summaries: [displaySummary],
+  };
 }
 
 /**
@@ -138,12 +184,12 @@ function loadContractDocuments(options) {
       continue;
     }
 
-    loaded.push({
-      family: options.family,
-      file: filePath,
-      artifact_ref: toEvidenceRef(options.init, filePath),
-      document: /** @type {Record<string, unknown>} */ (contract.document),
-    });
+      loaded.push(withDisplaySummary({
+        family: options.family,
+        file: filePath,
+        artifact_ref: toEvidenceRef(options.init, filePath),
+        document: /** @type {Record<string, unknown>} */ (contract.document),
+      }));
   }
 
   return loaded;
@@ -168,18 +214,42 @@ function loadJsonDocuments(options) {
       if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
         continue;
       }
-      loaded.push({
+      loaded.push(withDisplaySummary({
         family: "run-control-audit",
         file: filePath,
         artifact_ref: toEvidenceRef(options.init, filePath),
         document: /** @type {Record<string, unknown>} */ (parsed),
-      });
+      }));
     } catch {
       // Ignore malformed audit sidecars; contract-backed artifacts still load through validators.
     }
   }
 
   return loaded;
+}
+
+/**
+ * @param {ReturnType<typeof initializeProjectRuntime>} init
+ * @returns {Record<string, unknown> | null}
+ */
+function readLatestProviderStepStatus(init) {
+  const statuses = listJsonFiles(init.runtimeLayout.stateRoot)
+    .filter((filePath) => RUN_CONTROL_STATE_REGEX.test(path.basename(filePath)))
+    .flatMap((filePath) => {
+      try {
+        const state = JSON.parse(fs.readFileSync(filePath, "utf8"));
+        const normalized = normalizeProviderStepStatus(asRecord(state).provider_step_status);
+        return normalized ? [{ status: normalized, updatedMs: fs.statSync(filePath).mtimeMs }] : [];
+      } catch {
+        return [];
+      }
+    })
+    .sort((left, right) => {
+      const leftUpdated = Date.parse(String(left.status.updated_at ?? "")) || left.updatedMs;
+      const rightUpdated = Date.parse(String(right.status.updated_at ?? "")) || right.updatedMs;
+      return rightUpdated - leftUpdated;
+    });
+  return statuses[0]?.status ?? null;
 }
 
 /**
@@ -200,6 +270,8 @@ export function readProjectState(options = {}) {
     runtime_root: init.runtimeRoot,
     runtime_layout: init.state.runtime_layout,
     state_file: init.stateFile,
+    provider_step_status: readLatestProviderStepStatus(init),
+    artifact_display_summaries: listArtifactDisplaySummaries({ ...options, limit: options.limit ?? 50 }),
   };
 }
 
@@ -444,11 +516,44 @@ export function listOperatorRequests(options = {}) {
     files: reportFiles,
     family: "operator-request",
     matcher: OPERATOR_REQUEST_REGEX,
-  }).map((entry) => ({
-    ...entry,
-    operator_request_ref: `packet://operator-request@${entry.artifact_ref}`,
-    document: sanitizeOperatorRequestDocument(entry.document),
-  }));
+  }).map((entry) => {
+    const operatorRequestRef = `packet://operator-request@${entry.artifact_ref}`;
+    const displaySummary = buildArtifactDisplaySummary({
+      family: "operator-request",
+      file: entry.file,
+      artifactRef: operatorRequestRef,
+      sourceRef: entry.artifact_ref,
+      document: entry.document,
+    });
+    return {
+      ...entry,
+      operator_request_ref: operatorRequestRef,
+      display_summary: displaySummary,
+      artifact_display_summaries: [displaySummary],
+      document: sanitizeOperatorRequestDocument(entry.document),
+    };
+  });
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   limit?: number,
+ * }} options
+ */
+export function listArtifactDisplaySummaries(options = {}) {
+  const nextActionReport = readNextActionReport(options);
+  const summaries = [
+    ...listPacketArtifacts(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
+    ...listStepResults(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
+    ...listQualityArtifacts(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
+    ...listOperatorRequests(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
+    ...(nextActionReport?.artifact_display_summaries ?? []),
+  ];
+  return applyReadModelLimit(uniqueArtifactDisplaySummaries(summaries), options.limit);
 }
 
 /**

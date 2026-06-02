@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -11,6 +12,7 @@ export { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs"
 
 const ADAPTER_RESPONSE_STATUSES = Object.freeze(["success", "failed", "blocked"]);
 const EXTERNAL_REQUEST_TRANSPORTS = Object.freeze(["stdin-json", "file-attachment", "argv-json", "none"]);
+const SHORT_EXECUTION_ROOT_MODES = Object.freeze(["short-symlink", "short_symlink"]);
 
 const EXTERNAL_RUNTIME_SUPERVISOR_SOURCE = String.raw`
 const { spawn } = require("node:child_process");
@@ -35,6 +37,96 @@ function readOptions() {
     });
     process.exit(0);
   }
+}
+
+function asObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function asString(value) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function asNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function parseIsoMs(value) {
+  const stringValue = asString(value);
+  if (!stringValue) return null;
+  const parsed = Date.parse(stringValue);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function writeProviderStepStatus(patch = {}) {
+  const providerConfig = asObject(options.provider_step_status);
+  const stateFile = asString(providerConfig.state_file);
+  if (!stateFile) return;
+
+  const now = new Date();
+  const nowIso = now.toISOString();
+  let state = {};
+  try {
+    state = asObject(JSON.parse(fs.readFileSync(stateFile, "utf8")));
+  } catch {
+    state = {};
+  }
+  const previous = asObject(state.provider_step_status);
+  const startedAt = asString(previous.started_at) || asString(providerConfig.started_at) || nowIso;
+  const startedMs = parseIsoMs(startedAt) || now.getTime();
+  const timeoutBudgetMs = asNumber(previous.timeout_budget_ms) || asNumber(providerConfig.timeout_budget_ms) || timeoutMs;
+  const elapsedMs = Math.max(0, Math.floor(now.getTime() - startedMs));
+  const remainingBudgetMs = Math.max(0, Math.floor(timeoutBudgetMs - elapsedMs));
+  const lastOutputAt = asString(patch.last_output_at) || asString(previous.last_output_at) || null;
+  const lastArtifactUpdateAt =
+    asString(patch.last_artifact_update_at) || asString(previous.last_artifact_update_at) || null;
+  const lastActivityMs = Math.max(parseIsoMs(lastOutputAt) || startedMs, parseIsoMs(lastArtifactUpdateAt) || startedMs);
+  const silentMs = Math.max(0, Math.floor(now.getTime() - lastActivityMs));
+  const timeoutRiskThreshold = Math.min(60000, Math.max(5000, Math.floor(timeoutBudgetMs * 0.1)));
+  const terminalStatus = patch.status === "completed" || patch.status === "failed" || patch.status === "interrupted";
+  let status = asString(patch.status) || asString(previous.status) || "running";
+  if (!terminalStatus) {
+    if (remainingBudgetMs <= timeoutRiskThreshold) {
+      status = "timeout-risk";
+    } else if (silentMs >= 60000) {
+      status = "silent-running";
+    } else {
+      status = "running";
+    }
+  }
+
+  state.provider_step_status = {
+    provider: asString(providerConfig.provider) || asString(previous.provider),
+    adapter: asString(providerConfig.adapter) || asString(previous.adapter),
+    route_id: asString(providerConfig.route_id) || asString(previous.route_id),
+    step_id: asString(providerConfig.step_id) || asString(previous.step_id),
+    status,
+    elapsed_ms: elapsedMs,
+    timeout_budget_ms: timeoutBudgetMs,
+    remaining_budget_ms: remainingBudgetMs,
+    last_output_at: lastOutputAt,
+    last_artifact_update_at: lastArtifactUpdateAt,
+    current_command_label:
+      asString(providerConfig.current_command_label) || asString(previous.current_command_label) || "external-provider-runner",
+    recommended_action:
+      asString(patch.recommended_action) ||
+      (status === "timeout-risk"
+        ? "Check provider progress or stop before budget is exhausted."
+        : status === "silent-running"
+          ? "No output yet; provider is still running."
+          : status === "failed"
+            ? "Inspect provider evidence and failure summary."
+            : status === "completed"
+              ? "Continue with post-run verification."
+              : "Provider is still running."),
+    started_at: startedAt,
+    updated_at: nowIso,
+    finished_at: asString(patch.finished_at) || asString(previous.finished_at) || null,
+  };
+  state.updated_at = nowIso;
+  try {
+    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + "\n", "utf8");
+  } catch {}
 }
 
 function appendBounded(current, chunk, maxBuffer) {
@@ -63,17 +155,23 @@ let stdout = "";
 let stderr = "";
 let timedOut = false;
 let emitted = false;
+let heartbeatTimer = null;
 
 function finish(result) {
   if (emitted) {
     return;
   }
   emitted = true;
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
   emit(result);
 }
 
 let child;
 try {
+  writeProviderStepStatus({ status: "running" });
   child = spawn(options.command, Array.isArray(options.args) ? options.args : [], {
     cwd: options.cwd,
     env: options.env,
@@ -81,6 +179,11 @@ try {
     stdio: ["pipe", "pipe", "pipe"],
   });
 } catch (error) {
+  writeProviderStepStatus({
+    status: "failed",
+    recommended_action: "Inspect provider spawn failure evidence.",
+    finished_at: new Date().toISOString(),
+  });
   finish({
     status: null,
     signal: null,
@@ -93,8 +196,16 @@ try {
   process.exit(0);
 }
 
+heartbeatTimer = setInterval(() => {
+  writeProviderStepStatus({ status: "running" });
+}, 5000);
+
 const timer = setTimeout(() => {
   timedOut = true;
+  writeProviderStepStatus({
+    status: "timeout-risk",
+    recommended_action: "Provider budget was exhausted; stopping external runner.",
+  });
   killProcessTree(child, "SIGKILL");
 }, timeoutMs);
 
@@ -102,12 +213,19 @@ child.stdout.setEncoding("utf8");
 child.stderr.setEncoding("utf8");
 child.stdout.on("data", (chunk) => {
   stdout = appendBounded(stdout, chunk, maxBuffer);
+  writeProviderStepStatus({ status: "running", last_output_at: new Date().toISOString() });
 });
 child.stderr.on("data", (chunk) => {
   stderr = appendBounded(stderr, chunk, maxBuffer);
+  writeProviderStepStatus({ status: "running", last_output_at: new Date().toISOString() });
 });
 child.on("error", (error) => {
   clearTimeout(timer);
+  writeProviderStepStatus({
+    status: "failed",
+    recommended_action: "Inspect provider process error evidence.",
+    finished_at: new Date().toISOString(),
+  });
   finish({
     status: null,
     signal: null,
@@ -120,6 +238,12 @@ child.on("error", (error) => {
 });
 child.on("close", (status, signal) => {
   clearTimeout(timer);
+  writeProviderStepStatus({
+    status: status === 0 && !timedOut ? "completed" : "failed",
+    recommended_action:
+      status === 0 && !timedOut ? "Continue with post-run verification." : "Inspect provider evidence and failure summary.",
+    finished_at: new Date().toISOString(),
+  });
   finish({
     status,
     signal,
@@ -236,6 +360,85 @@ function resolveRequestTimeoutMs(request, fallback) {
 }
 
 /**
+ * @param {{ externalRuntime: Record<string, unknown>, timeoutMs: number }} options
+ * @returns {string[]}
+ */
+export function resolveExternalRuntimeNativeTimeoutArgs(options) {
+  const profile = asRecord(options.externalRuntime.native_timeout_arg);
+  const flag = asOptionalString(profile.flag);
+  if (!flag) {
+    return [];
+  }
+  const reserveMs = asPositiveInteger(profile.reserve_ms, 0);
+  const timeoutMs = Math.max(1000, Math.floor(options.timeoutMs) - reserveMs);
+  const seconds = Math.max(1, Math.floor(timeoutMs / 1000));
+  const format = asOptionalString(profile.format) ?? "seconds";
+  const value = format === "duration-seconds" ? `${seconds}s` : String(seconds);
+  return [flag, value];
+}
+
+/**
+ * Some external runners derive local state paths from the current working
+ * directory. Long live E2E run roots can exceed those runner limits even when
+ * the target checkout itself is valid, so adapter profiles may opt into a
+ * short symlink cwd while AOR keeps the canonical checkout as source of truth.
+ *
+ * @param {{ externalRuntime: Record<string, unknown>, executionRoot: string }} options
+ * @returns {{
+ *   executionRoot: string,
+ *   canonicalExecutionRoot: string,
+ *   mode: "direct" | "short-symlink",
+ *   aliased: boolean,
+ * }}
+ */
+export function resolveExternalRuntimeExecutionRoot(options) {
+  const configuredMode = asOptionalString(options.externalRuntime.execution_root_mode);
+  const shortModeRequested =
+    options.externalRuntime.short_execution_root === true ||
+    (configuredMode ? SHORT_EXECUTION_ROOT_MODES.includes(configuredMode) : false);
+  const canonicalExecutionRoot = fs.realpathSync(options.executionRoot);
+  if (!shortModeRequested) {
+    return {
+      executionRoot: options.executionRoot,
+      canonicalExecutionRoot,
+      mode: "direct",
+      aliased: false,
+    };
+  }
+
+  const configuredBase = asOptionalString(options.externalRuntime.short_execution_root_base);
+  const baseRoot = configuredBase
+    ? path.isAbsolute(configuredBase)
+      ? configuredBase
+      : path.resolve(process.cwd(), configuredBase)
+    : path.join(os.tmpdir(), "aor-exec-root");
+  fs.mkdirSync(baseRoot, { recursive: true });
+  const digest = createHash("sha256").update(canonicalExecutionRoot).digest("hex").slice(0, 16);
+  const aliasRoot = path.join(baseRoot, `x-${digest}`);
+  if (fs.existsSync(aliasRoot)) {
+    let pointsAtCanonical = false;
+    try {
+      pointsAtCanonical = fs.realpathSync(aliasRoot) === canonicalExecutionRoot;
+    } catch {
+      pointsAtCanonical = false;
+    }
+    if (!pointsAtCanonical) {
+      fs.rmSync(aliasRoot, { recursive: true, force: true });
+    }
+  }
+  if (!fs.existsSync(aliasRoot)) {
+    fs.symlinkSync(canonicalExecutionRoot, aliasRoot, "dir");
+  }
+
+  return {
+    executionRoot: aliasRoot,
+    canonicalExecutionRoot,
+    mode: "short-symlink",
+    aliased: true,
+  };
+}
+
+/**
  * @param {{
  *   command: string,
  *   args?: string[],
@@ -244,6 +447,7 @@ function resolveRequestTimeoutMs(request, fallback) {
  *   input?: string,
  *   timeout: number,
  *   maxBuffer: number,
+ *   providerStepStatus?: Record<string, unknown> | null,
  * }} options
  * @returns {{
  *   status: number | null,
@@ -264,6 +468,7 @@ export function runExternalRuntimeProcessSync(options) {
     input: options.input,
     timeout_ms: timeoutMs,
     max_buffer: maxBuffer,
+    provider_step_status: options.providerStepStatus ?? null,
   };
   const supervisor = spawnSync(process.execPath, ["-e", EXTERNAL_RUNTIME_SUPERVISOR_SOURCE], {
     cwd: options.cwd,
@@ -324,6 +529,67 @@ function asStringMap(value) {
     ([key, entry]) => typeof key === "string" && typeof entry === "string" && entry.trim().length > 0,
   );
   return Object.fromEntries(entries.map(([key, entry]) => [key, entry.trim()]));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Record<string, string>}
+ */
+function asEnvFromMap(value) {
+  const record = asRecord(value);
+  const entries = Object.entries(record).filter(
+    ([key, entry]) =>
+      typeof key === "string" &&
+      key.trim().length > 0 &&
+      typeof entry === "string" &&
+      entry.trim().length > 0,
+  );
+  return Object.fromEntries(entries.map(([key, entry]) => [key.trim(), entry.trim()]));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is string}
+ */
+function hasEnvValue(value) {
+  return typeof value === "string" && value.length > 0;
+}
+
+/**
+ * @param {{
+ *   externalRuntime: Record<string, unknown>,
+ *   baseEnv?: NodeJS.ProcessEnv,
+ * }} options
+ * @returns {{
+ *   env: NodeJS.ProcessEnv,
+ *   applied: Array<{ target: string, source: string }>,
+ *   missing: Array<{ target: string, source: string }>,
+ * }}
+ */
+export function resolveExternalRuntimeEnvironment(options) {
+  const externalRuntime = asRecord(options.externalRuntime);
+  const baseEnv = options.baseEnv ?? process.env;
+  const envOverrides = asStringMap(externalRuntime.env);
+  const envFrom = asEnvFromMap(externalRuntime.env_from);
+  const env = {
+    ...baseEnv,
+    ...envOverrides,
+  };
+  const applied = [];
+  const missing = [];
+  for (const [target, source] of Object.entries(envFrom)) {
+    if (hasEnvValue(env[target])) {
+      continue;
+    }
+    const sourceValue = baseEnv[source];
+    if (hasEnvValue(sourceValue)) {
+      env[target] = sourceValue;
+      applied.push({ target, source });
+    } else {
+      missing.push({ target, source });
+    }
+  }
+  return { env, applied, missing };
 }
 
 /**
@@ -1029,6 +1295,7 @@ export function createAdapterRequestEnvelope(input) {
     input_packet_refs: asStringArray(input.input_packet_refs),
     dry_run: Boolean(input.dry_run),
     context: asRecord(input.context),
+    provider_step_status: asRecord(input.provider_step_status),
   };
 }
 
@@ -1145,7 +1412,6 @@ export function createLiveAdapter(options) {
   const requestViaStdin = externalRuntime.request_via_stdin !== false;
   const requestTransport = resolveRequestTransport(externalRuntime, requestViaStdin);
   const timeoutMs = asPositiveInteger(externalRuntime.timeout_ms, 30000);
-  const envOverrides = asStringMap(externalRuntime.env);
   const runtimeEvidenceRoot = asOptionalString(options.runtimeEvidenceRoot);
   const projectRoot = asOptionalString(options.projectRoot);
   const requestedExecutionRoot = asOptionalString(options.executionRoot);
@@ -1186,10 +1452,11 @@ export function createLiveAdapter(options) {
           : null;
       const invocationToken = `${envelope.run_id}:${envelope.step_id}:${envelope.request_id}:${Date.now()}`;
       const normalizedEvidenceToken = invocationToken.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      const runnerEnv = {
-        ...process.env,
-        ...envOverrides,
-      };
+      const runtimeEnvironment = resolveExternalRuntimeEnvironment({
+        externalRuntime,
+        baseEnv: process.env,
+      });
+      const runnerEnv = runtimeEnvironment.env;
       const runtimeInvocation = resolveExternalRuntimePermissionPolicy({
         externalRuntime,
         requestedMode: asOptionalString(runnerEnv.AOR_RUNTIME_AGENT_PERMISSION_MODE),
@@ -1329,6 +1596,11 @@ export function createLiveAdapter(options) {
         });
       }
 
+      const executionRootBinding = resolveExternalRuntimeExecutionRoot({
+        externalRuntime,
+        executionRoot,
+      });
+      const runnerExecutionRoot = executionRootBinding.executionRoot;
       let runtimeArgs = [...runtimeInvocation.args];
       const requestTimeoutMs = resolveRequestTimeoutMs(envelope, timeoutMs);
       const startedAt = new Date().toISOString();
@@ -1342,6 +1614,13 @@ export function createLiveAdapter(options) {
         },
       };
       const serializedRunnerInput = `${JSON.stringify(runnerInput)}\n`;
+      runtimeArgs = [
+        ...runtimeArgs,
+        ...resolveExternalRuntimeNativeTimeoutArgs({
+          externalRuntime,
+          timeoutMs: requestTimeoutMs,
+        }),
+      ];
       const evidenceDir = runtimeEvidenceRoot
         ? path.isAbsolute(runtimeEvidenceRoot)
           ? runtimeEvidenceRoot
@@ -1378,11 +1657,12 @@ export function createLiveAdapter(options) {
       const invocation = runExternalRuntimeProcessSync({
         command: runtimeCommand,
         args: runtimeArgs,
-        cwd: executionRoot,
+        cwd: runnerExecutionRoot,
         env: runnerEnv,
         input: requestInput,
         timeout: requestTimeoutMs,
         maxBuffer: 10 * 1024 * 1024,
+        providerStepStatus: asRecord(envelope.provider_step_status),
       });
       const finishedAt = new Date().toISOString();
 
@@ -1412,9 +1692,13 @@ export function createLiveAdapter(options) {
           request_transport: requestTransport,
           request_file: requestFile,
           request_file_ref: requestFileRef,
-          execution_root: executionRoot,
+          execution_root: runnerExecutionRoot,
+          execution_root_mode: executionRootBinding.mode,
+          canonical_execution_root: executionRootBinding.canonicalExecutionRoot,
           permission_mode: runtimeInvocation.permissionMode,
           permission_mode_source: runtimeInvocation.source,
+          env_from_applied: runtimeEnvironment.applied,
+          env_from_missing: runtimeEnvironment.missing,
         },
         process: {
           exit_code: invocation.status,
@@ -1457,10 +1741,14 @@ export function createLiveAdapter(options) {
           runtime_mode: runtimeMode,
           command: runtimeCommand,
           args: runtimeArgs,
-          execution_root: executionRoot,
+          execution_root: runnerExecutionRoot,
+          execution_root_mode: executionRootBinding.mode,
+          canonical_execution_root: executionRootBinding.canonicalExecutionRoot,
           timeout_ms: requestTimeoutMs,
           permission_mode: runtimeInvocation.permissionMode,
           permission_mode_source: runtimeInvocation.source,
+          env_from_applied: runtimeEnvironment.applied,
+          env_from_missing: runtimeEnvironment.missing,
           exit_code: invocation.status,
           signal: invocation.signal,
           timed_out: invocationTimedOut,

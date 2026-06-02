@@ -106,6 +106,13 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `frontend_interaction_refs`
 - `final_step_verdict`
 
+When a step invokes an external provider, `step_journal[]` may also include
+`provider_step_status`. This is the same query-safe heartbeat exposed by the
+control plane and must preserve provider, adapter, route, step, status,
+elapsed/budget fields, last output/artifact timestamps, command label, and
+recommended action. It must not include raw process commands, command args,
+environment variables, tokens, or secrets.
+
 `plan` should preserve:
 - `objective`
 - `public_surface`
@@ -139,6 +146,34 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `accepted`
 - `missing`
 - `rejected`
+
+`agent_decision_request_ref` is the source of truth for preparing skill-agent
+operator decisions. Each decision request must include `decision_rubric` with
+`required_evidence_refs[]`, optional `frontend_evidence_refs[]`,
+`operator_decision_expected_ref`, and `expected_response_shape`. A helper-
+prepared operator decision must preserve:
+- `request_id`
+- `step_id`
+- `step_instance_id`
+- `iteration`
+- `status` (`accepted`)
+- `operator_ref`
+- `action` (`continue|answer|frontend_interact|retry_public_step|diagnose|block`)
+- `reason`
+- `semantic_analysis.status`
+- `semantic_analysis.judge_source` (`skill-agent`)
+- `semantic_analysis.findings[]`
+- `inspected_evidence_refs[]` copied from
+  `decision_rubric.required_evidence_refs[]`
+- `evidence_refs[]` including required inspected refs and any frontend refs
+- `frontend_evidence_refs[]` when UI/browser proof is required
+- `source_agent_decision_request_ref`
+- `created_at`
+
+Rejected decisions must keep a readable `operator_decision_rejection_reason`.
+The correction path is to prepare a new draft from the same
+`agent_decision_request_ref` and selected public action; operators should not
+need to hand-edit raw JSON to copy required evidence refs.
 
 `interactive_decisions[]` should preserve:
 - `step_id`

@@ -7,6 +7,14 @@ Live E2E simulates a user who has installed AOR, initializes or attaches a targe
 
 Every run starts by proving the AOR launcher before target execution. Source-channel acceptance and production-proof profiles create `${TMPDIR:-/tmp}/aor-live-e2e/<run-id>/`, copy the current AOR source into `aor-source`, run the source-only install proof (`corepack enable`, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm aor --help`), and then use a run-scoped session launcher from that isolated source install. Runtime state is stored under `<workspace>/runtime`; target checkouts live under `<workspace>/runtime/projects/<id>/target-checkouts`. `--runtime-root` and `--aor-install-mode repo-local` are explicit dev/debug overrides, not acceptance defaults. Profiles that use `--aor-bin` must still prove the provided binary with `aor --help`.
 
+Provider CLIs that derive local project state paths from the checkout path may set `live_e2e.target_checkout_root_mode: short-physical`. In that mode the runner still stores AOR reports and state under the normal isolated workspace, but clones the target repository into a short physical temp checkout. Use this only for provider path-length limits; no-upstream-write, delivery guardrails, and target `.aor/` runtime ownership remain unchanged.
+
+Small or medium provider smoke profiles may set `live_e2e.provider_step_timeouts_sec` as a map from step name to timeout seconds. Provider-pinned route materialization applies these values to generated route constraints before public execution starts, so bounded profiles can fail closed on provider latency instead of inheriting long full-lifecycle route caps.
+
+Qwen candidate profiles are the exception: catalog-backed Qwen full-journey profiles keep the one-hour provider step budget for implementation, repair, review, and QA even when the profile duration class is `small` or `medium`. Shorter local proof budgets have produced false timeout evidence after partial target diffs, so Qwen latency diagnostics must use a separately named diagnostic profile instead of weakening the canonical candidate profiles.
+
+Small or medium provider smoke profiles may also set `live_e2e.provider_step_retry_max_attempts` and `live_e2e.provider_step_repair_max_attempts` as maps from public step name to non-negative attempt count. Provider-pinned policy materialization writes run-scoped step policy overrides and passes them through public `--policy-overrides`, so a bounded Qwen smoke can use one provider attempt with `0` retry/repair attempts while still exercising the normal Runtime Harness fail-closed path.
+
 The runner invokes the installed project flow step by step. Each step follows `plan -> execute -> inspect -> classify -> decide -> persist`; the next public command is allowed only after the current step decision is `continue` or after a requested interaction/frontend/manual action is completed through a public surface.
 
 Operator-initiated interventions are public-surface actions, not private runner
@@ -43,9 +51,14 @@ Catalog-backed full-journey profiles:
 - `full-journey-regress-ky.yaml`
 - `full-journey-regress-ky-anthropic.yaml`
 - `full-journey-regress-ky-open-code.yaml`
+- `full-journey-regress-ky-small-codex.yaml`
+- `full-journey-regress-ky-medium-codex.yaml`
 - `full-journey-regress-ky-medium-anthropic.yaml`
 - `full-journey-regress-ky-medium-open-code.yaml`
+- `full-journey-regress-ky-small-qwen.yaml`
+- `full-journey-regress-ky-medium-qwen.yaml`
 - `full-journey-release-ky-medium-openai.yaml`
+- `installed-user-guided-journey-qwen.yaml`
 - `full-journey-regress-httpie.yaml`
 - `full-journey-regress-httpie-anthropic.yaml`
 - `full-journey-repair-httpie-medium-anthropic.yaml`
@@ -125,12 +138,25 @@ Provider permission-mode analogues:
 - Claude Code restricted: `--permission-mode auto`.
 - OpenCode full-bypass: `opencode run --format json --dangerously-skip-permissions` with the AOR request attached through OpenCode's message/`--file` CLI surface.
 - OpenCode restricted: `opencode run --format json` with the same file-attached request transport.
-- Qwen candidate full-bypass: `qwen --output-format json --approval-mode yolo`.
-- Qwen candidate restricted: `qwen --output-format json --approval-mode default`.
+- Qwen candidate full-bypass: `qwen --bare --auth-type anthropic --output-format json --approval-mode yolo --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with the one-hour real-runner external step timeout and `external_runtime.env_from` mapping `ANTHROPIC_AUTH_TOKEN` to `ANTHROPIC_API_KEY` when needed by the host setup.
+- Qwen candidate restricted: `qwen --bare --auth-type anthropic --output-format json --approval-mode default --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with the same candidate timeout and auth env bridge.
+
+Qwen candidate runs also rely on Runtime Harness runner-state leakage detection: target-checkout changes under `.codex/`, `.claude/`, `.qwen/`, or `.opencode/` are classified as `runner-owned-state-leak` and block the run before delivery proof can treat runner-local state as patch content.
 
 Use `runtime-permission-runner-certification.md` for the post-merge real-runner smoke lane that checks these mappings without changing contracts or provider status.
 
-Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. Preflight and full external runner execution are hard local subprocess bounds: a runner that exceeds them has its local process group killed and is reported as timeout evidence instead of leaving the public lifecycle waiting indefinitely. Real external provider profiles use a 60 minute full-runner bound (`timeout_ms=3600000`) while keeping preflight probes short (`preflight_timeout_ms=120000`), so medium and larger full-journey proofs are constrained by route/policy budgets before the adapter's hard cap. Per-step policy budgets may shorten an external runner request, but they must not extend it beyond the adapter profile timeout. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
+Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. Preflight and full external runner execution are hard local subprocess bounds: a runner that exceeds them has its local process group killed and is reported as timeout evidence instead of leaving the public lifecycle waiting indefinitely. Real external provider profiles use a 60 minute full-runner bound (`timeout_ms=3600000`) while keeping preflight probes short (`preflight_timeout_ms=120000`), so medium and larger full-journey proofs are constrained by route/policy budgets before the adapter's hard cap. Candidate qwen profiles use the same one-hour hard cap because full lifecycle implementation requests can exceed shorter local proof budgets, while qwen coverage remains extended and does not count toward required qualification until promoted. Per-step policy budgets may shorten an external runner request, but they must not extend it beyond the adapter profile timeout. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
+
+While an external provider step is running, `run-control-state-<run>.json`
+preserves `provider_step_status` and public reads expose the same heartbeat
+through `aor run status`, `GET /api/projects/:projectId/state`, and
+`GET /api/projects/:projectId/runs`. The status must show provider, adapter,
+route, step, elapsed time, timeout budget, remaining budget, last output or
+artifact update, a compact command label, and a recommended action. Silent
+providers are reported as `silent-running` after the no-output window rather
+than as a hung terminal process. Operator reports and the SPA must not print raw
+process commands, args, env, tokens, or provider secrets; raw evidence remains
+behind explicit evidence refs.
 
 Live adapter request and raw-output evidence files must use bounded filenames. Full-journey run ids, repair suffixes, step ids, and request ids can be long, so the persisted file name keeps the adapter prefix for operator readability and uses a short token plus hash for uniqueness. The evidence ref remains the durable contract; consumers must not depend on the full run id being embedded in the basename.
 
@@ -185,9 +211,63 @@ node ./scripts/live-e2e/manual-live-e2e.mjs \
 
 One invocation runs only the next pending controller step, writes `live_e2e_controller_state_file` plus a `live-e2e-step-observation-*` artifact, and prints the current decision. Re-run the same command with the same `--run-id` after completing any required public action. After the execution step has been observed, including while it is waiting for a skill-agent decision, manual resume reuses the preserved pre-execution baseline and target-cleanliness evidence instead of re-checking the already-mutated target checkout as if execution had not run; if that preserved readiness evidence is missing, resume fails closed. The same rule applies to repair-loop iterations such as `execution#2`: installing the operator decision must update the persisted observation, not rerun or reclassify the already observed public execution. When repeated command labels exist in the command journal, the controller resolves cached evidence by matching label plus step instance and iteration; legacy state may fall back only when the transcript matches the persisted step journal entry or the label is not repeated.
 
+Manual output includes a compact `provider_step_status` summary when the latest
+observed command ran an external provider. Use that summary to distinguish
+`running`, `silent-running`, `timeout-risk`, `completed`, and `failed` provider
+states without opening terminal process details.
+
+Artifact refs in live E2E UI/operator reads should render through
+`artifact_display_summaries[]`: show label, type, stage, status, severity, and
+short purpose first; keep the raw evidence/path/packet ref only in explicit
+debug or `Copy raw ref` actions. Missing or unreadable refs must stay visible as
+`status=missing` summaries rather than disappearing from the operator view.
+
+The execution evidence panel reads `RunSummary.execution_evidence` and is the
+operator view for provider execution, Runtime Harness decision, real-code-change
+status, post-run verification, review, delivery readiness, and no-upstream-write
+status. Changed paths are grouped as `mission-relevant`, `runtime-owned`,
+`runner-owned-leak`, and `scratch-unrelated`. Scratch-only output cannot count
+as a passing implementation. Runner-local state under `.qwen/`, `.codex/`,
+`.claude/`, or `.opencode/` in the target checkout is a blocking
+`runner-owned-leak` and must not be delivered as target work.
+
+Interruption controls must use public surfaces only:
+- stop a running provider with `aor run cancel`, which records durable
+  `provider_step_status.status=interrupted` plus `operator-stopped` audit
+  evidence;
+- preserve partial evidence with `aor run status --json`;
+- diagnose or retry with `manual-live-e2e.mjs --prepare-decision --action
+  diagnose` or `--action retry_public_step`.
+
+An interrupted provider run is not a pass and must remain visible as partial
+evidence for diagnosis or public retry. UI controls should disable diagnose or
+retry buttons when no public `agent_decision_request_ref` is visible, instead
+of inventing a private continuation path.
+
 Delivery-time harness certification uses the delivery-owned diagnostic label `delivery-harness-certify`. Review-time `harness-certify` evidence must not be replayed as delivery certification evidence, because delivery certification is a fresh public `aor harness certify` precondition before `aor deliver prepare`.
 
-When the step stops for a required skill-agent decision, write the decision JSON from the request's expected response shape and install it before resuming:
+When the step stops for a required skill-agent decision, prepare the decision
+from the request rubric instead of hand-copying raw JSON refs:
+
+```bash
+node ./scripts/live-e2e/manual-live-e2e.mjs \
+  --prepare-decision \
+  --request <agent_decision_request_ref> \
+  --action continue \
+  --finding "Required public evidence refs were inspected."
+```
+
+If `--request` is omitted, pass the same `--project-ref`, `--runtime-root` when
+used, and `--run-id`; the helper finds the latest pending
+`agent_decision_request_ref`. The helper writes to the request's
+`operator_decision_expected_ref` by default, or to `--output <decision.json>` for
+a draft file. It automatically fills `inspected_evidence_refs[]` from
+`decision_rubric.required_evidence_refs[]`, preserves frontend evidence refs, and
+prints a validation preview with readable rejection risks. Supported actions are
+`continue`, `diagnose`, `block`, `retry_public_step`, `answer`, and
+`frontend_interact`.
+
+Install the prepared decision before resuming:
 
 ```bash
 node ./scripts/live-e2e/manual-live-e2e.mjs \
@@ -196,6 +276,12 @@ node ./scripts/live-e2e/manual-live-e2e.mjs \
   --run-id <stable-run-id> \
   --operator-decision-file <decision.json>
 ```
+
+If the controller reports `operator_decision_status=rejected`, read the
+`operator_decision_rejection_reason` from the latest step observation and run the
+same `--prepare-decision` command again with the corrected action, semantic
+status, finding, or operator note. The correction path must not require manual
+editing of raw JSON just to restore required evidence refs.
 
 Interaction answers must still go through `aor run answer` or the HTTP answer route; a local operator decision file cannot substitute for answer audit evidence.
 
@@ -243,7 +329,7 @@ node ./scripts/live-e2e/qualification-loop.mjs \
 
 Record mode applies the same medium-or-larger and pass/fix/block classification gates as a fresh run, reads the observation report from the summary unless `--record-observation-report-file` is supplied, and upserts the qualification-set attempt by `run_id` so a manually resumed run replaces its earlier blocked accounting entry. The recorded summary must match the selected profile's `profile_id`, `target_catalog_id`, `feature_mission_id`, `scenario_family`, `provider_variant_id`, and `feature_size`. Run summaries include `commit_sha` and `branch_name`; record mode requires `commit_sha` to be on the current branch lineage and rejects cross-profile, cross-provider, corrupt, or stale qualification evidence before writing the qualification set.
 
-The launching agent performs the fix and commit. Final qualification requires at least five full positive medium-or-larger runs across provider variants: at least two `openai-primary`, at least two `anthropic-primary`, and at least one `open-code-primary`.
+The launching agent performs the fix and commit. Final qualification requires at least five full positive medium-or-larger runs across provider variants: at least two `openai-primary`, at least two `anthropic-primary`, and at least one `open-code-primary`. `qwen-primary` is extended candidate evidence and does not count toward the required qualification set until a future promotion changes its coverage tier.
 
 ## Layer behavior
 Legacy bounded rehearsal summaries:
@@ -267,7 +353,7 @@ Full-journey layer:
 - includes the materialized spec step-result as a concrete `packet://spec@evidence://...` promotion ref for adapter context, while `run start` binds the approved handoff ref into the compiled context.
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
 - repeats public `run start` / `review run` iterations with iteration-specific run ids when review or primary verification requests repair, and records each repeated step as `execution#N` and `review#N` in the step journal.
-- bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Timeout failures are preserved as failed step-result evidence; for full-journey baseline diagnostics they are interpreted through the same diagnostic/blocking gate rules as other target verification failures.
+- bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Generated live E2E project profiles default this bound to 1800 seconds per command so browser setup commands such as `npx playwright install` stay bounded without turning normal first-run multi-browser cache installation into a false readiness blocker. Timeout failures are preserved as failed step-result evidence; for full-journey baseline diagnostics they are interpreted through the same diagnostic/blocking gate rules as other target verification failures.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - gates continuation after every observed public step by the online live E2E controller decision.
 - keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; supported full-lifecycle profiles must execute them as ordinary observed steps.
@@ -418,7 +504,7 @@ The runner performs deterministic analysis for every step from public command tr
 
 The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent` and non-empty `inspected_evidence_refs[]`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` is removed; live E2E semantic analysis comes only from accepted skill-agent decisions and the final skill-agent verdict artifact.
 
-Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and screenshot or visual evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not replace `browser-task-proof` evidence.
+Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. Use `manual-live-e2e.mjs --prepare-decision` as the default draft path so required refs and frontend refs are copied from the request rather than typed by hand. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and screenshot or visual evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not replace `browser-task-proof` evidence.
 
 Judge criteria:
 - traceability to feature request, mission, and previous step;
@@ -497,7 +583,7 @@ close required acceptance.
 - `review-report.provider_traceability` matches the requested provider variant and adapter path.
 - `review-report.feature_size_fit` stays inside the declared size budget for the mission.
 - `review-report.artifact_quality.verify_summary_ref` points at the post-run `project verify` summary.
-- `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and `runner_quality_summary` are observed post-delivery dimensions. Runtime Harness can block final quality for missing execution evidence, adapter crashes, unresolved interaction, or blocked runtime state, but it does not fail implementation quality by path whitelist/blacklist rules.
+- `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and `runner_quality_summary` are observed post-delivery dimensions. Runtime Harness can block final quality for missing execution evidence, adapter crashes, unresolved interaction, blocked runtime state, runner-owned state leaks, or missing mission-relevant source-change evidence. It does not fail implementation quality by path whitelist/blacklist rules; `change_evidence.required_path_prefixes` only defines the minimum changed-path evidence that can prove the selected catalog mission was touched.
 - `delivery_manifest_file` exists and is anchored to the target checkout.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.
 - Guided proof execution starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; the target repository HEAD must remain unchanged and no remote write commands may be recorded unless an explicit future profile opts into network write-back.
@@ -537,3 +623,36 @@ Evidence note:
 - it records meaningful implementation changed paths under `source/utils/merge.ts` and `test/headers.ts`, plus pass summaries for post-run verification, Runtime Harness, review, delivery, and learning-loop closure.
 - it records `delivery_mode=patch-only`, `write_back_to_remote=false`, unchanged target `HEAD`, empty `commit_refs`, and `writeback_results=[patch-materialized]`.
 - it is sanitized for commit: no runtime output tree, target checkout, local absolute path, raw transcript, or secret material is included.
+
+## W35-S05 operator UX proof closure (2026-06-02)
+W35-S05 adds operator-UX proof evidence for the hardened live E2E surfaces:
+
+- `examples/live-e2e/fixtures/w35-s05/silent-provider-ux-proof.sample.json`
+  records a synthetic silent-provider proof for the current skill-agent-only
+  model. It proves that `provider_step_status`, `artifact_display_summaries[]`,
+  `RunSummary.execution_evidence`, public stop/save/diagnose actions, decision
+  helper auto-filled refs, runner-owned leak blocking, and no-upstream-write
+  evidence remain visible without terminal/process inspection.
+- Targeted regression coverage lives in
+  `scripts/test/live-e2e-proof-runner.test.mjs` and asserts the W35 fixture
+  preserves fail-closed operator evidence, readable artifact summaries, and
+  decision-helper required refs.
+- `examples/live-e2e/fixtures/w35-s05/live-attempts-summary.sample.json`
+  records the 2026-06-02 local attempts. Codex small reached public
+  `baseline-diagnostic` target verification and was blocked by a long-running
+  target `npm test`/AVA/WebKit process before a controller decision could be
+  produced. Qwen CLI availability was confirmed (`qwen --version` returned
+  `0.17.0`), but the Qwen full proof was not advanced because the same target
+  verification blocker appeared before provider-specific quality could be
+  judged. These attempts are fail-closed blocker evidence, not proof credit.
+- Real Codex/Qwen proof attempts for W35 must use
+  `full-journey-regress-ky-small-codex.yaml` or
+  `full-journey-regress-ky-medium-codex.yaml`, plus
+  `full-journey-regress-ky-small-qwen.yaml` for Qwen candidate evidence. If Qwen
+  remains silent, leaks runner-owned `.qwen/` state, times out, or fails target
+  verification, record it as provider-quality/environment blocker evidence
+  instead of a product pass.
+- Proof closure still requires accepted skill-agent decisions, non-empty
+  `inspected_evidence_refs[]`, frontend refs when the profile requires browser
+  proof, final skill-agent verdict evidence, and no-upstream-write assertions.
+  Deleted bounded or mock-backed proof profiles must not be restored.

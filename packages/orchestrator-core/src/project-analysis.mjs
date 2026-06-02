@@ -58,6 +58,19 @@ function toEvidenceRef(projectRoot, filePath) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @returns {string}
+ */
+function toProjectRelativeOrAbsolutePath(projectRoot, filePath) {
+  const relative = path.relative(projectRoot, filePath).replace(/\\/g, "/");
+  if (relative && !relative.startsWith("../") && !path.isAbsolute(relative)) {
+    return relative;
+  }
+  return filePath;
+}
+
+/**
  * @param {unknown} value
  * @returns {Record<string, unknown>}
  */
@@ -187,6 +200,7 @@ function resolveFeatureTraceability(options) {
     expectedEvidence: Array.isArray(requestDocument.expected_evidence)
       ? requestDocument.expected_evidence.filter((entry) => typeof entry === "string")
       : [],
+    requiredPathPrefixes: asStringArray(asRecord(requestDocument.change_evidence).required_path_prefixes),
     changeBudget:
       typeof requestDocument.change_budget === "object" && requestDocument.change_budget !== null
         ? asRecord(requestDocument.change_budget)
@@ -911,22 +925,22 @@ export function analyzeProjectRuntime(options = {}) {
     command_catalog: commandCatalog,
     service_boundaries: repoFacts.service_boundaries,
     route_resolution: {
-      routes_root: path.relative(init.projectRoot, routesRoot) || ".",
+      routes_root: toProjectRelativeOrAbsolutePath(init.projectRoot, routesRoot),
       applied_overrides: options.routeOverrides ?? {},
       matrix: routeResolutionMatrix,
     },
     asset_resolution: {
-      wrappers_root: path.relative(init.projectRoot, wrappersRoot) || ".",
-      prompts_root: path.relative(init.projectRoot, promptsRoot) || ".",
+      wrappers_root: toProjectRelativeOrAbsolutePath(init.projectRoot, wrappersRoot),
+      prompts_root: toProjectRelativeOrAbsolutePath(init.projectRoot, promptsRoot),
       matrix: assetResolutionMatrix,
     },
     policy_resolution: {
-      policies_root: path.relative(init.projectRoot, policiesRoot) || ".",
+      policies_root: toProjectRelativeOrAbsolutePath(init.projectRoot, policiesRoot),
       applied_overrides: options.policyOverrides ?? {},
       matrix: policyResolutionMatrix,
     },
     evaluation_registry: {
-      examples_root: path.relative(init.projectRoot, evaluationRegistry.examplesRoot) || ".",
+      examples_root: toProjectRelativeOrAbsolutePath(init.projectRoot, evaluationRegistry.examplesRoot),
       dataset_refs: evaluationRegistry.datasets.map((dataset) => dataset.dataset_ref),
       suite_refs: evaluationRegistry.suites.map((suite) => suite.suite_ref),
       datasets: evaluationRegistry.datasets,
@@ -959,6 +973,7 @@ export function analyzeProjectRuntime(options = {}) {
           allowed_paths: featureTraceability.allowedPaths,
           forbidden_paths: featureTraceability.forbiddenPaths,
           expected_evidence: featureTraceability.expectedEvidence,
+          required_path_prefixes: featureTraceability.requiredPathPrefixes,
           change_budget: featureTraceability.changeBudget,
           source_kind: featureTraceability.sourceKind,
           product_intake: featureTraceability.productIntake,
@@ -1016,7 +1031,7 @@ export function analyzeProjectRuntime(options = {}) {
           command: "aor project analyze",
           selected_profile_ref: init.projectProfileRef,
         },
-        routes_root: path.relative(init.projectRoot, routesRoot) || ".",
+        routes_root: toProjectRelativeOrAbsolutePath(init.projectRoot, routesRoot),
         applied_overrides: options.routeOverrides ?? {},
         matrix: routeResolutionMatrix,
         status: "resolved",
@@ -1037,8 +1052,8 @@ export function analyzeProjectRuntime(options = {}) {
           command: "aor project analyze",
           selected_profile_ref: init.projectProfileRef,
         },
-        wrappers_root: path.relative(init.projectRoot, wrappersRoot) || ".",
-        prompts_root: path.relative(init.projectRoot, promptsRoot) || ".",
+        wrappers_root: toProjectRelativeOrAbsolutePath(init.projectRoot, wrappersRoot),
+        prompts_root: toProjectRelativeOrAbsolutePath(init.projectRoot, promptsRoot),
         matrix: assetResolutionMatrix,
         status: "resolved",
       },
@@ -1058,7 +1073,7 @@ export function analyzeProjectRuntime(options = {}) {
           command: "aor project analyze",
           selected_profile_ref: init.projectProfileRef,
         },
-        policies_root: path.relative(init.projectRoot, policiesRoot) || ".",
+        policies_root: toProjectRelativeOrAbsolutePath(init.projectRoot, policiesRoot),
         applied_overrides: options.policyOverrides ?? {},
         matrix: policyResolutionMatrix,
         status: "resolved",
@@ -1079,7 +1094,7 @@ export function analyzeProjectRuntime(options = {}) {
           command: "aor project analyze",
           selected_profile_ref: init.projectProfileRef,
         },
-        examples_root: path.relative(init.projectRoot, evaluationRegistry.examplesRoot) || ".",
+        examples_root: toProjectRelativeOrAbsolutePath(init.projectRoot, evaluationRegistry.examplesRoot),
         dataset_refs: evaluationRegistry.datasets.map((dataset) => dataset.dataset_ref),
         suite_refs: evaluationRegistry.suites.map((suite) => suite.suite_ref),
         datasets: evaluationRegistry.datasets,

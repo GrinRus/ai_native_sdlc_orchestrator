@@ -23,7 +23,7 @@ pnpm check
 
 | Profile | Required tools | setup_commands | verification.commands | External downloads | Typical failure signature |
 | --- | --- | --- | --- | --- | --- |
-| `full-journey-production-proof-ky-openai` | `node >=22`, `npm`, `git`, Playwright runtime support, authenticated `codex` CLI with non-interactive edit permissions | `npm install`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries + external runner auth/config | `not authenticated`, permission/readiness denial, missing `codex`, or blocking target verification failure before `run start` |
+| `full-journey-production-proof-ky-openai` | `node >=22`, `npm`, `git`, Playwright runtime support, authenticated `codex` CLI with non-interactive edit permissions | `npm install --prefer-offline --no-audit --no-fund`<br>`npx playwright install` | `npm test` | npm packages + Playwright browser binaries + external runner auth/config | `not authenticated`, permission/readiness denial, missing `codex`, or blocking target verification failure before `run start` |
 | `commander-js` full-journey profiles | `node >=22`, `npm`, `git` | `npm ci` | `npm run test`<br>`npm run check` | npm packages | lockfile install errors, failing parser/help tests, or check script errors |
 | `pluggy` full-journey profiles | `python3 >=3.9`, `pip`, `git` | `python3 -m venv .aor/live-e2e-venv`<br>`.aor/live-e2e-venv/bin/python -m pip install -e . "pytest>=8" pytest-benchmark coverage` | `.aor/live-e2e-venv/bin/python -m pytest testing` | Python dependencies from index/mirror | venv creation, editable install, or pytest failure |
 | `cobra` extended target | `go`, `git` | `go mod download` | `go test ./...` | Go module downloads | module download or Go test failure |
@@ -34,7 +34,9 @@ pnpm check
 | `fastify` extended target | `node >=22`, `npm`, `git` | `npm install` | `npm run test:ci`<br>`npm run lint` | npm packages | dependency install, unit/type tests, or ESLint failure |
 | `prettier` extended target | `node >=22`, `yarn >=4`, `git` | `yarn install --immutable` | `yarn lint:typecheck`<br>`yarn lint:eslint`<br>`yarn test tests/format/typescript tests/format/markdown` | Yarn packages | immutable install, TypeScript, ESLint, or focused snapshot test failure |
 | `ruff` extended target | `rust/cargo`, `git` | `cargo fetch` | `cargo test -p ruff_linter`<br>`cargo test -p ruff_python_formatter` | Cargo crate downloads | cargo fetch, Rust compile, targeted crate test, or snapshot-related failure |
+| `ky` Codex/Qwen small and medium regress profiles | `node >=22`, `npm`, `git`, authenticated provider CLI (`codex` for `openai-primary`, `qwen` for `qwen-primary`; Qwen host auth may require the `ANTHROPIC_AUTH_TOKEN -> ANTHROPIC_API_KEY` adapter alias) | target catalog commands for `ky` (`npm install --prefer-offline --no-audit --no-fund`) | `npx xo`<br>`npm run build`<br>`npx ava test/headers.ts` for `ky-header-regression`; medium runs use the cataloged `ky-fetch-options-regression` target verification slice | npm packages + provider auth/config | missing provider CLI/auth, permission/readiness denial, provider timeout, target verification failure, or no-upstream-write violation |
 | `installed-user-guided-journey` | `node >=22`, `npm`, `git`, authenticated `codex` CLI, local web runtime support | target catalog commands for `ky` plus `aor app --smoke --open false --json` | target catalog commands plus guided flow-loop and web task proof | npm packages + Playwright browser binaries when the target commands require them | missing auth/permission readiness, failed target verification, missing first/second flow evidence, missing flow-targeted request evidence, missing web HTML/DOM/accessibility/screenshot-or-visual evidence, or missing skill-agent UI verdict |
+| `installed-user-guided-journey-qwen` | `node >=22`, `npm`, `git`, authenticated `qwen` CLI with the same auth env alias when needed, local web runtime support | target catalog commands for `ky` plus `aor app --smoke --open false --json` | target catalog commands plus guided flow-loop and web task proof | npm packages + Playwright browser binaries when the target commands require them + Qwen auth/config | missing qwen CLI/auth, path-length-sensitive runtime setup, provider timeout, failed target verification, missing browser-task proof, or missing skill-agent UI verdict |
 
 `pluggy` full-journey profiles require a full checkout with tags before editable
 install. The target derives its version with `setuptools-scm`; shallow clones
@@ -84,7 +86,7 @@ The legacy W7/W10/W11/W12 bounded rehearsal bundles were removed from the reposi
 
 Mandatory matrix axes:
 - `scenario_family`: `regress`, `release`, `repair`, `governance`
-- `provider_variant_id`: `openai-primary`, `anthropic-primary`, `open-code-primary`
+- `provider_variant_id`: `openai-primary`, `anthropic-primary`, `open-code-primary`, `qwen-primary`
 - `feature_size`: `small`, `medium`, `large`, with `xl` reserved for manual/overnight profiles
 - `run_tier`: `readme-smoke`, `bounded-live`, `full-journey-observation`, `acceptance`, `production-proof`
 
@@ -93,7 +95,8 @@ Operational rules:
 - each curated repo must expose `small`, `medium`, and `large` missions in its target catalog;
 - review and learning closure artifacts must carry `matrix_cell` and `coverage_follow_up`;
 - provider comparison coverage is required between `openai-primary` and `anthropic-primary` for at least one equivalent mission class per curated repo.
-- `openai-primary` and `anthropic-primary` are mandatory provider variants across comparison coverage; `open-code-primary` is extended candidate coverage until a future real-runner proof promotes it.
+- `openai-primary` and `anthropic-primary` are mandatory provider variants across comparison coverage; `open-code-primary` and `qwen-primary` are extended candidate coverage until future real-runner proof promotes them.
+- `qwen-primary` candidate steps use the one-hour real-runner external cap; timeout evidence is an adapter finding, not required matrix coverage.
 - required matrix coverage closes only for `coverage_status=covered_pass` on `run_tier=acceptance` or `run_tier=production-proof`; warning runs remain `covered_with_findings`.
 
 ## Removed W14-S07 matrix fixture bundle (2026-04-24)

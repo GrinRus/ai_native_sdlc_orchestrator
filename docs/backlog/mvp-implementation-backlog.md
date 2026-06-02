@@ -322,5 +322,14 @@ This is the master index for the implementation slices across all defined waves.
 | W34-S06 | Installed-user browser-task flow-loop proof | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, `apps/cli/**`, tests | W34-S03, W34-S04, W34-S05 |
 | W34-S07 | Backlog, docs, and release-gate alignment | EPIC-0 | done | `README.md`, `docs/backlog/**`, `docs/product/**`, `docs/ops/**`, `scripts/**`, release tests | W34-S06 |
 
+## W35 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W35-S01 | Provider heartbeat and long-running step status | EPIC-6 | done | `docs/product/**`, `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/cli/**`, `apps/web/**`, `scripts/live-e2e/**`, tests | W34-S07 |
+| W35-S02 | User-facing artifact reference renderer | EPIC-6 | done | `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, `examples/control-plane-api/**`, tests | W35-S01 |
+| W35-S03 | Operator decision helper and decision UX | EPIC-7 | done | `scripts/live-e2e/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, `docs/ops/**`, tests | W35-S02 |
+| W35-S04 | Execution evidence panel and interruption controls | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `apps/cli/**`, `packages/orchestrator-core/**`, `scripts/live-e2e/**`, `docs/contracts/**`, tests | W35-S01, W35-S02, W35-S03 |
+| W35-S05 | Codex/Qwen live E2E UX proof and runbook closure | EPIC-7 | blocked | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/web/**`, `apps/cli/**`, tests | W35-S04 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

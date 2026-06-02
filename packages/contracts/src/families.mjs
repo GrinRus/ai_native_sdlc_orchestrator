@@ -62,7 +62,7 @@ export const LIVE_E2E_OBSERVATION_STATUS_VALUES = [
   "resumed",
 ];
 const LIVE_E2E_SCENARIO_VALUES = ["regress", "release", "repair", "governance"];
-const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary"];
+const LIVE_E2E_PROVIDER_VARIANT_VALUES = ["openai-primary", "anthropic-primary", "open-code-primary", "qwen-primary"];
 export const INTAKE_SOURCE_KIND_VALUES = ["local-issue", "local-prd", "local-rfc", "local-note", "local-mail"];
 const LIVE_RUN_EVENT_TYPE_VALUES = [
   "run.started",

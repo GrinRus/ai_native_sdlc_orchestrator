@@ -16,6 +16,7 @@ Normalized output of one step regardless of whether that step was an artifact, p
 Step results make routing, validation, and quality logic consistent across the lifecycle.
 Execution engines may add replay metadata (for example route/asset/policy/adapter selections, timestamps, dry-run mode, and blocked-next-step guidance) as optional fields.
 `project verify` runner step results may add `command_timeout_ms` and `timed_out` so command-bound failures are machine-readable in addition to the transcript evidence.
+Catalog-backed runner steps may carry `routed_execution.feature_traceability.required_path_prefixes[]`. This is read-model traceability for `execution_evidence.real_code_change_status`: it identifies the minimum repository surfaces that can prove a mission-relevant change. It is not an allowed/forbidden path gate and must not replace review, verification, or delivery evidence.
 Runtime Harness controllers may add optional decision metadata:
 - `mission_outcome` (`satisfied|not_satisfied|not_applicable|unknown`)
 - `failure_class`
@@ -49,7 +50,8 @@ The field must not embed sensitive answer text. Operator answers belong in durab
 Permission requests may also be summarized at top level as `runtime_permission_request` and `runtime_permission_decision` so Runtime Harness reports and policy history can inspect auto decisions even when no user-facing `requested_interaction` was needed.
 `state_history[]` is the durable query-safe ledger for interactive continuation. Each entry should include `status`, `timestamp`, optional sanitized `summary`, `evidence_refs[]`, optional `answer_audit_refs[]`, and optional `continuation`. It may record `requested`, `answered`, `resumed`, `resume_failed`, and `blocked` states for one `interaction_id`; it must never include raw operator answer text.
 `repair_attempts` is the step-local Runtime Harness ledger. It should preserve the trigger, failure class, selected policy action, input evidence refs, repair route/compiled-context refs when executed, result, and budget exhaustion metadata. When repair executes, `input_evidence_refs` should include the generated repair input evidence that carries previous findings, failed step-result refs, diff status, adapter evidence, validator findings, and the current Runtime Harness report ref.
-`mission_semantics` records the semantic validation evidence used by the step controller, including changed paths, meaningful changed paths, ignored request input files, and strict no-op detection inputs when available. Runtime Harness no longer emits allowed/forbidden path gates, mission-scoped changed paths, or scope-violation paths as implementation-quality verdicts.
+`mission_semantics` records the semantic validation evidence used by the step controller, including changed paths, meaningful changed paths, runner-owned local state paths, ignored request input files, and strict no-op detection inputs when available. Runtime Harness no longer emits allowed/forbidden path gates, mission-scoped changed paths, or scope-violation paths as implementation-quality verdicts.
+`runner_owned_state_paths[]` and `runner_owned_state_paths_during_step[]` identify local runner configuration or skill state such as `.codex/`, `.claude/`, `.qwen/`, or `.opencode/` that appeared inside the target checkout. For live runner execution, these paths are not acceptable upstream patch material; Runtime Harness must classify them with `failure_class=runner-owned-state-leak` and `runtime_harness_decision=block`.
 
 ## Loader validation
 The shared contract loader validates nested step-result fields that carry runtime control evidence:
@@ -58,7 +60,7 @@ The shared contract loader validates nested step-result fields that carry runtim
 - `requested_interaction` may be `null`; when present it must be an object with `requested` as a boolean, optional `status` in `requested|answered|resumed|resume_failed|blocked`, query-safe evidence refs, optional query-safe `state_history[]`, and no raw answer fields.
 - `external_runner` must preserve `runtime_mode` and `command` when present; `raw_evidence_ref` is validated as a string when available, and `exit_code` is numeric when available or `null` for missing-command preflight failures.
 - `repair_attempts[]` entries must be objects with `attempt`, `trigger`, `result`, and `input_evidence_refs[]`.
-- `mission_semantics` path arrays must contain strings when present. Legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, and `scope_violation_paths` must not be emitted.
+- `mission_semantics` path arrays, including `runner_owned_state_paths[]` and `runner_owned_state_paths_during_step[]`, must contain strings when present. Legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, and `scope_violation_paths` must not be emitted.
 
 For `spec` routed steps, `routed_execution.discovery_research_gate` may carry the discovery research report status, ADR-ready flag, open questions, checks, and report refs from `aor discovery run`. This keeps ADR-readiness visible at specification handoff without making the spec step own research collection.
 For later discovery/architecture maturity flows, `routed_execution` may include `discovery_completeness_gate` and `architecture_traceability` payloads so planning handoff is auditable.

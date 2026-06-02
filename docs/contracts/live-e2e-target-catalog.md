@@ -23,6 +23,7 @@ Each mission should carry:
 - `expected_evidence`
 - `quality_evidence`
 - `acceptance_checks`
+- `change_evidence.required_path_prefixes` when the mission needs source-change evidence tied to specific repository surfaces
 - `size_budget`
 - `size_rationale`
 
@@ -37,7 +38,7 @@ Small regression missions may omit those fields when the bounded command gate is
 otherwise explicit, but the runner reports medium+ omissions as failed artifact
 quality and does not close required matrix acceptance.
 
-Missions must not use `allowed_paths` or `forbidden_paths` as Runtime Harness or live E2E acceptance gates. The catalog describes expected behavior, verification commands, quality evidence, feature size, and risks; final implementation quality is judged from the target result, skill-agent operator assessment, review, delivery, and post-run verification evidence.
+Missions must not use `allowed_paths` or `forbidden_paths` as Runtime Harness or live E2E acceptance gates. `change_evidence.required_path_prefixes` is narrower: it declares the minimum repository surfaces that can prove mission-relevant real-code-change evidence for `real_code_change_status`. It does not forbid other reviewed changes, but scratch files, provider-local state, editor backups, and unrelated root artifacts do not satisfy a mission that requires changes under source, test, or public type surfaces. The catalog describes expected behavior, verification commands, quality evidence, feature size, and risks; final implementation quality is judged from the target result, skill-agent operator assessment, review, delivery, and post-run verification evidence.
 
 ## Verification policy
 Catalog target `verification` keeps the existing command shape:
@@ -66,7 +67,7 @@ Full-journey reports must distinguish:
 - `post_run_diagnostic_verify_summary_file` and `post_run_diagnostic_status` when mission diagnostics are configured
 - `provider_execution_status`, `real_code_change_status`, `run_start_runtime_harness_decision`, `latest_runtime_harness_decision`, and `quality_gate_decision`
 
-`provider_execution_status=pass` requires materialized adapter raw execution evidence, not just provider route traceability. `real_code_change_status=pass` requires meaningful changed paths after setup baseline; backup/editor artifacts and `.aor/` runtime artifacts are not valid real-code-change evidence.
+`provider_execution_status=pass` requires materialized adapter raw execution evidence, not just provider route traceability. `real_code_change_status=pass` requires meaningful changed paths after setup baseline. When the selected mission declares `change_evidence.required_path_prefixes`, at least one meaningful changed path must match one of those prefixes. Backup/editor artifacts, provider-owned runner state, scratch files, unrelated root artifacts, and `.aor/` runtime artifacts are not valid real-code-change evidence.
 
 Run summaries must also carry a canonical status block that is separate from the
 target-level `quality_judgement`:

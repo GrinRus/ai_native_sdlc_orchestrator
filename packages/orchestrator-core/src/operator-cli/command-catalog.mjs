@@ -8,6 +8,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Inspect installed-user environment and repository readiness without mutating runtime state.",
     inputs: [
       "--project-ref <path> (optional, defaults to cwd)",
+      "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--json (optional)",
       "--help",
@@ -87,6 +88,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     summary: "Launch the optional local web console while keeping headless CLI/API operation valid.",
     inputs: [
       "--project-ref <path> (optional, defaults to cwd)",
+      "--project-profile <path> (optional)",
       "--runtime-root <path> (optional)",
       "--host <host> (optional, default 127.0.0.1)",
       "--port <number> (optional, default 0)",
@@ -98,6 +100,7 @@ const COMMAND_DEFINITIONS = Object.freeze([
     outputs: [
       "resolved_project_ref",
       "resolved_runtime_root",
+      "project_profile_ref",
       "guided_command",
       "guided_stage",
       "guided_status",

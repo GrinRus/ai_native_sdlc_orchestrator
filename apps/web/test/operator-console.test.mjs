@@ -40,7 +40,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Evidence Graph",
     "Runtime Trace",
     "Next action",
-    "Evidence refs",
+    "Evidence artifacts",
     "No upstream writes",
     "/flows/selected",
     "/evidence-graph",
@@ -64,8 +64,15 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Draft flow has no artifacts yet",
     "New Flow Preview",
     "Completeness Checklist",
+    "Cancel New Flow",
+    "flow.new-draft-cancelled",
+    "flowSelectionVersion",
+    "selectionVersion",
+    "selectionApplied",
+    "refresh({ newFlowDraft: false, selectedFlowId: fallbackFlowId, selectionVersion: cancelSelectionVersion })",
     "delivery-mode-card",
     "request-intent-segment",
+    "request-scope-card",
     "graph-flow-canvas",
     "graph-trace-row",
     "StageSpecificPanel",
@@ -74,6 +81,11 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Learning Closure / Start New Flow",
     "Interaction Detail",
     "Trace timeline",
+    "Provider heartbeat",
+    "provider_step_status",
+    "Provider is still running",
+    "No output yet, provider still running",
+    "/runs",
     "graph-context-tabs",
     "selected-node-panel",
     "stage-specific-panel",
@@ -98,7 +110,38 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "operator-request.completed",
     "mission create",
     "next",
-    "next?.document ?? next",
+    "artifact_display_summaries: next.artifact_display_summaries",
+    "artifact_display_summaries",
+    "normalizeArtifactSummary",
+    "artifactFilterMatches",
+    "artifact-filter-bar",
+    "Copy raw ref",
+    "Debug raw ref",
+    "Evidence artifacts",
+    "Operator Decision",
+    "operatorDecisionRequestsForFlow",
+    "supportedDecisionActionsFromRecord",
+    "decisionHelperCommand",
+    "shellArg",
+    "requestRef ? shellArg(requestRef)",
+    "Prepare corrected draft",
+    "manual-live-e2e.mjs",
+    "--prepare-decision",
+    "Copy request ref",
+    "Execution Evidence",
+    "executionEvidenceForFlow",
+    "execution_evidence",
+    "Provider execution",
+    "Runtime Harness",
+    "Real code change",
+    "runner-owned-leak",
+    "scratch-unrelated",
+    "Stop provider",
+    "Save partial evidence",
+    "Diagnose current step",
+    "Retry public step",
+    "aor run cancel",
+    "aor run status --run-id",
   ]) {
     assert.ok(source.includes(required), `SPA source should include '${required}'`);
   }
@@ -106,6 +149,16 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".flow-selector"), "SPA CSS should define flow selector layout");
   assert.ok(css.includes(".flow-cockpit"), "SPA CSS should define flow-first cockpit layout");
   assert.ok(css.includes(".stage-rail"), "SPA CSS should define flow-scoped stage rail layout");
+  assert.ok(css.includes(".provider-heartbeat-card"), "SPA CSS should define provider heartbeat cockpit layout");
+  assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
+  assert.ok(css.includes(".execution-evidence-panel"), "SPA CSS should define execution evidence panel layout");
+  assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");
+  assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
+  assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"), "SPA CSS should keep the mobile stage rail within the viewport");
+  assert.ok(css.includes(".stage-row .stage-copy strong"), "SPA CSS should allow mobile stage labels to wrap");
+  assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(92px, 1fr))"), "SPA CSS should keep the mobile flow timeline within the viewport");
+  assert.ok(css.includes(".timeline-step::before"), "SPA CSS should disable connector overflow for the mobile flow timeline");
+  assert.ok(css.includes(".trace-table table"), "SPA CSS should make runtime trace tables responsive on mobile");
   assert.ok(css.includes(".right-rail"), "SPA CSS should define evidence rail layout");
 });
 

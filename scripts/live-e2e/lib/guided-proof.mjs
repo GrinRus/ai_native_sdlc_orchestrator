@@ -84,6 +84,87 @@ function resolveEvidencePath(targetRoot, ref) {
 }
 
 /**
+ * @param {string | null} filePath
+ * @returns {Record<string, unknown>}
+ */
+function readJsonIfPresent(filePath) {
+  const resolved = asNonEmptyString(filePath);
+  if (!resolved || !fs.existsSync(resolved)) return {};
+  return asRecord(JSON.parse(fs.readFileSync(resolved, "utf8")));
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} webSmoke
+ * @returns {string}
+ */
+function resolveBrowserTaskProofFile(artifacts, webSmoke) {
+  const directProofFile =
+    asNonEmptyString(artifacts.guided_browser_task_proof_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_file);
+  if (directProofFile && fs.existsSync(directProofFile)) return directProofFile;
+  const requestFile =
+    asNonEmptyString(artifacts.guided_browser_task_proof_request_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_request_file);
+  const request = readJsonIfPresent(requestFile);
+  const expectedProofFile = asNonEmptyString(request.expected_browser_task_proof_file);
+  return expectedProofFile && fs.existsSync(expectedProofFile) ? expectedProofFile : directProofFile;
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} webSmoke
+ * @returns {Record<string, unknown>}
+ */
+function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
+  const browserTaskProofFile = resolveBrowserTaskProofFile(artifacts, webSmoke);
+  if (!browserTaskProofFile || !fs.existsSync(browserTaskProofFile)) return webSmoke;
+  const proof = readJsonIfPresent(browserTaskProofFile);
+  const proofOutcome = asRecord(proof.task_outcome);
+  const proofStatus = asNonEmptyString(proofOutcome.status) || asNonEmptyString(proof.status);
+  const screenshotFiles = uniqueStrings([
+    ...asStringArray(webSmoke.screenshot_files),
+    ...asStringArray(proof.screenshot_files),
+    ...asStringArray(proof.screenshot_refs),
+  ]);
+  const proofHasVisualEvidence = screenshotFiles.length > 0 || Boolean(asNonEmptyString(proof.visual_guardrail_file));
+  const proofPasses = (proofStatus === "pass" || proofStatus === "warn") && proofHasVisualEvidence;
+  if (!proofPasses) return { ...webSmoke, browser_task_proof_file: browserTaskProofFile };
+  return {
+    ...webSmoke,
+    rendered_html_file:
+      asNonEmptyString(proof.rendered_html_file) ||
+      asNonEmptyString(proof.html_ref) ||
+      asNonEmptyString(webSmoke.rendered_html_file),
+    dom_snapshot_file:
+      asNonEmptyString(proof.dom_snapshot_file) ||
+      asNonEmptyString(proof.dom_snapshot_ref) ||
+      asNonEmptyString(webSmoke.dom_snapshot_file),
+    accessibility_summary_file:
+      asNonEmptyString(proof.accessibility_summary_file) ||
+      asNonEmptyString(proof.accessibility_summary_ref) ||
+      asNonEmptyString(webSmoke.accessibility_summary_file),
+    visual_guardrail_file:
+      asNonEmptyString(proof.visual_guardrail_file) ||
+      asNonEmptyString(webSmoke.visual_guardrail_file),
+    browser_task_proof_file: browserTaskProofFile,
+    screenshot_files: screenshotFiles,
+    task_outcome: {
+      status: "pass",
+      checked_tasks: uniqueStrings([
+        ...asStringArray(asRecord(webSmoke.task_outcome).checked_tasks),
+        ...asStringArray(proofOutcome.checked_tasks),
+      ]),
+      findings: asStringArray(proofOutcome.findings),
+    },
+    ux_findings: uniqueStrings([...asStringArray(webSmoke.ux_findings), ...asStringArray(proof.ux_findings)]),
+    agent_verdict_ref:
+      asNonEmptyString(proof.agent_verdict_ref) ||
+      asNonEmptyString(webSmoke.agent_verdict_ref),
+  };
+}
+
+/**
  * @param {Record<string, unknown>} payload
  * @returns {string | null}
  */
@@ -115,7 +196,7 @@ function collectRequiredArtifactFiles(commandResults, artifacts) {
     asRecord(findCommand(commandResults, "guided-next-after-learning").parsed_payload) ||
     asRecord(findCommand(commandResults, "guided-next-after-delivery").parsed_payload);
   const reviewDecide = asRecord(findCommand(commandResults, "review-decide-approve").parsed_payload);
-  const webSmoke = asRecord(artifacts.guided_web_smoke);
+  const webSmoke = mergeBrowserTaskProofIntoWebSmoke(artifacts, asRecord(artifacts.guided_web_smoke));
 
   return {
     onboarding_report_file:
@@ -230,7 +311,7 @@ export function buildGuidedJourneyProof(options) {
     .filter(Boolean);
   const outputPolicy = asRecord(options.profile.output_policy);
   const requiredArtifactFiles = collectRequiredArtifactFiles(options.commandResults, options.artifacts);
-  const webSmoke = asRecord(options.artifacts.guided_web_smoke);
+  const webSmoke = mergeBrowserTaskProofIntoWebSmoke(options.artifacts, asRecord(options.artifacts.guided_web_smoke));
 
   return {
     proof_id: `${options.runId}.installed-user-guided-journey.v1`,

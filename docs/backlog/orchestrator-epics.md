@@ -109,6 +109,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W32:** `W32-S01` Operator-request interactive runtime flow
 - **W33:** `W33-S03` Failure-safe run start durable state; `W33-S04` Guided runtime-root fidelity; `W33-S05` Control-plane launch and port guidance alignment; `W33-S06` App-smoke console boundary and static snapshot removal; `W33-S07` CLI operator output ergonomics; `W33-S08` Control-plane OpenAPI payload schema depth; `W33-S09` Runtime read-model scale and pagination baseline; `W33-S10` Web app smoke module cleanup and console surface simplification
 - **W34:** `W34-S01` Flow product and contract baseline; `W34-S02` Runtime and control-plane flow projections; `W34-S03` Flow-first local web shell; `W34-S04` Flow-scoped evidence, trace, and interaction workbench; `W34-S05` Closure-to-new-flow UX
+- **W35:** `W35-S01` Provider heartbeat and long-running step status; `W35-S02` User-facing artifact reference renderer; `W35-S04` Execution evidence panel and interruption controls
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -138,3 +139,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W28:** `W28-S01` AOR install proof and setup journal; `W28-S02` Full-lifecycle and interaction gap closure; `W28-S03` Matrix target expansion
 - **W30:** `W30-S04` Self-hosted operations hardening docs
 - **W34:** `W34-S06` Installed-user browser-task flow-loop proof
+- **W35:** `W35-S03` Operator decision helper and decision UX; `W35-S05` Codex/Qwen live E2E UX proof and runbook closure

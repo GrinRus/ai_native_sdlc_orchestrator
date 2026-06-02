@@ -1355,9 +1355,377 @@
           },
           "state_file": {
             "type": "string"
+          },
+          "provider_step_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderStepStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "description": "User-facing summaries for recent readable artifact refs. Raw refs remain available only inside each summary raw_ref/debug action.",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
+            }
           }
         },
         "additionalProperties": true
+      },
+      "ArtifactDisplaySummary": {
+        "type": "object",
+        "description": "User-facing artifact reference summary for rendering evidence without making long paths or packet URIs the primary label.",
+        "required": [
+          "type",
+          "stage",
+          "label",
+          "status",
+          "severity",
+          "description",
+          "raw_ref",
+          "actions"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "critical"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "raw_ref": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplayAction"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ArtifactDisplayAction": {
+        "type": "object",
+        "required": [
+          "action_id",
+          "label",
+          "kind"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExecutionEvidenceSummary": {
+        "type": "object",
+        "description": "Operator-facing execution evidence summary derived from public read surfaces. It classifies changed paths, fail-closed blockers, provider execution state, verification status, and public recovery actions.",
+        "required": [
+          "status",
+          "provider_execution_status",
+          "runtime_harness_decision",
+          "real_code_change_status",
+          "post_run_verification_status",
+          "review_status",
+          "delivery_readiness_status",
+          "no_upstream_write_status",
+          "changed_path_groups",
+          "blockers",
+          "actions"
+        ],
+        "properties": {
+          "run_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "provider_execution_status": {
+            "type": "string"
+          },
+          "runtime_harness_decision": {
+            "type": "string"
+          },
+          "real_code_change_status": {
+            "type": "string"
+          },
+          "post_run_verification_status": {
+            "type": "string"
+          },
+          "review_status": {
+            "type": "string"
+          },
+          "delivery_readiness_status": {
+            "type": "string"
+          },
+          "no_upstream_write_status": {
+            "type": "string"
+          },
+          "required_path_prefixes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changed_path_groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionChangedPathGroup"
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionEvidenceAction"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExecutionChangedPathGroup": {
+        "type": "object",
+        "required": [
+          "group_id",
+          "label",
+          "status",
+          "severity",
+          "paths",
+          "count",
+          "description"
+        ],
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "enum": [
+              "mission-relevant",
+              "runtime-owned",
+              "runner-owned-leak",
+              "scratch-unrelated"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "success",
+              "warning",
+              "critical"
+            ]
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExecutionEvidenceAction": {
+        "type": "object",
+        "required": [
+          "action_id",
+          "label",
+          "enabled",
+          "command_surface",
+          "reason"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "enum": [
+              "stop_provider",
+              "save_partial_evidence",
+              "diagnose_current_step",
+              "retry_public_step"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "command_surface": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ProviderStepStatus": {
+        "type": "object",
+        "description": "Public, query-safe heartbeat for a routed external provider step. Raw process commands and secrets are not exposed here.",
+        "required": [
+          "status",
+          "elapsed_ms",
+          "current_command_label",
+          "recommended_action"
+        ],
+        "properties": {
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adapter": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "route_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "step_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "starting",
+              "running",
+              "silent-running",
+              "artifact-updated",
+              "timeout-risk",
+              "completed",
+              "interrupted",
+              "failed"
+            ]
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "timeout_budget_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "remaining_budget_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "last_output_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_artifact_update_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "current_command_label": {
+            "type": "string"
+          },
+          "recommended_action": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
       },
       "RuntimeLayout": {
         "type": "object",
@@ -1495,6 +1863,12 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
             }
           },
           "writeback_policy": {
@@ -1970,6 +2344,25 @@
                 "type": "null"
               }
             ]
+          },
+          "provider_step_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderStepStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution_evidence": {
+            "$ref": "#/components/schemas/ExecutionEvidenceSummary"
+          },
+          "artifact_display_summaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactDisplaySummary"
+            }
           }
         },
         "additionalProperties": true

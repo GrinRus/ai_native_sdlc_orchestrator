@@ -667,6 +667,37 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(appSmokeCompactPayload.flow_selector_loaded, true);
     assert.equal(appSmokeCompactPayload.new_flow_action_loaded, true);
 
+    const customProfilePath = path.join(projectRoot, "custom-app-profile.aor.yaml");
+    fs.writeFileSync(
+      customProfilePath,
+      fs.readFileSync(path.join(workspaceRoot, "examples/project.aor.yaml"), "utf8").replace(
+        /^project_id: .+$/mu,
+        "project_id: app-profile-override",
+      ),
+      "utf8",
+    );
+    const appSmokeWithProfile = spawnSync(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "app",
+      "--project-ref",
+      projectRoot,
+      "--project-profile",
+      customProfilePath,
+      "--smoke",
+      "true",
+      "--open",
+      "false",
+      "--json",
+    ], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+    assert.equal(appSmokeWithProfile.status, 0, appSmokeWithProfile.stderr);
+    const appSmokeWithProfilePayload = JSON.parse(appSmokeWithProfile.stdout);
+    assert.equal(appSmokeWithProfilePayload.project_id, "app-profile-override");
+    assert.equal(appSmokeWithProfilePayload.config_project_id, "app-profile-override");
+    assert.equal(appSmokeWithProfilePayload.state_project_id, "app-profile-override");
+
     const invalidAppPort = spawnSync(process.execPath, [
       path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
       "app",

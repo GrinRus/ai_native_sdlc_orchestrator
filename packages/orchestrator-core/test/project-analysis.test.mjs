@@ -135,7 +135,22 @@ test("analyzeProjectRuntime honors bundled project-profile registry roots for cl
     assert.equal(result.evaluationRegistry.datasets.length > 0, true);
     assert.equal(result.report.asset_mode, "bundled");
     assert.equal(result.report.registry_roots.routes, path.join(workspaceRoot, "examples/routes"));
+    assert.equal(result.report.route_resolution.routes_root, path.join(workspaceRoot, "examples/routes"));
+    assert.equal(result.report.asset_resolution.wrappers_root, path.join(workspaceRoot, "examples/wrappers"));
+    assert.equal(result.report.asset_resolution.prompts_root, path.join(workspaceRoot, "examples/prompts"));
+    assert.equal(result.report.policy_resolution.policies_root, path.join(workspaceRoot, "examples/policies"));
+    assert.equal(result.report.evaluation_registry.examples_root, path.join(workspaceRoot, "examples"));
     assert.equal(result.report.discovery_completeness.status, "pass");
+
+    const routeReport = JSON.parse(fs.readFileSync(result.routeResolutionPath, "utf8"));
+    const assetReport = JSON.parse(fs.readFileSync(result.assetResolutionPath, "utf8"));
+    const policyReport = JSON.parse(fs.readFileSync(result.policyResolutionPath, "utf8"));
+    const evaluationReport = JSON.parse(fs.readFileSync(result.evaluationRegistryPath, "utf8"));
+    assert.equal(routeReport.routes_root, path.join(workspaceRoot, "examples/routes"));
+    assert.equal(assetReport.wrappers_root, path.join(workspaceRoot, "examples/wrappers"));
+    assert.equal(assetReport.prompts_root, path.join(workspaceRoot, "examples/prompts"));
+    assert.equal(policyReport.policies_root, path.join(workspaceRoot, "examples/policies"));
+    assert.equal(evaluationReport.examples_root, path.join(workspaceRoot, "examples"));
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }

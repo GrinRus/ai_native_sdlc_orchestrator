@@ -1,0 +1,197 @@
+{
+  "fixture_id": "w35-s05.silent-provider-ux-proof.sample",
+  "slice_id": "W35-S05",
+  "profile_id": "live-e2e.full-journey.regress.ky.small.qwen",
+  "provider_variant_id": "qwen-primary",
+  "proof_kind": "synthetic-silent-provider-ui-smoke",
+  "status": "blocked",
+  "blocked_reason": "Provider remained silent long enough for operator UX proof; this fixture proves fail-closed observability, not model quality.",
+  "provider_step_status": {
+    "provider": "qwen",
+    "adapter": "qwen-code",
+    "route_id": "route.implement.default.qwen-primary",
+    "step_id": "execution#1",
+    "status": "silent-running",
+    "elapsed_ms": 540000,
+    "timeout_budget_ms": 3600000,
+    "remaining_budget_ms": 3060000,
+    "last_output_at": null,
+    "last_artifact_update_at": "2026-06-02T08:41:00.000Z",
+    "current_command_label": "external-provider-runner",
+    "recommended_action": "No output yet; keep monitoring or stop, save partial evidence, and diagnose through public live E2E surfaces.",
+    "started_at": "2026-06-02T08:32:00.000Z",
+    "updated_at": "2026-06-02T08:41:00.000Z"
+  },
+  "artifact_display_summaries": [
+    {
+      "type": "provider-raw-evidence",
+      "stage": "execution",
+      "label": "Qwen provider raw evidence",
+      "status": "partial",
+      "severity": "warning",
+      "description": "Provider launched and remained silent; raw evidence is available for debug copy only.",
+      "timestamp": "2026-06-02T08:41:00.000Z",
+      "source_ref": "evidence://reports/adapter-live-qwen-raw.json",
+      "raw_ref": "evidence://reports/adapter-live-qwen-raw.json",
+      "actions": [
+        {
+          "action_id": "copy_raw_ref",
+          "label": "Copy raw ref",
+          "kind": "debug"
+        }
+      ]
+    },
+    {
+      "type": "target-diff",
+      "stage": "verification",
+      "label": "Target diff relevance",
+      "status": "blocked",
+      "severity": "critical",
+      "description": "Runner-owned state appeared in the target checkout and blocks delivery proof.",
+      "timestamp": "2026-06-02T08:41:00.000Z",
+      "source_ref": "evidence://reports/target-diff-qwen.json",
+      "raw_ref": "evidence://reports/target-diff-qwen.json",
+      "actions": [
+        {
+          "action_id": "copy_raw_ref",
+          "label": "Copy raw ref",
+          "kind": "debug"
+        }
+      ]
+    }
+  ],
+  "execution_evidence": {
+    "run_id": "live-e2e.full-journey.regress.ky.small.qwen-w35-s05-silent",
+    "status": "blocked",
+    "provider_execution_status": "running",
+    "runtime_harness_decision": "block",
+    "real_code_change_status": "fail",
+    "post_run_verification_status": "unknown",
+    "review_status": "unknown",
+    "delivery_readiness_status": "not_materialized",
+    "no_upstream_write_status": "pass",
+    "required_path_prefixes": [
+      "source/",
+      "test/"
+    ],
+    "changed_path_groups": [
+      {
+        "group_id": "mission-relevant",
+        "label": "Mission-relevant changes",
+        "status": "present",
+        "severity": "success",
+        "paths": [
+          "source/core/Ky.ts",
+          "test/headers.ts"
+        ],
+        "count": 2,
+        "description": "Changed paths that satisfy implementation evidence for the selected mission."
+      },
+      {
+        "group_id": "runtime-owned",
+        "label": "Runtime-owned artifacts",
+        "status": "empty",
+        "severity": "info",
+        "paths": [],
+        "count": 0,
+        "description": "AOR runtime files are expected evidence, not target implementation changes."
+      },
+      {
+        "group_id": "runner-owned-leak",
+        "label": "Runner-owned state leaks",
+        "status": "present",
+        "severity": "critical",
+        "paths": [
+          ".qwen/skills/aor/SKILL.md"
+        ],
+        "count": 1,
+        "description": "Provider-local state inside the target checkout blocks delivery proof."
+      },
+      {
+        "group_id": "scratch-unrelated",
+        "label": "Scratch or unrelated output",
+        "status": "present",
+        "severity": "warning",
+        "paths": [
+          "scratch-output.txt"
+        ],
+        "count": 1,
+        "description": "Changed paths that do not prove the selected mission by themselves."
+      }
+    ],
+    "blockers": [
+      "Runner-owned state appeared inside the target checkout.",
+      "Runtime Harness decision is 'block'."
+    ],
+    "actions": [
+      {
+        "action_id": "stop_provider",
+        "label": "Stop provider",
+        "enabled": true,
+        "command_surface": "aor run cancel",
+        "reason": "Provider is still running."
+      },
+      {
+        "action_id": "save_partial_evidence",
+        "label": "Save partial evidence",
+        "enabled": true,
+        "command_surface": "aor run status --json",
+        "reason": "Preserve current public run-control evidence."
+      },
+      {
+        "action_id": "diagnose_current_step",
+        "label": "Diagnose current step",
+        "enabled": true,
+        "command_surface": "manual-live-e2e --prepare-decision --action diagnose",
+        "reason": "Diagnosis must go through public live E2E continuation surfaces."
+      },
+      {
+        "action_id": "retry_public_step",
+        "label": "Retry public step",
+        "enabled": false,
+        "command_surface": "manual-live-e2e --prepare-decision --action retry_public_step",
+        "reason": "Retry requires an accepted public decision request and a retryable controller state."
+      }
+    ]
+  },
+  "decision_helper": {
+    "agent_decision_request_ref": "evidence://reports/live-e2e-agent-decision-request-execution-1.json",
+    "action": "diagnose",
+    "decision_rubric": {
+      "required_evidence_refs": [
+        "evidence://reports/live-e2e-step-observation-execution-1.json",
+        "evidence://reports/adapter-live-qwen-raw.json",
+        "evidence://reports/target-diff-qwen.json"
+      ]
+    },
+    "prepared_decision": {
+      "decision_id": "live-e2e.full-journey.regress.ky.small.qwen-w35-s05-silent.execution-1.operator-decision.v1",
+      "action": "diagnose",
+      "semantic_analysis": {
+        "status": "blocked",
+        "judge_source": "skill-agent"
+      },
+      "inspected_evidence_refs": [
+        "evidence://reports/live-e2e-step-observation-execution-1.json",
+        "evidence://reports/adapter-live-qwen-raw.json",
+        "evidence://reports/target-diff-qwen.json"
+      ],
+      "findings": [
+        "Provider heartbeat is visible and fail-closed.",
+        "Runner-owned state leak blocks delivery proof."
+      ]
+    },
+    "validation_preview": {
+      "missing_required_inspected_evidence_refs": [],
+      "inspected_evidence_ref_count": 3
+    }
+  },
+  "proof_model": {
+    "operator_kind": "skill-agent",
+    "accepted_decisions_required": true,
+    "final_skill_agent_verdict_required": true,
+    "frontend_evidence_refs_required_when_profile_requires_frontend": true,
+    "no_upstream_write": true,
+    "legacy_bounded_or_mock_backed_profiles_restored": false
+  }
+}

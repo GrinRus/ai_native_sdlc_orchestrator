@@ -1,9 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  buildMissingArtifactDisplaySummary,
+  uniqueArtifactDisplaySummaries,
+} from "../artifact-display-summary.mjs";
 import { initializeProjectRuntime } from "../project-init.mjs";
 import {
   applyReadModelLimit,
+  listArtifactDisplaySummaries,
   listJsonFiles,
   listOperatorRequests,
   listPacketArtifacts,
@@ -186,7 +191,8 @@ function loadNextActionReports(init) {
             },
           ]
         : [];
-    });
+    })
+    .sort((left, right) => right.updatedMs - left.updatedMs);
 }
 
 /**
@@ -235,6 +241,7 @@ function nextActionMatchesFlow(document, flowSeed) {
  */
 function reportClosureBelongsToFlow(report, flowSeed) {
   if (!report) return true;
+  if (nextActionMatchesFlow(report, flowSeed)) return true;
   const closureState = asRecord(report.closure_state);
   const runId = asString(closureState.run_id);
   if (!runId) return true;
@@ -351,6 +358,49 @@ function resolveSourceLearningHandoffRefs(report) {
 }
 
 /**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   limit?: number,
+ * }} options
+ * @returns {Map<string, Record<string, unknown>>}
+ */
+function buildArtifactDisplaySummaryMap(options) {
+  const summaries = listArtifactDisplaySummaries(options);
+  const byRef = new Map();
+  for (const summary of summaries) {
+    for (const ref of [asString(summary.raw_ref), asString(summary.source_ref)]) {
+      if (ref) byRef.set(ref, summary);
+    }
+  }
+  return byRef;
+}
+
+/**
+ * @param {string[]} refs
+ * @param {Map<string, Record<string, unknown>>} summariesByRef
+ * @param {string | null} stage
+ * @returns {Record<string, unknown>[]}
+ */
+function artifactDisplaySummariesForRefs(refs, summariesByRef, stage) {
+  return uniqueArtifactDisplaySummaries(
+    refs.map((ref) => {
+      const direct = summariesByRef.get(ref);
+      if (direct) return direct;
+      for (const [candidateRef, summary] of summariesByRef.entries()) {
+        if (evidenceRefsMatch(candidateRef, ref)) return summary;
+      }
+      return buildMissingArtifactDisplaySummary(ref, {
+        stage,
+        reason: "Flow evidence ref is listed, but no readable artifact is available in the current read model.",
+      });
+    }),
+  );
+}
+
+/**
  * @param {{ report: Record<string, unknown> | null, status: "active" | "completed", followUpSourceHandoffRef: string | null }} options
  * @returns {Record<string, unknown>}
  */
@@ -376,9 +426,10 @@ function buildClosureProjection(options) {
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   seed: ReturnType<typeof loadIntakeFlowSeeds>[number],
  *   reportEntry: ReturnType<typeof loadNextActionReports>[number] | null,
+ *   artifactSummaryByRef: Map<string, Record<string, unknown>>,
  * }} options
  */
-function buildFlowProjection({ init, seed, reportEntry }) {
+function buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }) {
   const report = reportEntry?.document ?? null;
   const flowId = `flow.${init.projectId}.${normalizeForId(seed.missionKey) || "flow"}`;
   const projectState = asRecord(report?.project_state);
@@ -393,20 +444,22 @@ function buildFlowProjection({ init, seed, reportEntry }) {
     ...(closureBelongsToFlow ? asStringArray(report?.evidence_refs) : []),
     ...(closureBelongsToFlow ? collectNestedRefs(closureState) : []),
   ]);
+  const selectedStage =
+    status === "completed"
+      ? "learning"
+      : closureBelongsToFlow
+        ? asString(projectState.stage) ?? resolveInitialSelectedStage(seed.body)
+        : resolveInitialSelectedStage(seed.body);
   return {
     flow_id: flowId,
     status,
-    selected_stage:
-      status === "completed"
-        ? "learning"
-        : closureBelongsToFlow
-          ? asString(projectState.stage) ?? resolveInitialSelectedStage(seed.body)
-          : resolveInitialSelectedStage(seed.body),
+    selected_stage: selectedStage,
     mission_id: seed.missionKey,
     intake_packet_ref: seed.packetRef,
     intake_body_ref: seed.bodyRef,
     latest_next_action_report_ref: reportEntry?.artifactRef ?? null,
     evidence_refs: evidenceRefs,
+    artifact_display_summaries: artifactDisplaySummariesForRefs(evidenceRefs, artifactSummaryByRef, selectedStage),
     writeback_policy: resolveWritebackPolicy(seed.body, report),
     mission_settings: buildMissionSettingsProjection(seed.body),
     closure_state: buildClosureProjection({ report, status, followUpSourceHandoffRef }),
@@ -424,10 +477,11 @@ export function listFlowProjections(options = {}) {
   const reports = loadNextActionReports(init);
   const seeds = loadIntakeFlowSeeds(init);
   const latestReport = reports[0] ?? null;
+  const artifactSummaryByRef = buildArtifactDisplaySummaryMap(options);
   const flows = seeds.map((seed) => {
     const reportEntry = reports.find((entry) => nextActionMatchesFlow(entry.document, seed)) ?? null;
     return {
-      flow: buildFlowProjection({ init, seed, reportEntry }),
+      flow: buildFlowProjection({ init, seed, reportEntry, artifactSummaryByRef }),
       seedUpdatedMs: seed.updatedMs,
       reportUpdatedMs: reportEntry?.updatedMs ?? 0,
       selectedByLatestReport: latestReport ? nextActionMatchesFlow(latestReport.document, seed) : false,
@@ -616,11 +670,13 @@ function listFlowScopedEntries(options, flow) {
  */
 function buildEvidenceNode(entry, preferredRef) {
   const document = asRecord(entry.document);
+  const displaySummary = asRecord(entry.display_summary);
   return {
     node_id: preferredRef,
     ref: preferredRef,
     family: asString(entry.family) ?? "evidence",
     label:
+      asString(displaySummary.label) ??
       asString(document.packet_id) ??
       asString(document.request_id) ??
       asString(document.step_result_id) ??
@@ -628,16 +684,18 @@ function buildEvidenceNode(entry, preferredRef) {
       asString(document.manifest_id) ??
       asString(document.packet_id) ??
       path.basename(preferredRef),
-    status: resolveDocumentStatus(document),
-    stage: resolveDocumentStage(document),
+    status: asString(displaySummary.status) ?? resolveDocumentStatus(document),
+    stage: asString(displaySummary.stage) ?? resolveDocumentStage(document),
     run_ids: resolveDocumentRunRefs(document),
     target_flow_id: asString(document.target_flow_id),
     summary:
+      asString(displaySummary.description) ??
       asString(document.request_summary) ??
       asString(document.summary) ??
       asString(document.title) ??
       asString(document.reason) ??
       null,
+    display_summary: Object.keys(displaySummary).length > 0 ? displaySummary : null,
   };
 }
 
@@ -688,17 +746,23 @@ export function readFlowEvidenceGraph(options) {
     const entry = entriesByRef.get(ref);
     const node = entry
       ? buildEvidenceNode(entry, ref)
-      : {
+      : (() => {
+          const displaySummary = buildMissingArtifactDisplaySummary(ref, {
+            reason: "Flow evidence ref is listed, but no readable artifact is available in the current read model.",
+          });
+          return {
           node_id: ref,
           ref,
           family: "flow-evidence",
-          label: ref,
-          status: "ready",
-          stage: null,
+          label: displaySummary.label,
+          status: displaySummary.status,
+          stage: displaySummary.stage,
           run_ids: [],
           target_flow_id: null,
-          summary: "Evidence ref projected onto the selected flow.",
+          summary: displaySummary.description,
+          display_summary: displaySummary,
         };
+        })();
     if (!seenNodeIds.has(node.node_id)) {
       nodes.push(node);
       seenNodeIds.add(node.node_id);
@@ -747,6 +811,7 @@ export function readFlowEvidenceGraph(options) {
  */
 function buildTraceItemsForEntry(entry) {
   const document = asRecord(entry.document);
+  const displaySummary = asRecord(entry.display_summary);
   const refs = entryRefs(entry);
   const primaryRef = refs[0] ?? "unknown";
   const family = asString(entry.family) ?? "evidence";
@@ -757,8 +822,8 @@ function buildTraceItemsForEntry(entry) {
       kind: family,
       ref: primaryRef,
       run_ids: runIds,
-      stage: resolveDocumentStage(document),
-      status: resolveDocumentStatus(document),
+      stage: asString(displaySummary.stage) ?? resolveDocumentStage(document),
+      status: asString(displaySummary.status) ?? resolveDocumentStatus(document),
       step_id: asString(document.step_id),
       event_type:
         family === "step-result"
@@ -769,11 +834,13 @@ function buildTraceItemsForEntry(entry) {
               ? "delivery-release-artifact"
               : family,
       summary:
+        asString(displaySummary.description) ??
         asString(document.request_summary) ??
         asString(document.summary) ??
         asString(document.reason) ??
         asString(document.decision) ??
         null,
+      display_summary: Object.keys(displaySummary).length > 0 ? displaySummary : null,
     },
   ];
 }
@@ -850,16 +917,20 @@ export function readFlowRuntimeTrace(options) {
       continue;
     }
     const family = inferFamilyFromEvidenceRef(ref);
+    const displaySummary = buildMissingArtifactDisplaySummary(ref, {
+      reason: "Flow evidence ref is listed, but no readable artifact is available in the current read model.",
+    });
     traceItems.push({
       trace_id: `${family}:${ref}`,
       kind: family,
       ref,
       run_ids: inferRunIdsFromEvidenceRef(ref),
-      stage: null,
-      status: "referenced",
+      stage: displaySummary.stage,
+      status: displaySummary.status,
       step_id: null,
       event_type: traceEventTypeForFamily(family),
-      summary: "Flow-projected evidence ref.",
+      summary: displaySummary.description,
+      display_summary: displaySummary,
     });
   }
   const runIds = uniqueStrings(traceItems.flatMap((item) => asStringArray(item.run_ids)));

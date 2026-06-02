@@ -97,6 +97,29 @@ const REQUEST_INTENT_OPTIONS = [
   { value: "implement", label: "Implement", readOnly: false },
 ];
 
+const OPERATOR_DECISION_ACTIONS = [
+  { id: "continue", label: "Continue", semanticStatus: "pass" },
+  { id: "diagnose", label: "Diagnose", semanticStatus: "not_pass" },
+  { id: "block", label: "Block", semanticStatus: "blocked" },
+  { id: "retry_public_step", label: "Retry public step", semanticStatus: "warn" },
+  { id: "answer", label: "Answer", semanticStatus: "interaction_required" },
+  { id: "frontend_interact", label: "Frontend interact", semanticStatus: "interaction_required" },
+];
+
+const EXECUTION_PATH_GROUP_LABELS = {
+  "mission-relevant": "Mission-relevant changes",
+  "runtime-owned": "Runtime-owned artifacts",
+  "runner-owned-leak": "Runner-owned state leaks",
+  "scratch-unrelated": "Scratch or unrelated output",
+};
+
+const EXECUTION_ACTION_LABELS = {
+  stop_provider: "Stop provider",
+  save_partial_evidence: "Save partial evidence",
+  diagnose_current_step: "Diagnose current step",
+  retry_public_step: "Retry public step",
+};
+
 const REVIEW_GATE_ROWS = [
   { label: "Runtime Harness Report", tokens: ["runtime-harness-report", "REP-RTH"] },
   { label: "Validation Report", tokens: ["validation-report", "REP-VAL", "VAL-"] },
@@ -166,6 +189,141 @@ function evidenceRefsMatch(left, right) {
   );
 }
 
+const ARTIFACT_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "failed", label: "Failed" },
+  { id: "warnings", label: "Warnings" },
+  { id: "provider", label: "Provider" },
+  { id: "runtime-harness", label: "Runtime Harness" },
+  { id: "verification", label: "Verification" },
+  { id: "diff", label: "Diff" },
+  { id: "delivery", label: "Delivery" },
+  { id: "learning", label: "Learning" },
+];
+
+function titleFromRef(ref) {
+  const clean = String(ref ?? "artifact")
+    .replace(/^packet:\/\/[^@]+@/u, "")
+    .replace(/^evidence:\/\//u, "")
+    .split("/")
+    .pop()
+    ?.replace(/\.json$/u, "")
+    .replace(/[-_.]+/gu, " ")
+    .trim();
+  return clean ? clean.replace(/\b\w/gu, (match) => match.toUpperCase()) : "Artifact";
+}
+
+function artifactSeverityForStatus(status) {
+  const normalized = String(status ?? "").toLowerCase();
+  if (["fail", "failed", "not_pass", "blocked", "rejected", "error", "timeout", "missing", "unreadable"].includes(normalized)) return "critical";
+  if (["warn", "warning", "hold", "repair", "partial", "stale", "pending", "waiting"].includes(normalized)) return "warning";
+  if (["pass", "passed", "ready", "complete", "completed", "success", "accepted", "approved", "submitted"].includes(normalized)) return "success";
+  return "info";
+}
+
+function artifactTypeForRef(ref) {
+  const value = String(ref ?? "").toLowerCase();
+  if (value.includes("provider") && (value.includes("raw") || value.includes("evidence"))) return "provider-raw-evidence";
+  if (value.includes("runtime-harness-report")) return "runtime-harness-report";
+  if (value.includes("step-result")) return "routed-step-result";
+  if (value.includes("verify-summary") || value.includes("validation-report") || value.includes("evaluation-report")) return "verification";
+  if (value.includes("target-diff") || value.includes("diff") || value.includes("target-cleanliness")) return "target-diff";
+  if (value.includes("delivery-manifest") || value.includes("delivery-plan")) return "delivery-manifest";
+  if (value.includes("release-packet")) return "release-packet";
+  if (value.includes("learning-loop")) return "learning-handoff";
+  if (value.startsWith("packet://")) return "packet";
+  if (value.startsWith("evidence://")) return "evidence";
+  return "file";
+}
+
+function artifactStageForType(type, fallbackStage = "artifact") {
+  if (["provider-raw-evidence", "command-trace", "step-observation", "routed-step-result"].includes(type)) return "execution";
+  if (["runtime-harness-report", "review-report", "review-decision"].includes(type)) return "runtime-harness";
+  if (["verification", "target-diff"].includes(type)) return "verification";
+  if (["delivery-manifest", "release-packet"].includes(type)) return "delivery";
+  if (["learning", "learning-handoff"].includes(type)) return "learning";
+  return fallbackStage;
+}
+
+function normalizeArtifactSummary(value, fallbackRef = "", fallback = {}) {
+  const raw = value && typeof value === "object" ? value : {};
+  const rawRef = raw.raw_ref ?? fallbackRef;
+  const type = raw.type ?? artifactTypeForRef(rawRef);
+  const status = raw.status ?? fallback.status ?? "ready";
+  return {
+    type,
+    stage: raw.stage ?? fallback.stage ?? artifactStageForType(type, fallback.stage ?? "artifact"),
+    label: raw.label ?? titleFromRef(rawRef),
+    status,
+    severity: raw.severity ?? artifactSeverityForStatus(status),
+    description: raw.description ?? fallback.description ?? "Evidence artifact available through the control-plane read model.",
+    timestamp: raw.timestamp ?? null,
+    source_ref: raw.source_ref ?? rawRef,
+    raw_ref: rawRef,
+    actions: Array.isArray(raw.actions) ? raw.actions : [{ action_id: "copy_raw_ref", label: "Copy raw ref", kind: "debug" }],
+  };
+}
+
+function artifactRowFromSummary(summary, overrides = {}) {
+  const normalized = normalizeArtifactSummary(summary, overrides.ref, overrides);
+  return {
+    kind: normalized.type,
+    ref: normalized.raw_ref,
+    rawRef: normalized.raw_ref,
+    sourceRef: normalized.source_ref,
+    label: normalized.label,
+    status: normalized.status,
+    severity: normalized.severity,
+    stage: normalized.stage,
+    summary: normalized.description,
+    timestamp: normalized.timestamp,
+    actions: normalized.actions,
+    displaySummary: normalized,
+    targetFlowId: overrides.targetFlowId,
+  };
+}
+
+function missingArtifactRow(ref, stage = "artifact") {
+  return artifactRowFromSummary(
+    {
+      type: artifactTypeForRef(ref),
+      stage,
+      label: `${titleFromRef(ref)} missing`,
+      status: "missing",
+      severity: "critical",
+      description: "This ref is linked to the selected flow, but no readable artifact is available in the current read model.",
+      raw_ref: ref,
+    },
+    { ref },
+  );
+}
+
+function artifactFilterMatches(row, filterId) {
+  if (filterId === "all") return true;
+  const haystack = `${row.kind} ${row.stage} ${row.status} ${row.severity} ${row.label}`.toLowerCase();
+  if (filterId === "failed") return row.severity === "critical" || ["fail", "failed", "blocked", "missing", "not_pass"].includes(String(row.status).toLowerCase());
+  if (filterId === "warnings") return row.severity === "warning";
+  if (filterId === "provider") return haystack.includes("provider");
+  if (filterId === "runtime-harness") return haystack.includes("runtime-harness");
+  if (filterId === "verification") return haystack.includes("verification") || haystack.includes("validation") || haystack.includes("evaluation");
+  if (filterId === "diff") return haystack.includes("diff") || haystack.includes("cleanliness");
+  if (filterId === "delivery") return haystack.includes("delivery") || haystack.includes("release");
+  if (filterId === "learning") return haystack.includes("learning");
+  return true;
+}
+
+function artifactRowsForRefs(refs, rows, stage = "artifact") {
+  return (Array.isArray(refs) ? refs : []).map((ref) => {
+    return rows.find((row) => evidenceRefsMatch(row.ref, ref) || evidenceRefsMatch(row.sourceRef, ref)) ?? missingArtifactRow(ref, stage);
+  });
+}
+
+function evidenceRowForTokens(rows, tokens) {
+  return (Array.isArray(rows) ? rows : []).find((row) =>
+    tokens.some((token) => `${row.ref} ${row.sourceRef} ${row.label} ${row.kind}`.toLowerCase().includes(token.toLowerCase())),
+  ) ?? null;
+}
+
 function missionIdFromTitle(title) {
   const base = String(title ?? "flow").toLowerCase().replace(/[^a-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
   return `${base || "flow"}-${Date.now().toString(36)}`;
@@ -202,13 +360,99 @@ function statusTone(state) {
   if (["connected", "ready", "pass", "complete", "completed", "active", "isolated", "no-write", "detached", "enforced", "read-only"].includes(normalized)) return "safe";
   if (normalized.includes("connected") || normalized.includes("active") || normalized.includes("safe")) return "safe";
   if (normalized.includes("completed") || normalized.includes("enforced")) return "safe";
-  if (["blocked", "fail", "failed", "error"].includes(normalized)) return "danger";
-  if (normalized.includes("blocked") || normalized.includes("failed") || normalized.includes("error")) return "danger";
+  if (["blocked", "fail", "failed", "error", "critical", "interrupted"].includes(normalized)) return "danger";
+  if (normalized.includes("blocked") || normalized.includes("failed") || normalized.includes("error") || normalized.includes("critical")) return "danger";
   return "warn";
 }
 
 function StatusPill({ state }) {
   return <span className={`status-pill ${statusTone(state)}`}>{state}</span>;
+}
+
+function asProviderStepStatus(value) {
+  return value && typeof value === "object" && !Array.isArray(value) && value.status ? value : null;
+}
+
+function formatDurationMs(value) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return "n/a";
+  const totalSeconds = Math.floor(value / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes <= 0) return `${seconds}s`;
+  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function formatProviderTimestamp(value) {
+  if (typeof value !== "string" || value.trim().length === 0) return "No update yet";
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return value;
+  return new Date(parsed).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function providerStatusCopy(status) {
+  if (!status) return "No active provider step.";
+  if (status.status === "silent-running") return "No output yet, provider still running.";
+  if (status.status === "timeout-risk") return "Provider is still running and close to the timeout budget.";
+  if (status.status === "artifact-updated") return "Provider is running and evidence was updated.";
+  if (status.status === "completed") return "Provider completed. Continue with verification evidence.";
+  if (status.status === "interrupted") return "Provider was stopped or interrupted. Save partial evidence, then diagnose or retry.";
+  if (status.status === "failed") return "Provider failed. Inspect evidence before continuing.";
+  return "Provider step is running.";
+}
+
+function resolveProviderStepStatus(projectState, runs) {
+  const fromProject = asProviderStepStatus(projectState?.provider_step_status);
+  const fromRuns = Array.isArray(runs)
+    ? runs.map((run) => asProviderStepStatus(run.provider_step_status)).filter(Boolean)
+    : [];
+  return fromRuns.find((status) => !["completed", "failed", "interrupted"].includes(status.status)) ?? fromProject ?? fromRuns[0] ?? null;
+}
+
+function executionEvidenceForFlow(selectedFlow, runs, runtimeTrace, { draft = false } = {}) {
+  if (draft || !selectedFlow?.flow_id) return null;
+  const traceRunIds = new Set([
+    ...(Array.isArray(runtimeTrace?.run_ids) ? runtimeTrace.run_ids : []),
+    ...(Array.isArray(runtimeTrace?.trace_items)
+      ? runtimeTrace.trace_items.flatMap((item) => (Array.isArray(item.run_ids) ? item.run_ids : []))
+      : []),
+  ].filter(Boolean));
+  if (traceRunIds.size === 0) return null;
+  const candidates = (Array.isArray(runs) ? runs : []).filter((run) => traceRunIds.has(run.run_id) && run.execution_evidence);
+  const selectedRun = candidates.find((run) => run.provider_step_status?.status && !["completed", "failed", "interrupted"].includes(run.provider_step_status.status))
+    ?? candidates.at(-1)
+    ?? null;
+  return selectedRun?.execution_evidence
+    ? { ...selectedRun.execution_evidence, run_id: selectedRun.run_id, provider_step_status: selectedRun.provider_step_status ?? null }
+    : null;
+}
+
+function executionStatusRows(evidence) {
+  return [
+    { label: "Provider execution", value: evidence?.provider_execution_status ?? "unknown" },
+    { label: "Runtime Harness", value: evidence?.runtime_harness_decision ?? "unknown" },
+    { label: "Real code change", value: evidence?.real_code_change_status ?? "unknown" },
+    { label: "Post-run verification", value: evidence?.post_run_verification_status ?? "unknown" },
+    { label: "Review", value: evidence?.review_status ?? "unknown" },
+    { label: "Delivery readiness", value: evidence?.delivery_readiness_status ?? "unknown" },
+    { label: "No upstream writes", value: evidence?.no_upstream_write_status ?? "unknown" },
+  ];
+}
+
+function executionActionCommand(action, evidence, decisionRequests) {
+  const runId = evidence?.run_id ?? "<run-id>";
+  if (action.action_id === "stop_provider") {
+    return `aor run cancel --run-id ${runId} --approval-ref approval://operator/${runId}/stop`;
+  }
+  if (action.action_id === "save_partial_evidence") {
+    return `aor run status --run-id ${runId} --json`;
+  }
+  if (action.action_id === "diagnose_current_step") {
+    return decisionHelperCommand(decisionRequests[0]?.ref, "diagnose");
+  }
+  if (action.action_id === "retry_public_step") {
+    return decisionHelperCommand(decisionRequests[0]?.ref, "retry_public_step");
+  }
+  return action.command_surface ?? "public control-plane action";
 }
 
 function selectedStageRuntimeState(stage, currentStage, completed) {
@@ -391,19 +635,11 @@ function evidenceRowsForFlow(flow, rows, { draft = false } = {}) {
   const evidenceRefs = Array.isArray(flow.evidence_refs) ? flow.evidence_refs : [];
   const byRef = new Map(rows.map((row) => [row.ref, row]));
   const scopedRows = rows.filter((row) => {
-    return row.targetFlowId === flow.flow_id || evidenceRefs.some((ref) => evidenceRefsMatch(row.ref, ref));
+    return row.targetFlowId === flow.flow_id || evidenceRefs.some((ref) => evidenceRefsMatch(row.ref, ref) || evidenceRefsMatch(row.sourceRef, ref));
   });
   const merged = evidenceRefs.map((ref) => {
-    const matchedRow = byRef.get(ref) ?? rows.find((row) => evidenceRefsMatch(row.ref, ref));
-    return matchedRow
-      ? { ...matchedRow, ref }
-      : {
-          kind: "flow-evidence",
-          ref,
-          label: "flow evidence",
-          status: "ready",
-          summary: "Evidence linked to the selected flow projection.",
-        };
+    const matchedRow = byRef.get(ref) ?? rows.find((row) => evidenceRefsMatch(row.ref, ref) || evidenceRefsMatch(row.sourceRef, ref));
+    return matchedRow ? { ...matchedRow, ref: matchedRow.ref, sourceRef: ref } : missingArtifactRow(ref, flow.selected_stage ?? "artifact");
   });
   const seenRefs = new Set(merged.map((row) => comparableEvidenceRef(row.ref)));
   for (const row of scopedRows) {
@@ -452,6 +688,72 @@ function flowScopedInteractions(stepResults, selectedFlow, runtimeTrace, { draft
     });
 }
 
+function isAgentDecisionRequestRef(ref) {
+  return comparableEvidenceRef(ref).toLowerCase().includes("live-e2e-agent-decision-request");
+}
+
+function supportedDecisionActionsFromRecord(record) {
+  const rawShapeAction = String(record?.expected_response_shape?.action ?? record?.action ?? "");
+  const supported = rawShapeAction
+    .split("|")
+    .map((entry) => entry.trim())
+    .filter((entry) => OPERATOR_DECISION_ACTIONS.some((action) => action.id === entry));
+  return supported.length > 0 ? supported : OPERATOR_DECISION_ACTIONS.map((action) => action.id);
+}
+
+function operatorDecisionRequestsForFlow(selectedFlow, runtimeTrace, evidenceRows, { draft = false } = {}) {
+  if (draft || !selectedFlow?.flow_id) return [];
+  const traceItems = Array.isArray(runtimeTrace?.trace_items) ? runtimeTrace.trace_items : [];
+  const traceRefs = traceItems.flatMap((item) => {
+    const refs = [
+      item.agent_decision_request_ref,
+      item.display_summary?.raw_ref,
+      item.display_summary?.source_ref,
+      item.ref,
+    ].filter(Boolean);
+    return refs.map((ref) => ({
+      ref,
+      label: item.display_summary?.label ?? item.summary ?? "Agent decision request",
+      status: item.operator_decision_status ?? item.status ?? "pending",
+      rejectionReason: item.operator_decision_rejection_reason ?? item.rejection_reason ?? "",
+      supportedActions: supportedDecisionActionsFromRecord(item),
+    }));
+  });
+  const evidenceRefs = evidenceRows
+    .filter((row) => isAgentDecisionRequestRef(row.rawRef ?? row.sourceRef ?? row.ref))
+    .map((row) => ({
+      ref: row.rawRef ?? row.sourceRef ?? row.ref,
+      label: row.label ?? "Agent decision request",
+      status: row.status ?? "pending",
+      rejectionReason: row.rejectionReason ?? "",
+      supportedActions: OPERATOR_DECISION_ACTIONS.map((action) => action.id),
+    }));
+  const seen = new Set();
+  return [...traceRefs, ...evidenceRefs]
+    .filter((entry) => isAgentDecisionRequestRef(entry.ref))
+    .filter((entry) => {
+      const key = comparableEvidenceRef(entry.ref).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function shellArg(value) {
+  const text = String(value ?? "");
+  if (/^[A-Za-z0-9_./:@=-]+$/u.test(text)) return text;
+  return `'${text.replace(/'/gu, "'\\''")}'`;
+}
+
+function decisionHelperCommand(requestRef, action) {
+  return [
+    "node ./scripts/live-e2e/manual-live-e2e.mjs",
+    "--prepare-decision",
+    `--request ${requestRef ? shellArg(requestRef) : "<agent_decision_request_ref>"}`,
+    `--action ${shellArg(action)}`,
+  ].join(" ");
+}
+
 function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNewFlow }) {
   const activeFlows = flows.filter((flow) => flow.status === "active");
   const completedFlows = flows.filter((flow) => flow.status === "completed");
@@ -491,7 +793,7 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
   );
 }
 
-function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft }) {
+function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, providerStepStatus = null }) {
   const currentIndex = Math.max(0, STAGES.findIndex((stage) => stage.id === currentStage));
   const completed = isCompletedFlow(flow);
   const railTitle = newFlowDraft ? "New flow draft" : flow ? flowDisplayName(flow) : "No active flow";
@@ -508,6 +810,20 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft }
         <span>Flow stages</span>
         <strong>{newFlowDraft ? "Draft" : flow?.status ?? `${currentIndex + 1}/7`}</strong>
       </div>
+      {providerStepStatus ? (
+        <div className="provider-heartbeat-rail" aria-label="Provider step heartbeat">
+          <div>
+            <span>{providerStepStatus.provider ?? "Provider"}</span>
+            <strong>{providerStepStatus.adapter ?? providerStepStatus.route_id ?? "external runner"}</strong>
+          </div>
+          <StatusPill state={providerStepStatus.status} />
+          <p>{providerStatusCopy(providerStepStatus)}</p>
+          <small>
+            {formatDurationMs(providerStepStatus.elapsed_ms)}
+            {providerStepStatus.timeout_budget_ms ? ` / ${formatDurationMs(providerStepStatus.timeout_budget_ms)}` : ""}
+          </small>
+        </div>
+      ) : null}
       <nav aria-label="AOR flow stages">
         {STAGES.map((stage, index) => {
           const active = selectedStage === stage.id;
@@ -554,7 +870,7 @@ function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft }
   );
 }
 
-function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk, askDisabled = false, title = "Start New Flow", description = "Create a fresh mission/intake packet, then let AOR resolve the first next action.", followUpSourceHandoffRef = null }) {
+function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk, onCancel = null, askDisabled = false, title = "Start New Flow", description = "Create a fresh mission/intake packet, then let AOR resolve the first next action.", followUpSourceHandoffRef = null }) {
   const selectedDeliveryMode = form.deliveryMode || "no-write";
 
   return (
@@ -565,6 +881,11 @@ function MissionForm({ form, setForm, busy, submitMission, applyTemplate, onAsk,
           <p>{description}</p>
         </div>
         <div className="form-actions">
+          {onCancel ? (
+            <button className="secondary" type="button" onClick={onCancel} disabled={busy}>
+              Cancel New Flow
+            </button>
+          ) : null}
           <button className="secondary" type="button" onClick={applyTemplate} disabled={busy}>
             Load template
           </button>
@@ -678,10 +999,11 @@ function FlowTimeline({ currentStage, completed }) {
   );
 }
 
-function ActionContextGrid({ stage, action, evidenceRefs, blockers, deliveryMode }) {
+function ActionContextGrid({ stage, action, evidenceRefs, evidenceRows = [], blockers, deliveryMode }) {
   const expectedOutputs = STAGE_EXPECTED_OUTPUTS[stage.id] ?? ["Evidence artifact", "Policy decision", "Next-action report"];
   const command = actionCommandLabel(action);
   const riskLevel = blockers.length > 0 ? "Blocked" : deliveryMode === "no-write" ? "Low" : "Gated";
+  const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
   return (
     <div className="action-detail-grid" aria-label="Recommended action context">
       <div>
@@ -710,14 +1032,15 @@ function ActionContextGrid({ stage, action, evidenceRefs, blockers, deliveryMode
       <div>
         <span>Dry-run preview</span>
         <code>{command.includes("--dry-run") ? command : `${command} --dry-run`}</code>
-        <p>{evidenceRefs.length} selected-flow refs available before execution.</p>
+        <p>{visibleEvidence.length} selected-flow artifacts available before execution.</p>
       </div>
     </div>
   );
 }
 
-function StageSpecificPanel({ stage, completed, flow, evidenceRefs, blockers, deliveryMode }) {
+function StageSpecificPanel({ stage, completed, flow, evidenceRefs, evidenceRows = [], blockers, deliveryMode }) {
   const closureState = flow?.closure_state ?? {};
+  const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
   if (completed || stage.id === "learning") {
     const sourceHandoffRefs = Array.isArray(closureState.source_learning_handoff_refs)
       ? closureState.source_learning_handoff_refs
@@ -726,6 +1049,7 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, blockers, de
       closureState.recommended_follow_up_source_handoff_ref ??
       sourceHandoffRefs[0] ??
       evidenceRefForTokens(evidenceRefs, ["learning-loop-handoff", "LEARN-HND"]);
+    const handoffRow = handoffRef ? artifactRowsForRefs([handoffRef], evidenceRows, "learning")[0] : null;
     return (
       <div className="stage-specific-panel learning-panel">
         <div className="panel-heading">
@@ -744,7 +1068,7 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, blockers, de
           <div>
             <span>Follow-up source</span>
             <strong>{handoffRef ? "Available" : "Not captured yet"}</strong>
-            <code>{handoffRef ?? "learning handoff pending"}</code>
+            <p title={handoffRef ?? ""}>{handoffRow?.label ?? "Learning handoff pending"}</p>
           </div>
           <div>
             <span>New-flow path</span>
@@ -773,12 +1097,12 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, blockers, de
             </thead>
             <tbody>
               {REVIEW_GATE_ROWS.map((row) => {
-                const ref = evidenceRefForTokens(evidenceRefs, row.tokens);
+                const evidenceRow = evidenceRowForTokens(visibleEvidence, row.tokens);
                 return (
                   <tr key={row.label}>
                     <td>{row.label}</td>
-                    <td>{ref ? "Ready" : "Pending"}</td>
-                    <td><code>{ref ?? "awaiting evidence"}</code></td>
+                    <td>{evidenceRow ? evidenceRow.status ?? "Ready" : "Pending"}</td>
+                    <td><span className="artifact-ref-label" title={evidenceRow?.rawRef ?? ""}>{evidenceRow?.label ?? "Awaiting evidence"}</span></td>
                   </tr>
                 );
               })}
@@ -801,12 +1125,12 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, blockers, de
         </div>
         <div className="delivery-readiness-grid">
           {DELIVERY_CHECK_ROWS.map((row) => {
-            const ref = evidenceRefForTokens(evidenceRefs, row.tokens);
+            const evidenceRow = evidenceRowForTokens(visibleEvidence, row.tokens);
             return (
-              <div key={row.label} className={ref ? "ready" : "pending"}>
+              <div key={row.label} className={evidenceRow ? "ready" : "pending"}>
                 <span className="check-dot" />
                 <strong>{row.label}</strong>
-                <code>{ref ?? "pending"}</code>
+                <p title={evidenceRow?.rawRef ?? ""}>{evidenceRow?.label ?? "Pending"}</p>
               </div>
             );
           })}
@@ -836,7 +1160,7 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, blockers, de
           <StatusPill state={evidenceGateStatus(evidenceRefs, ["step-result", "run"], "waiting")} />
         </div>
         <div className="stage-signal-grid">
-          <div><span>Runtime evidence</span><strong>{evidenceRefs.filter((ref) => evidenceRefMatchesTokens(ref, ["step-result", "runtime-harness-report"])).length}</strong></div>
+          <div><span>Runtime evidence</span><strong>{visibleEvidence.filter((row) => evidenceRefMatchesTokens(`${row.ref} ${row.kind}`, ["step-result", "runtime-harness-report"])).length}</strong></div>
           <div><span>Open blockers</span><strong>{blockers.length}</strong></div>
           <div><span>Write-back mode</span><strong>{deliveryMode}</strong></div>
         </div>
@@ -855,8 +1179,8 @@ function StageSpecificPanel({ stage, completed, flow, evidenceRefs, blockers, de
           <StatusPill state={evidenceGateStatus(evidenceRefs, ["next-action-report"], "waiting")} />
         </div>
         <div className="stage-signal-grid">
-          <div><span>Next-action refs</span><strong>{evidenceRefs.filter((ref) => evidenceRefMatchesTokens(ref, ["next-action-report"])).length}</strong></div>
-          <div><span>Mission refs</span><strong>{evidenceRefs.filter((ref) => evidenceRefMatchesTokens(ref, ["intake", "mission"])).length}</strong></div>
+          <div><span>Next-action artifacts</span><strong>{visibleEvidence.filter((row) => evidenceRefMatchesTokens(`${row.ref} ${row.kind}`, ["next-action-report"])).length}</strong></div>
+          <div><span>Mission artifacts</span><strong>{visibleEvidence.filter((row) => evidenceRefMatchesTokens(`${row.ref} ${row.kind} ${row.label}`, ["intake", "mission"])).length}</strong></div>
           <div><span>Scope policy</span><strong>{deliveryMode === "no-write" ? "No upstream writes" : "Explicit paths required"}</strong></div>
         </div>
       </div>
@@ -881,6 +1205,8 @@ function FlowCockpit({
   onCreateFollowUp,
   onDuplicateMission,
   initializeProject,
+  providerStepStatus = null,
+  evidenceRows = [],
 }) {
   if (!flow && stage.id === "readiness") {
     const runtimeRoot = projectState?.runtime_root ?? config?.runtime_root ?? ".aor";
@@ -959,6 +1285,7 @@ function FlowCockpit({
     : Array.isArray(nextAction?.evidence_refs)
       ? nextAction.evidence_refs
       : [];
+  const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, stage.id);
   const deliveryMode =
     flow?.writeback_policy?.mode ??
     nextAction?.bounded_execution?.requested_delivery_mode ??
@@ -994,6 +1321,52 @@ function FlowCockpit({
           {completed ? "Inspect" : "Ask AOR"}
         </button>
       </div>
+
+      {providerStepStatus ? (
+        <div className={`provider-heartbeat-card ${providerStepStatus.status}`}>
+          <div className="provider-heartbeat-header">
+            <div>
+              <span>Provider heartbeat</span>
+              <h3>{providerStepStatus.provider ?? "External provider"}</h3>
+            </div>
+            <StatusPill state={providerStepStatus.status} />
+          </div>
+          <p>{providerStatusCopy(providerStepStatus)}</p>
+          <div className="provider-heartbeat-grid">
+            <div>
+              <span>Adapter</span>
+              <strong>{providerStepStatus.adapter ?? "unknown"}</strong>
+            </div>
+            <div>
+              <span>Route</span>
+              <strong>{providerStepStatus.route_id ?? "unknown"}</strong>
+            </div>
+            <div>
+              <span>Elapsed / budget</span>
+              <strong>
+                {formatDurationMs(providerStepStatus.elapsed_ms)}
+                {providerStepStatus.timeout_budget_ms ? ` / ${formatDurationMs(providerStepStatus.timeout_budget_ms)}` : ""}
+              </strong>
+            </div>
+            <div>
+              <span>Remaining</span>
+              <strong>{formatDurationMs(providerStepStatus.remaining_budget_ms)}</strong>
+            </div>
+            <div>
+              <span>Last output</span>
+              <strong>{formatProviderTimestamp(providerStepStatus.last_output_at)}</strong>
+            </div>
+            <div>
+              <span>Last artifact</span>
+              <strong>{formatProviderTimestamp(providerStepStatus.last_artifact_update_at)}</strong>
+            </div>
+          </div>
+          <div className="provider-heartbeat-action">
+            <span>{providerStepStatus.current_command_label ?? "external-provider-runner"}</span>
+            <strong>{providerStepStatus.recommended_action ?? "Provider is still running."}</strong>
+          </div>
+        </div>
+      ) : null}
 
       <FlowTimeline currentStage={currentStage} completed={completed} />
 
@@ -1062,6 +1435,7 @@ function FlowCockpit({
         stage={actionStage}
         action={nextPrimary}
         evidenceRefs={evidenceRefs}
+        evidenceRows={evidenceRows}
         blockers={blockers}
         deliveryMode={deliveryMode}
       />
@@ -1073,9 +1447,9 @@ function FlowCockpit({
           <p>{blockers.length === 0 ? "No blockers for the visible next step." : blockers[0]?.summary ?? blockers[0]?.code}</p>
         </div>
         <div>
-          <span>Evidence refs</span>
-          <strong>{evidenceRefs.length}</strong>
-          <p>{evidenceRefs[0] ?? "No flow evidence refs yet."}</p>
+          <span>Evidence artifacts</span>
+          <strong>{visibleEvidence.length}</strong>
+          <p title={visibleEvidence[0]?.rawRef ?? ""}>{visibleEvidence[0]?.label ?? "No flow evidence yet."}</p>
         </div>
         <div>
           <span>Flow ID</span>
@@ -1089,6 +1463,7 @@ function FlowCockpit({
         completed={completed}
         flow={flow}
         evidenceRefs={evidenceRefs}
+        evidenceRows={evidenceRows}
         blockers={blockers}
         deliveryMode={deliveryMode}
       />
@@ -1133,7 +1508,7 @@ function DraftFlowRail({ form }) {
   );
 }
 
-function RightRail({ nextAction, selectedFlow, projectState, config, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null }) {
+function RightRail({ nextAction, selectedFlow, projectState, config, operatorRequests, flows = [], newFlowDraft = false, missionDraft = null, evidenceRows = [] }) {
   const completed = isCompletedFlow(selectedFlow);
   const activeFlows = flows.filter((flow) => flow.status === "active");
   const completedFlows = flows.filter((flow) => flow.status === "completed");
@@ -1159,6 +1534,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, operatorReq
     : Array.isArray(nextAction?.evidence_refs)
       ? nextAction.evidence_refs
       : [];
+  const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, selectedFlow?.selected_stage ?? "artifact");
   const deliveryMode =
     selectedFlow?.writeback_policy?.mode ??
     nextAction?.bounded_execution?.requested_delivery_mode ??
@@ -1181,10 +1557,17 @@ function RightRail({ nextAction, selectedFlow, projectState, config, operatorReq
         </ul>
       </section>
       <section className="rail-card">
-        <h3>Evidence refs <span>{evidenceRefs.length}</span></h3>
-        <ul>
-          {evidenceRefs.length === 0 ? <li>No refs yet</li> : evidenceRefs.slice(0, 4).map((ref) => <li key={ref}><code>{ref}</code></li>)}
-        </ul>
+        <h3>Evidence artifacts <span>{visibleEvidence.length}</span></h3>
+        <div className="artifact-chip-list">
+          {visibleEvidence.length === 0 ? (
+            <span className="artifact-empty">No artifacts yet</span>
+          ) : visibleEvidence.slice(0, 4).map((row) => (
+            <span className={`artifact-chip ${row.severity}`} key={row.ref} title={row.rawRef}>
+              <strong>{row.label}</strong>
+              <em>{row.type ?? row.kind} / {row.status ?? "ready"}</em>
+            </span>
+          ))}
+        </div>
       </section>
       <section className="rail-card">
         <h3>Runtime root</h3>
@@ -1233,41 +1616,66 @@ function RightRail({ nextAction, selectedFlow, projectState, config, operatorReq
 }
 
 function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, copyRef }) {
+  const [filter, setFilter] = useState("all");
+  const filteredRows = rows.filter((row) => artifactFilterMatches(row, filter));
   const selected = rows.find((row) => row.ref === selectedRef) ?? rows[0] ?? null;
+  const groupedRows = filteredRows.reduce((groups, row) => {
+    const stage = row.stage ?? "artifact";
+    if (!groups.has(stage)) groups.set(stage, []);
+    groups.get(stage).push(row);
+    return groups;
+  }, new Map());
   return (
     <section className="work-card evidence-workbench">
       <div className="work-heading compact-heading">
         <div>
           <h3>Evidence & Documents</h3>
-          <p>Preview safe metadata, copy refs, or attach refs to an operator request.</p>
+          <p>Grouped artifact summaries for the selected flow. Raw refs are available through debug actions.</p>
         </div>
+      </div>
+      <div className="artifact-filter-bar" aria-label="Artifact filters">
+        {ARTIFACT_FILTERS.map((entry) => (
+          <button key={entry.id} className={filter === entry.id ? "selected" : ""} type="button" onClick={() => setFilter(entry.id)}>
+            {entry.label}
+          </button>
+        ))}
       </div>
       <div className="evidence-grid">
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Kind</th>
-                <th>Ref</th>
+                <th>Stage</th>
+                <th>Artifact</th>
                 <th>Status</th>
                 <th />
               </tr>
             </thead>
-            <tbody>
-              {rows.length === 0 ? (
+            {[...groupedRows.entries()].length === 0 ? (
+              <tbody>
                 <tr><td colSpan="4">No evidence yet</td></tr>
-              ) : rows.slice(0, 12).map((row) => (
-                <tr key={`${row.kind}-${row.ref}`} className={selected?.ref === row.ref ? "selected" : ""}>
-                  <td>{row.kind}</td>
-                  <td><button className="link-button" type="button" onClick={() => setSelectedRef(row.ref)}>{row.ref}</button></td>
-                  <td>{row.status ?? "ready"}</td>
-                  <td className="row-actions">
-                    <IconButton label="Copy ref" onClick={() => copyRef(row.ref)}><Icon name="copy" /></IconButton>
-                    <IconButton label="Attach as request target" onClick={() => attachTarget(row.ref)}><Icon name="target" /></IconButton>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+              </tbody>
+            ) : [...groupedRows.entries()].slice(0, 8).map(([stage, stageRows]) => (
+              <tbody key={stage}>
+                <tr className="artifact-stage-row"><td colSpan="4">{stage}</td></tr>
+                {stageRows.slice(0, 12).map((row) => (
+                  <tr key={`${row.kind}-${row.ref}`} className={selected?.ref === row.ref ? "selected" : ""}>
+                    <td>{row.stage ?? "artifact"}</td>
+                    <td>
+                      <button className="artifact-summary-button" type="button" onClick={() => setSelectedRef(row.ref)}>
+                        <strong>{row.label}</strong>
+                        <span>{row.kind}</span>
+                      </button>
+                    </td>
+                    <td><StatusPill state={row.status ?? "ready"} /></td>
+                    <td className="row-actions">
+                      <IconButton label="Copy raw ref" onClick={() => copyRef(row.rawRef ?? row.ref)}><Icon name="copy" /></IconButton>
+                      <IconButton label="Attach as request target" onClick={() => attachTarget(row.rawRef ?? row.ref)}><Icon name="target" /></IconButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
           </table>
         </div>
         <div className="preview-pane">
@@ -1275,8 +1683,15 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
           {selected ? (
             <>
               <strong>{selected.label}</strong>
-              <code>{selected.ref}</code>
+              <div className="artifact-meta-line">
+                <StatusPill state={selected.status ?? "ready"} />
+                <em>{selected.stage ?? "artifact"} / {selected.kind}</em>
+              </div>
               <p>{selected.summary}</p>
+              <details className="debug-ref-details">
+                <summary>Debug raw ref</summary>
+                <code>{selected.rawRef ?? selected.ref}</code>
+              </details>
             </>
           ) : (
             <p>Select evidence to preview.</p>
@@ -1306,7 +1721,7 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
               <div className="interaction-summary-row" key={interactionKey(interaction)}>
                 <strong>{interaction.prompt_summary ?? "Runtime requested input"}</strong>
                 <span>{interaction.run_id}</span>
-                <code>{interaction.step_result_ref}</code>
+                <span className="artifact-ref-label" title={interaction.step_result_ref}>{titleFromRef(interaction.step_result_ref)}</span>
               </div>
             ))}
           </div>
@@ -1329,7 +1744,7 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
                   <dt>Interaction</dt>
                   <dd><code>{selectedInteraction.interaction_id}</code></dd>
                   <dt>Evidence</dt>
-                  <dd><code>{selectedInteraction.step_result_ref}</code></dd>
+                  <dd><span className="artifact-ref-label" title={selectedInteraction.step_result_ref}>{titleFromRef(selectedInteraction.step_result_ref)}</span></dd>
                 </dl>
                 <div className="allowed-answer-types">
                   <span>Allowed answer types</span>
@@ -1353,6 +1768,181 @@ function InteractionsInbox({ interactions, answers, setAnswers, submitAnswer, bu
             );
           })() : null}
         </div>
+      )}
+    </section>
+  );
+}
+
+function OperatorDecisionDrawer({ decisionRequests, copyRef, busy }) {
+  const [selectedAction, setSelectedAction] = useState("continue");
+  const selectedRequest = decisionRequests[0] ?? null;
+  const selectedActionEntry = OPERATOR_DECISION_ACTIONS.find((entry) => entry.id === selectedAction) ?? OPERATOR_DECISION_ACTIONS[0];
+  const supportedActions = selectedRequest?.supportedActions ?? OPERATOR_DECISION_ACTIONS.map((action) => action.id);
+  const helperCommand = decisionHelperCommand(selectedRequest?.ref, selectedAction);
+  const rejectionReason = selectedRequest?.rejectionReason ?? "";
+  return (
+    <section className="work-card operator-decision-drawer">
+      <div className="work-heading compact-heading">
+        <div>
+          <h3>Operator Decision</h3>
+          <p>Prepare the skill-agent decision draft from the live E2E request rubric.</p>
+        </div>
+        <StatusPill state={selectedRequest ? selectedRequest.status : "no request"} />
+      </div>
+      {selectedRequest ? (
+        <>
+          <div className="decision-request-summary">
+            <span>Decision request</span>
+            <strong>{selectedRequest.label}</strong>
+            <button className="secondary compact" type="button" onClick={() => copyRef(selectedRequest.ref)} disabled={busy}>
+              Copy request ref
+            </button>
+          </div>
+          {rejectionReason ? (
+            <div className="decision-rejection-copy">
+              <span>Rejected decision reason</span>
+              <strong>{rejectionReason}</strong>
+            </div>
+          ) : null}
+          <div className="decision-action-grid" role="group" aria-label="Operator decision actions">
+            {OPERATOR_DECISION_ACTIONS.map((action) => (
+              <button
+                key={action.id}
+                className={selectedAction === action.id ? "selected" : ""}
+                type="button"
+                onClick={() => setSelectedAction(action.id)}
+                disabled={busy || !supportedActions.includes(action.id)}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+          <div className="decision-validation-preview">
+            <div>
+              <span>Semantic status</span>
+              <strong>{selectedActionEntry.semanticStatus}</strong>
+            </div>
+            <div>
+              <span>Supported actions</span>
+              <strong>{supportedActions.length}</strong>
+            </div>
+            <div>
+              <span>Inspected refs</span>
+              <strong>Auto-filled from rubric</strong>
+            </div>
+            <div>
+              <span>Frontend refs</span>
+              <strong>Preserved when required</strong>
+            </div>
+          </div>
+          <button className="primary drawer-submit" type="button" onClick={() => copyRef(helperCommand)} disabled={busy}>
+            Prepare corrected draft
+          </button>
+          <details className="debug-ref-details decision-debug">
+            <summary>Debug command and raw request ref</summary>
+            <code>{helperCommand}</code>
+            <code>{selectedRequest.ref}</code>
+          </details>
+        </>
+      ) : (
+        <p className="empty-state">No pending agent decision request for this flow.</p>
+      )}
+    </section>
+  );
+}
+
+function ExecutionEvidencePanel({ evidence, providerEvidenceRows, decisionRequests, copyRef, busy }) {
+  const statusRows = executionStatusRows(evidence);
+  const pathGroups = Array.isArray(evidence?.changed_path_groups) ? evidence.changed_path_groups : [];
+  const blockers = Array.isArray(evidence?.blockers) ? evidence.blockers : [];
+  const actions = Array.isArray(evidence?.actions) ? evidence.actions : [];
+  return (
+    <section className="work-card execution-evidence-panel">
+      <div className="work-heading compact-heading">
+        <div>
+          <h3>Execution Evidence</h3>
+          <p>Provider status, Runtime Harness decision, diff relevance, verification, and public recovery controls.</p>
+        </div>
+        <StatusPill state={evidence?.status ?? "no evidence"} />
+      </div>
+      {!evidence ? (
+        <p className="empty-state">No selected-flow execution evidence yet.</p>
+      ) : (
+        <>
+          <div className="execution-status-grid">
+            {statusRows.map((row) => (
+              <div key={row.label}>
+                <span>{row.label}</span>
+                <StatusPill state={row.value} />
+              </div>
+            ))}
+          </div>
+          {blockers.length > 0 ? (
+            <div className="execution-blockers" role="status">
+              <span>Blocking evidence</span>
+              <ul>{blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>
+            </div>
+          ) : null}
+          <div className="path-group-grid">
+            {pathGroups.map((group) => (
+              <div className={`path-group-row ${group.group_id}`} key={group.group_id}>
+                <div className="path-group-heading">
+                  <div>
+                    <span>{group.label ?? EXECUTION_PATH_GROUP_LABELS[group.group_id] ?? "Changed paths"}</span>
+                    <strong>{group.count ?? 0} paths</strong>
+                  </div>
+                  <StatusPill state={group.severity ?? group.status} />
+                </div>
+                <p>{group.description}</p>
+                {Array.isArray(group.paths) && group.paths.length > 0 ? (
+                  <ul className="path-chip-list">
+                    {group.paths.slice(0, 5).map((changedPath) => <li key={changedPath}>{changedPath}</li>)}
+                    {group.paths.length > 5 ? <li>{group.paths.length - 5} more</li> : null}
+                  </ul>
+                ) : (
+                  <em>No paths in this group.</em>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="provider-evidence-strip">
+            <div>
+              <span>Provider raw evidence</span>
+              <strong>{providerEvidenceRows.length} readable refs</strong>
+            </div>
+            {providerEvidenceRows.length > 0 ? providerEvidenceRows.slice(0, 4).map((row) => (
+              <button className="artifact-chip-button" type="button" key={row.ref} onClick={() => copyRef(row.rawRef ?? row.ref)} disabled={busy}>
+                <span>{row.label}</span>
+                <em>{row.status ?? "ready"}</em>
+              </button>
+            )) : <p>No provider evidence refs linked yet.</p>}
+          </div>
+          <div className="execution-action-grid" aria-label="Execution evidence actions">
+            {actions.map((action) => {
+              const needsDecisionRequest = ["diagnose_current_step", "retry_public_step"].includes(action.action_id);
+              const hasDecisionRequest = decisionRequests.length > 0;
+              const enabled = action.enabled && (!needsDecisionRequest || hasDecisionRequest);
+              const command = executionActionCommand(action, evidence, decisionRequests);
+              return (
+                <button
+                  key={action.action_id}
+                  className="secondary"
+                  type="button"
+                  onClick={() => copyRef(command)}
+                  disabled={busy || !enabled}
+                  title={enabled ? command : (needsDecisionRequest && !hasDecisionRequest ? "No public agent decision request ref is visible." : action.reason)}
+                >
+                  <strong>{action.label ?? EXECUTION_ACTION_LABELS[action.action_id] ?? "Execution action"}</strong>
+                  <span>{enabled ? action.command_surface : (needsDecisionRequest && !hasDecisionRequest ? "waiting for decision request" : action.reason)}</span>
+                </button>
+              );
+            })}
+          </div>
+          <details className="debug-ref-details execution-debug">
+            <summary>Debug execution payload</summary>
+            <code>{JSON.stringify({ run_id: evidence.run_id, status: evidence.status, required_path_prefixes: evidence.required_path_prefixes ?? [] })}</code>
+          </details>
+        </>
       )}
     </section>
   );
@@ -1395,9 +1985,9 @@ function EvidenceGraphPanel({ graph }) {
           <p className="empty-state">No flow graph loaded.</p>
         ) : nodes.slice(0, 8).map((node) => (
           <div className="graph-node" key={node.node_id ?? node.ref}>
-            <span>{node.family ?? node.kind ?? "evidence"}</span>
-            <strong>{node.label ?? node.ref}</strong>
-            <code>{node.ref}</code>
+            <span>{node.display_summary?.type ?? node.family ?? node.kind ?? "evidence"}</span>
+            <strong title={node.ref}>{node.display_summary?.label ?? node.label ?? "Evidence artifact"}</strong>
+            <em>{node.display_summary?.status ?? node.status ?? "linked"}</em>
           </div>
         ))}
       </div>
@@ -1415,9 +2005,8 @@ function EvidenceGraphPanel({ graph }) {
       {selectedNode ? (
         <div className="selected-node-panel">
           <span>Selected node</span>
-          <strong>{selectedNode.label ?? selectedNode.family ?? "Evidence"}</strong>
-          <code>{selectedNode.ref}</code>
-          <p>{selectedNode.summary ?? "Selected-flow evidence node."}</p>
+          <strong title={selectedNode.ref}>{selectedNode.display_summary?.label ?? selectedNode.label ?? selectedNode.family ?? "Evidence"}</strong>
+          <p>{selectedNode.display_summary?.description ?? selectedNode.summary ?? "Selected-flow evidence node."}</p>
         </div>
       ) : null}
     </section>
@@ -1453,7 +2042,7 @@ function RuntimeTracePanel({ trace }) {
               <th>Type</th>
               <th>Run</th>
               <th>Status</th>
-              <th>Ref</th>
+              <th>Artifact</th>
             </tr>
           </thead>
           <tbody>
@@ -1464,7 +2053,7 @@ function RuntimeTracePanel({ trace }) {
                 <td>{item.event_type ?? item.kind}</td>
                 <td>{Array.isArray(item.run_ids) ? item.run_ids.join(", ") : ""}</td>
                 <td>{item.status ?? "read"}</td>
-                <td><code>{item.ref ?? item.trace_id}</code></td>
+                <td><span className="artifact-ref-label" title={item.ref ?? item.trace_id}>{item.display_summary?.label ?? item.summary ?? item.kind}</span></td>
               </tr>
             ))}
           </tbody>
@@ -1522,7 +2111,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Close request drawer"><Icon name="close" /></button>
         </div>
-        <div className={`target-flow-card ${completed ? "read-only" : ""}`}>
+        <div className={`target-flow-card request-scope-card ${completed ? "read-only" : ""}`}>
           <span>Target flow</span>
           <strong>{flowDisplayName(flow)}</strong>
           <code>{flow?.flow_id ?? "new-flow-draft"}</code>
@@ -1613,14 +2202,14 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
               <dt>Context</dt>
               <dd><code>{result.compiled_context_ref}</code></dd>
               <dt>Step result</dt>
-              <dd><code>{result.routed_step_result_ref ?? result.routed_step_result_file}</code></dd>
+              <dd><span className="artifact-ref-label" title={result.routed_step_result_ref ?? result.routed_step_result_file}>{titleFromRef(result.routed_step_result_ref ?? result.routed_step_result_file)}</span></dd>
               <dt>Next action</dt>
-              <dd><code>{result.next_action_report_ref ?? result.next_action_report_file}</code></dd>
+              <dd><span className="artifact-ref-label" title={result.next_action_report_ref ?? result.next_action_report_file}>{titleFromRef(result.next_action_report_ref ?? result.next_action_report_file)}</span></dd>
             </dl>
             <div className="result-ref-list">
               <span>Proposal refs</span>
               {result.proposal_refs?.length ? (
-                <ul>{result.proposal_refs.map((ref) => <li key={ref}><code>{ref}</code></li>)}</ul>
+                <ul>{result.proposal_refs.map((ref) => <li key={ref}><span className="artifact-ref-label" title={ref}>{titleFromRef(ref)}</span></li>)}</ul>
               ) : (
                 <p>No proposal refs returned.</p>
               )}
@@ -1628,7 +2217,7 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
             {result.patch_refs?.length ? (
               <div className="result-ref-list">
                 <span>Patch refs</span>
-                <ul>{result.patch_refs.map((ref) => <li key={ref}><code>{ref}</code></li>)}</ul>
+                <ul>{result.patch_refs.map((ref) => <li key={ref}><span className="artifact-ref-label" title={ref}>{titleFromRef(ref)}</span></li>)}</ul>
               </div>
             ) : null}
           </div>
@@ -1652,6 +2241,7 @@ function App() {
   const [flowRuntimeTrace, setFlowRuntimeTrace] = useState(null);
   const [packets, setPackets] = useState([]);
   const [stepResults, setStepResults] = useState([]);
+  const [runs, setRuns] = useState([]);
   const [operatorRequests, setOperatorRequests] = useState([]);
   const [activity, setActivity] = useState([]);
   const [selectedStage, setSelectedStage] = useState("readiness");
@@ -1665,6 +2255,7 @@ function App() {
   const [answers, setAnswers] = useState({});
   const didChooseStage = useRef(false);
   const didAutoSelectStage = useRef(false);
+  const flowSelectionVersion = useRef(0);
 
   const apiProjectBase = useMemo(() => {
     if (!config?.project_id) return null;
@@ -1677,37 +2268,56 @@ function App() {
   const flowOptions = Array.isArray(flowList?.flows) ? flowList.flows : [];
 
   const evidenceRows = useMemo(() => {
-    const packetRows = packets.map((packet) => ({
-      kind: packet.family ?? "packet",
+    const fromSummary = (summary, overrides = {}) => artifactRowFromSummary(summary, overrides);
+    const packetRows = packets.map((packet) => fromSummary(packet.display_summary, {
       ref: packet.artifact_ref ?? packet.file,
-      label: packet.document?.packet_id ?? packet.document?.request_id ?? packet.family ?? "packet",
+      type: packet.family ?? "packet",
       status: packet.document?.status,
-      summary: packet.document?.summary ?? packet.document?.title ?? "Packet artifact metadata.",
+      description: packet.document?.summary ?? packet.document?.title ?? "Packet artifact metadata.",
     }));
-    const stepRows = stepResults.map((step) => ({
-      kind: "step-result",
+    const stepRows = stepResults.map((step) => fromSummary(step.display_summary, {
       ref: step.artifact_ref ?? step.file,
-      label: step.document?.step_result_id ?? "step-result",
+      type: "step-result",
       status: step.document?.status,
-      summary: step.document?.summary ?? "Step result metadata.",
+      description: step.document?.summary ?? "Step result metadata.",
     }));
-    const requestRows = operatorRequests.map((request) => ({
-      kind: "operator-request",
+    const requestRows = operatorRequests.map((request) => fromSummary(request.display_summary, {
       ref: request.operator_request_ref ?? request.artifact_ref ?? request.file,
-      label: request.document?.request_id ?? "operator-request",
+      type: "operator-request",
       status: request.document?.status,
-      summary: request.document?.request_summary ?? "Operator request metadata.",
+      description: request.document?.request_summary ?? "Operator request metadata.",
       targetFlowId: request.document?.target_flow_id,
     }));
+    const stateRows = (Array.isArray(projectState?.artifact_display_summaries) ? projectState.artifact_display_summaries : [])
+      .map((summary) => fromSummary(summary));
+    const runRows = (Array.isArray(runs) ? runs : [])
+      .flatMap((run) => Array.isArray(run.artifact_display_summaries) ? run.artifact_display_summaries : [])
+      .map((summary) => fromSummary(summary));
+    const flowRows = (Array.isArray(selectedFlow?.artifact_display_summaries) ? selectedFlow.artifact_display_summaries : [])
+      .map((summary) => fromSummary(summary));
+    const nextSummaryRows = (Array.isArray(nextAction?.artifact_display_summaries) ? nextAction.artifact_display_summaries : [])
+      .map((summary) => fromSummary(summary));
     const nextRows = (Array.isArray(nextAction?.evidence_refs) ? nextAction.evidence_refs : []).map((ref) => ({
-      kind: "next-action-ref",
+      kind: artifactTypeForRef(ref),
       ref,
+      rawRef: ref,
+      sourceRef: ref,
       label: "next-action evidence",
       status: "ready",
+      severity: "success",
+      stage: "planning",
       summary: "Evidence referenced by the latest next-action report.",
     }));
-    return [...requestRows, ...packetRows, ...stepRows, ...nextRows].filter((row) => typeof row.ref === "string");
-  }, [packets, stepResults, operatorRequests, nextAction]);
+    const seen = new Set();
+    return [...flowRows, ...requestRows, ...packetRows, ...stepRows, ...stateRows, ...runRows, ...nextSummaryRows, ...nextRows]
+      .filter((row) => typeof row.ref === "string" && row.ref.length > 0)
+      .filter((row) => {
+        const key = comparableEvidenceRef(row.ref).toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }, [packets, stepResults, operatorRequests, projectState, runs, selectedFlow, nextAction]);
 
   const flowEvidenceRows = useMemo(
     () => evidenceRowsForFlow(selectedFlow, evidenceRows, { draft: draftSurface }),
@@ -1727,6 +2337,19 @@ function App() {
   const interactions = useMemo(() => {
     return flowScopedInteractions(stepResults, selectedFlow, flowRuntimeTrace, { draft: draftSurface });
   }, [stepResults, selectedFlow, flowRuntimeTrace, draftSurface]);
+  const operatorDecisionRequests = useMemo(() => {
+    return operatorDecisionRequestsForFlow(selectedFlow, flowRuntimeTrace, flowEvidenceRows, { draft: draftSurface });
+  }, [selectedFlow, flowRuntimeTrace, flowEvidenceRows, draftSurface]);
+  const executionEvidence = useMemo(() => {
+    return executionEvidenceForFlow(selectedFlow, runs, flowRuntimeTrace, { draft: draftSurface });
+  }, [selectedFlow, runs, flowRuntimeTrace, draftSurface]);
+  const providerEvidenceRows = useMemo(() => {
+    return flowEvidenceRows.filter((row) => artifactFilterMatches(row, "provider"));
+  }, [flowEvidenceRows]);
+  const providerStepStatus = useMemo(
+    () => resolveProviderStepStatus(projectState, runs),
+    [projectState, runs],
+  );
 
   function pushActivity(label, detail) {
     setActivity((current) => [{ id: `${Date.now()}-${Math.random()}`, label, detail }, ...current.slice(0, 9)]);
@@ -1749,19 +2372,28 @@ function App() {
 
   async function refresh(options = {}) {
     setError("");
+    const refreshSelectionVersion = options.selectionVersion ?? flowSelectionVersion.current;
     const appConfig = config ?? (await readJson("/app-config.json"));
     setConfig(appConfig);
     const base = `/api/projects/${encodeURIComponent(appConfig.project_id)}`;
-    const [state, next, flowPayload, selectedFlowPayload, packetList, stepList, requestList] = await Promise.all([
+    const [state, next, flowPayload, selectedFlowPayload, packetList, stepList, runList, requestList] = await Promise.all([
       readJson(`${base}/state`),
       readJson(`${base}/next-action-report`).catch(() => null),
       readJson(`${base}/flows`).catch(() => ({ flows: [], selected_flow_id: null })),
       readJson(`${base}/flows/selected`).catch(() => null),
       readJson(`${base}/packets`).catch(() => []),
       readJson(`${base}/step-results`).catch(() => []),
+      readJson(`${base}/runs`).catch(() => []),
       readJson(`${base}/operator-requests`).catch(() => []),
     ]);
-    const nextReport = next?.document ?? next;
+    const nextReport = next?.document
+      ? {
+          ...next.document,
+          artifact_ref: next.artifact_ref,
+          display_summary: next.display_summary,
+          artifact_display_summaries: next.artifact_display_summaries,
+        }
+      : next;
     const flows = Array.isArray(flowPayload?.flows) ? flowPayload.flows : [];
     const draftMode = typeof options.newFlowDraft === "boolean" ? options.newFlowDraft : newFlowDraft;
     const preferredSelectedFlowId = Object.prototype.hasOwnProperty.call(options, "selectedFlowId")
@@ -1774,25 +2406,33 @@ function App() {
       selectedFlowPayload ??
       flows[0] ??
       null;
+    const selectionStillCurrent = refreshSelectionVersion === flowSelectionVersion.current;
     setProjectState(state);
     setNextAction(nextReport?.primary_action ? nextReport : null);
     setFlowList({ ...flowPayload, flows });
-    if (!draftMode) {
+    if (!draftMode && selectionStillCurrent) {
       setSelectedFlow(refreshedSelectedFlow);
       setSelectedFlowId(refreshedSelectedFlow?.flow_id ?? null);
       await loadFlowWorkbench(base, refreshedSelectedFlow);
-    } else {
+    } else if (draftMode && selectionStillCurrent) {
       await loadFlowWorkbench(base, null);
     }
     setPackets(Array.isArray(packetList) ? packetList : []);
     setStepResults(Array.isArray(stepList) ? stepList : []);
+    setRuns(Array.isArray(runList) ? runList : []);
     setOperatorRequests(Array.isArray(requestList) ? requestList : []);
-    if (!didAutoSelectStage.current && !didChooseStage.current) {
+    if (selectionStillCurrent && !didAutoSelectStage.current && !didChooseStage.current) {
       setSelectedStage(draftMode ? "mission" : flowStageId(refreshedSelectedFlow, nextReport?.primary_action ? nextReport : null, state));
       didAutoSelectStage.current = true;
     }
-    pushActivity("control-plane.connected", refreshedSelectedFlow?.flow_id ?? nextReport?.primary_action?.command ?? "state refreshed");
-    return { projectState: state, nextAction: nextReport?.primary_action ? nextReport : null, selectedFlow: refreshedSelectedFlow };
+    const activityFlow = selectionStillCurrent ? refreshedSelectedFlow : selectedFlow;
+    pushActivity("control-plane.connected", activityFlow?.flow_id ?? nextReport?.primary_action?.command ?? "state refreshed");
+    return {
+      projectState: state,
+      nextAction: nextReport?.primary_action ? nextReport : null,
+      selectedFlow: selectionStillCurrent ? refreshedSelectedFlow : selectedFlow,
+      selectionApplied: selectionStillCurrent,
+    };
   }
 
   useEffect(() => {
@@ -1805,6 +2445,7 @@ function App() {
   }
 
   function startNewFlow({ sourceFlow = null, followUp = false, duplicate = false } = {}) {
+    flowSelectionVersion.current += 1;
     const sourceHandoffRef =
       followUp
         ? sourceFlow?.closure_state?.recommended_follow_up_source_handoff_ref ??
@@ -1827,11 +2468,45 @@ function App() {
     );
   }
 
+  async function cancelNewFlowDraft() {
+    const fallbackFlow = selectedFlow ?? flowOptions.find((candidate) => candidate.status === "active") ?? flowOptions[0] ?? null;
+    const fallbackFlowId = fallbackFlow?.flow_id ?? selectedFlowId ?? null;
+    const cancelSelectionVersion = flowSelectionVersion.current + 1;
+    flowSelectionVersion.current = cancelSelectionVersion;
+    setBusy(true);
+    setError("");
+    setNewFlowDraft(false);
+    setDraftSourceFlow(null);
+    setDraftFollowUpHandoffRef(null);
+    setSelectedFlow(fallbackFlow);
+    setSelectedFlowId(fallbackFlow?.flow_id ?? null);
+    setSelectedStage(flowStageId(fallbackFlow, nextAction, projectState));
+    setRequestDrawerOpen(false);
+    try {
+      const refreshed = await refresh({ newFlowDraft: false, selectedFlowId: fallbackFlowId, selectionVersion: cancelSelectionVersion });
+      if (refreshed?.selectionApplied) {
+        setSelectedStage(flowStageId(refreshed?.selectedFlow, refreshed?.nextAction, refreshed?.projectState));
+      }
+      pushActivity("flow.new-draft-cancelled", refreshed?.selectedFlow?.flow_id ?? fallbackFlowId ?? "no active flow");
+    } catch (err) {
+      if (apiProjectBase && fallbackFlow) {
+        loadFlowWorkbench(apiProjectBase, fallbackFlow).catch((workbenchErr) =>
+          setError(workbenchErr instanceof Error ? workbenchErr.message : String(workbenchErr)),
+        );
+      }
+      setError(err instanceof Error ? err.message : String(err));
+      pushActivity("flow.new-draft-cancelled", fallbackFlow?.flow_id ?? "no active flow");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function selectFlow(flowId) {
     if (flowId === "__new__") {
       startNewFlow();
       return;
     }
+    flowSelectionVersion.current += 1;
     const flow = flowOptions.find((candidate) => candidate.flow_id === flowId) ?? null;
     setNewFlowDraft(false);
     setDraftSourceFlow(null);
@@ -2099,6 +2774,7 @@ function App() {
         onSelect={chooseStage}
         flow={selectedFlow}
         newFlowDraft={draftSurface}
+        providerStepStatus={providerStepStatus}
       />
 
       <main className="main">
@@ -2112,6 +2788,7 @@ function App() {
               submitMission={submitMission}
               applyTemplate={() => setForm(SAFE_TEMPLATE)}
               onAsk={() => openRequestDrawer()}
+              onCancel={cancelNewFlowDraft}
               askDisabled={!selectedFlow}
               title={draftFollowUpHandoffRef ? "Create Follow-up Flow" : "Start New Flow"}
               description={
@@ -2138,6 +2815,8 @@ function App() {
             onCreateFollowUp={() => startNewFlow({ sourceFlow: selectedFlow, followUp: true })}
             onDuplicateMission={() => startNewFlow({ sourceFlow: selectedFlow, duplicate: true })}
             initializeProject={initializeProject}
+            providerStepStatus={providerStepStatus}
+            evidenceRows={flowEvidenceRows}
           />
         )}
       </main>
@@ -2151,6 +2830,7 @@ function App() {
         flows={flowOptions}
         newFlowDraft={draftSurface}
         missionDraft={draftSurface ? form : null}
+        evidenceRows={flowEvidenceRows}
       />
 
       <section className="bottom-bar">
@@ -2168,14 +2848,29 @@ function App() {
         <div className="activity-table">
           <h3>Artifacts (Recent)</h3>
           <table>
-            <thead><tr><th>Ref</th><th>Status</th></tr></thead>
+            <thead><tr><th>Artifact</th><th>Status</th></tr></thead>
             <tbody>
               {flowEvidenceRows.length === 0 ? (
                 <tr><td colSpan="2">{draftSurface ? "Draft flow has no artifacts yet" : "No selected-flow artifacts yet"}</td></tr>
-              ) : flowEvidenceRows.slice(0, 5).map((row) => <tr key={row.ref}><td><code>{row.ref}</code></td><td>{row.status ?? "ready"}</td></tr>)}
+              ) : flowEvidenceRows.slice(0, 5).map((row) => (
+                <tr key={row.ref}>
+                  <td><span className="artifact-ref-label" title={row.rawRef ?? row.ref}>{row.label}</span></td>
+                  <td>{row.status ?? "ready"}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="workbench-row execution-evidence-row">
+        <ExecutionEvidencePanel
+          evidence={executionEvidence}
+          providerEvidenceRows={providerEvidenceRows}
+          decisionRequests={operatorDecisionRequests}
+          copyRef={copyRef}
+          busy={busy}
+        />
       </section>
 
       <section className="workbench-row graph-trace-row">
@@ -2191,13 +2886,20 @@ function App() {
           attachTarget={attachTarget}
           copyRef={copyRef}
         />
-        <InteractionsInbox
-          interactions={interactions}
-          answers={answers}
-          setAnswers={setAnswers}
-          submitAnswer={submitAnswer}
-          busy={busy}
-        />
+        <div className="operator-side-stack">
+          <InteractionsInbox
+            interactions={interactions}
+            answers={answers}
+            setAnswers={setAnswers}
+            submitAnswer={submitAnswer}
+            busy={busy}
+          />
+          <OperatorDecisionDrawer
+            decisionRequests={operatorDecisionRequests}
+            copyRef={copyRef}
+            busy={busy}
+          />
+        </div>
       </section>
 
       <RequestDrawer

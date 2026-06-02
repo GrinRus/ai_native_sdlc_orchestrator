@@ -1175,6 +1175,17 @@ test("W23 nested validators reject invalid nested shapes deterministically", () 
     "field_type_mismatch",
     "findings[0].evidence_refs",
   );
+  const invalidReviewTraceability = structuredClone(reviewReport.document);
+  invalidReviewTraceability.feature_traceability.required_path_prefixes = ["source/", 42];
+  assertValidationIssue(
+    validateContractDocument({
+      family: "review-report",
+      document: invalidReviewTraceability,
+      source: "test://w35-review-report-invalid-required-path-prefix",
+    }),
+    "field_type_mismatch",
+    "feature_traceability.required_path_prefixes[1]",
+  );
 
   const liveRunEvent = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/live-run-event.canonical.yaml"),

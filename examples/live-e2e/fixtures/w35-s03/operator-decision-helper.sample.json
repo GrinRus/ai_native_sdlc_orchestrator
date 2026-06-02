@@ -1,0 +1,88 @@
+{
+  "agent_decision_request": {
+    "request_id": "live-e2e-demo.execution.operator-decision-request",
+    "run_id": "live-e2e-demo",
+    "step_id": "execution",
+    "step_instance_id": "execution",
+    "iteration": 1,
+    "operator_context": {
+      "operator_kind": "skill-agent",
+      "operator_ref": "skill://live-e2e-runner",
+      "decision_policy": "required"
+    },
+    "deterministic_analysis": {
+      "status": "pass",
+      "recommendation": "continue"
+    },
+    "decision_rubric": {
+      "required_evidence_refs": [
+        "evidence://live-e2e-demo/live-e2e-step-plan-demo-01-execution.json",
+        "evidence://live-e2e-demo/live-e2e-agent-decision-request-demo-01-execution.json",
+        "evidence://live-e2e-demo/live-e2e-step-inspection-demo-01-execution.json",
+        "evidence://live-e2e-demo/live-e2e-step-classification-demo-01-execution.json",
+        "evidence://live-e2e-demo/run-start-transcript.json",
+        "evidence://live-e2e-demo/runtime-harness-report.json"
+      ],
+      "frontend_evidence_refs": [
+        "evidence://live-e2e-demo/guided-web-dom.json",
+        "evidence://live-e2e-demo/guided-web-accessibility.json",
+        "evidence://live-e2e-demo/guided-web-screenshot.png"
+      ],
+      "continuation_rule": "continue is allowed only when deterministic guardrails pass or warn and semantic_analysis.judge_source is skill-agent"
+    },
+    "operator_decision_expected_ref": "evidence://live-e2e-demo/live-e2e-operator-decision-demo-01-execution.json",
+    "expected_response_shape": {
+      "status": "accepted",
+      "operator_ref": "skill://live-e2e-runner",
+      "action": "continue|answer|frontend_interact|retry_public_step|diagnose|block",
+      "semantic_analysis": {
+        "status": "pass|warn|not_pass|blocked|interaction_required|resumed",
+        "judge_source": "skill-agent",
+        "findings": []
+      }
+    }
+  },
+  "prepared_operator_decision": {
+    "request_id": "live-e2e-demo.execution.operator-decision-request",
+    "step_id": "execution",
+    "step_instance_id": "execution",
+    "iteration": 1,
+    "status": "accepted",
+    "operator_ref": "skill://live-e2e-runner",
+    "action": "continue",
+    "reason": "Skill-agent accepted public evidence and required inspection refs.",
+    "inspected_evidence_refs": [
+      "evidence://live-e2e-demo/live-e2e-step-plan-demo-01-execution.json",
+      "evidence://live-e2e-demo/live-e2e-agent-decision-request-demo-01-execution.json",
+      "evidence://live-e2e-demo/live-e2e-step-inspection-demo-01-execution.json",
+      "evidence://live-e2e-demo/live-e2e-step-classification-demo-01-execution.json",
+      "evidence://live-e2e-demo/run-start-transcript.json",
+      "evidence://live-e2e-demo/runtime-harness-report.json"
+    ],
+    "evidence_refs": [
+      "evidence://live-e2e-demo/live-e2e-step-plan-demo-01-execution.json",
+      "evidence://live-e2e-demo/live-e2e-agent-decision-request-demo-01-execution.json",
+      "evidence://live-e2e-demo/live-e2e-step-inspection-demo-01-execution.json",
+      "evidence://live-e2e-demo/live-e2e-step-classification-demo-01-execution.json",
+      "evidence://live-e2e-demo/run-start-transcript.json",
+      "evidence://live-e2e-demo/runtime-harness-report.json",
+      "evidence://live-e2e-demo/guided-web-dom.json",
+      "evidence://live-e2e-demo/guided-web-accessibility.json",
+      "evidence://live-e2e-demo/guided-web-screenshot.png"
+    ],
+    "frontend_evidence_refs": [
+      "evidence://live-e2e-demo/guided-web-dom.json",
+      "evidence://live-e2e-demo/guided-web-accessibility.json",
+      "evidence://live-e2e-demo/guided-web-screenshot.png"
+    ],
+    "semantic_analysis": {
+      "status": "pass",
+      "judge_source": "skill-agent",
+      "findings": [
+        "Required public evidence refs were inspected."
+      ]
+    },
+    "source_agent_decision_request_ref": "evidence://live-e2e-demo/live-e2e-agent-decision-request-demo-01-execution.json",
+    "created_at": "2026-06-02T00:00:00.000Z"
+  }
+}

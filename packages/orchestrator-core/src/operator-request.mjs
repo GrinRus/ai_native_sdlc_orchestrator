@@ -500,6 +500,7 @@ export function createOperatorRequest(options) {
       projectRef: init.projectRoot,
       cwd: init.projectRoot,
       runtimeRoot: init.runtimeRoot,
+      projectProfile: init.projectProfilePath,
       targetFlowId,
       intentType,
       deliveryMode,

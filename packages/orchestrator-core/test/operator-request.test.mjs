@@ -143,6 +143,25 @@ function seedCompletedFlow(repoRoot) {
   };
 }
 
+/**
+ * @param {string} repoRoot
+ * @param {string} projectId
+ * @returns {string}
+ */
+function writeExplicitProjectProfile(repoRoot, projectId) {
+  const templatePath = path.join(repoRoot, "examples/project.aor.yaml");
+  const profilePath = path.join(repoRoot, `${projectId}.aor.yaml`);
+  const template = fs.readFileSync(templatePath, "utf8");
+  fs.writeFileSync(
+    profilePath,
+    template
+      .replace(/^project_id: .+$/mu, `project_id: ${projectId}`)
+      .replace(/^display_name: .+$/mu, `display_name: ${projectId}`),
+    "utf8",
+  );
+  return profilePath;
+}
+
 test("operator-request contract validates supported enums and rejects invalid intent deterministically", () => {
   const document = {
     request_id: "operator-request.test.1",
@@ -505,5 +524,46 @@ test("target-flow operator requests preserve completed-flow read-only guardrails
     } finally {
       await transport.close();
     }
+  });
+});
+
+test("target-flow operator requests validate flows against the explicit project profile", async () => {
+  await withTempRepo(async (repoRoot) => {
+    const projectProfile = writeExplicitProjectProfile(repoRoot, "profile-flow-project");
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot, projectProfile });
+    materializeIntakeArtifactPacket({
+      projectId: init.projectId,
+      projectRoot: init.projectRoot,
+      projectProfileRef: init.projectProfileRef,
+      runtimeLayout: init.runtimeLayout,
+      command: "aor mission create",
+      missionId: "profile-follow-up",
+      requestTitle: "Profile follow-up",
+      requestBrief: "Create an active flow under an explicit project profile.",
+      requestConstraints: ["Keep the request scoped to the explicit profile."],
+      goals: ["Inspect the active profile flow."],
+      kpis: [{ kpi_id: "profile-follow-up", name: "Profile follow-up", target: "Target flow guard passes." }],
+      definitionOfDone: ["A flow-targeted request can be created."],
+      allowedPaths: ["docs/**"],
+      deliveryMode: "no-write",
+      sourceKind: "local-note",
+      sourceRef: "docs/guide.md",
+    });
+
+    const flowId = `flow.${init.projectId}.profile-follow-up`;
+    const created = createOperatorRequest({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      projectProfile,
+      targetFlowId: flowId,
+      targetStage: "discovery",
+      intentType: "analyze",
+      requestText: "Inspect explicit profile flow evidence.",
+      targetRefs: ["README.md"],
+      deliveryMode: "no-write",
+    });
+
+    assert.equal(created.operatorRequest.project_id, init.projectId);
+    assert.equal(created.operatorRequest.target_flow_id, flowId);
   });
 });

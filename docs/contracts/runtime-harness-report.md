@@ -123,7 +123,8 @@ When runtime-agent permission mediation is enabled, `permission-mode-blocked` an
 
 When the interaction policy is `fail-closed`, existing diagnostic behavior is preserved and permission readiness failures may remain repair/fail evidence for live E2E proof runs.
 
-`mission_semantics` records the run-level semantic evidence used by the Runtime Harness for the step decision, including `changed_paths`, `non_bootstrap_changed_paths`, `meaningful_changed_paths`, ignored request input files, and whether strict code-changing no-op detection was applied. Runtime Harness must not emit path whitelist/blacklist verdicts such as legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, or `scope_violation_paths`.
+`mission_semantics` records the run-level semantic evidence used by the Runtime Harness for the step decision, including `changed_paths`, `non_bootstrap_changed_paths`, `meaningful_changed_paths`, `runner_owned_state_paths`, ignored request input files, and whether strict code-changing no-op detection was applied. Runtime Harness must not emit path whitelist/blacklist verdicts such as legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, or `scope_violation_paths`.
+`runner_owned_state_paths[]` is a safety gate for local runner state created inside the target checkout, including `.codex/`, `.claude/`, `.qwen/`, and `.opencode/`. Live runner execution must fail closed with `failure_class=runner-owned-state-leak` and `runtime_harness_decision=block` when these paths are present, because delivery proof must not include runner-local auth, config, skill, or session state as upstream patch content.
 
 ## Boundary rules
 - Runtime Harness reports diagnose AOR runtime behavior and may recommend recertification, but they do not promote or freeze assets.
