@@ -7,6 +7,19 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.4] - 2026-06-02
+
+- Added the W34 flow-centric operator console baseline, including active and
+  completed flow selection, scoped evidence workbench views, and follow-up flow
+  creation from learning handoff evidence.
+- Added W35 live E2E operator UX hardening for provider heartbeat/status
+  visibility, readable artifact summaries, decision-helper UX, execution
+  evidence panels, and interruption/retry control surfaces.
+- Updated packaged SPA release smoke coverage for the flow-centric console so
+  installed npm users keep the flow selector and `New Flow` launch path.
+- Documented that the Codex/Qwen live E2E UX proof slice remains blocked until
+  clean live proof closes or a replanning slice explicitly updates the target.
+
 ## [0.1.0-alpha.3] - 2026-05-24
 
 - Added W30 alpha-hardening source-of-truth docs, including the W30 backlog

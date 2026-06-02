@@ -30,7 +30,7 @@ The public source channel is the `main` branch on GitHub. Versioned npm CLI
 alpha releases are published as `@grinrus/aor` and tagged with matching GitHub
 Releases. There is no Docker or GHCR version channel yet.
 
-The root package is publishable as `@grinrus/aor@0.1.0-alpha.3`; internal
+The root package is publishable as `@grinrus/aor@0.1.0-alpha.4`; internal
 workspace packages stay `private:true`. The release branch and publish process
 are documented in `docs/ops/npm-cli-alpha-release.md`.
 
@@ -65,7 +65,7 @@ or OpenCode, are installed and configured outside AOR.
 ## Install CLI from npm alpha
 
 ```bash
-npm install -g @grinrus/aor@0.1.0-alpha.3
+npm install -g @grinrus/aor@0.1.0-alpha.4
 aor --help
 ```
 
@@ -294,7 +294,7 @@ claim.
 
 | Capability | Status | How to try or verify |
 | --- | --- | --- |
-| npm CLI alpha package | Implemented alpha | `npm install -g @grinrus/aor@0.1.0-alpha.3`. |
+| npm CLI alpha package | Implemented alpha | `npm install -g @grinrus/aor@0.1.0-alpha.4`. |
 | Source checkout install | Implemented | `corepack enable` and `pnpm install --frozen-lockfile`. |
 | Repository integrity checks | Implemented | `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check`. |
 | Guided target onboarding | Implemented baseline | `pnpm aor onboard ... --json`. |
