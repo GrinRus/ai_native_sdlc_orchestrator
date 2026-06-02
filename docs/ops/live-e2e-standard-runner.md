@@ -609,7 +609,7 @@ node ./scripts/live-e2e/run-profile.mjs \
 
 Pass evidence requires all of the following:
 - CLI transcript files for doctor, onboard, app, next, mission create, run execution, review decision, delivery, release, and learning closure.
-- Durable onboarding, intake, next-action, run, review, review-decision, delivery, release, learning, and web smoke artifacts, including flow selector and `New Flow` smoke markers.
+- Durable onboarding, intake, next-action, run, review, review-decision, delivery, release, learning, and web smoke artifacts, including first-run wizard, project switcher, flow selector, and `New Flow` smoke markers.
 - Public-repo safety assertions: `write_back_to_remote=false`, `patch-only` delivery mode, unchanged target `HEAD` until controlled execution, runtime state under `.aor/`, and no `.aor-live-e2e` state.
 - Blocked and partial-readiness branches must keep the same no-write defaults visible and must not be marked pass without durable artifacts.
 

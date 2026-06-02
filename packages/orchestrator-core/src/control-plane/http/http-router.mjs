@@ -1,5 +1,25 @@
 const ROUTES = Object.freeze([
   {
+    id: "project-index",
+    pattern: /^\/api\/projects$/u,
+    method: "GET",
+    allow: "GET",
+    permission: "read",
+    methodMessage: "Project index route supports only GET.",
+    params: [],
+    kind: "read",
+  },
+  {
+    id: "project-actions",
+    pattern: /^\/api\/projects\/actions$/u,
+    method: "POST",
+    allow: "POST",
+    permission: "mutate",
+    methodMessage: "Project action route supports only POST.",
+    params: [],
+    kind: "mutation",
+  },
+  {
     id: "project-state",
     pattern: /^\/api\/projects\/([^/]+)\/state$/u,
     method: "GET",
@@ -282,6 +302,8 @@ const ROUTES = Object.freeze([
 ]);
 
 const ROUTE_OPENAPI_PATHS = Object.freeze({
+  "project-index": "/api/projects",
+  "project-actions": "/api/projects/actions",
   "project-state": "/api/projects/{projectId}/state",
   packets: "/api/projects/{projectId}/packets",
   "step-results": "/api/projects/{projectId}/step-results",

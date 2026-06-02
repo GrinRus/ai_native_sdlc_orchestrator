@@ -89,6 +89,14 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "provider_step_status",
     "Provider is still running",
     "No output yet, provider still running",
+    "First-run wizard",
+    "Project Context",
+    "Runtime Readiness",
+    "Project switcher",
+    "Add local project",
+    "Runtime root preview",
+    "Add and initialize",
+    "/api/projects/actions",
     "/runs",
     "graph-context-tabs",
     "selected-node-panel",
@@ -101,6 +109,13 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Initialize Project Runtime",
     "First launch",
     "This does not create a flow",
+    "if (!flow) return \"readiness\"",
+    "newFlowDisabled",
+    "Initialize the project runtime before starting a flow.",
+    "flow.new-blocked",
+    "setAddProjectDrawerOpen(false)",
+    "activeProject?.runtime_root",
+    "Create the first no-write mission packet, then resolve the first next action.",
     "No active flow",
     "Readiness prepares the runtime before a flow is created",
     "selectedStageRuntimeState",
@@ -162,6 +177,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".flow-cockpit"), "SPA CSS should define flow-first cockpit layout");
   assert.ok(css.includes(".stage-rail"), "SPA CSS should define flow-scoped stage rail layout");
   assert.ok(css.includes(".provider-heartbeat-card"), "SPA CSS should define provider heartbeat cockpit layout");
+  assert.ok(css.includes(".first-run-wizard"), "SPA CSS should define first-run wizard layout");
+  assert.ok(css.includes(".project-switcher"), "SPA CSS should define project switcher layout");
   assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
   assert.ok(css.includes(".execution-evidence-panel"), "SPA CSS should define execution evidence panel layout");
   assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");
@@ -218,7 +235,12 @@ test("aor app smoke verifies the real flow-centric packaged SPA, config, and sta
     assert.equal(payload.html_loaded, true);
     assert.equal(payload.flow_selector_loaded, true);
     assert.equal(payload.new_flow_action_loaded, true);
+    assert.equal(payload.first_run_wizard_loaded, true);
+    assert.equal(payload.project_switcher_loaded, true);
     assert.equal(payload.config_project_id, payload.project_id);
+    assert.equal(payload.config_default_project_id, payload.project_id);
+    assert.equal(payload.project_index_default_project_id, payload.project_id);
+    assert.equal(payload.project_index_count, 1);
     assert.equal(payload.state_project_id, payload.project_id);
     assert.equal(payload.runtime_root, runtimeRoot);
   });

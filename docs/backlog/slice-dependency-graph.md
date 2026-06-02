@@ -183,6 +183,11 @@ graph TD
   W35S03[W35-S03 Operator decision helper and decision UX]
   W35S04[W35-S04 Execution evidence panel and interruption controls]
   W35S05[W35-S05 Codex/Qwen live E2E UX proof and runbook closure]
+  W36S01[W36-S01 No-settings onboarding and workspace contract baseline]
+  W36S02[W36-S02 App workspace and project registry]
+  W36S03[W36-S03 First-run onboarding wizard]
+  W36S04[W36-S04 Local multi-project switcher UX]
+  W36S05[W36-S05 Docs, smoke, and proof]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -461,6 +466,11 @@ graph TD
   W35S02 --> W35S04
   W35S03 --> W35S04
   W35S04 --> W35S05
+  W35S04 --> W36S01
+  W36S01 --> W36S02
+  W36S02 --> W36S03
+  W36S03 --> W36S04
+  W36S04 --> W36S05
 ```
 
 ## W0 hard dependencies
@@ -786,6 +796,15 @@ graph TD
 | W35-S04 | W35-S01, W35-S02, W35-S03 |
 | W35-S05 | W35-S04 |
 
+## W36 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W36-S01 | W35-S04 |
+| W36-S02 | W36-S01 |
+| W36-S03 | W36-S02 |
+| W36-S04 | W36-S03 |
+| W36-S05 | W36-S04 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -966,6 +985,11 @@ graph TD
 177. W35-S03
 178. W35-S04
 179. W35-S05
+180. W36-S01
+181. W36-S02
+182. W36-S03
+183. W36-S04
+184. W36-S05
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

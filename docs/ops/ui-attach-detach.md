@@ -17,8 +17,10 @@ aor app \
 Expected behavior:
 - the command starts a foreground loopback server and prints the local URL;
 - `/` serves the packaged SPA;
-- `/app-config.json` returns project id, project ref, runtime root, version, and API base;
+- `/app-config.json` returns the default project id, `projects[]`, project ref, runtime root, version, and API base;
+- `GET /api/projects` returns explicit local project summaries without initializing `.aor/`;
 - `/api/projects/:projectId/**` serves the same control-plane read, mutation, and SSE routes;
+- the top bar exposes the active project switcher and Add local project drawer;
 - the browser opens unless `--open false` is passed;
 - `Ctrl+C` stops the app server without changing run state.
 
@@ -30,9 +32,12 @@ aor app --project-ref <repo> --runtime-root <repo>/.aor --smoke --open false --j
 Expected smoke outcome:
 - `status="smoke-pass"`;
 - `html_loaded=true`;
+- `first_run_wizard_loaded=true`;
+- `project_switcher_loaded=true`;
 - `flow_selector_loaded=true`;
 - `new_flow_action_loaded=true`;
 - `config_project_id` and `state_project_id` match `project_id`;
+- `config_default_project_id` and `project_index_default_project_id` match;
 - only `.aor/` runtime state changes in the target repository.
 
 Local-alpha source checkouts use the detached API at `http://127.0.0.1:8080`
@@ -123,9 +128,12 @@ aor app \
 Expected smoke outcome:
 - JSON summary reports `mode="local-spa"` and `status="smoke-pass"`;
 - `html_loaded=true`;
+- `first_run_wizard_loaded=true`;
+- `project_switcher_loaded=true`;
 - `flow_selector_loaded=true`;
 - `new_flow_action_loaded=true`;
 - `config_project_id` and `state_project_id` match `project_id`;
+- `config_default_project_id` and `project_index_default_project_id` match;
 - CLI/API/headless surfaces remain available when the app process exits.
 
 ## Detached mutation smoke (optional)
@@ -202,7 +210,7 @@ aor app \
 ```
 
 Expected full-flow console evidence:
-- app smoke loads the packaged SPA, `/app-config.json`, `GET /api/projects/:projectId/state`, the flow selector marker, and the `New Flow` marker;
+- app smoke loads the packaged SPA, `/app-config.json`, `GET /api/projects`, `GET /api/projects/:projectId/state`, the first-run wizard marker, project switcher marker, flow selector marker, and the `New Flow` marker;
 - connected stage mutations use `POST /api/projects/:projectId/lifecycle-command/actions`; the SPA Mission form creates guided intake evidence and `next` refreshes the durable next-action report for the selected flow;
 - `New Flow` creates fresh mission/intake evidence and never mutates a completed flow;
 - Ask AOR/request-change actions use `POST /api/projects/:projectId/operator-requests` and `POST /api/projects/:projectId/operator-requests/:requestId/actions` with the selected `target_flow_id`;

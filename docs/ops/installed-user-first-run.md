@@ -7,25 +7,26 @@ This runbook covers the public installed-user first run from npm install through
 ```sh
 npm install -g @grinrus/aor@0.1.0-alpha.4
 aor --help
-aor doctor --project-ref <repo> --runtime-root <repo>/.aor --json
-aor onboard <repo> --runtime-root <repo>/.aor --json
-aor app --project-ref <repo> --runtime-root <repo>/.aor
+cd <repo>
+aor app
 ```
 
 `aor app` starts a foreground local loopback server, opens the browser by
 default, and prints the URL. Press `Ctrl+C` in that terminal to stop it.
+`aor doctor` and `aor onboard` remain the advanced/headless path for scripts,
+but the primary installed-user path is the local UI wizard.
 
 The UI first-run path is:
-1. open Readiness and confirm the project/runtime root;
-2. if onboarding has not run, use Initialize project;
-3. inspect the top-bar flow selector and confirm no completed flow is being mutated;
-4. open Mission or `New Flow`;
-5. apply the safe walkthrough template;
-6. submit Mission;
-7. inspect the selected active flow for next action, blockers, evidence refs,
+1. confirm Project Context: cwd candidate, editable project path, and runtime root preview;
+2. use Runtime Readiness to explicitly run Initialize project when needed;
+3. use First Flow to apply the safe walkthrough template;
+4. submit Mission with `delivery-mode=no-write`;
+5. use Next Action to refresh the deterministic next action and land in the active flow cockpit;
+6. inspect the top-bar project switcher, flow selector, and selected active flow for blockers, evidence refs,
    runtime root, and no-write safety;
-8. use `New Flow` only when starting fresh mission/intake evidence or a
+7. use `New Flow` only when starting fresh mission/intake evidence or a
    follow-up from learning closure;
+8. use Add local project only for explicit local paths; the UI must not scan the filesystem or mix runtime/evidence between projects;
 9. optionally use Ask AOR on any selected flow stage to create a bounded
    operator request against selected evidence or document refs.
 
@@ -139,16 +140,19 @@ aor app \
 Expected JSON:
 - `status: "smoke-pass"`;
 - `html_loaded: true`;
+- `first_run_wizard_loaded: true`;
+- `project_switcher_loaded: true`;
 - `flow_selector_loaded: true`;
 - `new_flow_action_loaded: true`;
 - `config_project_id` matches `project_id`;
-- `state_project_id` matches `project_id`.
+- `state_project_id` matches `project_id`;
+- `config_default_project_id` matches `project_index_default_project_id`.
 
 ## Smoke transcript shape
 The CLI test fixture `apps/cli/test/fixtures/installed-user-first-run-transcript.json` records the expected first-run command sequence:
-1. `doctor` reports ready status and no blockers on a valid temp repository.
+1. `doctor` reports ready status and no blockers on a valid temp repository for the advanced/headless path.
 2. `onboard` dispatches through `project init`, writes runtime state plus `onboarding-report.json` under `.aor/`, and does not copy example registries unless materialization is explicit.
-3. `app` reports an optional, non-mandatory local web surface and the installed-package smoke path verifies the packaged SPA/config/API routes plus the flow selector and `New Flow` bundle markers.
+3. `app` reports an optional, non-mandatory local web surface and the installed-package smoke path verifies the packaged SPA/config/API routes plus first-run wizard, project switcher, flow selector, and `New Flow` bundle markers.
 4. `next` points to a safe low-level follow-up after onboarding.
 
 No upstream writes are part of this first-run shortcut layer.

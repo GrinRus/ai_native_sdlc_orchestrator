@@ -170,12 +170,35 @@ async function main() {
   });
 
   const stateUrl = `${transport.baseUrl}/api/projects/${encodeURIComponent(transport.projectId)}/state`;
+  const lifecycleCommandUrl = `${transport.baseUrl}/api/projects/${encodeURIComponent(transport.projectId)}/lifecycle-command/actions`;
   try {
-    const response = await fetch(stateUrl, { headers: { accept: "application/json" } });
-    if (!response.ok) {
-      throw new Error(`GET ${stateUrl} failed with HTTP ${response.status}.`);
+    const previewResponse = await fetch(stateUrl, { headers: { accept: "application/json" } });
+    if (!previewResponse.ok) {
+      throw new Error(`GET ${stateUrl} failed with HTTP ${previewResponse.status}.`);
     }
-    await response.json();
+    const preview = await previewResponse.json();
+
+    const initResponse = await fetch(lifecycleCommandUrl, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({
+        command: "project init",
+        flags: {},
+      }),
+    });
+    if (!initResponse.ok) {
+      throw new Error(`POST ${lifecycleCommandUrl} failed with HTTP ${initResponse.status}.`);
+    }
+    const initPayload = await initResponse.json();
+
+    const stateResponse = await fetch(stateUrl, { headers: { accept: "application/json" } });
+    if (!stateResponse.ok) {
+      throw new Error(`GET ${stateUrl} after init failed with HTTP ${stateResponse.status}.`);
+    }
+    const state = await stateResponse.json();
 
     printSummary(
       {
@@ -183,6 +206,9 @@ async function main() {
         base_url: transport.baseUrl,
         project_id: transport.projectId,
         state_url: stateUrl,
+        preview_initialized: preview?.onboarding_summary?.initialized === true,
+        init_blocked: initPayload?.lifecycle_command?.blocked === true,
+        initialized: state?.onboarding_summary?.initialized === true,
         serve,
       },
       { json },

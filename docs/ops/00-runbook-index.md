@@ -5,7 +5,7 @@
 - `live-e2e-dependency-matrix.md` — canonical dependencies for setup and verification across all live E2E profiles.
 - `live-e2e-standard-runner.md` — installed-user black-box step-controller runner, manual workflow, step evaluator, qualification loop, and artifact map for catalog profiles.
 - `runtime-permission-runner-certification.md` — post-merge real-runner smoke lane for runtime permission mode mappings and restricted-mode interaction evidence.
-- `installed-user-first-run.md` — public guided install, `aor doctor`, `aor onboard`, local `aor app`, Mission form, `aor next`, and guided proof shortcuts.
+- `installed-user-first-run.md` — public guided install, no-settings local `aor app` wizard, local multi-project workspace, Mission form, `aor next`, and advanced `doctor`/`onboard` shortcuts.
 - `live-e2e-learning-loop.md` — repeatable scorecard/incident capture and backlog-quality handoff flow.
 - Historical bounded rehearsal docs remain archived under `docs/ops/`, but they are not current live E2E proof runbooks.
 - `github-fork-first-delivery.md` — fork-first delivery checkpoints, approval boundaries, and recovery guidance.

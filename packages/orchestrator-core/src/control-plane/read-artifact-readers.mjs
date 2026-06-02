@@ -7,7 +7,8 @@ import {
   uniqueArtifactDisplaySummaries,
 } from "../artifact-display-summary.mjs";
 import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
-import { initializeProjectRuntime } from "../project-init.mjs";
+import { initializeProjectRuntime, previewProjectRuntime } from "../project-init.mjs";
+import { buildOnboardingSummary } from "./onboarding-summary.mjs";
 
 const ARTIFACT_PACKET_REGEX = /^.+\.artifact\..+\.json$/;
 const WAVE_TICKET_REGEX = /^wave-ticket-.*\.json$/;
@@ -530,7 +531,33 @@ function readLatestProviderStepStatus(init) {
  * }} options
  */
 export function readProjectState(options = {}) {
+  const preview = previewProjectRuntime({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+  });
+  if (!preview.stateExists) {
+    return {
+      project_id: preview.projectId,
+      display_name: preview.displayName,
+      project_root: preview.projectRoot,
+      project_profile_ref: preview.projectProfileRef,
+      runtime_root: preview.runtimeRoot,
+      runtime_layout: preview.runtimeLayout,
+      state_file: null,
+      onboarding_summary: buildOnboardingSummary(preview),
+      provider_step_status: null,
+      artifact_display_summaries: [],
+    };
+  }
   const init = initializeProjectRuntime(options);
+  const initializedPreview = previewProjectRuntime({
+    cwd: options.cwd,
+    projectRef: init.projectRoot,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+  });
   return {
     project_id: init.projectId,
     display_name: init.displayName,
@@ -539,6 +566,7 @@ export function readProjectState(options = {}) {
     runtime_root: init.runtimeRoot,
     runtime_layout: init.state.runtime_layout,
     state_file: init.stateFile,
+    onboarding_summary: buildOnboardingSummary(initializedPreview),
     provider_step_status: readLatestProviderStepStatus(init),
     artifact_display_summaries: listArtifactDisplaySummaries({ ...options, limit: options.limit ?? 50 }),
   };

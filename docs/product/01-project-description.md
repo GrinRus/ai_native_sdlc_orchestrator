@@ -101,6 +101,11 @@ AOR must work for:
 
 A bounded multirepo graph belongs to one AOR project profile and may include separate repositories for backend services, mobile apps, frontend apps, documentation, or shared libraries. This is distinct from coordinating multiple independent AOR `project_id` profiles in one portfolio-level flow.
 
+The local installed-user app may show several explicitly added local AOR
+projects in one loopback session. That is a UI workspace convenience for
+switching between independent `project_id` contexts; it does not merge those
+projects into one planning, execution, delivery, or release flow.
+
 AOR does **not** target unbounded organization-wide orchestration in MVP.
 
 The MVP proof path for bounded multirepo support is intentionally narrow: one profile, explicit `repos[]`, explicit `repo_graph[]`, deterministic per-repo and integration validation refs, coordination evidence before non-`no-write` delivery, and repo-level changed-path lineage in the delivery manifest and release packet.

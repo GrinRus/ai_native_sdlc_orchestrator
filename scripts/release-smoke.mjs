@@ -151,7 +151,12 @@ try {
     appSmoke.html_loaded !== true ||
     appSmoke.flow_selector_loaded !== true ||
     appSmoke.new_flow_action_loaded !== true ||
+    appSmoke.first_run_wizard_loaded !== true ||
+    appSmoke.project_switcher_loaded !== true ||
     appSmoke.config_project_id !== appSmoke.project_id ||
+    appSmoke.config_default_project_id !== appSmoke.project_id ||
+    appSmoke.project_index_default_project_id !== appSmoke.project_id ||
+    appSmoke.project_index_count !== 1 ||
     appSmoke.state_project_id !== appSmoke.project_id
   ) {
     throw new Error(`Installed package app smoke failed:\n${JSON.stringify(appSmoke, null, 2)}`);

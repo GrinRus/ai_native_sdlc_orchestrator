@@ -20,10 +20,14 @@ same loopback process as the control-plane API.
 The npm alpha package includes `apps/web/dist` as a supported installed-user
 surface. `aor app` starts a foreground local loopback server, serves the
 packaged SPA at `/`, serves `/app-config.json`, exposes the existing
-same-origin `/api/projects/:projectId/**` control-plane routes, opens the
-browser by default, and stops when the foreground process exits.
+same-origin `/api/projects/:projectId/**` control-plane routes, exposes
+`GET /api/projects` for the explicit local project registry, opens the browser
+by default, and stops when the foreground process exits.
 
-The SPA may guide the first Mission intake flow by calling
+The SPA may guide first-run onboarding by previewing project context without
+initializing `.aor/`, calling the existing runtime initialization command only
+after explicit user action, and then guiding the first Mission intake flow by
+calling
 `POST /api/projects/:projectId/lifecycle-command/actions` with
 `command: "mission create"` and then `command: "next"`. It must not define
 new packet fields, own orchestration decisions, or bypass headless CLI/API
@@ -38,8 +42,9 @@ policy gates.
 - Release packaging must include `apps/web/dist` and the shared launcher/runtime
   files.
 - Release smoke can run `aor app --smoke --open false --json` against a
-  temporary project, prove the flow selector and `New Flow` bundle markers, and
-  assert that only `.aor/` changes.
+  temporary project, prove the first-run wizard, project switcher, flow
+  selector, and `New Flow` bundle markers, and assert that only `.aor/`
+  changes.
 - The UI safe walkthrough template only fills existing Mission intake fields
   and defaults delivery mode to `no-write`.
 

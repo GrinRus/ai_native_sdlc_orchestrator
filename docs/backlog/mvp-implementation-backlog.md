@@ -331,5 +331,14 @@ This is the master index for the implementation slices across all defined waves.
 | W35-S04 | Execution evidence panel and interruption controls | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `apps/cli/**`, `packages/orchestrator-core/**`, `scripts/live-e2e/**`, `docs/contracts/**`, tests | W35-S01, W35-S02, W35-S03 |
 | W35-S05 | Codex/Qwen live E2E UX proof and runbook closure | EPIC-7 | blocked | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/web/**`, `apps/cli/**`, tests | W35-S04 |
 
+## W36 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W36-S01 | No-settings onboarding and workspace contract baseline | EPIC-1 | done | `docs/product/**`, `docs/architecture/**`, `docs/contracts/**`, `docs/backlog/**` | W35-S04 |
+| W36-S02 | App workspace and project registry | EPIC-6 | done | `packages/orchestrator-core/**`, `apps/api/**`, `docs/contracts/**`, tests | W36-S01 |
+| W36-S03 | First-run onboarding wizard | EPIC-6 | done | `apps/web/**`, `packages/orchestrator-core/**`, tests | W36-S02 |
+| W36-S04 | Local multi-project switcher UX | EPIC-6 | done | `apps/web/**`, `packages/orchestrator-core/**`, tests | W36-S03 |
+| W36-S05 | Docs, smoke, and proof | EPIC-7 | done | `README.md`, `docs/ops/**`, `apps/web/**`, `packages/orchestrator-core/**`, `scripts/**`, tests | W36-S04 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

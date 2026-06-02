@@ -4,7 +4,6 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { attachUiLifecycle, detachUiLifecycle } from "../control-plane/ui-lifecycle.mjs";
 import { createControlPlaneHttpServer } from "../control-plane/http/http-transport.mjs";
 
 /**
@@ -235,7 +234,7 @@ function readPackagedSpaText(staticRoot) {
 /**
  * @param {string} staticRoot
  * @param {string} html
- * @returns {{ htmlLoaded: boolean, flowSelectorLoaded: boolean, newFlowActionLoaded: boolean }}
+ * @returns {{ htmlLoaded: boolean, flowSelectorLoaded: boolean, newFlowActionLoaded: boolean, wizardLoaded: boolean, projectSwitcherLoaded: boolean }}
  */
 function inspectPackagedSpa(staticRoot, html) {
   const packagedText = `${html}\n${readPackagedSpaText(staticRoot)}`;
@@ -243,6 +242,8 @@ function inspectPackagedSpa(staticRoot, html) {
     htmlLoaded: html.includes("AOR Operator Console"),
     flowSelectorLoaded: packagedText.includes("Flow selector") && packagedText.includes("flow-selector"),
     newFlowActionLoaded: packagedText.includes("New Flow") && packagedText.includes("new-flow-button"),
+    wizardLoaded: packagedText.includes("First-run wizard") && packagedText.includes("first-run-wizard"),
+    projectSwitcherLoaded: packagedText.includes("Project switcher") && packagedText.includes("project-switcher"),
   };
 }
 
@@ -285,20 +286,7 @@ export async function runAppCommand(args, options = {}) {
         packageVersion,
       },
     });
-    attachUiLifecycle({
-      cwd,
-      projectRef,
-      projectProfile,
-      runtimeRoot: runtimeRootInput,
-      controlPlane: transport.baseUrl,
-    });
-
     const stopLocalApp = async () => {
-      detachUiLifecycle({
-        cwd,
-        projectRef,
-        runtimeRoot: runtimeRootInput,
-      });
       await transport.close();
     };
 
@@ -312,7 +300,7 @@ export async function runAppCommand(args, options = {}) {
       project_id: transport.projectId,
       project_profile_ref: transport.projectProfileRef,
       project_ref: projectRef,
-      runtime_root: runtimeRootInput ? path.resolve(cwd, runtimeRootInput) : path.join(projectRef, ".aor"),
+      runtime_root: transport.runtimeRoot ?? (runtimeRootInput ? path.resolve(cwd, runtimeRootInput) : path.join(projectRef, ".aor")),
       host: transport.host,
       port: transport.port,
       open,
@@ -322,6 +310,7 @@ export async function runAppCommand(args, options = {}) {
     if (smoke) {
       const html = await getText(appUrl);
       const config = await getJson(`${transport.baseUrl}/app-config.json`);
+      const projectIndex = await getJson(`${transport.baseUrl}/api/projects`);
       const state = await getJson(`${transport.baseUrl}/api/projects/${encodeURIComponent(transport.projectId)}/state`);
       await stopLocalApp();
       const packagedSpa = inspectPackagedSpa(staticRoot, html);
@@ -331,8 +320,13 @@ export async function runAppCommand(args, options = {}) {
         html_loaded: packagedSpa.htmlLoaded,
         flow_selector_loaded: packagedSpa.flowSelectorLoaded,
         new_flow_action_loaded: packagedSpa.newFlowActionLoaded,
+        first_run_wizard_loaded: packagedSpa.wizardLoaded,
+        project_switcher_loaded: packagedSpa.projectSwitcherLoaded,
         config_project_id: config.project_id,
+        config_default_project_id: config.default_project_id,
         config_project_profile_ref: config.project_profile_ref,
+        project_index_default_project_id: projectIndex.default_project_id,
+        project_index_count: Array.isArray(projectIndex.projects) ? projectIndex.projects.length : 0,
         state_project_id: state.project_id,
         state_project_profile_ref: state.project_profile_ref,
       };

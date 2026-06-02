@@ -19,11 +19,12 @@ W21-S02 implements the first-run shell for `doctor`, `onboard`, `app`, and `next
 `aor app` launcher semantics:
 - default host is `127.0.0.1`; default port `0` asks the OS for a free local port;
 - `--open true|false` controls browser launch;
-- `--smoke --open false --json` starts the server, checks `/`, `/app-config.json`, and `GET /api/projects/:projectId/state`, prints JSON, then exits;
+- `--smoke --open false --json` starts the server, checks `/`, `/app-config.json`, `GET /api/projects`, `GET /api/projects/:projectId/state`, first-run wizard markers, project switcher markers, flow selector markers, and `New Flow` markers, prints JSON, then exits;
+- the app starts from one default project but can add local projects only from explicit user input; it does not scan the filesystem or provide hosted portfolio orchestration;
 - the foreground server is stopped by `Ctrl+C` or process termination;
 - the packaged UI can submit `mission create` and `next` through `POST /api/projects/:projectId/lifecycle-command/actions`, but orchestration remains owned by runtime command handlers.
 - the packaged UI can create and run operator requests through `POST /api/projects/:projectId/operator-requests` and `POST /api/projects/:projectId/operator-requests/:requestId/actions`, preserving the same scope and delivery-mode checks as the CLI.
-- generated static HTML snapshots are not a console path; smoke evidence comes from the real `aor app` SPA/config/state check.
+- generated static HTML snapshots are not a console path; smoke evidence comes from the real `aor app` SPA/config/project-index/state check.
 
 Operator request command semantics:
 - `aor request create` stores raw request text only in durable `operator-request` evidence and exposes sanitized summaries in read surfaces;

@@ -32,8 +32,15 @@ Operators need live state without making the UI part of the critical path.
 `aor app` starts a local loopback web console from the installed package. The
 same process serves:
 - `/` for the packaged SPA;
-- `/app-config.json` for project id, project ref, runtime root, package version, and API base;
+- `/app-config.json` for project id, default project id, project list, project ref, runtime root, package version, and API base;
+- `/api/projects` for local app-session project summaries;
 - `/api/projects/:projectId/**` for the existing control-plane read, mutation, and SSE routes.
+
+The app starts with one explicit project context from `--project-ref` or the
+current working directory. Additional projects can be added only by explicit
+operator input. The app does not scan the filesystem for projects, persist a
+global recent-project list, or merge multiple `project_id` contexts into one
+portfolio flow.
 
 The app can submit the first Mission form through
 `POST /api/projects/:projectId/lifecycle-command/actions` with
@@ -43,9 +50,10 @@ continuation, review decisions, or delivery gates.
 
 Release and live E2E smoke for the web surface uses
 `aor app --smoke true --open false --json`, which loads the real SPA,
-`/app-config.json`, control-plane state route, and the flow selector / `New
-Flow` bundle markers. A generated static HTML snapshot is not a supported
-operator console or proof path.
+`/app-config.json`, local project index, control-plane state route, the
+first-run wizard / project switcher markers, and the flow selector / `New Flow`
+bundle markers. A generated static HTML snapshot is not a supported operator
+console or proof path.
 
 The app can also submit operator-initiated interventions through
 `POST /api/projects/:projectId/operator-requests` and run them through
