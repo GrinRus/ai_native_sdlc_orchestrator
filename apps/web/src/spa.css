@@ -43,11 +43,11 @@ button:disabled {
   grid-column: 1 / -1;
   grid-row: 1;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   min-width: 0;
-  overflow-x: auto;
+  overflow-x: visible;
   padding: 8px 14px;
   border-bottom: 1px solid #dfe5ea;
   background: #ffffff;
@@ -139,10 +139,10 @@ button:disabled {
 .project-switcher {
   display: grid;
   grid-template-columns: minmax(190px, 260px) minmax(150px, 230px) auto;
-  flex: 0 1 560px;
+  flex: 0 0 560px;
   gap: 8px;
   align-items: end;
-  min-width: 0;
+  min-width: min(100%, 560px);
 }
 
 .project-switcher label {
@@ -177,10 +177,10 @@ button:disabled {
 .flow-selector {
   display: grid;
   grid-template-columns: minmax(190px, 280px) auto;
-  flex: 0 1 360px;
+  flex: 0 0 360px;
   gap: 8px;
   align-items: end;
-  min-width: 0;
+  min-width: min(100%, 360px);
 }
 
 .flow-selector label {

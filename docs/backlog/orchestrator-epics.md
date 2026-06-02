@@ -143,3 +143,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W34:** `W34-S06` Installed-user browser-task flow-loop proof
 - **W35:** `W35-S03` Operator decision helper and decision UX; `W35-S05` Codex/Qwen live E2E UX proof and runbook closure
 - **W36:** `W36-S05` Docs, smoke, and proof
+- **W37:** `W37-S01` Live E2E target setup and verification closure
