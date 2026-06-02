@@ -22,15 +22,46 @@ function shortHash(value) {
 }
 
 /**
+ * @param {string} char
+ * @returns {boolean}
+ */
+function isProjectIdChar(char) {
+  return (
+    (char >= "a" && char <= "z")
+    || (char >= "0" && char <= "9")
+    || char === "."
+    || char === "_"
+    || char === "-"
+  );
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
 function normalizeId(value) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/gu, "-")
-    .replace(/^-+|-+$/gu, "")
-    || "project";
+  let normalized = "";
+  let previousWasReplacement = false;
+  for (const char of value.toLowerCase()) {
+    if (isProjectIdChar(char)) {
+      normalized += char;
+      previousWasReplacement = false;
+      continue;
+    }
+    if (!previousWasReplacement) {
+      normalized += "-";
+      previousWasReplacement = true;
+    }
+  }
+  let start = 0;
+  let end = normalized.length;
+  while (start < end && normalized[start] === "-") {
+    start += 1;
+  }
+  while (end > start && normalized[end - 1] === "-") {
+    end -= 1;
+  }
+  return normalized.slice(start, end) || "project";
 }
 
 /**
