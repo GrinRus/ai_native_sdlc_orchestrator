@@ -221,6 +221,9 @@ Artifact refs in live E2E UI/operator reads should render through
 short purpose first; keep the raw evidence/path/packet ref only in explicit
 debug or `Copy raw ref` actions. Missing or unreadable refs must stay visible as
 `status=missing` summaries rather than disappearing from the operator view.
+When a live E2E step observation artifact exists but still needs a skill-agent
+operator decision, render it as `status=awaiting-decision` with warning severity
+instead of treating the observation itself as missing evidence.
 
 The execution evidence panel reads `RunSummary.execution_evidence` and is the
 operator view for provider execution, Runtime Harness decision, real-code-change

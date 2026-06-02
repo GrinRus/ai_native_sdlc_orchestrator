@@ -62,6 +62,10 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "draftSurface",
     "currentStage = draftSurface ? \"mission\"",
     "Draft flow has no artifacts yet",
+    "No visible artifacts yet",
+    "workbenchEvidenceRows",
+    "latestDecisionRequestFromEvidence",
+    "selected flow or project-level live evidence",
     "New Flow Preview",
     "Completeness Checklist",
     "Cancel New Flow",
@@ -115,6 +119,8 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "normalizeArtifactSummary",
     "artifactFilterMatches",
     "artifact-filter-bar",
+    "filteredRows.find",
+    "No evidence matches the selected filter.",
     "Copy raw ref",
     "Debug raw ref",
     "Evidence artifacts",
@@ -128,6 +134,12 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "manual-live-e2e.mjs",
     "--prepare-decision",
     "Copy request ref",
+    "copyFeedback",
+    "Clipboard unavailable. Select and copy this value.",
+    "Copy fallback value",
+    "ref.copy-fallback",
+    "awaiting-decision",
+    '"exit-0"',
     "Execution Evidence",
     "executionEvidenceForFlow",
     "execution_evidence",
@@ -154,6 +166,7 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".execution-evidence-panel"), "SPA CSS should define execution evidence panel layout");
   assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");
   assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
+  assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"), "SPA CSS should keep the mobile stage rail within the viewport");
   assert.ok(css.includes(".stage-row .stage-copy strong"), "SPA CSS should allow mobile stage labels to wrap");
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(92px, 1fr))"), "SPA CSS should keep the mobile flow timeline within the viewport");

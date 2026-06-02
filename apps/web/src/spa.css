@@ -1969,6 +1969,51 @@ tr.selected td {
   min-width: 0;
 }
 
+.copy-feedback {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 14px;
+  border: 1px solid #b8e0d8;
+  border-radius: 6px;
+  background: #edfdf9;
+  color: #0f5f59;
+}
+
+.copy-feedback.manual {
+  border-color: #f2c76b;
+  background: #fff8e7;
+  color: #6f4c00;
+}
+
+.copy-feedback > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.copy-feedback strong {
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.copy-feedback textarea {
+  width: 100%;
+  min-height: 58px;
+  resize: vertical;
+  padding: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #24313d;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .decision-request-summary,
 .decision-rejection-copy {
   display: grid;

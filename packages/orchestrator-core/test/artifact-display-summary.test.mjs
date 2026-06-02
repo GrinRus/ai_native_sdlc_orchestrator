@@ -58,6 +58,12 @@ test("artifact display summary classifies refs without making raw refs the label
   assert.notEqual(summary.label, summary.raw_ref);
   assert.ok(summary.actions.some((action) => action.action_id === "copy_raw_ref"));
 
+  const successfulCommand = buildArtifactDisplaySummary({
+    rawRef: "/runtime/reports/live-e2e-command-traces-run/01-project-init.json",
+    status: "exit-0",
+  });
+  assert.equal(successfulCommand.severity, "success");
+
   const missing = buildMissingArtifactDisplaySummary("evidence://reports/target-diff-summary.json");
   assert.equal(missing.status, "missing");
   assert.equal(missing.severity, "critical");
@@ -110,6 +116,122 @@ test("control-plane read surfaces expose artifact display summaries for packet a
     const state = readProjectState({ cwd: repoRoot, projectRef: repoRoot });
     assert.ok(state.artifact_display_summaries.some((entry) => entry.type === "packet"));
     assert.ok(state.artifact_display_summaries.some((entry) => entry.type === "routed-step-result"));
+  });
+});
+
+test("project state exposes live E2E summaries and nested provider heartbeat", () => {
+  withCleanRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    const requestFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-agent-decision-request-ui-proof-02-spec.json");
+    const decisionFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-operator-decision-ui-proof-02-spec.json");
+    const observationFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-step-observation-ui-proof-02-spec.json");
+    writeJson(requestFile, {
+      request_id: "ui-proof.spec.operator-decision-request",
+      run_id: "ui-proof",
+      step_id: "spec",
+      operator_decision_expected_ref: decisionFile,
+      expected_response_shape: { action: "continue|diagnose|block" },
+      decision_rubric: {
+        required_evidence_refs: [observationFile],
+        frontend_evidence_refs: [],
+      },
+      created_at: "2026-06-02T00:00:00.000Z",
+    });
+    writeJson(observationFile, {
+      run_id: "ui-proof",
+      step_id: "spec",
+      flow_stage: "discovery",
+      operator_decision_status: "missing",
+      deterministic_analysis: { status: "pass" },
+      created_at: "2026-06-02T00:01:00.000Z",
+    });
+    const runSummaryFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-run-summary-ui-proof.json");
+    writeJson(runSummaryFile, {
+      run_id: "ui-proof",
+      status: "blocked",
+      created_at: "2026-06-02T00:02:00.000Z",
+    });
+    const baselineSummaryFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-baseline-verify-ui-proof-01-verify-summary-baseline-diagnostic-abc123.json");
+    writeJson(baselineSummaryFile, {
+      run_id: "github-sandbox.run.ui-proof.verify.baseline-diagnostic.v1",
+      status: "passed",
+      created_at: "2026-06-02T00:03:00.000Z",
+    });
+    const baselineCommandFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-baseline-verify-ui-proof-02-step-result-baseline-diagnostic-1-def456.json");
+    writeJson(baselineCommandFile, {
+      run_id: "github-sandbox.run.ui-proof.verify.baseline-diagnostic.v1",
+      step_id: "verify.baseline-diagnostic.command.1",
+      status: "passed",
+      command: "npm install --prefer-offline --no-audit --no-fund",
+      created_at: "2026-06-02T00:04:00.000Z",
+    });
+    const finalRequestFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-final-skill-agent-verdict-request-ui-proof.json");
+    writeJson(finalRequestFile, {
+      run_id: "ui-proof",
+      status: "ready",
+      created_at: "2026-06-02T00:05:00.000Z",
+    });
+    const nestedStateFile = path.join(
+      init.runtimeLayout.projectRuntimeRoot,
+      "target-checkouts",
+      "demo",
+      ".aor",
+      "projects",
+      "target.run.ui-proof",
+      "state",
+      "run-control-state-ui-proof.json",
+    );
+    writeJson(nestedStateFile, {
+      run_id: "ui-proof",
+      status: "running",
+      provider_step_status: {
+        provider: "codex",
+        adapter: "codex-cli",
+        route_id: "route.spec.default",
+        step_id: "spec",
+        status: "silent-running",
+        elapsed_ms: 65000,
+        timeout_budget_ms: 300000,
+        remaining_budget_ms: 235000,
+        last_output_at: null,
+        last_artifact_update_at: null,
+        current_command_label: "external-provider-runner",
+        recommended_action: "No output yet; provider is still running.",
+        started_at: "2026-06-02T00:00:00.000Z",
+        updated_at: "2026-06-02T00:01:05.000Z",
+      },
+    });
+
+    const state = readProjectState({ cwd: repoRoot, projectRef: repoRoot });
+    assert.equal(state.provider_step_status?.status, "silent-running");
+    assert.equal(state.provider_step_status?.provider, "codex");
+    assert.ok(state.artifact_display_summaries.some((entry) =>
+      entry.type === "operator-decision-request" &&
+      entry.status === "pending" &&
+      entry.raw_ref === requestFile,
+    ));
+    assert.ok(state.artifact_display_summaries.some((entry) =>
+      entry.type === "step-observation" &&
+      entry.status === "awaiting-decision" &&
+      entry.severity === "warning" &&
+      entry.raw_ref === observationFile,
+    ));
+    assert.ok(state.artifact_display_summaries.some((entry) =>
+      entry.raw_ref === runSummaryFile &&
+      entry.label === "Live E2E run summary",
+    ));
+    assert.ok(state.artifact_display_summaries.some((entry) =>
+      entry.raw_ref === baselineSummaryFile &&
+      entry.label === "Baseline verification summary",
+    ));
+    assert.ok(state.artifact_display_summaries.some((entry) =>
+      entry.raw_ref === baselineCommandFile &&
+      entry.label === "Baseline check: npm install --prefer-offline --no-audit",
+    ));
+    assert.ok(state.artifact_display_summaries.some((entry) =>
+      entry.raw_ref === finalRequestFile &&
+      entry.label === "Final skill-agent verdict request",
+    ));
   });
 });
 

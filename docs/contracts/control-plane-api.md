@@ -270,10 +270,13 @@ Each artifact display summary includes:
 
 Missing or unreadable refs are represented as summaries with
 `status=missing` and `severity=critical` rather than disappearing from the
-read model. Web renderers group summaries by flow/stage and may filter them by
-`Failed`, `Warnings`, `Provider`, `Runtime Harness`, `Verification`, `Diff`,
-`Delivery`, and `Learning`. Raw refs stay available for skill-agent evidence
-and debugging, but the user-facing primary text is the summary label/type.
+read model. Existing live E2E step-observation artifacts that are waiting for
+the skill-agent operator decision use `status=awaiting-decision` and
+`severity=warning`; they must not be rendered as missing evidence. Web renderers
+group summaries by flow/stage and may filter them by `Failed`, `Warnings`,
+`Provider`, `Runtime Harness`, `Verification`, `Diff`, `Delivery`, and
+`Learning`. Raw refs stay available for skill-agent evidence and debugging, but
+the user-facing primary text is the summary label/type.
 
 ## Connected lifecycle mutations (W18 baseline)
 

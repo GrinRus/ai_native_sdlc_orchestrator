@@ -216,8 +216,8 @@ function titleFromRef(ref) {
 function artifactSeverityForStatus(status) {
   const normalized = String(status ?? "").toLowerCase();
   if (["fail", "failed", "not_pass", "blocked", "rejected", "error", "timeout", "missing", "unreadable"].includes(normalized)) return "critical";
-  if (["warn", "warning", "hold", "repair", "partial", "stale", "pending", "waiting"].includes(normalized)) return "warning";
-  if (["pass", "passed", "ready", "complete", "completed", "success", "accepted", "approved", "submitted"].includes(normalized)) return "success";
+  if (["warn", "warning", "hold", "repair", "partial", "stale", "pending", "waiting", "awaiting-decision"].includes(normalized)) return "warning";
+  if (["pass", "passed", "ready", "complete", "completed", "success", "accepted", "approved", "submitted", "exit-0"].includes(normalized)) return "success";
   return "info";
 }
 
@@ -658,6 +658,16 @@ function latestRequestForFlow(operatorRequests, selectedFlow, { draft = false } 
   return operatorRequests.find((request) => request.document?.target_flow_id === selectedFlow.flow_id)?.document ?? null;
 }
 
+function latestDecisionRequestFromEvidence(evidenceRows) {
+  const requestRow = (Array.isArray(evidenceRows) ? evidenceRows : [])
+    .find((row) => isAgentDecisionRequestRef(row.rawRef ?? row.sourceRef ?? row.ref));
+  if (!requestRow) return null;
+  return {
+    request_summary: requestRow.label ?? "Live E2E operator decision request",
+    status: requestRow.status ?? "pending",
+  };
+}
+
 function flowScopedInteractions(stepResults, selectedFlow, runtimeTrace, { draft = false } = {}) {
   if (draft) return [];
   if (!selectedFlow?.flow_id) return [];
@@ -702,8 +712,8 @@ function supportedDecisionActionsFromRecord(record) {
 }
 
 function operatorDecisionRequestsForFlow(selectedFlow, runtimeTrace, evidenceRows, { draft = false } = {}) {
-  if (draft || !selectedFlow?.flow_id) return [];
-  const traceItems = Array.isArray(runtimeTrace?.trace_items) ? runtimeTrace.trace_items : [];
+  if (draft) return [];
+  const traceItems = selectedFlow?.flow_id && Array.isArray(runtimeTrace?.trace_items) ? runtimeTrace.trace_items : [];
   const traceRefs = traceItems.flatMap((item) => {
     const refs = [
       item.agent_decision_request_ref,
@@ -1534,13 +1544,17 @@ function RightRail({ nextAction, selectedFlow, projectState, config, operatorReq
     : Array.isArray(nextAction?.evidence_refs)
       ? nextAction.evidence_refs
       : [];
-  const visibleEvidence = artifactRowsForRefs(evidenceRefs, evidenceRows, selectedFlow?.selected_stage ?? "artifact");
+  const visibleEvidence = evidenceRefs.length > 0
+    ? artifactRowsForRefs(evidenceRefs, evidenceRows, selectedFlow?.selected_stage ?? "artifact")
+    : (!selectedFlow && !newFlowDraft ? evidenceRows : []);
   const deliveryMode =
     selectedFlow?.writeback_policy?.mode ??
     nextAction?.bounded_execution?.requested_delivery_mode ??
     nextAction?.mission_state?.delivery_mode ??
     "no-write";
-  const latestRequest = latestRequestForFlow(operatorRequests, selectedFlow, { draft: newFlowDraft });
+  const latestRequest =
+    latestRequestForFlow(operatorRequests, selectedFlow, { draft: newFlowDraft }) ??
+    (!selectedFlow && !newFlowDraft ? latestDecisionRequestFromEvidence(evidenceRows) : null);
 
   return (
     <aside className="right-rail">
@@ -1618,7 +1632,7 @@ function RightRail({ nextAction, selectedFlow, projectState, config, operatorReq
 function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, copyRef }) {
   const [filter, setFilter] = useState("all");
   const filteredRows = rows.filter((row) => artifactFilterMatches(row, filter));
-  const selected = rows.find((row) => row.ref === selectedRef) ?? rows[0] ?? null;
+  const selected = filteredRows.find((row) => row.ref === selectedRef) ?? filteredRows[0] ?? null;
   const groupedRows = filteredRows.reduce((groups, row) => {
     const stage = row.stage ?? "artifact";
     if (!groups.has(stage)) groups.set(stage, []);
@@ -1630,7 +1644,7 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
       <div className="work-heading compact-heading">
         <div>
           <h3>Evidence & Documents</h3>
-          <p>Grouped artifact summaries for the selected flow. Raw refs are available through debug actions.</p>
+          <p>Grouped artifact summaries for the selected flow or project-level live evidence. Raw refs are available through debug actions.</p>
         </div>
       </div>
       <div className="artifact-filter-bar" aria-label="Artifact filters">
@@ -1653,7 +1667,7 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
             </thead>
             {[...groupedRows.entries()].length === 0 ? (
               <tbody>
-                <tr><td colSpan="4">No evidence yet</td></tr>
+                <tr><td colSpan="4">No evidence matches the selected filter.</td></tr>
               </tbody>
             ) : [...groupedRows.entries()].slice(0, 8).map(([stage, stageRows]) => (
               <tbody key={stage}>
@@ -1694,7 +1708,7 @@ function EvidenceWorkbench({ rows, selectedRef, setSelectedRef, attachTarget, co
               </details>
             </>
           ) : (
-            <p>Select evidence to preview.</p>
+            <p>{rows.length === 0 ? "Select evidence to preview." : "No evidence matches the selected filter."}</p>
           )}
         </div>
       </div>
@@ -1866,7 +1880,7 @@ function ExecutionEvidencePanel({ evidence, providerEvidenceRows, decisionReques
         <StatusPill state={evidence?.status ?? "no evidence"} />
       </div>
       {!evidence ? (
-        <p className="empty-state">No selected-flow execution evidence yet.</p>
+        <p className="empty-state">No execution evidence visible yet.</p>
       ) : (
         <>
           <div className="execution-status-grid">
@@ -2253,6 +2267,7 @@ function App() {
   const [requestResult, setRequestResult] = useState(null);
   const [selectedRef, setSelectedRef] = useState("");
   const [answers, setAnswers] = useState({});
+  const [copyFeedback, setCopyFeedback] = useState(null);
   const didChooseStage = useRef(false);
   const didAutoSelectStage = useRef(false);
   const flowSelectionVersion = useRef(0);
@@ -2323,33 +2338,56 @@ function App() {
     () => evidenceRowsForFlow(selectedFlow, evidenceRows, { draft: draftSurface }),
     [selectedFlow, evidenceRows, draftSurface],
   );
+  const workbenchEvidenceRows = useMemo(
+    () => {
+      if (draftSurface) return [];
+      return selectedFlow?.flow_id ? flowEvidenceRows : evidenceRows;
+    },
+    [draftSurface, selectedFlow, flowEvidenceRows, evidenceRows],
+  );
 
   useEffect(() => {
-    if (flowEvidenceRows.length === 0) {
+    if (workbenchEvidenceRows.length === 0) {
       if (selectedRef) setSelectedRef("");
       return;
     }
-    if (!selectedRef || !flowEvidenceRows.some((row) => row.ref === selectedRef)) {
-      setSelectedRef(flowEvidenceRows[0].ref);
+    if (!selectedRef || !workbenchEvidenceRows.some((row) => row.ref === selectedRef)) {
+      setSelectedRef(workbenchEvidenceRows[0].ref);
     }
-  }, [flowEvidenceRows, selectedRef]);
+  }, [workbenchEvidenceRows, selectedRef]);
 
   const interactions = useMemo(() => {
     return flowScopedInteractions(stepResults, selectedFlow, flowRuntimeTrace, { draft: draftSurface });
   }, [stepResults, selectedFlow, flowRuntimeTrace, draftSurface]);
   const operatorDecisionRequests = useMemo(() => {
-    return operatorDecisionRequestsForFlow(selectedFlow, flowRuntimeTrace, flowEvidenceRows, { draft: draftSurface });
-  }, [selectedFlow, flowRuntimeTrace, flowEvidenceRows, draftSurface]);
-  const executionEvidence = useMemo(() => {
-    return executionEvidenceForFlow(selectedFlow, runs, flowRuntimeTrace, { draft: draftSurface });
-  }, [selectedFlow, runs, flowRuntimeTrace, draftSurface]);
-  const providerEvidenceRows = useMemo(() => {
-    return flowEvidenceRows.filter((row) => artifactFilterMatches(row, "provider"));
-  }, [flowEvidenceRows]);
+    return operatorDecisionRequestsForFlow(selectedFlow, flowRuntimeTrace, workbenchEvidenceRows, { draft: draftSurface });
+  }, [selectedFlow, flowRuntimeTrace, workbenchEvidenceRows, draftSurface]);
   const providerStepStatus = useMemo(
     () => resolveProviderStepStatus(projectState, runs),
     [projectState, runs],
   );
+  const executionEvidence = useMemo(() => {
+    const flowExecutionEvidence = executionEvidenceForFlow(selectedFlow, runs, flowRuntimeTrace, { draft: draftSurface });
+    if (flowExecutionEvidence || draftSurface || selectedFlow?.flow_id || !providerStepStatus) return flowExecutionEvidence;
+    return {
+      run_id: providerStepStatus.route_id ?? providerStepStatus.step_id ?? "live-e2e",
+      status: providerStepStatus.status,
+      provider_execution_status: providerStepStatus.status,
+      runtime_harness_decision: "pending",
+      real_code_change_status: "pending",
+      post_run_verification_status: "pending",
+      review_status: "pending",
+      delivery_readiness_status: "pending",
+      no_upstream_write_status: "enforced",
+      changed_path_groups: [],
+      blockers: [],
+      actions: [],
+      provider_step_status: providerStepStatus,
+    };
+  }, [selectedFlow, runs, flowRuntimeTrace, draftSurface, providerStepStatus]);
+  const providerEvidenceRows = useMemo(() => {
+    return workbenchEvidenceRows.filter((row) => artifactFilterMatches(row, "provider"));
+  }, [workbenchEvidenceRows]);
 
   function pushActivity(label, detail) {
     setActivity((current) => [{ id: `${Date.now()}-${Math.random()}`, label, detail }, ...current.slice(0, 9)]);
@@ -2716,12 +2754,33 @@ function App() {
   }
 
   async function copyRef(ref) {
-    try {
-      await navigator.clipboard?.writeText(ref);
-      pushActivity("ref.copied", ref);
-    } catch {
-      pushActivity("ref.selected", ref);
+    const value = String(ref ?? "");
+    if (!value) return;
+    const clipboard = navigator.clipboard;
+    if (clipboard && typeof clipboard.writeText === "function") {
+      try {
+        await clipboard.writeText(value);
+        setCopyFeedback({ status: "copied", message: "Copied to clipboard.", value: "" });
+        pushActivity("ref.copied", value);
+        return;
+      } catch {
+        // Fall through to the visible manual-copy fallback below.
+      }
     }
+    setCopyFeedback({
+      status: "manual",
+      message: "Clipboard unavailable. Select and copy this value.",
+      value,
+    });
+    pushActivity("ref.copy-fallback", value);
+  }
+
+  function dismissCopyFeedback() {
+    setCopyFeedback(null);
+  }
+
+  function copyFeedbackClassName() {
+    return `copy-feedback ${copyFeedback?.status === "manual" ? "manual" : "copied"}`;
   }
 
   const deliveryMode =
@@ -2767,6 +2826,23 @@ function App() {
           <Icon name="folder" />Copy runtime path
         </button>
       </header>
+
+      {copyFeedback ? (
+        <section className={copyFeedbackClassName()} role="status" aria-live="polite">
+          <div>
+            <strong>{copyFeedback.message}</strong>
+            {copyFeedback.value ? (
+              <textarea
+                aria-label="Copy fallback value"
+                readOnly
+                value={copyFeedback.value}
+                onFocus={(event) => event.currentTarget.select()}
+              />
+            ) : null}
+          </div>
+          <button className="secondary compact" type="button" onClick={dismissCopyFeedback}>Dismiss</button>
+        </section>
+      ) : null}
 
       <StageRail
         selectedStage={selectedStage}
@@ -2830,7 +2906,7 @@ function App() {
         flows={flowOptions}
         newFlowDraft={draftSurface}
         missionDraft={draftSurface ? form : null}
-        evidenceRows={flowEvidenceRows}
+        evidenceRows={workbenchEvidenceRows}
       />
 
       <section className="bottom-bar">
@@ -2850,9 +2926,9 @@ function App() {
           <table>
             <thead><tr><th>Artifact</th><th>Status</th></tr></thead>
             <tbody>
-              {flowEvidenceRows.length === 0 ? (
-                <tr><td colSpan="2">{draftSurface ? "Draft flow has no artifacts yet" : "No selected-flow artifacts yet"}</td></tr>
-              ) : flowEvidenceRows.slice(0, 5).map((row) => (
+              {workbenchEvidenceRows.length === 0 ? (
+                <tr><td colSpan="2">{draftSurface ? "Draft flow has no artifacts yet" : "No visible artifacts yet"}</td></tr>
+              ) : workbenchEvidenceRows.slice(0, 5).map((row) => (
                 <tr key={row.ref}>
                   <td><span className="artifact-ref-label" title={row.rawRef ?? row.ref}>{row.label}</span></td>
                   <td>{row.status ?? "ready"}</td>
@@ -2880,7 +2956,7 @@ function App() {
 
       <section className="workbench-row secondary-workbench-row">
         <EvidenceWorkbench
-          rows={flowEvidenceRows}
+          rows={workbenchEvidenceRows}
           selectedRef={selectedRef}
           setSelectedRef={setSelectedRef}
           attachTarget={attachTarget}

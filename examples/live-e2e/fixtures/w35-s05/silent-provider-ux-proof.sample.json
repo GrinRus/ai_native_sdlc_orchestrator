@@ -42,6 +42,24 @@
       ]
     },
     {
+      "type": "step-observation",
+      "stage": "execution",
+      "label": "execution step observation",
+      "status": "awaiting-decision",
+      "severity": "warning",
+      "description": "Live E2E step observation is present; operator decision is still required.",
+      "timestamp": "2026-06-02T08:41:00.000Z",
+      "source_ref": "evidence://reports/live-e2e-step-observation-w35-s05-execution.json",
+      "raw_ref": "evidence://reports/live-e2e-step-observation-w35-s05-execution.json",
+      "actions": [
+        {
+          "action_id": "copy_raw_ref",
+          "label": "Copy raw ref",
+          "kind": "debug"
+        }
+      ]
+    },
+    {
       "type": "target-diff",
       "stage": "verification",
       "label": "Target diff relevance",

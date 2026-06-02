@@ -128,10 +128,10 @@ function severityForStatus(status) {
   if (["fail", "failed", "not_pass", "blocked", "rejected", "error", "timeout", "missing", "unreadable"].includes(normalized)) {
     return "critical";
   }
-  if (["warn", "warning", "hold", "repair", "partial", "stale", "pending", "waiting"].includes(normalized)) {
+  if (["warn", "warning", "hold", "repair", "partial", "stale", "pending", "waiting", "awaiting-decision"].includes(normalized)) {
     return "warning";
   }
-  if (["pass", "passed", "ready", "complete", "completed", "success", "accepted", "approved", "submitted"].includes(normalized)) {
+  if (["pass", "passed", "ready", "complete", "completed", "success", "accepted", "approved", "submitted", "exit-0"].includes(normalized)) {
     return "success";
   }
   return "info";
