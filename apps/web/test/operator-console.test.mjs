@@ -179,6 +179,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".provider-heartbeat-card"), "SPA CSS should define provider heartbeat cockpit layout");
   assert.ok(css.includes(".first-run-wizard"), "SPA CSS should define first-run wizard layout");
   assert.ok(css.includes(".project-switcher"), "SPA CSS should define project switcher layout");
+  assert.match(css, /\.topbar\s*\{[\s\S]*?flex-wrap: wrap;/u, "SPA topbar should wrap instead of overlapping project and flow controls");
+  assert.match(css, /\.project-switcher\s*\{[\s\S]*?flex: 0 0 560px;/u, "Project switcher should not shrink under the flow selector");
+  assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 360px;/u, "Flow selector should not intercept project switcher clicks");
   assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
   assert.ok(css.includes(".execution-evidence-panel"), "SPA CSS should define execution evidence panel layout");
   assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");

@@ -258,6 +258,16 @@ pass. W35-S05 must remain unfinished until a Codex small/medium proof closes
 cleanly or the slice is explicitly replanned around the target-verification
 environment blocker.
 
+The 2026-06-02 post-`0.1.0-alpha.5` retry
+`w35-s05-codex-small-20260602214808` reached the same provider-independent
+closure class: AOR installation, target checkout, browser-cache preflight,
+live-adapter preflight, intake/analyze/validate, and step plans were produced,
+then baseline diagnostic stayed in `npm exec playwright install` before a
+manual controller decision could be produced. Qwen was not rerun because the
+same `ky` target setup path would block before any Qwen-specific quality signal.
+`W37-S01` replans that target setup/verification closure before W35-S05 can be
+retried as proof.
+
 ### Out of scope
 - Requiring every candidate provider to pass product-quality gates before UI/UX proof can close.
 - Restoring deleted bounded/mock-backed proof profiles.

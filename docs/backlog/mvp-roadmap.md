@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-36-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-37-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -47,6 +47,7 @@ The authoritative planning model for implementation lives in:
 | W34 | Refactor the local console around runtime-owned flows and prove the flow loop through browser-task live E2E evidence. | 7 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-34-implementation-slices.md` |
 | W35 | Harden live E2E operator UX for long-running providers, decision helper automation, readable artifacts, execution evidence, and Codex/Qwen proof. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-35-implementation-slices.md` |
 | W36 | Make the local app self-guided from a no-settings launch and support explicitly added local projects without mixing runtime state. | 5 | EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-36-implementation-slices.md` |
+| W37 | Replan W35-S05 around bounded target setup and verification closure so Codex/Qwen proof attempts do not block before operator-visible decisions. | 1 | EPIC-7 | `docs/backlog/wave-37-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -175,6 +176,7 @@ The authoritative planning model for implementation lives in:
 | W36-S03 | first-run wizard target: PBO-01, PBO-02, PBO-03, PBO-09 |
 | W36-S04 | local multi-project switcher target: PBO-09, OPS-01, OPS-10 |
 | W36-S05 | no-settings UI proof target: OPS-06, OPS-10, PBO-09 |
+| W37-S01 | live E2E target setup closure target: OPS-06, OPS-07, OPS-11 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -633,6 +635,17 @@ boundaries.
 - Release/app smoke covers wizard, initialize action, project switcher, flow selector, and `New Flow` markers.
 
 **Detailed slices:** `docs/backlog/wave-36-implementation-slices.md`
+
+## W37 - live E2E target setup closure
+**Goal:** Turn the W35-S05 Codex/Qwen blocker into bounded target setup and verification behavior before retrying provider proof, so long-running Playwright or full-suite target checks are visible, budgeted, and fail-closed before any provider-quality conclusion is made.
+
+**Exit criteria:**
+- W37 is represented across the roadmap, master backlog, dependency graph, and owning wave doc.
+- The `ky` live E2E target setup path has bounded Playwright/browser dependency handling and does not run unbounded `npm exec playwright install` during baseline diagnostic.
+- Target verification separates provider-independent setup blockers from Codex/Qwen provider quality evidence.
+- W35-S05 remains blocked until Codex closes cleanly and Qwen closes or records a provider/environment blocker after the target setup path is bounded.
+
+**Detailed slices:** `docs/backlog/wave-37-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.
