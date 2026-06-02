@@ -656,23 +656,12 @@ export function resolveRuntimeRoot(options) {
  * @param {{ runtimeRoot: string, projectId: string }} options
  * @returns {{ runtimeRoot: string, projectsRoot: string, projectRuntimeRoot: string, artifactsRoot: string, reportsRoot: string, stateRoot: string }}
  */
-export function ensureRuntimeLayout(options) {
+export function resolveRuntimeLayout(options) {
   const projectsRoot = path.join(options.runtimeRoot, "projects");
   const projectRuntimeRoot = path.join(projectsRoot, options.projectId);
   const artifactsRoot = path.join(projectRuntimeRoot, "artifacts");
   const reportsRoot = path.join(projectRuntimeRoot, "reports");
   const stateRoot = path.join(projectRuntimeRoot, "state");
-
-  for (const dirPath of [
-    options.runtimeRoot,
-    projectsRoot,
-    projectRuntimeRoot,
-    artifactsRoot,
-    reportsRoot,
-    stateRoot,
-  ]) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
 
   return {
     runtimeRoot: options.runtimeRoot,
@@ -682,6 +671,26 @@ export function ensureRuntimeLayout(options) {
     reportsRoot,
     stateRoot,
   };
+}
+
+/**
+ * @param {{ runtimeRoot: string, projectId: string }} options
+ * @returns {{ runtimeRoot: string, projectsRoot: string, projectRuntimeRoot: string, artifactsRoot: string, reportsRoot: string, stateRoot: string }}
+ */
+export function ensureRuntimeLayout(options) {
+  const layout = resolveRuntimeLayout(options);
+  for (const dirPath of [
+    options.runtimeRoot,
+    layout.projectsRoot,
+    layout.projectRuntimeRoot,
+    layout.artifactsRoot,
+    layout.reportsRoot,
+    layout.stateRoot,
+  ]) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+
+  return layout;
 }
 
 /**
@@ -1106,5 +1115,94 @@ export function initializeProjectRuntime(options = {}) {
       materializeProjectProfile || materializeBootstrapAssets
         ? profileMaterialization.idempotent && bootstrapAssetsMaterialization.idempotent
         : null,
+  };
+}
+
+/**
+ * Resolve the local app project identity and runtime paths without creating
+ * runtime directories or materializing generated profiles.
+ *
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   bootstrapTemplate?: string,
+ *   repoBuildCommands?: string[],
+ *   repoLintCommands?: string[],
+ *   repoTestCommands?: string[],
+ * }} options
+ * @returns {{
+ *   projectId: string,
+ *   displayName: string,
+ *   projectRoot: string,
+ *   projectProfileRef: string,
+ *   projectProfileSource: string,
+ *   runtimeRoot: string,
+ *   runtimeLayout: ReturnType<typeof resolveRuntimeLayout>,
+ *   stateFile: string,
+ *   onboardingReportFile: string,
+ *   stateExists: boolean,
+ *   onboardingReportExists: boolean,
+ * }}
+ */
+export function previewProjectRuntime(options = {}) {
+  const cwd = options.cwd ?? process.cwd();
+  const projectRoot = discoverProjectRoot({ cwd, projectRef: options.projectRef });
+  const projectProfilePath = resolveOptionalProjectProfilePath({
+    cwd,
+    projectRoot,
+    projectProfile: options.projectProfile,
+  });
+  const generatedBundledProfile = projectProfilePath
+    ? null
+    : createBootstrapProjectProfile({
+        cwd,
+        projectRoot,
+        bootstrapTemplate:
+          typeof options.bootstrapTemplate === "string" && options.bootstrapTemplate.trim().length > 0
+            ? options.bootstrapTemplate.trim()
+            : undefined,
+        assetMode: "bundled",
+        repoBuildCommands: Array.isArray(options.repoBuildCommands) ? options.repoBuildCommands : [],
+        repoLintCommands: Array.isArray(options.repoLintCommands) ? options.repoLintCommands : [],
+        repoTestCommands: Array.isArray(options.repoTestCommands) ? options.repoTestCommands : [],
+      });
+  const loadedProfile = generatedBundledProfile
+    ? resolveProjectProfileRuntimeMetadata({
+        projectProfilePath: "<generated-bundled-profile>",
+        profileDocument: generatedBundledProfile.profile,
+      })
+    : loadProjectProfileForRuntime({ projectProfilePath });
+  const runtimeRoot = resolveRuntimeRoot({
+    projectRoot,
+    runtimeRootOverride: options.runtimeRoot,
+    runtimeRootFromProfile: loadedProfile.runtimeRootFromProfile,
+  });
+  const runtimeLayout = resolveRuntimeLayout({
+    runtimeRoot,
+    projectId: loadedProfile.projectId,
+  });
+  const stateFile = path.join(runtimeLayout.stateRoot, "project-init-state.json");
+  const onboardingReportFile = path.join(runtimeLayout.reportsRoot, "onboarding-report.json");
+
+  return {
+    projectId: loadedProfile.projectId,
+    displayName: loadedProfile.displayName,
+    projectRoot,
+    projectProfileRef: generatedBundledProfile
+      ? "<generated-bundled-profile>"
+      : toProjectRelativePath(projectRoot, loadedProfile.projectProfilePath),
+    projectProfileSource: generatedBundledProfile
+      ? "generated-bundled-preview"
+      : typeof options.projectProfile === "string" && options.projectProfile.trim().length > 0
+        ? "explicit"
+        : "default-discovered",
+    runtimeRoot,
+    runtimeLayout,
+    stateFile,
+    onboardingReportFile,
+    stateExists: fs.existsSync(stateFile),
+    onboardingReportExists: fs.existsSync(onboardingReportFile),
   };
 }

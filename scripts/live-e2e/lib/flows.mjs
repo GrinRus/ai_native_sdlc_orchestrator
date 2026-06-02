@@ -1097,7 +1097,11 @@ function runGuidedWebSmoke(options) {
     summary.html_loaded === true &&
     summary.flow_selector_loaded === true &&
     summary.new_flow_action_loaded === true &&
+    summary.first_run_wizard_loaded === true &&
+    summary.project_switcher_loaded === true &&
     asNonEmptyString(summary.config_project_id) === asNonEmptyString(summary.project_id) &&
+    asNonEmptyString(summary.config_default_project_id) === asNonEmptyString(summary.project_id) &&
+    asNonEmptyString(summary.project_index_default_project_id) === asNonEmptyString(summary.project_id) &&
     asNonEmptyString(summary.state_project_id) === asNonEmptyString(summary.project_id);
   writeJson(browserTaskProofRequestFile, {
     request_id: `${options.runId}.guided-browser-task-proof-request.v1`,
@@ -1139,6 +1143,8 @@ function runGuidedWebSmoke(options) {
     html_loaded: summary.html_loaded === true,
     flow_selector_loaded: summary.flow_selector_loaded === true,
     new_flow_action_loaded: summary.new_flow_action_loaded === true,
+    first_run_wizard_loaded: summary.first_run_wizard_loaded === true,
+    project_switcher_loaded: summary.project_switcher_loaded === true,
     app_url: asNonEmptyString(summary.app_url) || null,
     control_plane: asNonEmptyString(summary.control_plane) || null,
     project_id: asNonEmptyString(summary.project_id) || null,
@@ -1150,6 +1156,9 @@ function runGuidedWebSmoke(options) {
       "packaged SPA HTML loaded",
       "app config route loaded",
       "project state route loaded",
+      "local project index route loaded",
+      "first-run wizard bundle marker loaded",
+      "project switcher bundle marker loaded",
       "flow selector bundle marker loaded",
       "New Flow bundle marker loaded",
     ],
@@ -1163,6 +1172,8 @@ function runGuidedWebSmoke(options) {
     html_loaded: summary.html_loaded === true,
     flow_selector_loaded: summary.flow_selector_loaded === true,
     new_flow_action_loaded: summary.new_flow_action_loaded === true,
+    first_run_wizard_loaded: summary.first_run_wizard_loaded === true,
+    project_switcher_loaded: summary.project_switcher_loaded === true,
     note:
       "This deterministic app-smoke summary is a guardrail only; it is not browser-task-proof screenshot evidence.",
   });

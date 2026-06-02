@@ -13,7 +13,7 @@ All apps listed here are package-managed workspace entries, not just folders.
 
 - `apps/api` — thin module export surface that re-exports the shared HTTP/SSE control-plane transport and read/control services
 - `apps/cli` — thin operator CLI entrypoint and bootstrap surface over shared operator services
-- `apps/web` — optional React/Vite operator console source; the npm package serves the built `dist` assets through `aor app`, and app smoke validates the real SPA/config/state route path plus flow selector / `New Flow` bundle markers without a public static snapshot module export
+- `apps/web` — optional React/Vite operator console source; the npm package serves the built `dist` assets through `aor app`, and app smoke validates the real SPA/config/project-index/state route path plus first-run wizard, project switcher, flow selector, and `New Flow` bundle markers without a public static snapshot module export
 
 ## Packages
 All packages listed here are package-managed workspace entries with private manifests.

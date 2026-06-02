@@ -644,6 +644,8 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(appSmokePayload.html_loaded, true);
     assert.equal(appSmokePayload.flow_selector_loaded, true);
     assert.equal(appSmokePayload.new_flow_action_loaded, true);
+    assert.equal(appSmokePayload.first_run_wizard_loaded, true);
+    assert.equal(appSmokePayload.project_switcher_loaded, true);
     assert.equal(appSmokePayload.state_project_id, appSmokePayload.project_id);
 
     const appSmokeCompact = spawnSync(process.execPath, [
@@ -666,6 +668,8 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     assert.equal(appSmokeCompactPayload.html_loaded, true);
     assert.equal(appSmokeCompactPayload.flow_selector_loaded, true);
     assert.equal(appSmokeCompactPayload.new_flow_action_loaded, true);
+    assert.equal(appSmokeCompactPayload.first_run_wizard_loaded, true);
+    assert.equal(appSmokeCompactPayload.project_switcher_loaded, true);
 
     const customProfilePath = path.join(projectRoot, "custom-app-profile.aor.yaml");
     fs.writeFileSync(
@@ -696,6 +700,7 @@ test("guided first-run shortcuts expose help, human defaults, JSON mode, and gro
     const appSmokeWithProfilePayload = JSON.parse(appSmokeWithProfile.stdout);
     assert.equal(appSmokeWithProfilePayload.project_id, "app-profile-override");
     assert.equal(appSmokeWithProfilePayload.config_project_id, "app-profile-override");
+    assert.equal(appSmokeWithProfilePayload.config_default_project_id, "app-profile-override");
     assert.equal(appSmokeWithProfilePayload.state_project_id, "app-profile-override");
 
     const invalidAppPort = spawnSync(process.execPath, [

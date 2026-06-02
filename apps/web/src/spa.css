@@ -136,6 +136,44 @@ button:disabled {
   max-width: 190px;
 }
 
+.project-switcher {
+  display: grid;
+  grid-template-columns: minmax(190px, 260px) minmax(150px, 230px) auto;
+  flex: 0 1 560px;
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
+.project-switcher label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.project-switcher span {
+  color: #65717d;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.project-switcher select {
+  height: 34px;
+}
+
+.project-switcher-meta {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.project-switcher-meta code {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .flow-selector {
   display: grid;
   grid-template-columns: minmax(190px, 280px) auto;
@@ -519,6 +557,17 @@ p {
   gap: 14px;
 }
 
+.first-run-wizard {
+  border-color: #bfd7e5;
+}
+
+.wizard-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .readiness-check-list {
   display: grid;
   gap: 8px;
@@ -575,6 +624,38 @@ p {
   width: 28px;
   height: 28px;
   color: #0f766e;
+}
+
+.success-note {
+  padding: 10px 12px;
+  border: 1px solid #b7e4d4;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 13px;
+}
+
+.runtime-root-preview {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #d8e5ea;
+  border-radius: 8px;
+  background: #f7fbfc;
+}
+
+.runtime-root-preview span {
+  color: #66727d;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.runtime-root-preview code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .flow-lifecycle-preview {
@@ -2124,6 +2205,12 @@ tr.selected td {
   justify-self: stretch;
 }
 
+.drawer-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
 .run-result {
   gap: 10px;
   background: #f8fbfa;
@@ -2207,6 +2294,11 @@ code {
     max-width: min(210px, 55vw);
   }
 
+  .project-switcher {
+    grid-template-columns: minmax(220px, 1fr) minmax(150px, 220px) auto;
+    flex: 1 1 560px;
+  }
+
   .flow-selector {
     grid-template-columns: minmax(220px, 1fr) auto;
     flex: 1 1 420px;
@@ -2231,6 +2323,11 @@ code {
   .flow-selector {
     grid-template-columns: minmax(220px, 1fr) auto;
     flex: 1 1 420px;
+  }
+
+  .project-switcher {
+    grid-template-columns: minmax(220px, 1fr) minmax(150px, 220px) auto;
+    flex: 1 1 560px;
   }
 
   .right-rail {
@@ -2291,6 +2388,10 @@ code {
 
   .new-flow-button {
     width: 100%;
+  }
+
+  .drawer-actions {
+    grid-template-columns: 1fr;
   }
 
   .stage-rail {

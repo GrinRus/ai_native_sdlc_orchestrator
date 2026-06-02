@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-35-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-36-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -46,6 +46,7 @@ The authoritative planning model for implementation lives in:
 | W33 | Align the post-rebase console source of truth around `aor app`, remove the static snapshot surface, and preserve local-alpha stabilization fixes without adding security/hosted scope. | 10 | EPIC-0, EPIC-6 | `docs/backlog/wave-33-implementation-slices.md` |
 | W34 | Refactor the local console around runtime-owned flows and prove the flow loop through browser-task live E2E evidence. | 7 | EPIC-0, EPIC-6, EPIC-7 | `docs/backlog/wave-34-implementation-slices.md` |
 | W35 | Harden live E2E operator UX for long-running providers, decision helper automation, readable artifacts, execution evidence, and Codex/Qwen proof. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-35-implementation-slices.md` |
+| W36 | Make the local app self-guided from a no-settings launch and support explicitly added local projects without mixing runtime state. | 5 | EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-36-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -169,6 +170,11 @@ The authoritative planning model for implementation lives in:
 | W35-S03 | skill-agent decision helper target: OPS-04, OPS-06, OPS-07, OPS-11 |
 | W35-S04 | execution evidence and interruption target: OPS-01, OPS-04, OPS-06, OPS-07, OPS-11, DEV-05, RQA-02 |
 | W35-S05 | Codex/Qwen UX proof target: OPS-06, OPS-07, OPS-11, PBO-09 |
+| W36-S01 | no-settings onboarding and local workspace contract target: PBO-09, OPS-01, OPS-10 |
+| W36-S02 | local app project registry target: PBO-09, OPS-01, RMO-01 |
+| W36-S03 | first-run wizard target: PBO-01, PBO-02, PBO-03, PBO-09 |
+| W36-S04 | local multi-project switcher target: PBO-09, OPS-01, OPS-10 |
+| W36-S05 | no-settings UI proof target: OPS-06, OPS-10, PBO-09 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -614,6 +620,19 @@ boundaries.
 - W35-S05 proof closure includes the silent-provider UX fixture and requires any Qwen non-pass to be recorded as clear provider-quality/environment blocker evidence, not as product success.
 
 **Detailed slices:** `docs/backlog/wave-35-implementation-slices.md`
+
+## W36 - no-settings onboarding and local multi-project UI
+**Goal:** Make `aor app` self-guided for an installed user who starts the UI with no setup flags, while allowing several explicitly added local projects in one loopback console without turning that console into hosted portfolio orchestration.
+
+**Exit criteria:**
+- W36 is represented across the roadmap, master backlog, epic map, dependency graph, and owning wave doc.
+- `aor app` still supports the existing single-project launch contract, but `/app-config.json` also exposes `default_project_id` and `projects[]`.
+- The local control-plane exposes `GET /api/projects` for app-session project summaries and dispatches existing `/api/projects/:projectId/**` routes to the matching runtime context.
+- The packaged SPA opens to a first-run wizard that shows project context, explicit runtime initialization, first-flow mission intake, and next-action handoff without requiring README setup.
+- The top bar includes a project switcher and an add-local-project drawer; projects are added only from explicit user input and keep separate runtime/evidence/flow state.
+- Release/app smoke covers wizard, initialize action, project switcher, flow selector, and `New Flow` markers.
+
+**Detailed slices:** `docs/backlog/wave-36-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

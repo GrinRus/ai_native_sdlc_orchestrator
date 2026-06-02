@@ -8,14 +8,15 @@ import {
   handleLifecycleCommandAction,
   handleOperatorRequestAction,
   handleOperatorRequestCreate,
+  handleProjectAction,
   handleRunControlAction,
   handleUiLifecycleAction,
 } from "./http-mutation-handlers.mjs";
 import { handleReadRoute } from "./http-read-handlers.mjs";
 import { matchControlPlaneRoute } from "./http-router.mjs";
 import { handleRunEventStream } from "./http-stream-handlers.mjs";
-import { asPositiveInteger, asString, attachResponseRedactionPolicy, sendError } from "./http-utils.mjs";
-import { readProjectState } from "../read-surface.mjs";
+import { asPositiveInteger, asString, attachResponseRedactionPolicy, sendError, sendJson } from "./http-utils.mjs";
+import { createLocalProjectRegistry, summarizeProjectContext } from "../local-project-registry.mjs";
 
 /**
  * @param {{
@@ -23,6 +24,12 @@ import { readProjectState } from "../read-surface.mjs";
  *   projectRef: string,
  *   projectProfile?: string,
  *   runtimeRoot?: string,
+ *   projects?: Array<{
+ *     projectRef: string,
+ *     projectProfile?: string,
+ *     runtimeRoot?: string,
+ *     label?: string,
+ *   }>,
  *   host?: string,
  *   port?: number,
  *   auth?: {
@@ -46,25 +53,27 @@ export function createControlPlaneHttpServer(options) {
   const host = asString(options.host) ?? "127.0.0.1";
   const requestedPort = asPositiveInteger(options.port);
   const port = requestedPort ?? 0;
-  const runtimeOptions = {
+  const projectInputs = Array.isArray(options.projects) && options.projects.length > 0
+    ? options.projects
+    : [{
+        projectRef: options.projectRef,
+        projectProfile: options.projectProfile,
+        runtimeRoot: options.runtimeRoot,
+      }];
+  const registry = createLocalProjectRegistry({
     cwd: options.cwd,
-    projectRef: options.projectRef,
-    projectProfile: options.projectProfile,
-    runtimeRoot: options.runtimeRoot,
-  };
-  const state = readProjectState(runtimeOptions);
-  const projectId = state.project_id;
-  const projectProfileRef = state.project_profile_ref;
+    projects: projectInputs,
+  });
+  const defaultContext = registry.getContext(registry.defaultProjectId);
+  const defaultSummary = summarizeProjectContext(defaultContext);
+  const projectId = defaultSummary.project_id;
+  const projectProfileRef = defaultSummary.project_profile_ref;
   const appStaticRoot = asString(options.app?.staticRoot);
   const appIndexFile = appStaticRoot ? path.join(appStaticRoot, "index.html") : null;
   if (appStaticRoot && !fs.existsSync(appIndexFile ?? "")) {
     throw new Error(`AOR app static bundle is missing at '${appStaticRoot}'. Run the web build before launching the app.`);
   }
   const authPolicy = normalizeAuthPolicy(options.auth, projectId);
-  const runtimeOptionsWithSecurity = {
-    ...runtimeOptions,
-    redactionPolicy: authPolicy.redactionPolicy,
-  };
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -84,7 +93,7 @@ export function createControlPlaneHttpServer(options) {
           requestUrl,
           response,
           staticRoot: appStaticRoot,
-          projectState: state,
+          registry,
           packageVersion: asString(options.app?.packageVersion) ?? "0.0.0",
           baseUrl: `http://${request.headers.host ?? `${host}:${port}`}`,
         });
@@ -100,10 +109,6 @@ export function createControlPlaneHttpServer(options) {
       }
 
       const { route, params } = matchedRoute;
-      if (params.projectId !== projectId) {
-        sendError(response, 404, "project_not_found", "Requested project id does not match transport scope.");
-        return;
-      }
 
       if (method !== route.method) {
         response.setHeader("allow", route.allow);
@@ -111,10 +116,23 @@ export function createControlPlaneHttpServer(options) {
         return;
       }
 
+      const routeProjectId = asString(params.projectId) ?? projectId;
+      const context = route.id === "project-index" || route.id === "project-actions"
+        ? defaultContext
+        : registry.getContext(routeProjectId);
+      if (!context) {
+        sendError(response, 404, "project_not_found", "Requested project id does not match any registered local project.");
+        return;
+      }
+      const runtimeOptionsWithSecurity = {
+        ...context.runtimeOptions,
+        redactionPolicy: authPolicy.redactionPolicy,
+      };
+
       const decision = authorizeRequest({
         request,
         policy: authPolicy,
-        projectId,
+        projectId: routeProjectId,
         requiredPermission: route.permission,
       });
       if (!decision.allowed) {
@@ -123,6 +141,10 @@ export function createControlPlaneHttpServer(options) {
       }
 
       if (route.kind === "read") {
+        if (route.id === "project-index") {
+          sendJson(response, 200, registry.summarize());
+          return;
+        }
         handleReadRoute({
           routeId: route.id,
           params,
@@ -130,6 +152,11 @@ export function createControlPlaneHttpServer(options) {
           response,
           runtimeOptions: runtimeOptionsWithSecurity,
         });
+        return;
+      }
+
+      if (route.id === "project-actions") {
+        await handleProjectAction({ request, response, registry });
         return;
       }
 
@@ -202,6 +229,8 @@ export function createControlPlaneHttpServer(options) {
         baseUrl,
         projectId,
         projectProfileRef,
+        projectRef: defaultSummary.project_ref,
+        runtimeRoot: defaultSummary.runtime_root,
         async close() {
           if (!server.listening) {
             return;
@@ -246,7 +275,7 @@ function contentTypeFor(filePath) {
  *   requestUrl: URL,
  *   response: import("node:http").ServerResponse,
  *   staticRoot: string,
- *   projectState: ReturnType<typeof readProjectState>,
+ *   registry: ReturnType<typeof createLocalProjectRegistry>,
  *   packageVersion: string,
  *   baseUrl: string,
  * }} options
@@ -259,6 +288,10 @@ function serveAppRoute(options) {
   }
 
   if (pathname === "/app-config.json") {
+    const workspace = options.registry.summarize();
+    const defaultProject =
+      workspace.projects.find((project) => project.project_id === workspace.default_project_id) ??
+      workspace.projects[0];
     options.response.statusCode = 200;
     options.response.setHeader("content-type", "application/json; charset=utf-8");
     options.response.end(
@@ -266,10 +299,12 @@ function serveAppRoute(options) {
         {
           app: "aor-operator-console",
           version: options.packageVersion,
-          project_id: options.projectState.project_id,
-          project_profile_ref: options.projectState.project_profile_ref,
-          project_ref: options.projectState.project_root,
-          runtime_root: options.projectState.runtime_root,
+          project_id: defaultProject?.project_id,
+          default_project_id: workspace.default_project_id,
+          projects: workspace.projects,
+          project_profile_ref: defaultProject?.project_profile_ref,
+          project_ref: defaultProject?.project_ref,
+          runtime_root: defaultProject?.runtime_root,
           api_base_url: options.baseUrl,
           control_plane: options.baseUrl,
         },

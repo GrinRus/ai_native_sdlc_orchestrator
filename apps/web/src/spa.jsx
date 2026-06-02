@@ -803,6 +803,45 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
   );
 }
 
+function projectStatusLabel(project) {
+  const onboarding = project?.onboarding_summary ?? {};
+  const flowSummary = project?.active_flow_summary ?? {};
+  if (flowSummary.status === "active-flow") return "Active flow";
+  if (flowSummary.status === "completed-only") return "Completed flows";
+  if (onboarding.status === "initialized") return "Initialized";
+  if (onboarding.status === "runtime-ready") return "Runtime ready";
+  return "First launch";
+}
+
+function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAddProject, busy }) {
+  const activeProject = projects.find((project) => project.project_id === activeProjectId) ?? projects[0] ?? null;
+  return (
+    <div className="project-switcher" aria-label="Project switcher">
+      <label>
+        <span>Project switcher</span>
+        <select
+          value={activeProject?.project_id ?? ""}
+          onChange={(event) => onSelectProject(event.target.value)}
+          disabled={busy || projects.length === 0}
+        >
+          {projects.map((project) => (
+            <option key={project.project_id} value={project.project_id}>
+              {project.label ?? project.display_name ?? project.project_id}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="project-switcher-meta">
+        <StatusPill state={projectStatusLabel(activeProject)} />
+        <code title={activeProject?.runtime_root ?? ""}>{activeProject?.runtime_root ?? "runtime pending"}</code>
+      </div>
+      <button className="utility-button compact" type="button" onClick={onOpenAddProject} disabled={busy}>
+        <Icon name="folder" />Add local project
+      </button>
+    </div>
+  );
+}
+
 function StageRail({ selectedStage, currentStage, onSelect, flow, newFlowDraft, providerStepStatus = null }) {
   const currentIndex = Math.max(0, STAGES.findIndex((stage) => stage.id === currentStage));
   const completed = isCompletedFlow(flow);
@@ -1215,37 +1254,79 @@ function FlowCockpit({
   onCreateFollowUp,
   onDuplicateMission,
   initializeProject,
+  activeProject = null,
+  onOpenAddProject = null,
   providerStepStatus = null,
   evidenceRows = [],
 }) {
   if (!flow && stage.id === "readiness") {
-    const runtimeRoot = projectState?.runtime_root ?? config?.runtime_root ?? ".aor";
-    const stateReady = Boolean(projectState?.state_file);
+    const projectRef = activeProject?.project_ref ?? config?.project_ref ?? "loading";
+    const runtimeRoot = projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor";
+    const onboarding = projectState?.onboarding_summary ?? activeProject?.onboarding_summary ?? {};
+    const stateReady = Boolean(projectState?.state_file) || onboarding.initialized === true || onboarding.state_exists === true;
+    const flowReady = false;
+    const wizardStatus = stateReady ? "Runtime ready" : "First launch";
+    const wizardSteps = [
+      {
+        label: "Project Context",
+        status: projectRef && projectRef !== "loading" ? "ready" : "pending",
+        detail: "Confirm the target repository and runtime root before AOR writes local evidence.",
+        code: projectRef,
+      },
+      {
+        label: "Runtime Readiness",
+        status: stateReady ? "ready" : "pending",
+        detail: stateReady ? "Runtime state is reachable." : "Runtime folders and state evidence are not initialized yet.",
+        code: projectState?.state_file ?? "state file pending",
+      },
+      {
+        label: "First Flow",
+        status: flowReady ? "ready" : "pending",
+        detail: "Create the first no-write mission packet from the safe walkthrough template.",
+        code: flowReady ? "mission evidence visible" : "mission intake pending",
+      },
+      {
+        label: "Next Action",
+        status: nextAction?.primary_action ? "ready" : "pending",
+        detail: "Refresh next action and land in the active flow cockpit.",
+        code: nextAction?.primary_action?.command ?? "next pending",
+      },
+    ];
     return (
-      <section className="work-card stage-work readiness-cockpit">
+      <section className="work-card stage-work readiness-cockpit first-run-wizard" aria-label="First-run wizard">
         <div className="work-heading">
           <div>
             <div className="heading-line">
-              <h2>Readiness</h2>
-              <StatusPill state="First launch" />
+              <h2>First-run wizard</h2>
+              <StatusPill state={wizardStatus} />
             </div>
-            <p>Validate the local runtime, safety policy, and project context before creating a flow.</p>
+            <p>Readiness prepares the runtime before a flow is created. Validate project context, initialize explicitly, then create the first flow.</p>
           </div>
-          <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
-            <Icon name="refresh" />
-            Refresh readiness
-          </button>
+          <div className="wizard-heading-actions">
+            {onOpenAddProject ? (
+              <button className="secondary" type="button" onClick={onOpenAddProject} disabled={busy}>
+                <Icon name="folder" />
+                Add local project
+              </button>
+            ) : null}
+            <button className="secondary" type="button" onClick={onRefresh} disabled={busy}>
+              <Icon name="refresh" />
+              Refresh readiness
+            </button>
+          </div>
         </div>
 
         <div className="readiness-check-list">
-          <div className={stateReady ? "ready" : "pending"}>
-            <span className="check-dot" />
-            <div>
-              <strong>Project runtime</strong>
-              <p>{stateReady ? "Runtime state is reachable." : "Runtime folders and state evidence are not initialized yet."}</p>
+          {wizardSteps.map((step) => (
+            <div key={step.label} className={step.status}>
+              <span className="check-dot" />
+              <div>
+                <strong>{step.label}</strong>
+                <p>{step.detail}</p>
+              </div>
+              <code>{step.code}</code>
             </div>
-            <code>{projectState?.state_file ?? "state file pending"}</code>
-          </div>
+          ))}
           <div className="ready">
             <span className="check-dot" />
             <div>
@@ -1254,28 +1335,35 @@ function FlowCockpit({
             </div>
             <code>{runtimeRoot}</code>
           </div>
-          <div className="pending">
-            <span className="check-dot" />
-            <div>
-              <strong>Flow model</strong>
-              <p>No active flow is selected. Use New Flow after readiness to create mission/intake evidence.</p>
-            </div>
-            <code>no active flow</code>
-          </div>
         </div>
 
-        <div className="readiness-action">
-          <div>
-            <Icon name="play" />
+        {!stateReady ? (
+          <div className="readiness-action">
             <div>
-              <h3>Initialize Project Runtime</h3>
-              <p>This does not create a flow. It prepares local runtime evidence and safety controls.</p>
+              <Icon name="play" />
+              <div>
+                <h3>Initialize Project Runtime</h3>
+                <p>This does not create a flow. It prepares local runtime evidence and safety controls.</p>
+              </div>
             </div>
+            <button className="primary" type="button" onClick={initializeProject} disabled={busy}>
+              Initialize Project Runtime
+            </button>
           </div>
-          <button className="primary" type="button" onClick={initializeProject} disabled={busy}>
-            Initialize Project Runtime
-          </button>
-        </div>
+        ) : (
+          <div className="readiness-action">
+            <div>
+              <Icon name="plus" />
+              <div>
+                <h3>Start First Flow</h3>
+                <p>Runtime is ready. Create a no-write mission packet and let AOR resolve the next action.</p>
+              </div>
+            </div>
+            <button className="primary" type="button" onClick={onStartNewFlow} disabled={busy}>
+              Start First Flow
+            </button>
+          </div>
+        )}
 
         <div className="flow-lifecycle-preview" aria-label="Flow lifecycle after readiness">
           <div className="complete"><span className="check-dot" /><strong>Initialize project</strong><p>Prepare runtime and policy</p></div>
@@ -2077,6 +2165,68 @@ function RuntimeTracePanel({ trace }) {
   );
 }
 
+function AddProjectDrawer({ open, form, setForm, busy, result, onClose, onAdd, onAddAndInitialize }) {
+  if (!open) return null;
+  const projectPath = form.projectRef.trim();
+  const runtimePreview = form.runtimeRoot.trim() || (projectPath ? `${projectPath.replace(/\/+$/u, "")}/.aor` : "<project>/.aor");
+  return (
+    <div className="drawer-backdrop add-project-backdrop" role="presentation">
+      <aside className="request-drawer add-project-drawer" aria-label="Add local project drawer">
+        <div className="drawer-header">
+          <div>
+            <p className="eyebrow">Local workspace</p>
+            <h2>Add local project</h2>
+          </div>
+          <button className="secondary compact" type="button" onClick={onClose}>Close</button>
+        </div>
+        <div className="request-scope-card">
+          <label>
+            Project path
+            <input
+              value={form.projectRef}
+              onChange={(event) => setForm({ ...form, projectRef: event.target.value })}
+              placeholder="/path/to/local-project"
+            />
+          </label>
+          <label>
+            Label
+            <input
+              value={form.label}
+              onChange={(event) => setForm({ ...form, label: event.target.value })}
+              placeholder="Optional display name"
+            />
+          </label>
+          <label>
+            Runtime root
+            <input
+              value={form.runtimeRoot}
+              onChange={(event) => setForm({ ...form, runtimeRoot: event.target.value })}
+              placeholder="Defaults to <project>/.aor"
+            />
+          </label>
+          <div className="runtime-root-preview" aria-label="Runtime root preview">
+            <span>Runtime root preview</span>
+            <code>{runtimePreview}</code>
+          </div>
+        </div>
+        {result ? (
+          <div className={result.status === "error" ? "alert" : "success-note"} role="status">
+            {result.message}
+          </div>
+        ) : null}
+        <div className="drawer-actions">
+          <button className="secondary drawer-submit" type="button" onClick={onAdd} disabled={busy || !projectPath}>
+            Add project to workspace
+          </button>
+          <button className="primary drawer-submit" type="button" onClick={onAddAndInitialize} disabled={busy || !projectPath}>
+            Add and initialize
+          </button>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose, onRun }) {
   const drawerRef = useRef(null);
 
@@ -2243,6 +2393,8 @@ function RequestDrawer({ open, stage, flow, form, setForm, busy, result, onClose
 
 function App() {
   const [config, setConfig] = useState(null);
+  const [projectIndex, setProjectIndex] = useState({ projects: [], default_project_id: null });
+  const [activeProjectId, setActiveProjectId] = useState(null);
   const [projectState, setProjectState] = useState(null);
   const [nextAction, setNextAction] = useState(null);
   const [flowList, setFlowList] = useState({ flows: [], selected_flow_id: null });
@@ -2263,6 +2415,9 @@ function App() {
   const [error, setError] = useState("");
   const [form, setForm] = useState(SAFE_TEMPLATE);
   const [requestDrawerOpen, setRequestDrawerOpen] = useState(false);
+  const [addProjectDrawerOpen, setAddProjectDrawerOpen] = useState(false);
+  const [addProjectForm, setAddProjectForm] = useState({ projectRef: "", label: "", runtimeRoot: "" });
+  const [addProjectResult, setAddProjectResult] = useState(null);
   const [requestForm, setRequestForm] = useState(DEFAULT_REQUEST);
   const [requestResult, setRequestResult] = useState(null);
   const [selectedRef, setSelectedRef] = useState("");
@@ -2273,14 +2428,24 @@ function App() {
   const flowSelectionVersion = useRef(0);
 
   const apiProjectBase = useMemo(() => {
-    if (!config?.project_id) return null;
-    return `/api/projects/${encodeURIComponent(config.project_id)}`;
-  }, [config]);
+    const projectId = activeProjectId ?? config?.default_project_id ?? config?.project_id;
+    if (!projectId) return null;
+    return `/api/projects/${encodeURIComponent(projectId)}`;
+  }, [activeProjectId, config]);
 
   const activeStage = STAGES.find((stage) => stage.id === selectedStage) ?? STAGES[1];
   const draftSurface = newFlowDraft;
   const currentStage = draftSurface ? "mission" : flowStageId(selectedFlow, nextAction, projectState);
   const flowOptions = Array.isArray(flowList?.flows) ? flowList.flows : [];
+  const projectOptions = Array.isArray(projectIndex?.projects) && projectIndex.projects.length > 0
+    ? projectIndex.projects
+    : Array.isArray(config?.projects)
+      ? config.projects
+      : [];
+  const activeProject = projectOptions.find((project) => project.project_id === activeProjectId) ??
+    projectOptions.find((project) => project.project_id === config?.project_id) ??
+    projectOptions[0] ??
+    null;
 
   const evidenceRows = useMemo(() => {
     const fromSummary = (summary, overrides = {}) => artifactRowFromSummary(summary, overrides);
@@ -2412,8 +2577,60 @@ function App() {
     setError("");
     const refreshSelectionVersion = options.selectionVersion ?? flowSelectionVersion.current;
     const appConfig = config ?? (await readJson("/app-config.json"));
+    const projectPayload = await readJson("/api/projects").catch(() => ({
+      default_project_id: appConfig.default_project_id ?? appConfig.project_id,
+      projects: Array.isArray(appConfig.projects) ? appConfig.projects : [],
+    }));
     setConfig(appConfig);
-    const base = `/api/projects/${encodeURIComponent(appConfig.project_id)}`;
+    const projects = Array.isArray(projectPayload.projects) && projectPayload.projects.length > 0
+      ? projectPayload.projects
+      : Array.isArray(appConfig.projects)
+        ? appConfig.projects
+        : [];
+    const selectedProjectId =
+      options.projectId ??
+      activeProjectId ??
+      projectPayload.default_project_id ??
+      appConfig.default_project_id ??
+      appConfig.project_id;
+    const selectedProject = projects.find((project) => project.project_id === selectedProjectId) ?? projects[0] ?? null;
+    const effectiveProjectId = selectedProject?.project_id ?? selectedProjectId;
+    setProjectIndex({
+      ...projectPayload,
+      default_project_id: projectPayload.default_project_id ?? appConfig.default_project_id ?? appConfig.project_id,
+      projects,
+    });
+    if (effectiveProjectId && activeProjectId !== effectiveProjectId) {
+      setActiveProjectId(effectiveProjectId);
+    }
+    const onboarding = selectedProject?.onboarding_summary ?? {};
+    const shouldReadProjectState = onboarding.initialized === true || onboarding.state_exists === true;
+    if (!shouldReadProjectState) {
+      const selectionStillCurrent = refreshSelectionVersion === flowSelectionVersion.current;
+      setProjectState(null);
+      setNextAction(null);
+      setFlowList({ flows: [], selected_flow_id: null });
+      setSelectedFlow(null);
+      setSelectedFlowId(null);
+      setPackets([]);
+      setStepResults([]);
+      setRuns([]);
+      setOperatorRequests([]);
+      setFlowEvidenceGraph(null);
+      setFlowRuntimeTrace(null);
+      if (selectionStillCurrent && !didChooseStage.current) {
+        setSelectedStage("readiness");
+        didAutoSelectStage.current = true;
+      }
+      pushActivity("control-plane.project-preview", selectedProject?.label ?? selectedProject?.project_id ?? "project pending");
+      return {
+        projectState: null,
+        nextAction: null,
+        selectedFlow: null,
+        selectionApplied: selectionStillCurrent,
+      };
+    }
+    const base = `/api/projects/${encodeURIComponent(effectiveProjectId)}`;
     const [state, next, flowPayload, selectedFlowPayload, packetList, stepList, runList, requestList] = await Promise.all([
       readJson(`${base}/state`),
       readJson(`${base}/next-action-report`).catch(() => null),
@@ -2480,6 +2697,101 @@ function App() {
   function chooseStage(stageId) {
     didChooseStage.current = true;
     setSelectedStage(stageId);
+  }
+
+  function resetProjectScopedState() {
+    flowSelectionVersion.current += 1;
+    didChooseStage.current = false;
+    didAutoSelectStage.current = false;
+    setProjectState(null);
+    setNextAction(null);
+    setFlowList({ flows: [], selected_flow_id: null });
+    setSelectedFlow(null);
+    setSelectedFlowId(null);
+    setNewFlowDraft(false);
+    setDraftSourceFlow(null);
+    setDraftFollowUpHandoffRef(null);
+    setFlowEvidenceGraph(null);
+    setFlowRuntimeTrace(null);
+    setPackets([]);
+    setStepResults([]);
+    setRuns([]);
+    setOperatorRequests([]);
+    setSelectedRef("");
+    setAnswers({});
+    setActivity([]);
+    setSelectedStage("readiness");
+    setRequestDrawerOpen(false);
+    setRequestResult(null);
+  }
+
+  async function selectProject(projectId) {
+    if (!projectId || projectId === activeProjectId || busy) return;
+    resetProjectScopedState();
+    setActiveProjectId(projectId);
+    try {
+      await refresh({ projectId, selectionVersion: flowSelectionVersion.current });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  function openAddProjectDrawer() {
+    setAddProjectResult(null);
+    setAddProjectDrawerOpen(true);
+  }
+
+  function closeAddProjectDrawer() {
+    setAddProjectDrawerOpen(false);
+    setAddProjectResult(null);
+  }
+
+  async function addLocalProject({ initializeAfterAdd = false } = {}) {
+    if (busy || !addProjectForm.projectRef.trim()) return;
+    setBusy(true);
+    setError("");
+    setAddProjectResult(null);
+    try {
+      const payload = await readJson("/api/projects/actions", {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: JSON.stringify({
+          action: "add",
+          project_ref: addProjectForm.projectRef.trim(),
+          ...(addProjectForm.label.trim() ? { label: addProjectForm.label.trim() } : {}),
+          ...(addProjectForm.runtimeRoot.trim() ? { runtime_root: addProjectForm.runtimeRoot.trim() } : {}),
+        }),
+      });
+      const nextProjectId = payload.project?.project_id;
+      setProjectIndex({
+        default_project_id: payload.default_project_id,
+        projects: Array.isArray(payload.projects) ? payload.projects : [],
+      });
+      let resultMessage = "Project added to this local app session.";
+      setAddProjectForm({ projectRef: "", label: "", runtimeRoot: "" });
+      if (nextProjectId) {
+        resetProjectScopedState();
+        setActiveProjectId(nextProjectId);
+        if (initializeAfterAdd) {
+          const projectBase = `/api/projects/${encodeURIComponent(nextProjectId)}`;
+          await readJson(`${projectBase}/lifecycle-command/actions`, {
+            method: "POST",
+            headers: { "content-type": "application/json; charset=utf-8" },
+            body: JSON.stringify({ command: "project init", flags: {} }),
+          });
+          resultMessage = "Project added and initialized. Create the first no-write flow next.";
+          pushActivity("workspace.project-initialized", nextProjectId);
+        }
+        await refresh({ projectId: nextProjectId, selectionVersion: flowSelectionVersion.current });
+      }
+      setAddProjectResult({ status: "ok", message: resultMessage });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setAddProjectResult({ status: "error", message });
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   function startNewFlow({ sourceFlow = null, followUp = false, duplicate = false } = {}) {
@@ -2799,10 +3111,13 @@ function App() {
             <span>v0.4.2</span>
           </div>
         </div>
-        <div className="top-context">
-          <span>Project</span>
-          <code>{config?.project_ref ?? "loading"}</code>
-        </div>
+        <ProjectSwitcher
+          projects={projectOptions}
+          activeProjectId={activeProject?.project_id ?? activeProjectId ?? config?.project_id}
+          onSelectProject={selectProject}
+          onOpenAddProject={openAddProjectDrawer}
+          busy={busy}
+        />
         <FlowSelector
           flows={flowOptions}
           selectedFlowId={selectedFlowId}
@@ -2812,7 +3127,7 @@ function App() {
         />
         <div className="top-context runtime-context">
           <span>Runtime root</span>
-          <code>{projectState?.runtime_root ?? config?.runtime_root ?? ".aor"}</code>
+          <code>{projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor"}</code>
         </div>
         <StatusPill state={draftSurface ? "Draft flow" : selectedFlow?.status ?? "No active flow"} />
         <div className="topbar-spacer" />
@@ -2822,7 +3137,7 @@ function App() {
           <Icon name="target" />Ask AOR
         </button>
         <IconButton label="Refresh" onClick={() => refresh().catch((err) => setError(err.message))} disabled={busy}><Icon name="refresh" /></IconButton>
-        <button className="utility-button" type="button" onClick={() => copyRef(projectState?.runtime_root ?? config?.runtime_root ?? ".aor")}>
+        <button className="utility-button" type="button" onClick={() => copyRef(projectState?.runtime_root ?? activeProject?.runtime_root ?? config?.runtime_root ?? ".aor")}>
           <Icon name="folder" />Copy runtime path
         </button>
       </header>
@@ -2891,6 +3206,8 @@ function App() {
             onCreateFollowUp={() => startNewFlow({ sourceFlow: selectedFlow, followUp: true })}
             onDuplicateMission={() => startNewFlow({ sourceFlow: selectedFlow, duplicate: true })}
             initializeProject={initializeProject}
+            activeProject={activeProject}
+            onOpenAddProject={openAddProjectDrawer}
             providerStepStatus={providerStepStatus}
             evidenceRows={flowEvidenceRows}
           />
@@ -2988,6 +3305,16 @@ function App() {
         result={requestResult}
         onClose={closeRequestDrawer}
         onRun={createAndRunRequest}
+      />
+      <AddProjectDrawer
+        open={addProjectDrawerOpen}
+        form={addProjectForm}
+        setForm={setAddProjectForm}
+        busy={busy}
+        result={addProjectResult}
+        onClose={closeAddProjectDrawer}
+        onAdd={() => addLocalProject()}
+        onAddAndInitialize={() => addLocalProject({ initializeAfterAdd: true })}
       />
     </div>
   );

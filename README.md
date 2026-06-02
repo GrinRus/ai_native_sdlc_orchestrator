@@ -91,14 +91,26 @@ When using the npm CLI package, replace `pnpm aor` in the examples below with
 
 ## Run your first no-write local mission
 
-Run AOR against a local target repository. The safest first path uses the npm
-CLI, initializes `.aor/` with `aor onboard .`, and then launches the local UI
-with `aor app`. The UI opens the Mission form, offers a safe walkthrough
-template, submits the existing `mission create` command through the control
-plane, and immediately refreshes `next` for the selected runtime-owned flow.
-The local console is flow-centric: the top bar shows the flow selector and
-`New Flow`, active flows can continue through lifecycle commands, and completed
-flows remain read-only evidence chains.
+Run AOR from the local target repository and let the UI guide setup:
+
+```bash
+cd /path/to/local-project
+aor app
+```
+
+`aor app` starts a foreground local loopback server on `127.0.0.1`, opens the
+browser by default, and prints the URL. Press `Ctrl+C` in that terminal to stop
+the server. On a clean project the UI shows a first-run wizard:
+
+1. confirm the project path and runtime root;
+2. explicitly run **Initialize Project Runtime**;
+3. create the first no-write flow from the safe Mission template;
+4. refresh the next action and land in the active flow cockpit.
+
+The local console is flow-centric and project-aware: the top bar shows the
+active project switcher, runtime status, flow selector, and `New Flow`. Use
+**Add local project** to add another repository explicitly; the app does not
+scan the filesystem and keeps runtime/evidence/flow state isolated per project.
 
 This path keeps `delivery-mode no-write` by default and stores runtime state
 under the target repository. It intentionally lets AOR generate a bundled
@@ -108,6 +120,8 @@ repository. It does not require authenticated external runners.
 In no-write mode, AOR still writes runtime state: it can create reports,
 packets, and the generated bundled profile under `$TARGET_REPO/.aor`, but it
 must not edit target source files or attempt upstream write-back.
+
+Advanced/headless users can still run the same setup through CLI commands:
 
 ```bash
 export TARGET_REPO=/path/to/local-project
@@ -124,11 +138,6 @@ aor app \
   --project-ref "$TARGET_REPO" \
   --runtime-root "$AOR_RUNTIME"
 ```
-
-`aor app` starts a foreground local loopback server on `127.0.0.1`, opens the
-browser by default, and prints the URL. Press `Ctrl+C` in that terminal to stop
-the server. If the UI starts before onboarding, the Readiness stage shows an
-explicit Initialize action instead of silently creating mission evidence.
 
 In the Mission form, the bundled safe walkthrough template fills only existing
 intake fields: title, brief, goal, constraint, KPI, Definition of Done, and
@@ -201,9 +210,12 @@ aor app --project-ref "$TARGET_REPO" --runtime-root "$AOR_RUNTIME" --smoke --ope
 ```
 
 The smoke JSON must report `status=smoke-pass`, `html_loaded=true`,
-`flow_selector_loaded=true`, `new_flow_action_loaded=true`, and matching
-`config_project_id` / `state_project_id` values. This deterministic app smoke
-is a release guardrail, not a hosted-service or production-automation claim.
+`first_run_wizard_loaded=true`, `project_switcher_loaded=true`,
+`flow_selector_loaded=true`, `new_flow_action_loaded=true`, matching
+`config_project_id` / `state_project_id` values, and matching
+`config_default_project_id` / `project_index_default_project_id` values. This
+deterministic app smoke is a release guardrail, not a hosted-service or
+production-automation claim.
 
 Use a disposable local checkout or branch until you understand the generated
 state. Runtime output under `.aor/` can contain project metadata, reports, and
@@ -230,9 +242,9 @@ it creates target-repo files outside `.aor/`.
   JSON output.
 - `aor app` serves the packaged SPA at `/`, app config at `/app-config.json`,
   and the same-origin control-plane API under `/api/projects/:projectId/**`.
-- the local UI shows the flow selector, active/completed flow boundaries,
-  flow-scoped stage rail, and `New Flow` draft intake while keeping the flow as
-  the primary operator object.
+- the local UI shows first-run onboarding, the project switcher, flow selector,
+  active/completed flow boundaries, flow-scoped stage rail, and `New Flow`
+  draft intake while keeping the flow as the primary operator object.
 - `Ask AOR` and `aor request create/run/status` write durable operator-request
   evidence, proposal refs, optional patch refs, compiled-context refs, and a
   refreshed next-action report scoped to the selected flow.
@@ -277,7 +289,8 @@ the web console.
 The npm alpha also includes a packaged local SPA for installed users:
 
 - `aor app` launches the optional local web console for a target project. It is
-  the product operator-console path in the local alpha.
+  the product operator-console path in the local alpha and supports explicitly
+  added local projects in one loopback UI.
 - `apps/web` contains the React/Vite operator console source and packaged
   `dist` assets.
 - `apps/api` remains a thin API export surface; shared HTTP/SSE transport lives
@@ -297,10 +310,10 @@ claim.
 | npm CLI alpha package | Implemented alpha | `npm install -g @grinrus/aor@0.1.0-alpha.4`. |
 | Source checkout install | Implemented | `corepack enable` and `pnpm install --frozen-lockfile`. |
 | Repository integrity checks | Implemented | `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm check`. |
-| Guided target onboarding | Implemented baseline | `pnpm aor onboard ... --json`. |
+| Guided target onboarding | Implemented UI baseline | `cd <repo> && aor app`; headless path remains `pnpm aor onboard ... --json`. |
 | No-write mission intake | Implemented baseline | `pnpm aor mission create ... --delivery-mode no-write --json`. |
 | Next-action reporting | Implemented baseline | `pnpm aor next ... --json`. |
-| Local installed-user UI | Implemented flow-centric baseline | `aor app --project-ref <repo>` launches the packaged SPA with flow selector, active/completed flow views, and `New Flow`. |
+| Local installed-user UI | Implemented flow-centric baseline | `aor app` launches the packaged SPA with first-run wizard, project switcher, flow selector, active/completed flow views, and `New Flow`. |
 | Operator requests | Implemented flow-scoped baseline | `aor request create/run/status` routes bounded Ask AOR work through runtime evidence and `target_flow_id`. |
 | CLI/API/web baselines | Implemented baseline | See `apps/*`, `packages/*`, and the command catalog. |
 | Production-readiness gate | Implemented bounded gate | `pnpm production:ready --json`. |
@@ -317,7 +330,7 @@ self-hosted CLI/API mode documented in this repository. Internal evaluation and
 proof fixtures exist for maintainers, but they are not a public onboarding path
 and are intentionally not part of the README workflow.
 
-The current roadmap source of truth extends through W35 in
+The current roadmap source of truth extends through W36 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -429,9 +442,10 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current alpha distribution is tracked through `W35` and focuses on:
+The current alpha distribution is tracked through `W36` and focuses on:
 
 - Safer operator onboarding.
+- No-settings local UI onboarding and explicit local multi-project workspaces.
 - Stronger runner-adapter coverage.
 - Clearer review, QA, and delivery evidence.
 - Public-repo security posture and governance.

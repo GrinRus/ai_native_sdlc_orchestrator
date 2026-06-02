@@ -51,8 +51,9 @@ git repository while asserting that only `.aor/` runtime state changes. W30
 extends that smoke path to run `aor app --help` so optional API/web guidance is
 covered. W31 extends it further with
 `aor app --smoke --open false --json`, which starts the local packaged SPA,
-checks `/`, `/app-config.json`, and `GET /api/projects/:projectId/state`, then
-exits without starting a hosted service or making the web console required.
+checks `/`, `/app-config.json`, `GET /api/projects`, and
+`GET /api/projects/:projectId/state`, then exits without starting a hosted
+service or making the web console required.
 W32 extends the source checkout and package smoke expectations with
 `aor request create --json`, `aor request run --json`, and sanitized
 operator-request API coverage so the packaged CLI proves bounded interactive
@@ -64,6 +65,10 @@ installed-user live E2E acceptance still comes from
 `installed-user-guided-journey.yaml` with `browser-task-proof`, flow-loop
 fields, accepted skill-agent decisions, a final skill-agent verdict, and
 no-upstream-write assertions.
+W36 extends the same deterministic smoke so it must also prove the first-run
+wizard marker, project switcher marker, `/api/projects` project index, and
+matching `default_project_id` fields while preserving the single-project
+`aor app` launch contract.
 
 W30 alpha hardening also requires the production-readiness gate to verify the
 ADR index, OpenAPI 3.1 control-plane route contract, self-hosted operations

@@ -1134,6 +1134,85 @@ test("local app server serves SPA config and existing control-plane routes", asy
   });
 });
 
+test("local app project index and add-project action keep project runtimes isolated", async () => {
+  await withTempRepo(async (firstProjectRoot) => {
+    await withTempRepo(async (secondProjectRoot) => {
+      const firstRuntimeRoot = path.join(firstProjectRoot, ".aor");
+      const secondRuntimeRoot = path.join(secondProjectRoot, ".aor-alt");
+      const transport = await createControlPlaneHttpServer({
+        cwd: workspaceRoot,
+        projectRef: firstProjectRoot,
+        runtimeRoot: firstRuntimeRoot,
+        host: "127.0.0.1",
+        port: 0,
+        app: {
+          staticRoot: path.join(workspaceRoot, "apps/web/dist"),
+          packageVersion: "0.0.0-test",
+        },
+      });
+
+      try {
+        const configResponse = await getJson(`${transport.baseUrl}/app-config.json`);
+        assert.equal(configResponse.status, 200);
+        const config = await configResponse.json();
+        assert.equal(config.project_id, transport.projectId);
+        assert.equal(config.default_project_id, transport.projectId);
+        assert.equal(config.projects.length, 1);
+
+        const indexResponse = await getJson(`${transport.baseUrl}/api/projects`);
+        assert.equal(indexResponse.status, 200);
+        const index = await indexResponse.json();
+        assert.equal(index.default_project_id, transport.projectId);
+        assert.equal(index.projects.length, 1);
+        assert.equal(index.projects[0].onboarding_summary.initialized, false);
+        assert.equal(fs.existsSync(firstRuntimeRoot), false, "project index must not initialize runtime state");
+
+        const addResponse = await postJson(`${transport.baseUrl}/api/projects/actions`, {
+          action: "add",
+          project_ref: secondProjectRoot,
+          runtime_root: secondRuntimeRoot,
+          label: "Second target",
+        });
+        assert.equal(addResponse.status, 200);
+        const added = await addResponse.json();
+        assert.equal(added.projects.length, 2);
+        assert.equal(added.project.label, "Second target");
+        assert.equal(added.project.runtime_root, secondRuntimeRoot);
+        assert.notEqual(added.project.project_id, transport.projectId);
+        assert.equal(typeof added.project.runtime_project_id, "string");
+        assert.equal(fs.existsSync(secondRuntimeRoot), false, "adding a project must not initialize runtime state");
+
+        const secondInitResponse = await postJson(
+          `${transport.baseUrl}/api/projects/${added.project.project_id}/lifecycle-command/actions`,
+          {
+            command: "project init",
+            flags: {},
+          },
+        );
+        assert.equal(secondInitResponse.status, 200);
+        const secondInit = await secondInitResponse.json();
+        assert.equal(secondInit.lifecycle_command.blocked, false);
+        assert.equal(fs.existsSync(secondRuntimeRoot), true, "second project init must initialize the selected runtime root");
+        assert.equal(fs.existsSync(firstRuntimeRoot), false, "second project init must not initialize the default runtime root");
+
+        const secondStateResponse = await getJson(`${transport.baseUrl}/api/projects/${added.project.project_id}/state`);
+        assert.equal(secondStateResponse.status, 200);
+        const secondState = await secondStateResponse.json();
+        assert.equal(secondState.project_id, added.project.runtime_project_id);
+        assert.equal(secondState.runtime_root, secondRuntimeRoot);
+
+        const firstStateResponse = await getJson(`${transport.baseUrl}/api/projects/${transport.projectId}/state`);
+        assert.equal(firstStateResponse.status, 200);
+        const firstState = await firstStateResponse.json();
+        assert.equal(firstState.project_id, transport.projectId);
+        assert.equal(firstState.runtime_root, firstRuntimeRoot);
+      } finally {
+        await transport.close();
+      }
+    });
+  });
+});
+
 test("production-hardened transport enforces authz and redacts configured secrets from denials and logs", async () => {
   await withTempRepo(async (repoRoot) => {
     const runId = "run.http.transport.production-hardening.v1";

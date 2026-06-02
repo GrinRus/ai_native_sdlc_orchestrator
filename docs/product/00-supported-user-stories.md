@@ -109,7 +109,7 @@ W18 closes the connected operator-surface path for runner-requested questions: s
 - Use scoped locks and cross-repo validation.
 - Produce coordinated delivery manifests for bounded multirepo work.
 
-Bounded multirepo means one AOR project profile can coordinate several explicit repositories, such as backend services, mobile, and frontend repos. It does not mean MVP portfolio orchestration across multiple independent AOR `project_id` profiles.
+Bounded multirepo means one AOR project profile can coordinate several explicit repositories, such as backend services, mobile, and frontend repos. It does not mean MVP portfolio orchestration across multiple independent AOR `project_id` profiles. W36 adds a local app workspace that can switch between explicitly added projects, but each project still owns separate runtime state, flows, and evidence.
 
 ### Incident / improvement owner
 - Open incident reports from failed releases or production feedback.
@@ -127,7 +127,7 @@ Bounded multirepo means one AOR project profile can coordinate several explicit 
 
 `W21-S04` closes the guided mission and next-action resolver portion: installed users get one primary next command, evidence refs, blockers, active-run handling, and explicit write-back policy before delivery-capable work is recommended.
 
-`W31-S01` closes the installed-user local UI intake story: a user who installed `@grinrus/aor` can run `aor onboard .`, launch `aor app`, apply the safe walkthrough Mission template, submit the first mission, and see the refreshed next action, blockers, evidence refs, and `.aor/` runtime root without reading internal implementation docs.
+`W31-S01` closes the installed-user local UI intake story, and `W36-S03`/`W36-S04` make it no-settings and project-aware: a user who installed `@grinrus/aor` can run `cd <repo> && aor app`, confirm project context, initialize the runtime explicitly, apply the safe walkthrough Mission template, submit the first mission, switch between explicitly added local projects, and see the refreshed next action, blockers, evidence refs, and `.aor/` runtime root without reading internal implementation docs.
 
 ### Delivery transaction / Git / PR flow
 - Deliver output through canonical `patch-only`, `local-branch`, or `fork-first-pr` policy modes.

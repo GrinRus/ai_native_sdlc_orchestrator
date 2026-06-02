@@ -63,12 +63,15 @@ read-only evidence chains. `New Flow` creates fresh mission/intake evidence and
 refreshes `next`; follow-up flows may cite a completed learning handoff without
 mutating the completed source flow.
 
-W31-S01 adds the installed-package local app mode:
+W31-S01 adds the installed-package local app mode, and W36 turns it into the
+primary no-settings UI onboarding path:
 - `aor app --project-ref <repo>` starts a foreground loopback server and opens the packaged SPA by default;
-- `/` serves the SPA, `/app-config.json` returns `project_id`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata;
+- `cd <repo> && aor app` is the primary installed-user quickstart; `doctor` and `onboard` remain advanced/headless shortcuts;
+- `/` serves the SPA, `/app-config.json` returns `project_id`, `default_project_id`, `projects[]`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata;
+- `GET /api/projects` returns explicit local project summaries without scanning the filesystem or initializing `.aor/`;
 - `/api/projects/:projectId/**` remains the control-plane route family used by CLI/API/headless flows;
-- `aor app --smoke true --open false --json` validates the real SPA, config, state routes, flow selector marker, and `New Flow` marker for release and live E2E guardrail evidence;
-- if onboarding has not run yet, the Readiness stage shows an explicit Initialize action instead of silently creating mission evidence.
+- `aor app --smoke true --open false --json` validates the real SPA, config, project index, state routes, first-run wizard marker, project switcher marker, flow selector marker, and `New Flow` marker for release and live E2E guardrail evidence;
+- if onboarding has not run yet, the wizard shows Project Context, Runtime Readiness, First Flow, and Next Action steps instead of silently creating mission evidence.
 
 The optional web console keeps the seven guided stages, but W34 scopes them to
 the selected flow:

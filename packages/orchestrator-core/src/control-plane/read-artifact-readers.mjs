@@ -7,7 +7,8 @@ import {
   uniqueArtifactDisplaySummaries,
 } from "../artifact-display-summary.mjs";
 import { normalizeProviderStepStatus } from "../provider-step-status.mjs";
-import { initializeProjectRuntime } from "../project-init.mjs";
+import { initializeProjectRuntime, previewProjectRuntime } from "../project-init.mjs";
+import { buildOnboardingSummary } from "./onboarding-summary.mjs";
 
 const ARTIFACT_PACKET_REGEX = /^.+\.artifact\..+\.json$/;
 const WAVE_TICKET_REGEX = /^wave-ticket-.*\.json$/;
@@ -531,6 +532,12 @@ function readLatestProviderStepStatus(init) {
  */
 export function readProjectState(options = {}) {
   const init = initializeProjectRuntime(options);
+  const preview = previewProjectRuntime({
+    cwd: options.cwd,
+    projectRef: init.projectRoot,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+  });
   return {
     project_id: init.projectId,
     display_name: init.displayName,
@@ -539,6 +546,7 @@ export function readProjectState(options = {}) {
     runtime_root: init.runtimeRoot,
     runtime_layout: init.state.runtime_layout,
     state_file: init.stateFile,
+    onboarding_summary: buildOnboardingSummary(preview),
     provider_step_status: readLatestProviderStepStatus(init),
     artifact_display_summaries: listArtifactDisplaySummaries({ ...options, limit: options.limit ?? 50 }),
   };

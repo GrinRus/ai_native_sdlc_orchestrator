@@ -10,6 +10,7 @@ import { runLifecycleCommand } from "../lifecycle-command.mjs";
 import { OperatorRequestError, createOperatorRequest, runOperatorRequest } from "../../operator-request.mjs";
 import { applyRunControlAction } from "../run-control.mjs";
 import { attachUiLifecycle, detachUiLifecycle } from "../ui-lifecycle.mjs";
+import { summarizeProjectContext } from "../local-project-registry.mjs";
 
 const RUN_CONTROL_ACTIONS = new Set(["start", "pause", "resume", "steer", "cancel"]);
 const UI_LIFECYCLE_ACTIONS = new Set(["attach", "detach"]);
@@ -114,6 +115,47 @@ export async function handleUiLifecycleAction({ request, response, runtimeOption
   sendJson(response, 200, {
     ui_lifecycle: toUiLifecycleResponse(result),
   });
+}
+
+/**
+ * @param {{
+ *   request: import("node:http").IncomingMessage,
+ *   response: import("node:http").ServerResponse,
+ *   registry: ReturnType<import("../local-project-registry.mjs").createLocalProjectRegistry>,
+ * }} options
+ */
+export async function handleProjectAction({ request, response, registry }) {
+  const payload = await readMutationPayload(request, response);
+  if (!payload) {
+    return;
+  }
+
+  const action = asString(payload.action);
+  if (action !== "add") {
+    sendError(response, 400, "invalid_project_action", `Unsupported project action '${action ?? "missing"}'.`);
+    return;
+  }
+
+  const projectRef = asString(payload.project_ref);
+  if (!projectRef) {
+    sendError(response, 400, "invalid_project_ref", "Project action 'add' requires project_ref.");
+    return;
+  }
+
+  try {
+    const context = registry.addProject({
+      projectRef,
+      projectProfile: asString(payload.project_profile) ?? undefined,
+      runtimeRoot: asString(payload.runtime_root) ?? undefined,
+      label: asString(payload.label) ?? undefined,
+    });
+    sendJson(response, 200, {
+      project: summarizeProjectContext(context),
+      ...registry.summarize(),
+    });
+  } catch (error) {
+    sendError(response, 400, "project_add_failed", error instanceof Error ? error.message : String(error));
+  }
 }
 
 /**

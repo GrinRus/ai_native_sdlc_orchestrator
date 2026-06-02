@@ -16,7 +16,7 @@ the accepted alpha transport boundary. A future NestJS-backed transport requires
 a new ADR before implementation work changes this contract.
 
 Implemented operation families:
-- read: project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report, flow projections;
+- read: local app project index, project state, packets, step results, manifests, promotion decisions, compiler revision statuses, quality artifacts, runs, run event history, run policy history, strategic snapshot, planner metrics, finance monitoring, next-action report, flow projections;
 - run control: start/pause/resume/steer/cancel with guardrail enforcement and audit records;
 - operator requests: create/list/run bounded operator-initiated runtime interventions with sanitized read payloads;
 - UI lifecycle: attach/detach/read state with headless-safe semantics;
@@ -98,6 +98,7 @@ The control plane remains the orchestration owner:
 - guided web can invoke the bounded `mission create` and `next` lifecycle-command mutations to create mission evidence and refresh the durable `next-action-report`;
 - guided web can invoke operator-request mutations to analyze, explain, revise, repair, validate, plan, implement, or review bounded artifacts from any stage while keeping raw request text in durable evidence only;
 - the installed local SPA is served by `aor app` from the shared HTTP transport, not by importing `apps/api` into the CLI launcher;
+- the installed local SPA can switch between explicitly registered local projects through app-session project summaries, but each selected project keeps separate runtime state, flow projections, evidence refs, and mutation routes;
 - read-only, disconnected, connected, detached, blocked, and ready UI states must be derived from durable runtime state;
 - guided flows must preserve no-upstream-write defaults until delivery mode, policy, review, approval, and writeback evidence are explicit.
 
@@ -524,7 +525,8 @@ Reconnect and backpressure baseline:
 
 Connected-mode transport mapping is implemented for read, follow, and bounded mutation baseline:
 - `GET /` for the packaged local SPA when the transport is started with an app static root;
-- `GET /app-config.json` for same-origin app configuration (`project_id`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata);
+- `GET /app-config.json` for same-origin app configuration (`project_id`, `default_project_id`, `projects[]`, `project_ref`, `runtime_root`, package version, API base, and control-plane metadata);
+- `GET /api/projects` for local app-session project summaries;
 - `GET /api/projects/:projectId/state`
 - `GET /api/projects/:projectId/strategic-snapshot`
 - `GET /api/projects/:projectId/planner-metrics`
@@ -544,6 +546,14 @@ Connected-mode transport mapping is implemented for read, follow, and bounded mu
 - `POST /api/projects/:projectId/ui-lifecycle/actions`
 - `POST /api/projects/:projectId/lifecycle-command/actions`
 - `POST /api/projects/:projectId/interactions/answers`
+- `POST /api/projects/actions` for explicit local add-project actions in the app session.
+
+Local app project summary baseline:
+- `project_id` as the local app route key, `runtime_project_id` as the underlying runtime contract identity, `label`, `project_ref`, `project_profile_ref`, and `runtime_root`;
+- `project_id` remains equal to `runtime_project_id` for the default single-project case; duplicate local profiles in one app session get a stable app-scoped `project_id` suffix so their runtime/evidence chains do not mix;
+- `onboarding_summary` with `status`, `initialized`, `can_initialize`, `recommended_action`, and user-facing blockers;
+- `active_flow_summary` with active/completed flow counts and selected flow id when runtime state already exists;
+- `read_only=true` because project-list reads must not initialize `.aor/`.
 
 Detached read-model scale baseline:
 - list/read-model routes that can fan out over `.aor` artifacts accept optional `?limit=<n>`;
@@ -561,13 +571,17 @@ Detached mutation payload baseline:
 - lifecycle-command response reuses CLI command output fields under `command_output` and adds transport-level `artifact_refs`, `evidence_refs`, `blocked`, and `blocked_reason`;
 - interaction answer payload fields: `run_id`, `interaction_id`, `answer`, `reason`, `approval_ref`, `answer_evidence_ref`;
 - interaction answer response writes and references durable answer audit evidence before reporting whether continuation remains blocked.
+- project action payload fields: `action=add`, `project_ref`, optional `runtime_root`, optional `project_profile`, and optional `label`;
+- project action response returns the added project summary and the refreshed local `projects[]` list.
 
 The OpenAPI component names that own these local-alpha payloads are
 `ProjectStateResponse`, `RunsResponse`, `RunEventHistoryResponse`,
 `RunControlActionRequest`, `RunControlActionResponse`,
 `UiLifecycleActionRequest`, `UiLifecycleActionResponse`,
 `LifecycleCommandActionRequest`, `LifecycleCommandActionResponse`,
-`InteractionAnswerRequest`, and `InteractionAnswerResponse`.
+`InteractionAnswerRequest`, `InteractionAnswerResponse`,
+`ProjectIndexResponse`, `ProjectActionRequest`, and
+`ProjectActionResponse`.
 
 Detached mutation error-shape baseline:
 - `invalid_json` for malformed request body;
