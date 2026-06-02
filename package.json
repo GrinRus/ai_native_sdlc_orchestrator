@@ -1,7 +1,7 @@
 {
   "name": "@grinrus/aor",
   "private": false,
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.6",
   "description": "AI-native SDLC orchestrator CLI for bounded packets, evidence, reviews, and delivery decisions.",
   "license": "Apache-2.0",
   "type": "module",

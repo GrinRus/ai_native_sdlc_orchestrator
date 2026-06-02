@@ -7,6 +7,18 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.6] - 2026-06-02
+
+- Fixed the local app topbar/project switcher layout so `Add local project`
+  remains clickable beside the flow selector in the packaged no-settings UI.
+- Preserved the W36 onboarding and local multi-project behavior while adding
+  regression coverage for the project switcher/topbar click path.
+- Added W37 target setup closure planning so W35-S05 live proof retries can
+  bound target setup, expose setup elapsed/budget/status evidence, and separate
+  provider-independent setup blockers from Codex/Qwen provider quality.
+- Documented that W35-S05 remains blocked until clean Codex/Qwen proof or
+  bounded target blocker evidence closes.
+
 ## [0.1.0-alpha.5] - 2026-06-02
 
 - Added W36 no-settings onboarding for `aor app`, including the first-run
