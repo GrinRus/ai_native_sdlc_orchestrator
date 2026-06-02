@@ -257,7 +257,7 @@ for (const section of [
 
 for (const needle of [
   "git clone https://github.com/GrinRus/ai_native_sdlc_orchestrator.git",
-  "npm install -g @grinrus/aor@0.1.0-alpha.3",
+  "npm install -g @grinrus/aor@0.1.0-alpha.4",
   "docs/ops/npm-cli-alpha-release.md",
   "workspace packages stay `private:true`",
   "pnpm install --frozen-lockfile",
