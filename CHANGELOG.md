@@ -7,6 +7,19 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.5] - 2026-06-02
+
+- Added W36 no-settings onboarding for `aor app`, including the first-run
+  wizard, explicit runtime initialization, first mission intake, and flow
+  cockpit handoff.
+- Added the local multi-project workspace and project switcher so one loopback
+  UI can manage multiple independent local projects without mixing runtime or
+  evidence state.
+- Hardened project readiness reads to use a non-mutating runtime preview before
+  explicit initialization.
+- Updated clean UI onboarding smoke and browser proof coverage for the W36
+  wizard and multi-project flow.
+
 ## [0.1.0-alpha.4] - 2026-06-02
 
 - Added the W34 flow-centric operator console baseline, including active and

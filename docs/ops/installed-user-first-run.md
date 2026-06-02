@@ -5,7 +5,7 @@ This runbook covers the public installed-user first run from npm install through
 
 ## Commands
 ```sh
-npm install -g @grinrus/aor@0.1.0-alpha.4
+npm install -g @grinrus/aor@0.1.0-alpha.5
 aor --help
 cd <repo>
 aor app
