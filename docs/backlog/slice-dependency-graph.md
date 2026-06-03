@@ -191,6 +191,10 @@ graph TD
   W37S01[W37-S01 Live E2E target setup and verification closure]
   W38S01[W38-S01 Qwen stream progress adapter closure]
   W39S01[W39-S01 Live E2E provider parity policy]
+  W40S01[W40-S01 Post-alpha.7 backlog and product baseline]
+  W40S02[W40-S02 Installed-user onboarding and release docs hardening]
+  W40S03[W40-S03 Active live E2E heartbeat surfacing]
+  W40S04[W40-S04 Optional provider qualification matrix]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -478,6 +482,15 @@ graph TD
   W35S05 --> W38S01
   W37S01 --> W38S01
   W38S01 --> W39S01
+  W39S01 --> W40S01
+  W36S05 --> W40S01
+  W40S01 --> W40S02
+  W40S01 --> W40S03
+  W35S01 --> W40S03
+  W38S01 --> W40S03
+  W39S01 --> W40S03
+  W40S03 --> W40S04
+  W39S01 --> W40S04
 ```
 
 ## W0 hard dependencies
@@ -827,6 +840,14 @@ graph TD
 |---|---|
 | W39-S01 | W38-S01 |
 
+## W40 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W40-S01 | W39-S01, W36-S05 |
+| W40-S02 | W40-S01 |
+| W40-S03 | W40-S01, W35-S01, W38-S01, W39-S01 |
+| W40-S04 | W40-S03, W39-S01 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1015,6 +1036,10 @@ graph TD
 185. W37-S01
 186. W38-S01
 187. W39-S01
+188. W40-S01
+189. W40-S02
+190. W40-S03
+191. W40-S04
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

@@ -330,7 +330,7 @@ self-hosted CLI/API mode documented in this repository. Internal evaluation and
 proof fixtures exist for maintainers, but they are not a public onboarding path
 and are intentionally not part of the README workflow.
 
-The current roadmap source of truth extends through W39 in
+The current roadmap source of truth extends through W40 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -442,7 +442,7 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current alpha distribution is tracked through `W39` and focuses on:
+The current alpha distribution is tracked through `W40` and focuses on:
 
 - Safer operator onboarding.
 - No-settings local UI onboarding and explicit local multi-project workspaces.
@@ -471,6 +471,9 @@ The current alpha distribution is tracked through `W39` and focuses on:
   operator-visible decisions.
 - Qwen stream progress mapping so realtime `stream-json` activity appears as
   provider heartbeat/progress evidence instead of misleading silent-running UX.
+- Post-alpha.7 installed-user hardening for clean registry smoke commands,
+  no-settings onboarding polish, internal proof-runner heartbeat visibility, and
+  optional provider qualification planning.
 
 ## Contributing
 
