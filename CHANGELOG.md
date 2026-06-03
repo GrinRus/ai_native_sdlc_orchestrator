@@ -7,6 +7,20 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.7] - 2026-06-03
+
+- Added W37 target setup and verification closure evidence so live E2E reports
+  separate provider-independent target setup blockers from provider quality.
+- Closed W35 live E2E UX proof coverage with Codex proof evidence and Qwen
+  fail-closed/operator evidence while preserving no-upstream-write semantics.
+- Added W38 Qwen `stream-json` progress handling so long candidate runs expose
+  non-silent provider status without depending on private Qwen logs.
+- Added W39 provider parity lifecycle defaults so Codex, Claude, OpenCode, and
+  Qwen use shared retry/repair semantics and do not start hidden internal
+  repair after a terminal provider result.
+- Fixed Codex preflight classification for benign `avoid interactive prompts`
+  wording.
+
 ## [0.1.0-alpha.6] - 2026-06-02
 
 - Fixed the local app topbar/project switcher layout so `Add local project`

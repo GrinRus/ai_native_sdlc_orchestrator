@@ -48,7 +48,7 @@ function releaseEvent(overrides = {}) {
       merged: true,
       base: { ref: "main" },
       head: {
-        ref: "release/v0.1.0-alpha.6",
+        ref: "release/v0.1.0-alpha.7",
         repo: { full_name: "GrinRus/ai_native_sdlc_orchestrator" },
       },
       labels: [{ name: RELEASE_LABEL }],
@@ -60,27 +60,27 @@ function releaseEvent(overrides = {}) {
 test("release verifier accepts matching release branch and package metadata", () => {
   const result = validateReleaseState({
     rootDir: workspaceRoot,
-    releaseBranch: "release/v0.1.0-alpha.6",
+    releaseBranch: "release/v0.1.0-alpha.7",
     strictReleaseBranch: true,
   });
   assert.deepEqual(result.findings, []);
   assert.equal(result.ok, true);
-  assert.equal(result.packageVersion, "0.1.0-alpha.6");
+  assert.equal(result.packageVersion, "0.1.0-alpha.7");
 });
 
 test("release verifier rejects release branch version mismatch", () => {
   const tempRoot = copyFixtureRepo();
   try {
     updateJson(path.join(tempRoot, "package.json"), (json) => {
-      json.version = "0.1.0-alpha.7";
+      json.version = "0.1.0-alpha.8";
     });
     const result = validateReleaseState({
       rootDir: tempRoot,
-      releaseBranch: "release/v0.1.0-alpha.6",
+      releaseBranch: "release/v0.1.0-alpha.7",
       strictReleaseBranch: true,
     });
     assert.equal(result.ok, false);
-    assert.match(result.findings.join("\n"), /expects version '0\.1\.0-alpha\.6'/u);
+    assert.match(result.findings.join("\n"), /expects version '0\.1\.0-alpha\.7'/u);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -92,11 +92,11 @@ test("release verifier rejects missing changelog entry", () => {
     fs.writeFileSync(path.join(tempRoot, "CHANGELOG.md"), "# Changelog\n\n## Unreleased\n", "utf8");
     const result = validateReleaseState({
       rootDir: tempRoot,
-      releaseBranch: "release/v0.1.0-alpha.6",
+      releaseBranch: "release/v0.1.0-alpha.7",
       strictReleaseBranch: true,
     });
     assert.equal(result.ok, false);
-    assert.match(result.findings.join("\n"), /CHANGELOG\.md must mention '## \[0\.1\.0-alpha\.6\]'/u);
+    assert.match(result.findings.join("\n"), /CHANGELOG\.md must mention '## \[0\.1\.0-alpha\.7\]'/u);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -113,7 +113,7 @@ test("release verifier rejects wrong package name and public internal packages",
     });
     const result = validateReleaseState({
       rootDir: tempRoot,
-      releaseBranch: "release/v0.1.0-alpha.6",
+      releaseBranch: "release/v0.1.0-alpha.7",
       strictReleaseBranch: true,
     });
     assert.equal(result.ok, false);
@@ -145,7 +145,7 @@ test("release verifier rejects publish workflows without trusted publishing runt
     );
     const result = validateReleaseState({
       rootDir: tempRoot,
-      releaseBranch: "release/v0.1.0-alpha.6",
+      releaseBranch: "release/v0.1.0-alpha.7",
       strictReleaseBranch: true,
     });
     assert.equal(result.ok, false);
@@ -193,7 +193,7 @@ test("publish event guard accepts only merged release PRs with publish label", (
   const accepted = validatePublishEvent({
     event: releaseEvent(),
     repository: "GrinRus/ai_native_sdlc_orchestrator",
-    packageVersion: "0.1.0-alpha.6",
+    packageVersion: "0.1.0-alpha.7",
   });
   assert.equal(accepted.shouldPublish, true);
 
@@ -205,7 +205,7 @@ test("publish event guard accepts only merged release PRs with publish label", (
       },
     }),
     repository: "GrinRus/ai_native_sdlc_orchestrator",
-    packageVersion: "0.1.0-alpha.6",
+    packageVersion: "0.1.0-alpha.7",
   });
   assert.equal(missingLabel.shouldPublish, false);
   assert.match(missingLabel.findings.join("\n"), /release:publish/u);
@@ -213,8 +213,8 @@ test("publish event guard accepts only merged release PRs with publish label", (
   const mismatch = validatePublishEvent({
     event: releaseEvent(),
     repository: "GrinRus/ai_native_sdlc_orchestrator",
-    packageVersion: "0.1.0-alpha.7",
+    packageVersion: "0.1.0-alpha.8",
   });
   assert.equal(mismatch.shouldPublish, false);
-  assert.match(mismatch.findings.join("\n"), /expects version '0\.1\.0-alpha\.6'/u);
+  assert.match(mismatch.findings.join("\n"), /expects version '0\.1\.0-alpha\.7'/u);
 });
