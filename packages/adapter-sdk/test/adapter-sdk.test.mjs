@@ -870,6 +870,76 @@ test("live adapter kills external runner process groups on timeout", () => {
   }
 });
 
+test("live adapter interrupts external runner when public run-control cancel is recorded", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-adapter-interrupt-"));
+  const stateFile = path.join(repoRoot, "run-control-state-interrupted.json");
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify(
+      {
+        run_id: "run-live-interrupted",
+        status: "running",
+        provider_step_status: {
+          status: "running",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const cancelScript = [
+    "const fs = require('node:fs');",
+    `const stateFile = ${JSON.stringify(stateFile)};`,
+    "setTimeout(() => {",
+    "  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));",
+    "  state.status = 'canceled';",
+    "  state.provider_step_status = { ...(state.provider_step_status || {}), status: 'interrupted' };",
+    "  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\\n');",
+    "}, 75);",
+    "setTimeout(() => {}, 5000);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: buildExternalRunnerProfile({
+      command: process.execPath,
+      args: ["-e", cancelScript],
+      timeoutMs: 2000,
+      handler: null,
+    }),
+  });
+
+  try {
+    const response = adapter.execute({
+      request_id: "req-live-interrupted",
+      run_id: "run-live-interrupted",
+      step_id: "step-live-interrupted",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default.qwen-primary" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.default.qwen-primary",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 2000,
+        heartbeat_interval_ms: 25,
+      },
+    });
+
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "external-runner-interrupted");
+    assert.equal(response.output.external_runner.timed_out, false);
+    assert.equal(state.provider_step_status.status, "interrupted");
+    assert.match(state.provider_step_status.recommended_action, /stopped by the operator/i);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("live adapter applies resolved route timeout when it is shorter than the adapter timeout", () => {
   const adapter = createLiveAdapter({
     adapterId: "claude-code",

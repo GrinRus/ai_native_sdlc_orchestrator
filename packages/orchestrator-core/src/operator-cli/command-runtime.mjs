@@ -590,9 +590,13 @@ export function findLatestRuntimeHarnessReportForRun(options) {
  * @returns {Record<string, unknown>}
  */
 export function finalizeRunControlState(options) {
-  const terminalStatus = options.stepStatus === "passed" ? "completed" : "failed";
   const stateFileSnapshot = fs.existsSync(options.stateFile) ? readJson(options.stateFile) : {};
   const providerStepStatus = asPlainObject(stateFileSnapshot.provider_step_status);
+  const stateStatus = typeof stateFileSnapshot.status === "string" ? stateFileSnapshot.status : null;
+  const providerStatus = typeof providerStepStatus.status === "string" ? providerStepStatus.status : null;
+  const interrupted =
+    providerStatus === "interrupted" || stateStatus === "canceled" || stateStatus === "cancelled" || stateStatus === "interrupted";
+  const terminalStatus = interrupted ? "canceled" : options.stepStatus === "passed" ? "completed" : "failed";
   const previousAuditRefs = asStringArray(options.previousState?.audit_refs);
   const previousEvidenceRefs = asStringArray(options.previousState?.step_result_refs);
   const stepResultRef = toEvidenceRef(options.projectRoot, options.stepResultFile);
@@ -602,7 +606,7 @@ export function finalizeRunControlState(options) {
     run_id: typeof options.previousState?.run_id === "string" ? options.previousState.run_id : null,
     status: terminalStatus,
     current_step: options.targetStep,
-    last_action: "start",
+    last_action: interrupted && typeof stateFileSnapshot.last_action === "string" ? stateFileSnapshot.last_action : "start",
     started_at:
       typeof options.previousState?.started_at === "string"
         ? options.previousState.started_at

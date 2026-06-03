@@ -129,6 +129,29 @@ function writeProviderStepStatus(patch = {}) {
   } catch {}
 }
 
+function readProviderStepState() {
+  const providerConfig = asObject(options.provider_step_status);
+  const stateFile = asString(providerConfig.state_file);
+  if (!stateFile) return {};
+  try {
+    return asObject(JSON.parse(fs.readFileSync(stateFile, "utf8")));
+  } catch {
+    return {};
+  }
+}
+
+function providerCancellationRequested() {
+  const state = readProviderStepState();
+  const stateStatus = asString(state.status);
+  const providerStatus = asString(asObject(state.provider_step_status).status);
+  return (
+    stateStatus === "canceled" ||
+    stateStatus === "cancelled" ||
+    stateStatus === "interrupted" ||
+    providerStatus === "interrupted"
+  );
+}
+
 function appendBounded(current, chunk, maxBuffer) {
   const next = current + chunk;
   return next.length > maxBuffer ? next.slice(0, maxBuffer) : next;
@@ -154,8 +177,11 @@ const maxBuffer = Number.isFinite(options.max_buffer) && options.max_buffer > 0 
 let stdout = "";
 let stderr = "";
 let timedOut = false;
+let interrupted = false;
 let emitted = false;
 let heartbeatTimer = null;
+let interruptKillTimer = null;
+const heartbeatIntervalMs = Math.max(25, asNumber(asObject(options.provider_step_status).heartbeat_interval_ms) || 5000);
 
 function finish(result) {
   if (emitted) {
@@ -165,6 +191,10 @@ function finish(result) {
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
+  }
+  if (interruptKillTimer) {
+    clearTimeout(interruptKillTimer);
+    interruptKillTimer = null;
   }
   emit(result);
 }
@@ -197,8 +227,23 @@ try {
 }
 
 heartbeatTimer = setInterval(() => {
+  if (providerCancellationRequested()) {
+    if (!interrupted) {
+      interrupted = true;
+      writeProviderStepStatus({
+        status: "interrupted",
+        recommended_action: "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
+        finished_at: new Date().toISOString(),
+      });
+      killProcessTree(child, "SIGTERM");
+      interruptKillTimer = setTimeout(() => {
+        killProcessTree(child, "SIGKILL");
+      }, 1000);
+    }
+    return;
+  }
   writeProviderStepStatus({ status: "running" });
-}, 5000);
+}, heartbeatIntervalMs);
 
 const timer = setTimeout(() => {
   timedOut = true;
@@ -238,10 +283,18 @@ child.on("error", (error) => {
 });
 child.on("close", (status, signal) => {
   clearTimeout(timer);
+  if (interruptKillTimer) {
+    clearTimeout(interruptKillTimer);
+    interruptKillTimer = null;
+  }
   writeProviderStepStatus({
-    status: status === 0 && !timedOut ? "completed" : "failed",
+    status: interrupted ? "interrupted" : status === 0 && !timedOut ? "completed" : "failed",
     recommended_action:
-      status === 0 && !timedOut ? "Continue with post-run verification." : "Inspect provider evidence and failure summary.",
+      interrupted
+        ? "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step."
+        : status === 0 && !timedOut
+          ? "Continue with post-run verification."
+          : "Inspect provider evidence and failure summary.",
     finished_at: new Date().toISOString(),
   });
   finish({
@@ -249,8 +302,12 @@ child.on("close", (status, signal) => {
     signal,
     stdout,
     stderr,
-    error_code: timedOut ? "ETIMEDOUT" : null,
-    error_message: timedOut ? "External runtime timed out after " + timeoutMs + "ms." : null,
+    error_code: interrupted ? "EINTERRUPTED" : timedOut ? "ETIMEDOUT" : null,
+    error_message: interrupted
+      ? "External runtime was interrupted by public run-control cancel."
+      : timedOut
+        ? "External runtime timed out after " + timeoutMs + "ms."
+        : null,
     timed_out: timedOut,
   });
 });
@@ -1667,9 +1724,11 @@ export function createLiveAdapter(options) {
       const finishedAt = new Date().toISOString();
 
       const invocationError = invocation.error instanceof Error ? invocation.error : null;
+      const invocationInterrupted = invocationError?.code === "EINTERRUPTED";
       const invocationTimedOut =
-        invocationError?.code === "ETIMEDOUT" ||
-        ((invocation.signal === "SIGTERM" || invocation.signal === "SIGKILL") && invocation.status === null);
+        !invocationInterrupted &&
+        (invocationError?.code === "ETIMEDOUT" ||
+          ((invocation.signal === "SIGTERM" || invocation.signal === "SIGKILL") && invocation.status === null));
       const invocationFailed = invocationError !== null || invocation.status !== 0;
       const stdout = typeof invocation.stdout === "string" ? invocation.stdout : "";
       const stderr = typeof invocation.stderr === "string" ? invocation.stderr : "";
@@ -1796,6 +1855,22 @@ export function createLiveAdapter(options) {
           output: {
             ...baseOutput,
             failure_kind: "external-runner-timeout",
+          },
+          evidence_refs: evidenceRefs,
+          tool_traces: toolTraces,
+        });
+      }
+
+      if (invocationInterrupted) {
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: "blocked",
+          summary: `External runner command '${runtimeCommand}' was interrupted through public run-control for adapter '${adapterId}'.`,
+          output: {
+            ...baseOutput,
+            blocked: true,
+            failure_kind: "external-runner-interrupted",
           },
           evidence_refs: evidenceRefs,
           tool_traces: toolTraces,

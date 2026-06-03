@@ -505,6 +505,10 @@ function buildScorecard(options) {
       asNonEmptyString(options.flowResult.artifacts.live_e2e_observation_report_file) || null,
     scenario_coverage_status: qualityJudgement.scenario_coverage_status ?? null,
     provider_execution_status: qualityJudgement.provider_execution_status ?? null,
+    provider_step_status:
+      typeof options.flowResult.artifacts.provider_step_status === "object" && options.flowResult.artifacts.provider_step_status
+        ? options.flowResult.artifacts.provider_step_status
+        : null,
     feature_size_fit_status: qualityJudgement.feature_size_fit_status ?? null,
     target_baseline_status: qualityJudgement.target_baseline_status ?? null,
     target_pre_execution_status:
@@ -890,6 +894,123 @@ function buildSetupJournal(artifacts) {
   return setupEntries;
 }
 
+function latestProviderStepStatusFromArtifacts(artifacts) {
+  const direct = asRecord(artifacts.provider_step_status);
+  if (Object.keys(direct).length > 0) return direct;
+
+  const controllerEntries = Array.isArray(artifacts.live_e2e_step_journal_entries)
+    ? artifacts.live_e2e_step_journal_entries.map((entry) => asRecord(entry))
+    : [];
+  for (let index = controllerEntries.length - 1; index >= 0; index -= 1) {
+    const providerStepStatus = asRecord(controllerEntries[index].provider_step_status);
+    if (Object.keys(providerStepStatus).length > 0) return providerStepStatus;
+  }
+
+  const commandResults = Array.isArray(artifacts.command_results)
+    ? artifacts.command_results.map((entry) => asRecord(entry))
+    : [];
+  for (let index = commandResults.length - 1; index >= 0; index -= 1) {
+    const providerStepStatus = asRecord(commandResults[index].provider_step_status);
+    if (Object.keys(providerStepStatus).length > 0) return providerStepStatus;
+  }
+
+  return {};
+}
+
+function classifyProviderStepStatus(providerStepStatus) {
+  const status = asNonEmptyString(providerStepStatus.status);
+  if (!status || ["completed", "complete", "pass", "succeeded"].includes(status)) {
+    return {
+      provider_execution_status: status === "completed" || status === "complete" || status === "succeeded" ? "completed" : null,
+      failure_owner: null,
+      failure_phase: null,
+      failure_class: null,
+    };
+  }
+
+  if (status === "failed" || status === "fail") {
+    return {
+      provider_execution_status: "failed",
+      failure_owner: "provider",
+      failure_phase: "provider_execution",
+      failure_class: "provider_failed",
+    };
+  }
+
+  if (["interrupted", "silent-running", "timeout-risk", "timeout", "timed-out"].includes(status)) {
+    return {
+      provider_execution_status: status === "timeout" || status === "timed-out" ? "timeout" : status,
+      failure_owner: "provider",
+      failure_phase: "provider_execution",
+      failure_class: "provider_blocked",
+    };
+  }
+
+  return {
+    provider_execution_status: status,
+    failure_owner: null,
+    failure_phase: null,
+    failure_class: null,
+  };
+}
+
+function hydrateFlowArtifactsFromControllerState(artifacts) {
+  const controllerStateFile = asNonEmptyString(artifacts.live_e2e_controller_state_file);
+  const snapshot = asRecord(readJsonIfPresent(controllerStateFile)?.artifacts_snapshot);
+  const copyIfMissing = (key) => {
+    const current = artifacts[key];
+    const candidate = snapshot[key];
+    const currentPresent =
+      typeof current === "string"
+        ? current.length > 0
+        : typeof current === "object" && current
+          ? Object.keys(asRecord(current)).length > 0
+          : current !== null && current !== undefined;
+    const candidatePresent =
+      typeof candidate === "string"
+        ? candidate.length > 0
+        : typeof candidate === "object" && candidate
+          ? Object.keys(asRecord(candidate)).length > 0
+          : candidate !== null && candidate !== undefined;
+    if (!currentPresent && candidatePresent) {
+      artifacts[key] = candidate;
+    }
+  };
+
+  for (const key of [
+    "target_checkout_root",
+    "target_pre_execution_status_file",
+    "target_pre_execution_status",
+    "target_setup_status",
+    "target_verification_status_detail",
+    "failure_owner",
+    "failure_phase",
+    "failure_class",
+    "baseline_verify_status",
+    "baseline_verify_summary_file",
+    "baseline_verify_gate_decision",
+    "execution_readiness_file",
+    "target_cleanliness_before_execution_file",
+    "target_cleanliness_before_execution",
+  ]) {
+    copyIfMissing(key);
+  }
+
+  const latestProviderStepStatus = latestProviderStepStatusFromArtifacts(artifacts);
+  if (Object.keys(latestProviderStepStatus).length > 0) {
+    artifacts.provider_step_status = latestProviderStepStatus;
+    const providerClassification = classifyProviderStepStatus(latestProviderStepStatus);
+    if (!asNonEmptyString(artifacts.provider_execution_status)) {
+      artifacts.provider_execution_status = providerClassification.provider_execution_status;
+    }
+    if (!asNonEmptyString(artifacts.failure_owner) && providerClassification.failure_owner) {
+      artifacts.failure_owner = providerClassification.failure_owner;
+      artifacts.failure_phase = providerClassification.failure_phase;
+      artifacts.failure_class = providerClassification.failure_class;
+    }
+  }
+}
+
 function buildStepJournal(options) {
   const controllerEntries = Array.isArray(options.flowResult.artifacts.live_e2e_step_journal_entries)
     ? options.flowResult.artifacts.live_e2e_step_journal_entries.map((entry) => asRecord(entry))
@@ -1171,6 +1292,23 @@ function buildObservationReport(options) {
     },
     flow_range_policy: flowRangePolicy,
     overall_status: asNonEmptyString(finalAnalysis.status) || "not_pass",
+    target_setup_status:
+      typeof options.flowResult.artifacts.target_setup_status === "object" && options.flowResult.artifacts.target_setup_status
+        ? options.flowResult.artifacts.target_setup_status
+        : null,
+    target_verification_status:
+      typeof options.flowResult.artifacts.target_verification_status_detail === "object" &&
+      options.flowResult.artifacts.target_verification_status_detail
+        ? options.flowResult.artifacts.target_verification_status_detail
+        : null,
+    provider_step_status:
+      typeof options.flowResult.artifacts.provider_step_status === "object" && options.flowResult.artifacts.provider_step_status
+        ? options.flowResult.artifacts.provider_step_status
+        : null,
+    provider_execution_status: asNonEmptyString(options.flowResult.artifacts.provider_execution_status) || null,
+    failure_owner: asNonEmptyString(options.flowResult.artifacts.failure_owner) || null,
+    failure_phase: asNonEmptyString(options.flowResult.artifacts.failure_phase) || null,
+    failure_class: asNonEmptyString(options.flowResult.artifacts.failure_class) || null,
     aor_installation: asRecord(options.flowResult.artifacts.aor_installation),
     aor_installation_proof_file: asNonEmptyString(options.flowResult.artifacts.aor_installation_proof_file),
     setup_journal: setupJournal,
@@ -1501,6 +1639,7 @@ function writeProofRunnerArtifacts(options) {
     `live-e2e-scorecard-target-${normalizeId(options.runId)}.json`,
   );
   const productionProofPolicy = buildProductionProofSummary(options.profile);
+  hydrateFlowArtifactsFromControllerState(options.flowResult.artifacts);
   const observationReport = buildObservationReport({
     runId: options.runId,
     profilePath: options.profilePath,
@@ -1524,6 +1663,7 @@ function writeProofRunnerArtifacts(options) {
   });
   observationReport.final_skill_agent_verdict_request_file = finalSkillAgentVerdict.requestFile;
   if (finalSkillAgentVerdict.verdict) {
+    observationReport.report_status = "final";
     observationReport.final_skill_agent_verdict_file = finalSkillAgentVerdict.verdictFile;
     observationReport.final_skill_agent_verdict = finalSkillAgentVerdict.verdict;
   } else {
@@ -1699,6 +1839,10 @@ function writeProofRunnerArtifacts(options) {
         : null,
     post_run_diagnostic_status: asNonEmptyString(options.flowResult.artifacts.post_run_diagnostic_status) || null,
     provider_execution_status: asNonEmptyString(options.flowResult.artifacts.provider_execution_status) || null,
+    provider_step_status:
+      typeof options.flowResult.artifacts.provider_step_status === "object" && options.flowResult.artifacts.provider_step_status
+        ? options.flowResult.artifacts.provider_step_status
+        : null,
     real_code_change_status: asNonEmptyString(options.flowResult.artifacts.real_code_change_status) || null,
     runtime_harness_decision: asNonEmptyString(options.flowResult.artifacts.runtime_harness_decision) || null,
     run_start_runtime_harness_decision:

@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { listRuns, readProjectState } from "../src/control-plane/read-surface.mjs";
+import { finalizeRunControlState } from "../src/operator-cli/command-runtime.mjs";
 import { mergeProviderStepStatus, normalizeProviderStepStatus } from "../src/provider-step-status.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 import { applyRunControlAction } from "../src/run-control.mjs";
@@ -238,5 +239,65 @@ test("run cancel records provider interruption instead of pass or crash", () => 
     assert.equal(run?.provider_step_status?.status, "interrupted");
     assert.equal(run?.execution_evidence?.provider_execution_status, "interrupted");
     assert.equal(run?.execution_evidence?.actions.find((entry) => entry.action_id === "save_partial_evidence")?.enabled, true);
+  });
+});
+
+test("run finalization preserves public provider interruption instead of overwriting it as failed", () => {
+  withCleanRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    const stateFile = path.join(init.runtimeLayout.stateRoot, "run-control-state-live-e2e-provider-finalize.json");
+    const stepResultFile = path.join(init.runtimeLayout.reportsRoot, "step-result-live-e2e-provider-finalize.json");
+    const previousState = {
+      schema_version: 1,
+      run_id: "live-e2e-provider-finalize",
+      status: "canceled",
+      current_step: "implement",
+      last_action: "cancel",
+      started_at: "2026-06-02T00:00:00.000Z",
+      updated_at: "2026-06-02T00:01:00.000Z",
+      action_sequence: 2,
+      audit_refs: ["evidence://.aor/projects/provider-status-target/reports/run-control-event-live-e2e-provider-finalize-0002.json"],
+      provider_step_status: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.qwen",
+        step_id: "run.start.implement",
+        status: "interrupted",
+        timeout_budget_ms: 3_600_000,
+        elapsed_ms: 90_000,
+        current_command_label: "external-provider-runner",
+        recommended_action: "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
+        started_at: "2026-06-02T00:00:00.000Z",
+        updated_at: "2026-06-02T00:01:30.000Z",
+        finished_at: "2026-06-02T00:01:30.000Z",
+      },
+    };
+    writeJson(stateFile, previousState);
+    writeJson(stepResultFile, {
+      step_result_id: "live-e2e-provider-finalize.implement.failed",
+      run_id: "live-e2e-provider-finalize",
+      step_id: "run.start.implement",
+      step_class: "runner",
+      status: "failed",
+      summary: "Provider was interrupted through public run-control.",
+      evidence_refs: ["evidence://reports/step-result-live-e2e-provider-finalize.json"],
+    });
+
+    const finalized = finalizeRunControlState({
+      projectRoot: init.projectRoot,
+      stateFile,
+      previousState,
+      stepStatus: "failed",
+      targetStep: "implement",
+      stepResultFile,
+    });
+
+    assert.equal(finalized.status, "canceled");
+    assert.equal(finalized.last_action, "cancel");
+    assert.equal(finalized.provider_step_status.status, "interrupted");
+    const runs = listRuns({ cwd: repoRoot, projectRef: repoRoot });
+    const run = runs.find((entry) => entry.run_id === "live-e2e-provider-finalize");
+    assert.equal(run?.provider_step_status?.status, "interrupted");
+    assert.equal(run?.execution_evidence?.provider_execution_status, "interrupted");
   });
 });

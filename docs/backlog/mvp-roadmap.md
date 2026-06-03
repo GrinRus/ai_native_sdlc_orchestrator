@@ -619,7 +619,7 @@ boundaries.
 - Execution evidence distinguishes mission-relevant changed paths, runtime-owned artifacts, runner-owned state leaks, scratch files, Runtime Harness status, verification status, and no-upstream-write state.
 - Stop, diagnose, and retry controls use public control-plane surfaces and preserve partial evidence.
 - Codex/Qwen live E2E UX proof uses current skill-agent-only profiles and does not reintroduce removed bounded or mock-backed proof paths.
-- W35-S05 proof closure includes the silent-provider UX fixture and requires any Qwen non-pass to be recorded as clear provider-quality/environment blocker evidence, not as product success.
+- W35-S05 proof closure includes the silent-provider UX fixture, a clean Codex small proof, and a fail-closed Qwen provider blocker with target setup/verification shown separately from provider execution.
 
 **Detailed slices:** `docs/backlog/wave-35-implementation-slices.md`
 
@@ -644,7 +644,7 @@ boundaries.
 - The `ky` live E2E target setup path has bounded Playwright/browser dependency handling and does not run unbounded `npm exec playwright install` during baseline diagnostic.
 - Target verification separates provider-independent setup blockers from Codex/Qwen provider quality evidence.
 - Live E2E summaries separate AOR runner/controller failures from target repository setup/test/build failures with `failure_owner` and `failure_phase` evidence.
-- W35-S05 remains blocked until Codex closes cleanly and Qwen closes or records a provider/environment blocker after the target setup path is bounded.
+- W37-S01 closure evidence is cited by W35-S05: Codex now closes cleanly and Qwen non-pass is recorded as provider-owned blocker evidence after bounded target setup and verification pass.
 
 **Detailed slices:** `docs/backlog/wave-37-implementation-slices.md`
 

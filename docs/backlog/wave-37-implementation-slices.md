@@ -20,8 +20,9 @@ provider-independent verification status before W35-S05 can be retried.
   quality.
 - AOR runner/controller failures and target repository setup/test/build failures
   are separated with `failure_owner` and `failure_phase` evidence.
-- W35-S05 stays blocked until Codex closes cleanly and Qwen closes or records a
-  provider/environment blocker after this setup path is bounded.
+- W37 evidence is citeable by W35-S05 proof closure: Codex can close cleanly and
+  Qwen non-pass can be recorded as provider/environment blocker only after this
+  setup path is bounded and separately reported.
 
 ---
 
@@ -57,6 +58,7 @@ provider-independent verification status before W35-S05 can be retried.
 - Codex small setup-closure retry evidence
 
 ### Out of scope
-- Claiming W35-S05 proof completion.
+- Claiming W35-S05 proof completion as part of W37-S01 itself; W35-S05 closure
+  is recorded in the W35 slice after the separate proof retry.
 - Improving Qwen model quality.
 - Publishing a release.

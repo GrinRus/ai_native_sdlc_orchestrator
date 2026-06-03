@@ -245,7 +245,8 @@ as a passing implementation. Runner-local state under `.qwen/`, `.codex/`,
 Interruption controls must use public surfaces only:
 - stop a running provider with `aor run cancel`, which records durable
   `provider_step_status.status=interrupted` plus `operator-stopped` audit
-  evidence;
+  evidence and interrupts the supervised external provider process instead of
+  only changing report state;
 - preserve partial evidence with `aor run status --json`;
 - diagnose or retry with `manual-live-e2e.mjs --prepare-decision --action
   diagnose` or `--action retry_public_step`.
@@ -644,6 +645,11 @@ W35-S05 adds operator-UX proof evidence for the hardened live E2E surfaces:
   `RunSummary.execution_evidence`, public stop/save/diagnose actions, decision
   helper auto-filled refs, runner-owned leak blocking, and no-upstream-write
   evidence remain visible without terminal/process inspection.
+- Final live proof evidence must preserve both provider and target-repository
+  classification: Codex proof may close cleanly, while Qwen may close as
+  fail-closed `provider_blocked` evidence only after target setup and
+  verification are shown separately as pass or as their own target/environment
+  blocker.
 - Targeted regression coverage lives in
   `scripts/test/live-e2e-proof-runner.test.mjs` and asserts the W35 fixture
   preserves fail-closed operator evidence, readable artifact summaries, and

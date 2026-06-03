@@ -329,7 +329,7 @@ This is the master index for the implementation slices across all defined waves.
 | W35-S02 | User-facing artifact reference renderer | EPIC-6 | done | `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, `examples/control-plane-api/**`, tests | W35-S01 |
 | W35-S03 | Operator decision helper and decision UX | EPIC-7 | done | `scripts/live-e2e/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, `docs/ops/**`, tests | W35-S02 |
 | W35-S04 | Execution evidence panel and interruption controls | EPIC-6 | done | `apps/web/**`, `apps/api/**`, `apps/cli/**`, `packages/orchestrator-core/**`, `scripts/live-e2e/**`, `docs/contracts/**`, tests | W35-S01, W35-S02, W35-S03 |
-| W35-S05 | Codex/Qwen live E2E UX proof and runbook closure | EPIC-7 | blocked | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/web/**`, `apps/cli/**`, tests | W35-S04 |
+| W35-S05 | Codex/Qwen live E2E UX proof and runbook closure | EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/web/**`, `apps/cli/**`, tests | W35-S04 |
 
 ## W36 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |

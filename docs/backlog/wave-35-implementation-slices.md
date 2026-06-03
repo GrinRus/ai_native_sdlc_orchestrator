@@ -214,11 +214,10 @@ The W35 backlog comes from real local live E2E operation:
 
 ## W35-S05 — Codex/Qwen live E2E UX proof and runbook closure
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** done
 - **Outcome:** Updated live E2E proof demonstrates that Codex and Qwen small/medium operator workflows expose heartbeat, decision helper, artifact summaries, execution evidence, and safe interruption/retry behavior through current proof surfaces.
 - **Primary modules:** `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, `apps/web/**`, `apps/cli/**`, tests
 - **Hard dependencies:** W35-S04
-- **External blocker:** Codex small/medium live proof must close past the Ky baseline target verification step; the 2026-06-02 local attempt blocked on long-running target `npm test`/AVA/WebKit before a live controller decision, so W35-S05 cannot be accepted without a clean rerun or an explicit replanning slice for target verification closure.
 - **Primary user story surfaces:** OPS-06, OPS-07, OPS-11, PBO-09.
 
 ### Local tasks
@@ -269,10 +268,34 @@ manual controller decision could be produced. Qwen was not rerun because the
 same `ky` target setup path would block before any Qwen-specific quality signal.
 `W37-S01` replans that target setup/verification closure before W35-S05 can be
 retried as proof.
-The retry must preserve owner/phase evidence: AOR runner/controller failures
-use `failure_owner=aor`; target repository setup, test, build, or browser
-dependency blockers use `failure_owner=target_repository` or `environment`;
-provider-specific failures are only assigned after Codex/Qwen execution starts.
+W37-S01 closed the target setup/verification blocker with bounded `ky` setup and
+provider-independent verification evidence. The 2026-06-03 W35 retry then
+closed the slice:
+
+- Codex small proof `w35-s05-codex-small-proof-20260603094440` completed with
+  `summary_status=pass`, `acceptance_status=pass`, `coverage_status=covered_pass`,
+  accepted skill-agent decisions for all eight included steps, final
+  skill-agent verdict `pass`, `target_setup_status.status=pass`,
+  `target_verification_status_detail.status=pass`, and
+  `provider_step_status.status=completed`.
+- Qwen small proof `w35-s05-qwen-interrupt-proof-20260603102247` is intentionally
+  not a pass. It reached provider execution after
+  `target_setup_status.status=pass` and
+  `target_verification_status_detail.status=pass`, then remained silent-running
+  and was stopped through public run control. The final summary records
+  `status=blocked`, `provider_execution_status=interrupted`,
+  `provider_step_status.status=interrupted`,
+  `failure_owner=provider`, `failure_phase=provider_execution`, and
+  `failure_class=provider_blocked`; final skill-agent verdict is `blocked` with
+  non-empty inspected evidence refs.
+- Public Stop Provider now interrupts the supervised external runner process and
+  preserves interrupted state through final run-control summary/report writes,
+  so a stopped provider no longer looks like a generic crash or unclassified
+  blocked run.
+- Manual resume summaries hydrate target pre-execution evidence from controller
+  state and surface provider/target owner-phase fields at report level, so target
+  repository failures, AOR failures, provider blockers, and operator actions stay
+  distinguishable in UI/operator evidence.
 
 ### Out of scope
 - Requiring every candidate provider to pass product-quality gates before UI/UX proof can close.

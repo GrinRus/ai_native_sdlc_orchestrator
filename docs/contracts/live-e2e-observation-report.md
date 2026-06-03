@@ -91,6 +91,21 @@ must not be reported as AOR product passes.
 - `delivery_default`
 - `full_lifecycle`
 
+When available, the report-level summary should also surface the same owner and
+phase separation used by readiness and step entries:
+- `target_setup_status`
+- `target_verification_status`
+- `provider_step_status`
+- `provider_execution_status`
+- `failure_owner`
+- `failure_phase`
+- `failure_class`
+
+Manual resume must not drop this context. If controller state already captured
+target pre-execution status or provider heartbeat, the final observation report
+must preserve it so operator UI and reports do not collapse target repository
+blockers, provider blockers, and AOR failures into an unclassified blocked run.
+
 `step_journal[]` should preserve:
 - `sequence`
 - `step_id`

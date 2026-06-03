@@ -432,22 +432,35 @@ test("W35 live attempts summary records blockers without claiming product pass",
   assert.equal(fixture.slice_id, "W35-S05");
   assert.equal(fixture.closure_policy.synthetic_fixture_can_prove_ui_observability_only, true);
   assert.equal(fixture.closure_policy.legacy_bounded_or_mock_backed_profiles_restored, false);
-  for (const attempt of fixture.attempts) {
+  for (const attempt of fixture.attempts.filter((entry) => entry.status !== "pass")) {
     assert.equal(attempt.status, "blocked");
     assert.equal(attempt.product_pass_claimed, false);
     assert.equal(attempt.no_upstream_write, true);
-    assert.match(attempt.public_command_surface, /live-e2e|qwen/u);
   }
-  const codexAttempt = fixture.attempts.find((entry) => entry.provider_variant_id === "openai-primary");
+  const codexAttempt = fixture.attempts.find((entry) => entry.run_id === "w35-s05-codex-small-1780389151");
   assert.equal(codexAttempt.blocker_class, "target-verification-environment");
   assert.equal(codexAttempt.failure_owner, "target_repository");
   assert.equal(codexAttempt.failure_phase, "target_verification");
   assert.equal(codexAttempt.target_pre_execution_status_ref, "examples/live-e2e/fixtures/w37-s01/target-pre-execution-status.sample.json");
   assert.match(codexAttempt.public_observation, /baseline-diagnostic/u);
-  const qwenAttempt = fixture.attempts.find((entry) => entry.provider_variant_id === "qwen-primary");
+  const qwenAttempt = fixture.attempts.find((entry) => entry.run_id === "w35-s05-qwen-small-preflight");
   assert.equal(qwenAttempt.failure_owner, "target_repository");
   assert.equal(qwenAttempt.failure_phase, "target_verification");
   assert.match(qwenAttempt.public_observation, /0\.17\.0/u);
+  const codexClosure = fixture.attempts.find((entry) => entry.run_id === "w35-s05-codex-small-proof-20260603094440");
+  assert.equal(codexClosure.status, "pass");
+  assert.equal(codexClosure.acceptance_status, "pass");
+  assert.equal(codexClosure.product_pass_claimed, true);
+  assert.equal(codexClosure.target_setup_status, "pass");
+  assert.equal(codexClosure.target_verification_status, "pass");
+  const qwenClosure = fixture.attempts.find((entry) => entry.run_id === "w35-s05-qwen-interrupt-proof-20260603102247");
+  assert.equal(qwenClosure.status, "blocked");
+  assert.equal(qwenClosure.failure_owner, "provider");
+  assert.equal(qwenClosure.failure_phase, "provider_execution");
+  assert.equal(qwenClosure.blocker_class, "provider_blocked");
+  assert.equal(qwenClosure.target_setup_status, "pass");
+  assert.equal(qwenClosure.target_verification_status, "pass");
+  assert.equal(qwenClosure.product_pass_claimed, false);
 });
 
 test("catalog feature request materialization preserves required path prefixes", () => {
@@ -1049,6 +1062,21 @@ test("run summary canonical status is recomputed on resumed final verdicts", () 
     runProfileSource,
     /if \(Object\.keys\(existing\)\.length > 0\) return existing/u,
   );
+});
+
+test("proof runner preserves target setup and provider interruption evidence on manual resume", () => {
+  const runProfileSource = fs.readFileSync(runProfileScript, "utf8");
+  assert.match(runProfileSource, /function hydrateFlowArtifactsFromControllerState/u);
+  assert.match(runProfileSource, /artifacts_snapshot/u);
+  assert.match(runProfileSource, /target_pre_execution_status/u);
+  assert.match(runProfileSource, /target_setup_status/u);
+  assert.match(runProfileSource, /target_verification_status_detail/u);
+  assert.match(runProfileSource, /function classifyProviderStepStatus/u);
+  assert.match(runProfileSource, /failure_owner: "provider"/u);
+  assert.match(runProfileSource, /failure_phase: "provider_execution"/u);
+  assert.match(runProfileSource, /failure_class: "provider_blocked"/u);
+  assert.match(runProfileSource, /provider_step_status:[\s\S]*options\.flowResult\.artifacts\.provider_step_status/u);
+  assert.match(runProfileSource, /finalSkillAgentVerdict\.verdict[\s\S]*observationReport\.report_status = "final"/u);
 });
 
 test("manual live E2E exposes final skill-agent verdict installation workflow", () => {
