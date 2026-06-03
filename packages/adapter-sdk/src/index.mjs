@@ -1000,7 +1000,8 @@ function stripBenignInteractiveNegations(text) {
     .replace(/\bwithout (?:any )?(?:clarifying )?questions?\b/giu, "")
     .replace(/\bno (?:clarifying )?questions?(?:\s+or\s+interactive prompts?)?\b/giu, "")
     .replace(/\bno interactive prompts?\b/giu, "")
-    .replace(/\bwithout (?:any )?interactive prompts?\b/giu, "");
+    .replace(/\bwithout (?:any )?interactive prompts?\b/giu, "")
+    .replace(/\bavoid(?:ing)? (?:any )?interactive prompts?\b/giu, "");
 }
 
 /**

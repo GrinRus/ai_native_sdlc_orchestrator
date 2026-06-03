@@ -321,6 +321,7 @@ test("external runner failure classifier ignores benign permission words on succ
     JSON.stringify({ status: "success", summary: "workspace-write permissions and sandbox are configured" }),
     "Confirmed. Bounded non-interactive edits are allowed with no questions or interactive prompts.",
     "Preflight passed. Do not ask questions instruction was followed.",
+    "Confirmed. I can perform bounded, non-interactive edits and avoid interactive prompts.",
   ]) {
     assert.equal(
       classifyExternalRunnerFailure({
