@@ -215,7 +215,29 @@ The smoke JSON must report `status=smoke-pass`, `html_loaded=true`,
 `config_project_id` / `state_project_id` values, and matching
 `config_default_project_id` / `project_index_default_project_id` values. This
 deterministic app smoke is a release guardrail, not a hosted-service or
-production-automation claim.
+production-automation claim. On a clean target, app smoke should pass without
+creating `.aor/`; runtime initialization remains an explicit UI action or
+headless `aor onboard` command.
+
+To prove the published npm package rather than the local source checkout, run
+registry smoke from a neutral temporary runner directory:
+
+```bash
+TMP="$(mktemp -d)"
+mkdir -p "$TMP/target" "$TMP/runner"
+git -C "$TMP/target" init
+cd "$TMP/runner"
+
+npm exec --yes --package @grinrus/aor@0.1.0-alpha.7 -- aor --help
+
+npm exec --yes --package @grinrus/aor@0.1.0-alpha.7 -- \
+  aor app --project-ref "$TMP/target" --runtime-root "$TMP/target/.aor" --smoke --open false --json
+```
+
+Do not run this registry-package smoke from the AOR source checkout. npm can
+prefer the local package context when the current directory is itself
+`@grinrus/aor`, which can hide the registry package's `aor` bin from the smoke
+PATH and produce a false `aor: command not found` result.
 
 Use a disposable local checkout or branch until you understand the generated
 state. Runtime output under `.aor/` can contain project metadata, reports, and

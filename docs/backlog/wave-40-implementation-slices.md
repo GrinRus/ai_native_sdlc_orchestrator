@@ -70,7 +70,7 @@ issues before any release or readiness claim is made.
 
 ## W40-S02 — Installed-user onboarding and release docs hardening
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Make the published npm alpha and no-settings `aor app` first run easier to verify and use after alpha.7 smoke findings.
 - **Primary modules:** `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests
 - **Hard dependencies:** W40-S01
@@ -106,7 +106,7 @@ issues before any release or readiness claim is made.
 
 ## W40-S03 — Active live E2E heartbeat surfacing
 - **Epic:** EPIC-6 Operator surface; EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Show provider heartbeat/progress while a live E2E provider step is still running, not only after final artifacts are available.
 - **Primary modules:** `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, `scripts/live-e2e/**`, `docs/contracts/**`, tests
 - **Hard dependencies:** W40-S01, W35-S01, W38-S01, W39-S01

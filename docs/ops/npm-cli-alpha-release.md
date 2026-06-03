@@ -70,6 +70,24 @@ wizard marker, project switcher marker, `/api/projects` project index, and
 matching `default_project_id` fields while preserving the single-project
 `aor app` launch contract.
 
+After a publish, registry smoke must run from a neutral temporary runner
+directory rather than from the AOR source checkout:
+
+```bash
+TMP="$(mktemp -d)"
+mkdir -p "$TMP/target" "$TMP/runner"
+git -C "$TMP/target" init
+cd "$TMP/runner"
+npm exec --yes --package @grinrus/aor@0.1.0-alpha.7 -- aor --help
+npm exec --yes --package @grinrus/aor@0.1.0-alpha.7 -- \
+  aor app --project-ref "$TMP/target" --runtime-root "$TMP/target/.aor" --smoke --open false --json
+```
+
+This proves the registry artifact and avoids npm resolving the local source
+checkout package context. For a clean target, the app smoke should pass without
+creating `$TMP/target/.aor`; explicit runtime initialization or `aor onboard`
+is the write boundary for first-run runtime state.
+
 W30 alpha hardening also requires the production-readiness gate to verify the
 ADR index, OpenAPI 3.1 control-plane route contract, self-hosted operations
 runbooks, story-status honesty for blocked OpenCode outcomes, and alpha

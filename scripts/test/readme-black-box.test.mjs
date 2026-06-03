@@ -8,6 +8,12 @@ import { fileURLToPath } from "node:url";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../..");
+const packageVersion = JSON.parse(fs.readFileSync(path.join(workspaceRoot, "package.json"), "utf8")).version;
+const registryPackageSpec = `@grinrus/aor@${packageVersion}`;
+
+function readRepoFile(filePath) {
+  return fs.readFileSync(path.join(workspaceRoot, filePath), "utf8");
+}
 
 function runChecked(command, args, options = {}) {
   const run = spawnSync(command, args, {
@@ -35,6 +41,12 @@ function parsePnpmJsonOutput(stdout) {
 function runAorJson(args, env = {}) {
   const run = runChecked("pnpm", ["aor", ...args, "--json"], { env });
   return parsePnpmJsonOutput(run.stdout);
+}
+
+function parseJsonObject(stdout) {
+  const jsonStart = stdout.indexOf("{\n");
+  assert.notEqual(jsonStart, -1, `expected JSON object in output:\n${stdout}`);
+  return JSON.parse(stdout.slice(jsonStart));
 }
 
 function createFakePnpmBin(tempRoot) {
@@ -169,6 +181,59 @@ test("README black-box quickstart runs no-write against an external local target
     assert.match(next.next_action_report_file, /\/\.aor\/projects\/local-project\/reports\/next-action-report\.json$/u);
 
     assertOnlyRuntimeStateChanged(targetRepo);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("installed-user docs require neutral registry package smoke", () => {
+  for (const filePath of [
+    "README.md",
+    "docs/ops/installed-user-first-run.md",
+    "docs/ops/npm-cli-alpha-release.md",
+  ]) {
+    const content = readRepoFile(filePath);
+    assert.ok(content.includes('mkdir -p "$TMP/target" "$TMP/runner"'), `${filePath} must create separate target and runner directories.`);
+    assert.ok(content.includes('cd "$TMP/runner"'), `${filePath} must run registry smoke from the neutral runner directory.`);
+    assert.ok(
+      content.includes(`npm exec --yes --package ${registryPackageSpec} -- aor --help`),
+      `${filePath} must prove the published package help command.`,
+    );
+    assert.ok(
+      content.includes(`--package ${registryPackageSpec} --`),
+      `${filePath} must pin npm exec to the current published package version.`,
+    );
+    assert.match(content, /source checkout/u, `${filePath} must warn against source-checkout package shadowing.`);
+  }
+});
+
+test("documented app smoke does not initialize clean target runtime", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-readme-app-smoke-"));
+  try {
+    const targetRepo = createTargetRepo(tempRoot);
+    const runtimeRoot = path.join(targetRepo, ".aor");
+    const run = runChecked(process.execPath, [
+      path.join(workspaceRoot, "apps/cli/bin/aor.mjs"),
+      "app",
+      "--project-ref",
+      targetRepo,
+      "--runtime-root",
+      runtimeRoot,
+      "--smoke",
+      "--open",
+      "false",
+      "--json",
+    ], {
+      cwd: path.join(tempRoot),
+    });
+    const smoke = parseJsonObject(run.stdout);
+    assert.equal(smoke.status, "smoke-pass");
+    assert.equal(smoke.first_run_wizard_loaded, true);
+    assert.equal(smoke.project_switcher_loaded, true);
+    assert.equal(smoke.flow_selector_loaded, true);
+    assert.equal(smoke.new_flow_action_loaded, true);
+    assert.equal(smoke.runtime_root, runtimeRoot);
+    assert.equal(fs.existsSync(runtimeRoot), false, "clean app smoke must not create .aor before explicit initialization");
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

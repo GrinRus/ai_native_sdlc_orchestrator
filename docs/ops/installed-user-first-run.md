@@ -32,6 +32,45 @@ The UI first-run path is:
 
 Guided shortcuts default to human-readable output. Pass `--json` when automation needs stable fields such as `guided_status`, `guided_actionable_blockers`, `resolved_project_ref`, and `resolved_runtime_root`.
 
+## First-run state matrix
+| State | Primary UI surface | Expected action | Runtime/evidence boundary |
+| --- | --- | --- | --- |
+| Clean local project | First-run wizard, Project Context, Runtime Readiness | Confirm the project path and click **Initialize Project Runtime** only when ready. | Page load and smoke must not create `.aor/`; initialization writes only the selected runtime root. |
+| Initialized without flows | First-run wizard, First Flow step | Create the first Mission from the safe walkthrough template. | Mission intake defaults to `delivery-mode=no-write`; target source files remain unchanged. |
+| Active flow | Flow selector, active cockpit, stage workbench | Follow the next action, inspect blockers/evidence, or use Ask AOR for bounded no-write analysis. | Evidence, operator requests, and runtime trace stay scoped to the selected flow. |
+| Completed flow | Completed flow view, learning closure, `New Flow` | Inspect read-only evidence or start a follow-up/new flow explicitly. | Completed-flow context is not reused as editable active state. |
+| Multiple local projects | Top-bar project switcher and Add local project drawer | Add only explicit local paths and switch by project label/id. | Runtime roots, selected flow, operator requests, evidence refs, and blockers are isolated per project. |
+
+Primary errors should name the failed project path, runtime root, profile, or
+smoke route in user-facing language. Raw stack traces and raw refs are debug
+details, not the primary installed-user explanation.
+
+## Registry package smoke
+Use this command path after publication when you need to prove the npm registry
+package instead of the current source checkout:
+
+```sh
+TMP="$(mktemp -d)"
+mkdir -p "$TMP/target" "$TMP/runner"
+git -C "$TMP/target" init
+cd "$TMP/runner"
+
+npm exec --yes --package @grinrus/aor@0.1.0-alpha.7 -- aor --help
+
+npm exec --yes --package @grinrus/aor@0.1.0-alpha.7 -- \
+  aor app --project-ref "$TMP/target" --runtime-root "$TMP/target/.aor" --smoke --open false --json
+```
+
+The separate `$TMP/runner` directory is intentional. Do not run this
+`npm exec --package` smoke from the AOR source checkout, because npm may use the
+local `@grinrus/aor` package context and fail to put the registry package bin in
+PATH. A false `aor: command not found` from the source checkout is a smoke
+setup error, not proof that the published package is missing its `bin` entry.
+
+For a clean target, the app smoke should pass without creating `$TMP/target/.aor`;
+runtime state is created only after the user explicitly initializes the project
+or after headless `aor onboard`.
+
 ## Wrapper ownership
 | Guided command | Low-level ownership | Notes |
 | --- | --- | --- |
