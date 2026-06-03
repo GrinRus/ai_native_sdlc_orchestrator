@@ -29,6 +29,7 @@ live_e2e:
     repair: 0
     review: 0
     qa: 0
+  target_command_timeout_sec: 300
 implementation_loop:
   enabled: true
   max_iterations: 3
@@ -60,6 +61,12 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+    - npm install --prefer-offline --no-audit --no-fund
+  commands:
+    - npx xo
+    - npm run build
+    - npx ava test/main.ts test/hooks.ts
   eval_suites:
     - suite.regress.short@v1
   harness:

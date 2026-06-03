@@ -12,6 +12,9 @@
       "public_command_surface": "node ./scripts/live-e2e/manual-live-e2e.mjs --project-ref . --profile ./scripts/live-e2e/profiles/full-journey-regress-ky-small-codex.yaml --run-id w35-s05-codex-small-1780389151 --runner-auth-mode host --runtime-agent-permission-mode full-bypass",
       "public_observation": "The run reached public `aor project verify --verification-label baseline-diagnostic --routed-dry-run-step implement` in the target checkout. Target `npm test`/AVA/WebKit stayed active for more than five minutes without producing a manual controller decision.",
       "blocker_class": "target-verification-environment",
+      "failure_owner": "target_repository",
+      "failure_phase": "target_verification",
+      "target_pre_execution_status_ref": "examples/live-e2e/fixtures/w37-s01/target-pre-execution-status.sample.json",
       "operator_action": "Stopped local proof-attempt processes to avoid leaving unmanaged target verification children running.",
       "product_pass_claimed": false,
       "no_upstream_write": true
@@ -25,6 +28,9 @@
       "public_command_surface": "/opt/homebrew/bin/qwen --version",
       "public_observation": "Qwen CLI responded with version 0.17.0. The Qwen full proof was not advanced past setup because the same ky target baseline verification blocker occurred before provider-specific proof quality could be judged.",
       "blocker_class": "target-verification-environment",
+      "failure_owner": "target_repository",
+      "failure_phase": "target_verification",
+      "target_pre_execution_status_ref": "examples/live-e2e/fixtures/w37-s01/target-pre-execution-status.sample.json",
       "product_pass_claimed": false,
       "no_upstream_write": true
     }

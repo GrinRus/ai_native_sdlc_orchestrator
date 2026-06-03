@@ -228,6 +228,7 @@ The W35 backlog comes from real local live E2E operation:
 4. Run at least one Codex small/medium proof and one Qwen small proof, or record a provider-quality blocker with UI evidence showing the run is still understandable and fail-closed.
 5. Preserve current skill-agent-only proof model: final skill-agent verdict, non-empty inspected refs, frontend evidence refs when profile requires them, and no-upstream-write assertions.
 6. Update docs/backlog/ops traceability with the final proof result, remaining blockers, and any provider-specific limitations.
+7. Preserve W37 owner/phase evidence so target repository setup/test/build failures remain distinct from AOR runner/controller failures and provider quality failures.
 
 ### Acceptance criteria
 1. Proof evidence shows a long-running or synthetic silent provider step with elapsed/budget/status visible in UI/operator report.
@@ -235,6 +236,7 @@ The W35 backlog comes from real local live E2E operation:
 3. Proof evidence shows artifact refs rendered as user-facing summaries with raw refs available for debug/copy.
 4. Proof evidence shows execution panel handling mission-relevant diff, scratch-only output, runner-owned state leak, or interrupted state as appropriate.
 5. Codex proof closes cleanly; Qwen either closes cleanly or fails/blocks with a clear provider-quality or environment reason and no false product pass.
+6. Any target repository blocker is reported with `failure_owner=target_repository` and must not be counted as an AOR product pass or provider failure.
 
 ### Done evidence
 - updated live E2E runbooks
@@ -267,6 +269,10 @@ manual controller decision could be produced. Qwen was not rerun because the
 same `ky` target setup path would block before any Qwen-specific quality signal.
 `W37-S01` replans that target setup/verification closure before W35-S05 can be
 retried as proof.
+The retry must preserve owner/phase evidence: AOR runner/controller failures
+use `failure_owner=aor`; target repository setup, test, build, or browser
+dependency blockers use `failure_owner=target_repository` or `environment`;
+provider-specific failures are only assigned after Codex/Qwen execution starts.
 
 ### Out of scope
 - Requiring every candidate provider to pass product-quality gates before UI/UX proof can close.

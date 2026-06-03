@@ -643,6 +643,7 @@ boundaries.
 - W37 is represented across the roadmap, master backlog, dependency graph, and owning wave doc.
 - The `ky` live E2E target setup path has bounded Playwright/browser dependency handling and does not run unbounded `npm exec playwright install` during baseline diagnostic.
 - Target verification separates provider-independent setup blockers from Codex/Qwen provider quality evidence.
+- Live E2E summaries separate AOR runner/controller failures from target repository setup/test/build failures with `failure_owner` and `failure_phase` evidence.
 - W35-S05 remains blocked until Codex closes cleanly and Qwen closes or records a provider/environment blocker after the target setup path is bounded.
 
 **Detailed slices:** `docs/backlog/wave-37-implementation-slices.md`

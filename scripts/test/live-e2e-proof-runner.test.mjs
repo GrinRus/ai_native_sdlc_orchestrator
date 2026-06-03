@@ -7,7 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { loadContractFile } from "../../packages/contracts/src/index.mjs";
-import { loadProofRunnerProfile } from "../live-e2e/lib/profile-catalog.mjs";
+import { loadProofRunnerProfile, resolveFullJourneyProfile } from "../live-e2e/lib/profile-catalog.mjs";
 import {
   materializeFeatureRequestFile,
   materializeGeneratedProjectProfile,
@@ -18,6 +18,8 @@ import {
 import { runLiveAdapterPreflight } from "../live-e2e/lib/preflight.mjs";
 import {
   archivedNextActionReportForMission,
+  buildTargetPreExecutionStatusReport,
+  evaluateBaselineVerifyGate,
   nextActionReportClosesFlow,
   prepareAorInstallationProof,
   runtimeHarnessReportHasMissionRelevantChanges,
@@ -438,8 +440,13 @@ test("W35 live attempts summary records blockers without claiming product pass",
   }
   const codexAttempt = fixture.attempts.find((entry) => entry.provider_variant_id === "openai-primary");
   assert.equal(codexAttempt.blocker_class, "target-verification-environment");
+  assert.equal(codexAttempt.failure_owner, "target_repository");
+  assert.equal(codexAttempt.failure_phase, "target_verification");
+  assert.equal(codexAttempt.target_pre_execution_status_ref, "examples/live-e2e/fixtures/w37-s01/target-pre-execution-status.sample.json");
   assert.match(codexAttempt.public_observation, /baseline-diagnostic/u);
   const qwenAttempt = fixture.attempts.find((entry) => entry.provider_variant_id === "qwen-primary");
+  assert.equal(qwenAttempt.failure_owner, "target_repository");
+  assert.equal(qwenAttempt.failure_phase, "target_verification");
   assert.match(qwenAttempt.public_observation, /0\.17\.0/u);
 });
 
@@ -515,6 +522,146 @@ test("generated live E2E profile allows the selected candidate provider adapter"
     assert.ok(loaded.document.allowed_providers.includes("qwen"));
     assert.ok(loaded.document.allowed_adapters.includes("qwen-code"));
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
+  });
+});
+
+test("generated ky small Codex profile uses bounded target setup and mission-scoped verification", () => {
+  withTempRoot((tempRoot) => {
+    const profileRef = "scripts/live-e2e/profiles/full-journey-regress-ky-small-codex.yaml";
+    const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    const resolved = resolveFullJourneyProfile({
+      profile: loadedProfile.profile,
+      catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
+    });
+    const generatedAssetsRoot = path.join(tempRoot, "assets");
+    fs.mkdirSync(generatedAssetsRoot, { recursive: true });
+
+    const result = materializeGeneratedProjectProfile({
+      hostRoot: repoRoot,
+      profilePath: loadedProfile.profilePath,
+      profile: resolved.resolvedProfile,
+      catalogEntry: resolved.catalogEntry,
+      providerVariant: resolved.providerVariant,
+      runId: "ky-small-bounded-target-setup",
+      targetCheckout: {
+        targetRepoId: "ky",
+        targetRepoRef: "main",
+      },
+      generatedAssetsRoot,
+    });
+
+    const loaded = loadContractFile({
+      filePath: result.generatedProjectProfileFile,
+      family: "project-profile",
+    });
+    assert.equal(loaded.ok, true);
+    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
+    assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
+    assert.deepEqual(loaded.document.repos[0].test_commands, [
+      "npx xo",
+      "npm run build",
+      "npx ava test/headers.ts",
+    ]);
+    assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
+  });
+});
+
+test("target pre-execution status separates target setup, target verification, and AOR failures", () => {
+  withTempRoot((tempRoot) => {
+    const setupTranscript = writeJsonFixture(path.join(tempRoot, "setup-transcript.json"));
+    const setupStepFile = writeJsonFixture(path.join(tempRoot, "setup-step.json"), {
+      status: "failed",
+      command: "npm install --prefer-offline --no-audit --no-fund",
+      summary: "Verification command 'npm install --prefer-offline --no-audit --no-fund' timed out after 120000ms.",
+      evidence_refs: [setupTranscript],
+      command_timeout_ms: 120000,
+      timed_out: true,
+      missing_prerequisites: [],
+    });
+    const verificationStepFile = writeJsonFixture(path.join(tempRoot, "verify-step.json"), {
+      status: "failed",
+      command: "npx ava test/headers.ts",
+      summary: "Verification command 'npx ava test/headers.ts' failed with exit code 1.",
+      evidence_refs: [writeJsonFixture(path.join(tempRoot, "verify-transcript.json"))],
+      command_timeout_ms: 120000,
+      timed_out: false,
+      missing_prerequisites: [],
+    });
+
+    const setupReport = buildTargetPreExecutionStatusReport({
+      verifySummary: { status: "failed", command_timeout_ms: 120000 },
+      verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary.json") },
+      stepResultFiles: [setupStepFile, verificationStepFile],
+      setupCommands: ["npm install --prefer-offline --no-audit --no-fund"],
+      verificationCommands: ["npx ava test/headers.ts"],
+      baselineGateDecision: { status: "fail", decision: "block", summary: "readiness-command-failed" },
+      runResult: {
+        durationSec: 121,
+        timeoutMs: 300000,
+        transcriptFile: path.join(tempRoot, "project-verify.json"),
+      },
+    });
+    assert.equal(setupReport.status, "blocked");
+    assert.equal(setupReport.failure_owner, "target_repository");
+    assert.equal(setupReport.failure_phase, "target_setup");
+    assert.equal(setupReport.failure_class, "target_setup_blocked");
+    assert.equal(setupReport.target_setup_status.timed_out, true);
+    assert.equal(setupReport.target_verification_status.status, "blocked");
+
+    const verificationReport = buildTargetPreExecutionStatusReport({
+      verifySummary: { status: "failed", command_timeout_ms: 120000 },
+      verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary.json") },
+      stepResultFiles: [verificationStepFile],
+      setupCommands: ["npm install --prefer-offline --no-audit --no-fund"],
+      verificationCommands: ["npx ava test/headers.ts"],
+      baselineGateDecision: { status: "warn", decision: "continue_with_warnings", summary: "target verification failed" },
+      runResult: { durationSec: 5, timeoutMs: 300000, transcriptFile: path.join(tempRoot, "project-verify.json") },
+    });
+    assert.equal(verificationReport.failure_owner, "target_repository");
+    assert.equal(verificationReport.failure_phase, "target_verification");
+    assert.equal(verificationReport.failure_class, "target_verification_blocked");
+
+    const aorReport = buildTargetPreExecutionStatusReport({
+      verifySummary: {},
+      verifyPayload: {},
+      stepResultFiles: [],
+      setupCommands: ["npm install --prefer-offline --no-audit --no-fund"],
+      verificationCommands: ["npx ava test/headers.ts"],
+      baselineGateDecision: { status: "fail", decision: "block", summary: "AOR command timed out." },
+      runResult: {
+        label: "project-verify-preflight",
+        durationSec: 300,
+        timeoutMs: 300000,
+        transcriptFile: path.join(tempRoot, "project-verify-timeout.json"),
+        timedOut: true,
+      },
+    });
+    assert.equal(aorReport.failure_owner, "aor");
+    assert.equal(aorReport.failure_phase, "target_verification");
+    assert.equal(aorReport.failure_class, "aor_failure");
+  });
+});
+
+test("baseline verify gate annotates blocker owner and phase", () => {
+  withTempRoot((tempRoot) => {
+    const stepFile = writeJsonFixture(path.join(tempRoot, "verify-step.json"), {
+      status: "failed",
+      command: "npx ava test/headers.ts",
+      summary: "Target test failed.",
+      evidence_refs: [],
+      missing_prerequisites: [],
+    });
+    const result = evaluateBaselineVerifyGate({
+      verifySummary: { status: "failed", validation_gate_status: "pass" },
+      verifyPayload: {},
+      stepResultFiles: [stepFile],
+      setupCommands: ["npm install --prefer-offline --no-audit --no-fund"],
+      verificationCommands: ["npx ava test/headers.ts"],
+      mode: "diagnostic",
+    });
+    assert.equal(result.failure_owner, "target_repository");
+    assert.equal(result.failure_phase, "target_verification");
+    assert.equal(result.failure_class, "target_verification_blocked");
   });
 });
 

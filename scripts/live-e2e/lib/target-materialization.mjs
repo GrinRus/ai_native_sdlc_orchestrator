@@ -18,6 +18,8 @@ import {
   writeJson,
 } from "./common.mjs";
 
+const DEFAULT_GENERATED_PROFILE_VERIFICATION_TIMEOUT_SEC = 1800;
+
 const LIVE_E2E_STEP_POLICY_CLASSES = Object.freeze({
   discovery: "artifact",
   research: "artifact",
@@ -248,6 +250,27 @@ function hydrateRepoVerificationCommands(repoRecord, verification) {
 }
 
 /**
+ * @param {Record<string, unknown>} profile
+ * @param {Record<string, unknown>} runtimeDefaults
+ * @returns {number}
+ */
+function resolveGeneratedProfileVerificationTimeoutSec(profile, runtimeDefaults) {
+  const livePolicy = asRecord(profile.live_e2e);
+  const verification = asRecord(profile.verification);
+  for (const candidate of [
+    livePolicy.target_command_timeout_sec,
+    verification.command_timeout_sec,
+    runtimeDefaults.verification_command_timeout_sec,
+  ]) {
+    const value = Number(candidate);
+    if (Number.isFinite(value) && value > 0) {
+      return Math.floor(value);
+    }
+  }
+  return DEFAULT_GENERATED_PROFILE_VERIFICATION_TIMEOUT_SEC;
+}
+
+/**
  * @param {string} value
  * @returns {string}
  */
@@ -320,10 +343,10 @@ export function materializeGeneratedProjectProfile(options) {
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);
   runtimeDefaults.runtime_root = ".aor";
   runtimeDefaults.workspace_mode = asNonEmptyString(asRecord(options.profile.runtime).mode) || "ephemeral";
-  runtimeDefaults.verification_command_timeout_sec =
-    Number(runtimeDefaults.verification_command_timeout_sec) > 0
-      ? runtimeDefaults.verification_command_timeout_sec
-      : 1800;
+  runtimeDefaults.verification_command_timeout_sec = resolveGeneratedProfileVerificationTimeoutSec(
+    options.profile,
+    runtimeDefaults,
+  );
   generatedProjectProfile.runtime_defaults = runtimeDefaults;
 
   const registryRoots = asRecord(generatedProjectProfile.registry_roots);

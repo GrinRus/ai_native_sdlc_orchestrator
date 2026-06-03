@@ -11,6 +11,14 @@ Provider CLIs that derive local project state paths from the checkout path may s
 
 Small or medium provider smoke profiles may set `live_e2e.provider_step_timeouts_sec` as a map from step name to timeout seconds. Provider-pinned route materialization applies these values to generated route constraints before public execution starts, so bounded profiles can fail closed on provider latency instead of inheriting long full-lifecycle route caps.
 
+Profiles may also set `live_e2e.target_command_timeout_sec` for target setup and
+verification commands that run before provider execution. The runner must expose
+`target_setup_status`, `target_verification_status`, `failure_owner`, and
+`failure_phase` in target pre-execution evidence. A target repository setup,
+test, build, browser dependency, or timeout blocker is not a Codex/Qwen quality
+signal. Conversely, AOR runner/controller/API/UI failures must be classified as
+`failure_owner=aor`, not hidden behind target repository blocker wording.
+
 Qwen candidate profiles are the exception: catalog-backed Qwen full-journey profiles keep the one-hour provider step budget for implementation, repair, review, and QA even when the profile duration class is `small` or `medium`. Shorter local proof budgets have produced false timeout evidence after partial target diffs, so Qwen latency diagnostics must use a separately named diagnostic profile instead of weakening the canonical candidate profiles.
 
 Small or medium provider smoke profiles may also set `live_e2e.provider_step_retry_max_attempts` and `live_e2e.provider_step_repair_max_attempts` as maps from public step name to non-negative attempt count. Provider-pinned policy materialization writes run-scoped step policy overrides and passes them through public `--policy-overrides`, so a bounded Qwen smoke can use one provider attempt with `0` retry/repair attempts while still exercising the normal Runtime Harness fail-closed path.
@@ -356,7 +364,7 @@ Full-journey layer:
 - includes the materialized spec step-result as a concrete `packet://spec@evidence://...` promotion ref for adapter context, while `run start` binds the approved handoff ref into the compiled context.
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
 - repeats public `run start` / `review run` iterations with iteration-specific run ids when review or primary verification requests repair, and records each repeated step as `execution#N` and `review#N` in the step journal.
-- bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Generated live E2E project profiles default this bound to 1800 seconds per command so browser setup commands such as `npx playwright install` stay bounded without turning normal first-run multi-browser cache installation into a false readiness blocker. Timeout failures are preserved as failed step-result evidence; for full-journey baseline diagnostics they are interpreted through the same diagnostic/blocking gate rules as other target verification failures.
+- bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Generated live E2E project profiles default this bound to 1800 seconds per command unless the profile sets `live_e2e.target_command_timeout_sec`; Ky Codex/Qwen small and medium profiles use explicit shorter budgets and mission-scoped verification commands so Playwright/browser setup cannot block before operator-visible decisions. Timeout failures are preserved as failed step-result evidence with target setup/verification owner and phase fields.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - gates continuation after every observed public step by the online live E2E controller decision.
 - keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; supported full-lifecycle profiles must execute them as ordinary observed steps.

@@ -339,7 +339,7 @@ This is the master index for the implementation slices across all defined waves.
 | W36-S03 | First-run onboarding wizard | EPIC-6 | done | `apps/web/**`, `packages/orchestrator-core/**`, tests | W36-S02 |
 | W36-S04 | Local multi-project switcher UX | EPIC-6 | done | `apps/web/**`, `packages/orchestrator-core/**`, tests | W36-S03 |
 | W36-S05 | Docs, smoke, and proof | EPIC-7 | done | `README.md`, `docs/ops/**`, `apps/web/**`, `packages/orchestrator-core/**`, `scripts/**`, tests | W36-S04 |
-| W37-S01 | Live E2E target setup and verification closure | EPIC-7 | ready | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, tests | W35-S04 |
+| W37-S01 | Live E2E target setup and verification closure | EPIC-7 | done | `scripts/live-e2e/**`, `docs/ops/**`, `examples/live-e2e/**`, tests | W35-S04 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

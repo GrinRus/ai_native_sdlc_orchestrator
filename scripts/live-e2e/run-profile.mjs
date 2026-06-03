@@ -507,6 +507,14 @@ function buildScorecard(options) {
     provider_execution_status: qualityJudgement.provider_execution_status ?? null,
     feature_size_fit_status: qualityJudgement.feature_size_fit_status ?? null,
     target_baseline_status: qualityJudgement.target_baseline_status ?? null,
+    target_pre_execution_status:
+      typeof options.flowResult.artifacts.target_pre_execution_status === "object" &&
+      options.flowResult.artifacts.target_pre_execution_status
+        ? options.flowResult.artifacts.target_pre_execution_status
+        : null,
+    failure_owner: asNonEmptyString(options.flowResult.artifacts.failure_owner) || null,
+    failure_phase: asNonEmptyString(options.flowResult.artifacts.failure_phase) || null,
+    failure_class: asNonEmptyString(options.flowResult.artifacts.failure_class) || null,
     real_code_change_status: qualityJudgement.real_code_change_status ?? null,
     post_run_verification_status: qualityJudgement.post_run_verification_status ?? null,
     post_run_diagnostic_status: qualityJudgement.post_run_diagnostic_status ?? null,
@@ -855,9 +863,21 @@ function buildSetupJournal(artifacts) {
         asNonEmptyString(artifacts.validation_report_file),
         asNonEmptyString(artifacts.baseline_verify_summary_file),
         asNonEmptyString(artifacts.verify_summary_file),
+        asNonEmptyString(artifacts.target_pre_execution_status_file),
         asNonEmptyString(artifacts.execution_readiness_file),
         asNonEmptyString(artifacts.live_adapter_preflight_file),
       ]),
+      target_setup_status:
+        typeof artifacts.target_setup_status === "object" && artifacts.target_setup_status
+          ? artifacts.target_setup_status
+          : null,
+      target_verification_status:
+        typeof artifacts.target_verification_status_detail === "object" && artifacts.target_verification_status_detail
+          ? artifacts.target_verification_status_detail
+          : null,
+      failure_owner: asNonEmptyString(artifacts.failure_owner) || null,
+      failure_phase: asNonEmptyString(artifacts.failure_phase) || null,
+      failure_class: asNonEmptyString(artifacts.failure_class) || null,
       summary:
         asNonEmptyString(artifacts.validation_report_file) ||
         asNonEmptyString(artifacts.baseline_verify_summary_file) ||
@@ -1647,6 +1667,27 @@ function writeProofRunnerArtifacts(options) {
       options.flowResult.artifacts.baseline_verify_gate_decision
         ? options.flowResult.artifacts.baseline_verify_gate_decision
         : null,
+    target_pre_execution_status_file:
+      typeof options.flowResult.artifacts.target_pre_execution_status_file === "string"
+        ? options.flowResult.artifacts.target_pre_execution_status_file
+        : null,
+    target_pre_execution_status:
+      typeof options.flowResult.artifacts.target_pre_execution_status === "object" &&
+      options.flowResult.artifacts.target_pre_execution_status
+        ? options.flowResult.artifacts.target_pre_execution_status
+        : null,
+    target_setup_status:
+      typeof options.flowResult.artifacts.target_setup_status === "object" && options.flowResult.artifacts.target_setup_status
+        ? options.flowResult.artifacts.target_setup_status
+        : null,
+    target_verification_status_detail:
+      typeof options.flowResult.artifacts.target_verification_status_detail === "object" &&
+      options.flowResult.artifacts.target_verification_status_detail
+        ? options.flowResult.artifacts.target_verification_status_detail
+        : null,
+    failure_owner: asNonEmptyString(options.flowResult.artifacts.failure_owner) || null,
+    failure_phase: asNonEmptyString(options.flowResult.artifacts.failure_phase) || null,
+    failure_class: asNonEmptyString(options.flowResult.artifacts.failure_class) || null,
     post_run_verify_summary_file:
       typeof options.flowResult.artifacts.post_run_verify_summary_file === "string"
         ? options.flowResult.artifacts.post_run_verify_summary_file

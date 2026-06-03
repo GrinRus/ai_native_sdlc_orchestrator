@@ -73,6 +73,20 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `evidence_refs`
 - `summary`
 
+The `readiness` setup entry may also include target setup and verification
+status details. These details must separate AOR runner/controller failures from
+target repository failures:
+- `target_setup_status`
+- `target_verification_status`
+- `failure_owner` (`aor|target_repository|provider|environment|operator`)
+- `failure_phase`
+  (`aor_install|target_checkout|target_setup|target_verification|provider_execution|controller_decision|ui_validation`)
+- `failure_class`
+
+Target repository setup, test, build, browser dependency, or timeout blockers
+are valid fail-closed evidence, but they are not provider-quality signals and
+must not be reported as AOR product passes.
+
 `flow_range_policy` must be one of:
 - `delivery_default`
 - `full_lifecycle`
