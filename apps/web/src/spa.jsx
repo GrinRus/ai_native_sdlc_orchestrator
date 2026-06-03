@@ -391,7 +391,8 @@ function formatProviderTimestamp(value) {
 
 function providerStatusCopy(status) {
   if (!status) return "No active provider step.";
-  if (status.status === "silent-running") return "No output yet, provider still running.";
+  if (status.last_progress_at) return `Provider activity observed: ${status.last_progress_label ?? status.last_progress_kind ?? "stream event"}.`;
+  if (status.status === "silent-running") return "No output or progress yet, provider still running.";
   if (status.status === "timeout-risk") return "Provider is still running and close to the timeout budget.";
   if (status.status === "artifact-updated") return "Provider is running and evidence was updated.";
   if (status.status === "completed") return "Provider completed. Continue with verification evidence.";
@@ -1461,8 +1462,20 @@ function FlowCockpit({
               <strong>{formatProviderTimestamp(providerStepStatus.last_output_at)}</strong>
             </div>
             <div>
+              <span>Last progress</span>
+              <strong>{formatProviderTimestamp(providerStepStatus.last_progress_at)}</strong>
+            </div>
+            <div>
+              <span>Activity</span>
+              <strong>{providerStepStatus.last_progress_label ?? providerStepStatus.last_progress_kind ?? "No progress yet"}</strong>
+            </div>
+            <div>
               <span>Last artifact</span>
               <strong>{formatProviderTimestamp(providerStepStatus.last_artifact_update_at)}</strong>
+            </div>
+            <div>
+              <span>Output mode</span>
+              <strong>{providerStepStatus.output_mode ?? "unknown"}</strong>
             </div>
           </div>
           <div className="provider-heartbeat-action">

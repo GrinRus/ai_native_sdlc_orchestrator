@@ -138,9 +138,12 @@ blockers, provider blockers, and AOR failures into an unclassified blocked run.
 When a step invokes an external provider, `step_journal[]` may also include
 `provider_step_status`. This is the same query-safe heartbeat exposed by the
 control plane and must preserve provider, adapter, route, step, status,
-elapsed/budget fields, last output/artifact timestamps, command label, and
+elapsed/budget fields, last output/artifact/progress timestamps, progress kind,
+progress label, progress event count, output mode, command label, and
 recommended action. It must not include raw process commands, command args,
-environment variables, tokens, or secrets.
+prompt text, file contents, environment variables, tokens, or secrets. Qwen
+`~/.qwen/**` files may be referenced only as manual debug context; normal live
+E2E reports must use public adapter stream evidence.
 
 `plan` should preserve:
 - `objective`

@@ -1533,6 +1533,304 @@ test("live adapter parses Qwen JSON array output and detects permission denials"
   assert.equal(response.output.runtime_permission_request.command, "git status --short");
 });
 
+test("live adapter turns Qwen stream-json events into sanitized provider progress", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-qwen-stream-progress-"));
+  const evidenceRoot = path.join(repoRoot, "reports");
+  const stateFile = path.join(repoRoot, "run-control-state-qwen-stream.json");
+  fs.mkdirSync(evidenceRoot, { recursive: true });
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify(
+      {
+        run_id: "run-qwen-stream",
+        status: "running",
+        provider_step_status: {
+          status: "running",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  const script = [
+    "const events = [",
+    "  {type:'system',subtype:'init'},",
+    "  {type:'assistant',message:{content:[{type:'text',text:'secret sk-live-progress should not be public'}]}},",
+    "  {type:'tool_call',name:'read_file',input:{file_path:'/private/secret.txt'}},",
+    "  {type:'stream_event',event:{type:'content_block_start',content_block:{type:'tool_use',name:'read_file',input:{file_path:'/private/secret.txt'}}}},",
+    "  {type:'result',subtype:'success'}",
+    "];",
+    "let delay = 0;",
+    "for (const event of events) {",
+    "  setTimeout(() => process.stdout.write(JSON.stringify(event) + '\\n'), delay);",
+    "  delay += 20;",
+    "}",
+    "setTimeout(() => process.exit(0), delay + 20);",
+  ].join("");
+
+  try {
+    const adapter = createLiveAdapter({
+      adapterId: "qwen-code",
+      adapterProfile: {
+        runner_family: "qwen",
+        ...buildExternalRunnerProfile({
+          command: process.execPath,
+          args: ["-e", script, "--", "--output-format", "stream-json"],
+          timeoutMs: 2000,
+          handler: null,
+        }),
+      },
+      runtimeEvidenceRoot: evidenceRoot,
+      projectRoot: repoRoot,
+      executionRoot: repoRoot,
+    });
+
+    const response = adapter.execute({
+      request_id: "req-qwen-stream",
+      run_id: "run-qwen-stream",
+      step_id: "step-qwen-stream",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default.qwen-primary" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.default.qwen-primary",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 2000,
+        heartbeat_interval_ms: 25,
+      },
+    });
+
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    const rawRef = response.evidence_refs.find((ref) => ref.includes("adapter-live-raw-qwen-code"));
+    assert.ok(rawRef);
+    const rawPath = rawRef.startsWith("evidence://")
+      ? path.isAbsolute(rawRef.slice("evidence://".length))
+        ? rawRef.slice("evidence://".length)
+        : path.join(repoRoot, rawRef.slice("evidence://".length))
+      : rawRef;
+    const rawEvidence = JSON.parse(fs.readFileSync(rawPath, "utf8"));
+
+    assert.equal(response.status, "success");
+    assert.equal(state.provider_step_status.status, "completed");
+    assert.equal(state.provider_step_status.output_mode, "stream-json");
+    assert.equal(state.provider_step_status.progress_event_count, 5);
+    assert.equal(state.provider_step_status.last_progress_kind, "result");
+    assert.equal(response.output.runner_output.jsonl_event_count, 5);
+    assert.equal(response.output.runner_output.jsonl_events, undefined);
+    assert.equal(response.output.external_runner.provider_progress_events.length, 5);
+    assert.equal(rawEvidence.provider_progress_events.length, 5);
+    assert.ok(
+      response.output.external_runner.provider_progress_events.some(
+        (event) => event.kind === "tool_call" && event.label === "read_file",
+      ),
+    );
+    assert.doesNotMatch(JSON.stringify(response.output.runner_output), /sk-live-progress|secret\\.txt/u);
+    assert.doesNotMatch(JSON.stringify(rawEvidence.provider_progress_events), /sk-live-progress|secret\\.txt/u);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("live adapter keeps malformed Qwen stream JSONL out of public runner output", () => {
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: {
+      runner_family: "qwen",
+      ...buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "process.stdout.write(JSON.stringify({type:'tool_call',name:'read_file'}) + '\\n');",
+            "process.stdout.write('not-json {secret}\\n');",
+          ].join(""),
+          "--",
+          "--output-format",
+          "stream-json",
+        ],
+        handler: null,
+      }),
+    },
+  });
+
+  const response = adapter.execute({
+    request_id: "req-qwen-malformed-stream",
+    run_id: "run-qwen-malformed-stream",
+    step_id: "step-qwen-malformed-stream",
+    step_class: "implement",
+    route: { resolved_route_id: "route.implement.default.qwen-primary" },
+    asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+    policy_bundle: { policy_id: "policy.step.runner.default" },
+    dry_run: false,
+  });
+
+  assert.equal(response.status, "success");
+  assert.equal(response.output.runner_output.malformed_jsonl, true);
+  assert.equal(response.output.runner_output.raw_stdout, undefined);
+  assert.equal(response.output.runner_output.provider_progress_events.length, 1);
+});
+
+test("live adapter keeps buffered Qwen json silent until final stdout", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-qwen-buffered-json-silent-"));
+  const stateFile = path.join(repoRoot, "run-control-state-qwen-buffered-json.json");
+  const staleStartedAt = new Date(Date.now() - 120000).toISOString();
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify(
+      {
+        run_id: "run-qwen-buffered-json",
+        status: "running",
+        provider_step_status: {
+          status: "running",
+          started_at: staleStartedAt,
+          timeout_budget_ms: 300000,
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const script = [
+    "const fs = require('node:fs');",
+    `const stateFile = ${JSON.stringify(stateFile)};`,
+    "setTimeout(() => {",
+    "  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));",
+    "  const provider = state.provider_step_status || {};",
+    "  process.stdout.write(JSON.stringify({",
+    "    status: 'success',",
+    "    summary: 'buffered json completed',",
+    "    output: {",
+    "      observed_status_before_stdout: provider.status || null,",
+    "      observed_progress_event_count: provider.progress_event_count ?? null",
+    "    }",
+    "  }));",
+    "}, 80);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: {
+      runner_family: "qwen",
+      ...buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", script, "--", "--output-format", "json"],
+        timeoutMs: 2000,
+        handler: null,
+      }),
+    },
+  });
+
+  try {
+    const response = adapter.execute({
+      request_id: "req-qwen-buffered-json",
+      run_id: "run-qwen-buffered-json",
+      step_id: "step-qwen-buffered-json",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default.qwen-primary" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.default.qwen-primary",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 300000,
+        heartbeat_interval_ms: 25,
+      },
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.output_mode, "json");
+    assert.equal(response.output.runner_output.observed_status_before_stdout, "silent-running");
+    assert.equal(response.output.runner_output.observed_progress_event_count, null);
+    assert.equal(response.output.external_runner.provider_progress_events.length, 0);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("live adapter preserves Qwen stream progress when run-control interrupts provider", () => {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-qwen-stream-interrupt-"));
+  const stateFile = path.join(repoRoot, "run-control-state-qwen-stream-interrupt.json");
+  fs.writeFileSync(
+    stateFile,
+    `${JSON.stringify(
+      {
+        run_id: "run-qwen-stream-interrupt",
+        status: "running",
+        provider_step_status: {
+          status: "running",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const interruptScript = [
+    "const fs = require('node:fs');",
+    `const stateFile = ${JSON.stringify(stateFile)};`,
+    "process.stdout.write(JSON.stringify({type:'tool_call',name:'read_file'}) + '\\n');",
+    "setTimeout(() => {",
+    "  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));",
+    "  state.status = 'canceled';",
+    "  state.provider_step_status = { ...(state.provider_step_status || {}), status: 'interrupted' };",
+    "  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\\n');",
+    "}, 75);",
+    "setTimeout(() => {}, 5000);",
+  ].join("");
+  const adapter = createLiveAdapter({
+    adapterId: "qwen-code",
+    adapterProfile: {
+      runner_family: "qwen",
+      ...buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", interruptScript, "--", "--output-format", "stream-json"],
+        timeoutMs: 2000,
+        handler: null,
+      }),
+    },
+  });
+
+  try {
+    const response = adapter.execute({
+      request_id: "req-qwen-stream-interrupt",
+      run_id: "run-qwen-stream-interrupt",
+      step_id: "step-qwen-stream-interrupt",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default.qwen-primary" },
+      asset_bundle: { wrapper_ref: "wrapper.runner.default@v3" },
+      policy_bundle: { policy_id: "policy.step.runner.default" },
+      dry_run: false,
+      provider_step_status: {
+        provider: "qwen",
+        adapter: "qwen-code",
+        route_id: "route.implement.default.qwen-primary",
+        step_id: "run.start.implement",
+        state_file: stateFile,
+        timeout_budget_ms: 2000,
+        heartbeat_interval_ms: 25,
+      },
+    });
+
+    const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "external-runner-interrupted");
+    assert.equal(response.output.external_runner.provider_progress_events.length, 1);
+    assert.equal(state.provider_step_status.status, "interrupted");
+    assert.equal(state.provider_step_status.last_progress_kind, "tool_call");
+    assert.equal(state.provider_step_status.progress_event_count, 1);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
 test("live adapter blocks successful runner exits that still emit tool denial evidence", () => {
   const adapter = createLiveAdapter({
     adapterId: "claude-code",

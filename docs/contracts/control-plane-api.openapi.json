@@ -1979,6 +1979,44 @@
             ],
             "format": "date-time"
           },
+          "last_progress_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_progress_kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_progress_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress_event_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "output_mode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "json",
+              "stream-json",
+              "text",
+              null
+            ]
+          },
           "current_command_label": {
             "type": "string"
           },

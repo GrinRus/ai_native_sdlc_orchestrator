@@ -95,6 +95,32 @@ test("provider step status downgrades stale artifact updates to silent-running",
   assert.equal(status?.remaining_budget_ms, 480_000);
 });
 
+test("provider step status treats recent stream progress as activity", () => {
+  const status = normalizeProviderStepStatus(
+    {
+      provider: "qwen",
+      adapter: "qwen-code",
+      route_id: "route.implement.qwen",
+      step_id: "run.start.implement",
+      status: "running",
+      timeout_budget_ms: 600_000,
+      started_at: "2026-06-02T00:00:00.000Z",
+      last_progress_at: "2026-06-02T00:01:50.000Z",
+      last_progress_kind: "tool_call",
+      last_progress_label: "read_file",
+      progress_event_count: 4,
+      output_mode: "stream-json",
+    },
+    { nowMs: Date.parse("2026-06-02T00:02:00.000Z"), silentAfterMs: 60_000 },
+  );
+
+  assert.equal(status?.status, "running");
+  assert.equal(status?.last_progress_kind, "tool_call");
+  assert.equal(status?.last_progress_label, "read_file");
+  assert.equal(status?.progress_event_count, 4);
+  assert.equal(status?.output_mode, "stream-json");
+});
+
 test("provider step status is exposed through project state and run summaries", () => {
   withCleanRepo((repoRoot) => {
     const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
