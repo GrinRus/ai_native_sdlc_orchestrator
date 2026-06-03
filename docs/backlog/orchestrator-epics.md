@@ -20,6 +20,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W30:** `W30-S01` Post-W29 alpha-hardening planning source of truth; `W30-S02` Alpha architecture decision records; `W30-S05` Alpha readiness gate expansion
 - **W33:** `W33-S01` Console flow source-of-truth and static snapshot removal; `W33-S02` Reliable root gates and live E2E timeout bounds
 - **W34:** `W34-S07` Backlog, docs, and release-gate alignment
+- **W40:** `W40-S01` Post-alpha.7 backlog and product baseline
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -31,6 +32,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W19:** `W19-S03` Discovery research and ADR evidence flow
 - **W21:** `W21-S01` Installed-user onboarding UX contract; `W21-S03` Clean project onboarding and asset-root resolution
 - **W36:** `W36-S01` No-settings onboarding and workspace contract baseline
+- **W40:** `W40-S02` Installed-user onboarding and release docs hardening
 
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
@@ -112,6 +114,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W34:** `W34-S01` Flow product and contract baseline; `W34-S02` Runtime and control-plane flow projections; `W34-S03` Flow-first local web shell; `W34-S04` Flow-scoped evidence, trace, and interaction workbench; `W34-S05` Closure-to-new-flow UX
 - **W35:** `W35-S01` Provider heartbeat and long-running step status; `W35-S02` User-facing artifact reference renderer; `W35-S04` Execution evidence panel and interruption controls
 - **W36:** `W36-S02` App workspace and project registry; `W36-S03` First-run onboarding wizard; `W36-S04` Local multi-project switcher UX
+- **W40:** `W40-S02` Installed-user onboarding and release docs hardening; `W40-S03` Active live E2E heartbeat surfacing
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -146,3 +149,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W37:** `W37-S01` Live E2E target setup and verification closure
 - **W38:** `W38-S01` Qwen stream progress adapter closure
 - **W39:** `W39-S01` Live E2E provider parity policy
+- **W40:** `W40-S03` Active live E2E heartbeat surfacing; `W40-S04` Optional provider qualification matrix

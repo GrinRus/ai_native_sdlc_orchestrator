@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-39-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-40-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -50,6 +50,7 @@ The authoritative planning model for implementation lives in:
 | W37 | Replan W35-S05 around bounded target setup and verification closure so Codex/Qwen proof attempts do not block before operator-visible decisions. | 1 | EPIC-7 | `docs/backlog/wave-37-implementation-slices.md` |
 | W38 | Make Qwen candidate live E2E progress observable through official stream-json output instead of treating buffered JSON stdout as provider silence. | 1 | EPIC-6, EPIC-7 | `docs/backlog/wave-38-implementation-slices.md` |
 | W39 | Standardize live E2E provider lifecycle semantics across Codex, Claude, OpenCode, and Qwen while keeping adapter-specific launch/progress behavior at the adapter boundary. | 1 | EPIC-7 | `docs/backlog/wave-39-implementation-slices.md` |
+| W40 | Turn alpha.7 installed-user findings into the next hardening wave for onboarding UX, active live E2E heartbeat visibility, release docs, and optional provider qualification. | 4 | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-40-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -181,6 +182,10 @@ The authoritative planning model for implementation lives in:
 | W37-S01 | live E2E target setup closure target: OPS-06, OPS-07, OPS-11 |
 | W38-S01 | Qwen stream progress adapter target: OPS-01, OPS-06, OPS-07, OPS-11 |
 | W39-S01 | provider-neutral live E2E lifecycle target: OPS-01, OPS-06, OPS-07, OPS-11 |
+| W40-S01 | post-alpha.7 backlog baseline and release smoke traceability (no direct story closure) |
+| W40-S02 | installed-user onboarding hardening target: PBO-09, OPS-01, OPS-06, OPS-10 |
+| W40-S03 | active live E2E heartbeat surfacing target: OPS-01, OPS-06, OPS-07, OPS-11 |
+| W40-S04 | optional provider qualification matrix target: DEV-04, AIP-12, OPS-06, OPS-07 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -675,6 +680,19 @@ boundaries.
 - Regression tests prove terminal provider failure preserves evidence without starting internal repair by default.
 
 **Detailed slices:** `docs/backlog/wave-39-implementation-slices.md`
+
+## W40 - post-alpha.7 installed-user and provider qualification hardening
+**Goal:** Convert the `0.1.0-alpha.7` release and installed-user smoke findings into the next deterministic backlog wave for onboarding polish, live E2E in-flight observability, and optional provider qualification without expanding into stable, hosted, Docker/GHCR, or SDK release scope.
+
+**Exit criteria:**
+- W40 is represented across the roadmap, master backlog, dependency graph, epic map, and owning wave doc.
+- Installed-user docs and smoke guidance distinguish registry package execution from local checkout context so `npm exec --package @grinrus/aor@<version>` remains a reliable proof path.
+- The no-settings `aor app` onboarding path has targeted UX hardening for first-run, runtime initialization, first flow, project switching, and readable failure guidance.
+- Live E2E UI/report surfaces show active provider heartbeat/progress while a provider step is still running, not only after terminal evidence lands.
+- Release and onboarding docs explain the alpha channel, clean UI launch, no surprise writes, and advanced headless paths in one coherent installed-user story.
+- Optional provider qualification tracks Qwen, OpenCode, Claude, and Codex through a matrix that separates coverage tier, auth/environment blockers, target repository blockers, and AOR product failures.
+
+**Detailed slices:** `docs/backlog/wave-40-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.
