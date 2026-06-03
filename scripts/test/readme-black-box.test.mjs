@@ -210,6 +210,7 @@ test("installed-user docs require neutral registry package smoke", () => {
 test("documented app smoke does not initialize clean target runtime", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-readme-app-smoke-"));
   try {
+    runChecked("pnpm", ["web:build"]);
     const targetRepo = createTargetRepo(tempRoot);
     const runtimeRoot = path.join(targetRepo, ".aor");
     const run = runChecked(process.execPath, [
