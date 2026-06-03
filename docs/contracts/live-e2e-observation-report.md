@@ -73,9 +73,38 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `evidence_refs`
 - `summary`
 
+The `readiness` setup entry may also include target setup and verification
+status details. These details must separate AOR runner/controller failures from
+target repository failures:
+- `target_setup_status`
+- `target_verification_status`
+- `failure_owner` (`aor|target_repository|provider|environment|operator`)
+- `failure_phase`
+  (`aor_install|target_checkout|target_setup|target_verification|provider_execution|controller_decision|ui_validation`)
+- `failure_class`
+
+Target repository setup, test, build, browser dependency, or timeout blockers
+are valid fail-closed evidence, but they are not provider-quality signals and
+must not be reported as AOR product passes.
+
 `flow_range_policy` must be one of:
 - `delivery_default`
 - `full_lifecycle`
+
+When available, the report-level summary should also surface the same owner and
+phase separation used by readiness and step entries:
+- `target_setup_status`
+- `target_verification_status`
+- `provider_step_status`
+- `provider_execution_status`
+- `failure_owner`
+- `failure_phase`
+- `failure_class`
+
+Manual resume must not drop this context. If controller state already captured
+target pre-execution status or provider heartbeat, the final observation report
+must preserve it so operator UI and reports do not collapse target repository
+blockers, provider blockers, and AOR failures into an unclassified blocked run.
 
 `step_journal[]` should preserve:
 - `sequence`
@@ -109,9 +138,12 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 When a step invokes an external provider, `step_journal[]` may also include
 `provider_step_status`. This is the same query-safe heartbeat exposed by the
 control plane and must preserve provider, adapter, route, step, status,
-elapsed/budget fields, last output/artifact timestamps, command label, and
+elapsed/budget fields, last output/artifact/progress timestamps, progress kind,
+progress label, progress event count, output mode, command label, and
 recommended action. It must not include raw process commands, command args,
-environment variables, tokens, or secrets.
+prompt text, file contents, environment variables, tokens, or secrets. Qwen
+`~/.qwen/**` files may be referenced only as manual debug context; normal live
+E2E reports must use public adapter stream evidence.
 
 `plan` should preserve:
 - `objective`

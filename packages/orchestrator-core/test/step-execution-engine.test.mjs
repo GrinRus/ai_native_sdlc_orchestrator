@@ -828,6 +828,100 @@ test("materializeRuntimeHarnessReport marks strict code-changing live no-op as r
   });
 });
 
+test("live E2E zero repair policy preserves terminal evidence without executing internal repair", () => {
+  withTempRepo((repoRoot) => {
+    const policyId = "policy.step.runner.live-e2e.no-internal-repair";
+    fs.writeFileSync(
+      path.join(repoRoot, "examples/policies/step-runner-live-e2e-no-internal-repair.yaml"),
+      [
+        `policy_id: ${policyId}`,
+        "step_class: runner",
+        "pre_validators:",
+        "  - contract-shape",
+        "  - repo-scope",
+        "  - approval-present",
+        "  - route-resolved",
+        "post_validators:",
+        "  - output-schema",
+        "  - evidence-complete",
+        "  - validation-commands",
+        "quality_gate:",
+        "  required: true",
+        "  suite_ref: suite.release.core@v1",
+        "retry:",
+        "  max_attempts: 0",
+        "  on:",
+        "    - provider-timeout",
+        "    - rate-limit",
+        "    - runner-crash",
+        "repair:",
+        "  max_attempts: 0",
+        "  on:",
+        "    - schema-mismatch",
+        "    - lint-failed",
+        "    - tests-failed",
+        "    - missing-evidence",
+        "escalation:",
+        "  after_total_failures: 4",
+        "  on:",
+        "    - business-ambiguity",
+        "    - policy-conflict",
+        "    - security-boundary",
+        "blocking_rules:",
+        "  - approval-missing",
+        "  - frozen-route",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    configureCodexExternalRuntime(repoRoot, {
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.stdout.write(JSON.stringify({",
+          "status:'success',",
+          "summary:'external runner terminal no-op',",
+          "output:{runner:'node-inline'},",
+          "evidence_refs:['evidence://external-runner/no-op-terminal']",
+          "}));",
+        ].join(""),
+      ],
+    });
+
+    const result = executeRuntimeHarnessControlledStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: false,
+      runId: "live-e2e-no-internal-repair",
+      stepId: "run.start.implement",
+      approvedHandoffRef: "evidence://handoff/live-e2e-no-internal-repair",
+      promotionEvidenceRefs: ["evidence://promotion/live-e2e-no-internal-repair"],
+      executionRoot: repoRoot,
+      policyOverrides: {
+        implement: policyId,
+      },
+    });
+
+    assert.equal(result.stepResult.status, "failed");
+    assert.equal(result.stepResult.runtime_harness_decision, "block");
+    assert.equal(result.stepResult.repair_status, "exhausted");
+    assert.equal(result.stepResult.failure_class, "no-op");
+    assert.equal(result.stepResult.repair_attempts.length, 1);
+    assert.equal(result.stepResult.repair_attempts[0].policy_budget.max_attempts, 0);
+    assert.equal(result.stepResult.repair_attempts[0].exhausted_budget, true);
+    assert.equal(
+      result.stepResult.routed_execution.policy_resolution.policy.policy_id,
+      policyId,
+    );
+
+    const reportFiles = fs.readdirSync(result.runtimeLayout.reportsRoot);
+    assert.equal(reportFiles.some((entry) => entry.startsWith("runtime-harness-repair-input-")), false);
+    assert.equal(reportFiles.some((entry) => entry.includes(".repair.")), false);
+  });
+});
+
 test("orchestrator-mediated permission auto-approval reinvokes a restricted runtime with the resume mode", () => {
   withTempRepo((repoRoot) => {
     const runId = "runtime-permission-auto-approve";

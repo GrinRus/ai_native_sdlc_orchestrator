@@ -189,6 +189,8 @@ graph TD
   W36S04[W36-S04 Local multi-project switcher UX]
   W36S05[W36-S05 Docs, smoke, and proof]
   W37S01[W37-S01 Live E2E target setup and verification closure]
+  W38S01[W38-S01 Qwen stream progress adapter closure]
+  W39S01[W39-S01 Live E2E provider parity policy]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -473,6 +475,9 @@ graph TD
   W36S03 --> W36S04
   W36S04 --> W36S05
   W35S04 --> W37S01
+  W35S05 --> W38S01
+  W37S01 --> W38S01
+  W38S01 --> W39S01
 ```
 
 ## W0 hard dependencies
@@ -812,6 +817,16 @@ graph TD
 |---|---|
 | W37-S01 | W35-S04 |
 
+## W38 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W38-S01 | W35-S05, W37-S01 |
+
+## W39 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W39-S01 | W38-S01 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -998,6 +1013,8 @@ graph TD
 183. W36-S04
 184. W36-S05
 185. W37-S01
+186. W38-S01
+187. W39-S01
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

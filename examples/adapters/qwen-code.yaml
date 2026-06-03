@@ -32,7 +32,8 @@ execution:
             - --auth-type
             - anthropic
             - --output-format
-            - json
+            - stream-json
+            - --include-partial-messages
             - --approval-mode
             - yolo
             - --exclude-tools
@@ -43,7 +44,8 @@ execution:
             - --auth-type
             - anthropic
             - --output-format
-            - json
+            - stream-json
+            - --include-partial-messages
             - --approval-mode
             - default
             - --exclude-tools
@@ -79,6 +81,7 @@ limitations:
   - Candidate adapter only; not part of required provider coverage until a real runner certification promotes it.
   - Candidate live steps keep the one-hour real-runner cap because Qwen Code can exceed shorter local proof budgets on full lifecycle implementation requests.
   - Qwen Code runs with --bare and --exclude-tools skill so candidate live execution does not materialize runner-local .qwen skill state inside target checkouts.
+  - Qwen Code uses --output-format stream-json with --include-partial-messages because buffered --output-format json emits stdout only at session completion and makes active runs look silent to AOR.
   - Qwen Code 0.17.0 requires explicit headless auth selection in the current host setup; this profile uses --auth-type anthropic and maps ANTHROPIC_AUTH_TOKEN to ANTHROPIC_API_KEY when the API-key variable is absent.
   - Qwen Code receives a native --max-wall-time value slightly below the AOR subprocess timeout so timeout evidence can come from the runner before AOR has to SIGKILL the process group.
   - Qwen Code restricted/default mode is not certified for AOR JSON-envelope requests: local smoke shows stdin and argv JSON requests can time out without structured permission_denial output.

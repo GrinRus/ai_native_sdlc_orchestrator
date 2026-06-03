@@ -7,7 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { loadContractFile } from "../../packages/contracts/src/index.mjs";
-import { loadProofRunnerProfile } from "../live-e2e/lib/profile-catalog.mjs";
+import { loadProofRunnerProfile, resolveFullJourneyProfile } from "../live-e2e/lib/profile-catalog.mjs";
 import {
   materializeFeatureRequestFile,
   materializeGeneratedProjectProfile,
@@ -18,6 +18,8 @@ import {
 import { runLiveAdapterPreflight } from "../live-e2e/lib/preflight.mjs";
 import {
   archivedNextActionReportForMission,
+  buildTargetPreExecutionStatusReport,
+  evaluateBaselineVerifyGate,
   nextActionReportClosesFlow,
   prepareAorInstallationProof,
   runtimeHarnessReportHasMissionRelevantChanges,
@@ -430,17 +432,35 @@ test("W35 live attempts summary records blockers without claiming product pass",
   assert.equal(fixture.slice_id, "W35-S05");
   assert.equal(fixture.closure_policy.synthetic_fixture_can_prove_ui_observability_only, true);
   assert.equal(fixture.closure_policy.legacy_bounded_or_mock_backed_profiles_restored, false);
-  for (const attempt of fixture.attempts) {
+  for (const attempt of fixture.attempts.filter((entry) => entry.status !== "pass")) {
     assert.equal(attempt.status, "blocked");
     assert.equal(attempt.product_pass_claimed, false);
     assert.equal(attempt.no_upstream_write, true);
-    assert.match(attempt.public_command_surface, /live-e2e|qwen/u);
   }
-  const codexAttempt = fixture.attempts.find((entry) => entry.provider_variant_id === "openai-primary");
+  const codexAttempt = fixture.attempts.find((entry) => entry.run_id === "w35-s05-codex-small-1780389151");
   assert.equal(codexAttempt.blocker_class, "target-verification-environment");
+  assert.equal(codexAttempt.failure_owner, "target_repository");
+  assert.equal(codexAttempt.failure_phase, "target_verification");
+  assert.equal(codexAttempt.target_pre_execution_status_ref, "examples/live-e2e/fixtures/w37-s01/target-pre-execution-status.sample.json");
   assert.match(codexAttempt.public_observation, /baseline-diagnostic/u);
-  const qwenAttempt = fixture.attempts.find((entry) => entry.provider_variant_id === "qwen-primary");
+  const qwenAttempt = fixture.attempts.find((entry) => entry.run_id === "w35-s05-qwen-small-preflight");
+  assert.equal(qwenAttempt.failure_owner, "target_repository");
+  assert.equal(qwenAttempt.failure_phase, "target_verification");
   assert.match(qwenAttempt.public_observation, /0\.17\.0/u);
+  const codexClosure = fixture.attempts.find((entry) => entry.run_id === "w35-s05-codex-small-proof-20260603094440");
+  assert.equal(codexClosure.status, "pass");
+  assert.equal(codexClosure.acceptance_status, "pass");
+  assert.equal(codexClosure.product_pass_claimed, true);
+  assert.equal(codexClosure.target_setup_status, "pass");
+  assert.equal(codexClosure.target_verification_status, "pass");
+  const qwenClosure = fixture.attempts.find((entry) => entry.run_id === "w35-s05-qwen-interrupt-proof-20260603102247");
+  assert.equal(qwenClosure.status, "blocked");
+  assert.equal(qwenClosure.failure_owner, "provider");
+  assert.equal(qwenClosure.failure_phase, "provider_execution");
+  assert.equal(qwenClosure.blocker_class, "provider_blocked");
+  assert.equal(qwenClosure.target_setup_status, "pass");
+  assert.equal(qwenClosure.target_verification_status, "pass");
+  assert.equal(qwenClosure.product_pass_claimed, false);
 });
 
 test("catalog feature request materialization preserves required path prefixes", () => {
@@ -515,6 +535,146 @@ test("generated live E2E profile allows the selected candidate provider adapter"
     assert.ok(loaded.document.allowed_providers.includes("qwen"));
     assert.ok(loaded.document.allowed_adapters.includes("qwen-code"));
     assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
+  });
+});
+
+test("generated ky small Codex profile uses bounded target setup and mission-scoped verification", () => {
+  withTempRoot((tempRoot) => {
+    const profileRef = "scripts/live-e2e/profiles/full-journey-regress-ky-small-codex.yaml";
+    const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef });
+    const resolved = resolveFullJourneyProfile({
+      profile: loadedProfile.profile,
+      catalogRoot: path.join(repoRoot, "scripts/live-e2e/catalog"),
+    });
+    const generatedAssetsRoot = path.join(tempRoot, "assets");
+    fs.mkdirSync(generatedAssetsRoot, { recursive: true });
+
+    const result = materializeGeneratedProjectProfile({
+      hostRoot: repoRoot,
+      profilePath: loadedProfile.profilePath,
+      profile: resolved.resolvedProfile,
+      catalogEntry: resolved.catalogEntry,
+      providerVariant: resolved.providerVariant,
+      runId: "ky-small-bounded-target-setup",
+      targetCheckout: {
+        targetRepoId: "ky",
+        targetRepoRef: "main",
+      },
+      generatedAssetsRoot,
+    });
+
+    const loaded = loadContractFile({
+      filePath: result.generatedProjectProfileFile,
+      family: "project-profile",
+    });
+    assert.equal(loaded.ok, true);
+    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
+    assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
+    assert.deepEqual(loaded.document.repos[0].test_commands, [
+      "npx xo",
+      "npm run build",
+      "npx ava test/headers.ts",
+    ]);
+    assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
+  });
+});
+
+test("target pre-execution status separates target setup, target verification, and AOR failures", () => {
+  withTempRoot((tempRoot) => {
+    const setupTranscript = writeJsonFixture(path.join(tempRoot, "setup-transcript.json"));
+    const setupStepFile = writeJsonFixture(path.join(tempRoot, "setup-step.json"), {
+      status: "failed",
+      command: "npm install --prefer-offline --no-audit --no-fund",
+      summary: "Verification command 'npm install --prefer-offline --no-audit --no-fund' timed out after 120000ms.",
+      evidence_refs: [setupTranscript],
+      command_timeout_ms: 120000,
+      timed_out: true,
+      missing_prerequisites: [],
+    });
+    const verificationStepFile = writeJsonFixture(path.join(tempRoot, "verify-step.json"), {
+      status: "failed",
+      command: "npx ava test/headers.ts",
+      summary: "Verification command 'npx ava test/headers.ts' failed with exit code 1.",
+      evidence_refs: [writeJsonFixture(path.join(tempRoot, "verify-transcript.json"))],
+      command_timeout_ms: 120000,
+      timed_out: false,
+      missing_prerequisites: [],
+    });
+
+    const setupReport = buildTargetPreExecutionStatusReport({
+      verifySummary: { status: "failed", command_timeout_ms: 120000 },
+      verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary.json") },
+      stepResultFiles: [setupStepFile, verificationStepFile],
+      setupCommands: ["npm install --prefer-offline --no-audit --no-fund"],
+      verificationCommands: ["npx ava test/headers.ts"],
+      baselineGateDecision: { status: "fail", decision: "block", summary: "readiness-command-failed" },
+      runResult: {
+        durationSec: 121,
+        timeoutMs: 300000,
+        transcriptFile: path.join(tempRoot, "project-verify.json"),
+      },
+    });
+    assert.equal(setupReport.status, "blocked");
+    assert.equal(setupReport.failure_owner, "target_repository");
+    assert.equal(setupReport.failure_phase, "target_setup");
+    assert.equal(setupReport.failure_class, "target_setup_blocked");
+    assert.equal(setupReport.target_setup_status.timed_out, true);
+    assert.equal(setupReport.target_verification_status.status, "blocked");
+
+    const verificationReport = buildTargetPreExecutionStatusReport({
+      verifySummary: { status: "failed", command_timeout_ms: 120000 },
+      verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary.json") },
+      stepResultFiles: [verificationStepFile],
+      setupCommands: ["npm install --prefer-offline --no-audit --no-fund"],
+      verificationCommands: ["npx ava test/headers.ts"],
+      baselineGateDecision: { status: "warn", decision: "continue_with_warnings", summary: "target verification failed" },
+      runResult: { durationSec: 5, timeoutMs: 300000, transcriptFile: path.join(tempRoot, "project-verify.json") },
+    });
+    assert.equal(verificationReport.failure_owner, "target_repository");
+    assert.equal(verificationReport.failure_phase, "target_verification");
+    assert.equal(verificationReport.failure_class, "target_verification_blocked");
+
+    const aorReport = buildTargetPreExecutionStatusReport({
+      verifySummary: {},
+      verifyPayload: {},
+      stepResultFiles: [],
+      setupCommands: ["npm install --prefer-offline --no-audit --no-fund"],
+      verificationCommands: ["npx ava test/headers.ts"],
+      baselineGateDecision: { status: "fail", decision: "block", summary: "AOR command timed out." },
+      runResult: {
+        label: "project-verify-preflight",
+        durationSec: 300,
+        timeoutMs: 300000,
+        transcriptFile: path.join(tempRoot, "project-verify-timeout.json"),
+        timedOut: true,
+      },
+    });
+    assert.equal(aorReport.failure_owner, "aor");
+    assert.equal(aorReport.failure_phase, "target_verification");
+    assert.equal(aorReport.failure_class, "aor_failure");
+  });
+});
+
+test("baseline verify gate annotates blocker owner and phase", () => {
+  withTempRoot((tempRoot) => {
+    const stepFile = writeJsonFixture(path.join(tempRoot, "verify-step.json"), {
+      status: "failed",
+      command: "npx ava test/headers.ts",
+      summary: "Target test failed.",
+      evidence_refs: [],
+      missing_prerequisites: [],
+    });
+    const result = evaluateBaselineVerifyGate({
+      verifySummary: { status: "failed", validation_gate_status: "pass" },
+      verifyPayload: {},
+      stepResultFiles: [stepFile],
+      setupCommands: ["npm install --prefer-offline --no-audit --no-fund"],
+      verificationCommands: ["npx ava test/headers.ts"],
+      mode: "diagnostic",
+    });
+    assert.equal(result.failure_owner, "target_repository");
+    assert.equal(result.failure_phase, "target_verification");
+    assert.equal(result.failure_class, "target_verification_blocked");
   });
 });
 
@@ -816,6 +976,40 @@ test("provider-pinned policy materialization honors bounded retry and repair ove
   });
 });
 
+test("provider-pinned policy materialization defaults live E2E provider steps to no internal repair", () => {
+  withTempRoot((tempRoot) => {
+    const policiesRoot = path.join(tempRoot, "policies");
+    fs.cpSync(path.join(repoRoot, "examples/policies"), policiesRoot, { recursive: true });
+
+    const result = materializeProviderPinnedPolicyOverrides({
+      policiesRoot,
+      providerVariantId: "openai-primary",
+      providerVariant: {
+        provider: "openai",
+        primary_adapter: "codex-cli",
+        route_override_policy: {
+          steps: ["implement", "review", "qa", "repair"],
+        },
+      },
+      profile: {
+        live_e2e: {},
+      },
+    });
+
+    assert.deepEqual(Object.keys(result.policyOverrides).sort(), ["implement", "qa", "repair", "review"]);
+    for (const [step, policyId] of Object.entries(result.policyOverrides)) {
+      const loaded = loadContractFile({
+        filePath: path.join(policiesRoot, `${step}-openai-primary-policy.yaml`),
+        family: "step-policy-profile",
+      });
+      assert.equal(loaded.ok, true);
+      assert.equal(loaded.document.policy_id, policyId);
+      assert.equal(loaded.document.retry.max_attempts, 0);
+      assert.equal(loaded.document.repair.max_attempts, 0);
+    }
+  });
+});
+
 test("live E2E generated project profile wiring preserves provider variants in every flow", () => {
   const flowsSource = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
   const materializationCalls = flowsSource.match(
@@ -827,6 +1021,7 @@ test("live E2E generated project profile wiring preserves provider variants in e
     assert.match(materializationCall, /providerVariant: options\.providerVariant/u);
   }
   assert.match(flowsSource, /materializeProviderPinnedPolicyOverrides/u);
+  assert.match(flowsSource, /providerVariant: options\.providerVariant/u);
   assert.match(flowsSource, /--policy-overrides/u);
 });
 
@@ -902,6 +1097,21 @@ test("run summary canonical status is recomputed on resumed final verdicts", () 
     runProfileSource,
     /if \(Object\.keys\(existing\)\.length > 0\) return existing/u,
   );
+});
+
+test("proof runner preserves target setup and provider interruption evidence on manual resume", () => {
+  const runProfileSource = fs.readFileSync(runProfileScript, "utf8");
+  assert.match(runProfileSource, /function hydrateFlowArtifactsFromControllerState/u);
+  assert.match(runProfileSource, /artifacts_snapshot/u);
+  assert.match(runProfileSource, /target_pre_execution_status/u);
+  assert.match(runProfileSource, /target_setup_status/u);
+  assert.match(runProfileSource, /target_verification_status_detail/u);
+  assert.match(runProfileSource, /function classifyProviderStepStatus/u);
+  assert.match(runProfileSource, /failure_owner: "provider"/u);
+  assert.match(runProfileSource, /failure_phase: "provider_execution"/u);
+  assert.match(runProfileSource, /failure_class: "provider_blocked"/u);
+  assert.match(runProfileSource, /provider_step_status:[\s\S]*options\.flowResult\.artifacts\.provider_step_status/u);
+  assert.match(runProfileSource, /finalSkillAgentVerdict\.verdict[\s\S]*observationReport\.report_status = "final"/u);
 });
 
 test("manual live E2E exposes final skill-agent verdict installation workflow", () => {

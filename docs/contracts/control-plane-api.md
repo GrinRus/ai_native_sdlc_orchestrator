@@ -201,6 +201,8 @@ Long-running external provider execution is exposed through the query-safe
   `timeout-risk`, `completed`, `interrupted`, or `failed`;
 - `elapsed_ms`, `timeout_budget_ms`, `remaining_budget_ms`;
 - `last_output_at`, `last_artifact_update_at`;
+- optional stream progress fields: `last_progress_at`, `last_progress_kind`,
+  `last_progress_label`, `progress_event_count`, and `output_mode`;
 - `current_command_label`;
 - `recommended_action`;
 - `started_at`, `updated_at`, and optional `finished_at`.
@@ -209,9 +211,11 @@ The field is a public control-plane signal, not process inspection. Runtime code
 updates it before and during external adapter execution, and read surfaces
 normalize elapsed and timeout budget values when queried. User-facing payloads
 must keep `current_command_label` compact and must not expose raw process
-commands, command args, environment variables, bearer tokens, auth tokens, or
-provider secrets. Raw provider evidence remains available only through explicit
-debug/evidence refs.
+commands, command args, prompt text, file contents, environment variables,
+bearer tokens, auth tokens, or provider secrets. Stream progress labels must be
+sanitized summaries such as `api_response`, `tool_call:read_file`, or
+`assistant message`, not raw provider payloads. Raw provider evidence remains
+available only through explicit debug/evidence refs.
 
 ## Execution evidence summaries (W35-S04)
 

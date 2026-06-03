@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-37-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-39-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -48,6 +48,8 @@ The authoritative planning model for implementation lives in:
 | W35 | Harden live E2E operator UX for long-running providers, decision helper automation, readable artifacts, execution evidence, and Codex/Qwen proof. | 5 | EPIC-6, EPIC-7 | `docs/backlog/wave-35-implementation-slices.md` |
 | W36 | Make the local app self-guided from a no-settings launch and support explicitly added local projects without mixing runtime state. | 5 | EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-36-implementation-slices.md` |
 | W37 | Replan W35-S05 around bounded target setup and verification closure so Codex/Qwen proof attempts do not block before operator-visible decisions. | 1 | EPIC-7 | `docs/backlog/wave-37-implementation-slices.md` |
+| W38 | Make Qwen candidate live E2E progress observable through official stream-json output instead of treating buffered JSON stdout as provider silence. | 1 | EPIC-6, EPIC-7 | `docs/backlog/wave-38-implementation-slices.md` |
+| W39 | Standardize live E2E provider lifecycle semantics across Codex, Claude, OpenCode, and Qwen while keeping adapter-specific launch/progress behavior at the adapter boundary. | 1 | EPIC-7 | `docs/backlog/wave-39-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -177,6 +179,8 @@ The authoritative planning model for implementation lives in:
 | W36-S04 | local multi-project switcher target: PBO-09, OPS-01, OPS-10 |
 | W36-S05 | no-settings UI proof target: OPS-06, OPS-10, PBO-09 |
 | W37-S01 | live E2E target setup closure target: OPS-06, OPS-07, OPS-11 |
+| W38-S01 | Qwen stream progress adapter target: OPS-01, OPS-06, OPS-07, OPS-11 |
+| W39-S01 | provider-neutral live E2E lifecycle target: OPS-01, OPS-06, OPS-07, OPS-11 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -619,7 +623,7 @@ boundaries.
 - Execution evidence distinguishes mission-relevant changed paths, runtime-owned artifacts, runner-owned state leaks, scratch files, Runtime Harness status, verification status, and no-upstream-write state.
 - Stop, diagnose, and retry controls use public control-plane surfaces and preserve partial evidence.
 - Codex/Qwen live E2E UX proof uses current skill-agent-only profiles and does not reintroduce removed bounded or mock-backed proof paths.
-- W35-S05 proof closure includes the silent-provider UX fixture and requires any Qwen non-pass to be recorded as clear provider-quality/environment blocker evidence, not as product success.
+- W35-S05 proof closure includes the silent-provider UX fixture, a clean Codex small proof, and a fail-closed Qwen provider blocker with target setup/verification shown separately from provider execution.
 
 **Detailed slices:** `docs/backlog/wave-35-implementation-slices.md`
 
@@ -643,9 +647,34 @@ boundaries.
 - W37 is represented across the roadmap, master backlog, dependency graph, and owning wave doc.
 - The `ky` live E2E target setup path has bounded Playwright/browser dependency handling and does not run unbounded `npm exec playwright install` during baseline diagnostic.
 - Target verification separates provider-independent setup blockers from Codex/Qwen provider quality evidence.
-- W35-S05 remains blocked until Codex closes cleanly and Qwen closes or records a provider/environment blocker after the target setup path is bounded.
+- Live E2E summaries separate AOR runner/controller failures from target repository setup/test/build failures with `failure_owner` and `failure_phase` evidence.
+- W37-S01 closure evidence is cited by W35-S05: Codex now closes cleanly and Qwen non-pass is recorded as provider-owned blocker evidence after bounded target setup and verification pass.
 
 **Detailed slices:** `docs/backlog/wave-37-implementation-slices.md`
+
+## W38 - Qwen stream progress adapter closure
+**Goal:** Replace Qwen candidate buffered JSON stdout with official stream-json progress so live E2E operator surfaces can show provider activity before final output.
+
+**Exit criteria:**
+- W38 is represented across the roadmap, master backlog, dependency graph, and owning wave doc.
+- Qwen candidate adapter profiles use `--output-format stream-json --include-partial-messages` while preserving existing safety, auth, timeout, and request transport behavior.
+- Provider heartbeat exposes sanitized Qwen stream progress fields without depending on private `~/.qwen/**` logs.
+- Live E2E summaries and UI distinguish stream-observed provider progress from true `silent-running`.
+- Regression tests prove stream JSONL progress prevents false silent-provider UX, malformed lines fail safely, and interrupted runs preserve progress evidence.
+
+**Detailed slices:** `docs/backlog/wave-38-implementation-slices.md`
+
+## W39 - live E2E provider parity standardization
+**Goal:** Make live E2E provider execution semantics provider-neutral across Codex, Claude, OpenCode, and Qwen while keeping command/auth/progress differences at the adapter boundary.
+
+**Exit criteria:**
+- W39 is represented across the roadmap, master backlog, dependency graph, and owning wave doc.
+- Live E2E runbooks define provider parity for public lifecycle, target classification, evidence, Runtime Harness retry/repair, operator decisions, and pass/blocker semantics.
+- Provider-pinned policy materialization defaults missing attempt maps to `retry=0` and `repair=0` for provider-backed live E2E steps.
+- Qwen profiles no longer carry provider-only retry/repair lifecycle maps.
+- Regression tests prove terminal provider failure preserves evidence without starting internal repair by default.
+
+**Detailed slices:** `docs/backlog/wave-39-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

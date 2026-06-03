@@ -80,8 +80,16 @@ function writeProviderStepStatus(patch = {}) {
   const lastOutputAt = asString(patch.last_output_at) || asString(previous.last_output_at) || null;
   const lastArtifactUpdateAt =
     asString(patch.last_artifact_update_at) || asString(previous.last_artifact_update_at) || null;
+  const lastProgressAt = asString(patch.last_progress_at) || asString(previous.last_progress_at) || null;
+  const progressEventCount =
+    asNumber(patch.progress_event_count) !== null
+      ? Math.max(0, Math.floor(asNumber(patch.progress_event_count)))
+      : asNumber(previous.progress_event_count) !== null
+        ? Math.max(0, Math.floor(asNumber(previous.progress_event_count)))
+        : null;
   const lastActivityMs = Math.max(parseIsoMs(lastOutputAt) || startedMs, parseIsoMs(lastArtifactUpdateAt) || startedMs);
-  const silentMs = Math.max(0, Math.floor(now.getTime() - lastActivityMs));
+  const lastObservedActivityMs = Math.max(lastActivityMs, parseIsoMs(lastProgressAt) || startedMs);
+  const silentMs = Math.max(0, Math.floor(now.getTime() - lastObservedActivityMs));
   const timeoutRiskThreshold = Math.min(60000, Math.max(5000, Math.floor(timeoutBudgetMs * 0.1)));
   const terminalStatus = patch.status === "completed" || patch.status === "failed" || patch.status === "interrupted";
   let status = asString(patch.status) || asString(previous.status) || "running";
@@ -106,6 +114,11 @@ function writeProviderStepStatus(patch = {}) {
     remaining_budget_ms: remainingBudgetMs,
     last_output_at: lastOutputAt,
     last_artifact_update_at: lastArtifactUpdateAt,
+    last_progress_at: lastProgressAt,
+    last_progress_kind: asString(patch.last_progress_kind) || asString(previous.last_progress_kind) || null,
+    last_progress_label: asString(patch.last_progress_label) || asString(previous.last_progress_label) || null,
+    progress_event_count: progressEventCount,
+    output_mode: asString(patch.output_mode) || asString(previous.output_mode) || null,
     current_command_label:
       asString(providerConfig.current_command_label) || asString(previous.current_command_label) || "external-provider-runner",
     recommended_action:
@@ -114,6 +127,8 @@ function writeProviderStepStatus(patch = {}) {
         ? "Check provider progress or stop before budget is exhausted."
         : status === "silent-running"
           ? "No output yet; provider is still running."
+          : lastProgressAt
+            ? "Provider stream progress observed; keep monitoring until the step completes."
           : status === "failed"
             ? "Inspect provider evidence and failure summary."
             : status === "completed"
@@ -129,9 +144,96 @@ function writeProviderStepStatus(patch = {}) {
   } catch {}
 }
 
+function readProviderStepState() {
+  const providerConfig = asObject(options.provider_step_status);
+  const stateFile = asString(providerConfig.state_file);
+  if (!stateFile) return {};
+  try {
+    return asObject(JSON.parse(fs.readFileSync(stateFile, "utf8")));
+  } catch {
+    return {};
+  }
+}
+
+function providerCancellationRequested() {
+  const state = readProviderStepState();
+  const stateStatus = asString(state.status);
+  const providerStatus = asString(asObject(state.provider_step_status).status);
+  return (
+    stateStatus === "canceled" ||
+    stateStatus === "cancelled" ||
+    stateStatus === "interrupted" ||
+    providerStatus === "interrupted"
+  );
+}
+
 function appendBounded(current, chunk, maxBuffer) {
   const next = current + chunk;
   return next.length > maxBuffer ? next.slice(0, maxBuffer) : next;
+}
+
+function safeLabel(value, fallback) {
+  const stringValue = asString(value);
+  if (!stringValue) return fallback;
+  const normalized = stringValue.replace(/[^A-Za-z0-9_.:-]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalized.length > 0 ? normalized.slice(0, 96) : fallback;
+}
+
+function outputModeFromArgs(args) {
+  if (!Array.isArray(args)) return null;
+  const index = args.findIndex((entry) => entry === "--output-format");
+  return index >= 0 ? asString(args[index + 1]) : null;
+}
+
+function summarizeProgressEvent(record, observedAt) {
+  const event = asObject(record);
+  if (Object.keys(event).length === 0) return null;
+  const systemPayload = asObject(event.systemPayload);
+  const uiEvent = asObject(systemPayload.uiEvent);
+  const streamEvent = asObject(event.event);
+  const streamContentBlock = asObject(streamEvent.content_block);
+  const streamEventType = asString(streamEvent.type);
+  const eventName = asString(uiEvent["event.name"]) || asString(event.event_name) || streamEventType;
+  const rawType = asString(event.type) || "json";
+  const subtype = asString(event.subtype);
+  const normalizedEventName = eventName ? eventName.replace(/^qwen-code\./, "") : null;
+  const functionName =
+    asString(uiEvent.function_name) ||
+    asString(asObject(event.functionCall).name) ||
+    asString(streamContentBlock.name) ||
+    asString(event.tool_name) ||
+    asString(event.name);
+  const streamBlockType = asString(streamContentBlock.type);
+
+  let kind = safeLabel(normalizedEventName || rawType, "json");
+  let label = safeLabel(subtype || normalizedEventName || rawType, kind);
+  if (kind === "tool_call" || rawType.includes("tool") || streamBlockType === "tool_use") {
+    kind = "tool_call";
+    label = safeLabel(functionName, "tool_call");
+  } else if (kind === "api_response") {
+    label = "api_response";
+  } else if (rawType === "stream_event") {
+    kind = safeLabel(streamEventType, "stream_event");
+    label = safeLabel(functionName || streamBlockType || streamEventType, kind);
+  } else if (rawType === "assistant") {
+    kind = "assistant";
+    label = "assistant-message";
+  } else if (rawType === "result") {
+    kind = "result";
+    label = safeLabel(subtype || event.status, "result");
+  } else if (rawType === "system" && subtype) {
+    kind = "system";
+    label = safeLabel(subtype, "system");
+  }
+
+  return {
+    observed_at: observedAt,
+    timestamp: asString(event.timestamp) || asString(uiEvent["event.timestamp"]) || null,
+    kind,
+    label,
+    type: safeLabel(rawType, "json"),
+    subtype: subtype ? safeLabel(subtype, "event") : null,
+  };
 }
 
 function killProcessTree(child, signal) {
@@ -151,11 +253,62 @@ function killProcessTree(child, signal) {
 const options = readOptions();
 const timeoutMs = Number.isFinite(options.timeout_ms) && options.timeout_ms > 0 ? Math.floor(options.timeout_ms) : 30000;
 const maxBuffer = Number.isFinite(options.max_buffer) && options.max_buffer > 0 ? Math.floor(options.max_buffer) : 10 * 1024 * 1024;
+const outputMode = outputModeFromArgs(options.args);
 let stdout = "";
 let stderr = "";
 let timedOut = false;
+let interrupted = false;
 let emitted = false;
 let heartbeatTimer = null;
+let interruptKillTimer = null;
+let stdoutLineBuffer = "";
+let providerProgressEventCount = 0;
+const providerProgressEvents = [];
+const heartbeatIntervalMs = Math.max(25, asNumber(asObject(options.provider_step_status).heartbeat_interval_ms) || 5000);
+
+function recordProviderProgress(record) {
+  const nowIso = new Date().toISOString();
+  const event = summarizeProgressEvent(record, nowIso);
+  if (!event) return;
+  providerProgressEventCount += 1;
+  providerProgressEvents.push(event);
+  if (providerProgressEvents.length > 100) {
+    providerProgressEvents.shift();
+  }
+  writeProviderStepStatus({
+    status: "running",
+    last_progress_at: nowIso,
+    last_progress_kind: event.kind,
+    last_progress_label: event.label,
+    progress_event_count: providerProgressEventCount,
+    output_mode: outputMode,
+    recommended_action: "Provider stream progress observed; keep monitoring until the step completes.",
+  });
+}
+
+function processStdoutProgressChunk(chunk) {
+  if (outputMode !== "stream-json") return;
+  stdoutLineBuffer += chunk;
+  const lines = stdoutLineBuffer.split(/\r?\n/);
+  stdoutLineBuffer = lines.pop() || "";
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      recordProviderProgress(JSON.parse(trimmed));
+    } catch {}
+  }
+}
+
+function flushStdoutProgressBuffer() {
+  if (outputMode !== "stream-json") return;
+  const trimmed = stdoutLineBuffer.trim();
+  stdoutLineBuffer = "";
+  if (!trimmed) return;
+  try {
+    recordProviderProgress(JSON.parse(trimmed));
+  } catch {}
+}
 
 function finish(result) {
   if (emitted) {
@@ -166,7 +319,11 @@ function finish(result) {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
   }
-  emit(result);
+  if (interruptKillTimer) {
+    clearTimeout(interruptKillTimer);
+    interruptKillTimer = null;
+  }
+  emit({ ...result, provider_progress_events: providerProgressEvents });
 }
 
 let child;
@@ -197,8 +354,23 @@ try {
 }
 
 heartbeatTimer = setInterval(() => {
+  if (providerCancellationRequested()) {
+    if (!interrupted) {
+      interrupted = true;
+      writeProviderStepStatus({
+        status: "interrupted",
+        recommended_action: "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
+        finished_at: new Date().toISOString(),
+      });
+      killProcessTree(child, "SIGTERM");
+      interruptKillTimer = setTimeout(() => {
+        killProcessTree(child, "SIGKILL");
+      }, 1000);
+    }
+    return;
+  }
   writeProviderStepStatus({ status: "running" });
-}, 5000);
+}, heartbeatIntervalMs);
 
 const timer = setTimeout(() => {
   timedOut = true;
@@ -213,6 +385,7 @@ child.stdout.setEncoding("utf8");
 child.stderr.setEncoding("utf8");
 child.stdout.on("data", (chunk) => {
   stdout = appendBounded(stdout, chunk, maxBuffer);
+  processStdoutProgressChunk(chunk);
   writeProviderStepStatus({ status: "running", last_output_at: new Date().toISOString() });
 });
 child.stderr.on("data", (chunk) => {
@@ -238,10 +411,19 @@ child.on("error", (error) => {
 });
 child.on("close", (status, signal) => {
   clearTimeout(timer);
+  flushStdoutProgressBuffer();
+  if (interruptKillTimer) {
+    clearTimeout(interruptKillTimer);
+    interruptKillTimer = null;
+  }
   writeProviderStepStatus({
-    status: status === 0 && !timedOut ? "completed" : "failed",
+    status: interrupted ? "interrupted" : status === 0 && !timedOut ? "completed" : "failed",
     recommended_action:
-      status === 0 && !timedOut ? "Continue with post-run verification." : "Inspect provider evidence and failure summary.",
+      interrupted
+        ? "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step."
+        : status === 0 && !timedOut
+          ? "Continue with post-run verification."
+          : "Inspect provider evidence and failure summary.",
     finished_at: new Date().toISOString(),
   });
   finish({
@@ -249,8 +431,12 @@ child.on("close", (status, signal) => {
     signal,
     stdout,
     stderr,
-    error_code: timedOut ? "ETIMEDOUT" : null,
-    error_message: timedOut ? "External runtime timed out after " + timeoutMs + "ms." : null,
+    error_code: interrupted ? "EINTERRUPTED" : timedOut ? "ETIMEDOUT" : null,
+    error_message: interrupted
+      ? "External runtime was interrupted by public run-control cancel."
+      : timedOut
+        ? "External runtime timed out after " + timeoutMs + "ms."
+        : null,
     timed_out: timedOut,
   });
 });
@@ -455,6 +641,7 @@ export function resolveExternalRuntimeExecutionRoot(options) {
  *   stdout: string,
  *   stderr: string,
  *   error: Error | null,
+ *   providerProgressEvents?: Array<Record<string, unknown>>,
  * }}
  */
 export function runExternalRuntimeProcessSync(options) {
@@ -487,6 +674,7 @@ export function runExternalRuntimeProcessSync(options) {
       stdout: "",
       stderr: typeof supervisor.stderr === "string" ? supervisor.stderr : "",
       error: supervisor.error,
+      providerProgressEvents: [],
     };
   }
 
@@ -505,6 +693,9 @@ export function runExternalRuntimeProcessSync(options) {
       stdout: typeof parsed.stdout === "string" ? parsed.stdout : "",
       stderr: typeof parsed.stderr === "string" ? parsed.stderr : "",
       error,
+      providerProgressEvents: Array.isArray(parsed.provider_progress_events)
+        ? parsed.provider_progress_events.map((event) => asRecord(event))
+        : [],
     };
   } catch (error) {
     const parseError = error instanceof Error ? error : new Error(String(error));
@@ -515,6 +706,7 @@ export function runExternalRuntimeProcessSync(options) {
       stdout: "",
       stderr: [typeof supervisor.stderr === "string" ? supervisor.stderr : "", supervisorStdout].filter(Boolean).join("\n"),
       error: parseError,
+      providerProgressEvents: [],
     };
   }
 }
@@ -602,6 +794,26 @@ function stableJsonText(value) {
   } catch {
     return "";
   }
+}
+
+/**
+ * @param {string[]} args
+ * @returns {string | null}
+ */
+function resolveOutputModeFromArgs(args) {
+  const index = args.findIndex((entry) => entry === "--output-format");
+  return index >= 0 ? asOptionalString(args[index + 1]) : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function safeProgressLabel(value) {
+  const stringValue = asOptionalString(value);
+  if (!stringValue) return null;
+  const normalized = stringValue.replace(/[^A-Za-z0-9_.:-]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalized.length > 0 ? normalized.slice(0, 96) : null;
 }
 
 /**
@@ -788,7 +1000,8 @@ function stripBenignInteractiveNegations(text) {
     .replace(/\bwithout (?:any )?(?:clarifying )?questions?\b/giu, "")
     .replace(/\bno (?:clarifying )?questions?(?:\s+or\s+interactive prompts?)?\b/giu, "")
     .replace(/\bno interactive prompts?\b/giu, "")
-    .replace(/\bwithout (?:any )?interactive prompts?\b/giu, "");
+    .replace(/\bwithout (?:any )?interactive prompts?\b/giu, "")
+    .replace(/\bavoid(?:ing)? (?:any )?interactive prompts?\b/giu, "");
 }
 
 /**
@@ -941,9 +1154,10 @@ function extractRunnerOutput(parsed) {
 
 /**
  * @param {string} stdout
+ * @param {{ sanitizeJsonlEvents?: boolean, providerProgressEvents?: Array<Record<string, unknown>> }} [options]
  * @returns {{ runnerPayload: Record<string, unknown>, runnerEvidenceRefs: string[], runnerToolTraces: Array<Record<string, unknown>> }}
  */
-function parseExternalRunnerStdout(stdout) {
+function parseExternalRunnerStdout(stdout, options = {}) {
   const stdoutTrimmed = stdout.trim();
   if (stdoutTrimmed.length === 0) {
     return {
@@ -972,6 +1186,25 @@ function parseExternalRunnerStdout(stdout) {
   }
 
   if (allJsonLines) {
+    if (options.sanitizeJsonlEvents) {
+      return {
+        runnerPayload: {
+          jsonl_event_count: jsonlRecords.length,
+          provider_progress_events: Array.isArray(options.providerProgressEvents)
+            ? options.providerProgressEvents.map((event) => ({
+                observed_at: asOptionalString(asRecord(event).observed_at),
+                timestamp: asOptionalString(asRecord(event).timestamp),
+                kind: safeProgressLabel(asRecord(event).kind) ?? "json",
+                label: safeProgressLabel(asRecord(event).label) ?? "event",
+                type: safeProgressLabel(asRecord(event).type) ?? "json",
+                subtype: safeProgressLabel(asRecord(event).subtype),
+              }))
+            : [],
+        },
+        runnerEvidenceRefs: [],
+        runnerToolTraces: [],
+      };
+    }
     const runnerEvidenceRefs = [];
     const runnerToolTraces = [];
     for (const record of jsonlRecords) {
@@ -985,6 +1218,27 @@ function parseExternalRunnerStdout(stdout) {
       },
       runnerEvidenceRefs,
       runnerToolTraces,
+    };
+  }
+
+  if (options.sanitizeJsonlEvents) {
+    return {
+      runnerPayload: {
+        malformed_jsonl: true,
+        raw_stdout_available_in_evidence: true,
+        provider_progress_events: Array.isArray(options.providerProgressEvents)
+          ? options.providerProgressEvents.map((event) => ({
+              observed_at: asOptionalString(asRecord(event).observed_at),
+              timestamp: asOptionalString(asRecord(event).timestamp),
+              kind: safeProgressLabel(asRecord(event).kind) ?? "json",
+              label: safeProgressLabel(asRecord(event).label) ?? "event",
+              type: safeProgressLabel(asRecord(event).type) ?? "json",
+              subtype: safeProgressLabel(asRecord(event).subtype),
+            }))
+          : [],
+      },
+      runnerEvidenceRefs: [],
+      runnerToolTraces: [],
     };
   }
 
@@ -1621,6 +1875,7 @@ export function createLiveAdapter(options) {
           timeoutMs: requestTimeoutMs,
         }),
       ];
+      const outputMode = resolveOutputModeFromArgs(runtimeArgs);
       const evidenceDir = runtimeEvidenceRoot
         ? path.isAbsolute(runtimeEvidenceRoot)
           ? runtimeEvidenceRoot
@@ -1667,12 +1922,17 @@ export function createLiveAdapter(options) {
       const finishedAt = new Date().toISOString();
 
       const invocationError = invocation.error instanceof Error ? invocation.error : null;
+      const invocationInterrupted = invocationError?.code === "EINTERRUPTED";
       const invocationTimedOut =
-        invocationError?.code === "ETIMEDOUT" ||
-        ((invocation.signal === "SIGTERM" || invocation.signal === "SIGKILL") && invocation.status === null);
+        !invocationInterrupted &&
+        (invocationError?.code === "ETIMEDOUT" ||
+          ((invocation.signal === "SIGTERM" || invocation.signal === "SIGKILL") && invocation.status === null));
       const invocationFailed = invocationError !== null || invocation.status !== 0;
       const stdout = typeof invocation.stdout === "string" ? invocation.stdout : "";
       const stderr = typeof invocation.stderr === "string" ? invocation.stderr : "";
+      const providerProgressEvents = Array.isArray(invocation.providerProgressEvents)
+        ? invocation.providerProgressEvents.map((event) => asRecord(event))
+        : [];
 
       const rawEvidenceRecord = {
         adapter_id: adapterId,
@@ -1692,6 +1952,7 @@ export function createLiveAdapter(options) {
           request_transport: requestTransport,
           request_file: requestFile,
           request_file_ref: requestFileRef,
+          output_mode: outputMode,
           execution_root: runnerExecutionRoot,
           execution_root_mode: executionRootBinding.mode,
           canonical_execution_root: executionRootBinding.canonicalExecutionRoot,
@@ -1711,6 +1972,7 @@ export function createLiveAdapter(options) {
           stdout,
           stderr,
         },
+        provider_progress_events: providerProgressEvents,
       };
 
       let rawEvidenceFile = null;
@@ -1730,7 +1992,10 @@ export function createLiveAdapter(options) {
         rawEvidenceRef = toEvidenceRef(projectRoot, rawEvidenceFile);
       }
 
-      const { runnerPayload, runnerEvidenceRefs, runnerToolTraces } = parseExternalRunnerStdout(stdout);
+      const { runnerPayload, runnerEvidenceRefs, runnerToolTraces } = parseExternalRunnerStdout(stdout, {
+        sanitizeJsonlEvents: runnerFamily === "qwen" && outputMode === "stream-json",
+        providerProgressEvents,
+      });
 
       const baseOutput = {
         mode: "execute",
@@ -1754,6 +2019,8 @@ export function createLiveAdapter(options) {
           timed_out: invocationTimedOut,
           request_transport: requestTransport,
           request_file_ref: requestFileRef,
+          output_mode: outputMode,
+          provider_progress_events: providerProgressEvents,
           raw_evidence_ref: rawEvidenceRef,
         },
         runner_output: runnerPayload,
@@ -1796,6 +2063,22 @@ export function createLiveAdapter(options) {
           output: {
             ...baseOutput,
             failure_kind: "external-runner-timeout",
+          },
+          evidence_refs: evidenceRefs,
+          tool_traces: toolTraces,
+        });
+      }
+
+      if (invocationInterrupted) {
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: "blocked",
+          summary: `External runner command '${runtimeCommand}' was interrupted through public run-control for adapter '${adapterId}'.`,
+          output: {
+            ...baseOutput,
+            blocked: true,
+            failure_kind: "external-runner-interrupted",
           },
           evidence_refs: evidenceRefs,
           tool_traces: toolTraces,

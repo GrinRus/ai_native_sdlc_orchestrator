@@ -85,9 +85,11 @@ export function normalizeProviderStepStatus(input, options = {}) {
         : null;
   const lastOutputAt = asString(raw.last_output_at);
   const lastArtifactUpdateAt = asString(raw.last_artifact_update_at);
+  const lastProgressAt = asString(raw.last_progress_at);
   const lastActivityMs = Math.max(
     parseIsoMs(lastOutputAt) ?? startedMs,
     parseIsoMs(lastArtifactUpdateAt) ?? startedMs,
+    parseIsoMs(lastProgressAt) ?? startedMs,
   );
   const silentMs = nonNegativeInteger(nowMs - lastActivityMs);
   const timeoutRiskThreshold =
@@ -131,6 +133,11 @@ export function normalizeProviderStepStatus(input, options = {}) {
     remaining_budget_ms: remainingBudgetMs,
     last_output_at: lastOutputAt,
     last_artifact_update_at: lastArtifactUpdateAt,
+    last_progress_at: lastProgressAt,
+    last_progress_kind: asString(raw.last_progress_kind),
+    last_progress_label: asString(raw.last_progress_label),
+    progress_event_count: asNumber(raw.progress_event_count) !== null ? nonNegativeInteger(asNumber(raw.progress_event_count) ?? 0) : null,
+    output_mode: asString(raw.output_mode),
     current_command_label: asString(raw.current_command_label) ?? "external-provider-runner",
     recommended_action: recommendedAction,
     started_at: startedAt,

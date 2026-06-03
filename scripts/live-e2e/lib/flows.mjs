@@ -39,6 +39,9 @@ import {
 } from "./target-materialization.mjs";
 import { resolveAuthProbeRequired, runLiveAdapterPreflight } from "./preflight.mjs";
 
+const MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS = 30_000;
+const LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS = 60_000;
+
 /**
  * @param {Record<string, string>} routeOverrides
  * @returns {string | null}
@@ -446,6 +449,7 @@ export function prepareAorInstallationProof(options) {
  *   transcriptsRoot: string,
  *   label: string,
  *   index: number,
+ *   timeoutMs?: number | null,
  * }}
  */
 function runAorCommand(options) {
@@ -455,7 +459,17 @@ function runAorCommand(options) {
     cwd: options.cwd,
     env: options.env,
     encoding: "utf8",
+    timeout:
+      typeof options.timeoutMs === "number" && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
+        ? Math.max(Math.floor(options.timeoutMs), MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS)
+        : undefined,
+    killSignal: "SIGKILL",
+    detached: process.platform !== "win32",
   });
+  const timedOut = commandTimedOut(run);
+  if (timedOut) {
+    terminateTimedOutProcessGroup(run.pid);
+  }
   const finishedAt = nowIso();
   const transcriptFile = path.join(
     options.transcriptsRoot,
@@ -476,8 +490,15 @@ function runAorCommand(options) {
     command: options.launch.command,
     args: redactSensitiveCommandArgs(rawArgs),
     exit_code: run.status ?? -1,
+    signal: run.signal ?? null,
+    timed_out: timedOut,
+    timeout_ms:
+      typeof options.timeoutMs === "number" && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
+        ? Math.max(Math.floor(options.timeoutMs), MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS)
+        : null,
+    error_code: /** @type {{ code?: unknown } | undefined} */ (run.error)?.code ?? null,
     stdout: run.stdout ?? "",
-    stderr: run.stderr ?? "",
+    stderr: run.stderr ?? (run.error instanceof Error ? run.error.message : ""),
     parsed_json: parsed,
     started_at: startedAt,
     finished_at: finishedAt,
@@ -485,17 +506,48 @@ function runAorCommand(options) {
   writeJson(transcriptFile, transcript);
   return {
     label: options.label,
-    ok: run.status === 0 && parsed !== null,
+    ok: run.status === 0 && parsed !== null && !timedOut,
     exitCode: run.status ?? -1,
     stdout: run.stdout ?? "",
-    stderr: run.stderr ?? "",
+    stderr: run.stderr ?? (run.error instanceof Error ? run.error.message : ""),
     payload: parsed,
     transcriptFile,
     startedAt,
     finishedAt,
     durationSec: resolveDurationSeconds(startedAt, finishedAt),
     commandSurface: resolveCommandSurface(options.args),
+    timedOut,
+    timeoutMs:
+      typeof options.timeoutMs === "number" && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
+        ? Math.max(Math.floor(options.timeoutMs), MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS)
+        : null,
   };
+}
+
+/**
+ * @param {import("node:child_process").SpawnSyncReturns<string>} commandRun
+ * @returns {boolean}
+ */
+function commandTimedOut(commandRun) {
+  const error = /** @type {{ code?: unknown } | undefined} */ (commandRun.error);
+  return error?.code === "ETIMEDOUT";
+}
+
+/**
+ * @param {number | undefined} pid
+ */
+function terminateTimedOutProcessGroup(pid) {
+  if (process.platform === "win32" || !Number.isInteger(pid) || Number(pid) <= 0) {
+    return;
+  }
+
+  for (const signal of ["SIGTERM", "SIGKILL"]) {
+    try {
+      process.kill(-Number(pid), signal);
+    } catch {
+      continue;
+    }
+  }
 }
 
 /**
@@ -547,14 +599,35 @@ function buildCommandDiagnostic(result) {
     started_at: result.startedAt,
     finished_at: result.finishedAt,
     duration_sec: result.durationSec,
+    timed_out: result.timedOut,
+    timeout_budget_ms: result.timeoutMs,
     transcript_file: result.transcriptFile,
     artifact_refs: uniqueStrings(collectStringRefs(result.payload)),
-    failure_class: result.ok ? null : "command-failed",
+    failure_class: result.ok ? null : result.timedOut ? "aor-command-timeout" : "command-failed",
+    failure_owner: result.ok ? null : "aor",
+    failure_phase: result.ok ? null : resolveFailurePhaseForCommandLabel(result.label),
     missing_evidence: [],
-    recommendation: result.ok ? "continue" : "inspect transcript and command stderr",
+    recommendation: result.ok
+      ? "continue"
+      : result.timedOut
+        ? "inspect AOR command transcript and target setup status before judging provider quality"
+        : "inspect transcript and command stderr",
     interactive_continuation: interactiveContinuation,
     provider_step_status: Object.keys(providerStepStatus).length > 0 ? providerStepStatus : null,
   };
+}
+
+/**
+ * @param {string} label
+ * @returns {"aor_install" | "target_checkout" | "target_setup" | "target_verification" | "provider_execution" | "controller_decision" | "ui_validation"}
+ */
+function resolveFailurePhaseForCommandLabel(label) {
+  if (label.includes("verify")) return "target_verification";
+  if (label.includes("app") || label.includes("web")) return "ui_validation";
+  if (label.includes("run-start") || label.includes("request-run")) return "provider_execution";
+  if (label.includes("decision") || label.includes("next")) return "controller_decision";
+  if (label.includes("init") || label.includes("doctor") || label.includes("onboard")) return "aor_install";
+  return "controller_decision";
 }
 
 /**
@@ -1398,9 +1471,248 @@ function preserveVerifyArtifacts(options) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function positiveIntegerOrNull(value) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue > 0 ? Math.floor(numberValue) : null;
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @returns {number | null}
+ */
+function resolveLiveE2eTargetCommandTimeoutMs(profile) {
+  const livePolicy = asRecord(profile.live_e2e);
+  const verification = asRecord(profile.verification);
+  const timeoutSec =
+    positiveIntegerOrNull(livePolicy.target_command_timeout_sec) ??
+    positiveIntegerOrNull(verification.command_timeout_sec);
+  return timeoutSec === null ? null : timeoutSec * 1000;
+}
+
+/**
+ * @param {{ profile: Record<string, unknown>, setupCommands: string[], verificationCommands: string[] }} options
+ * @returns {number | null}
+ */
+function resolveProjectVerifyPreflightTimeoutMs(options) {
+  const perCommandTimeoutMs = resolveLiveE2eTargetCommandTimeoutMs(options.profile);
+  if (perCommandTimeoutMs === null) return null;
+  const commandCount = Math.max(1, options.setupCommands.length + options.verificationCommands.length);
+  return Math.max(
+    MIN_LIVE_E2E_AOR_COMMAND_TIMEOUT_MS,
+    perCommandTimeoutMs * commandCount + LIVE_E2E_AOR_COMMAND_TIMEOUT_OVERHEAD_MS,
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @param {Set<string>} setupCommandSet
+ * @param {Set<string>} verificationCommandSet
+ * @returns {"target_setup" | "target_verification"}
+ */
+function resolveTargetFailurePhase(stepResult, setupCommandSet, verificationCommandSet) {
+  const command = asNonEmptyString(stepResult.command);
+  if (command && setupCommandSet.has(command)) return "target_setup";
+  if (command && verificationCommandSet.has(command)) return "target_verification";
+  const commandKind = asNonEmptyString(stepResult.command_kind);
+  if (commandKind === "lint" || commandKind === "setup") return "target_setup";
+  return "target_verification";
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @returns {"environment" | "target_repository"}
+ */
+function resolveTargetFailureOwner(stepResult) {
+  return asStringArray(stepResult.missing_prerequisites).length > 0 ? "environment" : "target_repository";
+}
+
+/**
+ * @param {{
+ *   stepResult: Record<string, unknown>,
+ *   stepResultFile: string,
+ *   setupCommandSet: Set<string>,
+ *   verificationCommandSet: Set<string>,
+ * }} options
+ */
+function describeTargetCommandFailure(options) {
+  const phase = resolveTargetFailurePhase(options.stepResult, options.setupCommandSet, options.verificationCommandSet);
+  const owner = resolveTargetFailureOwner(options.stepResult);
+  const command = asNonEmptyString(options.stepResult.command) || null;
+  const summary = asNonEmptyString(options.stepResult.summary) || "Target command failed.";
+  const evidenceRefs = uniqueStrings([options.stepResultFile, ...asStringArray(options.stepResult.evidence_refs)]);
+  return {
+    status: "blocked",
+    command_label: command,
+    elapsed_ms: null,
+    timeout_budget_ms:
+      typeof options.stepResult.command_timeout_ms === "number" ? Math.floor(options.stepResult.command_timeout_ms) : null,
+    blocker_reason: summary,
+    evidence_ref: evidenceRefs[0] ?? null,
+    evidence_refs: evidenceRefs,
+    failure_owner: owner,
+    failure_phase: phase,
+    failure_class: phase === "target_setup" ? "target_setup_blocked" : "target_verification_blocked",
+    provider_independent: true,
+    timed_out: options.stepResult.timed_out === true,
+    missing_prerequisites: asStringArray(options.stepResult.missing_prerequisites),
+  };
+}
+
+/**
+ * @param {{
+ *   verifySummary: Record<string, unknown>,
+ *   verifyPayload: Record<string, unknown>,
+ *   stepResultFiles: string[],
+ *   setupCommands: string[],
+ *   verificationCommands: string[],
+ *   baselineGateDecision?: Record<string, unknown>,
+ *   runResult?: ReturnType<typeof runAorCommand> | null,
+ * }} options
+ */
+export function buildTargetPreExecutionStatusReport(options) {
+  const setupCommandSet = new Set(options.setupCommands);
+  const verificationCommandSet = new Set(options.verificationCommands);
+  const stepEntries = options.stepResultFiles
+    .filter((filePath) => fileExists(filePath))
+    .map((filePath) => ({ filePath, document: asRecord(readJson(filePath)) }));
+  const failedEntries = stepEntries.filter((entry) => asNonEmptyString(entry.document.status) === "failed");
+  const failedSetup = failedEntries.find(
+    (entry) => resolveTargetFailurePhase(entry.document, setupCommandSet, verificationCommandSet) === "target_setup",
+  );
+  const failedVerification = failedEntries.find(
+    (entry) => resolveTargetFailurePhase(entry.document, setupCommandSet, verificationCommandSet) === "target_verification",
+  );
+  const runElapsedMs =
+    typeof options.runResult?.durationSec === "number" ? Math.max(0, Math.round(options.runResult.durationSec * 1000)) : null;
+  const runTimeoutMs =
+    typeof options.runResult?.timeoutMs === "number" ? Math.max(0, Math.floor(options.runResult.timeoutMs)) : null;
+  const commandTimeoutMs =
+    typeof options.verifySummary.command_timeout_ms === "number" ? Math.floor(options.verifySummary.command_timeout_ms) : null;
+  const summaryRef = asNonEmptyString(options.verifyPayload.verify_summary_file);
+  const transcriptRef = asNonEmptyString(options.runResult?.transcriptFile);
+  const setupStatus = failedSetup
+    ? describeTargetCommandFailure({
+        stepResult: failedSetup.document,
+        stepResultFile: failedSetup.filePath,
+        setupCommandSet,
+        verificationCommandSet,
+      })
+    : {
+        status: "pass",
+        command_label: options.setupCommands.at(-1) ?? null,
+        elapsed_ms: runElapsedMs,
+        timeout_budget_ms: commandTimeoutMs,
+        blocker_reason: null,
+        evidence_ref: summaryRef || transcriptRef || null,
+        evidence_refs: uniqueStrings([summaryRef, transcriptRef]),
+        failure_owner: null,
+        failure_phase: "target_setup",
+        failure_class: null,
+        provider_independent: true,
+        timed_out: false,
+        missing_prerequisites: [],
+      };
+  const verificationStatus = failedVerification
+    ? describeTargetCommandFailure({
+        stepResult: failedVerification.document,
+        stepResultFile: failedVerification.filePath,
+        setupCommandSet,
+        verificationCommandSet,
+      })
+    : failedSetup
+      ? {
+          status: "not_attempted",
+          command_label: options.verificationCommands.at(0) ?? null,
+          elapsed_ms: runElapsedMs,
+          timeout_budget_ms: commandTimeoutMs,
+          blocker_reason: "Target verification was not judged because target setup blocked first.",
+          evidence_ref: setupStatus.evidence_ref,
+          evidence_refs: asStringArray(setupStatus.evidence_refs),
+          failure_owner: "target_repository",
+          failure_phase: "target_verification",
+          failure_class: "target_setup_blocked",
+          provider_independent: true,
+          timed_out: false,
+          missing_prerequisites: [],
+        }
+      : {
+          status: asNonEmptyString(options.verifySummary.status) === "failed" ? "blocked" : "pass",
+          command_label: options.verificationCommands.at(-1) ?? null,
+          elapsed_ms: runElapsedMs,
+          timeout_budget_ms: commandTimeoutMs,
+          blocker_reason:
+            asNonEmptyString(options.verifySummary.status) === "failed"
+              ? asNonEmptyString(asRecord(options.baselineGateDecision).summary) || "Target verification failed."
+              : null,
+          evidence_ref: summaryRef || transcriptRef || null,
+          evidence_refs: uniqueStrings([summaryRef, transcriptRef]),
+          failure_owner: asNonEmptyString(options.verifySummary.status) === "failed" ? "target_repository" : null,
+          failure_phase: "target_verification",
+          failure_class:
+            asNonEmptyString(options.verifySummary.status) === "failed" ? "target_verification_blocked" : null,
+          provider_independent: true,
+          timed_out: false,
+          missing_prerequisites: [],
+        };
+  const statuses = [setupStatus, verificationStatus];
+  const blockingStatus =
+    statuses.find((status) => asNonEmptyString(status.status) === "blocked") ??
+    (options.runResult?.timedOut === true
+      ? {
+          status: "blocked",
+          command_label: asNonEmptyString(options.runResult.label) || "project-verify-preflight",
+          elapsed_ms: runElapsedMs,
+          timeout_budget_ms: runTimeoutMs,
+          blocker_reason: "AOR public project verify command timed out before target setup evidence was materialized.",
+          evidence_ref: transcriptRef || null,
+          evidence_refs: uniqueStrings([transcriptRef]),
+          failure_owner: "aor",
+          failure_phase: "target_verification",
+          failure_class: "aor_failure",
+          provider_independent: true,
+          timed_out: true,
+          missing_prerequisites: [],
+        }
+      : null);
+
+  return {
+    status: blockingStatus ? "blocked" : "pass",
+    provider_independent: true,
+    failure_owner: blockingStatus ? asNonEmptyString(blockingStatus.failure_owner) : null,
+    failure_phase: blockingStatus ? asNonEmptyString(blockingStatus.failure_phase) : null,
+    failure_class: blockingStatus ? asNonEmptyString(blockingStatus.failure_class) : null,
+    blocker_reason: blockingStatus ? asNonEmptyString(blockingStatus.blocker_reason) : null,
+    target_setup_status: setupStatus,
+    target_verification_status: verificationStatus,
+    baseline_verify_gate_decision: options.baselineGateDecision ?? null,
+    verify_summary_file: summaryRef || null,
+    step_result_files: options.stepResultFiles,
+    command_timeout_ms: commandTimeoutMs,
+    aor_command_timeout_ms: runTimeoutMs,
+    elapsed_ms: runElapsedMs,
+    generated_at: nowIso(),
+  };
+}
+
+/**
+ * @param {{ reportsRoot: string, runId: string, report: Record<string, unknown> }} options
+ */
+function writeTargetPreExecutionStatusReport(options) {
+  const reportFile = path.join(
+    options.reportsRoot,
+    `live-e2e-target-pre-execution-status-${normalizeId(options.runId)}.json`,
+  );
+  writeJson(reportFile, options.report);
+  return reportFile;
+}
+
+/**
  * @param {{ verifySummary: Record<string, unknown>, verifyPayload: Record<string, unknown>, stepResultFiles: string[], setupCommands: string[], verificationCommands: string[], mode: "diagnostic" | "blocking" }} options
  */
-function evaluateBaselineVerifyGate(options) {
+export function evaluateBaselineVerifyGate(options) {
   const failedSteps = options.stepResultFiles
     .filter((filePath) => fileExists(filePath))
     .map((filePath) => ({ filePath, document: asRecord(readJson(filePath)) }))
@@ -1460,6 +1772,26 @@ function evaluateBaselineVerifyGate(options) {
       findings,
       failed_commands: failedCommands,
       routed_step_result_file: routedStepResultFile || null,
+      failure_owner:
+        failedSteps.length > 0
+          ? resolveTargetFailureOwner(failedSteps[0].document)
+          : blockingReasons.some((reason) => reason.startsWith("routed-dry-run"))
+            ? "aor"
+            : "target_repository",
+      failure_phase:
+        failedSteps.length > 0
+          ? resolveTargetFailurePhase(failedSteps[0].document, setupCommandSet, verificationCommandSet)
+          : blockingReasons.some((reason) => reason.startsWith("routed-dry-run"))
+            ? "controller_decision"
+            : "target_verification",
+      failure_class:
+        failedSteps.length > 0
+          ? resolveTargetFailurePhase(failedSteps[0].document, setupCommandSet, verificationCommandSet) === "target_setup"
+            ? "target_setup_blocked"
+            : "target_verification_blocked"
+          : blockingReasons.some((reason) => reason.startsWith("routed-dry-run"))
+            ? "aor_failure"
+            : "target_verification_blocked",
     };
   }
 
@@ -1477,6 +1809,9 @@ function evaluateBaselineVerifyGate(options) {
       findings,
       failed_commands: failedCommands,
       routed_step_result_file: routedStepResultFile || null,
+      failure_owner: "target_repository",
+      failure_phase: "target_verification",
+      failure_class: "target_verification_blocked",
     };
   }
 
@@ -1490,6 +1825,9 @@ function evaluateBaselineVerifyGate(options) {
     findings,
     failed_commands: failedCommands,
     routed_step_result_file: routedStepResultFile || null,
+    failure_owner: null,
+    failure_phase: null,
+    failure_class: null,
   };
 }
 
@@ -2962,8 +3300,12 @@ export function executeFullJourneyFlow(options) {
       args: ["rev-parse", "HEAD"],
     });
     const catalogVerification = asRecord(options.catalogEntry.verification);
-    const repoLintCommands = asStringArray(catalogVerification.setup_commands);
-    const repoVerificationCommands = asStringArray(catalogVerification.commands);
+    const resolvedVerification = {
+      ...catalogVerification,
+      ...asRecord(options.profile.verification),
+    };
+    const repoLintCommands = asStringArray(resolvedVerification.setup_commands);
+    const repoVerificationCommands = asStringArray(resolvedVerification.commands);
     const postRunQualityPolicy = resolvePostRunQualityPolicy(options.mission, catalogVerification);
     artifacts.post_run_quality_policy = postRunQualityPolicy;
     const browserCachePreflight = prepareBrowserCachePreflight({
@@ -3028,6 +3370,10 @@ export function executeFullJourneyFlow(options) {
         transcriptsRoot,
         label,
         index: commandIndex,
+        timeoutMs:
+          typeof runOptions.timeoutMs === "number" && Number.isFinite(runOptions.timeoutMs)
+            ? Number(runOptions.timeoutMs)
+            : null,
       });
       commandIndex += 1;
       const diagnostic = buildCommandDiagnostic(result);
@@ -3038,6 +3384,10 @@ export function executeFullJourneyFlow(options) {
         diagnostic.recommendation = "inspect payload quality fields";
       }
       commandResults.push(diagnostic);
+      if (!result.ok && runOptions.allowFailureResult === true) {
+        diagnostic.accepted_failure_result = true;
+        return result;
+      }
       if (!result.ok && !(runOptions.allowNonZeroWithPayload === true && result.payload)) {
         const stderr = result.stderr.trim() || result.stdout.trim() || "command failed";
         throw new Error(`Public CLI command '${label}' failed: ${stderr}`);
@@ -3139,6 +3489,7 @@ export function executeFullJourneyFlow(options) {
     const providerPolicies = materializeProviderPinnedPolicyOverrides({
       policiesRoot: path.join(hostAssets.assetsRoot, "policies"),
       providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
+      providerVariant: options.providerVariant,
       profile: options.profile,
     });
     artifacts.provider_policy_override_files = providerPolicies.policyFiles;
@@ -3293,24 +3644,35 @@ export function executeFullJourneyFlow(options) {
       throw new Error(summary);
     }
     if (!hasReusablePreExecutionReadiness) {
-      const verifyPreflight = runCommand("project-verify-preflight", [
-        "project",
-        "verify",
-        "--project-ref",
-        ".",
-        "--project-profile",
-        generatedProfile.generatedProjectProfileFile,
-        "--runtime-root",
-        ".aor",
-        "--require-validation-pass",
-        "true",
-        "--verification-label",
-        "baseline-diagnostic",
-        "--routed-dry-run-step",
-        "implement",
-        ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
-        ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
-      ]);
+      const verifyPreflight = runCommand(
+        "project-verify-preflight",
+        [
+          "project",
+          "verify",
+          "--project-ref",
+          ".",
+          "--project-profile",
+          generatedProfile.generatedProjectProfileFile,
+          "--runtime-root",
+          ".aor",
+          "--require-validation-pass",
+          "true",
+          "--verification-label",
+          "baseline-diagnostic",
+          "--routed-dry-run-step",
+          "implement",
+          ...(routeOverridesFlag ? ["--route-overrides", routeOverridesFlag] : []),
+          ...(policyOverridesFlag ? ["--policy-overrides", policyOverridesFlag] : []),
+        ],
+        {
+          allowFailureResult: true,
+          timeoutMs: resolveProjectVerifyPreflightTimeoutMs({
+            profile: options.profile,
+            setupCommands: repoLintCommands,
+            verificationCommands: repoVerificationCommands,
+          }),
+        },
+      );
       baselineVerifySummaryPath = getStringField(verifyPreflight.payload, "verify_summary_file");
       artifacts.baseline_verify_summary_file = baselineVerifySummaryPath;
       artifacts.verify_summary_file = baselineVerifySummaryPath;
@@ -3327,14 +3689,47 @@ export function executeFullJourneyFlow(options) {
         fs.rmSync(artifacts.baseline_routed_dry_run_step_result_file, { force: true });
       }
       if (!baselineVerifySummaryPath || !fileExists(baselineVerifySummaryPath)) {
+        const targetPreExecutionStatus = buildTargetPreExecutionStatusReport({
+          verifySummary: {},
+          verifyPayload: asRecord(verifyPreflight.payload),
+          stepResultFiles: getStringArrayField(verifyPreflight.payload, "step_result_files"),
+          setupCommands: repoLintCommands,
+          verificationCommands: repoVerificationCommands,
+          baselineGateDecision: {
+            phase: "baseline_diagnostic",
+            mode: resolveBaselineGateMode(options.profile),
+            status: "fail",
+            decision: "block",
+            summary: verifyPreflight.timedOut
+              ? "AOR public project verify command timed out before target setup evidence was materialized."
+              : "Dry-run verify summary was not materialized.",
+            blocking_reasons: [verifyPreflight.timedOut ? "aor-project-verify-timeout" : "verify-summary-missing"],
+            failure_owner: "aor",
+            failure_phase: "target_verification",
+            failure_class: "aor_failure",
+          },
+          runResult: verifyPreflight,
+        });
+        const targetPreExecutionStatusFile = writeTargetPreExecutionStatusReport({
+          reportsRoot: options.layout.reportsRoot,
+          runId: options.runId,
+          report: targetPreExecutionStatus,
+        });
+        artifacts.target_pre_execution_status_file = targetPreExecutionStatusFile;
+        artifacts.target_pre_execution_status = targetPreExecutionStatus;
+        artifacts.target_setup_status = targetPreExecutionStatus.target_setup_status;
+        artifacts.target_verification_status_detail = targetPreExecutionStatus.target_verification_status;
+        artifacts.failure_owner = targetPreExecutionStatus.failure_owner;
+        artifacts.failure_phase = targetPreExecutionStatus.failure_phase;
+        artifacts.failure_class = targetPreExecutionStatus.failure_class;
         markStage(
           stageMap,
           "execution",
           "fail",
-          uniqueStrings([verifyPreflight.transcriptFile, ...collectStringRefs(verifyPreflight.payload)]),
-          "Dry-run verify summary was not materialized.",
+          uniqueStrings([verifyPreflight.transcriptFile, targetPreExecutionStatusFile, ...collectStringRefs(verifyPreflight.payload)]),
+          asNonEmptyString(targetPreExecutionStatus.blocker_reason) || "Dry-run verify summary was not materialized.",
         );
-        throw new Error("Dry-run verify summary was not materialized.");
+        throw new Error(asNonEmptyString(targetPreExecutionStatus.blocker_reason) || "Dry-run verify summary was not materialized.");
       }
       const baselineVerifySummary = readJson(baselineVerifySummaryPath);
       const preservedBaseline = preserveVerifyArtifacts({
@@ -3361,6 +3756,27 @@ export function executeFullJourneyFlow(options) {
         verificationCommands: repoVerificationCommands,
         mode: baselineGateMode,
       });
+      const targetPreExecutionStatus = buildTargetPreExecutionStatusReport({
+        verifySummary: asRecord(baselineVerifySummary),
+        verifyPayload: asRecord(verifyPreflight.payload),
+        stepResultFiles: getStringArrayField(verifyPreflight.payload, "step_result_files"),
+        setupCommands: repoLintCommands,
+        verificationCommands: repoVerificationCommands,
+        baselineGateDecision,
+        runResult: verifyPreflight,
+      });
+      const targetPreExecutionStatusFile = writeTargetPreExecutionStatusReport({
+        reportsRoot: options.layout.reportsRoot,
+        runId: options.runId,
+        report: targetPreExecutionStatus,
+      });
+      artifacts.target_pre_execution_status_file = targetPreExecutionStatusFile;
+      artifacts.target_pre_execution_status = targetPreExecutionStatus;
+      artifacts.target_setup_status = targetPreExecutionStatus.target_setup_status;
+      artifacts.target_verification_status_detail = targetPreExecutionStatus.target_verification_status;
+      artifacts.failure_owner = targetPreExecutionStatus.failure_owner;
+      artifacts.failure_phase = targetPreExecutionStatus.failure_phase;
+      artifacts.failure_class = targetPreExecutionStatus.failure_class;
       artifacts.baseline_verify_status = baselineGateDecision.status;
       artifacts.baseline_verify_gate_decision = baselineGateDecision;
       if (baselineGateDecision.decision === "block") {
@@ -3370,6 +3786,7 @@ export function executeFullJourneyFlow(options) {
           "fail",
           uniqueStrings([
             verifyPreflight.transcriptFile,
+            targetPreExecutionStatusFile,
             baselineVerifySummaryPath,
             ...asStringArray(artifacts.baseline_verify_preserved_files),
             ...collectStringRefs(verifyPreflight.payload),
@@ -3413,6 +3830,7 @@ export function executeFullJourneyFlow(options) {
         ...collectStringRefs(verifyPreflight.payload),
         targetCleanliness.reportFile,
         executionReadiness.decisionFile,
+        asNonEmptyString(artifacts.target_pre_execution_status_file),
       ]);
     } else {
       artifacts.pre_execution_readiness_reused_after_resume = true;

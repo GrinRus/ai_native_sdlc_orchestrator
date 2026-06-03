@@ -89,6 +89,32 @@ setup_journal:
     evidence_refs:
       - runtime://reports/project-validation-live-e2e.sample.run.json
       - runtime://reports/execution-readiness-live-e2e.sample.run.json
+      - runtime://reports/live-e2e-target-pre-execution-status-live-e2e.sample.run.json
+    target_setup_status:
+      status: pass
+      command_label: npm install --prefer-offline --no-audit --no-fund
+      elapsed_ms: 42000
+      timeout_budget_ms: 120000
+      blocker_reason: null
+      evidence_ref: runtime://reports/live-e2e-target-pre-execution-status-live-e2e.sample.run.json
+      failure_owner: null
+      failure_phase: target_setup
+      failure_class: null
+      provider_independent: true
+    target_verification_status:
+      status: pass
+      command_label: npx ava test/headers.ts
+      elapsed_ms: 42000
+      timeout_budget_ms: 120000
+      blocker_reason: null
+      evidence_ref: runtime://reports/live-e2e-target-pre-execution-status-live-e2e.sample.run.json
+      failure_owner: null
+      failure_phase: target_verification
+      failure_class: null
+      provider_independent: true
+    failure_owner: null
+    failure_phase: null
+    failure_class: null
     summary: Readiness validation evidence was materialized.
 step_journal:
   - sequence: 1

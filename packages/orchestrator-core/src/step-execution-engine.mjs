@@ -1294,12 +1294,21 @@ export function executeRoutedStep(options) {
       if (providerStepStatus) {
         const adapterOutput = asRecord(adapterResponse.output);
         const externalRunner = asRecord(adapterOutput.external_runner);
+        const stateFileSnapshot = readJsonFile(options.providerStepStatusStateFile) ?? {};
+        const currentProviderStepStatus = asRecord(stateFileSnapshot.provider_step_status);
+        const providerInterrupted =
+          asString(adapterOutput.failure_kind) === "external-runner-interrupted" ||
+          asString(stateFileSnapshot.status) === "canceled" ||
+          asString(stateFileSnapshot.status) === "cancelled" ||
+          asString(currentProviderStepStatus.status) === "interrupted";
         updateRunControlProviderStepStatus(options.providerStepStatusStateFile, {
           ...providerStepStatusBase,
-          status: invocation.status === "passed" ? "completed" : "failed",
+          status: providerInterrupted ? "interrupted" : invocation.status === "passed" ? "completed" : "failed",
           last_artifact_update_at: asString(externalRunner.raw_evidence_ref) ? new Date().toISOString() : null,
           recommended_action:
-            invocation.status === "passed"
+            providerInterrupted
+              ? "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step."
+              : invocation.status === "passed"
               ? "Continue with post-run verification."
               : "Inspect provider evidence and failure summary.",
           finished_at: new Date().toISOString(),
@@ -1672,7 +1681,9 @@ export function executeRuntimeHarnessControlledStep(options) {
     const maxAttempts = resolveActionBudget(current.stepResult, decision);
     counters[decision] += 1;
     if (counters[decision] > maxAttempts) {
-      const exhaustedAttempts = executedAttempts.map((attempt) => ({ ...attempt }));
+      const exhaustedAttempts = (
+        executedAttempts.length > 0 ? executedAttempts : asRecordArray(current.stepResult.repair_attempts)
+      ).map((attempt) => ({ ...attempt }));
       if (exhaustedAttempts.length > 0) {
         exhaustedAttempts[exhaustedAttempts.length - 1] = {
           ...exhaustedAttempts[exhaustedAttempts.length - 1],
