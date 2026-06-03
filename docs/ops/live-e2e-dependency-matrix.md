@@ -96,7 +96,7 @@ Operational rules:
 - review and learning closure artifacts must carry `matrix_cell` and `coverage_follow_up`;
 - provider comparison coverage is required between `openai-primary` and `anthropic-primary` for at least one equivalent mission class per curated repo.
 - `openai-primary` and `anthropic-primary` are mandatory provider variants across comparison coverage; `open-code-primary` and `qwen-primary` are extended candidate coverage until future real-runner proof promotes them.
-- `qwen-primary` candidate steps use the one-hour real-runner external cap; timeout evidence is an adapter finding, not required matrix coverage.
+- `qwen-primary` remains extended candidate coverage; timeout or provider-progress evidence is an adapter finding, while target setup/verification, Runtime Harness retry/repair, and operator evidence semantics remain provider-neutral across Codex, Claude, OpenCode, and Qwen.
 - required matrix coverage closes only for `coverage_status=covered_pass` on `run_tier=acceptance` or `run_tier=production-proof`; warning runs remain `covered_with_findings`.
 
 ## Removed W14-S07 matrix fixture bundle (2026-04-24)

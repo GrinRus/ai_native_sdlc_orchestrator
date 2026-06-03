@@ -144,3 +144,5 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W35:** `W35-S03` Operator decision helper and decision UX; `W35-S05` Codex/Qwen live E2E UX proof and runbook closure
 - **W36:** `W36-S05` Docs, smoke, and proof
 - **W37:** `W37-S01` Live E2E target setup and verification closure
+- **W38:** `W38-S01` Qwen stream progress adapter closure
+- **W39:** `W39-S01` Live E2E provider parity policy

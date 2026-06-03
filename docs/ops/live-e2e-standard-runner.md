@@ -19,9 +19,27 @@ test, build, browser dependency, or timeout blocker is not a Codex/Qwen quality
 signal. Conversely, AOR runner/controller/API/UI failures must be classified as
 `failure_owner=aor`, not hidden behind target repository blocker wording.
 
-Qwen candidate profiles are the exception: catalog-backed Qwen full-journey profiles keep the one-hour provider step budget for implementation, repair, review, and QA even when the profile duration class is `small` or `medium`. Shorter local proof budgets have produced false timeout evidence after partial target diffs, so Qwen latency diagnostics must use a separately named diagnostic profile instead of weakening the canonical candidate profiles.
+Live E2E provider parity is required across Codex, Claude, OpenCode, and Qwen.
+Provider-specific behavior belongs only at the adapter boundary: command shape,
+auth/env mapping, permission flags, output parsing, and coverage tier. The
+public lifecycle, target setup/verification classification, evidence model,
+Runtime Harness retry/repair semantics, operator decisions, and pass/blocker
+classification must stay provider-neutral. Coverage tier affects whether a run
+counts toward qualification; it must not change runner behavior.
 
-Small or medium provider smoke profiles may also set `live_e2e.provider_step_retry_max_attempts` and `live_e2e.provider_step_repair_max_attempts` as maps from public step name to non-negative attempt count. Provider-pinned policy materialization writes run-scoped step policy overrides and passes them through public `--policy-overrides`, so a bounded Qwen smoke can use one provider attempt with `0` retry/repair attempts while still exercising the normal Runtime Harness fail-closed path.
+Live E2E provider execution defaults to one terminal provider attempt per
+provider-backed step. Provider-pinned policy materialization writes run-scoped
+step policy overrides and passes them through public `--policy-overrides`; when
+`live_e2e.provider_step_retry_max_attempts` and
+`live_e2e.provider_step_repair_max_attempts` are absent, generated policies set
+`retry.max_attempts=0` and `repair.max_attempts=0` for the provider-pinned
+steps. Profiles may still set these maps explicitly, but they must do so as a
+profile-class policy that applies consistently across providers rather than as a
+provider workaround. A terminal provider failure must preserve the routed step
+result, raw adapter evidence, provider status/progress, and Runtime Harness
+report, then fail closed without launching an internal repair provider step.
+Public repair remains the outer `execution#N -> review#N` lifecycle loop
+controlled by `implementation_loop`.
 
 The runner invokes the installed project flow step by step. Each step follows `plan -> execute -> inspect -> classify -> decide -> persist`; the next public command is allowed only after the current step decision is `continue` or after a requested interaction/frontend/manual action is completed through a public surface.
 
@@ -146,14 +164,14 @@ Provider permission-mode analogues:
 - Claude Code restricted: `--permission-mode auto`.
 - OpenCode full-bypass: `opencode run --format json --dangerously-skip-permissions` with the AOR request attached through OpenCode's message/`--file` CLI surface.
 - OpenCode restricted: `opencode run --format json` with the same file-attached request transport.
-- Qwen candidate full-bypass: `qwen --bare --auth-type anthropic --output-format json --approval-mode yolo --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with the one-hour real-runner external step timeout and `external_runtime.env_from` mapping `ANTHROPIC_AUTH_TOKEN` to `ANTHROPIC_API_KEY` when needed by the host setup.
-- Qwen candidate restricted: `qwen --bare --auth-type anthropic --output-format json --approval-mode default --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with the same candidate timeout and auth env bridge.
+- Qwen candidate full-bypass: `qwen --bare --auth-type anthropic --output-format stream-json --include-partial-messages --approval-mode yolo --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with `external_runtime.env_from` mapping `ANTHROPIC_AUTH_TOKEN` to `ANTHROPIC_API_KEY` when needed by the host setup.
+- Qwen candidate restricted: `qwen --bare --auth-type anthropic --output-format stream-json --include-partial-messages --approval-mode default --exclude-tools skill --max-wall-time <resolved-timeout-minus-reserve>s` with the same auth env bridge.
 
 Qwen candidate runs also rely on Runtime Harness runner-state leakage detection: target-checkout changes under `.codex/`, `.claude/`, `.qwen/`, or `.opencode/` are classified as `runner-owned-state-leak` and block the run before delivery proof can treat runner-local state as patch content.
 
 Use `runtime-permission-runner-certification.md` for the post-merge real-runner smoke lane that checks these mappings without changing contracts or provider status.
 
-Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. Preflight and full external runner execution are hard local subprocess bounds: a runner that exceeds them has its local process group killed and is reported as timeout evidence instead of leaving the public lifecycle waiting indefinitely. Real external provider profiles use a 60 minute full-runner bound (`timeout_ms=3600000`) while keeping preflight probes short (`preflight_timeout_ms=120000`), so medium and larger full-journey proofs are constrained by route/policy budgets before the adapter's hard cap. Candidate qwen profiles use the same one-hour hard cap because full lifecycle implementation requests can exceed shorter local proof budgets, while qwen coverage remains extended and does not count toward required qualification until promoted. Per-step policy budgets may shorten an external runner request, but they must not extend it beyond the adapter profile timeout. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
+Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` when present, and otherwise derives a bounded probe timeout from `execution.external_runtime.timeout_ms`. Preflight and full external runner execution are hard local subprocess bounds: a runner that exceeds them has its local process group killed and is reported as timeout evidence instead of leaving the public lifecycle waiting indefinitely. Real external provider profiles use a 60 minute full-runner bound (`timeout_ms=3600000`) while keeping preflight probes short (`preflight_timeout_ms=120000`), so medium and larger full-journey proofs are constrained by route/policy budgets before the adapter's hard cap. Per-step policy budgets may shorten an external runner request, but they must not extend it beyond the adapter profile timeout. If the permission-readiness marker is written with the expected nonce before the runner times out, access readiness passes with a `post-marker-timeout` warning; structured permission denials still fail even when the marker exists.
 
 While an external provider step is running, `run-control-state-<run>.json`
 preserves `provider_step_status` and public reads expose the same heartbeat
@@ -165,6 +183,13 @@ providers are reported as `silent-running` after the no-output window rather
 than as a hung terminal process. Operator reports and the SPA must not print raw
 process commands, args, env, tokens, or provider secrets; raw evidence remains
 behind explicit evidence refs.
+
+For Qwen candidate profiles, `provider_step_status` also exposes sanitized
+stream progress from official `stream-json` stdout: `last_progress_at`,
+`last_progress_kind`, `last_progress_label`, `progress_event_count`, and
+`output_mode=stream-json`. AOR must not depend on private `~/.qwen/chats` or
+`~/.qwen/debug` files for normal progress detection. Those files are useful only
+for manual diagnosis when public stream evidence is absent.
 
 Live adapter request and raw-output evidence files must use bounded filenames. Full-journey run ids, repair suffixes, step ids, and request ids can be long, so the persisted file name keeps the adapter prefix for operator readability and uses a short token plus hash for uniqueness. The evidence ref remains the durable contract; consumers must not depend on the full run id being embedded in the basename.
 
@@ -360,7 +385,9 @@ Full-journey layer:
 - resolves mission post-run quality into a mission-blocking primary gate plus optional full diagnostic commands; a failed diagnostic command records findings without hiding a passing primary gate unless the mission declares `diagnostic_failure_mode=fail`;
 - has the runner prepare one structured feature request input under AOR run state;
 - requires medium, large, and xl catalog missions to provide goals, KPIs, Definition of Done, expected quality evidence, and primary post-run commands before the run can close acceptance;
-- materializes provider-pinned route overrides in host-side AOR run state before execution starts;
+- materializes provider-pinned route and policy overrides in host-side AOR run
+  state before execution starts so all provider variants share the same
+  retry/repair lifecycle semantics for the selected profile class;
 - writes an execution-readiness decision before `run start` so promotion evidence is based on readiness and routed dry-run proof, not on a failed baseline target check;
 - includes the materialized spec step-result as a concrete `packet://spec@evidence://...` promotion ref for adapter context, while `run start` binds the approved handoff ref into the compiled context.
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.

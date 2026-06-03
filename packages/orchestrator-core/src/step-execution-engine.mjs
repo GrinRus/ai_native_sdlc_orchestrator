@@ -1681,7 +1681,9 @@ export function executeRuntimeHarnessControlledStep(options) {
     const maxAttempts = resolveActionBudget(current.stepResult, decision);
     counters[decision] += 1;
     if (counters[decision] > maxAttempts) {
-      const exhaustedAttempts = executedAttempts.map((attempt) => ({ ...attempt }));
+      const exhaustedAttempts = (
+        executedAttempts.length > 0 ? executedAttempts : asRecordArray(current.stepResult.repair_attempts)
+      ).map((attempt) => ({ ...attempt }));
       if (exhaustedAttempts.length > 0) {
         exhaustedAttempts[exhaustedAttempts.length - 1] = {
           ...exhaustedAttempts[exhaustedAttempts.length - 1],

@@ -976,6 +976,40 @@ test("provider-pinned policy materialization honors bounded retry and repair ove
   });
 });
 
+test("provider-pinned policy materialization defaults live E2E provider steps to no internal repair", () => {
+  withTempRoot((tempRoot) => {
+    const policiesRoot = path.join(tempRoot, "policies");
+    fs.cpSync(path.join(repoRoot, "examples/policies"), policiesRoot, { recursive: true });
+
+    const result = materializeProviderPinnedPolicyOverrides({
+      policiesRoot,
+      providerVariantId: "openai-primary",
+      providerVariant: {
+        provider: "openai",
+        primary_adapter: "codex-cli",
+        route_override_policy: {
+          steps: ["implement", "review", "qa", "repair"],
+        },
+      },
+      profile: {
+        live_e2e: {},
+      },
+    });
+
+    assert.deepEqual(Object.keys(result.policyOverrides).sort(), ["implement", "qa", "repair", "review"]);
+    for (const [step, policyId] of Object.entries(result.policyOverrides)) {
+      const loaded = loadContractFile({
+        filePath: path.join(policiesRoot, `${step}-openai-primary-policy.yaml`),
+        family: "step-policy-profile",
+      });
+      assert.equal(loaded.ok, true);
+      assert.equal(loaded.document.policy_id, policyId);
+      assert.equal(loaded.document.retry.max_attempts, 0);
+      assert.equal(loaded.document.repair.max_attempts, 0);
+    }
+  });
+});
+
 test("live E2E generated project profile wiring preserves provider variants in every flow", () => {
   const flowsSource = fs.readFileSync(path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs"), "utf8");
   const materializationCalls = flowsSource.match(
@@ -987,6 +1021,7 @@ test("live E2E generated project profile wiring preserves provider variants in e
     assert.match(materializationCall, /providerVariant: options\.providerVariant/u);
   }
   assert.match(flowsSource, /materializeProviderPinnedPolicyOverrides/u);
+  assert.match(flowsSource, /providerVariant: options\.providerVariant/u);
   assert.match(flowsSource, /--policy-overrides/u);
 });
 

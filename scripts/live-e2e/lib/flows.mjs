@@ -3489,6 +3489,7 @@ export function executeFullJourneyFlow(options) {
     const providerPolicies = materializeProviderPinnedPolicyOverrides({
       policiesRoot: path.join(hostAssets.assetsRoot, "policies"),
       providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
+      providerVariant: options.providerVariant,
       profile: options.profile,
     });
     artifacts.provider_policy_override_files = providerPolicies.policyFiles;

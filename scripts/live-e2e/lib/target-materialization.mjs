@@ -504,6 +504,7 @@ export function materializeProviderPinnedRouteOverrides(options) {
  * @param {{
  *   policiesRoot: string,
  *   providerVariantId: string,
+ *   providerVariant?: Record<string, unknown>,
  *   profile?: Record<string, unknown>,
  * }} options
  */
@@ -516,9 +517,16 @@ export function materializeProviderPinnedPolicyOverrides(options) {
   const livePolicy = asRecord(asRecord(options.profile).live_e2e);
   const retryLimits = asRecord(livePolicy.provider_step_retry_max_attempts);
   const repairLimits = asRecord(livePolicy.provider_step_repair_max_attempts);
-  const steps = [...new Set([...Object.keys(retryLimits), ...Object.keys(repairLimits)])]
+  const explicitSteps = [...new Set([...Object.keys(retryLimits), ...Object.keys(repairLimits)])]
     .map((step) => asNonEmptyString(step))
     .filter(Boolean);
+  const profileDeclaresAttemptPolicy = explicitSteps.length > 0;
+  const providerRouteSteps = asStringArray(asRecord(options.providerVariant).route_override_policy?.steps);
+  const steps = profileDeclaresAttemptPolicy
+    ? explicitSteps
+    : providerRouteSteps
+        .map((step) => asNonEmptyString(step))
+        .filter(Boolean);
 
   /** @type {Record<string, string>} */
   const policyOverrides = {};
@@ -530,8 +538,8 @@ export function materializeProviderPinnedPolicyOverrides(options) {
     if (!stepClass) {
       continue;
     }
-    const retryMaxAttempts = asNonNegativeInteger(retryLimits[step]);
-    const repairMaxAttempts = asNonNegativeInteger(repairLimits[step]);
+    const retryMaxAttempts = profileDeclaresAttemptPolicy ? asNonNegativeInteger(retryLimits[step]) : 0;
+    const repairMaxAttempts = profileDeclaresAttemptPolicy ? asNonNegativeInteger(repairLimits[step]) : 0;
     if (retryMaxAttempts === null && repairMaxAttempts === null) {
       continue;
     }

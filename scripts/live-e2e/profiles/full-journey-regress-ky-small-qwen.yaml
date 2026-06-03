@@ -19,16 +19,6 @@ live_e2e:
     repair: 3600
     review: 3600
     qa: 3600
-  provider_step_retry_max_attempts:
-    implement: 0
-    repair: 0
-    review: 0
-    qa: 0
-  provider_step_repair_max_attempts:
-    implement: 0
-    repair: 0
-    review: 0
-    qa: 0
   target_command_timeout_sec: 120
 implementation_loop:
   enabled: true
