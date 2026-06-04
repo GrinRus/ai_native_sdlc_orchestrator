@@ -7,6 +7,20 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.8] - 2026-06-04
+
+- Hardened W40 installed-user onboarding and release docs so registry package
+  smoke, clean `aor app` launch, first-run guidance, no-surprise writes, and
+  advanced headless paths remain aligned.
+- Added active live E2E provider heartbeat surfacing through public run event
+  history, SSE/read surfaces, and local console auto-refresh while preserving
+  provider-neutral lifecycle semantics.
+- Added the optional live E2E provider qualification matrix for Codex, Claude,
+  OpenCode, and Qwen with owner/phase evidence and explicit release-blocking
+  separation.
+- Kept Qwen, OpenCode, and Claude optional unless a future release policy
+  explicitly promotes their coverage requirements.
+
 ## [0.1.0-alpha.7] - 2026-06-03
 
 - Added W37 target setup and verification closure evidence so live E2E reports
