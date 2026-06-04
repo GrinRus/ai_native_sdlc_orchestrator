@@ -171,7 +171,7 @@ next release decision.
 
 ## W43-S04 — Alpha.10 findings closure and next-release decision
 - **Epic:** EPIC-0 Repository development system; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Convert W43 installed-user and live E2E findings into scoped
   fixes, documented blockers, split backlog, or a next-release decision.
 - **Primary modules:** `docs/backlog/**`, `README.md`, `docs/ops/**`, tests
@@ -205,3 +205,25 @@ next release decision.
 - Publishing a release inside W43-S04.
 - Hiding release-needed fixes inside validation closure.
 - Changing optional provider release policy without a dedicated slice.
+
+### W43-S04 closure evidence
+
+| Finding | Owner / phase | Severity | Closure status | Next action |
+| --- | --- | --- | --- | --- |
+| Published alpha.10 registry package help and `aor app --smoke --open false --json` pass from a neutral temp runner. | `environment` / registry smoke | none | no release needed | Keep as W43-S02 installed-user confidence evidence. |
+| Clean alpha.10 app smoke and browser first-run UI preserve explicit initialization: `.aor/` is not created before the user clicks **Initialize Project Runtime**. | `aor` / onboarding | none | no release needed | Keep as validated installed-user evidence; no code or contract change required. |
+| Alpha.10 first-flow wizard lands in active flow cockpit with safe no-write mission defaults and readable next-action/evidence rows. | `aor` / first flow | none | no release needed | Keep as validated UI/UX evidence. |
+| Alpha.10 local multi-project switcher keeps runtime root, selected flow, evidence refs, blockers, operator requests, and readiness state isolated across explicitly added projects. | `aor` / project switching | none | no release needed | Keep as validated multi-project evidence. |
+| Browser text-entry automation could not type into the Add local project drawer because the in-app browser driver lacked the virtual clipboard helper. | `environment` / browser evidence capture | low | documented blocker | No AOR product fix. W43-S02 validated the same public add-project route and then verified project switching in the browser. |
+| Initial W43-S03 Codex smoke failed before target/provider execution because the neutral shell PATH did not expose Homebrew `corepack`/`pnpm`. | `environment` / `aor_install` | low | documented blocker | No AOR product fix. The smoke was rerun with the expected PATH and reached provider execution through the normal lifecycle. |
+| W43-S03 Codex provider execution was stopped by the operator through public `aor run cancel --approval-ref`, and evidence reported `failure_owner=operator`, `failure_phase=provider_execution`, and `failure_class=operator_stopped`. | `operator` / `provider_execution` | none | no release needed | Keep as W42-S02 classification validation evidence; Runtime Harness reported `overall_decision=block`, routed result and adapter raw evidence existed, and `repair_status=not_required`. |
+| Qwen was not rerun in W43-S03 because the local `qwen` CLI and Qwen/Anthropic API readiness evidence were missing. | `environment` / `provider_execution` | low | documented blocker | Keep optional and non-release-blocking. Do not infer Qwen quality from this environment blocker. |
+| Claude and OpenCode were not rerun in W43-S03 because the slice only required Codex plus optional Qwen when locally ready. | `environment` / `provider_execution` | low | documented blocker | Keep optional and non-release-blocking unless a future release-policy slice changes provider requirements. |
+
+**Next-release recommendation:** no alpha.11 release prep is warranted by W43.
+The published alpha.10 installed-user path passed, the live E2E interruption
+classification validated the already-published W42-S02 behavior, and all W43
+findings are either validated evidence or documented non-release-blocking
+environment/optional-provider blockers. W43-S04 does not create a release-prep
+slice. The next visible action after W43 is to open a new product/backlog wave
+from `origin/main` when the next objective is selected.
