@@ -7,6 +7,20 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.9] - 2026-06-04
+
+- Fixed the installed-user local app evidence rendering so valid runtime state,
+  onboarding report, and mission body sidecar refs render as readable ready
+  summaries instead of false `Evidence missing` entries.
+- Closed the W41 alpha.8 findings review with owner/phase classifications and
+  queued W42 follow-up slices for release prep and operator interruption
+  reporting cleanup.
+- Refreshed provider qualification docs and matrix evidence with Codex and Qwen
+  short-smoke parity results while keeping Qwen, OpenCode, and Claude optional
+  and non-release-blocking.
+- Kept the release scope to npm CLI alpha only; no stable, Docker/GHCR,
+  hosted/SaaS, SDK, or mandatory optional-provider qualification is claimed.
+
 ## [0.1.0-alpha.8] - 2026-06-04
 
 - Hardened W40 installed-user onboarding and release docs so registry package
