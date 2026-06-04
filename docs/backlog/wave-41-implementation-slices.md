@@ -109,7 +109,7 @@ a code fix, docs fix, live E2E proof refresh, or backlog split.
 
 ## W41-S03 — Alpha.8 provider qualification smoke refresh
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Refresh Codex/Qwen/Claude/OpenCode qualification evidence through the provider-neutral live E2E lifecycle after installed-user onboarding smoke has passed or produced explicit blockers.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `docs/product/**`, tests
 - **Hard dependencies:** W41-S02, W40-S04
@@ -146,7 +146,7 @@ a code fix, docs fix, live E2E proof refresh, or backlog split.
 
 ## W41-S04 — Alpha.8 findings closure and next-release decision
 - **Epic:** EPIC-0 Repository development system; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Convert W41 installed-user and provider-smoke findings into closed fixes or an explicit next-wave/release decision.
 - **Primary modules:** `docs/backlog/**`, `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, tests
 - **Hard dependencies:** W41-S02, W41-S03
