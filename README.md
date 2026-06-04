@@ -352,7 +352,7 @@ self-hosted CLI/API mode documented in this repository. Internal evaluation and
 proof fixtures exist for maintainers, but they are not a public onboarding path
 and are intentionally not part of the README workflow.
 
-The current roadmap source of truth extends through W42 in
+The current roadmap source of truth extends through W43 in
 `docs/backlog/mvp-roadmap.md`; this README summarizes the user-facing path
 without routing operators into internal evaluation material.
 
@@ -464,7 +464,7 @@ scripts/
 The roadmap lives in `docs/backlog/mvp-roadmap.md`; wave and slice details live
 under `docs/backlog/`. Treat those files as the planning source of truth.
 
-The current alpha distribution is tracked through `W42` and focuses on:
+The current alpha distribution is tracked through `W43` and focuses on:
 
 - Safer operator onboarding.
 - No-settings local UI onboarding and explicit local multi-project workspaces.
@@ -499,8 +499,9 @@ The current alpha distribution is tracked through `W42` and focuses on:
 - Post-alpha.8 installed-user validation, provider qualification evidence
   refresh, and owner/phase-classified findings closure before deciding whether a
   follow-up fix or release is needed.
-- Alpha.9 release prep for the W41 user-facing evidence-rendering fix, followed
-  by operator interruption owner/phase reporting cleanup.
+- Alpha.10 release publication for operator-owned provider interruption
+  classification, followed by installed-user and maintainer-side proof-runner
+  confidence refresh before any next release decision.
 
 ## Contributing
 
