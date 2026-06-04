@@ -89,6 +89,7 @@ Support bounded delivery modes, manifests, and release evidence.
 - **W24:** `W24-S03` Strict delivery gate consolidation
 - **W29:** `W29-S01` npm CLI alpha release channel
 - **W30:** `W30-S06` Alpha release and onboarding proof refresh
+- **W42:** `W42-S01` Alpha.9 release prep for W41 fixes
 
 ## EPIC-6 Operator surface
 Expose CLI, API, live events, and detachable UI flows.
@@ -118,6 +119,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W36:** `W36-S02` App workspace and project registry; `W36-S03` First-run onboarding wizard; `W36-S04` Local multi-project switcher UX
 - **W40:** `W40-S02` Installed-user onboarding and release docs hardening; `W40-S03` Active live E2E heartbeat surfacing
 - **W41:** `W41-S02` Alpha.8 installed-user onboarding smoke refresh; `W41-S04` Alpha.8 findings closure and next-release decision
+- **W42:** `W42-S02` Operator interruption owner classification cleanup
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -154,3 +156,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W39:** `W39-S01` Live E2E provider parity policy
 - **W40:** `W40-S03` Active live E2E heartbeat surfacing; `W40-S04` Optional provider qualification matrix
 - **W41:** `W41-S03` Alpha.8 provider qualification smoke refresh
+- **W42:** `W42-S02` Operator interruption owner classification cleanup

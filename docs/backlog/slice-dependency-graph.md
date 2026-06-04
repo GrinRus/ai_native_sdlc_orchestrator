@@ -199,6 +199,8 @@ graph TD
   W41S02[W41-S02 Alpha.8 installed-user onboarding smoke refresh]
   W41S03[W41-S03 Alpha.8 provider qualification smoke refresh]
   W41S04[W41-S04 Alpha.8 findings closure and next-release decision]
+  W42S01[W42-S01 Alpha.9 release prep for W41 fixes]
+  W42S02[W42-S02 Operator interruption owner classification cleanup]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -501,6 +503,8 @@ graph TD
   W40S04 --> W41S03
   W41S02 --> W41S04
   W41S03 --> W41S04
+  W41S04 --> W42S01
+  W42S01 --> W42S02
 ```
 
 ## W0 hard dependencies
@@ -866,6 +870,12 @@ graph TD
 | W41-S03 | W41-S02, W40-S04 |
 | W41-S04 | W41-S02, W41-S03 |
 
+## W42 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W42-S01 | W41-S04 |
+| W42-S02 | W42-S01 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1062,6 +1072,8 @@ graph TD
 193. W41-S02
 194. W41-S03
 195. W41-S04
+196. W42-S01
+197. W42-S02
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.

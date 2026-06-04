@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-41-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-42-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -52,6 +52,7 @@ The authoritative planning model for implementation lives in:
 | W39 | Standardize live E2E provider lifecycle semantics across Codex, Claude, OpenCode, and Qwen while keeping adapter-specific launch/progress behavior at the adapter boundary. | 1 | EPIC-7 | `docs/backlog/wave-39-implementation-slices.md` |
 | W40 | Turn alpha.7 installed-user findings into the next hardening wave for onboarding UX, active live E2E heartbeat visibility, release docs, and optional provider qualification. | 4 | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-40-implementation-slices.md` |
 | W41 | Validate the published alpha.8 installed-user path, refresh provider qualification evidence, and turn findings into scoped fixes or follow-up backlog. | 4 | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-41-implementation-slices.md` |
+| W42 | Publish the post-alpha.8 user-facing fix as alpha.9 and then clean up operator-initiated live E2E interruption ownership semantics. | 2 | EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-42-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -191,6 +192,8 @@ The authoritative planning model for implementation lives in:
 | W41-S02 | alpha.8 installed-user onboarding smoke target: PBO-01, PBO-02, PBO-09, OPS-01, OPS-06, OPS-10 |
 | W41-S03 | alpha.8 provider qualification smoke target: DEV-04, AIP-12, OPS-06, OPS-07, OPS-11 |
 | W41-S04 | alpha.8 findings closure target: OPS-01, OPS-06, OPS-10, OPS-11 |
+| W42-S01 | alpha.9 release prep for W41 user-facing fix (no direct story closure) |
+| W42-S02 | operator-initiated interruption owner classification target: OPS-01, OPS-06, OPS-11 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -711,6 +714,16 @@ boundaries.
 - W41 does not claim stable readiness, another npm release, Docker/GHCR, hosted/SaaS, SDK release, or mandatory Qwen/OpenCode/Claude qualification.
 
 **Detailed slices:** `docs/backlog/wave-41-implementation-slices.md`
+
+## W42 - alpha.9 release and operator interruption classification follow-up
+**Goal:** Release the W41 post-alpha.8 user-facing evidence-rendering fix through the npm alpha channel, then address the remaining live E2E owner/phase clarity finding for operator-initiated provider interruptions.
+
+**Exit criteria:**
+- Alpha.9 release prep is queued after W41-S04 and includes only already-merged W41 fixes/docs, without stable/Docker/GHCR/SDK claims.
+- Operator-initiated public cancel behavior is replanned as a separate contract-first slice rather than hidden inside release prep.
+- The backlog keeps optional provider qualification separate from release-blocking policy.
+
+**Detailed slices:** `docs/backlog/wave-42-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.
