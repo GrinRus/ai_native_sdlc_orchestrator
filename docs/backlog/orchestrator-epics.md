@@ -21,6 +21,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W33:** `W33-S01` Console flow source-of-truth and static snapshot removal; `W33-S02` Reliable root gates and live E2E timeout bounds
 - **W34:** `W34-S07` Backlog, docs, and release-gate alignment
 - **W40:** `W40-S01` Post-alpha.7 backlog and product baseline
+- **W41:** `W41-S01` Post-alpha.8 backlog and validation baseline; `W41-S04` Alpha.8 findings closure and next-release decision
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -33,6 +34,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W21:** `W21-S01` Installed-user onboarding UX contract; `W21-S03` Clean project onboarding and asset-root resolution
 - **W36:** `W36-S01` No-settings onboarding and workspace contract baseline
 - **W40:** `W40-S02` Installed-user onboarding and release docs hardening
+- **W41:** `W41-S02` Alpha.8 installed-user onboarding smoke refresh
 
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
@@ -115,6 +117,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W35:** `W35-S01` Provider heartbeat and long-running step status; `W35-S02` User-facing artifact reference renderer; `W35-S04` Execution evidence panel and interruption controls
 - **W36:** `W36-S02` App workspace and project registry; `W36-S03` First-run onboarding wizard; `W36-S04` Local multi-project switcher UX
 - **W40:** `W40-S02` Installed-user onboarding and release docs hardening; `W40-S03` Active live E2E heartbeat surfacing
+- **W41:** `W41-S02` Alpha.8 installed-user onboarding smoke refresh; `W41-S04` Alpha.8 findings closure and next-release decision
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -150,3 +153,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W38:** `W38-S01` Qwen stream progress adapter closure
 - **W39:** `W39-S01` Live E2E provider parity policy
 - **W40:** `W40-S03` Active live E2E heartbeat surfacing; `W40-S04` Optional provider qualification matrix
+- **W41:** `W41-S03` Alpha.8 provider qualification smoke refresh
