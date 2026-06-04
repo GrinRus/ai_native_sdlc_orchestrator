@@ -357,7 +357,13 @@ This is the master index for the implementation slices across all defined waves.
 | W41-S01 | Post-alpha.8 backlog and validation baseline | EPIC-0 | done | `docs/backlog/**`, `README.md` | W40-S04 |
 | W41-S02 | Alpha.8 installed-user onboarding smoke refresh | EPIC-1, EPIC-6 | done | `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W41-S01 |
 | W41-S03 | Alpha.8 provider qualification smoke refresh | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `docs/product/**`, tests | W41-S02, W40-S04 |
-| W41-S04 | Alpha.8 findings closure and next-release decision | EPIC-0, EPIC-6 | ready | `docs/backlog/**`, `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, tests | W41-S02, W41-S03 |
+| W41-S04 | Alpha.8 findings closure and next-release decision | EPIC-0, EPIC-6 | done | `docs/backlog/**`, `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, tests | W41-S02, W41-S03 |
+
+## W42 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W42-S01 | Alpha.9 release prep for W41 fixes | EPIC-5 | ready | `package.json`, `README.md`, `CHANGELOG.md`, `docs/ops/**`, release tests | W41-S04 |
+| W42-S02 | Operator interruption owner classification cleanup | EPIC-6, EPIC-7 | blocked | `docs/contracts/**`, `packages/orchestrator-core/**`, `scripts/live-e2e/**`, `apps/web/**`, `docs/ops/**`, tests | W42-S01 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

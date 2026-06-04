@@ -146,7 +146,7 @@ a code fix, docs fix, live E2E proof refresh, or backlog split.
 
 ## W41-S04 — Alpha.8 findings closure and next-release decision
 - **Epic:** EPIC-0 Repository development system; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Convert W41 installed-user and provider-smoke findings into closed fixes or an explicit next-wave/release decision.
 - **Primary modules:** `docs/backlog/**`, `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, tests
 - **Hard dependencies:** W41-S02, W41-S03
@@ -175,3 +175,22 @@ a code fix, docs fix, live E2E proof refresh, or backlog split.
 ### Out of scope
 - Publishing npm alpha.9.
 - Hosted/SaaS, Docker/GHCR, stable, or SDK release work.
+
+### W41-S04 closure evidence
+
+| Finding | Owner / phase | Severity | Closure status | Next action |
+| --- | --- | --- | --- | --- |
+| Initial neutral temp runner smoke failed when `npm` was not on PATH. | `environment` / registry smoke | low | documented blocker | No AOR fix. W41-S02 reran with `PATH="/opt/homebrew/bin:$PATH"` and the published package smoke passed. |
+| Published alpha.8 clean UI respected explicit initialization and did not create `.aor/` before the user clicked **Initialize Project Runtime**. | `aor` / onboarding | none | no release needed | Keep as validated installed-user evidence. |
+| Published alpha.8 multi-project UI kept selected flows, runtime state, evidence refs, operator requests, and blockers isolated between explicitly added local projects. | `aor` / project switching | none | no release needed | Keep as validated installed-user evidence. |
+| Valid runtime sidecar refs rendered as `Evidence missing` in selected-flow evidence views after first-flow creation. | `aor` / evidence rendering | high | fixed | W41-S02 fixed sidecar artifact display summaries and added regression coverage. Because alpha.8 is already published, W42-S01 is queued to release the fix as alpha.9. |
+| Codex and Qwen short provider smokes used the same W39 live E2E lifecycle and did not start hidden Runtime Harness repair after public terminal interruption. | `provider` / provider execution | none | documented blocker evidence | Keep as W41-S03 provider qualification evidence; not a product pass and not release-blocking. |
+| Qwen stream progress was visible through public `provider_step_status` during the smoke (`output_mode=stream-json`, progress count observed before interruption). | `provider` / provider execution | none | documented blocker evidence | Keep as W41-S03 evidence that Qwen is no longer misleadingly silent while progress is observed. |
+| Claude was not smoke-tested because the local `claude` CLI and auth readiness evidence were missing. | `environment` / `aor_install` | low | documented blocker | Keep optional and non-release-blocking. |
+| OpenCode was not smoke-tested because local CLI version was available but auth readiness evidence was missing. | `environment` / `provider_execution` | low | documented blocker | Keep optional and non-release-blocking. |
+| Operator timebox stops are currently summarized as `failure_owner=provider` because the terminal interruption happens in provider execution. | `aor` / live E2E summary classification | medium | split to backlog | W42-S02 will decide the contract-compatible owner/phase model for operator-initiated public cancels. |
+
+**Next-release recommendation:** release prep is warranted. The W41-S02
+evidence-rendering fix is user-facing and already merged after the alpha.8
+publication, so W42-S01 is the next ready slice for `0.1.0-alpha.9`. W41-S04
+does not publish the release.
