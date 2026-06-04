@@ -79,7 +79,7 @@ next release decision.
 
 ## W43-S02 — Alpha.10 installed-user onboarding and evidence smoke
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Validate the published alpha.10 package from an installed-user
   perspective and capture any onboarding/evidence readability findings with
   owner and phase.
@@ -126,7 +126,7 @@ next release decision.
 
 ## W43-S03 — Alpha.10 live E2E interruption and provider smoke
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Validate W42-S02 interruption ownership and provider-parity
   behavior through normal live E2E smoke after installed-user confidence checks.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`,
