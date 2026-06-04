@@ -16,6 +16,7 @@ import {
   materializeTargetCheckout,
 } from "../live-e2e/lib/target-materialization.mjs";
 import { runLiveAdapterPreflight } from "../live-e2e/lib/preflight.mjs";
+import { buildProviderQualificationMatrix } from "../live-e2e/lib/provider-qualification-matrix.mjs";
 import {
   archivedNextActionReportForMission,
   buildTargetPreExecutionStatusReport,
@@ -461,6 +462,81 @@ test("W35 live attempts summary records blockers without claiming product pass",
   assert.equal(qwenClosure.target_setup_status, "pass");
   assert.equal(qwenClosure.target_verification_status, "pass");
   assert.equal(qwenClosure.product_pass_claimed, false);
+});
+
+test("W40 provider qualification matrix uses evidence owner and phase instead of provider name", () => {
+  const fixture = JSON.parse(
+    fs.readFileSync(
+      path.join(repoRoot, "examples/live-e2e/fixtures/w40-s04/provider-qualification-matrix.sample.json"),
+      "utf8",
+    ),
+  );
+  const cells = new Map(fixture.matrix.provider_cells.map((entry) => [entry.provider_variant_id, entry]));
+  assert.equal(fixture.matrix.release_blocking_status, "pass");
+  assert.deepEqual(fixture.matrix.release_blocking_provider_ids, []);
+  assert.equal(cells.get("openai-primary").qualification_status, "qualified");
+  assert.equal(cells.get("anthropic-primary").qualification_status, "candidate");
+  assert.equal(cells.get("open-code-primary").qualification_status, "blocked");
+  assert.equal(cells.get("qwen-primary").qualification_status, "blocked");
+  for (const providerId of ["anthropic-primary", "open-code-primary", "qwen-primary"]) {
+    assert.equal(cells.get(providerId).release_blocking, false);
+  }
+
+  const matrix = buildProviderQualificationMatrix({
+    providers: [
+      {
+        provider_variant_id: "qwen-primary",
+        provider: "qwen",
+        adapter: "qwen-code",
+        coverage_tier: "extended",
+      },
+      {
+        provider_variant_id: "openai-primary",
+        provider: "openai",
+        adapter: "codex-cli",
+        coverage_tier: "required",
+      },
+    ],
+    attempts: [
+      {
+        run_id: "qwen-aor-ui-regression",
+        provider_variant_id: "qwen-primary",
+        status: "needs_fix",
+        failure_owner: "aor",
+        failure_phase: "ui_validation",
+        failure_class: "aor_failure",
+        public_observation: "The UI hid the accepted operator decision even though the Qwen provider step completed.",
+      },
+      {
+        run_id: "codex-target-setup-blocked",
+        provider_variant_id: "openai-primary",
+        status: "blocked",
+        failure_owner: "target_repository",
+        failure_phase: "target_setup",
+        failure_class: "target_setup_blocked",
+        public_observation: "The target repository install timed out before provider execution.",
+      },
+    ],
+    releaseBlockingProviderIds: ["openai-primary"],
+  });
+  const qwenCell = matrix.provider_cells.find((entry) => entry.provider_variant_id === "qwen-primary");
+  const codexCell = matrix.provider_cells.find((entry) => entry.provider_variant_id === "openai-primary");
+  assert.equal(qwenCell.qualification_status, "blocked");
+  assert.equal(qwenCell.failure_owner, "aor");
+  assert.equal(qwenCell.failure_phase, "ui_validation");
+  assert.equal(qwenCell.failure_class, "aor_failure");
+  assert.equal(codexCell.qualification_status, "blocked");
+  assert.equal(codexCell.failure_owner, "target_repository");
+  assert.equal(codexCell.failure_phase, "target_setup");
+  assert.equal(matrix.release_blocking_status, "blocked");
+  assert.deepEqual(matrix.release_blocking_failures, [
+    {
+      provider_variant_id: "openai-primary",
+      qualification_status: "blocked",
+      failure_owner: "target_repository",
+      failure_phase: "target_setup",
+    },
+  ]);
 });
 
 test("catalog feature request materialization preserves required path prefixes", () => {

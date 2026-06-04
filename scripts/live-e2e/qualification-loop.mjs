@@ -24,6 +24,11 @@ import {
   resolveCatalogRoot,
   resolveFullJourneyProfile,
 } from "./lib/profile-catalog.mjs";
+import {
+  DEFAULT_PROVIDER_QUALIFICATION_PROVIDERS,
+  buildProviderQualificationMatrix,
+  extractQualificationFailureContext,
+} from "./lib/provider-qualification-matrix.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const RUN_PROFILE_SCRIPT = path.join(SCRIPT_DIR, "run-profile.mjs");
@@ -236,6 +241,10 @@ function buildAnalysis(options) {
   ]
     .filter(([, value]) => asNonEmptyString(value) && !["pass", "warn", "accept"].includes(asNonEmptyString(value)))
     .map(([field, value]) => ({ field, value }));
+  const failure_context = extractQualificationFailureContext({
+    ...options.summary,
+    status: options.status,
+  });
   return {
     analysis_id: `${asNonEmptyString(options.summary.run_id) || "live-e2e"}.qualification-analysis.v1`,
     run_id: asNonEmptyString(options.summary.run_id) || null,
@@ -248,6 +257,7 @@ function buildAnalysis(options) {
     branch_name: asNonEmptyString(options.summary.branch_name) || null,
     failing_steps: failingSteps,
     quality_drops: qualityDrops,
+    failure_context,
     evidence_refs: [
       asNonEmptyString(options.summary.live_e2e_observation_report_file),
       asNonEmptyString(options.summary.review_report_file),
@@ -284,6 +294,11 @@ function updateQualificationSet(options) {
     summary_ref: asNonEmptyString(options.summary.summary_ref) || null,
     observation_report_ref: asNonEmptyString(options.summary.live_e2e_observation_report_file) || null,
     analysis_ref: asNonEmptyString(options.analysis.analysis_file) || null,
+    failure_owner: asNonEmptyString(asRecord(options.analysis.failure_context).failure_owner) || null,
+    failure_phase: asNonEmptyString(asRecord(options.analysis.failure_context).failure_phase) || null,
+    failure_class: asNonEmptyString(asRecord(options.analysis.failure_context).failure_class) || null,
+    blocker_reason: asNonEmptyString(asRecord(options.analysis.failure_context).blocker_reason) || null,
+    evidence_refs: asStringArray(asRecord(options.analysis.failure_context).evidence_refs),
     recorded_at: nowIso(),
   };
   const runId = asNonEmptyString(attempt.run_id);
@@ -318,6 +333,13 @@ function updateQualificationSet(options) {
     passing_run_count: passing.length,
     provider_counts,
     missing_provider_requirements,
+    provider_qualification_matrix: buildProviderQualificationMatrix({
+      scope: "live-e2e-final-qualification-set",
+      providers: DEFAULT_PROVIDER_QUALIFICATION_PROVIDERS,
+      attempts,
+      requiredProviderCounts: REQUIRED_PROVIDER_COUNTS,
+      releaseBlockingProviderIds: [],
+    }),
     attempts,
     updated_at: nowIso(),
   };

@@ -91,6 +91,7 @@ The flat, machine-checkable registry lives in `docs/product/user-story-coverage-
 - Run full-journey live acceptance only on curated repositories and curated feature missions.
 - Select the required matrix cell by scenario family, pinned provider variant, and declared feature size.
 - Track which required matrix cells are still uncovered after each live E2E run.
+- Read optional provider qualification by provider, adapter, coverage tier, owner, phase, evidence, and release-blocking status without opening raw provider logs.
 - Ask AOR to analyze or change bounded project artifacts from any flow stage through runtime-owned request evidence.
 
 W18 closes the connected operator-surface path for runner-requested questions: surface the question from `step-result.requested_interaction`, submit an approved operator answer through the control plane, emit query-safe live events, and keep the answer trail auditable without making the web UI own orchestration.
