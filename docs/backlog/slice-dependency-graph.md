@@ -195,6 +195,10 @@ graph TD
   W40S02[W40-S02 Installed-user onboarding and release docs hardening]
   W40S03[W40-S03 Active live E2E heartbeat surfacing]
   W40S04[W40-S04 Optional provider qualification matrix]
+  W41S01[W41-S01 Post-alpha.8 backlog and validation baseline]
+  W41S02[W41-S02 Alpha.8 installed-user onboarding smoke refresh]
+  W41S03[W41-S03 Alpha.8 provider qualification smoke refresh]
+  W41S04[W41-S04 Alpha.8 findings closure and next-release decision]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -491,6 +495,12 @@ graph TD
   W39S01 --> W40S03
   W40S03 --> W40S04
   W39S01 --> W40S04
+  W40S04 --> W41S01
+  W41S01 --> W41S02
+  W41S02 --> W41S03
+  W40S04 --> W41S03
+  W41S02 --> W41S04
+  W41S03 --> W41S04
 ```
 
 ## W0 hard dependencies
@@ -848,6 +858,14 @@ graph TD
 | W40-S03 | W40-S01, W35-S01, W38-S01, W39-S01 |
 | W40-S04 | W40-S03, W39-S01 |
 
+## W41 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W41-S01 | W40-S04 |
+| W41-S02 | W41-S01 |
+| W41-S03 | W41-S02, W40-S04 |
+| W41-S04 | W41-S02, W41-S03 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1040,6 +1058,10 @@ graph TD
 189. W40-S02
 190. W40-S03
 191. W40-S04
+192. W41-S01
+193. W41-S02
+194. W41-S03
+195. W41-S04
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.
