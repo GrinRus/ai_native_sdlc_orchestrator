@@ -347,8 +347,8 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W40-S01 | Post-alpha.7 backlog and product baseline | EPIC-0 | done | `docs/backlog/**`, `docs/product/**`, `docs/ops/**` | W39-S01, W36-S05 |
-| W40-S02 | Installed-user onboarding and release docs hardening | EPIC-1, EPIC-6 | ready | `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W40-S01 |
-| W40-S03 | Active live E2E heartbeat surfacing | EPIC-6, EPIC-7 | blocked | `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, `scripts/live-e2e/**`, `docs/contracts/**`, tests | W40-S01, W35-S01, W38-S01, W39-S01 |
+| W40-S02 | Installed-user onboarding and release docs hardening | EPIC-1, EPIC-6 | done | `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W40-S01 |
+| W40-S03 | Active live E2E heartbeat surfacing | EPIC-6, EPIC-7 | ready | `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, `scripts/live-e2e/**`, `docs/contracts/**`, tests | W40-S01, W35-S01, W38-S01, W39-S01 |
 | W40-S04 | Optional provider qualification matrix | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `docs/product/**`, tests | W40-S03, W39-S01 |
 
 ## Planning note
