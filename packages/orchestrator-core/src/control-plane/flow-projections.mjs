@@ -379,6 +379,24 @@ function buildArtifactDisplaySummaryMap(options) {
 }
 
 /**
+ * @param {string} ref
+ * @param {Map<string, Record<string, unknown>>} summariesByRef
+ * @param {string | null} stage
+ * @returns {Record<string, unknown>}
+ */
+function artifactDisplaySummaryForRef(ref, summariesByRef, stage) {
+  const direct = summariesByRef.get(ref);
+  if (direct) return direct;
+  for (const [candidateRef, summary] of summariesByRef.entries()) {
+    if (evidenceRefsMatch(candidateRef, ref)) return summary;
+  }
+  return buildMissingArtifactDisplaySummary(ref, {
+    stage,
+    reason: "Flow evidence ref is listed, but no readable artifact is available in the current read model.",
+  });
+}
+
+/**
  * @param {string[]} refs
  * @param {Map<string, Record<string, unknown>>} summariesByRef
  * @param {string | null} stage
@@ -386,17 +404,7 @@ function buildArtifactDisplaySummaryMap(options) {
  */
 function artifactDisplaySummariesForRefs(refs, summariesByRef, stage) {
   return uniqueArtifactDisplaySummaries(
-    refs.map((ref) => {
-      const direct = summariesByRef.get(ref);
-      if (direct) return direct;
-      for (const [candidateRef, summary] of summariesByRef.entries()) {
-        if (evidenceRefsMatch(candidateRef, ref)) return summary;
-      }
-      return buildMissingArtifactDisplaySummary(ref, {
-        stage,
-        reason: "Flow evidence ref is listed, but no readable artifact is available in the current read model.",
-      });
-    }),
+    refs.map((ref) => artifactDisplaySummaryForRef(ref, summariesByRef, stage)),
   );
 }
 
@@ -713,6 +721,7 @@ export function readFlowEvidenceGraph(options) {
   const flow = readFlowProjection(options);
   if (!flow) return null;
   const flowRefs = asStringArray(flow.evidence_refs);
+  const summariesByRef = buildArtifactDisplaySummaryMap(options);
   const entries = listFlowScopedEntries(options, flow);
   const entriesByRef = new Map();
   for (const entry of entries) {
@@ -747,9 +756,7 @@ export function readFlowEvidenceGraph(options) {
     const node = entry
       ? buildEvidenceNode(entry, ref)
       : (() => {
-          const displaySummary = buildMissingArtifactDisplaySummary(ref, {
-            reason: "Flow evidence ref is listed, but no readable artifact is available in the current read model.",
-          });
+          const displaySummary = artifactDisplaySummaryForRef(ref, summariesByRef, asString(flow.selected_stage));
           return {
           node_id: ref,
           ref,
@@ -910,6 +917,7 @@ function inferRunIdsFromEvidenceRef(ref) {
 export function readFlowRuntimeTrace(options) {
   const flow = readFlowProjection(options);
   if (!flow) return null;
+  const summariesByRef = buildArtifactDisplaySummaryMap(options);
   const entries = listFlowScopedEntries(options, flow);
   const traceItems = entries.flatMap((entry) => buildTraceItemsForEntry(entry));
   for (const ref of asStringArray(flow.evidence_refs)) {
@@ -917,9 +925,7 @@ export function readFlowRuntimeTrace(options) {
       continue;
     }
     const family = inferFamilyFromEvidenceRef(ref);
-    const displaySummary = buildMissingArtifactDisplaySummary(ref, {
-      reason: "Flow evidence ref is listed, but no readable artifact is available in the current read model.",
-    });
+    const displaySummary = artifactDisplaySummaryForRef(ref, summariesByRef, asString(flow.selected_stage));
     traceItems.push({
       trace_id: `${family}:${ref}`,
       kind: family,

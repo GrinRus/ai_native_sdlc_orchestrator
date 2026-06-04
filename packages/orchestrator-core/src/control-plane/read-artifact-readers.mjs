@@ -31,6 +31,9 @@ const LEARNING_LOOP_SCORECARD_REGEX = /^learning-loop-scorecard-.*\.json$/;
 const LEARNING_LOOP_HANDOFF_REGEX = /^learning-loop-handoff-.*\.json$/;
 const RUN_CONTROL_AUDIT_REGEX = /^run-control-event-.*\.json$/;
 const RUN_CONTROL_STATE_REGEX = /^run-control-state-.*\.json$/;
+const PROJECT_INIT_STATE_REGEX = /^project-init-state\.json$/;
+const ARTIFACT_BODY_REGEX = /^.+\.artifact\..+\.body\.json$/;
+const ONBOARDING_REPORT_REGEX = /^onboarding-report\.json$/;
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/;
 const OPERATOR_REQUEST_REGEX = /^operator-request-.*\.json$/;
 const LIVE_E2E_ARTIFACT_REGEX = /^live-e2e-(agent-decision-request|operator-decision|step-observation|observation-report|run-summary|controller-state|baseline-verify|final-skill-agent-verdict-request|final-skill-agent-verdict).*\.json$/;
@@ -451,6 +454,90 @@ function liveE2eSummaryParts(filePath, document) {
 
 /**
  * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   files: string[],
+ *   matcher: RegExp,
+ *   type: string,
+ *   stage: string,
+ *   fallbackLabel: string,
+ *   fallbackDescription: string,
+ * }} options
+ * @returns {Array<Record<string, unknown>>}
+ */
+function loadReadableEvidenceSidecarSummaries(options) {
+  /** @type {Array<Record<string, unknown>>} */
+  const summaries = [];
+  for (const filePath of options.files) {
+    if (!options.matcher.test(path.basename(filePath))) continue;
+    let document = {};
+    try {
+      const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        document = /** @type {Record<string, unknown>} */ (parsed);
+      }
+    } catch {
+      document = {};
+    }
+    summaries.push(buildArtifactDisplaySummary({
+      file: filePath,
+      artifactRef: toEvidenceRef(options.init, filePath),
+      document,
+      type: options.type,
+      stage: options.stage,
+      label: asString(document.title) ?? asString(document.packet_id) ?? options.fallbackLabel,
+      description: asString(document.summary) ?? options.fallbackDescription,
+      status: "ready",
+    }));
+  }
+  return summaries;
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   limit?: number,
+ * }} options
+ * @returns {Array<Record<string, unknown>>}
+ */
+function listReadableEvidenceSidecarSummaries(options = {}) {
+  const init = initializeProjectRuntime(options);
+  const summaries = [
+    ...loadReadableEvidenceSidecarSummaries({
+      init,
+      files: listJsonFiles(init.runtimeLayout.stateRoot),
+      matcher: PROJECT_INIT_STATE_REGEX,
+      type: "runtime-state",
+      stage: "readiness",
+      fallbackLabel: "Project runtime state",
+      fallbackDescription: "Runtime initialization state evidence.",
+    }),
+    ...loadReadableEvidenceSidecarSummaries({
+      init,
+      files: listJsonFiles(init.runtimeLayout.artifactsRoot),
+      matcher: ARTIFACT_BODY_REGEX,
+      type: "evidence",
+      stage: "mission",
+      fallbackLabel: "Mission intake body",
+      fallbackDescription: "Mission intake body evidence.",
+    }),
+    ...loadReadableEvidenceSidecarSummaries({
+      init,
+      files: listJsonFiles(init.runtimeLayout.reportsRoot),
+      matcher: ONBOARDING_REPORT_REGEX,
+      type: "onboarding-report",
+      stage: "readiness",
+      fallbackLabel: "Onboarding report",
+      fallbackDescription: "Runtime onboarding report evidence.",
+    }),
+  ];
+  return applyReadModelLimit(summaries, options.limit);
+}
+
+/**
+ * @param {{
  *   cwd?: string,
  *   projectRef?: string,
  *   projectProfile?: string,
@@ -845,6 +932,7 @@ export function listArtifactDisplaySummaries(options = {}) {
   const nextActionReport = readNextActionReport(options);
   const summaries = [
     ...listPacketArtifacts(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
+    ...listReadableEvidenceSidecarSummaries(options),
     ...listStepResults(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
     ...listQualityArtifacts(options).flatMap((entry) => entry.artifact_display_summaries ?? []),
     ...listOperatorRequests(options).flatMap((entry) => entry.artifact_display_summaries ?? []),

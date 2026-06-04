@@ -10,7 +10,7 @@ import {
   listStepResults,
   readProjectState,
 } from "../src/control-plane/read-surface.mjs";
-import { readFlowEvidenceGraph, listFlowProjections } from "../src/control-plane/flow-projections.mjs";
+import { readFlowEvidenceGraph, readFlowRuntimeTrace, listFlowProjections } from "../src/control-plane/flow-projections.mjs";
 import { buildArtifactDisplaySummary, buildMissingArtifactDisplaySummary } from "../src/artifact-display-summary.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 
@@ -267,7 +267,10 @@ test("flow projection and evidence graph render missing refs as explicit summari
       primary_action: { action_id: "inspect", command: "aor next", reason: "fixture" },
       blockers: [],
       evidence_refs: [
+        evidenceRef(repoRoot, init.stateFile),
+        evidenceRef(repoRoot, path.join(init.runtimeLayout.reportsRoot, "onboarding-report.json")),
         evidenceRef(repoRoot, packet.packetFile),
+        evidenceRef(repoRoot, packet.packetBodyFile),
         "evidence://reports/provider-raw-evidence-missing.json",
       ],
       closure_state: {},
@@ -277,12 +280,31 @@ test("flow projection and evidence graph render missing refs as explicit summari
     const flowList = listFlowProjections({ cwd: repoRoot, projectRef: repoRoot });
     const flow = flowList.flows.find((entry) => entry.mission_id === "missing-ref");
     assert.ok(flow);
+    const stateSummary = flow.artifact_display_summaries.find((entry) => entry.raw_ref === evidenceRef(repoRoot, init.stateFile));
+    assert.equal(stateSummary?.status, "ready");
+    assert.equal(stateSummary?.type, "runtime-state");
+    const onboardingSummary = flow.artifact_display_summaries.find((entry) => entry.raw_ref === evidenceRef(repoRoot, path.join(init.runtimeLayout.reportsRoot, "onboarding-report.json")));
+    assert.equal(onboardingSummary?.status, "ready");
+    assert.equal(onboardingSummary?.type, "onboarding-report");
+    const bodySummary = flow.artifact_display_summaries.find((entry) => entry.raw_ref === evidenceRef(repoRoot, packet.packetBodyFile));
+    assert.equal(bodySummary?.status, "ready");
+    assert.equal(bodySummary?.label, "Mission intake body");
     const missingSummary = flow.artifact_display_summaries.find((entry) => entry.raw_ref === "evidence://reports/provider-raw-evidence-missing.json");
     assert.equal(missingSummary?.status, "missing");
     assert.equal(missingSummary?.severity, "critical");
 
     const graph = readFlowEvidenceGraph({ cwd: repoRoot, projectRef: repoRoot, flowId: flow.flow_id });
+    const stateNode = graph.nodes.find((node) => node.ref === evidenceRef(repoRoot, init.stateFile));
+    assert.equal(stateNode?.display_summary?.status, "ready");
+    const bodyNode = graph.nodes.find((node) => node.ref === evidenceRef(repoRoot, packet.packetBodyFile));
+    assert.equal(bodyNode?.display_summary?.status, "ready");
     const missingNode = graph.nodes.find((node) => node.ref === "evidence://reports/provider-raw-evidence-missing.json");
     assert.equal(missingNode?.display_summary?.status, "missing");
+
+    const trace = readFlowRuntimeTrace({ cwd: repoRoot, projectRef: repoRoot, flowId: flow.flow_id });
+    const traceState = trace.trace_items.find((item) => item.ref === evidenceRef(repoRoot, init.stateFile));
+    assert.equal(traceState?.display_summary?.status, "ready");
+    const traceOnboarding = trace.trace_items.find((item) => item.ref === evidenceRef(repoRoot, path.join(init.runtimeLayout.reportsRoot, "onboarding-report.json")));
+    assert.equal(traceOnboarding?.display_summary?.status, "ready");
   });
 });

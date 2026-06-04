@@ -71,7 +71,7 @@ a code fix, docs fix, live E2E proof refresh, or backlog split.
 
 ## W41-S02 — Alpha.8 installed-user onboarding smoke refresh
 - **Epic:** EPIC-1 Bootstrap and onboarding; EPIC-6 Operator surface
-- **State:** ready
+- **State:** done
 - **Outcome:** Re-verify the published alpha.8 installed-user onboarding path and capture actionable UI/docs/code findings from the clean local app experience.
 - **Primary modules:** `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests
 - **Hard dependencies:** W41-S01
@@ -109,7 +109,7 @@ a code fix, docs fix, live E2E proof refresh, or backlog split.
 
 ## W41-S03 — Alpha.8 provider qualification smoke refresh
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Refresh Codex/Qwen/Claude/OpenCode qualification evidence through the provider-neutral live E2E lifecycle after installed-user onboarding smoke has passed or produced explicit blockers.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `docs/product/**`, tests
 - **Hard dependencies:** W41-S02, W40-S04
