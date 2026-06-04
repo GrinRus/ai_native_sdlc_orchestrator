@@ -7,6 +7,18 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.10] - 2026-06-04
+
+- Added operator-owned provider interruption classification so public live E2E
+  status, execution evidence, reports, and qualification summaries distinguish
+  operator stops from provider failures.
+- Added optional public `provider_step_status` interruption owner, status, and
+  reason fields while preserving fail-closed `interrupted` provider execution
+  semantics.
+- Updated the web execution evidence panel and live E2E examples so operator
+  stops render with owner/phase context and provider, target repository,
+  environment, and AOR failures remain separately classified.
+
 ## [0.1.0-alpha.9] - 2026-06-04
 
 - Fixed the installed-user local app evidence rendering so valid runtime state,
