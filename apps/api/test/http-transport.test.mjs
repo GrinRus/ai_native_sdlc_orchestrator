@@ -521,20 +521,36 @@ test("detached control-plane transport streams follow events through SSE", async
       assert.equal(streamResponse.status, 200);
 
       const nextEventPromise = readNextLiveRunEvent(streamResponse, { timeoutMs: 3000 });
+      const providerHeartbeatAt = new Date().toISOString();
       appendRunEvent({
         projectRef: repoRoot,
         cwd: repoRoot,
         runId,
-        eventType: "warning.raised",
+        eventType: "provider.heartbeat",
         payload: {
-          code: "scope.target_step_required",
-          summary: "Transport follow smoke warning.",
+          step_id: "run.start.implement",
+          status: "running",
+          summary: "Provider heartbeat is visible through SSE.",
+          provider_step_status: {
+            provider: "codex",
+            adapter: "codex-cli",
+            route_id: "route.implement.default",
+            step_id: "run.start.implement",
+            status: "running",
+            timeout_budget_ms: 300_000,
+            started_at: providerHeartbeatAt,
+            last_output_at: providerHeartbeatAt,
+          },
         },
+        timestamp: providerHeartbeatAt,
       });
 
       const streamed = await nextEventPromise;
-      assert.equal(streamed.event_type, "warning.raised");
-      assert.equal(streamed.summary, "Transport follow smoke warning.");
+      assert.equal(streamed.event_type, "provider.heartbeat");
+      assert.equal(streamed.summary, "Provider heartbeat is visible through SSE.");
+      assert.equal(streamed.provider_step_status.provider, "codex");
+      assert.equal(streamed.provider_step_status.status, "running");
+      assert.equal(Object.hasOwn(streamed.provider_step_status, "state_file"), false);
       controller.abort();
     } finally {
       await transport.close();

@@ -14,6 +14,7 @@ Normalized event emitted during workflow execution for CLI, API, and web subscri
 `event_type` must be one of:
 - `run.started`
 - `step.updated`
+- `provider.heartbeat`
 - `evidence.linked`
 - `warning.raised`
 - `run.terminal`
@@ -22,6 +23,11 @@ Normalized event emitted during workflow execution for CLI, API, and web subscri
 - `payload.sequence` is required and must increase monotonically within one `run_id`.
 - `payload` should include only query-safe fields needed by CLI/web subscribers (ids, refs, status, summaries).
 - For later operator troubleshooting, payloads may include `policy_context` (for example action risk tier and approval requirement flags) when the emitter has policy guardrail context.
+- `provider.heartbeat` payloads may include `provider_step_status`, using the same
+  public heartbeat shape as control-plane project state and run summaries. These
+  payloads must keep provider progress summarized and must not include raw
+  process commands, command args, prompts, file contents, environment values,
+  bearer tokens, auth tokens, or provider secrets.
 - W18 interactive continuation events should use existing query-safe event types such as `step.updated`, `warning.raised`, and `evidence.linked` unless the contract family is intentionally expanded. Payloads should point to `requested_interaction` and answer audit evidence refs rather than embedding sensitive answer text.
 - W20 production hardening requires event emitters and stream presenters to apply the configured redaction policy before JSONL append or SSE replay. Configured bearer tokens and explicit redaction values must not appear in live-event logs or stream payloads.
 

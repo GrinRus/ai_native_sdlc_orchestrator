@@ -9,6 +9,7 @@ import {
 import { validateContractDocument } from "../../contracts/src/index.mjs";
 import { resolveRouteForStep } from "../../provider-routing/src/route-resolution.mjs";
 
+import { appendRunEvent } from "./control-plane/live-event-stream.mjs";
 import { resolveAssetBundleForStep } from "./asset-loader.mjs";
 import { compileStepContext } from "./context-compiler.mjs";
 import { materializeDeliveryPlan } from "./delivery-plan.mjs";
@@ -155,6 +156,36 @@ function updateRunControlProviderStepStatus(filePath, patch) {
   fs.mkdirSync(path.dirname(stateFile), { recursive: true });
   fs.writeFileSync(stateFile, `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
   return status;
+}
+
+/**
+ * @param {{
+ *   cwd?: string,
+ *   projectRef?: string,
+ *   projectProfile?: string,
+ *   runtimeRoot?: string,
+ *   runId: string,
+ *   providerStepStatus: Record<string, unknown> | null | undefined,
+ *   summary: string,
+ * }} options
+ */
+function appendProviderHeartbeatEvent(options) {
+  const providerStepStatus = asRecord(options.providerStepStatus);
+  if (Object.keys(providerStepStatus).length === 0) return null;
+  return appendRunEvent({
+    cwd: options.cwd,
+    projectRef: options.projectRef,
+    projectProfile: options.projectProfile,
+    runtimeRoot: options.runtimeRoot,
+    runId: options.runId,
+    eventType: "provider.heartbeat",
+    payload: {
+      step_id: asString(providerStepStatus.step_id),
+      status: asString(providerStepStatus.status),
+      summary: options.summary,
+      provider_step_status: providerStepStatus,
+    },
+  });
 }
 
 /**
@@ -1243,6 +1274,17 @@ export function executeRoutedStep(options) {
         !dryRun && planReady
           ? updateRunControlProviderStepStatus(options.providerStepStatusStateFile, providerStepStatusBase)
           : null;
+      if (providerStepStatus) {
+        appendProviderHeartbeatEvent({
+          cwd: options.cwd,
+          projectRef: options.projectRef,
+          projectProfile: options.projectProfile,
+          runtimeRoot: options.runtimeRoot,
+          runId,
+          providerStepStatus,
+          summary: "Provider execution heartbeat started.",
+        });
+      }
 
       adapterRequest = createAdapterRequestEnvelope({
         request_id: `${stepResultId}.request`,
@@ -1301,7 +1343,7 @@ export function executeRoutedStep(options) {
           asString(stateFileSnapshot.status) === "canceled" ||
           asString(stateFileSnapshot.status) === "cancelled" ||
           asString(currentProviderStepStatus.status) === "interrupted";
-        updateRunControlProviderStepStatus(options.providerStepStatusStateFile, {
+        const terminalProviderStepStatus = updateRunControlProviderStepStatus(options.providerStepStatusStateFile, {
           ...providerStepStatusBase,
           status: providerInterrupted ? "interrupted" : invocation.status === "passed" ? "completed" : "failed",
           last_artifact_update_at: asString(externalRunner.raw_evidence_ref) ? new Date().toISOString() : null,
@@ -1312,6 +1354,15 @@ export function executeRoutedStep(options) {
               ? "Continue with post-run verification."
               : "Inspect provider evidence and failure summary.",
           finished_at: new Date().toISOString(),
+        });
+        appendProviderHeartbeatEvent({
+          cwd: options.cwd,
+          projectRef: options.projectRef,
+          projectProfile: options.projectProfile,
+          runtimeRoot: options.runtimeRoot,
+          runId,
+          providerStepStatus: terminalProviderStepStatus,
+          summary: "Provider execution heartbeat finished.",
         });
       }
 

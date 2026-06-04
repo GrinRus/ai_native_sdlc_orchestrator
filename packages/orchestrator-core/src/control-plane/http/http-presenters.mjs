@@ -1,3 +1,4 @@
+import { normalizeProviderStepStatus } from "../../provider-step-status.mjs";
 import { asPositiveInteger, asRecord, asString } from "./http-utils.mjs";
 
 /**
@@ -115,12 +116,26 @@ function toPolicyContext(payload) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function toTimestampMs(value) {
+  const timestamp = asString(value);
+  if (!timestamp) return null;
+  const parsed = Date.parse(timestamp);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
  * @param {Record<string, unknown>} event
  */
 export function toHistoryEvent(event) {
   const payload = asRecord(event.payload);
   const interaction = asRecord(payload.interaction);
   const continuation = asRecord(interaction.continuation);
+  const providerStepStatus = normalizeProviderStepStatus(asRecord(payload.provider_step_status), {
+    nowMs: toTimestampMs(event.timestamp) ?? undefined,
+  });
   return {
     event_id: asString(event.event_id) ?? "",
     timestamp: asString(event.timestamp),
@@ -133,6 +148,7 @@ export function toHistoryEvent(event) {
     interaction_id: asString(payload.interaction_id),
     step_result_ref: asString(payload.step_result_ref),
     answer_audit_ref: asString(payload.answer_audit_ref),
+    provider_step_status: providerStepStatus,
     interaction:
       Object.keys(interaction).length > 0
         ? {

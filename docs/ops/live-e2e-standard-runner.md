@@ -176,13 +176,18 @@ Live adapter preflight uses `execution.external_runtime.preflight_timeout_ms` wh
 While an external provider step is running, `run-control-state-<run>.json`
 preserves `provider_step_status` and public reads expose the same heartbeat
 through `aor run status`, `GET /api/projects/:projectId/state`, and
-`GET /api/projects/:projectId/runs`. The status must show provider, adapter,
-route, step, elapsed time, timeout budget, remaining budget, last output or
-artifact update, a compact command label, and a recommended action. Silent
-providers are reported as `silent-running` after the no-output window rather
-than as a hung terminal process. Operator reports and the SPA must not print raw
-process commands, args, env, tokens, or provider secrets; raw evidence remains
-behind explicit evidence refs.
+`GET /api/projects/:projectId/runs`. Active heartbeat events may also appear in
+`GET /api/projects/:projectId/runs/:runId/events/history` and the matching SSE
+stream as `provider.heartbeat` events with the same `provider_step_status`
+snapshot. The status must show provider, adapter, route, step, elapsed time,
+timeout budget, remaining budget, last output or artifact update, a compact
+command label, and a recommended action. Silent providers are reported as
+`silent-running` after the no-output window rather than as a hung terminal
+process. The SPA should auto-refresh public read surfaces while a provider
+status is active so elapsed/budget/progress remain visible without manual
+refresh. Operator reports and the SPA must not print raw process commands, args,
+env, tokens, or provider secrets; raw evidence remains behind explicit evidence
+refs.
 
 For Qwen candidate profiles, `provider_step_status` also exposes sanitized
 stream progress from official `stream-json` stdout: `last_progress_at`,

@@ -217,6 +217,15 @@ sanitized summaries such as `api_response`, `tool_call:read_file`, or
 `assistant message`, not raw provider payloads. Raw provider evidence remains
 available only through explicit debug/evidence refs.
 
+Active live E2E heartbeat surfacing extends the same public model to
+`GET /api/projects/:projectId/runs/:runId/events/history` and the matching
+SSE stream. Provider heartbeat events may include additive
+`provider_step_status` snapshots so web/CLI operators can see active
+elapsed/budget/progress state without rereading private process state. These
+event snapshots follow the same redaction and normalization rules as project
+state and run summaries; raw commands, args, prompts, file contents, and secrets
+remain out of the event payload.
+
 ## Execution evidence summaries (W35-S04)
 
 Run summaries expose additive `execution_evidence` for operator-facing live E2E
@@ -516,6 +525,7 @@ The current live stream is module-backed and uses the same event contract intend
 Expected event types:
 - `run.started`
 - `step.updated`
+- `provider.heartbeat`
 - `evidence.linked`
 - `warning.raised`
 - `run.terminal`

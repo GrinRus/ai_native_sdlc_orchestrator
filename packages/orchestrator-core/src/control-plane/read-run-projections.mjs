@@ -63,6 +63,17 @@ function asString(value) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function toTimestampMs(value) {
+  const timestamp = asString(value);
+  if (!timestamp) return null;
+  const parsed = Date.parse(timestamp);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
  * @param {Array<{ document?: Record<string, unknown> } | Record<string, unknown>>} stepResults
  * @returns {string[]}
  */
@@ -959,6 +970,9 @@ export function readRunEventHistory(options) {
     const policyContext = asRecord(payload.policy_context);
     const interaction = asRecord(payload.interaction);
     const continuation = asRecord(interaction.continuation);
+    const providerStepStatus = normalizeProviderStepStatus(asRecord(payload.provider_step_status), {
+      nowMs: toTimestampMs(event.timestamp) ?? undefined,
+    });
     return {
       event_id: asString(event.event_id) ?? "",
       timestamp: asString(event.timestamp) ?? null,
@@ -971,6 +985,7 @@ export function readRunEventHistory(options) {
       interaction_id: asString(payload.interaction_id),
       step_result_ref: asString(payload.step_result_ref),
       answer_audit_ref: asString(payload.answer_audit_ref),
+      provider_step_status: providerStepStatus,
       interaction:
         Object.keys(interaction).length > 0
           ? {

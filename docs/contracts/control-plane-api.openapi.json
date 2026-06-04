@@ -2927,6 +2927,16 @@
               "null"
             ]
           },
+          "provider_step_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderStepStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "interaction": {
             "anyOf": [
               {
