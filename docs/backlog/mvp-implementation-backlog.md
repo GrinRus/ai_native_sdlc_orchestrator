@@ -355,8 +355,8 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W41-S01 | Post-alpha.8 backlog and validation baseline | EPIC-0 | done | `docs/backlog/**`, `README.md` | W40-S04 |
-| W41-S02 | Alpha.8 installed-user onboarding smoke refresh | EPIC-1, EPIC-6 | ready | `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W41-S01 |
-| W41-S03 | Alpha.8 provider qualification smoke refresh | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `docs/product/**`, tests | W41-S02, W40-S04 |
+| W41-S02 | Alpha.8 installed-user onboarding smoke refresh | EPIC-1, EPIC-6 | done | `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W41-S01 |
+| W41-S03 | Alpha.8 provider qualification smoke refresh | EPIC-7 | ready | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `docs/product/**`, tests | W41-S02, W40-S04 |
 | W41-S04 | Alpha.8 findings closure and next-release decision | EPIC-0, EPIC-6 | blocked | `docs/backlog/**`, `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, tests | W41-S02, W41-S03 |
 
 ## Planning note

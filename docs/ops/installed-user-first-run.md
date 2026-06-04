@@ -71,6 +71,20 @@ For a clean target, the app smoke should pass without creating `$TMP/target/.aor
 runtime state is created only after the user explicitly initializes the project
 or after headless `aor onboard`.
 
+## W41 alpha.8 validation notes
+W41-S02 re-validates the published `0.1.0-alpha.8` package from a neutral
+temporary runner before relying on local source-checkout behavior.
+
+Findings and closure:
+
+| Finding | Owner | Phase | Status | Evidence |
+| --- | --- | --- | --- | --- |
+| Registry package help and app smoke load from npm, not the source checkout. | environment | registry smoke | passed | `npm exec --package @grinrus/aor@0.1.0-alpha.8 -- aor --help`; `aor app --smoke --open false --json` reports `smoke-pass` with wizard, project switcher, flow selector, and `New Flow` markers. |
+| Clean UI launch does not create runtime state before explicit initialization. | aor | onboarding | passed | Clean target has no `.aor/` before **Initialize Project Runtime**; initialization creates `project-init-state.json` only after the button click. |
+| First-flow wizard creates a no-write mission and lands in the active cockpit. | aor | first flow | passed | Safe walkthrough template defaults to `No-Write (Safe)` and resolves the next action to `aor discovery run` after mission creation. |
+| Local multi-project switching keeps runtime and flow state isolated. | aor | project switching | passed | Add-to-workspace leaves the second project uninitialized; initializing the selected project does not alter the first project's active flow. |
+| Existing runtime sidecar refs rendered as `Evidence missing` in the selected-flow evidence list, graph, and trace. | aor | evidence rendering | fixed | Runtime state, onboarding report, and mission body sidecars now render as readable `ready` summaries; only genuinely unresolved refs are marked missing. |
+
 ## Wrapper ownership
 | Guided command | Low-level ownership | Notes |
 | --- | --- | --- |
