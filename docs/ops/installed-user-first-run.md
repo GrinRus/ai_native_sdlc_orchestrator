@@ -71,6 +71,24 @@ For a clean target, the app smoke should pass without creating `$TMP/target/.aor
 runtime state is created only after the user explicitly initializes the project
 or after headless `aor onboard`.
 
+## W43 alpha.10 validation notes
+W43-S02 re-validates the published `0.1.0-alpha.10` package from a neutral
+temporary runner and browser-driven installed-user UI path. The slice produced
+evidence only; no source fix or public contract change was required.
+
+Findings and closure:
+
+| Finding | Owner | Phase | Status | Evidence |
+| --- | --- | --- | --- | --- |
+| Registry package help and app smoke load from npm, not the source checkout. | environment | registry smoke | passed | `npm exec --package @grinrus/aor@0.1.0-alpha.10 -- aor --help`; `aor app --smoke --open false --json` reports `status: "smoke-pass"` with first-run wizard, project switcher, flow selector, and `New Flow` markers. |
+| Clean smoke does not create runtime state before explicit initialization. | aor | onboarding | passed | The clean `target-a` app smoke returned matching `project_id`, `config_project_id`, `config_default_project_id`, `project_index_default_project_id`, and `state_project_id` values while `$TMP/target-a/.aor` remained absent. |
+| Browser first run follows Project Context -> Runtime Readiness -> First Flow -> Next Action. | aor | first flow | passed | Clicking **Initialize Project Runtime** created the runtime state; **Start First Flow** used the safe no-write walkthrough template; **Resolve Next Action** landed in the active cockpit with `flow.target-a.first-aor-walkthrough-mpze0gde`, `aor discovery run`, blockers `0`, and five readable evidence artifacts. |
+| Initialized-runtime resume preserves the active flow and next action. | aor | resume | passed | Reloading the UI kept the `target-a` runtime root, selected flow, no-write status, and discovery next action; the initialization button was no longer primary. |
+| Local multi-project state stays isolated across project switcher changes. | aor | project switching | passed | `POST /api/projects/actions` is the public action used by the Add local project drawer. A fresh minimal installed-package sequence confirmed add plus `GET /api/projects/target-b/state` kept `state_file: null` and did not create `$TMP/target-b/.aor`; the browser UI switcher then showed `target-b` without `target-a` flow/evidence and restored `target-a` flow/evidence after switching back. |
+| Evidence refs render as operator-readable rows/cards with raw refs as debug actions. | aor | evidence rendering | passed | Active cockpit and Evidence & Documents showed artifact labels, stages, status, blockers, runtime root, and `Debug raw ref` actions instead of requiring raw path inspection as the primary UI. |
+| Browser text-entry automation could not type into the Add local project drawer in this environment. | environment | browser evidence capture | documented | The in-app browser driver reported `Browser Use virtual clipboard is not installed` on `locator.fill`. The product path was still validated through the same public control-plane route used by the drawer, followed by browser project-switcher verification. |
+| Source regression coverage for project route isolation remains green. | aor | regression | passed | `node --test apps/api/test/http-transport.test.mjs --test-name-pattern "local app project index and add-project action keep project runtimes isolated"` passed locally. |
+
 ## W41 alpha.8 validation notes
 W41-S02 re-validates the published `0.1.0-alpha.8` package from a neutral
 temporary runner before relying on local source-checkout behavior.

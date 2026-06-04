@@ -369,8 +369,8 @@ This is the master index for the implementation slices across all defined waves.
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
 | W43-S01 | Post-alpha.10 backlog and confidence baseline | EPIC-0 | done | `docs/backlog/**`, `README.md` | W42-S02 |
-| W43-S02 | Alpha.10 installed-user onboarding and evidence smoke | EPIC-1, EPIC-6 | ready | `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W43-S01 |
-| W43-S03 | Alpha.10 live E2E interruption and provider smoke | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, tests | W43-S02 |
+| W43-S02 | Alpha.10 installed-user onboarding and evidence smoke | EPIC-1, EPIC-6 | done | `README.md`, `docs/ops/**`, `apps/cli/**`, `apps/web/**`, `packages/orchestrator-core/**`, tests | W43-S01 |
+| W43-S03 | Alpha.10 live E2E interruption and provider smoke | EPIC-7 | ready | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, tests | W43-S02 |
 | W43-S04 | Alpha.10 findings closure and next-release decision | EPIC-0, EPIC-6 | blocked | `docs/backlog/**`, `README.md`, `docs/ops/**`, tests | W43-S02, W43-S03 |
 
 ## Planning note
