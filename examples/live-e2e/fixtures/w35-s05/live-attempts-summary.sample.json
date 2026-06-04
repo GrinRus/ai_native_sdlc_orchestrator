@@ -58,13 +58,18 @@
       "status": "blocked",
       "blocked_stage": "provider execution",
       "public_observation": "Qwen reached provider execution after bounded target setup and verification passed, remained silent-running, and was stopped through public run-control. Final skill-agent verdict is blocked.",
-      "blocker_class": "provider_blocked",
-      "failure_owner": "provider",
+      "blocker_class": "operator_stopped",
+      "failure_owner": "operator",
       "failure_phase": "provider_execution",
       "target_setup_status": "pass",
       "target_verification_status": "pass",
       "provider_execution_status": "interrupted",
-      "provider_step_status": "interrupted",
+      "provider_step_status": {
+        "status": "interrupted",
+        "interruption_owner": "operator",
+        "interruption_status": "operator-stopped",
+        "interruption_reason": "Operator stopped the Qwen candidate proof through public run-control after collecting fail-closed progress evidence."
+      },
       "product_pass_claimed": false,
       "no_upstream_write": true
     }

@@ -409,6 +409,11 @@ function providerStatusCopy(status) {
   if (status.last_output_at) return "Provider output observed; step is still running.";
   if (status.status === "artifact-updated") return "Provider is running and evidence was updated.";
   if (status.status === "completed") return "Provider completed. Continue with verification evidence.";
+  if (status.status === "interrupted" && status.interruption_owner === "operator") {
+    return status.interruption_reason
+      ? `Provider was stopped by the operator: ${status.interruption_reason}`
+      : "Provider was stopped by the operator. Save partial evidence, then diagnose or retry.";
+  }
   if (status.status === "interrupted") return "Provider was stopped or interrupted. Save partial evidence, then diagnose or retry.";
   if (status.status === "failed") return "Provider failed. Inspect evidence before continuing.";
   return "Provider step is running.";
@@ -441,7 +446,7 @@ function executionEvidenceForFlow(selectedFlow, runs, runtimeTrace, { draft = fa
 }
 
 function executionStatusRows(evidence) {
-  return [
+  const rows = [
     { label: "Provider execution", value: evidence?.provider_execution_status ?? "unknown" },
     { label: "Runtime Harness", value: evidence?.runtime_harness_decision ?? "unknown" },
     { label: "Real code change", value: evidence?.real_code_change_status ?? "unknown" },
@@ -450,6 +455,25 @@ function executionStatusRows(evidence) {
     { label: "Delivery readiness", value: evidence?.delivery_readiness_status ?? "unknown" },
     { label: "No upstream writes", value: evidence?.no_upstream_write_status ?? "unknown" },
   ];
+  if (evidence?.provider_interruption_owner || evidence?.provider_step_status?.interruption_owner) {
+    rows.splice(1, 0, {
+      label: "Interruption owner",
+      value:
+        evidence.provider_interruption_owner ??
+        evidence.provider_step_status?.interruption_owner ??
+        "unknown",
+    });
+  }
+  if (evidence?.provider_interruption_status || evidence?.provider_step_status?.interruption_status) {
+    rows.splice(2, 0, {
+      label: "Interruption status",
+      value:
+        evidence.provider_interruption_status ??
+        evidence.provider_step_status?.interruption_status ??
+        "unknown",
+    });
+  }
+  return rows;
 }
 
 function executionActionCommand(action, evidence, decisionRequests) {

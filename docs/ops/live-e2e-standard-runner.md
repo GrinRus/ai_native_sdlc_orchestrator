@@ -274,9 +274,13 @@ as a passing implementation. Runner-local state under `.qwen/`, `.codex/`,
 
 Interruption controls must use public surfaces only:
 - stop a running provider with `aor run cancel`, which records durable
-  `provider_step_status.status=interrupted` plus `operator-stopped` audit
-  evidence and interrupts the supervised external provider process instead of
-  only changing report state;
+  `provider_step_status.status=interrupted`,
+  `provider_step_status.interruption_owner=operator`,
+  `provider_step_status.interruption_status=operator-stopped`, and matching
+  audit evidence. The controller must classify this as
+  `failure_owner=operator` and `failure_phase=provider_execution`, not as a
+  provider-quality failure, while still interrupting the supervised external
+  provider process instead of only changing report state;
 - preserve partial evidence with `aor run status --json`;
 - diagnose or retry with `manual-live-e2e.mjs --prepare-decision --action
   diagnose` or `--action retry_public_step`.

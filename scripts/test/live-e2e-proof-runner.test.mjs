@@ -456,9 +456,11 @@ test("W35 live attempts summary records blockers without claiming product pass",
   assert.equal(codexClosure.target_verification_status, "pass");
   const qwenClosure = fixture.attempts.find((entry) => entry.run_id === "w35-s05-qwen-interrupt-proof-20260603102247");
   assert.equal(qwenClosure.status, "blocked");
-  assert.equal(qwenClosure.failure_owner, "provider");
+  assert.equal(qwenClosure.failure_owner, "operator");
   assert.equal(qwenClosure.failure_phase, "provider_execution");
-  assert.equal(qwenClosure.blocker_class, "provider_blocked");
+  assert.equal(qwenClosure.blocker_class, "operator_stopped");
+  assert.equal(qwenClosure.provider_step_status.interruption_owner, "operator");
+  assert.equal(qwenClosure.provider_step_status.interruption_status, "operator-stopped");
   assert.equal(qwenClosure.target_setup_status, "pass");
   assert.equal(qwenClosure.target_verification_status, "pass");
   assert.equal(qwenClosure.product_pass_claimed, false);
@@ -478,6 +480,9 @@ test("W40 provider qualification matrix uses evidence owner and phase instead of
   assert.equal(cells.get("anthropic-primary").qualification_status, "candidate");
   assert.equal(cells.get("open-code-primary").qualification_status, "blocked");
   assert.equal(cells.get("qwen-primary").qualification_status, "blocked");
+  assert.equal(cells.get("qwen-primary").failure_owner, "operator");
+  assert.equal(cells.get("qwen-primary").failure_phase, "provider_execution");
+  assert.equal(cells.get("qwen-primary").failure_class, "operator_stopped");
   for (const providerId of ["anthropic-primary", "open-code-primary", "qwen-primary"]) {
     assert.equal(cells.get(providerId).release_blocking, false);
   }
@@ -516,15 +521,27 @@ test("W40 provider qualification matrix uses evidence owner and phase instead of
         failure_class: "target_setup_blocked",
         public_observation: "The target repository install timed out before provider execution.",
       },
+      {
+        run_id: "qwen-operator-stopped",
+        provider_variant_id: "qwen-primary",
+        status: "blocked",
+        provider_step_status: {
+          status: "interrupted",
+          interruption_owner: "operator",
+          interruption_status: "operator-stopped",
+          interruption_reason: "Operator stopped the provider through public run-control after collecting progress evidence.",
+        },
+      },
     ],
     releaseBlockingProviderIds: ["openai-primary"],
   });
   const qwenCell = matrix.provider_cells.find((entry) => entry.provider_variant_id === "qwen-primary");
   const codexCell = matrix.provider_cells.find((entry) => entry.provider_variant_id === "openai-primary");
   assert.equal(qwenCell.qualification_status, "blocked");
-  assert.equal(qwenCell.failure_owner, "aor");
-  assert.equal(qwenCell.failure_phase, "ui_validation");
-  assert.equal(qwenCell.failure_class, "aor_failure");
+  assert.equal(qwenCell.failure_owner, "operator");
+  assert.equal(qwenCell.failure_phase, "provider_execution");
+  assert.equal(qwenCell.failure_class, "operator_stopped");
+  assert.match(qwenCell.blocker_reason, /public run-control/u);
   assert.equal(codexCell.qualification_status, "blocked");
   assert.equal(codexCell.failure_owner, "target_repository");
   assert.equal(codexCell.failure_phase, "target_setup");
@@ -1183,8 +1200,10 @@ test("proof runner preserves target setup and provider interruption evidence on 
   assert.match(runProfileSource, /target_setup_status/u);
   assert.match(runProfileSource, /target_verification_status_detail/u);
   assert.match(runProfileSource, /function classifyProviderStepStatus/u);
+  assert.match(runProfileSource, /failure_owner: operatorStopped \? "operator" : "provider"/u);
   assert.match(runProfileSource, /failure_owner: "provider"/u);
   assert.match(runProfileSource, /failure_phase: "provider_execution"/u);
+  assert.match(runProfileSource, /failure_class: operatorStopped \? "operator_stopped" : "provider_blocked"/u);
   assert.match(runProfileSource, /failure_class: "provider_blocked"/u);
   assert.match(runProfileSource, /provider_step_status:[\s\S]*options\.flowResult\.artifacts\.provider_step_status/u);
   assert.match(runProfileSource, /finalSkillAgentVerdict\.verdict[\s\S]*observationReport\.report_status = "final"/u);

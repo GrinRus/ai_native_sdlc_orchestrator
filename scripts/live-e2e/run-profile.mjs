@@ -919,6 +919,9 @@ function latestProviderStepStatusFromArtifacts(artifacts) {
 
 function classifyProviderStepStatus(providerStepStatus) {
   const status = asNonEmptyString(providerStepStatus.status);
+  const interruptionOwner = asNonEmptyString(providerStepStatus.interruption_owner);
+  const interruptionStatus = asNonEmptyString(providerStepStatus.interruption_status);
+  const interruptionReason = asNonEmptyString(providerStepStatus.interruption_reason) ?? asNonEmptyString(providerStepStatus.recommended_action);
   if (!status || ["completed", "complete", "pass", "succeeded"].includes(status)) {
     return {
       provider_execution_status: status === "completed" || status === "complete" || status === "succeeded" ? "completed" : null,
@@ -937,7 +940,20 @@ function classifyProviderStepStatus(providerStepStatus) {
     };
   }
 
-  if (["interrupted", "silent-running", "timeout-risk", "timeout", "timed-out"].includes(status)) {
+  if (status === "interrupted") {
+    const operatorStopped =
+      interruptionOwner === "operator" ||
+      interruptionStatus === "operator-stopped" ||
+      /\boperator\b/iu.test(interruptionReason ?? "");
+    return {
+      provider_execution_status: "interrupted",
+      failure_owner: operatorStopped ? "operator" : "provider",
+      failure_phase: "provider_execution",
+      failure_class: operatorStopped ? "operator_stopped" : "provider_blocked",
+    };
+  }
+
+  if (["silent-running", "timeout-risk", "timeout", "timed-out"].includes(status)) {
     return {
       provider_execution_status: status === "timeout" || status === "timed-out" ? "timeout" : status,
       failure_owner: "provider",

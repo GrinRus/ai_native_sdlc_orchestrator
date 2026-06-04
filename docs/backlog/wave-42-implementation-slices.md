@@ -88,7 +88,7 @@ target-repository separation, or optional provider release policy.
 
 ## W42-S02 — Operator interruption owner classification cleanup
 - **Epic:** EPIC-6 Operator surface; EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Make public operator-initiated provider stops explicit in live E2E
   summaries, UI evidence, and qualification records without masking provider,
   target repository, environment, or AOR failures.
@@ -115,6 +115,27 @@ target-repository separation, or optional provider release policy.
 - targeted unit/integration/web tests
 - `pnpm live-e2e:test`
 - `pnpm slice:gate`
+
+### Closure evidence — 2026-06-04
+- Contract docs and OpenAPI now expose optional
+  `provider_step_status.interruption_owner`, `interruption_status`, and
+  sanitized `interruption_reason`; execution evidence also exposes
+  `provider_interruption_owner`, `provider_interruption_status`, and
+  `provider_interruption_reason`.
+- Public `aor run cancel` and adapter-supervised external runner interruption
+  preserve `interruption_owner=operator` and `interruption_status=operator-stopped`
+  while keeping provider execution `interrupted` and fail-closed.
+- Live E2E report hydration and provider qualification matrix generation now
+  classify operator timebox stops as `failure_owner=operator`,
+  `failure_phase=provider_execution`, and `failure_class=operator_stopped`;
+  provider failures/timeouts, target repository blockers, environment blockers,
+  and AOR failures remain separate owner/phase outcomes.
+- Web execution evidence renders interruption owner/status rows and operator
+  stop copy without requiring raw run-control JSON inspection.
+- Targeted validation passed:
+  provider status/runtime tests, execution evidence tests, adapter SDK tests,
+  web source tests, `pnpm test:references`, `pnpm live-e2e:test`,
+  `pnpm web:build`, and `pnpm slice:gate`.
 
 ### Out of scope
 - Improving provider model quality.

@@ -935,6 +935,9 @@ test("live adapter interrupts external runner when public run-control cancel is 
     assert.equal(response.output.failure_kind, "external-runner-interrupted");
     assert.equal(response.output.external_runner.timed_out, false);
     assert.equal(state.provider_step_status.status, "interrupted");
+    assert.equal(state.provider_step_status.interruption_owner, "operator");
+    assert.equal(state.provider_step_status.interruption_status, "operator-stopped");
+    assert.match(state.provider_step_status.interruption_reason, /public run-control cancel/i);
     assert.match(state.provider_step_status.recommended_action, /stopped by the operator/i);
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
@@ -1824,6 +1827,8 @@ test("live adapter preserves Qwen stream progress when run-control interrupts pr
     assert.equal(response.output.failure_kind, "external-runner-interrupted");
     assert.equal(response.output.external_runner.provider_progress_events.length, 1);
     assert.equal(state.provider_step_status.status, "interrupted");
+    assert.equal(state.provider_step_status.interruption_owner, "operator");
+    assert.equal(state.provider_step_status.interruption_status, "operator-stopped");
     assert.equal(state.provider_step_status.last_progress_kind, "tool_call");
     assert.equal(state.provider_step_status.progress_event_count, 1);
   } finally {

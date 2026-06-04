@@ -1,6 +1,7 @@
 const RUNNING_STATUSES = new Set(["starting", "running", "silent-running", "artifact-updated", "timeout-risk"]);
 const TERMINAL_STATUSES = new Set(["completed", "interrupted", "failed"]);
 const PROVIDER_STEP_STATUSES = new Set([...RUNNING_STATUSES, ...TERMINAL_STATUSES]);
+const INTERRUPTION_OWNERS = new Set(["operator", "provider", "environment", "unknown"]);
 const DEFAULT_SILENT_AFTER_MS = 60_000;
 
 /**
@@ -138,6 +139,11 @@ export function normalizeProviderStepStatus(input, options = {}) {
     last_progress_label: asString(raw.last_progress_label),
     progress_event_count: asNumber(raw.progress_event_count) !== null ? nonNegativeInteger(asNumber(raw.progress_event_count) ?? 0) : null,
     output_mode: asString(raw.output_mode),
+    interruption_owner: INTERRUPTION_OWNERS.has(asString(raw.interruption_owner) ?? "")
+      ? asString(raw.interruption_owner)
+      : null,
+    interruption_reason: asString(raw.interruption_reason),
+    interruption_status: asString(raw.interruption_status),
     current_command_label: asString(raw.current_command_label) ?? "external-provider-runner",
     recommended_action: recommendedAction,
     started_at: startedAt,

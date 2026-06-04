@@ -74,19 +74,35 @@ export function extractQualificationFailureContext(attempt) {
   const providerStepStatus = asRecord(attempt.provider_step_status);
   const baselineGate = asRecord(attempt.baseline_verify_gate_decision);
   const status = normalizeQualificationAttemptStatus(attempt);
+  const providerStatus = asNonEmptyString(providerStepStatus.status);
+  const providerInterruptionOwner = allowedString(providerStepStatus.interruption_owner, FAILURE_OWNERS);
+  const providerInterrupted = providerStatus === "interrupted";
+  const providerFailureOwner =
+    providerInterrupted
+      ? providerInterruptionOwner ?? "provider"
+      : providerStatus && !["completed", "complete", "pass", "passed", "succeeded"].includes(providerStatus)
+        ? "provider"
+        : null;
+  const providerFailureClass =
+    providerInterrupted && providerFailureOwner === "operator"
+      ? "operator_stopped"
+      : providerFailureOwner === "provider"
+        ? "provider_blocked"
+        : null;
 
   const failureOwner =
     allowedString(attempt.failure_owner, FAILURE_OWNERS) ||
     allowedString(targetSetupStatus.failure_owner, FAILURE_OWNERS) ||
     allowedString(targetVerificationStatus.failure_owner, FAILURE_OWNERS) ||
     allowedString(baselineGate.failure_owner, FAILURE_OWNERS) ||
+    providerFailureOwner ||
     (status === "needs_fix" ? "aor" : null);
   const failurePhase =
     allowedString(attempt.failure_phase, FAILURE_PHASES) ||
     allowedString(targetSetupStatus.failure_phase, FAILURE_PHASES) ||
     allowedString(targetVerificationStatus.failure_phase, FAILURE_PHASES) ||
     allowedString(baselineGate.failure_phase, FAILURE_PHASES) ||
-    (asNonEmptyString(providerStepStatus.status) ? "provider_execution" : null) ||
+    (providerStatus ? "provider_execution" : null) ||
     (status === "needs_fix" ? "ui_validation" : null);
   const failureClass =
     asNonEmptyString(attempt.failure_class) ||
@@ -94,11 +110,14 @@ export function extractQualificationFailureContext(attempt) {
     asNonEmptyString(targetSetupStatus.failure_class) ||
     asNonEmptyString(targetVerificationStatus.failure_class) ||
     asNonEmptyString(baselineGate.failure_class) ||
+    providerFailureClass ||
     (status === "needs_fix" ? "aor_failure" : null);
   const blockerReason =
     asNonEmptyString(attempt.blocker_reason) ||
     asNonEmptyString(targetSetupStatus.blocker_reason) ||
     asNonEmptyString(targetVerificationStatus.blocker_reason) ||
+    asNonEmptyString(providerStepStatus.interruption_reason) ||
+    asNonEmptyString(providerStepStatus.recommended_action) ||
     asNonEmptyString(attempt.public_observation) ||
     asNonEmptyString(attempt.summary) ||
     null;

@@ -120,6 +120,9 @@ test("execution evidence exposes interrupted provider actions through public sur
       adapter: "qwen-code",
       status: "interrupted",
       current_command_label: "external-provider-runner",
+      interruption_owner: "operator",
+      interruption_reason: "Operator stopped the short smoke after collecting progress evidence.",
+      interruption_status: "operator-stopped",
     },
     stepResults: [
       {
@@ -137,6 +140,9 @@ test("execution evidence exposes interrupted provider actions through public sur
   });
 
   assert.equal(summary.provider_execution_status, "interrupted");
+  assert.equal(summary.provider_interruption_owner, "operator");
+  assert.equal(summary.provider_interruption_reason, "Operator stopped the short smoke after collecting progress evidence.");
+  assert.equal(summary.provider_interruption_status, "operator-stopped");
   assert.match(summary.blockers.join("\n"), /stopped or interrupted/);
   assert.equal(summary.actions.find((entry) => entry.action_id === "stop_provider").enabled, false);
   assert.equal(summary.actions.find((entry) => entry.action_id === "save_partial_evidence").enabled, true);

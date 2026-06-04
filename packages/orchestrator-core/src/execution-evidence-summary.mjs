@@ -282,6 +282,13 @@ export function buildExecutionEvidenceSummary(options = {}) {
     resolveVerificationReportStatus(options.verificationReports ?? []) ??
     "unknown";
   const providerExecutionStatus = resolveProviderExecutionStatus(options.providerStepStatus);
+  const providerStepStatusRecord = asRecord(options.providerStepStatus);
+  const providerInterruptionOwner =
+    providerExecutionStatus === "interrupted" ? asString(providerStepStatusRecord.interruption_owner) : null;
+  const providerInterruptionReason =
+    providerExecutionStatus === "interrupted" ? asString(providerStepStatusRecord.interruption_reason) : null;
+  const providerInterruptionStatus =
+    providerExecutionStatus === "interrupted" ? asString(providerStepStatusRecord.interruption_status) : null;
   const realCodeChangeStatus =
     runnerOwnedPaths.length > 0
       ? "fail"
@@ -305,6 +312,9 @@ export function buildExecutionEvidenceSummary(options = {}) {
     run_id: options.runId ?? null,
     status: overallStatus,
     provider_execution_status: providerExecutionStatus,
+    provider_interruption_owner: providerInterruptionOwner,
+    provider_interruption_reason: providerInterruptionReason,
+    provider_interruption_status: providerInterruptionStatus,
     runtime_harness_decision: runtimeDecision ?? "unknown",
     real_code_change_status: realCodeChangeStatus,
     post_run_verification_status: postRunVerificationStatus,

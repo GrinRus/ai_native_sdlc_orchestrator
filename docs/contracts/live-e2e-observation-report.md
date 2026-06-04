@@ -140,7 +140,13 @@ When a step invokes an external provider, `step_journal[]` may also include
 control plane and must preserve provider, adapter, route, step, status,
 elapsed/budget fields, last output/artifact/progress timestamps, progress kind,
 progress label, progress event count, output mode, command label, and
-recommended action. It must not include raw process commands, command args,
+recommended action. For interrupted provider steps, it may also include
+`interruption_owner` (`operator|provider|environment|unknown`),
+`interruption_status` (for example `operator-stopped`), and a sanitized
+`interruption_reason`. Public operator cancel must be classified as
+`failure_owner=operator` and `failure_phase=provider_execution`; provider
+crashes, provider timeouts, target setup failures, and environment blockers
+must remain separately owned. It must not include raw process commands, command args,
 prompt text, file contents, environment variables, tokens, or secrets. Qwen
 `~/.qwen/**` files may be referenced only as manual debug context; normal live
 E2E reports must use public adapter stream evidence.
