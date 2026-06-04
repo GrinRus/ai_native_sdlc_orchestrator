@@ -137,3 +137,25 @@ operator-initiated `aor run cancel` is reported as `failure_owner=operator`,
 preserving fail-closed provider execution evidence. Provider crashes, provider
 timeouts, target repository blockers, environment blockers, and AOR product
 failures remain separate owner/phase outcomes.
+
+## W43-S03 alpha.10 live E2E smoke refresh
+
+W43-S03 refreshed interruption/provider smoke evidence after
+`@grinrus/aor@0.1.0-alpha.10` and W43-S02 installed-user validation. The smoke
+used the normal `manual-live-e2e.mjs` lifecycle and public run-control surfaces;
+it did not add a provider-specific mode.
+
+| Provider cell | Run or check | Owner / phase | Result |
+| --- | --- | --- | --- |
+| `openai-primary` | `w43-s03-codex-alpha10-20260604113716` with `full-journey-regress-ky-small-codex.yaml` | `operator` / `provider_execution` | `pnpm live-e2e:test` passed before the smoke. Discovery, spec, planning, and handoff were resumed through the decision helper. Execution reached the Codex provider step with public `provider_step_status.status=running`, then was stopped through `aor run cancel --approval-ref approval://operator/w43-s03-codex-alpha10-20260604113716/stop`. The run summary reports `status=blocked`, `failure_owner=operator`, `failure_phase=provider_execution`, and `failure_class=operator_stopped`; `provider_step_status.status=interrupted`, `interruption_owner=operator`, and `interruption_status=operator-stopped`. The routed result exists with `failure_class=external-runner-interrupted`, adapter raw evidence exists, Runtime Harness reports `overall_decision=block`, and `repair_status=not_required`; no hidden repair attempt file was produced. |
+| `qwen-primary` | local readiness check | `environment` / `provider_execution` | Qwen was not run in this W43-S03 environment because the `qwen` CLI was missing and `ANTHROPIC_API_KEY`, `QWEN_API_KEY`, and `DASHSCOPE_API_KEY` readiness checks were empty. This is a non-release-blocking optional-provider environment blocker, not a Qwen quality result. |
+| `anthropic-primary` | local readiness check | `environment` / `provider_execution` | Claude was not run in this W43-S03 scope. No Anthropic/Claude local readiness evidence was present, and optional provider runs remain non-release-blocking without an explicit release-policy slice. |
+| `open-code-primary` | not run by W43-S03 scope | `environment` / `provider_execution` | OpenCode was not run in W43-S03 because the slice only required Codex and optional Qwen when ready. This does not change the optional provider qualification policy. |
+
+An earlier W43-S03 Codex attempt,
+`w43-s03-codex-alpha10-20260604113605`, failed before target/provider execution
+because the neutral shell did not include `/opt/homebrew/bin`; the isolated
+installed-source setup could not find `corepack` or `pnpm`. That attempt is
+classified as environment/aor-install setup evidence and was rerun with the
+same public profile after restoring the expected PATH. It is not a target
+repository failure, provider failure, or AOR runtime pass.
