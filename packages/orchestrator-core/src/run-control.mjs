@@ -507,6 +507,9 @@ export function applyRunControlAction(options) {
             status: "interrupted",
             finished_at: eventTimestamp,
             last_artifact_update_at: eventTimestamp,
+            interruption_owner: "operator",
+            interruption_reason: reason ?? "Run canceled by operator.",
+            interruption_status: "operator-stopped",
             recommended_action: "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
           })
         : Object.keys(asRecord(stateBefore?.provider_step_status)).length > 0

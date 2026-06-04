@@ -86,6 +86,8 @@ test("operator console SPA exposes flow-first shell, Ask AOR drawer, evidence wo
   assert.match(source, /executionEvidenceForFlow/u);
   assert.match(source, /execution_evidence/u);
   assert.match(source, /Provider execution/u);
+  assert.match(source, /Interruption owner/u);
+  assert.match(source, /Interruption status/u);
   assert.match(source, /Real code change/u);
   assert.match(source, /runner-owned-leak/u);
   assert.match(source, /scratch-unrelated/u);

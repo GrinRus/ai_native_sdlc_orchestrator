@@ -120,8 +120,8 @@ adapter raw evidence, Runtime Harness report, and decision-helper behavior.
 
 | Provider cell | Run or check | Owner / phase | Result |
 | --- | --- | --- | --- |
-| `openai-primary` | `w41-s03-codex-small-20260604` with `full-journey-regress-ky-small-codex.yaml` | `provider` / `provider_execution` | Target setup passed (`npm install --prefer-offline --no-audit --no-fund`, 32.075s). The run reached the provider execution step and was stopped through public `aor run cancel` after the short-smoke timebox. Runtime Harness wrote `overall_decision=block`, `terminal_status=blocked`, `failure_class=external-runner-interrupted`, and `repair_status=not_required`; no hidden internal repair route started. |
-| `qwen-primary` | `w41-s03-qwen-small-20260604` with `full-journey-regress-ky-small-qwen.yaml` | `provider` / `provider_execution` | Target setup passed (`npm install --prefer-offline --no-audit --no-fund`, 21.004s). Qwen used the same live E2E lifecycle as Codex and differed only at the adapter boundary: `qwen-code` ran with `--output-format stream-json --include-partial-messages`. Public run-control showed `status=interrupted`, `output_mode=stream-json`, `progress_event_count=7481`, and `last_progress_kind=message_stop` after public cancel. Adapter raw evidence retained 100 sanitized progress summaries. Runtime Harness wrote `overall_decision=block`, `terminal_status=blocked`, `failure_class=external-runner-interrupted`, and `repair_status=not_required`; no hidden internal repair route started. |
+| `openai-primary` | `w41-s03-codex-small-20260604` with `full-journey-regress-ky-small-codex.yaml` | `operator` / `provider_execution` | Target setup passed (`npm install --prefer-offline --no-audit --no-fund`, 32.075s). The run reached the provider execution step and was stopped through public `aor run cancel` after the short-smoke timebox. W42-S02 classifies this as `interruption_owner=operator` and `failure_class=operator_stopped`; Runtime Harness still writes `overall_decision=block`, `terminal_status=blocked`, and `repair_status=not_required`, so no pass is claimed and no hidden internal repair route starts. |
+| `qwen-primary` | `w41-s03-qwen-small-20260604` with `full-journey-regress-ky-small-qwen.yaml` | `operator` / `provider_execution` | Target setup passed (`npm install --prefer-offline --no-audit --no-fund`, 21.004s). Qwen used the same live E2E lifecycle as Codex and differed only at the adapter boundary: `qwen-code` ran with `--output-format stream-json --include-partial-messages`. Public run-control showed `status=interrupted`, `interruption_owner=operator`, `output_mode=stream-json`, `progress_event_count=7481`, and `last_progress_kind=message_stop` after public cancel. Adapter raw evidence retained 100 sanitized progress summaries. Runtime Harness still writes `overall_decision=block`, `terminal_status=blocked`, and `repair_status=not_required`; no hidden internal repair route starts. |
 | `anthropic-primary` | local readiness check | `environment` / `aor_install` | `claude` CLI was not available locally, and no `ANTHROPIC_API_KEY` or `CLAUDE_CONFIG_DIR` readiness evidence was present. This optional provider cell was not run and remains non-release-blocking. |
 | `open-code-primary` | local readiness check | `environment` / `provider_execution` | `opencode --version` returned `1.14.30`, but no `OPENCODE_API_KEY` readiness evidence was present. This optional provider cell was not run and remains non-release-blocking. |
 
@@ -131,9 +131,9 @@ interrupted execution step through the decision helper. The helper populated all
 required inspected refs (`36` refs for the execution decisions) and no manual
 JSON editing was required.
 
-Finding for the W41 findings-closure slice: public operator timebox stops are
-currently summarized as `failure_owner=provider` because the interrupted state is
-attached to `provider_execution`. That is fail-closed and consistent with the
-current W35/W40 fixtures, but W41-S04 should decide whether future reports need
-a more explicit `failure_owner=operator` classification for operator-initiated
-smoke stops.
+W42-S02 closes the W41 findings-closure item for public operator timebox stops:
+operator-initiated `aor run cancel` is reported as `failure_owner=operator`,
+`failure_phase=provider_execution`, and `failure_class=operator_stopped` while
+preserving fail-closed provider execution evidence. Provider crashes, provider
+timeouts, target repository blockers, environment blockers, and AOR product
+failures remain separate owner/phase outcomes.

@@ -302,6 +302,9 @@ test("run cancel records provider interruption instead of pass or crash", () => 
     assert.equal(result.state.status, "canceled");
     assert.equal(result.state.provider_step_status.status, "interrupted");
     assert.equal(result.state.provider_step_status.provider, "qwen");
+    assert.equal(result.state.provider_step_status.interruption_owner, "operator");
+    assert.equal(result.state.provider_step_status.interruption_reason, "Operator stopped a silent provider step.");
+    assert.equal(result.state.provider_step_status.interruption_status, "operator-stopped");
     assert.match(result.state.provider_step_status.recommended_action, /stopped by the operator/i);
     const audit = JSON.parse(fs.readFileSync(result.auditFile, "utf8"));
     assert.equal(audit.provider_interruption.status, "operator-stopped");
@@ -309,7 +312,10 @@ test("run cancel records provider interruption instead of pass or crash", () => 
     const runs = listRuns({ cwd: repoRoot, projectRef: repoRoot });
     const run = runs.find((entry) => entry.run_id === "live-e2e-provider-stop");
     assert.equal(run?.provider_step_status?.status, "interrupted");
+    assert.equal(run?.provider_step_status?.interruption_owner, "operator");
     assert.equal(run?.execution_evidence?.provider_execution_status, "interrupted");
+    assert.equal(run?.execution_evidence?.provider_interruption_owner, "operator");
+    assert.equal(run?.execution_evidence?.provider_interruption_status, "operator-stopped");
     assert.equal(run?.execution_evidence?.actions.find((entry) => entry.action_id === "save_partial_evidence")?.enabled, true);
   });
 });
@@ -338,6 +344,9 @@ test("run finalization preserves public provider interruption instead of overwri
         timeout_budget_ms: 3_600_000,
         elapsed_ms: 90_000,
         current_command_label: "external-provider-runner",
+        interruption_owner: "operator",
+        interruption_reason: "Operator stopped the Qwen proof after the short-smoke timebox.",
+        interruption_status: "operator-stopped",
         recommended_action: "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
         started_at: "2026-06-02T00:00:00.000Z",
         updated_at: "2026-06-02T00:01:30.000Z",
@@ -367,9 +376,12 @@ test("run finalization preserves public provider interruption instead of overwri
     assert.equal(finalized.status, "canceled");
     assert.equal(finalized.last_action, "cancel");
     assert.equal(finalized.provider_step_status.status, "interrupted");
+    assert.equal(finalized.provider_step_status.interruption_owner, "operator");
     const runs = listRuns({ cwd: repoRoot, projectRef: repoRoot });
     const run = runs.find((entry) => entry.run_id === "live-e2e-provider-finalize");
     assert.equal(run?.provider_step_status?.status, "interrupted");
+    assert.equal(run?.provider_step_status?.interruption_owner, "operator");
     assert.equal(run?.execution_evidence?.provider_execution_status, "interrupted");
+    assert.equal(run?.execution_evidence?.provider_interruption_owner, "operator");
   });
 });

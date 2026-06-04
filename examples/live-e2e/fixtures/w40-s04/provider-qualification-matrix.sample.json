@@ -95,10 +95,10 @@
         "passing_run_count": 0,
         "latest_run_id": "w41-s03-qwen-small-20260604",
         "latest_attempt_status": "blocked",
-        "failure_owner": "provider",
+        "failure_owner": "operator",
         "failure_phase": "provider_execution",
-        "failure_class": "provider_blocked",
-        "blocker_reason": "Qwen reached provider execution after bounded target setup passed, emitted stream-json provider progress through the public provider_step_status surface, then stopped fail-closed through public run-control with Runtime Harness repair_status=not_required.",
+        "failure_class": "operator_stopped",
+        "blocker_reason": "Qwen reached provider execution after bounded target setup passed, emitted stream-json provider progress through the public provider_step_status surface, then stopped fail-closed through public run-control with interruption_owner=operator and Runtime Harness repair_status=not_required.",
         "evidence_refs": [
           "docs/ops/live-e2e-provider-qualification.md#w41-s03-alpha8-smoke-refresh",
           "examples/live-e2e/fixtures/w35-s05/live-attempts-summary.sample.json#w35-s05-qwen-interrupt-proof-20260603102247",

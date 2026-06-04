@@ -238,6 +238,9 @@ manifests, and provider heartbeat state.
 - `status`, `provider_execution_status`, `runtime_harness_decision`,
   `real_code_change_status`, `post_run_verification_status`, `review_status`,
   `delivery_readiness_status`, and `no_upstream_write_status`;
+- `provider_interruption_owner`, `provider_interruption_status`, and
+  `provider_interruption_reason` when the visible provider status is
+  interrupted;
 - `changed_path_groups[]` with `mission-relevant`, `runtime-owned`,
   `runner-owned-leak`, and `scratch-unrelated` grouping;
 - `blockers[]` with readable reasons for fail-closed operator handling;
@@ -259,9 +262,12 @@ Execution actions are descriptive public surfaces, not private process control:
   `manual-live-e2e --prepare-decision --action retry_public_step`.
 
 Stopping a running provider must write durable interrupted/operator-stopped
-evidence in run-control audit/state. The interrupted run is not a pass and must
-preserve partial evidence for diagnosis or retry through public manual live E2E
-surfaces.
+evidence in run-control audit/state. Public provider status must include
+`interruption_owner=operator`, `interruption_status=operator-stopped`, and a
+sanitized reason, and live E2E summaries must classify the failure context as
+`failure_owner=operator` with `failure_phase=provider_execution`. The
+interrupted run is not a pass and must preserve partial evidence for diagnosis
+or retry through public manual live E2E surfaces.
 
 ## Artifact display summaries (W35-S02)
 

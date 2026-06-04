@@ -119,6 +119,9 @@ function writeProviderStepStatus(patch = {}) {
     last_progress_label: asString(patch.last_progress_label) || asString(previous.last_progress_label) || null,
     progress_event_count: progressEventCount,
     output_mode: asString(patch.output_mode) || asString(previous.output_mode) || null,
+    interruption_owner: asString(patch.interruption_owner) || asString(previous.interruption_owner) || null,
+    interruption_reason: asString(patch.interruption_reason) || asString(previous.interruption_reason) || null,
+    interruption_status: asString(patch.interruption_status) || asString(previous.interruption_status) || null,
     current_command_label:
       asString(providerConfig.current_command_label) || asString(previous.current_command_label) || "external-provider-runner",
     recommended_action:
@@ -359,6 +362,9 @@ heartbeatTimer = setInterval(() => {
       interrupted = true;
       writeProviderStepStatus({
         status: "interrupted",
+        interruption_owner: "operator",
+        interruption_reason: "External runtime was interrupted by public run-control cancel.",
+        interruption_status: "operator-stopped",
         recommended_action: "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
         finished_at: new Date().toISOString(),
       });
@@ -418,6 +424,9 @@ child.on("close", (status, signal) => {
   }
   writeProviderStepStatus({
     status: interrupted ? "interrupted" : status === 0 && !timedOut ? "completed" : "failed",
+    interruption_owner: interrupted ? "operator" : null,
+    interruption_reason: interrupted ? "External runtime was interrupted by public run-control cancel." : null,
+    interruption_status: interrupted ? "operator-stopped" : null,
     recommended_action:
       interrupted
         ? "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step."

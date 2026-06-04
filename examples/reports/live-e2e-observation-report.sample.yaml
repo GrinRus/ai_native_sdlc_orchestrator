@@ -32,6 +32,34 @@ flow_range:
     - learning
 flow_range_policy: delivery_default
 overall_status: warn
+provider_execution_status: interrupted
+failure_owner: operator
+failure_phase: provider_execution
+failure_class: operator_stopped
+provider_step_status:
+  provider: qwen
+  adapter: qwen-code
+  route_id: route.implement.default.qwen-primary
+  step_id: run.start.implement
+  status: interrupted
+  elapsed_ms: 90000
+  timeout_budget_ms: 3600000
+  remaining_budget_ms: 3510000
+  last_output_at: null
+  last_artifact_update_at: "2026-05-18T00:02:00.000Z"
+  last_progress_at: "2026-05-18T00:01:59.000Z"
+  last_progress_kind: tool_call
+  last_progress_label: read_file
+  progress_event_count: 42
+  output_mode: stream-json
+  interruption_owner: operator
+  interruption_status: operator-stopped
+  interruption_reason: Operator stopped the provider through public run-control after collecting progress evidence.
+  current_command_label: external-provider-runner
+  recommended_action: Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.
+  started_at: "2026-05-18T00:00:30.000Z"
+  updated_at: "2026-05-18T00:02:00.000Z"
+  finished_at: "2026-05-18T00:02:00.000Z"
 aor_installation:
   status: pass
   declared_policy: source-install-required

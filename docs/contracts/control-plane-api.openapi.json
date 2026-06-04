@@ -1769,6 +1769,31 @@
           "provider_execution_status": {
             "type": "string"
           },
+          "provider_interruption_owner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "operator",
+              "provider",
+              "environment",
+              "unknown",
+              null
+            ]
+          },
+          "provider_interruption_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider_interruption_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "runtime_harness_decision": {
             "type": "string"
           },
@@ -2016,6 +2041,33 @@
               "text",
               null
             ]
+          },
+          "interruption_owner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "operator",
+              "provider",
+              "environment",
+              "unknown",
+              null
+            ]
+          },
+          "interruption_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sanitized user-facing reason for an interrupted provider step. Must not include raw commands, prompts, file contents, env vars, tokens, or secrets."
+          },
+          "interruption_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional public interruption status, for example operator-stopped when a public run-control cancel stopped the provider."
           },
           "current_command_label": {
             "type": "string"
