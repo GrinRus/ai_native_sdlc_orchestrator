@@ -362,8 +362,8 @@ This is the master index for the implementation slices across all defined waves.
 ## W42 slices
 | Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
 |---|---|---|---|---|---|
-| W42-S01 | Alpha.9 release prep for W41 fixes | EPIC-5 | ready | `package.json`, `README.md`, `CHANGELOG.md`, `docs/ops/**`, release tests | W41-S04 |
-| W42-S02 | Operator interruption owner classification cleanup | EPIC-6, EPIC-7 | blocked | `docs/contracts/**`, `packages/orchestrator-core/**`, `scripts/live-e2e/**`, `apps/web/**`, `docs/ops/**`, tests | W42-S01 |
+| W42-S01 | Alpha.9 release prep for W41 fixes | EPIC-5 | done | `package.json`, `README.md`, `CHANGELOG.md`, `docs/ops/**`, release tests | W41-S04 |
+| W42-S02 | Operator interruption owner classification cleanup | EPIC-6, EPIC-7 | ready | `docs/contracts/**`, `packages/orchestrator-core/**`, `scripts/live-e2e/**`, `apps/web/**`, `docs/ops/**`, tests | W42-S01 |
 
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

@@ -29,7 +29,7 @@ target-repository separation, or optional provider release policy.
 
 ## W42-S01 — Alpha.9 release prep for W41 fixes
 - **Epic:** EPIC-5 Delivery and release
-- **State:** ready
+- **State:** done
 - **Outcome:** Prepare and publish the npm alpha release that carries the
   post-alpha.8 installed-user evidence-rendering fix and W41 docs updates.
 - **Primary modules:** `package.json`, `README.md`, `CHANGELOG.md`,
@@ -61,6 +61,24 @@ target-repository separation, or optional provider release policy.
 - npm/tag/GitHub Release verification
 - installed-user registry smoke output
 
+### Closure evidence — 2026-06-04
+- Release branch `release/v0.1.0-alpha.9` contained release metadata,
+  release docs, changelog, and release-prep guardrail fixture updates only.
+- Local strict release gate passed with
+  `AOR_RELEASE_BRANCH=release/v0.1.0-alpha.9 AOR_RELEASE_STRICT_BRANCH=true pnpm release:gate`.
+- Release PR [#69](https://github.com/GrinRus/ai_native_sdlc_orchestrator/pull/69)
+  passed Repo integrity, CodeQL, Dependency Review, OpenSSF Scorecard, and
+  Release candidate gate before merge.
+- GitHub Trusted Publishing completed successfully for
+  `@grinrus/aor@0.1.0-alpha.9`; npm `alpha` points at `0.1.0-alpha.9`,
+  npm `latest` remains `0.1.0-alpha.1`, git tag `v0.1.0-alpha.9` exists,
+  and the GitHub Release is marked prerelease.
+- Installed-user registry smoke from a neutral temp runner returned
+  `status=smoke-pass` with `flow_selector_loaded`,
+  `new_flow_action_loaded`, `first_run_wizard_loaded`, and
+  `project_switcher_loaded`, and it did not create the clean target `.aor/`
+  before explicit initialization.
+
 ### Out of scope
 - Operator interruption owner classification changes.
 - New runtime/API contract fields.
@@ -70,7 +88,7 @@ target-repository separation, or optional provider release policy.
 
 ## W42-S02 — Operator interruption owner classification cleanup
 - **Epic:** EPIC-6 Operator surface; EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Make public operator-initiated provider stops explicit in live E2E
   summaries, UI evidence, and qualification records without masking provider,
   target repository, environment, or AOR failures.
