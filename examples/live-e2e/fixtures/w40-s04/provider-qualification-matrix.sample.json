@@ -115,6 +115,7 @@
     "This fixture is an optional provider qualification matrix, not a release readiness certificate.",
     "Coverage tier is preserved from the provider catalog, but release_blocking is false for every W40 optional provider cell.",
     "Target repository and environment blockers must stay separate from AOR product failures and provider quality findings.",
-    "W41-S03 refreshed the alpha.8 smoke evidence through normal live E2E profile runs for Codex and Qwen; short interrupted smoke runs are documented as fail-closed evidence and do not claim a new provider quality pass."
+    "W41-S03 refreshed the alpha.8 smoke evidence through normal live E2E profile runs for Codex and Qwen; short interrupted smoke runs are documented as fail-closed evidence and do not claim a new provider quality pass.",
+    "W43-S03 refreshed alpha.10 Codex interruption evidence through normal live E2E lifecycle. That short smoke is documented in docs/ops/live-e2e-provider-qualification.md as non-release-blocking operator-stopped evidence and does not replace the historical W35 clean pass cell."
   ]
 }

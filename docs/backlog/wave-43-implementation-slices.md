@@ -126,7 +126,7 @@ next release decision.
 
 ## W43-S03 — Alpha.10 live E2E interruption and provider smoke
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Validate W42-S02 interruption ownership and provider-parity
   behavior through normal live E2E smoke after installed-user confidence checks.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`,
@@ -171,7 +171,7 @@ next release decision.
 
 ## W43-S04 — Alpha.10 findings closure and next-release decision
 - **Epic:** EPIC-0 Repository development system; EPIC-6 Operator surface
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Convert W43 installed-user and live E2E findings into scoped
   fixes, documented blockers, split backlog, or a next-release decision.
 - **Primary modules:** `docs/backlog/**`, `README.md`, `docs/ops/**`, tests
