@@ -8,6 +8,7 @@ import { redactSensitiveValue } from "./redaction.mjs";
 const LIVE_RUN_EVENT_TYPES = new Set([
   "run.started",
   "step.updated",
+  "provider.heartbeat",
   "evidence.linked",
   "warning.raised",
   "run.terminal",

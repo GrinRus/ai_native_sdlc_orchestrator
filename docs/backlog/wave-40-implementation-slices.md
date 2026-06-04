@@ -106,7 +106,7 @@ issues before any release or readiness claim is made.
 
 ## W40-S03 — Active live E2E heartbeat surfacing
 - **Epic:** EPIC-6 Operator surface; EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Show provider heartbeat/progress while a live E2E provider step is still running, not only after final artifacts are available.
 - **Primary modules:** `packages/orchestrator-core/**`, `apps/api/**`, `apps/web/**`, `scripts/live-e2e/**`, `docs/contracts/**`, tests
 - **Hard dependencies:** W40-S01, W35-S01, W38-S01, W39-S01
@@ -143,7 +143,7 @@ issues before any release or readiness claim is made.
 
 ## W40-S04 — Optional provider qualification matrix
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** blocked
+- **State:** ready
 - **Outcome:** Define and prove a provider qualification matrix that records optional coverage status without turning extended providers into release blockers.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `docs/product/**`, tests
 - **Hard dependencies:** W40-S03, W39-S01

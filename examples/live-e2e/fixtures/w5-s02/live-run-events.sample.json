@@ -25,30 +25,56 @@
     "event_id": "run.live.stream.v1.event.000003",
     "run_id": "run.live.stream.v1",
     "timestamp": "2026-04-21T17:00:07.000Z",
-    "event_type": "evidence.linked",
+    "event_type": "provider.heartbeat",
     "payload": {
       "sequence": 3,
-      "evidence_ref": "evidence://reports/run.live.stream.v1/step-result-bootstrap.json"
+      "step_id": "bootstrap.clone",
+      "status": "running",
+      "summary": "Provider heartbeat is visible through public event surfaces.",
+      "provider_step_status": {
+        "provider": "codex",
+        "adapter": "codex-cli",
+        "route_id": "route.implement.default",
+        "step_id": "bootstrap.clone",
+        "status": "running",
+        "elapsed_ms": 5000,
+        "timeout_budget_ms": 300000,
+        "remaining_budget_ms": 295000,
+        "last_output_at": "2026-04-21T17:00:06.000Z",
+        "last_artifact_update_at": null,
+        "current_command_label": "external-provider-runner",
+        "recommended_action": "Provider is still running."
+      }
     }
   },
   {
     "event_id": "run.live.stream.v1.event.000004",
     "run_id": "run.live.stream.v1",
-    "timestamp": "2026-04-21T17:00:08.000Z",
-    "event_type": "warning.raised",
+    "timestamp": "2026-04-21T17:00:07.000Z",
+    "event_type": "evidence.linked",
     "payload": {
       "sequence": 4,
-      "code": "budget.near_limit",
-      "summary": "Wall-clock usage exceeded 80 percent."
+      "evidence_ref": "evidence://reports/run.live.stream.v1/step-result-bootstrap.json"
     }
   },
   {
     "event_id": "run.live.stream.v1.event.000005",
     "run_id": "run.live.stream.v1",
+    "timestamp": "2026-04-21T17:00:08.000Z",
+    "event_type": "warning.raised",
+    "payload": {
+      "sequence": 5,
+      "code": "budget.near_limit",
+      "summary": "Wall-clock usage exceeded 80 percent."
+    }
+  },
+  {
+    "event_id": "run.live.stream.v1.event.000006",
+    "run_id": "run.live.stream.v1",
     "timestamp": "2026-04-21T17:00:10.000Z",
     "event_type": "run.terminal",
     "payload": {
-      "sequence": 5,
+      "sequence": 6,
       "status": "pass"
     }
   }

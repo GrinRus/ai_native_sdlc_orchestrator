@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { listRuns, readProjectState } from "../src/control-plane/read-surface.mjs";
+import { appendRunEvent } from "../src/control-plane/live-event-stream.mjs";
+import { listRuns, readProjectState, readRunEventHistory } from "../src/control-plane/read-surface.mjs";
 import { finalizeRunControlState } from "../src/operator-cli/command-runtime.mjs";
 import { mergeProviderStepStatus, normalizeProviderStepStatus } from "../src/provider-step-status.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
@@ -169,6 +170,51 @@ test("provider step status is exposed through project state and run summaries", 
     assert.equal(Object.hasOwn(run?.provider_step_status ?? {}, "state_file"), false);
     assert.equal(run?.execution_evidence?.provider_execution_status, "running");
     assert.equal(run?.execution_evidence?.actions.find((entry) => entry.action_id === "stop_provider")?.enabled, true);
+  });
+});
+
+test("provider step status is exposed through public run event history", () => {
+  withCleanRepo((repoRoot) => {
+    initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    appendRunEvent({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      runId: "live-e2e-provider-events",
+      eventType: "provider.heartbeat",
+      payload: {
+        step_id: "run.start.implement",
+        status: "running",
+        summary: "Provider execution heartbeat started.",
+        provider_step_status: {
+          provider: "qwen",
+          adapter: "qwen-code",
+          route_id: "route.implement.qwen",
+          step_id: "run.start.implement",
+          status: "running",
+          timeout_budget_ms: 600_000,
+          started_at: "2026-06-02T00:00:00.000Z",
+          last_progress_at: "2026-06-02T00:01:50.000Z",
+          last_progress_kind: "tool_call",
+          last_progress_label: "read_file",
+          progress_event_count: 4,
+          output_mode: "stream-json",
+        },
+      },
+      timestamp: "2026-06-02T00:02:00.000Z",
+    });
+
+    const history = readRunEventHistory({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      runId: "live-e2e-provider-events",
+    });
+    assert.equal(history.total_events, 1);
+    assert.equal(history.events[0].event_type, "provider.heartbeat");
+    assert.equal(history.events[0].provider_step_status?.provider, "qwen");
+    assert.equal(history.events[0].provider_step_status?.status, "running");
+    assert.equal(history.events[0].provider_step_status?.last_progress_label, "read_file");
+    assert.equal(history.events[0].provider_step_status?.output_mode, "stream-json");
+    assert.equal(Object.hasOwn(history.events[0].provider_step_status ?? {}, "state_file"), false);
   });
 });
 

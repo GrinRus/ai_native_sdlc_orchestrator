@@ -373,6 +373,10 @@ function asProviderStepStatus(value) {
   return value && typeof value === "object" && !Array.isArray(value) && value.status ? value : null;
 }
 
+function isActiveProviderStepStatus(status) {
+  return Boolean(status && !["completed", "failed", "interrupted"].includes(status.status));
+}
+
 function formatDurationMs(value) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return "n/a";
   const totalSeconds = Math.floor(value / 1000);
@@ -391,9 +395,18 @@ function formatProviderTimestamp(value) {
 
 function providerStatusCopy(status) {
   if (!status) return "No active provider step.";
-  if (status.last_progress_at) return `Provider activity observed: ${status.last_progress_label ?? status.last_progress_kind ?? "stream event"}.`;
-  if (status.status === "silent-running") return "No output or progress yet, provider still running.";
+  const progressLabel = status.last_progress_label ?? status.last_progress_kind ?? "stream event";
+  if (status.status === "silent-running" && status.last_progress_at) {
+    return `Provider progress was observed earlier (${progressLabel}), but there is no recent output or progress.`;
+  }
+  if (status.status === "silent-running" && status.last_output_at) {
+    return "Provider output was observed earlier, but there is no recent output or progress.";
+  }
+  if (status.status === "silent-running") return "No output or progress has been observed yet; provider still running.";
+  if (status.status === "timeout-risk" && status.last_progress_at) return `Provider activity is visible (${progressLabel}), but the step is close to the timeout budget.`;
   if (status.status === "timeout-risk") return "Provider is still running and close to the timeout budget.";
+  if (status.last_progress_at) return `Provider activity observed: ${progressLabel}.`;
+  if (status.last_output_at) return "Provider output observed; step is still running.";
   if (status.status === "artifact-updated") return "Provider is running and evidence was updated.";
   if (status.status === "completed") return "Provider completed. Continue with verification evidence.";
   if (status.status === "interrupted") return "Provider was stopped or interrupted. Save partial evidence, then diagnose or retry.";
@@ -406,7 +419,7 @@ function resolveProviderStepStatus(projectState, runs) {
   const fromRuns = Array.isArray(runs)
     ? runs.map((run) => asProviderStepStatus(run.provider_step_status)).filter(Boolean)
     : [];
-  return fromRuns.find((status) => !["completed", "failed", "interrupted"].includes(status.status)) ?? fromProject ?? fromRuns[0] ?? null;
+  return fromRuns.find((status) => isActiveProviderStepStatus(status)) ?? fromProject ?? fromRuns[0] ?? null;
 }
 
 function executionEvidenceForFlow(selectedFlow, runs, runtimeTrace, { draft = false } = {}) {
@@ -2606,7 +2619,7 @@ function App() {
   }
 
   async function refresh(options = {}) {
-    setError("");
+    if (!options.silent) setError("");
     const refreshSelectionVersion = options.selectionVersion ?? flowSelectionVersion.current;
     const appConfig = config ?? (await readJson("/app-config.json"));
     const projectPayload = await readJson("/api/projects").catch(() => ({
@@ -2654,7 +2667,9 @@ function App() {
         setSelectedStage("readiness");
         didAutoSelectStage.current = true;
       }
-      pushActivity("control-plane.project-preview", selectedProject?.label ?? selectedProject?.project_id ?? "project pending");
+      if (!options.silent) {
+        pushActivity("control-plane.project-preview", selectedProject?.label ?? selectedProject?.project_id ?? "project pending");
+      }
       return {
         projectState: null,
         nextAction: null,
@@ -2713,7 +2728,9 @@ function App() {
       didAutoSelectStage.current = true;
     }
     const activityFlow = selectionStillCurrent ? refreshedSelectedFlow : selectedFlow;
-    pushActivity("control-plane.connected", activityFlow?.flow_id ?? nextReport?.primary_action?.command ?? "state refreshed");
+    if (!options.silent) {
+      pushActivity("control-plane.connected", activityFlow?.flow_id ?? nextReport?.primary_action?.command ?? "state refreshed");
+    }
     return {
       projectState: state,
       nextAction: nextReport?.primary_action ? nextReport : null,
@@ -2725,6 +2742,17 @@ function App() {
   useEffect(() => {
     refresh().catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
+
+  useEffect(() => {
+    if (!apiProjectBase || !isActiveProviderStepStatus(providerStepStatus)) return undefined;
+    const poll = () => {
+      refresh({ silent: true, selectionVersion: flowSelectionVersion.current }).catch((err) =>
+        setError(err instanceof Error ? err.message : String(err)),
+      );
+    };
+    const interval = window.setInterval(poll, 5000);
+    return () => window.clearInterval(interval);
+  }, [apiProjectBase, providerStepStatus?.status, providerStepStatus?.updated_at, providerStepStatus?.last_progress_at, providerStepStatus?.last_output_at]);
 
   function chooseStage(stageId) {
     didChooseStage.current = true;

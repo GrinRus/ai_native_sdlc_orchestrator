@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { materializeIntakeArtifactPacket } from "../src/artifact-store.mjs";
+import { readRunEventHistory } from "../src/control-plane/read-surface.mjs";
 import { initializeProjectRuntime } from "../src/project-init.mjs";
 import { executeRoutedStep, executeRuntimeHarnessControlledStep } from "../src/step-execution-engine.mjs";
 import { classifyRuntimeStepOutcome, materializeRuntimeHarnessReport } from "../src/runtime-harness-report.mjs";
@@ -682,6 +683,9 @@ test("executeRoutedStep still writes failed step-result when routed resolution f
 
 test("executeRoutedStep supports live execution for supported adapter when delivery guardrails are ready", () => {
   withTempRepo((repoRoot) => {
+    const runId = "provider-heartbeat-live-step";
+    const init = initializeProjectRuntime({ projectRef: repoRoot, cwd: repoRoot });
+    const providerStepStatusStateFile = path.join(init.runtimeLayout.stateRoot, `run-control-state-${runId}.json`);
     const executionRoot = path.join(repoRoot, "target-checkout-root");
     fs.mkdirSync(executionRoot, { recursive: true });
     configureCodexExternalRuntime(repoRoot, {
@@ -708,12 +712,15 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
       cwd: repoRoot,
       stepClass: "implement",
       dryRun: false,
+      runId,
+      stepId: "run.start.implement",
       approvedHandoffRef: "evidence://handoff/approved-1",
       promotionEvidenceRefs: [
         "evidence://promotion/pass-1",
         "packet://spec@evidence://reports/spec-step-result.json",
       ],
       executionRoot,
+      providerStepStatusStateFile,
     });
 
     assert.equal(result.stepResult.status, "passed");
@@ -768,6 +775,12 @@ test("executeRoutedStep supports live execution for supported adapter when deliv
         result.stepResult.routed_execution.context_compilation.compiled_context_ref,
       ),
     );
+    const heartbeatHistory = readRunEventHistory({ projectRef: repoRoot, cwd: repoRoot, runId });
+    const heartbeatEvents = heartbeatHistory.events.filter((event) => event.event_type === "provider.heartbeat");
+    assert.equal(heartbeatEvents.length, 2);
+    assert.equal(heartbeatEvents[0].provider_step_status?.status, "running");
+    assert.equal(heartbeatEvents[1].provider_step_status?.status, "completed");
+    assert.equal(heartbeatEvents[1].provider_step_status?.adapter, "codex-cli");
   });
 });
 

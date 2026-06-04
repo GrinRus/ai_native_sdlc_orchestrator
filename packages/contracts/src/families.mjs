@@ -67,6 +67,7 @@ export const INTAKE_SOURCE_KIND_VALUES = ["local-issue", "local-prd", "local-rfc
 const LIVE_RUN_EVENT_TYPE_VALUES = [
   "run.started",
   "step.updated",
+  "provider.heartbeat",
   "evidence.linked",
   "warning.raised",
   "run.terminal",
