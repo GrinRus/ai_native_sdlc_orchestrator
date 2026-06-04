@@ -109,3 +109,31 @@ browser/runtime prerequisite is missing, record a `blocked` cell with
 `failure_owner=environment` or `failure_owner=target_repository` as appropriate.
 This is acceptable fail-closed evidence. It is not a provider quality pass and
 must not be counted as AOR product success.
+
+## W41-S03 alpha.8 smoke refresh
+
+W41-S03 refreshed the provider qualification surface after
+`@grinrus/aor@0.1.0-alpha.8`. The refresh used short normal live E2E profile
+runs, not provider-specific diagnostic modes. The goal was parity evidence:
+target setup classification, provider heartbeat/progress, routed step result,
+adapter raw evidence, Runtime Harness report, and decision-helper behavior.
+
+| Provider cell | Run or check | Owner / phase | Result |
+| --- | --- | --- | --- |
+| `openai-primary` | `w41-s03-codex-small-20260604` with `full-journey-regress-ky-small-codex.yaml` | `provider` / `provider_execution` | Target setup passed (`npm install --prefer-offline --no-audit --no-fund`, 32.075s). The run reached the provider execution step and was stopped through public `aor run cancel` after the short-smoke timebox. Runtime Harness wrote `overall_decision=block`, `terminal_status=blocked`, `failure_class=external-runner-interrupted`, and `repair_status=not_required`; no hidden internal repair route started. |
+| `qwen-primary` | `w41-s03-qwen-small-20260604` with `full-journey-regress-ky-small-qwen.yaml` | `provider` / `provider_execution` | Target setup passed (`npm install --prefer-offline --no-audit --no-fund`, 21.004s). Qwen used the same live E2E lifecycle as Codex and differed only at the adapter boundary: `qwen-code` ran with `--output-format stream-json --include-partial-messages`. Public run-control showed `status=interrupted`, `output_mode=stream-json`, `progress_event_count=7481`, and `last_progress_kind=message_stop` after public cancel. Adapter raw evidence retained 100 sanitized progress summaries. Runtime Harness wrote `overall_decision=block`, `terminal_status=blocked`, `failure_class=external-runner-interrupted`, and `repair_status=not_required`; no hidden internal repair route started. |
+| `anthropic-primary` | local readiness check | `environment` / `aor_install` | `claude` CLI was not available locally, and no `ANTHROPIC_API_KEY` or `CLAUDE_CONFIG_DIR` readiness evidence was present. This optional provider cell was not run and remains non-release-blocking. |
+| `open-code-primary` | local readiness check | `environment` / `provider_execution` | `opencode --version` returned `1.14.30`, but no `OPENCODE_API_KEY` readiness evidence was present. This optional provider cell was not run and remains non-release-blocking. |
+
+Both Codex and Qwen smoke runs used accepted public operator decisions for
+deterministic controller steps and installed `diagnose` decisions for the
+interrupted execution step through the decision helper. The helper populated all
+required inspected refs (`36` refs for the execution decisions) and no manual
+JSON editing was required.
+
+Finding for the W41 findings-closure slice: public operator timebox stops are
+currently summarized as `failure_owner=provider` because the interrupted state is
+attached to `provider_execution`. That is fail-closed and consistent with the
+current W35/W40 fixtures, but W41-S04 should decide whether future reports need
+a more explicit `failure_owner=operator` classification for operator-initiated
+smoke stops.

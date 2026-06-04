@@ -93,13 +93,14 @@
         "release_blocking": false,
         "required_pass_count": 0,
         "passing_run_count": 0,
-        "latest_run_id": "w35-s05-qwen-interrupt-proof-20260603102247",
+        "latest_run_id": "w41-s03-qwen-small-20260604",
         "latest_attempt_status": "blocked",
         "failure_owner": "provider",
         "failure_phase": "provider_execution",
         "failure_class": "provider_blocked",
-        "blocker_reason": "Qwen reached provider execution after bounded target setup and verification passed, then stopped fail-closed through public run-control with provider progress/status evidence.",
+        "blocker_reason": "Qwen reached provider execution after bounded target setup passed, emitted stream-json provider progress through the public provider_step_status surface, then stopped fail-closed through public run-control with Runtime Harness repair_status=not_required.",
         "evidence_refs": [
+          "docs/ops/live-e2e-provider-qualification.md#w41-s03-alpha8-smoke-refresh",
           "examples/live-e2e/fixtures/w35-s05/live-attempts-summary.sample.json#w35-s05-qwen-interrupt-proof-20260603102247",
           "docs/ops/live-e2e-standard-runner.md#qwen-candidate-profiles"
         ]
@@ -108,11 +109,12 @@
     "release_blocking_provider_ids": [],
     "release_blocking_failures": [],
     "release_blocking_status": "pass",
-    "generated_at": "2026-06-04T00:00:00.000Z"
+    "generated_at": "2026-06-04T09:00:00.000Z"
   },
   "notes": [
     "This fixture is an optional provider qualification matrix, not a release readiness certificate.",
     "Coverage tier is preserved from the provider catalog, but release_blocking is false for every W40 optional provider cell.",
-    "Target repository and environment blockers must stay separate from AOR product failures and provider quality findings."
+    "Target repository and environment blockers must stay separate from AOR product failures and provider quality findings.",
+    "W41-S03 refreshed the alpha.8 smoke evidence through normal live E2E profile runs for Codex and Qwen; short interrupted smoke runs are documented as fail-closed evidence and do not claim a new provider quality pass."
   ]
 }
