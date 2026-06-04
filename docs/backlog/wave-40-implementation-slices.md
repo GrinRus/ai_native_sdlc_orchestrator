@@ -143,7 +143,7 @@ issues before any release or readiness claim is made.
 
 ## W40-S04 — Optional provider qualification matrix
 - **Epic:** EPIC-7 Live E2E and rehearsal
-- **State:** ready
+- **State:** done
 - **Outcome:** Define and prove a provider qualification matrix that records optional coverage status without turning extended providers into release blockers.
 - **Primary modules:** `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `docs/product/**`, tests
 - **Hard dependencies:** W40-S03, W39-S01

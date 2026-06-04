@@ -373,6 +373,18 @@ Record mode applies the same medium-or-larger and pass/fix/block classification 
 
 The launching agent performs the fix and commit. Final qualification requires at least five full positive medium-or-larger runs across provider variants: at least two `openai-primary`, at least two `anthropic-primary`, and at least one `open-code-primary`. `qwen-primary` is extended candidate evidence and does not count toward the required qualification set until a future promotion changes its coverage tier.
 
+W40 adds an optional provider qualification matrix for installed-user alpha
+operations. That matrix is separate from historical final-qualification counts:
+it records Codex, Claude, OpenCode, and Qwen as readable provider cells with
+`qualification_status`, `failure_owner`, `failure_phase`, and
+`release_blocking` fields. The W40 optional matrix must not infer success or
+failure from provider name alone. It must also keep target repository blockers,
+environment/auth blockers, provider blockers, and AOR product failures separate.
+For the current alpha scope, optional provider cells do not block release unless
+a release plan explicitly lists them in `release_blocking_provider_ids[]`.
+Details and the sample report are in
+`docs/ops/live-e2e-provider-qualification.md`.
+
 ## Layer behavior
 Legacy bounded rehearsal summaries:
 - may still appear in archived evidence and backlog history;
