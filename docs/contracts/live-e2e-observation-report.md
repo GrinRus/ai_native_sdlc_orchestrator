@@ -77,6 +77,12 @@ This contract intentionally replaces the legacy post-run `step_matrix`, `verdict
 - `delivery_default`
 - `full_lifecycle`
 
+For `full_lifecycle`, terminal lifecycle steps are profile-declared:
+`release` is included only when the profile declares a `release` stage, and
+`learning` is included only when the profile declares a `learning` stage.
+This lets governance profiles close audit/learning evidence without requiring
+a release packet when the scenario policy does not require release.
+
 `step_journal[]` should preserve:
 - `sequence`
 - `step_id`

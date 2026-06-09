@@ -12,7 +12,7 @@ For canonical setup and verification dependency details per profile, use `docs/o
 - Mandatory full-journey live E2E is allowed only on curated catalog targets and curated feature missions.
 - Full-journey runs must generate the feature request and discovery/spec/handoff during the run.
 - Acceptance and production-proof full-journey runs must use isolated AOR source install by default and support the public `execution#N -> review#N` repair loop.
-- Always materialize review, QA, and delivery artifacts for full-journey observation runs; release and learning become observed steps when the profile declares `live_e2e.flow_range_policy=full_lifecycle`.
+- Always materialize review, QA, and delivery artifacts for full-journey observation runs. `full_lifecycle` profiles observe profile-declared terminal stages: release profiles must close release plus learning, while governance profiles that declare `learning` must close audit/learning without requiring a release packet.
 - Every mandatory full-journey run must resolve one curated matrix cell:
   - `repo`
   - `feature mission`

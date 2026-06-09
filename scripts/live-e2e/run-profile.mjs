@@ -40,25 +40,11 @@ import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib
 import {
   buildLiveE2eStepPlan,
   createLiveE2eStepController,
+  getLiveE2eIncludedStepsForProfile,
   isLiveE2eControllerStopInProgress,
   resolveLiveE2eOperatorContext,
 } from "./lib/step-controller.mjs";
 
-const LIVE_E2E_DELIVERY_STEPS = Object.freeze([
-  "discovery",
-  "spec",
-  "planning",
-  "handoff",
-  "execution",
-  "review",
-  "qa",
-  "delivery",
-]);
-const LIVE_E2E_FULL_LIFECYCLE_STEPS = Object.freeze([
-  ...LIVE_E2E_DELIVERY_STEPS,
-  "release",
-  "learning",
-]);
 const LIVE_E2E_OBSERVATION_PRELUDE_STEPS = Object.freeze([
   "install",
   "target_checkout",
@@ -561,11 +547,11 @@ function resolveFlowRangePolicy(profile) {
 }
 
 /**
- * @param {"delivery_default" | "full_lifecycle"} policy
+ * @param {Record<string, unknown>} profile
  * @returns {string[]}
  */
-function getIncludedStepsForPolicy(policy) {
-  return policy === "full_lifecycle" ? [...LIVE_E2E_FULL_LIFECYCLE_STEPS] : [...LIVE_E2E_DELIVERY_STEPS];
+function getIncludedStepsForProfile(profile) {
+  return getLiveE2eIncludedStepsForProfile(profile);
 }
 
 /**
@@ -1129,8 +1115,11 @@ function buildInteractiveDecisions(stepJournal) {
 
 function buildObservationReport(options) {
   const flowRangePolicy = resolveFlowRangePolicy(options.profile);
-  const includedSteps = getIncludedStepsForPolicy(flowRangePolicy);
-  const excludedSteps = flowRangePolicy === "full_lifecycle" ? [] : ["release", "learning"];
+  const includedSteps = getIncludedStepsForProfile(options.profile);
+  const excludedSteps =
+    flowRangePolicy === "full_lifecycle"
+      ? ["release", "learning"].filter((step) => !includedSteps.includes(step))
+      : ["release", "learning"];
   const setupJournal = buildSetupJournal(options.flowResult.artifacts);
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const controllerStop = asRecord(options.flowResult.artifacts.live_e2e_controller_stop);

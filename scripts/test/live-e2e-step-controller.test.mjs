@@ -134,6 +134,45 @@ test("live E2E step controller persists observation and state before next step",
   });
 });
 
+test("live E2E full lifecycle respects profile-declared terminal stages", () => {
+  withTempRoot((reportsRoot) => {
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-governance-terminal-stages",
+      profile: {
+        stages: [
+          "bootstrap",
+          "discovery",
+          "spec",
+          "planning",
+          "handoff",
+          "execution",
+          "review",
+          "qa",
+          "delivery",
+          "learning",
+        ],
+        live_e2e: { flow_range_policy: "full_lifecycle" },
+      },
+      mode: "manual",
+    });
+
+    assert.deepEqual(controller.includedSteps, [
+      "discovery",
+      "spec",
+      "planning",
+      "handoff",
+      "execution",
+      "review",
+      "qa",
+      "delivery",
+      "learning",
+    ]);
+    assert.equal(controller.includedSteps.includes("release"), false);
+    assert.equal(controller.getState().current_step, "discovery");
+  });
+});
+
 test("live E2E step controller blocks skill-agent profiles until operator decision is accepted", () => {
   withTempRoot((reportsRoot) => {
     const controller = createLiveE2eStepController({

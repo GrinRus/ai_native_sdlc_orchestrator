@@ -14,6 +14,7 @@ import {
 
 const DELIVERY_STEPS = Object.freeze(["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"]);
 const FULL_LIFECYCLE_STEPS = Object.freeze([...DELIVERY_STEPS, "release", "learning"]);
+const TERMINAL_LIFECYCLE_STEPS = Object.freeze(["release", "learning"]);
 
 const STEP_COMMAND_LABELS = Object.freeze({
   discovery: ["discovery-run", "project-analyze"],
@@ -100,6 +101,21 @@ export function resolveLiveE2eFlowRangePolicy(profile) {
  */
 export function getLiveE2eIncludedSteps(policy) {
   return policy === "full_lifecycle" ? [...FULL_LIFECYCLE_STEPS] : [...DELIVERY_STEPS];
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @returns {string[]}
+ */
+export function getLiveE2eIncludedStepsForProfile(profile) {
+  const policy = resolveLiveE2eFlowRangePolicy(profile);
+  if (policy !== "full_lifecycle") return [...DELIVERY_STEPS];
+  const declaredStages = asStringArray(profile.stages);
+  if (declaredStages.length === 0) return [...FULL_LIFECYCLE_STEPS];
+  return [
+    ...DELIVERY_STEPS,
+    ...TERMINAL_LIFECYCLE_STEPS.filter((step) => declaredStages.includes(step)),
+  ];
 }
 
 /**
@@ -553,7 +569,7 @@ export function isLiveE2eControllerStop(error) {
 export function createLiveE2eStepController(options) {
   const mode = options.mode === "manual" || options.mode === "evaluator" ? options.mode : "auto";
   const policy = resolveLiveE2eFlowRangePolicy(options.profile);
-  const includedSteps = getLiveE2eIncludedSteps(policy);
+  const includedSteps = getLiveE2eIncludedStepsForProfile(options.profile);
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const normalizedRunId = normalizeId(options.runId);
   const stateFile = path.join(options.reportsRoot, `live-e2e-controller-state-${normalizedRunId}.json`);

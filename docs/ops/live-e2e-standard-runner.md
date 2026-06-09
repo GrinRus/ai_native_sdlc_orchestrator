@@ -239,7 +239,7 @@ Full-journey layer:
 - bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Timeout failures are preserved as failed step-result evidence; for full-journey baseline diagnostics they are interpreted through the same diagnostic/blocking gate rules as other target verification failures.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - gates continuation after every observed public step by the online live E2E controller decision.
-- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, must execute them as ordinary observed steps.
+- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, execute profile-declared terminal stages as ordinary observed steps. Governance profiles that declare `learning` must reach learning closure even when release is not required.
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
 - runner auth probe is required;
@@ -354,7 +354,8 @@ Default profiles use `live_e2e.flow_range_policy=delivery_default`:
 
 `discovery -> spec -> planning -> handoff -> execution -> review -> qa -> delivery`
 
-Guided or release profiles use `live_e2e.flow_range_policy=full_lifecycle`:
+Guided, release, or governance-audit profiles use `live_e2e.flow_range_policy=full_lifecycle`.
+The terminal segment is profile-declared: release profiles include `release -> learning`, while governance profiles can include `learning` without requiring `release`.
 
 `discovery -> spec -> planning -> handoff -> execution -> review -> qa -> delivery -> release -> learning`
 
