@@ -335,3 +335,241 @@ test("proof runner writes partial quality summaries for blocked live E2E reports
     assert.notEqual(written.summary.quality_judgement, null);
   });
 });
+
+test("proof runner removes stale operator-boundary findings from accepted pass steps", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "post-run-verify-summary.json",
+        "post-run-diagnostic-summary.json",
+        "review-report.json",
+        "runtime-harness-report.json",
+        "evaluation-report.json",
+        "delivery-manifest.json",
+        "release-packet.json",
+        "learning-scorecard.json",
+        "learning-handoff.json",
+        "command-transcript.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+    fs.writeFileSync(files["review-report.json"], '{"code_quality":{"status":"pass","findings":[]}}\n', "utf8");
+
+    const staleFinding = "Skill-agent operator decision is required before the next public step.";
+    const steps = ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery", "release", "learning"];
+    const stepJournalEntries = steps.map((step, index) => {
+      const planRef = path.join(reportsRoot, `${step}-plan.json`);
+      const executionRef = path.join(reportsRoot, `${step}-execution.json`);
+      const inspectionRef = path.join(reportsRoot, `${step}-inspection.json`);
+      const classificationRef = path.join(reportsRoot, `${step}-classification.json`);
+      const decisionRequestRef = path.join(reportsRoot, `${step}-agent-request.json`);
+      const operatorDecisionRef = path.join(reportsRoot, `operator-decision-${step}.json`);
+      for (const file of [
+        planRef,
+        executionRef,
+        inspectionRef,
+        classificationRef,
+        decisionRequestRef,
+        operatorDecisionRef,
+      ]) {
+        fs.writeFileSync(file, "{}\n", "utf8");
+      }
+
+      return {
+        sequence: index + 1,
+        step_id: step,
+        step_instance_id: step,
+        iteration: 1,
+        flow_stage: step,
+        plan: {
+          objective: `Observe ${step}.`,
+          public_surface: `aor ${step} run`,
+          command_labels: [`${step}-run`],
+          expected_artifacts: ["command_transcript"],
+          inspection_sources: ["command_transcript"],
+          safety_constraints: ["no-upstream-write"],
+        },
+        plan_ref: planRef,
+        public_surface: `aor ${step} run`,
+        transcript_ref: files["command-transcript.json"],
+        execution_ref: executionRef,
+        inspection_ref: inspectionRef,
+        classification_ref: classificationRef,
+        artifact_refs: [files["command-transcript.json"]],
+        started_at: "2026-06-09T00:00:00.000Z",
+        finished_at: "2026-06-09T00:00:01.000Z",
+        duration_sec: 1,
+        deterministic_analysis: {
+          status: "pass",
+          exit_code: 0,
+          failure_class: null,
+          missing_evidence: [],
+          recommendation: "continue",
+        },
+        semantic_analysis: {
+          status: "pass",
+          judge_source: "skill-agent",
+          findings: [staleFinding],
+        },
+        agent_decision_request_ref: decisionRequestRef,
+        operator_decision_ref: operatorDecisionRef,
+        operator_decision_status: "accepted",
+        inspected_evidence_refs: [files["command-transcript.json"]],
+        requested_interaction: null,
+        decision: {
+          action: "continue",
+          reason: `${step} accepted.`,
+          next_step: steps[index + 1] ?? null,
+        },
+        resume_result: null,
+        frontend_interaction_refs: [],
+        final_step_verdict: "pass",
+      };
+    });
+
+    const runId = "accepted-pass-clears-stale-finding";
+    const finalVerdictFile = path.join(reportsRoot, `live-e2e-final-skill-agent-verdict-${runId}.json`);
+    fs.writeFileSync(
+      finalVerdictFile,
+      `${JSON.stringify(
+        {
+          verdict_id: `${runId}.final-skill-agent-verdict.v1`,
+          run_id: runId,
+          status: "pass",
+          judge_source: "skill-agent",
+          inspected_evidence_refs: [files["controller-state.json"]],
+          evidence_refs: [files["controller-state.json"]],
+          findings: [],
+          final_recommendation: "accept",
+          created_at: "2026-06-09T00:00:00.000Z",
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.accepted-pass-clears-stale-finding",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "release",
+        provider_variant_id: "openai-primary",
+        run_tier: "acceptance",
+        stages: ["bootstrap", ...steps],
+        live_e2e: {
+          flow_range_policy: "full_lifecycle",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "pass",
+        stageResults: steps.map((step) => ({
+          stage: step,
+          status: "pass",
+          evidence_refs: [files["command-transcript.json"]],
+          summary: `${step} passed.`,
+        })),
+        commandResults: [
+          {
+            label: "learning-handoff",
+            command_surface: "aor learning handoff",
+            status: "pass",
+            exit_code: 0,
+            transcript_file: files["command-transcript.json"],
+            artifact_refs: [files["command-transcript.json"]],
+          },
+        ],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: stepJournalEntries,
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "pass",
+          post_run_verify_summary_file: files["post-run-verify-summary.json"],
+          post_run_verify_status: "pass",
+          post_run_diagnostic_verify_summary_file: files["post-run-diagnostic-summary.json"],
+          post_run_diagnostic_status: "pass",
+          provider_execution_status: "pass",
+          real_code_change_status: "pass",
+          runtime_harness_decision: "pass",
+          run_start_runtime_harness_decision: "pass",
+          latest_runtime_harness_decision: "pass",
+          runtime_harness_report_file: files["runtime-harness-report.json"],
+          review_report_file: files["review-report.json"],
+          evaluation_report_file: files["evaluation-report.json"],
+          evaluation_status: "pass",
+          delivery_manifest_file: files["delivery-manifest.json"],
+          delivery_quality_gate_status: "pass",
+          release_packet_file: files["release-packet.json"],
+          release_status: "pass",
+          learning_loop_scorecard_file: files["learning-scorecard.json"],
+          learning_loop_handoff_file: files["learning-handoff.json"],
+          quality_gate_decision: "pass",
+          code_quality_status: "pass",
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "medium",
+          matrix_cell: { cell_id: "ky.release.medium.openai" },
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.summary.status, "pass");
+    const observationReport = JSON.parse(fs.readFileSync(written.summary.live_e2e_observation_report_file, "utf8"));
+    assert.equal(observationReport.overall_status, "pass");
+    assert.deepEqual(observationReport.final_analysis.findings, []);
+    assert.equal(
+      observationReport.step_journal.every((entry) => !entry.semantic_analysis.findings.includes(staleFinding)),
+      true,
+    );
+  });
+});

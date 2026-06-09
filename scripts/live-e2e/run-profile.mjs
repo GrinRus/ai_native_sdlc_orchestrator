@@ -66,6 +66,7 @@ const LIVE_E2E_OBSERVATION_PRELUDE_STEPS = Object.freeze([
   "intake",
   "readiness",
 ]);
+const OPERATOR_DECISION_REQUIRED_FINDING = "Skill-agent operator decision is required before the next public step.";
 const LIVE_E2E_OPERATOR_ACTIONS = Object.freeze([
   "continue",
   "answer",
@@ -813,6 +814,16 @@ function buildStepJournal(options) {
     const deterministicStatus = toObservationStatus(asNonEmptyString(deterministicAnalysis.status) || "not_pass");
     const rawSemanticAnalysis = asRecord(rawEntry.semantic_analysis);
     const semanticStatus = toObservationStatus(asNonEmptyString(rawSemanticAnalysis.status) || deterministicStatus);
+    const semanticFindings = uniqueStrings(
+      asStringArray(rawSemanticAnalysis.findings).filter(
+        (finding) =>
+          !(
+            rawOperatorDecisionStatus === "accepted" &&
+            semanticStatus === "pass" &&
+            finding === OPERATOR_DECISION_REQUIRED_FINDING
+          ),
+      ),
+    );
     const finalStepVerdict =
       observationSeverity(semanticStatus) > observationSeverity(deterministicStatus) ? semanticStatus : deterministicStatus;
     const requestedInteraction = asRecord(rawEntry.requested_interaction);
@@ -893,7 +904,7 @@ function buildStepJournal(options) {
         status: semanticStatus,
         judge_source: asNonEmptyString(rawSemanticAnalysis.judge_source) || "deterministic-runner",
         findings: uniqueStrings([
-          ...asStringArray(rawSemanticAnalysis.findings),
+          ...semanticFindings,
           ...(semanticStatus === "pass" ? [] : [asNonEmptyString(stage.summary) || `${step} did not complete cleanly`]),
         ]),
       },
