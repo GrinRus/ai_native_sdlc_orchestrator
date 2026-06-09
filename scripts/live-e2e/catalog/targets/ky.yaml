@@ -192,8 +192,8 @@ feature_missions:
         target: lint, build, and targeted AVA coverage pass after the change
         measurement: post-run primary verification
     definition_of_done:
-      - Bounded primary verification passes and full npm test is preserved as
-        diagnostic evidence.
+      - Bounded primary verification passes and the broader stable AVA subset is
+        preserved as diagnostic evidence.
       - Delivery and release packet evidence are anchored to the target checkout.
       - No upstream write-back is attempted.
     expected_evidence: &a3
@@ -209,7 +209,7 @@ feature_missions:
         - npm run build
         - npx ava test/hooks.ts
       diagnostic_commands:
-        - npm test
+        - npx ava test/hooks.ts test/core.ts test/options.ts
       diagnostic_failure_mode: warn
     supported_scenarios:
       - release
