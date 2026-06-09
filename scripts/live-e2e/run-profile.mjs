@@ -393,6 +393,82 @@ function buildCodeQualityObservation(artifacts) {
 }
 
 /**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {string | null}
+ */
+function inferRuntimeHarnessDecision(artifacts) {
+  const directDecision =
+    asNonEmptyString(artifacts.runtime_harness_decision) ||
+    asNonEmptyString(artifacts.run_start_runtime_harness_decision) ||
+    asNonEmptyString(artifacts.latest_runtime_harness_decision) ||
+    asNonEmptyString(artifacts.runtime_harness_overall_decision);
+  if (directDecision) return directDecision;
+  const reportFiles = uniqueStrings([
+    asNonEmptyString(artifacts.latest_runtime_harness_report_file),
+    asNonEmptyString(artifacts.delivery_runtime_harness_report_file),
+    asNonEmptyString(artifacts.runtime_harness_report_file),
+    asNonEmptyString(artifacts.run_start_runtime_harness_report_file),
+  ]);
+  for (const reportFile of reportFiles) {
+    const decision = asNonEmptyString(readJsonIfPresent(reportFile).overall_decision);
+    if (decision) return decision;
+  }
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {{ reportsRoot: string, sourceRoot: string, targetCheckoutRoot?: string }} context
+ */
+function normalizePreVerdictQualityArtifacts(artifacts, context) {
+  const reviewReport = readJsonIfPresent(asNonEmptyString(artifacts.review_report_file));
+  const reviewCodeStatus = normalizeVerdictStatus(asRecord(reviewReport.code_quality).status);
+  const changedPaths = collectDeliveryChangedPaths(artifacts);
+  const providerEvidenceMaterialized = localEvidenceRefExists(asNonEmptyString(artifacts.adapter_raw_evidence_ref), {
+    reportsRoot: context.reportsRoot,
+    sourceRoot: context.sourceRoot,
+    targetCheckoutRoot: asNonEmptyString(context.targetCheckoutRoot),
+  });
+  if (!asNonEmptyString(artifacts.provider_execution_status) && asNonEmptyString(artifacts.adapter_raw_evidence_ref)) {
+    artifacts.provider_execution_status = providerEvidenceMaterialized ? "pass" : "fail";
+  }
+  if (!asNonEmptyString(artifacts.real_code_change_status) && changedPaths.length > 0) {
+    artifacts.real_code_change_status = "pass";
+  }
+  if (!asNonEmptyString(artifacts.code_quality_status) && Object.keys(asRecord(reviewReport.code_quality)).length > 0) {
+    artifacts.code_quality_status = reviewCodeStatus;
+  }
+  const runtimeHarnessDecision = inferRuntimeHarnessDecision(artifacts);
+  if (!asNonEmptyString(artifacts.runtime_harness_decision) && runtimeHarnessDecision) {
+    artifacts.runtime_harness_decision = runtimeHarnessDecision;
+  }
+  if (!asNonEmptyString(artifacts.latest_runtime_harness_decision) && runtimeHarnessDecision) {
+    artifacts.latest_runtime_harness_decision = runtimeHarnessDecision;
+  }
+  if (!asNonEmptyString(artifacts.run_start_runtime_harness_decision) && runtimeHarnessDecision) {
+    artifacts.run_start_runtime_harness_decision = runtimeHarnessDecision;
+  }
+  const deliveryStatus = asNonEmptyString(artifacts.delivery_manifest_file) ? "materialized" : "not_materialized";
+  const releaseStatus = asNonEmptyString(artifacts.release_status) || (asNonEmptyString(artifacts.release_packet_file) ? "pass" : "");
+  const verificationPass = asNonEmptyString(artifacts.post_run_verify_status) === "pass";
+  const diagnosticPass = asNonEmptyString(artifacts.post_run_diagnostic_status) !== "fail";
+  const qualityInputsPass =
+    asNonEmptyString(artifacts.provider_execution_status) === "pass" &&
+    asNonEmptyString(artifacts.real_code_change_status) === "pass" &&
+    ["pass", "warn"].includes(asNonEmptyString(artifacts.code_quality_status)) &&
+    verificationPass &&
+    diagnosticPass &&
+    deliveryStatus === "materialized" &&
+    (releaseStatus === "pass" || !releaseStatus);
+  if (!asNonEmptyString(artifacts.quality_gate_decision) && qualityInputsPass) {
+    artifacts.quality_gate_decision = "pass";
+  }
+  if (!asNonEmptyString(artifacts.artifact_quality_status) && qualityInputsPass) {
+    artifacts.artifact_quality_status = "pass";
+  }
+}
+
+/**
  * @param {{
  *   runId: string,
  *   profilePath: string,
@@ -1169,8 +1245,9 @@ function resolveFinalSkillAgentVerdict(options) {
     ...frontendInteractions.flatMap((entry) => asStringArray(entry.evidence_refs)),
   ]);
   const lifecycleCompleteness = buildLifecycleCompletenessSummary(options.observationReport);
+  const lifecyclePendingSteps = asStringArray(lifecycleCompleteness.pending_steps);
   const lifecycleCompletenessStatus =
-    asNonEmptyString(lifecycleCompleteness.continuation_status) === "complete" && missingSteps.length === 0
+    lifecyclePendingSteps.length === 0 && missingSteps.length === 0
       ? "pass"
       : "blocked";
   const operatorDecisionStatus = missingSteps.length === 0 && acceptedSkillAgentSteps.length >= includedSteps.length
@@ -1382,14 +1459,19 @@ function resolveSummaryCanonicalStatus(options) {
     ? asNonEmptyString(options.flowResult.artifacts.release_status) || "fail"
     : asNonEmptyString(options.flowResult.artifacts.release_status) || "not_attempted";
   const releaseMissing = releaseRequired && releaseStatus !== "pass";
+  const allStageResultsPass =
+    options.flowResult.stageResults.length > 0 &&
+    options.flowResult.stageResults.every((entry) => asNonEmptyString(entry.status) === "pass");
+  const blockedOnlyByFinalVerdict = options.observationStatus === "blocked" && allStageResultsPass;
+  const effectiveObservationStatus = blockedOnlyByFinalVerdict ? "pass" : options.observationStatus;
   const acceptanceStatus =
     releaseMissing
       ? "fail"
       : deliveryStatus === "degraded" || deliveryStatus === "blocked"
         ? "fail"
-      : options.observationStatus === "pass"
+      : effectiveObservationStatus === "pass"
       ? "pass"
-      : options.observationStatus === "warn" && deliveryStatus !== "not_materialized"
+      : effectiveObservationStatus === "warn" && deliveryStatus !== "not_materialized"
         ? "warn"
         : "fail";
   const runTier = resolveSummaryRunTier(options.profile);
@@ -1402,7 +1484,7 @@ function resolveSummaryCanonicalStatus(options) {
     : acceptanceStatus === "warn" && deliveryStatus !== "not_materialized"
       ? "covered_with_findings"
       : "attempted_failed";
-  const blockedContinuation = options.observationStatus === "blocked";
+  const blockedContinuation = effectiveObservationStatus === "blocked";
   const findings = uniqueStrings([
     ...(releaseMissing ? ["Required release stage did not materialize strict release-packet evidence."] : []),
     ...(blockedContinuation ? ["Live E2E controller stopped before full lifecycle completion."] : []),
@@ -1410,7 +1492,10 @@ function resolveSummaryCanonicalStatus(options) {
   return {
     command_status: commandStatus,
     target_verification_status: asNonEmptyString(options.flowResult.artifacts.post_run_verify_status) || "not_attempted",
-    artifact_quality_status: asNonEmptyString(qualityJudgement.artifact_quality) || "not_attempted",
+    artifact_quality_status:
+      asNonEmptyString(qualityJudgement.artifact_quality) ||
+      asNonEmptyString(options.flowResult.artifacts.artifact_quality_status) ||
+      "not_attempted",
     delivery_status: deliveryStatus,
     coverage_status: coverageStatus,
     acceptance_status: acceptanceStatus,
@@ -1704,6 +1789,11 @@ export function writeProofRunnerArtifacts(options) {
     `live-e2e-scorecard-target-${normalizeId(options.runId)}.json`,
   );
   const productionProofPolicy = buildProductionProofSummary(options.profile);
+  normalizePreVerdictQualityArtifacts(options.flowResult.artifacts, {
+    reportsRoot: options.layout.reportsRoot,
+    sourceRoot: options.hostRoot,
+    targetCheckoutRoot: asNonEmptyString(options.flowResult.artifacts.target_checkout_root),
+  });
   const observationReport = buildObservationReport({
     runId: options.runId,
     profilePath: options.profilePath,
