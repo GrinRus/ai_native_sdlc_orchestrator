@@ -7,9 +7,10 @@ repo:
 verification:
   setup_commands:
     - npm install
-    - npx playwright install
   commands:
-    - npm test
+    - npx xo
+    - npm run build
+    - npx ava test/hooks.ts
 safety_defaults:
   write_back_to_remote: false
   preferred_delivery_mode: patch-only
