@@ -571,5 +571,17 @@ test("proof runner removes stale operator-boundary findings from accepted pass s
       observationReport.step_journal.every((entry) => !entry.semantic_analysis.findings.includes(staleFinding)),
       true,
     );
+    const verdictRequest = JSON.parse(fs.readFileSync(written.summary.final_skill_agent_verdict_request_file, "utf8"));
+    assert.equal(verdictRequest.final_skill_agent_verdict_expected_ref, finalVerdictFile);
+    assert.equal(verdictRequest.deterministic_analysis.status, "pass");
+    assert.equal(verdictRequest.completion_summary.lifecycle_completeness_status, "pass");
+    assert.equal(verdictRequest.completion_summary.operator_decision_status, "accepted");
+    assert.equal(verdictRequest.completion_summary.provider_execution_status, "pass");
+    assert.equal(verdictRequest.completion_summary.delivery_status, "materialized");
+    assert.equal(verdictRequest.completion_summary.release_status, "pass");
+    assert.notEqual(verdictRequest.completion_summary.artifact_quality_status, null);
+    assert.equal(verdictRequest.runner_quality_summary.final_recommendation, "accept");
+    assert.equal(verdictRequest.quality_judgement.overall_status, "pass");
+    assert.equal(verdictRequest.stage_results.length, steps.length);
   });
 });

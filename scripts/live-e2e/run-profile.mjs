@@ -1113,9 +1113,18 @@ function buildObservationReport(options) {
  *   sourceRoot?: string,
  *   targetCheckoutRoot?: string,
  *   observationReport: Record<string, unknown>,
+ *   canonicalStatus?: Record<string, unknown>,
+ *   runnerQualitySummary?: Record<string, unknown>,
+ *   qualityJudgement?: Record<string, unknown>,
+ *   flowResult?: Record<string, unknown>,
  * }}
  */
 function resolveFinalSkillAgentVerdict(options) {
+  const flowResult = asRecord(options.flowResult);
+  const artifacts = asRecord(flowResult.artifacts);
+  const canonicalStatus = asRecord(options.canonicalStatus);
+  const runnerQualitySummary = asRecord(options.runnerQualitySummary);
+  const qualityJudgement = asRecord(options.qualityJudgement);
   const stepJournal = Array.isArray(options.observationReport.step_journal)
     ? options.observationReport.step_journal.map((entry) => asRecord(entry))
     : [];
@@ -1160,24 +1169,99 @@ function resolveFinalSkillAgentVerdict(options) {
     ...frontendInteractions.flatMap((entry) => asStringArray(entry.evidence_refs)),
   ]);
   const lifecycleCompleteness = buildLifecycleCompletenessSummary(options.observationReport);
+  const lifecycleCompletenessStatus =
+    asNonEmptyString(lifecycleCompleteness.continuation_status) === "complete" && missingSteps.length === 0
+      ? "pass"
+      : "blocked";
+  const operatorDecisionStatus = missingSteps.length === 0 && acceptedSkillAgentSteps.length >= includedSteps.length
+    ? "accepted"
+    : "blocked";
+  const providerExecutionStatus =
+    asNonEmptyString(artifacts.provider_execution_status) ||
+    asNonEmptyString(qualityJudgement.provider_execution_status) ||
+    "not_attempted";
+  const deliveryStatus =
+    asNonEmptyString(canonicalStatus.delivery_status) ||
+    asNonEmptyString(artifacts.delivery_status) ||
+    "not_materialized";
+  const releaseStatus =
+    asNonEmptyString(canonicalStatus.release_status) || asNonEmptyString(artifacts.release_status) || "not_attempted";
+  const artifactQualityStatus =
+    asNonEmptyString(canonicalStatus.artifact_quality_status) ||
+    asNonEmptyString(artifacts.artifact_quality_status) ||
+    "not_attempted";
+  const baselineVerifyStatus =
+    asNonEmptyString(artifacts.baseline_verify_status) ||
+    asNonEmptyString(qualityJudgement.target_baseline_status) ||
+    "not_attempted";
+  const postRunVerificationStatus =
+    asNonEmptyString(artifacts.post_run_verify_status) ||
+    asNonEmptyString(qualityJudgement.post_run_verification_status) ||
+    "not_attempted";
+  const postRunDiagnosticStatus =
+    asNonEmptyString(artifacts.post_run_diagnostic_status) ||
+    asNonEmptyString(qualityJudgement.post_run_diagnostic_status) ||
+    "not_attempted";
+  const realCodeChangeStatus =
+    asNonEmptyString(artifacts.real_code_change_status) ||
+    asNonEmptyString(qualityJudgement.real_code_change_status) ||
+    "not_attempted";
+  const deterministicRequestStatus =
+    asNonEmptyString(canonicalStatus.acceptance_status) === "pass" &&
+    lifecycleCompletenessStatus === "pass" &&
+    operatorDecisionStatus === "accepted"
+      ? "pass"
+      : finalAnalysisStatus;
   const request = {
     request_id: `${options.runId}.final-skill-agent-verdict-request.v1`,
     run_id: options.runId,
     expected_verdict_file: expectedVerdictFile,
+    final_skill_agent_verdict_expected_ref: expectedVerdictFile,
     required_judge_source: "skill-agent",
     current_deterministic_status: finalAnalysisStatus,
+    deterministic_analysis: {
+      status: deterministicRequestStatus,
+      final_analysis_status: finalAnalysisStatus,
+      self_pending_final_verdict: !fileExists(expectedVerdictFile),
+    },
     required_steps: includedSteps,
     accepted_step_count: acceptedSkillAgentSteps.length,
     missing_skill_agent_steps: missingSteps,
     missing_frontend_agent_verdicts: missingFrontendVerdicts,
     failed_frontend_interactions: failedFrontendInteractions,
     lifecycle_completeness: lifecycleCompleteness,
+    completion_summary: {
+      lifecycle_completeness_status: lifecycleCompletenessStatus,
+      operator_decision_status: operatorDecisionStatus,
+      provider_execution_status: providerExecutionStatus,
+      delivery_status: deliveryStatus,
+      release_status: releaseStatus,
+      artifact_quality_status: artifactQualityStatus,
+      baseline_verify_status: baselineVerifyStatus,
+      post_run_verification_status: postRunVerificationStatus,
+      post_run_diagnostic_status: postRunDiagnosticStatus,
+      real_code_change_status: realCodeChangeStatus,
+      final_verdict_status: fileExists(expectedVerdictFile) ? "present" : "missing",
+    },
+    canonical_status: Object.keys(canonicalStatus).length > 0 ? canonicalStatus : {},
+    runner_quality_summary: Object.keys(runnerQualitySummary).length > 0 ? runnerQualitySummary : {},
+    quality_judgement: Object.keys(qualityJudgement).length > 0 ? qualityJudgement : {},
+    stage_results: Array.isArray(flowResult.stageResults) ? flowResult.stageResults : [],
+    adapter_raw_evidence_ref: asNonEmptyString(artifacts.adapter_raw_evidence_ref) || "not_attempted",
     current_artifact_status: {
       final_analysis_status: finalAnalysisStatus,
       frontend_interaction_count: frontendInteractions.length,
       accepted_step_count: acceptedSkillAgentSteps.length,
       missing_step_count: missingSteps.length,
       evidence_ref_count: requiredEvidenceRefs.length,
+      provider_execution_status: providerExecutionStatus,
+      delivery_status: deliveryStatus,
+      release_status: releaseStatus,
+      artifact_quality_status: artifactQualityStatus,
+      baseline_verify_status: baselineVerifyStatus,
+      post_run_verification_status: postRunVerificationStatus,
+      post_run_diagnostic_status: postRunDiagnosticStatus,
+      real_code_change_status: realCodeChangeStatus,
     },
     required_inspection: [
       "review the full observation report and step observations",
@@ -1742,6 +1826,17 @@ export function writeProofRunnerArtifacts(options) {
       observationReport,
     });
   }
+  resolveFinalSkillAgentVerdict({
+    runId: options.runId,
+    reportsRoot: options.layout.reportsRoot,
+    sourceRoot: options.hostRoot,
+    targetCheckoutRoot: asNonEmptyString(options.flowResult.artifacts.target_checkout_root),
+    observationReport,
+    canonicalStatus,
+    runnerQualitySummary: asRecord(options.flowResult.artifacts.runner_quality_summary),
+    qualityJudgement: asRecord(options.flowResult.artifacts.quality_judgement),
+    flowResult: options.flowResult,
+  });
   const sourceMetadata = resolveHostSourceMetadata(options.hostRoot);
   const latestRuntimeHarnessReportFile =
     asNonEmptyString(productionProof?.evidence_refs?.runtime_harness_report_file) ||
