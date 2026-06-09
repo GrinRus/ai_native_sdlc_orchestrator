@@ -250,21 +250,56 @@ function isOperatorAction(action) {
 }
 
 /**
- * @param {string} evidenceRef
- * @param {string} reportsRoot
+ * @param {Record<string, unknown>} context
+ * @returns {string[]}
+ */
+function evidenceRootCandidates(context = {}) {
+  return uniqueStrings([
+    asNonEmptyString(context.reportsRoot),
+    asNonEmptyString(context.sourceRoot),
+    asNonEmptyString(context.targetCheckoutRoot),
+    ...asStringArray(context.extraRoots),
+  ]).filter((root) => root && path.isAbsolute(root) && fileExists(root));
+}
+
+/**
+ * @param {string} ref
  * @returns {boolean}
  */
-function localEvidenceRefExists(evidenceRef, reportsRoot) {
+function isMaterializedRelativeRef(ref) {
+  return (
+    ref.startsWith(".") ||
+    ref.startsWith("apps/") ||
+    ref.startsWith("docs/") ||
+    ref.startsWith("examples/") ||
+    ref.startsWith("packages/") ||
+    ref.startsWith("scripts/") ||
+    ref.includes("\\")
+  );
+}
+
+/**
+ * @param {string} evidenceRef
+ * @param {Record<string, unknown>} context
+ * @returns {boolean}
+ */
+function localEvidenceRefExists(evidenceRef, context = {}) {
   const ref = asNonEmptyString(evidenceRef);
   if (!ref) return true;
   if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(ref)) {
     if (!ref.startsWith("evidence://")) return true;
     const evidencePath = ref.slice("evidence://".length);
-    return !path.isAbsolute(evidencePath) || fileExists(evidencePath);
+    if (!evidencePath) return false;
+    if (path.isAbsolute(evidencePath)) return fileExists(evidencePath);
+    const roots = evidenceRootCandidates(context);
+    if (roots.some((root) => fileExists(path.resolve(root, evidencePath)))) return true;
+    return !isMaterializedRelativeRef(evidencePath);
   }
   if (path.isAbsolute(ref)) return fileExists(ref);
   if (ref.startsWith(".") || ref.includes("/") || ref.includes("\\")) {
-    return fileExists(path.resolve(reportsRoot, ref));
+    const roots = evidenceRootCandidates(context);
+    if (roots.some((root) => fileExists(path.resolve(root, ref)))) return true;
+    return !isMaterializedRelativeRef(ref);
   }
   return true;
 }
@@ -290,7 +325,7 @@ function requiredInspectionRefsForEntry(entry) {
  * @param {Record<string, unknown>} entry
  * @returns {string | null}
  */
-function rejectInconsistentSkillAgentDecision(decision, action, entry, profile = {}, reportsRoot = "") {
+function rejectInconsistentSkillAgentDecision(decision, action, entry, profile = {}, evidenceContext = {}) {
   const semantic = asRecord(decision.semantic_analysis);
   const judgeSource = asNonEmptyString(semantic.judge_source) || asNonEmptyString(decision.judge_source);
   if (judgeSource !== "skill-agent") {
@@ -304,7 +339,7 @@ function rejectInconsistentSkillAgentDecision(decision, action, entry, profile =
   if (missingInspectionRefs.length > 0) {
     return `Skill-agent operator decisions must cite required inspected evidence refs: ${missingInspectionRefs.join(", ")}.`;
   }
-  const missingMaterializedRefs = inspectedEvidenceRefs.filter((ref) => !localEvidenceRefExists(ref, reportsRoot));
+  const missingMaterializedRefs = inspectedEvidenceRefs.filter((ref) => !localEvidenceRefExists(ref, evidenceContext));
   if (missingMaterializedRefs.length > 0) {
     return `Skill-agent operator decisions cite missing local evidence refs: ${missingMaterializedRefs.join(", ")}.`;
   }
@@ -358,7 +393,13 @@ function buildStepInstanceId(step, iteration) {
 }
 
 /**
- * @param {{ profile: Record<string, unknown>, entry: Record<string, unknown>, decisionFile: string, operatorContext: Record<string, unknown> }}
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   entry: Record<string, unknown>,
+ *   decisionFile: string,
+ *   operatorContext: Record<string, unknown>,
+ *   evidenceContext?: Record<string, unknown>,
+ * }}
  */
 function resolveOperatorDecision(options) {
   if (fileExists(options.decisionFile)) {
@@ -370,7 +411,7 @@ function resolveOperatorDecision(options) {
       action,
       options.entry,
       options.profile,
-      options.reportsRoot,
+      asRecord(options.evidenceContext),
     );
     const stepMatches =
       !asNonEmptyString(decision.step_id) ||
@@ -505,6 +546,8 @@ export function isLiveE2eControllerStop(error) {
  *   runId: string,
  *   profile: Record<string, unknown>,
  *   mode?: "auto" | "manual" | "evaluator",
+ *   sourceRoot?: string,
+ *   targetCheckoutRoot?: string,
  * }} options
  */
 export function createLiveE2eStepController(options) {
@@ -545,6 +588,21 @@ export function createLiveE2eStepController(options) {
     operator_context: operatorContext,
     retry_counters: retryCounters,
   };
+
+  /**
+   * @param {Record<string, unknown>} artifacts
+   * @returns {Record<string, unknown>}
+   */
+  function buildEvidenceContext(artifacts = {}) {
+    return {
+      reportsRoot: options.reportsRoot,
+      sourceRoot: asNonEmptyString(options.sourceRoot),
+      targetCheckoutRoot:
+        asNonEmptyString(options.targetCheckoutRoot) ||
+        asNonEmptyString(artifacts.target_checkout_root) ||
+        asNonEmptyString(asRecord(state.artifacts_snapshot).target_checkout_root),
+    };
+  }
 
   for (const evidenceFile of asStringArray(state.evidence_refs)) {
     if (!evidenceFile || !fileExists(evidenceFile)) continue;
@@ -736,7 +794,7 @@ export function createLiveE2eStepController(options) {
           entry: persistedEntry,
           decisionFile: files.decisionFile,
           operatorContext,
-          reportsRoot: options.reportsRoot,
+          evidenceContext: buildEvidenceContext(asRecord(state.artifacts_snapshot)),
         });
         const entry = { ...persistedEntry };
         entry.operator_decision_ref = operatorDecision.ref;
@@ -1027,7 +1085,7 @@ export function createLiveE2eStepController(options) {
       entry,
       decisionFile: files.decisionFile,
       operatorContext,
-      reportsRoot: options.reportsRoot,
+      evidenceContext: buildEvidenceContext(input.artifacts),
     });
     entry.operator_decision_ref = operatorDecision.ref;
     entry.operator_decision_status = operatorDecision.status;

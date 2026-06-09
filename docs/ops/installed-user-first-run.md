@@ -132,12 +132,15 @@ Expected JSON:
 - `html_loaded: true`;
 - `config_project_id` matches `project_id`;
 - `state_project_id` matches `project_id`.
+- `render_guard_status: "pass"` with the packaged script and stylesheet refs
+  checked from `apps/web/dist`;
+- `blank_root_regression_detected: false`.
 
 ## Smoke transcript shape
 The CLI test fixture `apps/cli/test/fixtures/installed-user-first-run-transcript.json` records the expected first-run command sequence:
 1. `doctor` reports ready status and no blockers on a valid temp repository.
 2. `onboard` dispatches through `project init`, writes runtime state plus `onboarding-report.json` under `.aor/`, and does not copy example registries unless materialization is explicit.
-3. `app` reports an optional, non-mandatory local web surface and the installed-package smoke path verifies the packaged SPA/config/API routes.
+3. `app` reports an optional, non-mandatory local web surface and the installed-package smoke path verifies the packaged SPA/config/API routes plus render-oriented bundle evidence.
 4. `next` points to a safe low-level follow-up after onboarding.
 
 No upstream writes are part of this first-run shortcut layer.

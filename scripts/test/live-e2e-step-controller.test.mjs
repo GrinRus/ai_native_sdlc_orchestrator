@@ -315,6 +315,64 @@ test("live E2E step controller rejects skill-agent continue when deterministic c
   });
 });
 
+test("live E2E step controller resolves repo-relative inspected refs from source root", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const sourceRoot = path.join(tempRoot, "aor-source");
+    fs.mkdirSync(path.join(sourceRoot, "docs", "ops"), { recursive: true });
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const runbookRef = "docs/ops/live-e2e-standard-runner.md";
+    fs.writeFileSync(path.join(sourceRoot, runbookRef), "# Live E2E\n", "utf8");
+    const transcriptFile = path.join(reportsRoot, "01-discovery-run.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      sourceRoot,
+      runId: "controller-source-root-ref",
+      profile: {
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      mode: "auto",
+    });
+    controller.planCommand({ label: "discovery-run", commandSurface: "aor discovery run" });
+    writeSkillAgentDecision(reportsRoot, "controller-source-root-ref", 1, "discovery", {
+      nextStep: "spec",
+      inspectedEvidenceRefs: [transcriptFile, runbookRef],
+    });
+
+    const result = controller.observeStage({
+      stage: "discovery",
+      stageResult: {
+        stage: "discovery",
+        status: "pass",
+        evidence_refs: [transcriptFile],
+        summary: "Discovery passed.",
+      },
+      commandResults: [
+        {
+          label: "discovery-run",
+          command_surface: "aor discovery run",
+          status: "pass",
+          transcript_file: transcriptFile,
+          artifact_refs: [transcriptFile],
+        },
+      ],
+      artifacts: {},
+    });
+
+    assert.equal(result.action, "continue");
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.operator_decision_status, "accepted");
+    assert.equal(entry.inspected_evidence_refs.includes(runbookRef), true);
+  });
+});
+
 test("live E2E step controller marks execution not_pass when post-run verification fails", () => {
   withTempRoot((reportsRoot) => {
     const controller = createLiveE2eStepController({

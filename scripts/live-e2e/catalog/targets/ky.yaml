@@ -32,6 +32,12 @@ required_matrix_cells:
     feature_mission_id: ky-release-doc-typing
     provider_variant_id: openai-primary
     coverage_tier: required
+  - cell_id: ky.release.medium.anthropic
+    scenario_family: release
+    feature_size: medium
+    feature_mission_id: ky-release-doc-typing
+    provider_variant_id: anthropic-primary
+    coverage_tier: required
   - cell_id: ky.regress.small.open-code
     scenario_family: regress
     feature_size: small
@@ -55,6 +61,13 @@ provider_comparison_pairs:
     scenario_family: regress
     feature_size: small
     feature_mission_id: ky-header-regression
+    provider_variants:
+      - openai-primary
+      - anthropic-primary
+  - pair_id: ky.release.medium
+    scenario_family: release
+    feature_size: medium
+    feature_mission_id: ky-release-doc-typing
     provider_variants:
       - openai-primary
       - anthropic-primary

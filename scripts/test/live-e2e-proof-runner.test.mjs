@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadProofRunnerProfile } from "../live-e2e/lib/profile-catalog.mjs";
 import { prepareAorInstallationProof } from "../live-e2e/lib/flows.mjs";
+import { writeProofRunnerArtifacts } from "../live-e2e/run-profile.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const runProfileScript = path.join(repoRoot, "scripts/live-e2e/run-profile.mjs");
@@ -158,5 +159,179 @@ test("proof runner reuses valid installation proof for manual resume", () => {
     assert.equal(result.proof.reused_for_manual_resume, true);
     assert.equal(result.launch.command, launcher);
     assert.equal(result.setupEntry.public_surface, "cached pnpm source install");
+  });
+});
+
+test("proof runner writes partial quality summaries for blocked live E2E reports", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "discovery-plan.json",
+        "discovery-execution.json",
+        "discovery-inspection.json",
+        "discovery-classification.json",
+        "discovery-agent-request.json",
+        "discovery-transcript.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+
+    const runId = "blocked-partial-quality";
+    const stepJournalEntry = {
+      sequence: 1,
+      step_id: "discovery",
+      step_instance_id: "discovery",
+      iteration: 1,
+      flow_stage: "discovery",
+      plan: {
+        objective: "Observe discovery.",
+        public_surface: "aor discovery run",
+        command_labels: ["discovery-run"],
+        expected_artifacts: ["analysis_report_file"],
+        inspection_sources: ["command_transcript"],
+        safety_constraints: ["no-upstream-write"],
+      },
+      plan_ref: files["discovery-plan.json"],
+      public_surface: "aor discovery run",
+      transcript_ref: files["discovery-transcript.json"],
+      execution_ref: files["discovery-execution.json"],
+      inspection_ref: files["discovery-inspection.json"],
+      classification_ref: files["discovery-classification.json"],
+      artifact_refs: [files["discovery-transcript.json"]],
+      started_at: "2026-06-09T00:00:00.000Z",
+      finished_at: "2026-06-09T00:00:01.000Z",
+      duration_sec: 1,
+      deterministic_analysis: {
+        status: "pass",
+        exit_code: 0,
+        failure_class: null,
+        missing_evidence: [],
+        recommendation: "continue",
+      },
+      semantic_analysis: {
+        status: "blocked",
+        judge_source: "skill-agent",
+        findings: ["Operator decision artifact is required before continuation."],
+      },
+      agent_decision_request_ref: files["discovery-agent-request.json"],
+      operator_decision_ref: path.join(reportsRoot, "missing-decision.json"),
+      operator_decision_status: "missing",
+      inspected_evidence_refs: [],
+      requested_interaction: null,
+      decision: {
+        action: "diagnose",
+        reason: "Missing skill-agent operator decision.",
+      },
+      resume_result: null,
+      frontend_interaction_refs: [],
+      final_step_verdict: "blocked",
+    };
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.blocked-partial-quality",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "release",
+        provider_variant_id: "openai-primary",
+        stages: ["bootstrap", "discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery", "release"],
+        live_e2e: {
+          flow_range_policy: "full_lifecycle",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "blocked",
+        stageResults: [
+          {
+            stage: "discovery",
+            status: "pass",
+            evidence_refs: [files["discovery-transcript.json"]],
+            summary: "Discovery reached an operator decision boundary.",
+          },
+        ],
+        commandResults: [
+          {
+            label: "discovery-run",
+            command_surface: "aor discovery run",
+            status: "pass",
+            exit_code: 0,
+            transcript_file: files["discovery-transcript.json"],
+            artifact_refs: [files["discovery-transcript.json"]],
+          },
+        ],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_controller_stop: {
+            decision: { action: "diagnose", next_step: "discovery" },
+            state: { completed_steps: ["discovery"], current_step: "discovery" },
+          },
+          live_e2e_step_journal_entries: [stepJournalEntry],
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "pass",
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "medium",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.summary.status, "blocked");
+    assert.equal(written.summary.continuation_status, "blocked");
+    assert.equal(written.summary.blocked_step_id, "discovery");
+    assert.equal(written.summary.runner_quality_summary.summary_type, "partial");
+    assert.equal(written.summary.runner_quality_summary.lifecycle_completeness.pending_steps.includes("release"), true);
+    assert.equal(written.summary.quality_judgement.judgement_type, "partial");
+    assert.equal(written.summary.quality_judgement.provider_execution_status, "not_attempted");
+    assert.notEqual(written.summary.runner_quality_summary, null);
+    assert.notEqual(written.summary.quality_judgement, null);
   });
 });

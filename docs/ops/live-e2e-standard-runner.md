@@ -376,7 +376,13 @@ The runner performs deterministic analysis for every step from public command tr
 
 The live E2E skill is the operator. It reads the decision request, inspects public artifacts/UI/API/logs, writes the operator decision artifact with `semantic_analysis.judge_source=skill-agent` and non-empty `inspected_evidence_refs[]`, and answers any requested interaction through public control-plane surfaces such as `aor run answer` or the HTTP answer route. `--agent-judge-file` is removed; live E2E semantic analysis comes only from accepted skill-agent decisions and the final skill-agent verdict artifact.
 
-Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and real screenshot evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not satisfy `browser-task-proof` screenshot requirements.
+Every `agent_decision_request_ref` carries a decision rubric with required inspection refs. The skill-agent decision must cite those refs in `inspected_evidence_refs[]`; missing or non-materialized local refs are rejected fail-closed. Absolute refs are checked as files, repo-relative refs such as `docs/...` are resolved from the installed AOR source root, and materialized `evidence://.aor/...` refs are resolved from the target runtime root. Symbolic refs such as `evidence://handoff/...` are allowed as symbolic evidence identifiers. For UI-capable profiles, the decision must cite the frontend evidence refs for HTML, DOM snapshot, accessibility summary, and real screenshot evidence before continuation can be accepted. Deterministic `aor app --smoke` visual summaries are guardrails only and do not satisfy `browser-task-proof` screenshot requirements.
+
+Blocked or in-progress runs still write partial `runner_quality_summary` and
+`quality_judgement` objects. Those partial summaries must expose lifecycle
+completeness, the blocked step, provider execution status, delivery/release
+materialization status, and risk findings instead of leaving key quality fields
+null.
 
 Judge criteria:
 - traceability to feature request, mission, and previous step;
