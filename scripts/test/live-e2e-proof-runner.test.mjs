@@ -157,8 +157,10 @@ test("proof runner reuses valid installation proof for manual resume", () => {
     });
 
     assert.equal(result.proof.reused_for_manual_resume, true);
+    assert.equal(fs.existsSync(result.proof.cached_launcher_smoke_file), true);
     assert.equal(result.launch.command, launcher);
     assert.equal(result.setupEntry.public_surface, "cached pnpm source install");
+    assert.equal(result.setupEntry.evidence_refs.includes(result.proof.cached_launcher_smoke_file), true);
   });
 });
 

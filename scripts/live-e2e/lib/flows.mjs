@@ -207,6 +207,24 @@ function runInstallProofCommand(options) {
   return transcript;
 }
 
+/**
+ * @param {{ launcherRef: string, installRoot: string }} options
+ * @returns {{ status: "pass" | "fail", transcriptFile: string }}
+ */
+function verifyCachedAorLauncher(options) {
+  const transcriptFile = path.join(options.installRoot, "00-cached-aor-project-init-help.json");
+  const transcript = runInstallProofCommand({
+    cwd: path.dirname(options.launcherRef),
+    command: options.launcherRef,
+    args: ["project", "init", "--help"],
+    transcriptFile,
+  });
+  return {
+    status: asNonEmptyString(transcript.status) === "pass" ? "pass" : "fail",
+    transcriptFile,
+  };
+}
+
 const ISOLATED_SOURCE_SKIP_NAMES = new Set([
   ".aor",
   ".git",
@@ -274,16 +292,15 @@ export function prepareAorInstallationProof(options) {
     const cachedSourceCommit = asNonEmptyString(cachedProof.source_commit_sha);
     const cachedInstallMode = asNonEmptyString(cachedProof.install_mode);
     const sourceCommitMatches = !currentSourceCommit || !cachedSourceCommit || currentSourceCommit === cachedSourceCommit;
-    if (
-      asNonEmptyString(cachedProof.status) === "pass" &&
-      sourceCommitMatches &&
-      launcherRef &&
-      fileExists(launcherRef)
-    ) {
+    const cacheLooksReusable =
+      asNonEmptyString(cachedProof.status) === "pass" && sourceCommitMatches && launcherRef && fileExists(launcherRef);
+    const cachedLauncherSmoke = cacheLooksReusable ? verifyCachedAorLauncher({ launcherRef, installRoot }) : null;
+    if (cacheLooksReusable && cachedLauncherSmoke?.status === "pass") {
       const cachedProofWithReuse = {
         ...cachedProof,
         reused_for_manual_resume: true,
         reused_at: nowIso(),
+        cached_launcher_smoke_file: cachedLauncherSmoke.transcriptFile,
       };
       writeJson(proofFile, cachedProofWithReuse);
       const setupEntry = {
@@ -292,7 +309,11 @@ export function prepareAorInstallationProof(options) {
         status: "pass",
         public_surface:
           cachedInstallMode === "provided-binary" ? "provided aor binary" : "cached pnpm source install",
-        evidence_refs: uniqueStrings([proofFile, ...asStringArray(cachedProof.command_transcripts)]),
+        evidence_refs: uniqueStrings([
+          proofFile,
+          ...asStringArray(cachedProof.command_transcripts),
+          cachedLauncherSmoke.transcriptFile,
+        ]),
         summary: "AOR installation proof was reused for manual resume because the source proof remained valid.",
       };
       return {
@@ -353,6 +374,7 @@ export function prepareAorInstallationProof(options) {
     addCommand("pnpm-install-frozen-lockfile", "pnpm", ["install", "--frozen-lockfile"]);
     addCommand("pnpm-build", "pnpm", ["build"]);
     addCommand("pnpm-aor-help", "pnpm", ["aor", "--help"]);
+    addCommand("pnpm-aor-project-init-help", "pnpm", ["aor", "project", "init", "--help"]);
     const launcherScript = path.join(installRoot, "aor-session-launcher.sh");
     fs.writeFileSync(
       launcherScript,
