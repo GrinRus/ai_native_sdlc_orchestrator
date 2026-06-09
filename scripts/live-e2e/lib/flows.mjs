@@ -1830,6 +1830,11 @@ function buildCanonicalRunStatus(options) {
   const scenarioCoverageStatus = normalizeCanonicalStatus(options.scenarioCoverage.status);
   const qualityGateStatus = normalizeCanonicalStatus(options.artifacts.quality_gate_decision);
   const diagnosticStatus = normalizeCanonicalStatus(options.artifacts.post_run_diagnostic_status);
+  const postRunQualityPolicy = asRecord(options.artifacts.post_run_quality_policy);
+  const diagnosticFailureMode =
+    asNonEmptyString(postRunQualityPolicy.diagnosticFailureMode) === "fail" ? "fail" : "warn";
+  const diagnosticBlocksAcceptance =
+    diagnosticStatus === "fail" || (diagnosticStatus === "warn" && diagnosticFailureMode === "fail");
   const strictIntakeFailed = intakeGate.strict_required === true && asNonEmptyString(intakeGate.status) === "fail";
   const releaseMissing = releaseRequired && releaseStatus !== "pass";
   const fatalAcceptance =
@@ -1844,12 +1849,11 @@ function buildCanonicalRunStatus(options) {
     realCodeChangeStatus === "fail" ||
     scenarioCoverageStatus === "fail" ||
     qualityGateStatus === "fail" ||
+    diagnosticBlocksAcceptance ||
     releaseMissing;
   const acceptanceStatus = fatalAcceptance
     ? "fail"
-    : diagnosticStatus === "warn" ||
-        diagnosticStatus === "fail" ||
-        asNonEmptyString(options.qualityJudgement.overall_status) === "pass_with_findings"
+    : asNonEmptyString(options.qualityJudgement.overall_status) === "pass_with_findings"
       ? "warn"
       : "pass";
   const hasMatrixCell = hasObjectFields(asRecord(options.artifacts.matrix_cell));
@@ -1871,7 +1875,7 @@ function buildCanonicalRunStatus(options) {
     ...(releaseMissing ? ["Required release stage did not materialize strict release-packet evidence."] : []),
     ...(providerExecutionStatus === "fail" ? ["Provider execution evidence was not materialized."] : []),
     ...(realCodeChangeStatus === "fail" ? ["No meaningful real code change was observed."] : []),
-    ...(diagnosticStatus === "warn" || diagnosticStatus === "fail" ? ["Diagnostic post-run verification reported findings."] : []),
+    ...(diagnosticBlocksAcceptance ? ["Diagnostic post-run verification reported findings."] : []),
   ]);
   return {
     command_status: commandStatus,
@@ -4256,6 +4260,10 @@ export function executeFullJourneyFlow(options) {
     };
     qualityJudgement.feature_request_quality =
       intakeGateStatus === "fail" ? "fail" : artifacts.intake_artifact_packet_file && artifacts.feature_request_file ? "pass" : "fail";
+    const diagnosticOverallStatus =
+      postRunDiagnosticStatus === "warn" && postRunQualityPolicy.diagnosticFailureMode === "warn"
+        ? "pass"
+        : postRunDiagnosticStatus;
     const verdictStatuses = [
       qualityJudgement.target_selection,
       qualityJudgement.feature_request_quality,
@@ -4265,7 +4273,7 @@ export function executeFullJourneyFlow(options) {
       qualityJudgement.target_baseline_status,
       qualityJudgement.real_code_change_status,
       qualityJudgement.post_run_verification_status,
-      qualityJudgement.post_run_diagnostic_status,
+      diagnosticOverallStatus,
       qualityJudgement.artifact_quality,
       qualityJudgement.code_quality,
       qualityJudgement.provider_execution_status,
