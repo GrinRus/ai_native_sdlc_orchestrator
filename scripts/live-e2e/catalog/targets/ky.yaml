@@ -57,6 +57,12 @@ required_matrix_cells:
     feature_mission_id: ky-retry-hooks-governance
     provider_variant_id: openai-primary
     coverage_tier: extended
+  - cell_id: ky.governance.large.anthropic
+    scenario_family: governance
+    feature_size: large
+    feature_mission_id: ky-retry-hooks-governance
+    provider_variant_id: anthropic-primary
+    coverage_tier: extended
 provider_comparison_pairs:
   - pair_id: ky.regress.small
     scenario_family: regress
@@ -69,6 +75,13 @@ provider_comparison_pairs:
     scenario_family: release
     feature_size: medium
     feature_mission_id: ky-release-doc-typing
+    provider_variants:
+      - openai-primary
+      - anthropic-primary
+  - pair_id: ky.governance.large
+    scenario_family: governance
+    feature_size: large
+    feature_mission_id: ky-retry-hooks-governance
     provider_variants:
       - openai-primary
       - anthropic-primary

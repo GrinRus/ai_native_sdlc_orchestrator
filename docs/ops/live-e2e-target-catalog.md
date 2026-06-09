@@ -193,6 +193,7 @@ Required coverage matrix:
 
 Extended candidate cells:
 - `ky.governance.large.openai` (`ky-retry-hooks-governance`)
+- `ky.governance.large.anthropic` (`ky-retry-hooks-governance`)
 - `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)
 - `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)

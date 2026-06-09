@@ -56,6 +56,7 @@ Catalog-backed full-journey profiles:
 - `full-journey-governance-pluggy-medium-openai.yaml`
 - `full-journey-governance-pluggy-medium-open-code.yaml`
 - `full-journey-governance-ky-large-openai.yaml`
+- `full-journey-governance-ky-large-anthropic.yaml`
 - `full-journey-release-nextjs.yaml`
 - `full-journey-release-nextjs-anthropic.yaml`
 - `full-journey-repair-nextjs-medium-anthropic.yaml`
