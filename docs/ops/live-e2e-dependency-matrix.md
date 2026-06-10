@@ -75,7 +75,7 @@ The legacy W7/W10/W11/W12 bounded rehearsal bundles were removed from the reposi
 Mandatory matrix axes:
 - `scenario_family`: `regress`, `release`, `repair`, `governance`
 - `provider_variant_id`: `openai-primary`, `anthropic-primary`, `open-code-primary`
-- `feature_size`: `small`, `medium`, `large`, with `xl` reserved for manual/overnight profiles
+- `feature_size`: `small`, `medium`, `large`, with `xlarge` reserved for manual/overnight profiles. `xl` is accepted only as a legacy alias.
 - `run_tier`: `readme-smoke`, `bounded-live`, `full-journey-observation`, `acceptance`, `production-proof`
 
 Operational rules:

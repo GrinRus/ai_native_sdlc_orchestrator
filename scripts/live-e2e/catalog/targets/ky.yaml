@@ -85,6 +85,19 @@ provider_comparison_pairs:
     provider_variants:
       - openai-primary
       - anthropic-primary
+manual_matrix_cells:
+  - cell_id: ky.governance.xlarge.openai
+    scenario_family: governance
+    feature_size: xlarge
+    feature_mission_id: ky-request-lifecycle-observability-xlarge
+    provider_variant_id: openai-primary
+    coverage_tier: manual
+  - cell_id: ky.governance.xlarge.anthropic
+    scenario_family: governance
+    feature_size: xlarge
+    feature_mission_id: ky-request-lifecycle-observability-xlarge
+    provider_variant_id: anthropic-primary
+    coverage_tier: manual
 feature_missions:
   - mission_id: ky-header-regression
     title: Preserve narrow header-normalization regression coverage
@@ -293,3 +306,76 @@ feature_missions:
       max_changed_files: 12
       max_added_lines: 460
     quality_evidence: *a4
+  - mission_id: ky-request-lifecycle-observability-xlarge
+    title: Govern a request lifecycle observability extension
+    brief: Manually rehearse a broader request lifecycle change that extends retry,
+      hook, and type/documentation surfaces with audit-grade evidence and no
+      upstream write-back.
+    feature_size: xlarge
+    execution_policy: manual-only
+    goals:
+      - Extend request lifecycle observability across core retry behavior, hook
+        state, public types, and tests.
+      - Preserve backwards-compatible request lifecycle boundaries and avoid
+        provider/control-plane leakage into the target library.
+      - Keep audit, review, delivery, and learning closure linked to the target
+        checkout.
+    kpis:
+      - kpi_id: ky-xlarge-lifecycle-depth
+        name: Request lifecycle depth
+        target: core source, hook/type surface, targeted AVA tests, and
+          documentation or type export evidence all trace to one lifecycle intent
+        measurement: target diff review plus post-run primary verification
+      - kpi_id: ky-xlarge-governance-lineage
+        name: Xlarge governance lineage
+        target: review, delivery, audit, and learning artifacts preserve the same
+          manual matrix cell
+        measurement: scenario coverage and artifact consistency checks
+    definition_of_done:
+      - Bounded primary verification passes and diagnostic full-suite output is
+        recorded.
+      - Runtime source, tests, public types, and docs or exported type evidence
+        are all present when the change affects public API behavior.
+      - Governance, audit, and learning evidence links back to the mission and
+        target checkout.
+      - No upstream write-back is attempted.
+    expected_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+      - learning-loop-handoff
+    acceptance_checks:
+      - preserve repo-local request lifecycle boundaries
+      - require source, tests, public type surface, and docs or export evidence
+      - keep governance and audit evidence linked to the target checkout
+      - avoid any upstream write-back
+    post_run_quality:
+      primary_commands:
+        - npx xo
+        - npm run build
+        - npx ava test/main.ts test/hooks.ts
+      diagnostic_commands:
+        - npm test
+      diagnostic_failure_mode: warn
+    supported_scenarios:
+      - governance
+      - repair
+    recommended_provider_variants:
+      - openai-primary
+      - anthropic-primary
+    size_budget:
+      max_changed_files: 18
+      max_added_lines: 900
+    size_rationale: Xlarge ky missions are manual-only because request lifecycle
+      API changes can require maintainer judgement over hook ordering, public type
+      compatibility, retry semantics, and release risk.
+    change_budget:
+      max_changed_files: 18
+      max_added_lines: 900
+    quality_evidence:
+      - verify-summary
+      - routed-step-result
+      - review-report
+      - delivery-manifest
+      - learning-loop-handoff

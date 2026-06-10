@@ -41,12 +41,19 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `ky-retry-hooks-governance`
     - `large`, `governance|repair`
     - broader request lifecycle mission with stricter audit/learning closure
+  - `ky-request-lifecycle-observability-xlarge`
+    - `xlarge`, `governance|repair`, manual-only
+    - broader retry, hook, public type, and observability rehearsal with operator
+      review required for every controller step
 - Best profiles:
   - full-journey required cells:
     - `full-journey-regress-ky.yaml` (`regress/small/openai-primary`)
     - `full-journey-regress-ky-medium-anthropic.yaml` (`regress/medium/anthropic-primary`)
     - `full-journey-regress-ky-medium-open-code.yaml` (`regress/medium/open-code-primary`)
     - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`)
+  - manual-only xlarge profiles:
+    - `manual-xlarge-governance-ky-openai.yaml` (`governance/xlarge/openai-primary`)
+    - `manual-xlarge-governance-ky-anthropic.yaml` (`governance/xlarge/anthropic-primary`)
   - production-proof candidate:
     - `full-journey-production-proof-ky-openai.yaml` (`regress/small/openai-primary`, real external process, blocking target verification)
 - Failure-safe defaults:
@@ -68,11 +75,18 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `httpie-cli-config-surface-hardening`
     - `large`, `governance`
     - broader config/audit safe mission with explicit governance evidence
+  - `httpie-cli-request-policy-orchestration-xlarge`
+    - `xlarge`, `governance|release`, manual-only
+    - cross-surface request policy rehearsal across config, request
+      construction, diagnostics, tests, and governance artifacts
 - Best profiles:
   - full-journey required cells:
     - `full-journey-regress-httpie.yaml` (`regress/small/openai-primary`)
     - `full-journey-repair-httpie-medium-anthropic.yaml` (`repair/medium/anthropic-primary`)
     - `full-journey-governance-httpie-medium-openai.yaml` (`governance/medium/openai-primary`)
+  - manual-only xlarge profiles:
+    - `manual-xlarge-governance-httpie-openai.yaml` (`governance/xlarge/openai-primary`)
+    - `manual-xlarge-governance-httpie-anthropic.yaml` (`governance/xlarge/anthropic-primary`)
 - Bootstrap baseline:
   - use `make install` before `make test` / `make codestyle`
 - Full-journey verification baseline:
@@ -96,11 +110,18 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - `large`, `release|governance`
     - release-shaped mission inside `apps/**` and `packages/**`
     - expected evidence: `delivery-manifest`, `release-packet`, `review-report`
+  - `nextjs-cross-package-release-orchestration`
+    - `xlarge`, `release|governance`, manual-only
+    - cross-package release rehearsal with multiple package/app boundaries,
+      tests, release notes or changesets, delivery, release, and learning evidence
 - Best profiles:
   - full-journey required cells:
     - `full-journey-release-nextjs.yaml` (`release/large/openai-primary`)
     - `full-journey-repair-nextjs-medium-anthropic.yaml` (`repair/medium/anthropic-primary`)
     - `full-journey-governance-nextjs-large-openai.yaml` (`governance/large/openai-primary`)
+  - manual-only xlarge profiles:
+    - `manual-xlarge-release-nextjs-openai.yaml` (`release/xlarge/openai-primary`)
+    - `manual-xlarge-release-nextjs-anthropic.yaml` (`release/xlarge/anthropic-primary`)
 - Failure-safe defaults:
   - `write_back_to_remote=false`
   - preferred delivery mode: `fork-first-pr`
@@ -195,6 +216,9 @@ Extended candidate cells:
 - `ky.governance.large.openai` (`ky-retry-hooks-governance`)
 - `ky.governance.large.anthropic` (`ky-retry-hooks-governance`)
 - `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)
+- `ky.governance.xlarge.openai` / `ky.governance.xlarge.anthropic` (`ky-request-lifecycle-observability-xlarge`, manual-only)
+- `httpie-cli.governance.xlarge.openai` / `httpie-cli.governance.xlarge.anthropic` (`httpie-cli-request-policy-orchestration-xlarge`, manual-only)
+- `nextjs.release.xlarge.openai` / `nextjs.release.xlarge.anthropic` (`nextjs-cross-package-release-orchestration`, manual-only)
 - `pluggy.governance.medium.open-code` (`pluggy-typing-governance`)
 - `nextjs.regress.small.openai` (`nextjs-shared-util-regression`)
 - `cobra.regress.small.openai`
@@ -209,7 +233,7 @@ Feature-size taxonomy:
 - `small`: one focused behavior surface, usually 1-2 files and one targeted regression.
 - `medium`: bounded source plus test/type integration, usually 3-6 files.
 - `large`: cross-package or release/governance lineage with broader artifact expectations.
-- `xl`: manual or overnight rehearsal only; do not add xl cells to required coverage.
+- `xlarge`: manual or overnight rehearsal only; do not add xlarge cells to required coverage or qualification sets. Legacy `xl` inputs are accepted as `xlarge`, but new catalog entries must use `xlarge`.
 
 Run-tier taxonomy:
 - `readme-smoke`: README-led no-write installed-user path.

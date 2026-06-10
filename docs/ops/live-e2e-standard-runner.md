@@ -63,6 +63,18 @@ Catalog-backed full-journey profiles:
 - `full-journey-governance-nextjs-large-openai.yaml`
 - `full-journey-regress-nextjs-small-openai.yaml`
 
+Manual-only xlarge profiles:
+- `manual-xlarge-release-nextjs-openai.yaml`
+- `manual-xlarge-release-nextjs-anthropic.yaml`
+- `manual-xlarge-governance-ky-openai.yaml`
+- `manual-xlarge-governance-ky-anthropic.yaml`
+- `manual-xlarge-governance-httpie-openai.yaml`
+- `manual-xlarge-governance-httpie-anthropic.yaml`
+
+Xlarge profiles must be launched through `manual-live-e2e.mjs`; `run-profile`
+auto/evaluator mode and `qualification-loop.mjs` reject them before target
+execution.
+
 The human catalog stays in `docs/ops/live-e2e-target-catalog.md`; machine-readable matrix definitions live under:
 - `scripts/live-e2e/catalog/targets/*.yaml`
 - `scripts/live-e2e/catalog/scenarios/*.yaml`
@@ -196,7 +208,9 @@ node ./scripts/live-e2e/qualification-loop.mjs \
   --profile ./scripts/live-e2e/profiles/full-journey-regress-ky-medium-open-code.yaml
 ```
 
-The helper accepts only medium, large, or xl profiles. It runs one fresh live E2E, writes `live-e2e-qualification-analysis-*`, and exits as:
+The helper accepts only medium or large profiles. Xlarge profiles are
+manual-only and must not enter qualification sets. The helper runs one fresh live
+E2E, writes `live-e2e-qualification-analysis-*`, and exits as:
 - `0` / `passed`: full flow and quality passed;
 - `2` / `needs_fix`: AOR code or live E2E flow likely needs a patch before rerun;
 - `3` / `blocked`: environment, provider, auth, permission, or safety setup prevented a valid evaluation.
@@ -211,9 +225,9 @@ node ./scripts/live-e2e/qualification-loop.mjs \
   --record-run-summary-file <live-e2e-run-summary-file>
 ```
 
-Record mode applies the same medium-or-larger and pass/fix/block classification gates as a fresh run, reads the observation report from the summary unless `--record-observation-report-file` is supplied, and upserts the qualification-set attempt by `run_id` so a manually resumed run replaces its earlier blocked accounting entry. The recorded summary must match the selected profile's `profile_id`, `target_catalog_id`, `feature_mission_id`, `scenario_family`, `provider_variant_id`, and `feature_size`. Run summaries include `commit_sha` and `branch_name`; record mode requires `commit_sha` to be on the current branch lineage and rejects cross-profile, cross-provider, corrupt, or stale qualification evidence before writing the qualification set.
+Record mode applies the same medium/large and pass/fix/block classification gates as a fresh run, reads the observation report from the summary unless `--record-observation-report-file` is supplied, and upserts the qualification-set attempt by `run_id` so a manually resumed run replaces its earlier blocked accounting entry. The recorded summary must match the selected profile's `profile_id`, `target_catalog_id`, `feature_mission_id`, `scenario_family`, `provider_variant_id`, and `feature_size`. Run summaries include `commit_sha` and `branch_name`; record mode requires `commit_sha` to be on the current branch lineage and rejects cross-profile, cross-provider, corrupt, stale, or xlarge-only qualification evidence before writing the qualification set.
 
-The launching agent performs the fix and commit. Final qualification requires at least five full positive medium-or-larger runs across provider variants: at least two `openai-primary`, at least two `anthropic-primary`, and at least one `open-code-primary`.
+The launching agent performs the fix and commit. Final qualification requires at least five full positive medium/large runs across provider variants: at least two `openai-primary`, at least two `anthropic-primary`, and at least one `open-code-primary`.
 
 ## Layer behavior
 Bounded rehearsal layer:
@@ -230,7 +244,7 @@ Full-journey layer:
 - treats full-journey baseline target verification as diagnostic by default: failed target `verification.commands` are preserved as context, but setup failures, missing prerequisites, failed validation, missing or failed routed dry-run, provider readiness failure, and unsafe write-back policy still block before execution;
 - resolves mission post-run quality into a mission-blocking primary gate plus optional full diagnostic commands; a failed diagnostic command records findings without hiding a passing primary gate unless the mission declares `diagnostic_failure_mode=fail`;
 - has the runner prepare one structured feature request input under AOR run state;
-- requires medium, large, and xl catalog missions to provide goals, KPIs, Definition of Done, expected quality evidence, and primary post-run commands before the run can close acceptance;
+- requires medium, large, and xlarge catalog missions to provide goals, KPIs, Definition of Done, expected quality evidence, and primary post-run commands; xlarge remains manual observation evidence and cannot close required acceptance;
 - materializes provider-pinned route overrides in host-side AOR run state before execution starts;
 - writes an execution-readiness decision before `run start` so promotion evidence is based on readiness and routed dry-run proof, not on a failed baseline target check;
 - includes the materialized spec step-result as a concrete `packet://spec@evidence://...` promotion ref for adapter context, while `run start` binds the approved handoff ref into the compiled context.
