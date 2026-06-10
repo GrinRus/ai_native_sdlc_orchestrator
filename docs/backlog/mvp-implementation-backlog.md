@@ -373,5 +373,14 @@ This is the master index for the implementation slices across all defined waves.
 | W43-S03 | Alpha.10 live E2E interruption and provider smoke | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, tests | W43-S02 |
 | W43-S04 | Alpha.10 findings closure and next-release decision | EPIC-0, EPIC-6 | done | `docs/backlog/**`, `README.md`, `docs/ops/**`, tests | W43-S02, W43-S03 |
 
+## W44 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W44-S01 | Artifact workflow taxonomy and transition invariants | EPIC-0, EPIC-3 | ready | `docs/architecture/**`, `docs/contracts/**`, `docs/backlog/**`, `examples/**` | W43-S04 |
+| W44-S02 | Discovery/research/spec prompt bundle split | EPIC-3 | blocked | `examples/prompts/**`, `examples/project*.aor.yaml`, `packages/contracts/**`, `packages/orchestrator-core/**`, tests | W44-S01 |
+| W44-S03 | Artifact readiness state machine and stale transitions | EPIC-1, EPIC-6 | blocked | `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `examples/reports/**`, tests | W44-S01 |
+| W44-S04 | Context, skill, and policy overlays from evidence | EPIC-4, EPIC-3 | blocked | `examples/context/**`, `examples/skills/**`, `examples/policies/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, `docs/architecture/**`, tests | W44-S02, W44-S03 |
+| W44-S05 | Post-implementation docs and live E2E validation | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, tests | W44-S04 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.
