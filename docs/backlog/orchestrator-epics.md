@@ -24,6 +24,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W41:** `W41-S01` Post-alpha.8 backlog and validation baseline; `W41-S04` Alpha.8 findings closure and next-release decision
 - **W43:** `W43-S01` Post-alpha.10 backlog and confidence baseline; `W43-S04` Alpha.10 findings closure and next-release decision
 - **W44:** `W44-S01` Artifact workflow taxonomy and transition invariants; `W44-S05` Post-implementation docs and live E2E validation
+- **W45:** `W45-S06` Documentation refresh and live E2E acceptance
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -80,6 +81,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W23:** `W23-S01` Nested contract validation pack
 - **W24:** `W24-S01` Run-level Runtime Harness controller
 - **W44:** `W44-S04` Context, skill, and policy overlays from evidence
+- **W45:** `W45-S01` Quality repair request contract and operating model; `W45-S02` Cross-stage repair state machine and next-action resolver
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -128,6 +130,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W42:** `W42-S02` Operator interruption owner classification cleanup
 - **W43:** `W43-S02` Alpha.10 installed-user onboarding and evidence smoke; `W43-S04` Alpha.10 findings closure and next-release decision
 - **W44:** `W44-S03` Artifact readiness state machine and stale transitions
+- **W45:** `W45-S02` Cross-stage repair state machine and next-action resolver; `W45-S03` CLI and control-plane quality repair surfaces; `W45-S04` Web repair-cycle observability
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -167,3 +170,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W42:** `W42-S02` Operator interruption owner classification cleanup
 - **W43:** `W43-S03` Alpha.10 live E2E interruption and provider smoke
 - **W44:** `W44-S05` Post-implementation docs and live E2E validation
+- **W45:** `W45-S05` Repair-loop proof fixtures and live profile; `W45-S06` Documentation refresh and live E2E acceptance
