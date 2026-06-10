@@ -1879,7 +1879,7 @@ function resolveRunTier(profile) {
  * @returns {boolean}
  */
 function requiresStrictMissionIntake(featureSize) {
-  return featureSize === "medium" || featureSize === "large" || featureSize === "xl";
+  return featureSize === "medium" || featureSize === "large" || featureSize === "xlarge" || featureSize === "xl";
 }
 
 /**

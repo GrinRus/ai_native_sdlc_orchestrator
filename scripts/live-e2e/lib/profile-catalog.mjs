@@ -331,11 +331,28 @@ export function loadCatalogProviderVariant(options) {
 }
 
 /**
- * @param {string} value
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function normalizeFeatureSize(value) {
+  const normalized = asNonEmptyString(value).toLowerCase();
+  return normalized === "xl" ? "xlarge" : normalized;
+}
+
+/**
+ * @param {unknown} value
  * @returns {boolean}
  */
 function isFeatureSize(value) {
-  return value === "small" || value === "medium" || value === "large" || value === "xl";
+  return ["small", "medium", "large", "xlarge"].includes(normalizeFeatureSize(value));
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isManualOnlyFeatureSize(value) {
+  return normalizeFeatureSize(value) === "xlarge";
 }
 
 /**
@@ -446,10 +463,17 @@ function assertProductionProofReadiness(resolvedProfile, proofPolicy) {
  * @param {string} providerVariantId
  */
 function resolveMatrixCell(catalogEntry, featureMissionId, scenarioFamily, providerVariantId) {
-  const trackedCells = Array.isArray(catalogEntry.required_matrix_cells)
+  const requiredMatrixCells = Array.isArray(catalogEntry.required_matrix_cells)
     ? /** @type {Array<Record<string, unknown>>} */ (catalogEntry.required_matrix_cells)
     : [];
-  const requiredCells = trackedCells.filter((cell) => (asNonEmptyString(cell.coverage_tier) || "required") === "required");
+  const manualMatrixCells = Array.isArray(catalogEntry.manual_matrix_cells)
+    ? /** @type {Array<Record<string, unknown>>} */ (catalogEntry.manual_matrix_cells).map((cell) => ({
+        ...cell,
+        coverage_tier: asNonEmptyString(cell.coverage_tier) || "manual",
+      }))
+    : [];
+  const trackedCells = [...requiredMatrixCells, ...manualMatrixCells];
+  const requiredCells = requiredMatrixCells.filter((cell) => (asNonEmptyString(cell.coverage_tier) || "required") === "required");
   const matchingCell =
     trackedCells.find(
       (cell) =>
@@ -554,10 +578,10 @@ export function resolveFullJourneyProfile(options) {
   if (!mission) {
     throw new UsageError(`Feature mission '${featureMissionId}' was not found in catalog '${targetCatalogId}'.`);
   }
-  const featureSize = asNonEmptyString(asRecord(mission).feature_size);
+  const featureSize = normalizeFeatureSize(asRecord(mission).feature_size);
   if (!isFeatureSize(featureSize)) {
     throw new UsageError(
-      `Feature mission '${featureMissionId}' in catalog '${targetCatalogId}' must declare feature_size as small, medium, large, or xl.`,
+      `Feature mission '${featureMissionId}' in catalog '${targetCatalogId}' must declare feature_size as small, medium, large, or xlarge.`,
     );
   }
   const supportedScenarios = asStringArray(asRecord(mission).supported_scenarios);

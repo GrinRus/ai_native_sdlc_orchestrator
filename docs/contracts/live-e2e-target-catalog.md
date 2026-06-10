@@ -12,6 +12,10 @@ Machine-readable internal catalog document that binds one curated repository to 
 - `provider_comparison_pairs`
 - `feature_missions`
 
+Optional manual-only coverage lives under `manual_matrix_cells`. These cells are
+visible matrix entries for operator-run rehearsals, but they never close
+required acceptance coverage and must not be consumed by the qualification loop.
+
 ## Feature mission expectations
 Each mission should carry:
 - `mission_id`
@@ -27,16 +31,16 @@ Each mission should carry:
 - `size_budget`
 - `size_rationale`
 
-Medium, large, and xl missions must also carry enough acceptance intent for a
-release-quality live E2E run:
+Medium, large, and xlarge missions must also carry enough acceptance intent for
+a release-quality live E2E run:
 - `goals`
 - `kpis`
 - `definition_of_done`
 - `post_run_quality.primary_commands`
 
 Small regression missions may omit those fields when the bounded command gate is
-otherwise explicit, but the runner reports medium+ omissions as failed artifact
-quality and does not close required matrix acceptance.
+otherwise explicit, but the runner reports medium/large/xlarge omissions as
+failed artifact quality and does not close required matrix acceptance.
 
 Missions must not use `allowed_paths` or `forbidden_paths` as Runtime Harness or live E2E acceptance gates. `change_evidence.required_path_prefixes` is narrower: it declares the minimum repository surfaces that can prove mission-relevant real-code-change evidence for `real_code_change_status`. It does not forbid other reviewed changes, but scratch files, provider-local state, editor backups, and unrelated root artifacts do not satisfy a mission that requires changes under source, test, or public type surfaces. The catalog describes expected behavior, verification commands, quality evidence, feature size, and risks; final implementation quality is judged from the target result, skill-agent operator assessment, review, delivery, and post-run verification evidence.
 
@@ -95,5 +99,6 @@ under delivery, release, verification, or artifact-quality status.
 ## Notes
 - The catalog is curated, not cartesian-complete.
 - Every curated repo should expose at least one `small`, one `medium`, and one `large` mission.
-- `xl` is reserved for manual or overnight rehearsals and must not be required coverage.
+- `xlarge` is reserved for manual or overnight rehearsals and must not be required coverage.
+- `xl` is a legacy alias for `xlarge`; new catalog entries must use `xlarge`.
 - Cells with `coverage_tier=required` are the canonical acceptance subset for that repo. Historical `required_matrix_cells` entries with `coverage_tier=extended` are tracked candidate cells and must not count as mandatory acceptance coverage.

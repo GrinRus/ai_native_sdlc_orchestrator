@@ -29,6 +29,7 @@ import {
   discoverHostProjectId,
   ensureRuntimeLayout,
   isFullJourneyProfile,
+  isManualOnlyFeatureSize,
   loadProofRunnerProfile,
   resolveCatalogRoot,
   resolveFullJourneyProfile,
@@ -2065,6 +2066,11 @@ function runCli(rawArgs) {
       })
     : null;
   const profile = fullJourneyResolution?.resolvedProfile ?? loadedProfile;
+  if (fullJourneyResolution && isManualOnlyFeatureSize(fullJourneyResolution.featureSize) && controllerMode !== "manual") {
+    throw new UsageError(
+      `Profile '${asNonEmptyString(profile.profile_id) || profileRef}' targets feature_size=xlarge, which is manual-only. Use manual-live-e2e.mjs so each controller step is operator-inspected.`,
+    );
+  }
   const productionProof = fullJourneyResolution ? buildProductionProofSummary(profile) : null;
   const examplesRoot = requireDirectory(path.join(hostRoot, "examples"));
   const runId =

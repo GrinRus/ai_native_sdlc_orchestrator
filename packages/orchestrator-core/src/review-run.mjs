@@ -662,12 +662,12 @@ export function materializeReviewReport(options) {
     typeof declaredSizeBudget.max_added_lines === "number" ? declaredSizeBudget.max_added_lines : null;
   const maxTouchedLines =
     typeof declaredSizeBudget.max_touched_lines === "number" ? declaredSizeBudget.max_touched_lines : null;
-  if (featureSize && !["small", "medium", "large"].includes(featureSize)) {
+  if (featureSize && !["small", "medium", "large", "xlarge", "xl"].includes(featureSize)) {
     pushFinding({
       findings: featureSizeFindings,
       severity: "warn",
       category: "feature-size-fit",
-      summary: `Declared feature size '${featureSize}' is outside the shared small/medium/large taxonomy.`,
+      summary: `Declared feature size '${featureSize}' is outside the shared small/medium/large/xlarge taxonomy.`,
       evidenceRefs: intakePacket ? [intakePacket.artifact_ref] : [],
     });
   }
