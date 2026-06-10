@@ -21,6 +21,7 @@ import {
 import {
   isFullJourneyProfile,
   loadProofRunnerProfile,
+  normalizeFeatureSize,
   resolveCatalogRoot,
   resolveFullJourneyProfile,
 } from "./lib/profile-catalog.mjs";
@@ -32,7 +33,7 @@ import {
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const RUN_PROFILE_SCRIPT = path.join(SCRIPT_DIR, "run-profile.mjs");
-const QUALIFYING_FEATURE_SIZES = new Set(["medium", "large", "xl"]);
+const QUALIFYING_FEATURE_SIZES = new Set(["medium", "large"]);
 const REQUIRED_PROVIDER_COUNTS = Object.freeze({
   "openai-primary": 2,
   "anthropic-primary": 2,
@@ -368,10 +369,10 @@ function recordQualificationResult(options) {
   }
   const observationFile = resolveSummaryRelativePath(summaryFile, observationFileRef);
   const observationReport = asRecord(readJson(observationFile));
-  const featureSize = asNonEmptyString(summary.feature_size);
+  const featureSize = normalizeFeatureSize(summary.feature_size);
   if (!QUALIFYING_FEATURE_SIZES.has(featureSize)) {
     throw new UsageError(
-      `Qualification loop requires recorded summary feature_size medium, large, or xl; received '${featureSize || "unknown"}'.`,
+      `Qualification loop requires recorded summary feature_size medium or large; xlarge is manual-only. Received '${featureSize || "unknown"}'.`,
     );
   }
   const status = classifyQualification(summary, observationReport);
@@ -429,7 +430,7 @@ function runCli(rawArgs) {
         "Usage: node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path> [--qualification-set-file <path>] [run-profile flags...]",
         "       node ./scripts/live-e2e/qualification-loop.mjs --project-ref <path> --profile <path> --record-run-summary-file <path> [--record-observation-report-file <path>] [--qualification-set-file <path>]",
         "",
-        "Runs one medium-or-larger live E2E profile and writes a qualification analysis for the launching agent.",
+        "Runs one medium or large live E2E profile and writes a qualification analysis for the launching agent.",
       ].join("\n"),
     );
     return 0;
@@ -475,11 +476,13 @@ function runCli(rawArgs) {
       })
     : null;
   const featureSize =
-    fullJourney?.featureSize ??
-    asNonEmptyString(loaded.profile.feature_size) ??
-    asNonEmptyString(asRecord(loaded.profile.matrix_cell).feature_size);
+    normalizeFeatureSize(fullJourney?.featureSize) ||
+    normalizeFeatureSize(loaded.profile.feature_size) ||
+    normalizeFeatureSize(asRecord(loaded.profile.matrix_cell).feature_size);
   if (!QUALIFYING_FEATURE_SIZES.has(featureSize)) {
-    throw new UsageError(`Qualification loop requires feature_size medium, large, or xl; received '${featureSize || "unknown"}'.`);
+    throw new UsageError(
+      `Qualification loop requires feature_size medium or large; xlarge is manual-only. Received '${featureSize || "unknown"}'.`,
+    );
   }
   if (recordRunSummaryFile) {
     return recordQualificationResult({

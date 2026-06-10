@@ -7,7 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { loadContractFile } from "../../packages/contracts/src/index.mjs";
-import { loadProofRunnerProfile, resolveFullJourneyProfile } from "../live-e2e/lib/profile-catalog.mjs";
+import { loadProofRunnerProfile, resolveCatalogRoot, resolveFullJourneyProfile } from "../live-e2e/lib/profile-catalog.mjs";
 import {
   materializeFeatureRequestFile,
   materializeGeneratedProjectProfile,
@@ -35,6 +35,7 @@ import {
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const runProfileScript = path.join(repoRoot, "scripts/live-e2e/run-profile.mjs");
 const manualLiveE2eScript = path.join(repoRoot, "scripts/live-e2e/manual-live-e2e.mjs");
+const qualificationLoopScript = path.join(repoRoot, "scripts/live-e2e/qualification-loop.mjs");
 
 function withTempRoot(callback) {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-live-e2e-proof-runner-"));
@@ -1223,6 +1224,62 @@ test("manual live E2E exposes final skill-agent verdict installation workflow", 
   assert.match(source, /expected_final_skill_agent_verdict_ref/u);
   assert.match(source, /requiredPublicAction[\s\S]*final_skill_agent_verdict/u);
   assert.match(source, /!currentStep && finalSkillAgentVerdictMissing/u);
+});
+
+test("xlarge catalog profiles resolve as manual-only matrix cells", () => {
+  const loaded = loadProofRunnerProfile({
+    hostRoot: repoRoot,
+    profileRef: "scripts/live-e2e/profiles/manual-xlarge-release-nextjs-openai.yaml",
+  });
+  const resolved = resolveFullJourneyProfile({
+    profile: loaded.profile,
+    catalogRoot: resolveCatalogRoot({ hostRoot: repoRoot }),
+  });
+
+  assert.equal(resolved.featureSize, "xlarge");
+  assert.equal(resolved.coverageTier, "manual");
+  assert.equal(resolved.matrixCell.cell_id, "nextjs.release.xlarge.openai");
+  assert.equal(resolved.resolvedProfile.run_tier, "full-journey-observation");
+});
+
+test("run-profile rejects xlarge profiles outside manual controller mode", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      runProfileScript,
+      "--project-ref",
+      repoRoot,
+      "--profile",
+      "scripts/live-e2e/profiles/manual-xlarge-release-nextjs-openai.yaml",
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(`${result.stdout}\n${result.stderr}`, /feature_size=xlarge, which is manual-only/u);
+});
+
+test("qualification loop rejects xlarge profiles", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      qualificationLoopScript,
+      "--project-ref",
+      repoRoot,
+      "--profile",
+      "scripts/live-e2e/profiles/manual-xlarge-release-nextjs-openai.yaml",
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+    },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(`${result.stdout}\n${result.stderr}`, /xlarge is manual-only/u);
 });
 
 test("proof runner rejects removed --agent-judge-file flag before live execution", () => {

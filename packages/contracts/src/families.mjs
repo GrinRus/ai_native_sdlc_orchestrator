@@ -1474,6 +1474,7 @@ export const CONTRACT_FAMILY_INDEX = Object.freeze([
       verification: "object",
       safety_defaults: "object",
       required_matrix_cells: "array",
+      manual_matrix_cells: "array",
       provider_comparison_pairs: "array",
       feature_missions: "array",
     },
