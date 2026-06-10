@@ -1,0 +1,16 @@
+{
+  "manifest_version": 1,
+  "source_hash": "5b3726f6681af8748a642fa2381680305653548c1f026cebb36268e9ea24a38d",
+  "source_files": [
+    "apps/web/index.html",
+    "apps/web/package.json",
+    "apps/web/src/spa.css",
+    "apps/web/src/spa.jsx",
+    "apps/web/vite.config.mjs"
+  ],
+  "dist_files": [
+    "apps/web/dist/assets/index-Bu6JMQb-.css",
+    "apps/web/dist/assets/index-DtpWwC98.js",
+    "apps/web/dist/index.html"
+  ]
+}

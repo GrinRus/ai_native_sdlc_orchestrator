@@ -62,6 +62,12 @@ required_matrix_cells:
     feature_mission_id: ky-retry-hooks-governance
     provider_variant_id: openai-primary
     coverage_tier: extended
+  - cell_id: ky.governance.large.anthropic
+    scenario_family: governance
+    feature_size: large
+    feature_mission_id: ky-retry-hooks-governance
+    provider_variant_id: anthropic-primary
+    coverage_tier: extended
 provider_comparison_pairs:
   - pair_id: ky.regress.small
     scenario_family: regress
@@ -250,7 +256,7 @@ feature_missions:
         - npm run build
         - npx ava test/hooks.ts
       diagnostic_commands:
-        - npm test
+        - npx ava test/hooks.ts test/core.ts test/options.ts
       diagnostic_failure_mode: warn
     supported_scenarios:
       - release

@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 
 import {
   UsageError,
@@ -40,25 +41,11 @@ import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib
 import {
   buildLiveE2eStepPlan,
   createLiveE2eStepController,
+  getLiveE2eIncludedStepsForProfile,
   isLiveE2eControllerStopInProgress,
   resolveLiveE2eOperatorContext,
 } from "./lib/step-controller.mjs";
 
-const LIVE_E2E_DELIVERY_STEPS = Object.freeze([
-  "discovery",
-  "spec",
-  "planning",
-  "handoff",
-  "execution",
-  "review",
-  "qa",
-  "delivery",
-]);
-const LIVE_E2E_FULL_LIFECYCLE_STEPS = Object.freeze([
-  ...LIVE_E2E_DELIVERY_STEPS,
-  "release",
-  "learning",
-]);
 const LIVE_E2E_OBSERVATION_PRELUDE_STEPS = Object.freeze([
   "install",
   "target_checkout",
@@ -66,6 +53,7 @@ const LIVE_E2E_OBSERVATION_PRELUDE_STEPS = Object.freeze([
   "intake",
   "readiness",
 ]);
+const OPERATOR_DECISION_REQUIRED_FINDING = "Skill-agent operator decision is required before the next public step.";
 const LIVE_E2E_OPERATOR_ACTIONS = Object.freeze([
   "continue",
   "answer",
@@ -276,21 +264,56 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
 }
 
 /**
- * @param {string} evidenceRef
- * @param {string} reportsRoot
+ * @param {Record<string, unknown>} context
+ * @returns {string[]}
+ */
+function evidenceRootCandidates(context = {}) {
+  return uniqueStrings([
+    asNonEmptyString(context.reportsRoot),
+    asNonEmptyString(context.sourceRoot),
+    asNonEmptyString(context.targetCheckoutRoot),
+    ...asStringArray(context.extraRoots),
+  ]).filter((root) => root && path.isAbsolute(root) && fileExists(root));
+}
+
+/**
+ * @param {string} ref
  * @returns {boolean}
  */
-function localEvidenceRefExists(evidenceRef, reportsRoot) {
+function isMaterializedRelativeRef(ref) {
+  return (
+    ref.startsWith(".") ||
+    ref.startsWith("apps/") ||
+    ref.startsWith("docs/") ||
+    ref.startsWith("examples/") ||
+    ref.startsWith("packages/") ||
+    ref.startsWith("scripts/") ||
+    ref.includes("\\")
+  );
+}
+
+/**
+ * @param {string} evidenceRef
+ * @param {Record<string, unknown>} context
+ * @returns {boolean}
+ */
+function localEvidenceRefExists(evidenceRef, context = {}) {
   const ref = asNonEmptyString(evidenceRef);
   if (!ref) return true;
   if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(ref)) {
     if (!ref.startsWith("evidence://")) return true;
     const evidencePath = ref.slice("evidence://".length);
-    return !path.isAbsolute(evidencePath) || fileExists(evidencePath);
+    if (!evidencePath) return false;
+    if (path.isAbsolute(evidencePath)) return fileExists(evidencePath);
+    const roots = evidenceRootCandidates(context);
+    if (roots.some((root) => fileExists(path.resolve(root, evidencePath)))) return true;
+    return !isMaterializedRelativeRef(evidencePath);
   }
   if (path.isAbsolute(ref)) return fileExists(ref);
   if (ref.startsWith(".") || ref.includes("/") || ref.includes("\\")) {
-    return fileExists(path.resolve(reportsRoot, ref));
+    const roots = evidenceRootCandidates(context);
+    if (roots.some((root) => fileExists(path.resolve(root, ref)))) return true;
+    return !isMaterializedRelativeRef(ref);
   }
   return true;
 }
@@ -441,6 +464,82 @@ function buildCodeQualityObservation(artifacts) {
 }
 
 /**
+ * @param {Record<string, unknown>} artifacts
+ * @returns {string | null}
+ */
+function inferRuntimeHarnessDecision(artifacts) {
+  const directDecision =
+    asNonEmptyString(artifacts.runtime_harness_decision) ||
+    asNonEmptyString(artifacts.run_start_runtime_harness_decision) ||
+    asNonEmptyString(artifacts.latest_runtime_harness_decision) ||
+    asNonEmptyString(artifacts.runtime_harness_overall_decision);
+  if (directDecision) return directDecision;
+  const reportFiles = uniqueStrings([
+    asNonEmptyString(artifacts.latest_runtime_harness_report_file),
+    asNonEmptyString(artifacts.delivery_runtime_harness_report_file),
+    asNonEmptyString(artifacts.runtime_harness_report_file),
+    asNonEmptyString(artifacts.run_start_runtime_harness_report_file),
+  ]);
+  for (const reportFile of reportFiles) {
+    const decision = asNonEmptyString(readJsonIfPresent(reportFile).overall_decision);
+    if (decision) return decision;
+  }
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {{ reportsRoot: string, sourceRoot: string, targetCheckoutRoot?: string }} context
+ */
+function normalizePreVerdictQualityArtifacts(artifacts, context) {
+  const reviewReport = readJsonIfPresent(asNonEmptyString(artifacts.review_report_file));
+  const reviewCodeStatus = normalizeVerdictStatus(asRecord(reviewReport.code_quality).status);
+  const changedPaths = collectDeliveryChangedPaths(artifacts);
+  const providerEvidenceMaterialized = localEvidenceRefExists(asNonEmptyString(artifacts.adapter_raw_evidence_ref), {
+    reportsRoot: context.reportsRoot,
+    sourceRoot: context.sourceRoot,
+    targetCheckoutRoot: asNonEmptyString(context.targetCheckoutRoot),
+  });
+  if (!asNonEmptyString(artifacts.provider_execution_status) && asNonEmptyString(artifacts.adapter_raw_evidence_ref)) {
+    artifacts.provider_execution_status = providerEvidenceMaterialized ? "pass" : "fail";
+  }
+  if (!asNonEmptyString(artifacts.real_code_change_status) && changedPaths.length > 0) {
+    artifacts.real_code_change_status = "pass";
+  }
+  if (!asNonEmptyString(artifacts.code_quality_status) && Object.keys(asRecord(reviewReport.code_quality)).length > 0) {
+    artifacts.code_quality_status = reviewCodeStatus;
+  }
+  const runtimeHarnessDecision = inferRuntimeHarnessDecision(artifacts);
+  if (!asNonEmptyString(artifacts.runtime_harness_decision) && runtimeHarnessDecision) {
+    artifacts.runtime_harness_decision = runtimeHarnessDecision;
+  }
+  if (!asNonEmptyString(artifacts.latest_runtime_harness_decision) && runtimeHarnessDecision) {
+    artifacts.latest_runtime_harness_decision = runtimeHarnessDecision;
+  }
+  if (!asNonEmptyString(artifacts.run_start_runtime_harness_decision) && runtimeHarnessDecision) {
+    artifacts.run_start_runtime_harness_decision = runtimeHarnessDecision;
+  }
+  const deliveryStatus = asNonEmptyString(artifacts.delivery_manifest_file) ? "materialized" : "not_materialized";
+  const releaseStatus = asNonEmptyString(artifacts.release_status) || (asNonEmptyString(artifacts.release_packet_file) ? "pass" : "");
+  const verificationPass = asNonEmptyString(artifacts.post_run_verify_status) === "pass";
+  const diagnosticPass = asNonEmptyString(artifacts.post_run_diagnostic_status) !== "fail";
+  const qualityInputsPass =
+    asNonEmptyString(artifacts.provider_execution_status) === "pass" &&
+    asNonEmptyString(artifacts.real_code_change_status) === "pass" &&
+    ["pass", "warn"].includes(asNonEmptyString(artifacts.code_quality_status)) &&
+    verificationPass &&
+    diagnosticPass &&
+    deliveryStatus === "materialized" &&
+    (releaseStatus === "pass" || !releaseStatus);
+  if (!asNonEmptyString(artifacts.quality_gate_decision) && qualityInputsPass) {
+    artifacts.quality_gate_decision = "pass";
+  }
+  if (!asNonEmptyString(artifacts.artifact_quality_status) && qualityInputsPass) {
+    artifacts.artifact_quality_status = "pass";
+  }
+}
+
+/**
  * @param {{
  *   runId: string,
  *   profilePath: string,
@@ -545,11 +644,11 @@ function resolveFlowRangePolicy(profile) {
 }
 
 /**
- * @param {"delivery_default" | "full_lifecycle"} policy
+ * @param {Record<string, unknown>} profile
  * @returns {string[]}
  */
-function getIncludedStepsForPolicy(policy) {
-  return policy === "full_lifecycle" ? [...LIVE_E2E_FULL_LIFECYCLE_STEPS] : [...LIVE_E2E_DELIVERY_STEPS];
+function getIncludedStepsForProfile(profile) {
+  return getLiveE2eIncludedStepsForProfile(profile);
 }
 
 /**
@@ -1049,6 +1148,16 @@ function buildStepJournal(options) {
     const deterministicStatus = toObservationStatus(asNonEmptyString(deterministicAnalysis.status) || "not_pass");
     const rawSemanticAnalysis = asRecord(rawEntry.semantic_analysis);
     const semanticStatus = toObservationStatus(asNonEmptyString(rawSemanticAnalysis.status) || deterministicStatus);
+    const semanticFindings = uniqueStrings(
+      asStringArray(rawSemanticAnalysis.findings).filter(
+        (finding) =>
+          !(
+            rawOperatorDecisionStatus === "accepted" &&
+            semanticStatus === "pass" &&
+            finding === OPERATOR_DECISION_REQUIRED_FINDING
+          ),
+      ),
+    );
     const finalStepVerdict =
       observationSeverity(semanticStatus) > observationSeverity(deterministicStatus) ? semanticStatus : deterministicStatus;
     const requestedInteraction = asRecord(rawEntry.requested_interaction);
@@ -1129,7 +1238,7 @@ function buildStepJournal(options) {
         status: semanticStatus,
         judge_source: asNonEmptyString(rawSemanticAnalysis.judge_source) || "deterministic-runner",
         findings: uniqueStrings([
-          ...asStringArray(rawSemanticAnalysis.findings),
+          ...semanticFindings,
           ...(semanticStatus === "pass" ? [] : [asNonEmptyString(stage.summary) || `${step} did not complete cleanly`]),
         ]),
       },
@@ -1278,8 +1387,11 @@ function buildInteractiveDecisions(stepJournal) {
 
 function buildObservationReport(options) {
   const flowRangePolicy = resolveFlowRangePolicy(options.profile);
-  const includedSteps = getIncludedStepsForPolicy(flowRangePolicy);
-  const excludedSteps = flowRangePolicy === "full_lifecycle" ? [] : ["release", "learning"];
+  const includedSteps = getIncludedStepsForProfile(options.profile);
+  const excludedSteps =
+    flowRangePolicy === "full_lifecycle"
+      ? ["release", "learning"].filter((step) => !includedSteps.includes(step))
+      : ["release", "learning"];
   const setupJournal = buildSetupJournal(options.flowResult.artifacts);
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const controllerStop = asRecord(options.flowResult.artifacts.live_e2e_controller_stop);
@@ -1349,9 +1461,63 @@ function buildObservationReport(options) {
 }
 
 /**
- * @param {{ runId: string, reportsRoot: string, observationReport: Record<string, unknown> }}
+ * @param {Record<string, unknown>} observationReport
+ * @returns {Record<string, unknown>}
+ */
+function buildLifecycleCompletenessSummary(observationReport) {
+  const includedSteps = asStringArray(asRecord(observationReport.flow_range).included_steps);
+  const stepJournal = Array.isArray(observationReport.step_journal)
+    ? observationReport.step_journal.map((entry) => asRecord(entry))
+    : [];
+  const acceptedStepIds = new Set(
+    stepJournal
+      .filter((entry) => asNonEmptyString(entry.operator_decision_status) === "accepted")
+      .map((entry) => asNonEmptyString(entry.step_id))
+      .filter(Boolean),
+  );
+  const pendingSteps = includedSteps.filter((step) => !acceptedStepIds.has(step));
+  const blockedEntry =
+    stepJournal.find((entry) => ["missing", "rejected"].includes(asNonEmptyString(entry.operator_decision_status))) ??
+    stepJournal.find((entry) =>
+      ["blocked", "not_pass", "interaction_required"].includes(toObservationStatus(asNonEmptyString(entry.final_step_verdict))),
+    ) ??
+    null;
+  return {
+    included_steps: includedSteps,
+    included_step_count: includedSteps.length,
+    observed_step_count: stepJournal.length,
+    accepted_step_count: acceptedStepIds.size,
+    pending_steps: pendingSteps,
+    missing_operator_decision_steps: stepJournal
+      .filter((entry) => asNonEmptyString(entry.operator_decision_status) !== "accepted")
+      .map((entry) => asNonEmptyString(entry.step_id))
+      .filter(Boolean),
+    blocked_step_id: blockedEntry ? asNonEmptyString(blockedEntry.step_id) : null,
+    blocked_step_instance_id: blockedEntry ? asNonEmptyString(blockedEntry.step_instance_id) : null,
+    continuation_status:
+      pendingSteps.length === 0 && asNonEmptyString(observationReport.overall_status) !== "blocked" ? "complete" : "blocked",
+  };
+}
+
+/**
+ * @param {{
+ *   runId: string,
+ *   reportsRoot: string,
+ *   sourceRoot?: string,
+ *   targetCheckoutRoot?: string,
+ *   observationReport: Record<string, unknown>,
+ *   canonicalStatus?: Record<string, unknown>,
+ *   runnerQualitySummary?: Record<string, unknown>,
+ *   qualityJudgement?: Record<string, unknown>,
+ *   flowResult?: Record<string, unknown>,
+ * }}
  */
 function resolveFinalSkillAgentVerdict(options) {
+  const flowResult = asRecord(options.flowResult);
+  const artifacts = asRecord(flowResult.artifacts);
+  const canonicalStatus = asRecord(options.canonicalStatus);
+  const runnerQualitySummary = asRecord(options.runnerQualitySummary);
+  const qualityJudgement = asRecord(options.qualityJudgement);
   const stepJournal = Array.isArray(options.observationReport.step_journal)
     ? options.observationReport.step_journal.map((entry) => asRecord(entry))
     : [];
@@ -1395,17 +1561,102 @@ function resolveFinalSkillAgentVerdict(options) {
     ]),
     ...frontendInteractions.flatMap((entry) => asStringArray(entry.evidence_refs)),
   ]);
+  const lifecycleCompleteness = buildLifecycleCompletenessSummary(options.observationReport);
+  const lifecyclePendingSteps = asStringArray(lifecycleCompleteness.pending_steps);
+  const lifecycleCompletenessStatus =
+    lifecyclePendingSteps.length === 0 && missingSteps.length === 0
+      ? "pass"
+      : "blocked";
+  const operatorDecisionStatus = missingSteps.length === 0 && acceptedSkillAgentSteps.length >= includedSteps.length
+    ? "accepted"
+    : "blocked";
+  const providerExecutionStatus =
+    asNonEmptyString(artifacts.provider_execution_status) ||
+    asNonEmptyString(qualityJudgement.provider_execution_status) ||
+    "not_attempted";
+  const deliveryStatus =
+    asNonEmptyString(canonicalStatus.delivery_status) ||
+    asNonEmptyString(artifacts.delivery_status) ||
+    "not_materialized";
+  const releaseStatus =
+    asNonEmptyString(canonicalStatus.release_status) || asNonEmptyString(artifacts.release_status) || "not_attempted";
+  const artifactQualityStatus =
+    asNonEmptyString(canonicalStatus.artifact_quality_status) ||
+    asNonEmptyString(artifacts.artifact_quality_status) ||
+    "not_attempted";
+  const baselineVerifyStatus =
+    asNonEmptyString(artifacts.baseline_verify_status) ||
+    asNonEmptyString(qualityJudgement.target_baseline_status) ||
+    "not_attempted";
+  const postRunVerificationStatus =
+    asNonEmptyString(artifacts.post_run_verify_status) ||
+    asNonEmptyString(qualityJudgement.post_run_verification_status) ||
+    "not_attempted";
+  const postRunDiagnosticStatus =
+    asNonEmptyString(artifacts.post_run_diagnostic_status) ||
+    asNonEmptyString(qualityJudgement.post_run_diagnostic_status) ||
+    "not_attempted";
+  const realCodeChangeStatus =
+    asNonEmptyString(artifacts.real_code_change_status) ||
+    asNonEmptyString(qualityJudgement.real_code_change_status) ||
+    "not_attempted";
+  const deterministicRequestStatus =
+    asNonEmptyString(canonicalStatus.acceptance_status) === "pass" &&
+    lifecycleCompletenessStatus === "pass" &&
+    operatorDecisionStatus === "accepted"
+      ? "pass"
+      : finalAnalysisStatus;
   const request = {
     request_id: `${options.runId}.final-skill-agent-verdict-request.v1`,
     run_id: options.runId,
     expected_verdict_file: expectedVerdictFile,
+    final_skill_agent_verdict_expected_ref: expectedVerdictFile,
     required_judge_source: "skill-agent",
     current_deterministic_status: finalAnalysisStatus,
+    deterministic_analysis: {
+      status: deterministicRequestStatus,
+      final_analysis_status: finalAnalysisStatus,
+      self_pending_final_verdict: !fileExists(expectedVerdictFile),
+    },
     required_steps: includedSteps,
     accepted_step_count: acceptedSkillAgentSteps.length,
     missing_skill_agent_steps: missingSteps,
     missing_frontend_agent_verdicts: missingFrontendVerdicts,
     failed_frontend_interactions: failedFrontendInteractions,
+    lifecycle_completeness: lifecycleCompleteness,
+    completion_summary: {
+      lifecycle_completeness_status: lifecycleCompletenessStatus,
+      operator_decision_status: operatorDecisionStatus,
+      provider_execution_status: providerExecutionStatus,
+      delivery_status: deliveryStatus,
+      release_status: releaseStatus,
+      artifact_quality_status: artifactQualityStatus,
+      baseline_verify_status: baselineVerifyStatus,
+      post_run_verification_status: postRunVerificationStatus,
+      post_run_diagnostic_status: postRunDiagnosticStatus,
+      real_code_change_status: realCodeChangeStatus,
+      final_verdict_status: fileExists(expectedVerdictFile) ? "present" : "missing",
+    },
+    canonical_status: Object.keys(canonicalStatus).length > 0 ? canonicalStatus : {},
+    runner_quality_summary: Object.keys(runnerQualitySummary).length > 0 ? runnerQualitySummary : {},
+    quality_judgement: Object.keys(qualityJudgement).length > 0 ? qualityJudgement : {},
+    stage_results: Array.isArray(flowResult.stageResults) ? flowResult.stageResults : [],
+    adapter_raw_evidence_ref: asNonEmptyString(artifacts.adapter_raw_evidence_ref) || "not_attempted",
+    current_artifact_status: {
+      final_analysis_status: finalAnalysisStatus,
+      frontend_interaction_count: frontendInteractions.length,
+      accepted_step_count: acceptedSkillAgentSteps.length,
+      missing_step_count: missingSteps.length,
+      evidence_ref_count: requiredEvidenceRefs.length,
+      provider_execution_status: providerExecutionStatus,
+      delivery_status: deliveryStatus,
+      release_status: releaseStatus,
+      artifact_quality_status: artifactQualityStatus,
+      baseline_verify_status: baselineVerifyStatus,
+      post_run_verification_status: postRunVerificationStatus,
+      post_run_diagnostic_status: postRunDiagnosticStatus,
+      real_code_change_status: realCodeChangeStatus,
+    },
     required_inspection: [
       "review the full observation report and step observations",
       "verify every included step has an accepted skill-agent decision",
@@ -1451,7 +1702,14 @@ function resolveFinalSkillAgentVerdict(options) {
   if (evidenceRefs.length === 0) {
     invalidReasons.push("final verdict must reference inspected evidence.");
   }
-  const missingMaterializedRefs = inspectedRefs.filter((ref) => !localEvidenceRefExists(ref, options.reportsRoot));
+  const missingMaterializedRefs = inspectedRefs.filter(
+    (ref) =>
+      !localEvidenceRefExists(ref, {
+        reportsRoot: options.reportsRoot,
+        sourceRoot: options.sourceRoot,
+        targetCheckoutRoot: options.targetCheckoutRoot,
+      }),
+  );
   if (missingMaterializedRefs.length > 0) {
     invalidReasons.push(`final verdict cites missing local evidence refs: ${missingMaterializedRefs.join(", ")}.`);
   }
@@ -1516,14 +1774,19 @@ function resolveSummaryCanonicalStatus(options) {
     ? asNonEmptyString(options.flowResult.artifacts.release_status) || "fail"
     : asNonEmptyString(options.flowResult.artifacts.release_status) || "not_attempted";
   const releaseMissing = releaseRequired && releaseStatus !== "pass";
+  const allStageResultsPass =
+    options.flowResult.stageResults.length > 0 &&
+    options.flowResult.stageResults.every((entry) => asNonEmptyString(entry.status) === "pass");
+  const blockedOnlyByFinalVerdict = options.observationStatus === "blocked" && allStageResultsPass;
+  const effectiveObservationStatus = blockedOnlyByFinalVerdict ? "pass" : options.observationStatus;
   const acceptanceStatus =
     releaseMissing
       ? "fail"
       : deliveryStatus === "degraded" || deliveryStatus === "blocked"
         ? "fail"
-      : options.observationStatus === "pass"
+      : effectiveObservationStatus === "pass"
       ? "pass"
-      : options.observationStatus === "warn" && deliveryStatus !== "not_materialized"
+      : effectiveObservationStatus === "warn" && deliveryStatus !== "not_materialized"
         ? "warn"
         : "fail";
   const runTier = resolveSummaryRunTier(options.profile);
@@ -1536,10 +1799,18 @@ function resolveSummaryCanonicalStatus(options) {
     : acceptanceStatus === "warn" && deliveryStatus !== "not_materialized"
       ? "covered_with_findings"
       : "attempted_failed";
+  const blockedContinuation = effectiveObservationStatus === "blocked";
+  const findings = uniqueStrings([
+    ...(releaseMissing ? ["Required release stage did not materialize strict release-packet evidence."] : []),
+    ...(blockedContinuation ? ["Live E2E controller stopped before full lifecycle completion."] : []),
+  ]);
   return {
     command_status: commandStatus,
     target_verification_status: asNonEmptyString(options.flowResult.artifacts.post_run_verify_status) || "not_attempted",
-    artifact_quality_status: asNonEmptyString(qualityJudgement.artifact_quality) || "not_attempted",
+    artifact_quality_status:
+      asNonEmptyString(qualityJudgement.artifact_quality) ||
+      asNonEmptyString(options.flowResult.artifacts.artifact_quality_status) ||
+      "not_attempted",
     delivery_status: deliveryStatus,
     coverage_status: coverageStatus,
     acceptance_status: acceptanceStatus,
@@ -1547,13 +1818,128 @@ function resolveSummaryCanonicalStatus(options) {
     release_status: releaseStatus,
     proof_eligible_tier: proofEligibleTier,
     required_matrix_acceptance_closed: coverageStatus === "covered_pass" && proofEligibleTier,
-    findings: releaseMissing ? ["Required release stage did not materialize strict release-packet evidence."] : [],
+    findings,
     summary:
-      acceptanceStatus === "pass"
+      blockedContinuation
+        ? "Live E2E continuation is blocked and acceptance is incomplete."
+        : acceptanceStatus === "pass"
         ? "Live E2E acceptance evidence passed."
         : acceptanceStatus === "warn"
           ? "Live E2E completed with findings; required matrix acceptance is not closed."
           : "Live E2E did not meet acceptance requirements.",
+  };
+}
+
+/**
+ * @param {{
+ *   canonicalStatus: Record<string, unknown>,
+ *   observationReport: Record<string, unknown>,
+ *   flowResult: { artifacts: Record<string, unknown> },
+ *   finalSkillAgentVerdict: Record<string, unknown>,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function buildPartialRunnerQualitySummary(options) {
+  const artifacts = options.flowResult.artifacts;
+  const completeness = buildLifecycleCompletenessSummary(options.observationReport);
+  const completionComplete = asNonEmptyString(completeness.continuation_status) === "complete";
+  const acceptancePass = asNonEmptyString(options.canonicalStatus.acceptance_status) === "pass";
+  return {
+    summary_type: "partial",
+    completion_status: asNonEmptyString(completeness.continuation_status),
+    mission_satisfaction: acceptancePass ? "pass" : "not_pass",
+    implementation_relevance: asNonEmptyString(artifacts.real_code_change_status) || "not_attempted",
+    diff_quality: asNonEmptyString(artifacts.code_quality_status) || "not_attempted",
+    verification_interpretation:
+      asNonEmptyString(options.canonicalStatus.target_verification_status) ||
+      asNonEmptyString(artifacts.post_run_verify_status) ||
+      "not_attempted",
+    artifact_consistency: asNonEmptyString(options.canonicalStatus.artifact_quality_status) || "not_attempted",
+    provider_execution_status: asNonEmptyString(artifacts.provider_execution_status) || "not_attempted",
+    delivery_status: asNonEmptyString(options.canonicalStatus.delivery_status) || "not_attempted",
+    release_status: asNonEmptyString(options.canonicalStatus.release_status) || "not_attempted",
+    lifecycle_completeness: completeness,
+    risk_findings: uniqueStrings([
+      ...asStringArray(options.canonicalStatus.findings),
+      ...asStringArray(asRecord(options.observationReport.final_analysis).findings),
+      ...asStringArray(options.finalSkillAgentVerdict.missingFindings),
+    ]),
+    final_recommendation: acceptancePass && completionComplete ? "accept" : "reject",
+  };
+}
+
+/**
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   canonicalStatus: Record<string, unknown>,
+ *   runnerQualitySummary: Record<string, unknown>,
+ *   flowResult: { artifacts: Record<string, unknown> },
+ *   observationReport: Record<string, unknown>,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function buildPartialQualityJudgement(options) {
+  const artifacts = options.flowResult.artifacts;
+  const stepJournal = Array.isArray(options.observationReport.step_journal)
+    ? options.observationReport.step_journal.map((entry) => asRecord(entry))
+    : [];
+  const discoveryAccepted = stepJournal.some(
+    (entry) =>
+      asNonEmptyString(entry.step_id) === "discovery" &&
+      asNonEmptyString(entry.operator_decision_status) === "accepted" &&
+      ["pass", "warn", "resumed"].includes(toObservationStatus(asNonEmptyString(asRecord(entry.semantic_analysis).status))),
+  );
+  const deliveryStatus = asNonEmptyString(options.canonicalStatus.delivery_status);
+  const releaseStatus = asNonEmptyString(options.canonicalStatus.release_status);
+  const completionComplete = asNonEmptyString(options.runnerQualitySummary.completion_status) === "complete";
+  const acceptancePass = asNonEmptyString(options.canonicalStatus.acceptance_status) === "pass";
+  return {
+    judgement_type: "partial",
+    scenario_family: asNonEmptyString(options.profile.scenario_family) || null,
+    provider_variant_id: asNonEmptyString(options.profile.provider_variant_id) || null,
+    feature_size: artifacts.feature_size ?? null,
+    target_selection: asNonEmptyString(artifacts.target_checkout_root) ? "pass" : "not_attempted",
+    feature_request_quality:
+      asNonEmptyString(artifacts.feature_request_file) || asNonEmptyString(artifacts.intake_artifact_packet_file)
+        ? "pass"
+        : "not_attempted",
+    scenario_coverage_status: asNonEmptyString(options.canonicalStatus.coverage_status) || "not_attempted",
+    provider_execution_status: asNonEmptyString(artifacts.provider_execution_status) || "not_attempted",
+    target_baseline_status:
+      asNonEmptyString(artifacts.baseline_verify_status) ||
+      asNonEmptyString(artifacts.target_baseline_status) ||
+      "not_attempted",
+    real_code_change_status: asNonEmptyString(artifacts.real_code_change_status) || "not_attempted",
+    runner_quality_summary: options.runnerQualitySummary,
+    post_run_verification_status:
+      asNonEmptyString(artifacts.post_run_verify_status) ||
+      asNonEmptyString(options.canonicalStatus.target_verification_status) ||
+      "not_attempted",
+    post_run_diagnostic_status: asNonEmptyString(artifacts.post_run_diagnostic_status) || "not_attempted",
+    discovery_quality: discoveryAccepted ? "pass" : "not_attempted",
+    runtime_success:
+      asNonEmptyString(artifacts.routed_step_result_file) &&
+      asNonEmptyString(artifacts.runtime_harness_report_file) &&
+      asNonEmptyString(artifacts.provider_execution_status) === "pass"
+        ? "pass"
+        : "not_attempted",
+    runtime_harness_decision: asNonEmptyString(artifacts.runtime_harness_decision) || "not_attempted",
+    run_start_runtime_harness_decision: asNonEmptyString(artifacts.run_start_runtime_harness_decision) || "not_attempted",
+    latest_runtime_harness_decision: asNonEmptyString(artifacts.latest_runtime_harness_decision) || "not_attempted",
+    artifact_quality: asNonEmptyString(options.canonicalStatus.artifact_quality_status) || "not_attempted",
+    code_quality: asNonEmptyString(artifacts.code_quality_status) || "not_attempted",
+    feature_size_fit_status: asNonEmptyString(artifacts.feature_size_fit_status) || "not_attempted",
+    delivery_release_quality:
+      deliveryStatus === "materialized" && (releaseStatus === "pass" || releaseStatus === "not_attempted")
+        ? "pass"
+        : "not_attempted",
+    learning_loop_closure:
+      asNonEmptyString(artifacts.learning_loop_scorecard_file) && asNonEmptyString(artifacts.learning_loop_handoff_file)
+        ? "pass"
+        : "not_attempted",
+    quality_gate_decision: asNonEmptyString(artifacts.quality_gate_decision) || "not_attempted",
+    overall_status: acceptancePass && completionComplete ? "pass" : "fail",
+    summary: asNonEmptyString(options.canonicalStatus.summary) || "Partial quality judgement generated for an incomplete run.",
   };
 }
 
@@ -1565,9 +1951,27 @@ function writeAgentArtifactReviewRequest(options) {
     options.reportsRoot,
     `live-e2e-agent-artifact-review-request-${normalizeId(options.runId)}.json`,
   );
+  const missingDecisionSteps = options.stepJournal
+    .filter((entry) => asNonEmptyString(entry.operator_decision_status) !== "accepted")
+    .map((entry) => asNonEmptyString(entry.step_id))
+    .filter(Boolean);
+  const requiredArtifactRefs = uniqueStrings(options.stepJournal.flatMap((entry) => asStringArray(entry.artifact_refs)));
+  const missingArtifactSteps = options.stepJournal
+    .filter((entry) => asStringArray(entry.artifact_refs).length === 0)
+    .map((entry) => asNonEmptyString(entry.step_id))
+    .filter(Boolean);
   const request = {
     request_id: `${options.runId}.agent-artifact-review.v1`,
     run_id: options.runId,
+    required_review: {
+      step_count: options.stepJournal.length,
+      accepted_operator_decision_count: options.stepJournal.length - missingDecisionSteps.length,
+      missing_operator_decision_steps: missingDecisionSteps,
+      artifact_ref_count: requiredArtifactRefs.length,
+      missing_artifact_steps: missingArtifactSteps,
+    },
+    required_artifacts: requiredArtifactRefs,
+    missing_artifacts: missingArtifactSteps,
     rubric: {
       statuses: ["pass", "warn", "not_pass", "blocked", "interaction_required", "resumed"],
       criteria: [
@@ -1595,9 +1999,18 @@ function writeAgentArtifactReviewRequest(options) {
     },
     steps: options.stepJournal.map((entry) => ({
       step_id: asNonEmptyString(entry.step_id),
+      step_instance_id: asNonEmptyString(entry.step_instance_id),
       flow_stage: asNonEmptyString(entry.flow_stage),
       artifact_refs: asStringArray(entry.artifact_refs),
+      operator_decision_status: asNonEmptyString(entry.operator_decision_status),
+      inspected_evidence_refs_count: asStringArray(entry.inspected_evidence_refs).length,
+      semantic_status: asNonEmptyString(asRecord(entry.semantic_analysis).status),
+      semantic_judge_source: asNonEmptyString(asRecord(entry.semantic_analysis).judge_source),
       observed_status: asNonEmptyString(entry.final_step_verdict),
+      findings: uniqueStrings([
+        ...asStringArray(asRecord(entry.deterministic_analysis).findings),
+        ...asStringArray(asRecord(entry.semantic_analysis).findings),
+      ]),
     })),
   };
   writeJson(requestFile, request);
@@ -1646,7 +2059,7 @@ function writeStepObservationFiles(options) {
  *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
  * }}
  */
-function writeProofRunnerArtifacts(options) {
+export function writeProofRunnerArtifacts(options) {
   const summaryFile = path.join(
     options.layout.reportsRoot,
     `live-e2e-run-summary-${normalizeId(options.runId)}.json`,
@@ -1656,6 +2069,11 @@ function writeProofRunnerArtifacts(options) {
     `live-e2e-scorecard-target-${normalizeId(options.runId)}.json`,
   );
   const productionProofPolicy = buildProductionProofSummary(options.profile);
+  normalizePreVerdictQualityArtifacts(options.flowResult.artifacts, {
+    reportsRoot: options.layout.reportsRoot,
+    sourceRoot: options.hostRoot,
+    targetCheckoutRoot: asNonEmptyString(options.flowResult.artifacts.target_checkout_root),
+  });
   hydrateFlowArtifactsFromControllerState(options.flowResult.artifacts);
   const observationReport = buildObservationReport({
     runId: options.runId,
@@ -1676,6 +2094,8 @@ function writeProofRunnerArtifacts(options) {
   const finalSkillAgentVerdict = resolveFinalSkillAgentVerdict({
     runId: options.runId,
     reportsRoot: options.layout.reportsRoot,
+    sourceRoot: options.hostRoot,
+    targetCheckoutRoot: asNonEmptyString(options.flowResult.artifacts.target_checkout_root),
     observationReport,
   });
   observationReport.final_skill_agent_verdict_request_file = finalSkillAgentVerdict.requestFile;
@@ -1752,6 +2172,43 @@ function writeProofRunnerArtifacts(options) {
   options.flowResult.artifacts.release_status = canonicalStatus.release_status;
   options.flowResult.artifacts.proof_eligible_tier = canonicalStatus.proof_eligible_tier;
   options.flowResult.artifacts.required_matrix_acceptance_closed = canonicalStatus.required_matrix_acceptance_closed;
+  if (
+    !(
+      typeof options.flowResult.artifacts.runner_quality_summary === "object" &&
+      options.flowResult.artifacts.runner_quality_summary
+    )
+  ) {
+    options.flowResult.artifacts.runner_quality_summary = buildPartialRunnerQualitySummary({
+      canonicalStatus,
+      observationReport,
+      flowResult: options.flowResult,
+      finalSkillAgentVerdict,
+    });
+  }
+  if (
+    !(
+      typeof options.flowResult.artifacts.quality_judgement === "object" && options.flowResult.artifacts.quality_judgement
+    )
+  ) {
+    options.flowResult.artifacts.quality_judgement = buildPartialQualityJudgement({
+      profile: options.profile,
+      canonicalStatus,
+      runnerQualitySummary: asRecord(options.flowResult.artifacts.runner_quality_summary),
+      flowResult: options.flowResult,
+      observationReport,
+    });
+  }
+  resolveFinalSkillAgentVerdict({
+    runId: options.runId,
+    reportsRoot: options.layout.reportsRoot,
+    sourceRoot: options.hostRoot,
+    targetCheckoutRoot: asNonEmptyString(options.flowResult.artifacts.target_checkout_root),
+    observationReport,
+    canonicalStatus,
+    runnerQualitySummary: asRecord(options.flowResult.artifacts.runner_quality_summary),
+    qualityJudgement: asRecord(options.flowResult.artifacts.quality_judgement),
+    flowResult: options.flowResult,
+  });
   const sourceMetadata = resolveHostSourceMetadata(options.hostRoot);
   const latestRuntimeHarnessReportFile =
     asNonEmptyString(productionProof?.evidence_refs?.runtime_harness_report_file) ||
@@ -1767,6 +2224,7 @@ function writeProofRunnerArtifacts(options) {
     asNonEmptyString(options.flowResult.artifacts.delivery_runtime_harness_report_file),
     asNonEmptyString(options.flowResult.artifacts.run_start_runtime_harness_report_file),
   ]);
+  const lifecycleCompleteness = buildLifecycleCompletenessSummary(observationReport);
 
   const summary = {
     run_id: options.runId,
@@ -1787,6 +2245,10 @@ function writeProofRunnerArtifacts(options) {
     started_at: options.flowResult.startedAt,
     finished_at: options.flowResult.finishedAt,
     status: observationReport.overall_status,
+    continuation_status: lifecycleCompleteness.continuation_status,
+    blocked_step_id: lifecycleCompleteness.blocked_step_id,
+    blocked_step_instance_id: lifecycleCompleteness.blocked_step_instance_id,
+    lifecycle_completeness: lifecycleCompleteness,
     canonical_status: canonicalStatus,
     command_status: canonicalStatus.command_status,
     target_verification_status: canonicalStatus.target_verification_status,
@@ -2122,6 +2584,8 @@ function runCli(rawArgs) {
     runId,
     profile,
     mode: controllerMode,
+    sourceRoot: asNonEmptyString(asRecord(aorInstallation.proof).installed_source_root) || hostRoot,
+    targetCheckoutRoot: asNonEmptyString(asRecord(aorInstallation.proof).target_checkout_root),
   });
 
   /** @type {{
@@ -2343,15 +2807,17 @@ function runCli(rawArgs) {
   return 0;
 }
 
-try {
-  process.exitCode = runCli(process.argv.slice(2));
-} catch (error) {
-  if (error instanceof UsageError) {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  } else {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`${message}\n`);
-    process.exitCode = 1;
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    process.exitCode = runCli(process.argv.slice(2));
+  } catch (error) {
+    if (error instanceof UsageError) {
+      process.stderr.write(`${error.message}\n`);
+      process.exitCode = 1;
+    } else {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`${message}\n`);
+      process.exitCode = 1;
+    }
   }
 }

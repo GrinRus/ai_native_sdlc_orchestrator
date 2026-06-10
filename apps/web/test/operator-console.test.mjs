@@ -257,6 +257,12 @@ test("aor app smoke verifies the real flow-centric packaged SPA, config, and sta
     assert.equal(payload.project_index_default_project_id, payload.project_id);
     assert.equal(payload.project_index_count, 1);
     assert.equal(payload.state_project_id, payload.project_id);
+    assert.equal(payload.render_guard_status, "pass");
+    assert.equal(payload.blank_root_regression_detected, false);
+    assert.equal(payload.render_guard.root_element_present, true);
+    assert.ok(payload.render_guard.module_script_count >= 1);
+    assert.ok(payload.render_guard.stylesheet_count >= 1);
+    assert.equal(payload.render_guard.app_shell_marker_present, true);
     assert.equal(payload.runtime_root, runtimeRoot);
   });
 });
