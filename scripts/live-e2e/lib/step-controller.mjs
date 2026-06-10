@@ -14,6 +14,7 @@ import {
 
 const DELIVERY_STEPS = Object.freeze(["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"]);
 const FULL_LIFECYCLE_STEPS = Object.freeze([...DELIVERY_STEPS, "release", "learning"]);
+const TERMINAL_LIFECYCLE_STEPS = Object.freeze(["release", "learning"]);
 
 const STEP_COMMAND_LABELS = Object.freeze({
   discovery: ["discovery-run", "project-analyze"],
@@ -115,6 +116,21 @@ export function resolveLiveE2eFlowRangePolicy(profile) {
  */
 export function getLiveE2eIncludedSteps(policy) {
   return policy === "full_lifecycle" ? [...FULL_LIFECYCLE_STEPS] : [...DELIVERY_STEPS];
+}
+
+/**
+ * @param {Record<string, unknown>} profile
+ * @returns {string[]}
+ */
+export function getLiveE2eIncludedStepsForProfile(profile) {
+  const policy = resolveLiveE2eFlowRangePolicy(profile);
+  if (policy !== "full_lifecycle") return [...DELIVERY_STEPS];
+  const declaredStages = asStringArray(profile.stages);
+  if (declaredStages.length === 0) return [...FULL_LIFECYCLE_STEPS];
+  return [
+    ...DELIVERY_STEPS,
+    ...TERMINAL_LIFECYCLE_STEPS.filter((step) => declaredStages.includes(step)),
+  ];
 }
 
 /**
@@ -299,31 +315,66 @@ function isOperatorAction(action) {
 }
 
 /**
- * @param {string} evidenceRef
- * @param {string} reportsRoot
+ * @param {Record<string, unknown>} context
+ * @returns {string[]}
+ */
+function evidenceRootCandidates(context = {}) {
+  return uniqueStrings([
+    asNonEmptyString(context.reportsRoot),
+    asNonEmptyString(context.sourceRoot),
+    asNonEmptyString(context.targetCheckoutRoot),
+    ...asStringArray(context.extraRoots),
+  ]).filter((root) => root && path.isAbsolute(root) && fileExists(root));
+}
+
+/**
+ * @param {string} ref
  * @returns {boolean}
  */
-function localEvidenceRefExists(evidenceRef, reportsRoot) {
+function isMaterializedRelativeRef(ref) {
+  return (
+    ref.startsWith(".") ||
+    ref.startsWith("apps/") ||
+    ref.startsWith("docs/") ||
+    ref.startsWith("examples/") ||
+    ref.startsWith("packages/") ||
+    ref.startsWith("scripts/") ||
+    ref.includes("\\")
+  );
+}
+
+/**
+ * @param {string} evidenceRef
+ * @param {Record<string, unknown>} context
+ * @returns {boolean}
+ */
+function localEvidenceRefExists(evidenceRef, context = {}) {
   const ref = asNonEmptyString(evidenceRef);
   if (!ref) return true;
   if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(ref)) {
     if (!ref.startsWith("evidence://")) return true;
     const evidencePath = ref.slice("evidence://".length);
-    return !path.isAbsolute(evidencePath) || fileExists(evidencePath);
+    if (!evidencePath) return false;
+    if (path.isAbsolute(evidencePath)) return fileExists(evidencePath);
+    const roots = evidenceRootCandidates(context);
+    if (roots.some((root) => fileExists(path.resolve(root, evidencePath)))) return true;
+    return !isMaterializedRelativeRef(evidencePath);
   }
   if (path.isAbsolute(ref)) return fileExists(ref);
   if (ref.startsWith(".") || ref.includes("/") || ref.includes("\\")) {
-    return fileExists(path.resolve(reportsRoot, ref));
+    const roots = evidenceRootCandidates(context);
+    if (roots.some((root) => fileExists(path.resolve(root, ref)))) return true;
+    return !isMaterializedRelativeRef(ref);
   }
   return true;
 }
 
 /**
  * @param {Record<string, unknown>} entry
- * @param {string} reportsRoot
+ * @param {Record<string, unknown>} evidenceContext
  * @returns {string[]}
  */
-function requiredInspectionRefsForEntry(entry, reportsRoot = "") {
+function requiredInspectionRefsForEntry(entry, evidenceContext = {}) {
   const controllerRefs = uniqueStrings([
     asNonEmptyString(entry.agent_decision_request_ref),
     asNonEmptyString(entry.transcript_ref),
@@ -333,25 +384,25 @@ function requiredInspectionRefsForEntry(entry, reportsRoot = "") {
   const materializedArtifactRefs = uniqueStrings([
     ...asStringArray(entry.artifact_refs),
     ...asStringArray(entry.frontend_interaction_refs),
-  ]).filter((ref) => localEvidenceRefExists(ref, reportsRoot));
+  ]).filter((ref) => localEvidenceRefExists(ref, evidenceContext));
   return uniqueStrings([...controllerRefs, ...materializedArtifactRefs]);
 }
 
 /**
  * @param {Record<string, unknown>} entry
- * @param {string} reportsRoot
+ * @param {Record<string, unknown>} evidenceContext
  * @returns {string[]}
  */
-function requiredInspectionRefsForDecision(entry, reportsRoot = "") {
+function requiredInspectionRefsForDecision(entry, evidenceContext = {}) {
   const requestRef = asNonEmptyString(entry.agent_decision_request_ref);
   if (requestRef && fileExists(requestRef)) {
     const request = asRecord(readJson(requestRef));
     const expectedRefs = asStringArray(asRecord(request.expected_response_shape).inspected_evidence_refs);
     if (expectedRefs.length > 0) {
-      return expectedRefs.filter((ref) => localEvidenceRefExists(ref, reportsRoot));
+      return expectedRefs.filter((ref) => localEvidenceRefExists(ref, evidenceContext));
     }
   }
-  return requiredInspectionRefsForEntry(entry, reportsRoot);
+  return requiredInspectionRefsForEntry(entry, evidenceContext);
 }
 
 /**
@@ -359,10 +410,10 @@ function requiredInspectionRefsForDecision(entry, reportsRoot = "") {
  * @param {string} action
  * @param {Record<string, unknown>} entry
  * @param {Record<string, unknown>} profile
- * @param {string} reportsRoot
+ * @param {Record<string, unknown>} evidenceContext
  * @returns {string | null}
  */
-function rejectInconsistentSkillAgentDecision(decision, action, entry, profile = {}, reportsRoot = "") {
+function rejectInconsistentSkillAgentDecision(decision, action, entry, profile = {}, evidenceContext = {}) {
   const semantic = asRecord(decision.semantic_analysis);
   const judgeSource = asNonEmptyString(semantic.judge_source) || asNonEmptyString(decision.judge_source);
   if (judgeSource !== "skill-agent") {
@@ -372,13 +423,13 @@ function rejectInconsistentSkillAgentDecision(decision, action, entry, profile =
   if (inspectedEvidenceRefs.length === 0) {
     return "Skill-agent operator decisions must include non-empty inspected_evidence_refs.";
   }
-  const missingInspectionRefs = requiredInspectionRefsForDecision(entry, reportsRoot).filter(
+  const missingInspectionRefs = requiredInspectionRefsForDecision(entry, evidenceContext).filter(
     (ref) => !inspectedEvidenceRefs.includes(ref),
   );
   if (missingInspectionRefs.length > 0) {
     return `Skill-agent operator decisions must cite required inspected evidence refs: ${missingInspectionRefs.join(", ")}.`;
   }
-  const missingMaterializedRefs = inspectedEvidenceRefs.filter((ref) => !localEvidenceRefExists(ref, reportsRoot));
+  const missingMaterializedRefs = inspectedEvidenceRefs.filter((ref) => !localEvidenceRefExists(ref, evidenceContext));
   if (missingMaterializedRefs.length > 0) {
     return `Skill-agent operator decisions cite missing local evidence refs: ${missingMaterializedRefs.join(", ")}.`;
   }
@@ -432,7 +483,13 @@ function buildStepInstanceId(step, iteration) {
 }
 
 /**
- * @param {{ profile: Record<string, unknown>, entry: Record<string, unknown>, decisionFile: string, operatorContext: Record<string, unknown> }}
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   entry: Record<string, unknown>,
+ *   decisionFile: string,
+ *   operatorContext: Record<string, unknown>,
+ *   evidenceContext?: Record<string, unknown>,
+ * }}
  */
 function resolveOperatorDecision(options) {
   if (fileExists(options.decisionFile)) {
@@ -444,7 +501,7 @@ function resolveOperatorDecision(options) {
       action,
       options.entry,
       options.profile,
-      options.reportsRoot,
+      asRecord(options.evidenceContext),
     );
     const stepMatches =
       !asNonEmptyString(decision.step_id) ||
@@ -601,12 +658,14 @@ export function isLiveE2eControllerStop(error) {
  *   runId: string,
  *   profile: Record<string, unknown>,
  *   mode?: "auto" | "manual" | "evaluator",
+ *   sourceRoot?: string,
+ *   targetCheckoutRoot?: string,
  * }} options
  */
 export function createLiveE2eStepController(options) {
   const mode = options.mode === "manual" || options.mode === "evaluator" ? options.mode : "auto";
   const policy = resolveLiveE2eFlowRangePolicy(options.profile);
-  const includedSteps = getLiveE2eIncludedSteps(policy);
+  const includedSteps = getLiveE2eIncludedStepsForProfile(options.profile);
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const normalizedRunId = normalizeId(options.runId);
   const stateFile = path.join(options.reportsRoot, `live-e2e-controller-state-${normalizedRunId}.json`);
@@ -641,6 +700,21 @@ export function createLiveE2eStepController(options) {
     operator_context: operatorContext,
     retry_counters: retryCounters,
   };
+
+  /**
+   * @param {Record<string, unknown>} artifacts
+   * @returns {Record<string, unknown>}
+   */
+  function buildEvidenceContext(artifacts = {}) {
+    return {
+      reportsRoot: options.reportsRoot,
+      sourceRoot: asNonEmptyString(options.sourceRoot),
+      targetCheckoutRoot:
+        asNonEmptyString(options.targetCheckoutRoot) ||
+        asNonEmptyString(artifacts.target_checkout_root) ||
+        asNonEmptyString(asRecord(state.artifacts_snapshot).target_checkout_root),
+    };
+  }
 
   for (const evidenceFile of asStringArray(state.evidence_refs)) {
     if (!evidenceFile || !fileExists(evidenceFile)) continue;
@@ -779,7 +853,7 @@ export function createLiveE2eStepController(options) {
       entry: persistedEntry,
       decisionFile: files.decisionFile,
       operatorContext,
-      reportsRoot: options.reportsRoot,
+      evidenceContext: buildEvidenceContext(asRecord(state.artifacts_snapshot)),
     });
     const entry = { ...persistedEntry };
     entry.operator_decision_ref = operatorDecision.ref;
@@ -937,8 +1011,9 @@ export function createLiveE2eStepController(options) {
     const stage = asRecord(input.stageResult);
     const command =
       findLiveE2eCommandByPreferredLabel(input.commandResults, getLiveE2eCommandLabelPriority(step), step, iteration) ?? {};
+    const evidenceContext = buildEvidenceContext(input.artifacts);
     const artifactRefs = collectArtifactRefs(command, stage).filter((ref) =>
-      localEvidenceRefExists(ref, options.reportsRoot),
+      localEvidenceRefExists(ref, evidenceContext),
     );
     const planned = planByStep[stepInstanceId] ?? planCommand({
       label: asNonEmptyString(command.label) || getLiveE2eCommandLabelPriority(step)[0] || step,
@@ -1096,7 +1171,7 @@ export function createLiveE2eStepController(options) {
       step: stepInstanceId,
     });
     entry.agent_decision_request_ref = files.requestFile;
-    const requiredInspectionRefs = requiredInspectionRefsForEntry(entry, options.reportsRoot);
+    const requiredInspectionRefs = requiredInspectionRefsForEntry(entry, evidenceContext);
     const decisionRequest = {
       request_id: `${options.runId}.${step}.operator-decision-request`,
       run_id: options.runId,
@@ -1169,7 +1244,7 @@ export function createLiveE2eStepController(options) {
       entry,
       decisionFile: files.decisionFile,
       operatorContext,
-      reportsRoot: options.reportsRoot,
+      evidenceContext,
     });
     entry.operator_decision_ref = operatorDecision.ref;
     entry.operator_decision_status = operatorDecision.status;

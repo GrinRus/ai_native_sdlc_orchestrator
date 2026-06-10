@@ -2061,3 +2061,87 @@ test("live E2E step controller stops on diagnose decisions", () => {
     assert.equal(state.pending_decision.action, "diagnose");
   });
 });
+
+test("live E2E step controller accepts repo-relative source evidence refs", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const sourceRoot = path.join(tempRoot, "source");
+    fs.mkdirSync(path.join(sourceRoot, "docs"), { recursive: true });
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    const sourceDocRef = "docs/live-e2e-hardening.md";
+    fs.writeFileSync(path.join(sourceRoot, sourceDocRef), "# Live E2E hardening\n", "utf8");
+    const transcriptFile = path.join(reportsRoot, "01-discovery-run.json");
+    fs.writeFileSync(transcriptFile, "{}\n", "utf8");
+
+    const runId = "controller-source-relative-ref";
+    const profile = { live_e2e: { flow_range_policy: "delivery_default" } };
+    const controller = createLiveE2eStepController({
+      reportsRoot,
+      sourceRoot,
+      runId,
+      profile,
+      mode: "auto",
+    });
+    writeSkillAgentDecision(reportsRoot, runId, 1, "discovery", {
+      nextStep: "spec",
+      inspectedEvidenceRefs: [transcriptFile, sourceDocRef],
+      evidenceRefs: [transcriptFile, sourceDocRef],
+    });
+
+    const result = controller.observeStage({
+      stage: "discovery",
+      stageResult: {
+        stage: "discovery",
+        status: "pass",
+        evidence_refs: [sourceDocRef],
+        summary: "Discovery cited repo docs evidence.",
+      },
+      commandResults: [
+        {
+          label: "discovery-run",
+          command_surface: "aor discovery run",
+          status: "pass",
+          transcript_file: transcriptFile,
+          artifact_refs: [sourceDocRef],
+          exit_code: 0,
+        },
+      ],
+      artifacts: {},
+    });
+
+    assert.equal(result.action, "continue");
+    const [entry] = controller.getStepJournal();
+    assert.equal(entry.artifact_refs.includes(sourceDocRef), true);
+    const request = JSON.parse(fs.readFileSync(entry.agent_decision_request_ref, "utf8"));
+    assert.equal(request.decision_rubric.required_evidence_refs.includes(sourceDocRef), true);
+    assert.equal(entry.operator_decision_status, "accepted");
+  });
+});
+
+test("full lifecycle controller includes only profile-declared terminal stages", () => {
+  withTempRoot((reportsRoot) => {
+    const governanceController = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-profile-declared-terminals",
+      profile: {
+        stages: ["bootstrap", "discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery", "learning"],
+        live_e2e: { flow_range_policy: "full_lifecycle" },
+      },
+      mode: "auto",
+    });
+    assert.equal(governanceController.includedSteps.includes("learning"), true);
+    assert.equal(governanceController.includedSteps.includes("release"), false);
+
+    const releaseController = createLiveE2eStepController({
+      reportsRoot,
+      runId: "controller-profile-declared-release",
+      profile: {
+        stages: ["bootstrap", "discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery", "release", "learning"],
+        live_e2e: { flow_range_policy: "full_lifecycle" },
+      },
+      mode: "auto",
+    });
+    assert.equal(releaseController.includedSteps.includes("release"), true);
+    assert.equal(releaseController.includedSteps.includes("learning"), true);
+  });
+});

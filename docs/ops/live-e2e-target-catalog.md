@@ -379,6 +379,7 @@ Extended candidate cells:
 - `ky.regress.small.openai.codex` (`ky-header-regression`)
 - `ky.regress.medium.openai.codex` (`ky-fetch-options-regression`)
 - `ky.governance.large.openai` (`ky-retry-hooks-governance`)
+- `ky.governance.large.anthropic` (`ky-retry-hooks-governance`)
 - `ky.regress.small.qwen` (`ky-header-regression`)
 - `ky.regress.medium.qwen` (`ky-fetch-options-regression`)
 - `httpie-cli.governance.large.openai` (`httpie-cli-config-surface-hardening`)

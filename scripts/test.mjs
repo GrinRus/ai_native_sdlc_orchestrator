@@ -1088,16 +1088,13 @@ if (readmeBlackBoxTestRun.status !== 0) {
 
 console.log("README black-box tests ok: documented no-write quickstart runs on an external target repo");
 
-const webDistIndex = path.join(root, "apps/web/dist/index.html");
-if (!fs.existsSync(webDistIndex)) {
-  const webBuildRun = spawnSync("pnpm", ["web:build"], {
-    cwd: root,
-    stdio: "inherit",
-    shell: process.platform === "win32",
-  });
-  if (webBuildRun.status !== 0) {
-    process.exit(webBuildRun.status ?? 1);
-  }
+const webDistFreshnessRun = spawnSync(process.execPath, ["./scripts/web-dist-freshness.mjs", "check"], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if (webDistFreshnessRun.status !== 0) {
+  process.exit(webDistFreshnessRun.status ?? 1);
 }
 
 console.log("web app test bundle ok: local app smoke can serve packaged SPA assets");

@@ -91,6 +91,12 @@ must not be reported as AOR product passes.
 - `delivery_default`
 - `full_lifecycle`
 
+For `full_lifecycle`, terminal lifecycle steps are profile-declared:
+`release` is included only when the profile declares a `release` stage, and
+`learning` is included only when the profile declares a `learning` stage.
+This lets governance profiles close audit/learning evidence without requiring
+a release packet when the scenario policy does not require release.
+
 When available, the report-level summary should also surface the same owner and
 phase separation used by readiness and step entries:
 - `target_setup_status`

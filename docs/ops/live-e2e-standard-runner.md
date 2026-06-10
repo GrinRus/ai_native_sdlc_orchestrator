@@ -5,7 +5,7 @@ Provide one installed-user black-box proof runner for catalog-backed full-journe
 
 Live E2E simulates a user who has installed AOR, initializes or attaches a target repository, walks the public SDLC flow through CLI/API surfaces, and then emits a per-step black-box observation summary. It must not call private runtime internals to repair the run. It proves whether AOR works as a product from the public surface and whether produced artifacts explain each `pass`, `warn`, `not_pass`, block, and missing-evidence gap.
 
-Every run starts by proving the AOR launcher before target execution. Source-channel acceptance and production-proof profiles create `${TMPDIR:-/tmp}/aor-live-e2e/<run-id>/`, copy the current AOR source into `aor-source`, run the source-only install proof (`corepack enable`, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm aor --help`), and then use a run-scoped session launcher from that isolated source install. Runtime state is stored under `<workspace>/runtime`; target checkouts live under `<workspace>/runtime/projects/<id>/target-checkouts`. `--runtime-root` and `--aor-install-mode repo-local` are explicit dev/debug overrides, not acceptance defaults. Profiles that use `--aor-bin` must still prove the provided binary with `aor --help`.
+Every run starts by proving the AOR launcher before target execution. Source-channel acceptance and production-proof profiles create `${TMPDIR:-/tmp}/aor-live-e2e/<run-id>/`, copy the current AOR source into `aor-source`, run the source-only install proof (`corepack enable`, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm aor --help`, `pnpm aor project init --help`), and then use a run-scoped session launcher from that isolated source install. Manual resume may reuse the install proof only after the cached launcher also passes `aor project init --help`, so a stale or partially materialized dependency tree fails before lifecycle commands run. Runtime state is stored under `<workspace>/runtime`; target checkouts live under `<workspace>/runtime/projects/<id>/target-checkouts`. `--runtime-root` and `--aor-install-mode repo-local` are explicit dev/debug overrides, not acceptance defaults. Profiles that use `--aor-bin` must still prove the provided binary with `aor --help`.
 
 Provider CLIs that derive local project state paths from the checkout path may set `live_e2e.target_checkout_root_mode: short-physical`. In that mode the runner still stores AOR reports and state under the normal isolated workspace, but clones the target repository into a short physical temp checkout. Use this only for provider path-length limits; no-upstream-write, delivery guardrails, and target `.aor/` runtime ownership remain unchanged.
 
@@ -98,6 +98,7 @@ Catalog-backed full-journey profiles:
 - `full-journey-governance-pluggy-medium-openai.yaml`
 - `full-journey-governance-pluggy-medium-open-code.yaml`
 - `full-journey-governance-ky-large-openai.yaml`
+- `full-journey-governance-ky-large-anthropic.yaml`
 - `full-journey-release-nextjs.yaml`
 - `full-journey-release-nextjs-anthropic.yaml`
 - `full-journey-repair-nextjs-medium-anthropic.yaml`
@@ -430,7 +431,7 @@ Full-journey layer:
 - bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Generated live E2E project profiles default this bound to 1800 seconds per command unless the profile sets `live_e2e.target_command_timeout_sec`; Ky Codex/Qwen small and medium profiles use explicit shorter budgets and mission-scoped verification commands so Playwright/browser setup cannot block before operator-visible decisions. Timeout failures are preserved as failed step-result evidence with target setup/verification owner and phase fields.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - gates continuation after every observed public step by the online live E2E controller decision.
-- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; supported full-lifecycle profiles must execute them as ordinary observed steps.
+- keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, execute profile-declared terminal stages as ordinary observed steps. Governance profiles that declare `learning` must reach learning closure even when release is not required.
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
 - runner auth probe is required;
@@ -555,7 +556,8 @@ Default profiles use `live_e2e.flow_range_policy=delivery_default`:
 
 `discovery -> spec -> planning -> handoff -> execution -> review -> qa -> delivery`
 
-Guided or release profiles use `live_e2e.flow_range_policy=full_lifecycle`:
+Guided, release, or governance-audit profiles use `live_e2e.flow_range_policy=full_lifecycle`.
+The terminal segment is profile-declared: release profiles include `release -> learning`, while governance profiles can include `learning` without requiring `release`.
 
 `discovery -> spec -> planning -> handoff -> execution -> review -> qa -> delivery -> release -> learning`
 

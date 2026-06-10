@@ -207,6 +207,94 @@ async function getText(url) {
 }
 
 /**
+ * @param {string} html
+ * @returns {{ scripts: string[], stylesheets: string[] }}
+ */
+function extractPackagedAssetRefs(html) {
+  /** @type {string[]} */
+  const scripts = [];
+  /** @type {string[]} */
+  const stylesheets = [];
+  const attributePattern = /\b(?:src|href)=["']([^"']+)["']/giu;
+  for (const match of html.matchAll(attributePattern)) {
+    const ref = match[1];
+    if (ref.startsWith("http://") || ref.startsWith("https://") || ref.startsWith("//")) continue;
+    if (ref.endsWith(".js")) {
+      scripts.push(ref);
+    } else if (ref.endsWith(".css")) {
+      stylesheets.push(ref);
+    }
+  }
+  return {
+    scripts: [...new Set(scripts)].sort(),
+    stylesheets: [...new Set(stylesheets)].sort(),
+  };
+}
+
+/**
+ * @param {string} ref
+ * @param {string} baseUrl
+ * @returns {string}
+ */
+function resolveAssetUrl(ref, baseUrl) {
+  return new URL(ref, baseUrl).href;
+}
+
+/**
+ * @param {string} url
+ * @returns {Promise<string>}
+ */
+async function getAssetText(url) {
+  const response = await fetch(url, { headers: { accept: "text/javascript, text/css, text/plain" } });
+  if (!response.ok) {
+    throw new Error(`Smoke asset request failed (${response.status}) for ${url}.`);
+  }
+  return response.text();
+}
+
+/**
+ * @param {{ html: string, appUrl: string }} input
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function buildRenderGuard(input) {
+  const assets = extractPackagedAssetRefs(input.html);
+  const scriptTexts = await Promise.all(
+    assets.scripts.map((ref) => getAssetText(resolveAssetUrl(ref, input.appUrl))),
+  );
+  const stylesheetTexts = await Promise.all(
+    assets.stylesheets.map((ref) => getAssetText(resolveAssetUrl(ref, input.appUrl))),
+  );
+  const combinedScripts = scriptTexts.join("\n");
+  const rootElementPresent = /\bid=["']root["']/u.test(input.html);
+  const titlePresent = input.html.includes("AOR Operator Console");
+  const appShellMarkerPresent =
+    combinedScripts.includes("AOR Operator Console") && combinedScripts.includes("Mission intake");
+  const blankRootRegressionDetected = /\bmissionStatus\b/u.test(combinedScripts);
+  const findings = [];
+  if (!rootElementPresent) findings.push("index.html does not expose the React root element");
+  if (!titlePresent) findings.push("index.html does not expose the console title");
+  if (assets.scripts.length === 0) findings.push("index.html does not reference a packaged script bundle");
+  if (assets.stylesheets.length === 0) findings.push("index.html does not reference a packaged stylesheet");
+  if (!appShellMarkerPresent) findings.push("packaged script bundle does not include operator console shell markers");
+  if (blankRootRegressionDetected) findings.push("packaged script bundle still contains the missionStatus blank-root regression");
+
+  return {
+    status: findings.length === 0 ? "pass" : "fail",
+    root_element_present: rootElementPresent,
+    title_present: titlePresent,
+    module_script_count: assets.scripts.length,
+    stylesheet_count: assets.stylesheets.length,
+    checked_script_refs: assets.scripts,
+    checked_stylesheet_refs: assets.stylesheets,
+    checked_script_bytes: scriptTexts.reduce((sum, text) => sum + text.length, 0),
+    checked_stylesheet_bytes: stylesheetTexts.reduce((sum, text) => sum + text.length, 0),
+    app_shell_marker_present: appShellMarkerPresent,
+    blank_root_regression_detected: blankRootRegressionDetected,
+    findings,
+  };
+}
+
+/**
  * @param {string} staticRoot
  * @returns {string}
  */
@@ -308,30 +396,49 @@ export async function runAppCommand(args, options = {}) {
     };
 
     if (smoke) {
-      const html = await getText(appUrl);
-      const config = await getJson(`${transport.baseUrl}/app-config.json`);
-      const projectIndex = await getJson(`${transport.baseUrl}/api/projects`);
-      const state = await getJson(`${transport.baseUrl}/api/projects/${encodeURIComponent(transport.projectId)}/state`);
-      await stopLocalApp();
-      const packagedSpa = inspectPackagedSpa(staticRoot, html);
-      const smokeSummary = {
-        ...summary,
-        status: "smoke-pass",
-        html_loaded: packagedSpa.htmlLoaded,
-        flow_selector_loaded: packagedSpa.flowSelectorLoaded,
-        new_flow_action_loaded: packagedSpa.newFlowActionLoaded,
-        first_run_wizard_loaded: packagedSpa.wizardLoaded,
-        project_switcher_loaded: packagedSpa.projectSwitcherLoaded,
-        config_project_id: config.project_id,
-        config_default_project_id: config.default_project_id,
-        config_project_profile_ref: config.project_profile_ref,
-        project_index_default_project_id: projectIndex.default_project_id,
-        project_index_count: Array.isArray(projectIndex.projects) ? projectIndex.projects.length : 0,
-        state_project_id: state.project_id,
-        state_project_profile_ref: state.project_profile_ref,
-      };
+      let smokePass = false;
+      let smokeSummary = summary;
+      try {
+        const html = await getText(appUrl);
+        const config = await getJson(`${transport.baseUrl}/app-config.json`);
+        const projectIndex = await getJson(`${transport.baseUrl}/api/projects`);
+        const state = await getJson(`${transport.baseUrl}/api/projects/${encodeURIComponent(transport.projectId)}/state`);
+        const packagedSpa = inspectPackagedSpa(staticRoot, html);
+        const renderGuard = await buildRenderGuard({ html, appUrl });
+        const routeChecksPass =
+          packagedSpa.htmlLoaded &&
+          packagedSpa.flowSelectorLoaded &&
+          packagedSpa.newFlowActionLoaded &&
+          packagedSpa.wizardLoaded &&
+          packagedSpa.projectSwitcherLoaded &&
+          config.project_id === transport.projectId &&
+          projectIndex.default_project_id === transport.projectId &&
+          state.project_id === transport.projectId;
+        smokePass = routeChecksPass && renderGuard.status === "pass";
+        smokeSummary = {
+          ...summary,
+          status: smokePass ? "smoke-pass" : "smoke-fail",
+          html_loaded: packagedSpa.htmlLoaded,
+          flow_selector_loaded: packagedSpa.flowSelectorLoaded,
+          new_flow_action_loaded: packagedSpa.newFlowActionLoaded,
+          first_run_wizard_loaded: packagedSpa.wizardLoaded,
+          project_switcher_loaded: packagedSpa.projectSwitcherLoaded,
+          config_project_id: config.project_id,
+          config_default_project_id: config.default_project_id,
+          config_project_profile_ref: config.project_profile_ref,
+          project_index_default_project_id: projectIndex.default_project_id,
+          project_index_count: Array.isArray(projectIndex.projects) ? projectIndex.projects.length : 0,
+          state_project_id: state.project_id,
+          state_project_profile_ref: state.project_profile_ref,
+          render_guard_status: renderGuard.status,
+          blank_root_regression_detected: renderGuard.blank_root_regression_detected,
+          render_guard: renderGuard,
+        };
+      } finally {
+        await stopLocalApp();
+      }
       stdout.write(`${formatJson(smokeSummary, jsonMode === "compact" ? "compact" : "full")}\n`);
-      return 0;
+      return smokePass ? 0 : 1;
     }
 
     if (jsonMode !== "off") {
