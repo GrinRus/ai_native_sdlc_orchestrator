@@ -23,6 +23,7 @@ Turn the design package into a verifiable monorepo and contributor-safe developm
 - **W40:** `W40-S01` Post-alpha.7 backlog and product baseline
 - **W41:** `W41-S01` Post-alpha.8 backlog and validation baseline; `W41-S04` Alpha.8 findings closure and next-release decision
 - **W43:** `W43-S01` Post-alpha.10 backlog and confidence baseline; `W43-S04` Alpha.10 findings closure and next-release decision
+- **W44:** `W44-S01` Artifact workflow taxonomy and transition invariants; `W44-S05` Post-implementation docs and live E2E validation
 
 ## EPIC-1 Bootstrap and onboarding
 Create a repeatable flow to turn a repository into a machine-usable target.
@@ -37,6 +38,7 @@ Create a repeatable flow to turn a repository into a machine-usable target.
 - **W40:** `W40-S02` Installed-user onboarding and release docs hardening
 - **W41:** `W41-S02` Alpha.8 installed-user onboarding smoke refresh
 - **W43:** `W43-S02` Alpha.10 installed-user onboarding and evidence smoke
+- **W44:** `W44-S03` Artifact readiness state machine and stale transitions
 
 ## EPIC-2 Packet lifecycle
 Materialize discovery, planning, handoff, release, and adjacent artifacts as durable packets.
@@ -59,6 +61,7 @@ Resolve and execute steps through routes, wrappers, prompt bundles, policies, an
 - **W16:** `W16-S04` Orchestrator-core execution decomposition; `W16-S06` Adapter permission legacy removal
 - **W20:** `W20-S03` OpenCode candidate evidence and downgrade follow-up
 - **W22:** `W22-S03` OpenCode maturity downgrade
+- **W44:** `W44-S01` Artifact workflow taxonomy and transition invariants; `W44-S02` Discovery/research/spec prompt bundle split; `W44-S04` Context, skill, and policy overlays from evidence
 
 ## EPIC-4 Quality platform
 Implement validation, eval, harness, certification, and promotion.
@@ -76,6 +79,7 @@ Implement validation, eval, harness, certification, and promotion.
 - **W21:** `W21-S06` Review, delivery, release, and learning closure UX
 - **W23:** `W23-S01` Nested contract validation pack
 - **W24:** `W24-S01` Run-level Runtime Harness controller
+- **W44:** `W44-S04` Context, skill, and policy overlays from evidence
 
 ## EPIC-5 Delivery and release
 Support bounded delivery modes, manifests, and release evidence.
@@ -123,6 +127,7 @@ Expose CLI, API, live events, and detachable UI flows.
 - **W41:** `W41-S02` Alpha.8 installed-user onboarding smoke refresh; `W41-S04` Alpha.8 findings closure and next-release decision
 - **W42:** `W42-S02` Operator interruption owner classification cleanup
 - **W43:** `W43-S02` Alpha.10 installed-user onboarding and evidence smoke; `W43-S04` Alpha.10 findings closure and next-release decision
+- **W44:** `W44-S03` Artifact readiness state machine and stale transitions
 
 ## EPIC-7 Live E2E and rehearsal
 Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
@@ -161,3 +166,4 @@ Standardize rehearsal, live E2E, scorecards, and learning-loop operations.
 - **W41:** `W41-S03` Alpha.8 provider qualification smoke refresh
 - **W42:** `W42-S02` Operator interruption owner classification cleanup
 - **W43:** `W43-S03` Alpha.10 live E2E interruption and provider smoke
+- **W44:** `W44-S05` Post-implementation docs and live E2E validation
