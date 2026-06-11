@@ -7,6 +7,19 @@ versioned AOR snapshots.
 
 - No unreleased changes yet.
 
+## [0.1.0-alpha.11] - 2026-06-11
+
+- Added live E2E quality gates for mission-scoped verification, delivery path
+  integrity, final skill-agent verdict hydration, and artifact completeness.
+- Hardened Runtime Harness, review, delivery, and handoff artifacts so
+  mission-relevant changed paths, goals, Definition of Done, KPIs, and
+  post-run verification commands stay traceable through the run.
+- Fixed public run-control interruption classification for external providers
+  when a canceled runner closes before the heartbeat observes the cancel state.
+- Generalized the HTTPie target-catalog warning-output guidance so release
+  artifacts avoid run-specific fixture wording while preserving output-quality
+  expectations.
+
 ## [0.1.0-alpha.10] - 2026-06-04
 
 - Added operator-owned provider interruption classification so public live E2E

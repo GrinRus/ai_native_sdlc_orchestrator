@@ -5,7 +5,7 @@ This runbook covers the public installed-user first run from npm install through
 
 ## Commands
 ```sh
-npm install -g @grinrus/aor@0.1.0-alpha.10
+npm install -g @grinrus/aor@0.1.0-alpha.11
 aor --help
 cd <repo>
 aor app
@@ -55,9 +55,9 @@ mkdir -p "$TMP/target" "$TMP/runner"
 git -C "$TMP/target" init
 cd "$TMP/runner"
 
-npm exec --yes --package @grinrus/aor@0.1.0-alpha.10 -- aor --help
+npm exec --yes --package @grinrus/aor@0.1.0-alpha.11 -- aor --help
 
-npm exec --yes --package @grinrus/aor@0.1.0-alpha.10 -- \
+npm exec --yes --package @grinrus/aor@0.1.0-alpha.11 -- \
   aor app --project-ref "$TMP/target" --runtime-root "$TMP/target/.aor" --smoke --open false --json
 ```
 
