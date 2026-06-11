@@ -15,6 +15,9 @@ import {
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const workspaceRoot = path.resolve(path.dirname(currentFilePath), "../..");
+const RELEASE_PACKAGE_VERSION = JSON.parse(fs.readFileSync(path.join(workspaceRoot, "package.json"), "utf8")).version;
+const RELEASE_BRANCH = `release/v${RELEASE_PACKAGE_VERSION}`;
+const MISMATCH_PACKAGE_VERSION = "0.0.0-alpha.0";
 
 function copyFixtureRepo() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aor-release-flow-test-"));
@@ -44,11 +47,11 @@ function updateJson(file, updater) {
 function releaseEvent(overrides = {}) {
   return {
     action: "closed",
-    pull_request: {
-      merged: true,
-      base: { ref: "main" },
-      head: {
-        ref: "release/v0.1.0-alpha.10",
+      pull_request: {
+        merged: true,
+        base: { ref: "main" },
+        head: {
+        ref: RELEASE_BRANCH,
         repo: { full_name: "GrinRus/ai_native_sdlc_orchestrator" },
       },
       labels: [{ name: RELEASE_LABEL }],
@@ -60,27 +63,27 @@ function releaseEvent(overrides = {}) {
 test("release verifier accepts matching release branch and package metadata", () => {
   const result = validateReleaseState({
     rootDir: workspaceRoot,
-    releaseBranch: "release/v0.1.0-alpha.10",
+    releaseBranch: RELEASE_BRANCH,
     strictReleaseBranch: true,
   });
   assert.deepEqual(result.findings, []);
   assert.equal(result.ok, true);
-  assert.equal(result.packageVersion, "0.1.0-alpha.10");
+  assert.equal(result.packageVersion, RELEASE_PACKAGE_VERSION);
 });
 
 test("release verifier rejects release branch version mismatch", () => {
   const tempRoot = copyFixtureRepo();
   try {
     updateJson(path.join(tempRoot, "package.json"), (json) => {
-      json.version = "0.1.0-alpha.11";
+      json.version = MISMATCH_PACKAGE_VERSION;
     });
     const result = validateReleaseState({
       rootDir: tempRoot,
-      releaseBranch: "release/v0.1.0-alpha.10",
+      releaseBranch: RELEASE_BRANCH,
       strictReleaseBranch: true,
     });
     assert.equal(result.ok, false);
-    assert.match(result.findings.join("\n"), /expects version '0\.1\.0-alpha\.10'/u);
+    assert.match(result.findings.join("\n"), new RegExp(`expects version '${RELEASE_PACKAGE_VERSION}'`, "u"));
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -92,11 +95,11 @@ test("release verifier rejects missing changelog entry", () => {
     fs.writeFileSync(path.join(tempRoot, "CHANGELOG.md"), "# Changelog\n\n## Unreleased\n", "utf8");
     const result = validateReleaseState({
       rootDir: tempRoot,
-      releaseBranch: "release/v0.1.0-alpha.10",
+      releaseBranch: RELEASE_BRANCH,
       strictReleaseBranch: true,
     });
     assert.equal(result.ok, false);
-    assert.match(result.findings.join("\n"), /CHANGELOG\.md must mention '## \[0\.1\.0-alpha\.10\]'/u);
+    assert.match(result.findings.join("\n"), new RegExp(`CHANGELOG\\.md must mention '## \\[${RELEASE_PACKAGE_VERSION}\\]'`, "u"));
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -113,7 +116,7 @@ test("release verifier rejects wrong package name and public internal packages",
     });
     const result = validateReleaseState({
       rootDir: tempRoot,
-      releaseBranch: "release/v0.1.0-alpha.10",
+      releaseBranch: RELEASE_BRANCH,
       strictReleaseBranch: true,
     });
     assert.equal(result.ok, false);
@@ -145,7 +148,7 @@ test("release verifier rejects publish workflows without trusted publishing runt
     );
     const result = validateReleaseState({
       rootDir: tempRoot,
-      releaseBranch: "release/v0.1.0-alpha.10",
+      releaseBranch: RELEASE_BRANCH,
       strictReleaseBranch: true,
     });
     assert.equal(result.ok, false);
@@ -193,7 +196,7 @@ test("publish event guard accepts only merged release PRs with publish label", (
   const accepted = validatePublishEvent({
     event: releaseEvent(),
     repository: "GrinRus/ai_native_sdlc_orchestrator",
-    packageVersion: "0.1.0-alpha.10",
+    packageVersion: RELEASE_PACKAGE_VERSION,
   });
   assert.equal(accepted.shouldPublish, true);
 
@@ -205,7 +208,7 @@ test("publish event guard accepts only merged release PRs with publish label", (
       },
     }),
     repository: "GrinRus/ai_native_sdlc_orchestrator",
-    packageVersion: "0.1.0-alpha.10",
+    packageVersion: RELEASE_PACKAGE_VERSION,
   });
   assert.equal(missingLabel.shouldPublish, false);
   assert.match(missingLabel.findings.join("\n"), /release:publish/u);
@@ -213,8 +216,8 @@ test("publish event guard accepts only merged release PRs with publish label", (
   const mismatch = validatePublishEvent({
     event: releaseEvent(),
     repository: "GrinRus/ai_native_sdlc_orchestrator",
-    packageVersion: "0.1.0-alpha.11",
+    packageVersion: MISMATCH_PACKAGE_VERSION,
   });
   assert.equal(mismatch.shouldPublish, false);
-  assert.match(mismatch.findings.join("\n"), /expects version '0\.1\.0-alpha\.10'/u);
+  assert.match(mismatch.findings.join("\n"), new RegExp(`expects version '${RELEASE_PACKAGE_VERSION}'`, "u"));
 });
