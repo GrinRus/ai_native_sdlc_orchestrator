@@ -373,5 +373,24 @@ This is the master index for the implementation slices across all defined waves.
 | W43-S03 | Alpha.10 live E2E interruption and provider smoke | EPIC-7 | done | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, `apps/web/**`, tests | W43-S02 |
 | W43-S04 | Alpha.10 findings closure and next-release decision | EPIC-0, EPIC-6 | done | `docs/backlog/**`, `README.md`, `docs/ops/**`, tests | W43-S02, W43-S03 |
 
+## W44 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W44-S01 | Artifact workflow taxonomy and transition invariants | EPIC-0, EPIC-3 | ready | `docs/architecture/**`, `docs/contracts/**`, `docs/backlog/**`, `examples/**` | W43-S04 |
+| W44-S02 | Discovery/research/spec prompt bundle split | EPIC-3 | blocked | `examples/prompts/**`, `examples/project*.aor.yaml`, `packages/contracts/**`, `packages/orchestrator-core/**`, tests | W44-S01 |
+| W44-S03 | Artifact readiness state machine and stale transitions | EPIC-1, EPIC-6 | blocked | `docs/contracts/**`, `packages/orchestrator-core/**`, `apps/cli/**`, `apps/api/**`, `apps/web/**`, `examples/reports/**`, tests | W44-S01 |
+| W44-S04 | Context, skill, and policy overlays from evidence | EPIC-4, EPIC-3 | blocked | `examples/context/**`, `examples/skills/**`, `examples/policies/**`, `packages/orchestrator-core/**`, `packages/contracts/**`, `docs/architecture/**`, tests | W44-S02, W44-S03 |
+| W44-S05 | Post-implementation docs and live E2E validation | EPIC-0, EPIC-7 | blocked | `README.md`, `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `examples/live-e2e/**`, `scripts/live-e2e/**`, tests | W44-S04 |
+
+## W45 slices
+| Slice ID | Title | Epic | State | Primary modules | Hard dependencies |
+|---|---|---|---|---|---|
+| W45-S01 | Quality repair request contract and operating model | EPIC-4 | blocked | `docs/contracts/**`, `docs/architecture/**`, `examples/reports/**`, `examples/project.aor.yaml`, `docs/backlog/**` | W44-S05 |
+| W45-S02 | Cross-stage repair state machine and next-action resolver | EPIC-4, EPIC-6 | blocked | `packages/orchestrator-core/**`, `packages/observability/**`, `packages/contracts/**`, tests | W45-S01 |
+| W45-S03 | CLI and control-plane quality repair surfaces | EPIC-6 | blocked | `apps/cli/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/contracts/control-plane-api.md`, `examples/control-plane-api/**`, tests | W45-S02 |
+| W45-S04 | Web repair-cycle observability | EPIC-6 | blocked | `apps/web/**`, `apps/api/**`, `packages/orchestrator-core/**`, `docs/product/**`, tests | W45-S03 |
+| W45-S05 | Repair-loop proof fixtures and live profile | EPIC-7 | blocked | `scripts/live-e2e/**`, `examples/live-e2e/**`, `docs/ops/**`, tests | W45-S02, W45-S03, W45-S04 |
+| W45-S06 | Documentation refresh and live E2E acceptance | EPIC-7, EPIC-0 | blocked | `docs/architecture/**`, `docs/contracts/**`, `docs/ops/**`, `docs/product/**`, `docs/backlog/**`, `README.md`, `scripts/live-e2e/**`, `examples/live-e2e/**`, tests | W45-S05 |
+
 ## Planning note
 Every wave document now includes a starter local-task outline for each slice. Agents should normally implement one slice at a time and refine only the local tasks inside that slice unless the shared backlog truly needs a new independently acceptable outcome.

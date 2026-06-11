@@ -51,6 +51,11 @@ function asNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function isCanceledStatus(value) {
+  const status = asString(value);
+  return status === "canceled" || status === "cancelled" || status === "interrupted";
+}
+
 function parseIsoMs(value) {
   const stringValue = asString(value);
   if (!stringValue) return null;
@@ -103,7 +108,7 @@ function writeProviderStepStatus(patch = {}) {
     }
   }
 
-  state.provider_step_status = {
+  const nextProviderStepStatus = {
     provider: asString(providerConfig.provider) || asString(previous.provider),
     adapter: asString(providerConfig.adapter) || asString(previous.adapter),
     route_id: asString(providerConfig.route_id) || asString(previous.route_id),
@@ -141,8 +146,31 @@ function writeProviderStepStatus(patch = {}) {
     updated_at: nowIso,
     finished_at: asString(patch.finished_at) || asString(previous.finished_at) || null,
   };
+  state.provider_step_status = nextProviderStepStatus;
   state.updated_at = nowIso;
   try {
+    const latestState = asObject(JSON.parse(fs.readFileSync(stateFile, "utf8")));
+    const latestProviderStatus = asString(asObject(latestState.provider_step_status).status);
+    const nextStatus = asString(nextProviderStepStatus.status);
+    if (isCanceledStatus(latestState.status)) {
+      state = { ...latestState, provider_step_status: nextProviderStepStatus, updated_at: nowIso };
+    }
+    if (latestProviderStatus === "interrupted" && nextStatus !== "interrupted") {
+      const latestProviderStepStatus = asObject(latestState.provider_step_status);
+      state.provider_step_status = {
+        ...nextProviderStepStatus,
+        status: "interrupted",
+        interruption_owner:
+          asString(latestProviderStepStatus.interruption_owner) || nextProviderStepStatus.interruption_owner,
+        interruption_reason:
+          asString(latestProviderStepStatus.interruption_reason) || nextProviderStepStatus.interruption_reason,
+        interruption_status:
+          asString(latestProviderStepStatus.interruption_status) || nextProviderStepStatus.interruption_status,
+        recommended_action:
+          asString(latestProviderStepStatus.recommended_action) ||
+          "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
+      };
+    }
     fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + "\n", "utf8");
   } catch {}
 }
