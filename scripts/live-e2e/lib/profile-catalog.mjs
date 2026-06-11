@@ -390,6 +390,33 @@ function hasStrings(value) {
 }
 
 /**
+ * @param {{
+ *   catalogVerification: Record<string, unknown>,
+ *   profileVerification: Record<string, unknown>,
+ *   mission: Record<string, unknown>,
+ * }} options
+ */
+function resolveProfileVerification(options) {
+  const catalogSetupCommands = asStringArray(options.catalogVerification.setup_commands);
+  const profileSetupCommands = asStringArray(options.profileVerification.setup_commands);
+  const catalogVerificationCommands = asStringArray(options.catalogVerification.commands);
+  const profileVerificationCommands = asStringArray(options.profileVerification.commands);
+  const missionPrimaryCommands = asStringArray(asRecord(options.mission.post_run_quality).primary_commands);
+
+  return {
+    ...options.catalogVerification,
+    ...options.profileVerification,
+    setup_commands: profileSetupCommands.length > 0 ? profileSetupCommands : catalogSetupCommands,
+    commands:
+      profileVerificationCommands.length > 0
+        ? profileVerificationCommands
+        : missionPrimaryCommands.length > 0
+          ? missionPrimaryCommands
+          : catalogVerificationCommands,
+  };
+}
+
+/**
  * @param {Record<string, unknown>} resolvedProfile
  * @param {Record<string, unknown>} proofPolicy
  */
@@ -615,10 +642,11 @@ export function resolveFullJourneyProfile(options) {
 
   const resolvedProfile = /** @type {Record<string, unknown>} */ (JSON.parse(JSON.stringify(options.profile)));
   resolvedProfile.target_repo = asRecord(JSON.parse(JSON.stringify(asRecord(catalogEntry.repo))));
-  resolvedProfile.verification = {
-    ...asRecord(catalogEntry.verification),
-    ...asRecord(options.profile.verification),
-  };
+  resolvedProfile.verification = resolveProfileVerification({
+    catalogVerification: asRecord(catalogEntry.verification),
+    profileVerification: asRecord(options.profile.verification),
+    mission: asRecord(mission),
+  });
   resolvedProfile.output_policy = {
     ...asRecord(catalogEntry.safety_defaults),
     ...asRecord(options.profile.output_policy),

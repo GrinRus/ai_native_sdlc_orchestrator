@@ -126,7 +126,7 @@ feature_missions:
       - review-report
     acceptance_checks:
       - keep changes inside source and test folders only
-      - preserve npm test as full-suite diagnostic evidence
+      - preserve Playwright setup and npm test as full-suite diagnostic evidence
       - pass the mission-scoped headers regression gate
     change_evidence:
       required_path_prefixes:
@@ -138,6 +138,7 @@ feature_missions:
         - npm run build
         - npx ava test/headers.ts
       diagnostic_commands:
+        - npx playwright install
         - npm test
       diagnostic_failure_mode: warn
     supported_scenarios:
@@ -172,8 +173,8 @@ feature_missions:
         measurement: post-run primary verification
     definition_of_done:
       - The change stays inside source, tests, and public type surface.
-      - Bounded primary verification passes and full npm test is recorded as
-        diagnostic evidence.
+      - Bounded primary verification passes and Playwright-backed full npm test
+        is recorded as diagnostic evidence.
     expected_evidence: &a2
       - verify-summary
       - routed-step-result
@@ -181,7 +182,7 @@ feature_missions:
       - delivery-manifest
     acceptance_checks:
       - keep the fix inside source, tests, and type surface only
-      - preserve npm test as full-suite diagnostic evidence
+      - preserve Playwright setup and npm test as full-suite diagnostic evidence
       - keep delivery evidence anchored to the target checkout
     change_evidence:
       required_path_prefixes:
@@ -192,8 +193,9 @@ feature_missions:
       primary_commands:
         - npx xo
         - npm run build
-        - npx ava test/main.ts test/hooks.ts
+        - "npx ava test/retry.ts --match='*shouldRetry*'"
       diagnostic_commands:
+        - npx playwright install
         - npm test
       diagnostic_failure_mode: warn
     supported_scenarios:
@@ -289,8 +291,8 @@ feature_missions:
           cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
-      - Bounded primary verification passes and diagnostic full-suite output is
-        recorded.
+      - Bounded primary verification passes and Playwright-backed diagnostic
+        full-suite output is recorded.
       - Governance, audit, and learning evidence links back to the mission and
         target checkout.
     expected_evidence: &a4
@@ -312,8 +314,9 @@ feature_missions:
       primary_commands:
         - npx xo
         - npm run build
-        - npx ava test/main.ts test/hooks.ts
+        - npx ava test/main.ts test/hooks.ts test/retry.ts
       diagnostic_commands:
+        - npx playwright install
         - npm test
       diagnostic_failure_mode: warn
     supported_scenarios:
@@ -358,8 +361,8 @@ feature_missions:
           manual matrix cell
         measurement: scenario coverage and artifact consistency checks
     definition_of_done:
-      - Bounded primary verification passes and diagnostic full-suite output is
-        recorded.
+      - Bounded primary verification passes and Playwright-backed diagnostic
+        full-suite output is recorded.
       - Runtime source, tests, public types, and docs or exported type evidence
         are all present when the change affects public API behavior.
       - Governance, audit, and learning evidence links back to the mission and
@@ -382,6 +385,7 @@ feature_missions:
         - npm run build
         - npx ava test/main.ts test/hooks.ts
       diagnostic_commands:
+        - npx playwright install
         - npm test
       diagnostic_failure_mode: warn
     supported_scenarios:

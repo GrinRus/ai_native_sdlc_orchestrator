@@ -126,7 +126,8 @@
         "meaningful_changed_paths": [
           "src/implemented.js"
         ],
-        "strict_code_changing_noop": true
+        "strict_code_changing_noop_detection_applied": true,
+        "strict_code_changing_noop": false
       },
       "evidence_refs": [
         "evidence://reports/step-result-routed-runtime-harness-controller-fixture.json"

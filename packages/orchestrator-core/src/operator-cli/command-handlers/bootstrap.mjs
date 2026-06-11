@@ -93,6 +93,33 @@ export const BOOTSTRAP_COMMAND_GROUP = Object.freeze({
 });
 
 /**
+ * @param {string | string[] | true | undefined} value
+ * @returns {Array<{ kpi_id: string, name: string, target: string, measurement?: string }>}
+ */
+function resolveKpiFlags(value) {
+  if (value === undefined) return [];
+  if (value === true) {
+    throw new CliUsageError("Flag '--kpi' requires a value.");
+  }
+  const values = Array.isArray(value) ? value : [value];
+  return values.map((entry, index) => {
+    const [kpiId, name, target, ...measurementParts] = entry.split(":").map((part) => part.trim());
+    const measurement = measurementParts.join(":").trim();
+    if (!kpiId || !name || !target) {
+      throw new CliUsageError(
+        `Flag '--kpi' value ${index + 1} must use 'kpi_id:name:target[:measurement]' format.`,
+      );
+    }
+    return {
+      kpi_id: kpiId,
+      name,
+      target,
+      ...(measurement ? { measurement } : {}),
+    };
+  });
+}
+
+/**
  * @param {{ command: string, flags: Record<string, string | string[] | true>, cwd: string, outputState: Record<string, unknown> }} context
  * @returns {boolean}
  */
@@ -169,6 +196,9 @@ export function handleBootstrapCommand(context) {
       requestTitle: resolveOptionalStringFlag("request-title", flags["request-title"]) ?? null,
       requestBrief: resolveOptionalStringFlag("request-brief", flags["request-brief"]) ?? null,
       requestConstraints: resolveOptionalCsvFlag("request-constraints", flags["request-constraints"]),
+      goals: resolveOptionalStringListFlag("goal", flags.goal),
+      kpis: resolveKpiFlags(flags.kpi),
+      definitionOfDone: resolveOptionalStringListFlag("dod", flags.dod),
       requestFile: requestFile ?? null,
       sourceKind: resolveOptionalStringFlag("source-kind", flags["source-kind"]) ?? null,
       sourceRef: resolveOptionalStringFlag("source-ref", flags["source-ref"]) ?? null,
@@ -316,6 +346,10 @@ export function handleBootstrapCommand(context) {
       repoBuildCommands: resolveOptionalStringListFlag("repo-build-command", flags["repo-build-command"]),
       repoLintCommands: resolveOptionalStringListFlag("repo-lint-command", flags["repo-lint-command"]),
       repoTestCommands: resolveOptionalStringListFlag("repo-test-command", flags["repo-test-command"]),
+      outputQualityBaselineFiles: resolveOptionalStringListFlag(
+        "output-quality-baseline",
+        flags["output-quality-baseline"],
+      ),
     });
 
     outputState.resolvedProjectRef = verifyResult.projectRoot;

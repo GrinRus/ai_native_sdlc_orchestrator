@@ -418,6 +418,9 @@ child.on("error", (error) => {
 child.on("close", (status, signal) => {
   clearTimeout(timer);
   flushStdoutProgressBuffer();
+  if (!interrupted && providerCancellationRequested()) {
+    interrupted = true;
+  }
   if (interruptKillTimer) {
     clearTimeout(interruptKillTimer);
     interruptKillTimer = null;

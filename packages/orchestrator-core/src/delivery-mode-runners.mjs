@@ -158,6 +158,72 @@ function parseNumstat(output) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeRepoPath(value) {
+  return value.trim().replace(/\\/g, "/").replace(/^\.\//u, "");
+}
+
+/**
+ * @param {{ executionRoot: string, expectedChangedPaths?: string[] }} options
+ * @returns {string[]}
+ */
+function resolveExpectedUntrackedPaths(options) {
+  return Array.from(new Set(Array.isArray(options.expectedChangedPaths) ? options.expectedChangedPaths : []))
+    .map(normalizeRepoPath)
+    .filter((repoPath) => repoPath.length > 0)
+    .filter((repoPath) => {
+      const absolutePath = path.resolve(options.executionRoot, repoPath);
+      const relative = path.relative(options.executionRoot, absolutePath);
+      if (!relative || relative.startsWith("../")) {
+        return false;
+      }
+      if (!fs.existsSync(absolutePath)) {
+        return false;
+      }
+
+      const tracked = runGit({
+        cwd: options.executionRoot,
+        args: ["ls-files", "--error-unmatch", "--", repoPath],
+      });
+      return tracked.status !== 0;
+    });
+}
+
+/**
+ * @param {{ executionRoot: string, expectedChangedPaths?: string[], commands: string[] }} options
+ * @returns {string[]}
+ */
+function stageExpectedUntrackedPaths(options) {
+  const untrackedPaths = resolveExpectedUntrackedPaths(options);
+  if (untrackedPaths.length === 0) {
+    return [];
+  }
+
+  options.commands.push(`git add -N -- ${untrackedPaths.join(" ")}`);
+  runGitChecked({
+    cwd: options.executionRoot,
+    args: ["add", "-N", "--", ...untrackedPaths],
+  });
+  return untrackedPaths;
+}
+
+/**
+ * @param {{ executionRoot: string, intentToAddPaths: string[], commands: string[] }} options
+ */
+function resetIntentToAddPaths(options) {
+  if (options.intentToAddPaths.length === 0) {
+    return;
+  }
+  options.commands.push(`git reset -- ${options.intentToAddPaths.join(" ")}`);
+  runGitChecked({
+    cwd: options.executionRoot,
+    args: ["reset", "--", ...options.intentToAddPaths],
+  });
+}
+
+/**
  * @param {string} remoteUrl
  * @returns {{ host: string, owner: string, repo: string } | null}
  */
@@ -206,46 +272,59 @@ export function runNoWriteDeliveryMode() {
 }
 
 /**
- * @param {{ executionRoot: string, artifactsRoot: string, runId: string }} options
+ * @param {{ executionRoot: string, artifactsRoot: string, runId: string, expectedChangedPaths?: string[] }} options
  */
 export function runPatchOnlyDeliveryMode(options) {
   const commands = [];
-
-  commands.push("git diff --binary HEAD");
-  const patchBody = runGitChecked({
-    cwd: options.executionRoot,
-    args: ["diff", "--binary", "HEAD"],
-  });
-  const patchFile = path.join(
-    options.artifactsRoot,
-    `delivery-patch-${normalizeForId(options.runId)}-${Date.now()}.patch`,
-  );
-  fs.writeFileSync(patchFile, patchBody, "utf8");
-
-  commands.push("git diff --name-only HEAD");
-  const changedPaths = parseLineList(
-    runGitChecked({
-      cwd: options.executionRoot,
-      args: ["diff", "--name-only", "HEAD"],
-    }),
-  );
-
-  commands.push("git diff --numstat HEAD");
-  const diffStats = parseNumstat(
-    runGitChecked({
-      cwd: options.executionRoot,
-      args: ["diff", "--numstat", "HEAD"],
-    }),
-  );
-
-  return {
+  const intentToAddPaths = stageExpectedUntrackedPaths({
+    executionRoot: options.executionRoot,
+    expectedChangedPaths: options.expectedChangedPaths,
     commands,
-    changedPaths,
-    diffStats,
-    outputs: {
-      patch_file: patchFile,
-    },
-  };
+  });
+
+  try {
+    commands.push("git diff --binary HEAD");
+    const patchBody = runGitChecked({
+      cwd: options.executionRoot,
+      args: ["diff", "--binary", "HEAD"],
+    });
+    const patchFile = path.join(
+      options.artifactsRoot,
+      `delivery-patch-${normalizeForId(options.runId)}-${Date.now()}.patch`,
+    );
+    fs.writeFileSync(patchFile, patchBody, "utf8");
+
+    commands.push("git diff --name-only HEAD");
+    const changedPaths = parseLineList(
+      runGitChecked({
+        cwd: options.executionRoot,
+        args: ["diff", "--name-only", "HEAD"],
+      }),
+    );
+
+    commands.push("git diff --numstat HEAD");
+    const diffStats = parseNumstat(
+      runGitChecked({
+        cwd: options.executionRoot,
+        args: ["diff", "--numstat", "HEAD"],
+      }),
+    );
+
+    return {
+      commands,
+      changedPaths,
+      diffStats,
+      outputs: {
+        patch_file: patchFile,
+      },
+    };
+  } finally {
+    resetIntentToAddPaths({
+      executionRoot: options.executionRoot,
+      intentToAddPaths,
+      commands,
+    });
+  }
 }
 
 /**
@@ -338,6 +417,7 @@ export function runLocalBranchDeliveryMode(options) {
  *   enableNetworkWrite?: boolean,
  *   githubToken?: string,
  *   githubCliPath?: string,
+ *   expectedChangedPaths?: string[],
  * }} options
  */
 export function runForkFirstPrDeliveryMode(options) {
@@ -370,21 +450,36 @@ export function runForkFirstPrDeliveryMode(options) {
   const forkRemoteUrl =
     asString(options.forkRemoteUrl) ?? `https://github.com/${forkOwner}/${parsedRemote.repo}.git`;
 
-  commands.push("git diff --name-only HEAD");
-  const changedPaths = parseLineList(
-    runGitChecked({
-      cwd: options.executionRoot,
-      args: ["diff", "--name-only", "HEAD"],
-    }),
-  );
+  const intentToAddPaths = stageExpectedUntrackedPaths({
+    executionRoot: options.executionRoot,
+    expectedChangedPaths: options.expectedChangedPaths,
+    commands,
+  });
+  let changedPaths;
+  let diffStats;
+  try {
+    commands.push("git diff --name-only HEAD");
+    changedPaths = parseLineList(
+      runGitChecked({
+        cwd: options.executionRoot,
+        args: ["diff", "--name-only", "HEAD"],
+      }),
+    );
 
-  commands.push("git diff --numstat HEAD");
-  const diffStats = parseNumstat(
-    runGitChecked({
-      cwd: options.executionRoot,
-      args: ["diff", "--numstat", "HEAD"],
-    }),
-  );
+    commands.push("git diff --numstat HEAD");
+    diffStats = parseNumstat(
+      runGitChecked({
+        cwd: options.executionRoot,
+        args: ["diff", "--numstat", "HEAD"],
+      }),
+    );
+  } finally {
+    resetIntentToAddPaths({
+      executionRoot: options.executionRoot,
+      intentToAddPaths,
+      commands,
+    });
+  }
 
   const apiIntent = {
     mode: "fork-first-pr",
@@ -634,6 +729,7 @@ export function runForkFirstPrDeliveryMode(options) {
  *   enableNetworkWrite?: boolean,
  *   githubToken?: string,
  *   githubCliPath?: string,
+ *   expectedChangedPaths?: string[],
  * }} options
  */
 export function runDeliveryMode(options) {

@@ -428,7 +428,7 @@ Full-journey layer:
 - includes the materialized spec step-result as a concrete `packet://spec@evidence://...` promotion ref for adapter context, while `run start` binds the approved handoff ref into the compiled context.
 - runs the public observation lifecycle through `intake create`, `project analyze`, `project validate`, baseline `project verify --verification-label baseline-diagnostic --routed-dry-run-step implement`, `discovery run`, `spec build`, `wave create`, `handoff approve`, `project validate --require-approved-handoff`, `run start`, `run status`, primary post-run `project verify --verification-label post-run-primary`, `review run`, `eval run`, optional diagnostic `project verify --verification-label post-run-diagnostic`, and `deliver prepare --quality-gate-mode observe`.
 - repeats public `run start` / `review run` iterations with iteration-specific run ids when review or primary verification requests repair, and records each repeated step as `execution#N` and `review#N` in the step journal.
-- bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Generated live E2E project profiles default this bound to 1800 seconds per command unless the profile sets `live_e2e.target_command_timeout_sec`; Ky Codex/Qwen small and medium profiles use explicit shorter budgets and mission-scoped verification commands so Playwright/browser setup cannot block before operator-visible decisions. Timeout failures are preserved as failed step-result evidence with target setup/verification owner and phase fields.
+- bounds each target `project verify` command with a per-command timeout from the generated project profile and uses a hard local timeout signal for target commands. Generated live E2E project profiles default this bound to 1800 seconds per command unless the profile sets `live_e2e.target_command_timeout_sec`; Ky bounded full-journey profiles use explicit shorter budgets and mission-scoped verification commands so Playwright/browser setup and the full browser matrix cannot block before operator-visible decisions. Ky diagnostic full-suite policy installs Playwright browsers immediately before `npm test`, preserving full-suite evidence without reintroducing browser setup into the primary gate. Timeout failures are preserved as failed step-result evidence with target setup/verification owner and phase fields.
 - runs target verification commands with inherited Node compile-cache state disabled so the orchestrator's runtime session cache cannot corrupt target package-manager or test-runner module loading.
 - gates continuation after every observed public step by the online live E2E controller decision.
 - keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, execute profile-declared terminal stages as ordinary observed steps. Governance profiles that declare `learning` must reach learning closure even when release is not required.
@@ -637,6 +637,13 @@ Canonical fields:
 The target scorecard mirrors these canonical fields in addition to linking back
 to the summary.
 
+The final skill-agent verdict request is an operator-facing packet and must use
+the same hydrated canonical status inputs as the run summary. Once delivery,
+review, verification, or release refs have materialized in the controller state,
+the request's `completion_summary`, `current_artifact_status`,
+`canonical_status`, `runner_quality_summary`, and `quality_judgement` must
+reflect those refs before the skill-agent is asked for the final verdict.
+
 `command_status` is about technical command evidence, not final quality. If the
 runner intentionally accepts a non-zero command because it emitted a readable
 payload, the command diagnostic keeps the non-zero exit code while canonical
@@ -722,7 +729,10 @@ W35-S05 adds operator-UX proof evidence for the hardened live E2E surfaces:
   records the 2026-06-02 local attempts. Codex small reached public
   `baseline-diagnostic` target verification and was blocked by a long-running
   target `npm test`/AVA/WebKit process before a controller decision could be
-  produced. Qwen CLI availability was confirmed (`qwen --version` returned
+  produced. Current bounded Ky profiles keep `npm test` as post-run diagnostic
+  evidence and run `npx playwright install` before that diagnostic full-suite,
+  so browser-cache misses are recorded as target diagnostic findings instead of
+  pre-execution blockers. Qwen CLI availability was confirmed (`qwen --version` returned
   `0.17.0`), but the Qwen full proof was not advanced because the same target
   verification blocker appeared before provider-specific quality could be
   judged. These attempts are fail-closed blocker evidence, not proof credit.

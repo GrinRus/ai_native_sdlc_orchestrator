@@ -162,6 +162,32 @@ function toEvidenceRef(projectRoot, filePath) {
 }
 
 /**
+ * @param {string} projectRoot
+ * @param {string} ref
+ * @returns {string | null}
+ */
+function resolveLocalEvidenceFile(projectRoot, ref) {
+  const value = asString(ref);
+  if (!value) return null;
+  if (path.isAbsolute(value)) return value;
+  if (!value.startsWith("evidence://")) return null;
+  const evidencePath = value.slice("evidence://".length);
+  if (!evidencePath) return null;
+  return path.isAbsolute(evidencePath) ? evidencePath : path.resolve(projectRoot, evidencePath);
+}
+
+/**
+ * @param {string} projectRoot
+ * @param {string} filePath
+ * @param {string | null | undefined} ref
+ * @returns {string}
+ */
+function evidenceRefForLoadedFile(projectRoot, filePath, ref) {
+  const evidenceRef = asString(ref);
+  return evidenceRef?.startsWith("evidence://") ? evidenceRef : toEvidenceRef(projectRoot, filePath);
+}
+
+/**
  * @param {string} dirPath
  * @returns {string[]}
  */
@@ -601,7 +627,7 @@ export function synthesizeRepairAttempts(stepResult, classification, artifactRef
 /**
  * @param {Record<string, unknown>} stepResult
  * @param {string} artifactRef
- * @param {{ gitStatusAvailable: boolean, changedPaths: string[], nonBootstrapChangedPaths: string[], meaningfulChangedPaths: string[], nonInputChangedPaths: string[], runnerOwnedStatePaths?: string[], ignoredInputFiles: string[], strictCodeChangingNoop: boolean }} missionSemantics
+ * @param {{ gitStatusAvailable: boolean, changedPaths: string[], nonBootstrapChangedPaths: string[], meaningfulChangedPaths: string[], nonInputChangedPaths: string[], runnerOwnedStatePaths?: string[], ignoredInputFiles: string[], strictCodeChangingNoopDetectionApplied?: boolean, strictCodeChangingNoop: boolean }} missionSemantics
  */
 function buildStepDecision(stepResult, artifactRef, missionSemantics) {
   const routedExecution = asRecord(stepResult.routed_execution);
@@ -640,6 +666,7 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
       meaningful_changed_paths: missionSemantics.meaningfulChangedPaths,
       runner_owned_state_paths: asStringArray(missionSemantics.runnerOwnedStatePaths),
       ignored_input_files: missionSemantics.ignoredInputFiles,
+      strict_code_changing_noop_detection_applied: missionSemantics.strictCodeChangingNoopDetectionApplied === true,
       strict_code_changing_noop: missionSemantics.strictCodeChangingNoop,
     },
     evidence_refs: uniqueStrings([artifactRef, ...asStringArray(stepResult.evidence_refs)]),
@@ -653,7 +680,10 @@ function buildStepDecision(stepResult, artifactRef, missionSemantics) {
  * }} options
  */
 function loadRunStepArtifacts(options) {
-  const loadedArtifacts = loadAllRunStepArtifacts(options);
+  const loadedArtifacts = [
+    ...loadAllRunStepArtifacts(options),
+    ...loadLinkedRunStepArtifacts(options),
+  ];
   const seenStepKeys = new Set();
   return loadedArtifacts.filter((entry) => {
     const stepId = asString(entry.document.step_id) ?? entry.file;
@@ -669,6 +699,7 @@ function loadRunStepArtifacts(options) {
  * @param {{
  *   init: ReturnType<typeof initializeProjectRuntime>,
  *   runId: string,
+ *   linkedEvidenceRefs?: string[],
  * }} options
  */
 function loadAllRunStepArtifacts(options) {
@@ -682,6 +713,34 @@ function loadAllRunStepArtifacts(options) {
         ? {
             file: filePath,
             artifact_ref: toEvidenceRef(options.init.projectRoot, filePath),
+            document,
+          }
+        : null;
+    })
+    .filter((entry) => entry !== null);
+}
+
+/**
+ * @param {{
+ *   init: ReturnType<typeof initializeProjectRuntime>,
+ *   runId: string,
+ *   linkedEvidenceRefs?: string[],
+ * }} options
+ */
+function loadLinkedRunStepArtifacts(options) {
+  return uniqueStrings(asStringArray(options.linkedEvidenceRefs))
+    .map((ref) => {
+      const filePath = resolveLocalEvidenceFile(options.init.projectRoot, ref);
+      if (!filePath || !path.basename(filePath).startsWith("step-result-") || !fs.existsSync(filePath)) {
+        return null;
+      }
+      const loaded = loadContractFile({ filePath, family: "step-result" });
+      if (!loaded.ok) return null;
+      const document = asRecord(loaded.document);
+      return stepResultLinksRun(document, options.runId)
+        ? {
+            file: filePath,
+            artifact_ref: evidenceRefForLoadedFile(options.init.projectRoot, filePath, ref),
             document,
           }
         : null;
@@ -1032,6 +1091,27 @@ function recommendationActionForFinding(finding) {
  */
 export function materializeRuntimeHarnessReport(options) {
   const init = initializeProjectRuntime(options);
+  const reportPath = path.join(
+    init.runtimeLayout.reportsRoot,
+    `runtime-harness-report-${normalizeId(options.runId)}.json`,
+  );
+  const previousReport = readJsonFile(reportPath);
+  const previousRunController = asRecord(previousReport?.run_controller);
+  const previousRunTransitions = Array.isArray(previousReport?.run_transitions)
+    ? previousReport.run_transitions
+    : null;
+  const previousRunDecision = asRecord(previousReport?.run_decision);
+  const activeRunDecision =
+    options.runDecision && Object.keys(asRecord(options.runDecision)).length > 0
+      ? asRecord(options.runDecision)
+      : previousRunDecision;
+  const activeRunController =
+    options.runController && Object.keys(asRecord(options.runController)).length > 0
+      ? asRecord(options.runController)
+      : previousRunController;
+  const activeRunTransitions = Array.isArray(options.runTransitions)
+    ? options.runTransitions
+    : previousRunTransitions;
   const missionProfile = resolveRuntimeMissionProfile(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const missionType = options.missionType ?? missionProfile.missionType;
   const strictnessProfile = options.strictnessProfile ?? missionProfile.strictnessProfile;
@@ -1040,7 +1120,9 @@ export function materializeRuntimeHarnessReport(options) {
   const runnerOwnedStatePaths = filterRunnerOwnedStatePaths(changedPathStatus.changedPaths);
   const missionScope = loadMissionScope(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const missionScopedChanges = resolveMissionScopedChanges(nonBootstrapChangedPaths, missionScope);
-  const strictCodeChangingNoop = missionType === "code-changing" || missionType === "release";
+  const strictCodeChangingNoopDetectionApplied = missionType === "code-changing" || missionType === "release";
+  const strictCodeChangingNoop =
+    strictCodeChangingNoopDetectionApplied && missionScopedChanges.meaningfulChangedPaths.length === 0;
   const missionSemantics = {
     gitStatusAvailable: changedPathStatus.available,
     changedPaths: changedPathStatus.changedPaths,
@@ -1049,9 +1131,18 @@ export function materializeRuntimeHarnessReport(options) {
     meaningfulChangedPaths: missionScopedChanges.meaningfulChangedPaths,
     runnerOwnedStatePaths,
     ignoredInputFiles: missionScopedChanges.ignoredInputFiles,
+    strictCodeChangingNoopDetectionApplied,
     strictCodeChangingNoop,
   };
-  const stepArtifacts = loadRunStepArtifacts({ init, runId: options.runId });
+  const linkedStepEvidenceRefs = uniqueStrings([
+    ...asStringArray(activeRunDecision.evidence_refs),
+    ...asRecordArray(activeRunTransitions).flatMap((transition) => asStringArray(transition.evidence_refs)),
+  ]);
+  const stepArtifacts = loadRunStepArtifacts({
+    init,
+    runId: options.runId,
+    linkedEvidenceRefs: linkedStepEvidenceRefs,
+  });
   const runtimePermissionStepArtifacts = loadRuntimePermissionStepArtifacts({ init, runId: options.runId });
   const qualityArtifacts = loadRunQualityArtifacts({ init, runId: options.runId });
   const deliveryArtifacts = loadRunDeliveryArtifacts({ init, runId: options.runId });
@@ -1112,25 +1203,6 @@ export function materializeRuntimeHarnessReport(options) {
     ...stepDecisions.flatMap((decision) => asStringArray(decision.evidence_refs)),
   ]);
 
-  const reportPath = path.join(
-    init.runtimeLayout.reportsRoot,
-    `runtime-harness-report-${normalizeId(options.runId)}.json`,
-  );
-  const previousReport = readJsonFile(reportPath);
-  const previousRunController = asRecord(previousReport?.run_controller);
-  const previousRunTransitions = Array.isArray(previousReport?.run_transitions)
-    ? previousReport.run_transitions
-    : null;
-  const previousRunDecision = asRecord(previousReport?.run_decision);
-  const activeRunDecision =
-    options.runDecision && Object.keys(asRecord(options.runDecision)).length > 0
-      ? asRecord(options.runDecision)
-      : previousRunDecision;
-  const activeRunController =
-    options.runController && Object.keys(asRecord(options.runController)).length > 0
-      ? asRecord(options.runController)
-      : previousRunController;
-
   const report = {
     report_id: `${options.runId}.runtime-harness-report.v1`,
     project_id: init.projectId,
@@ -1152,10 +1224,8 @@ export function materializeRuntimeHarnessReport(options) {
   if (Object.keys(activeRunController).length > 0) {
     report.run_controller = cloneJson(activeRunController);
   }
-  if (Array.isArray(options.runTransitions)) {
-    report.run_transitions = cloneJson(options.runTransitions);
-  } else if (previousRunTransitions) {
-    report.run_transitions = cloneJson(previousRunTransitions);
+  if (Array.isArray(activeRunTransitions)) {
+    report.run_transitions = cloneJson(activeRunTransitions);
   }
   if (Object.keys(activeRunDecision).length > 0) {
     report.run_decision = cloneJson(activeRunDecision);

@@ -15,7 +15,12 @@ Normalized output of one step regardless of whether that step was an artifact, p
 ## Notes
 Step results make routing, validation, and quality logic consistent across the lifecycle.
 Execution engines may add replay metadata (for example route/asset/policy/adapter selections, timestamps, dry-run mode, and blocked-next-step guidance) as optional fields.
-`project verify` runner step results may add `command_timeout_ms` and `timed_out` so command-bound failures are machine-readable in addition to the transcript evidence.
+`project verify` runner step results may add command-level evidence so bounded verification is machine-readable in addition to the transcript evidence:
+- `command_timeout_ms` and `timed_out`;
+- `started_at`, `finished_at`, and `duration_ms`;
+- `exit_code`, `signal`, and `error_code`;
+- `output_excerpt.stdout_tail` and `output_excerpt.stderr_tail`.
+- `output_quality_findings[]` when an exit-0 command still emits high-signal warning output such as Python or Node warning tokens in stderr; these findings are bounded, query-safe evidence and make the command result `failed` unless a current `project verify` run marks the same warning class from a prior verify summary as `baseline_status=pre_existing`.
 Catalog-backed runner steps may carry `routed_execution.feature_traceability.required_path_prefixes[]`. This is read-model traceability for `execution_evidence.real_code_change_status`: it identifies the minimum repository surfaces that can prove a mission-relevant change. It is not an allowed/forbidden path gate and must not replace review, verification, or delivery evidence.
 Runtime Harness controllers may add optional decision metadata:
 - `mission_outcome` (`satisfied|not_satisfied|not_applicable|unknown`)
@@ -57,6 +62,7 @@ Permission requests may also be summarized at top level as `runtime_permission_r
 The shared contract loader validates nested step-result fields that carry runtime control evidence:
 - `evidence_refs[]` and nested evidence arrays must contain strings.
 - `runtime_harness_decision` must use `pass|retry|repair|escalate|block|fail` when present.
+- `project verify` command evidence is optional for backward compatibility, but when present `exit_code` is numeric or `null`, `signal` and `error_code` are strings or `null`, `output_excerpt` must stay a bounded summary rather than a full transcript, and `output_quality_findings[]` entries must carry string `rule_id`, `source`, `severity`, `summary`, and optional bounded `excerpt`. Baseline-accepted warning findings may add string `baseline_status` and `baseline_evidence_refs[]` pointing to the prior verify summaries that prove the warning class was pre-existing.
 - `requested_interaction` may be `null`; when present it must be an object with `requested` as a boolean, optional `status` in `requested|answered|resumed|resume_failed|blocked`, query-safe evidence refs, optional query-safe `state_history[]`, and no raw answer fields.
 - `external_runner` must preserve `runtime_mode` and `command` when present; `raw_evidence_ref` is validated as a string when available, and `exit_code` is numeric when available or `null` for missing-command preflight failures.
 - `repair_attempts[]` entries must be objects with `attempt`, `trigger`, `result`, and `input_evidence_refs[]`.

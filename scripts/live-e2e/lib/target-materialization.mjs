@@ -64,9 +64,15 @@ export function materializeFeatureRequestFile(options) {
     mission_id: missionId,
     title: asNonEmptyString(options.mission.title) || missionId,
     brief: asNonEmptyString(options.mission.brief) || "Catalog-backed full-journey feature request.",
+    goals: asStringArray(options.mission.goals),
+    kpis: Array.isArray(options.mission.kpis)
+      ? options.mission.kpis.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
+      : [],
+    definition_of_done: asStringArray(options.mission.definition_of_done),
     expected_evidence: asStringArray(options.mission.expected_evidence),
     acceptance_checks: asStringArray(options.mission.acceptance_checks),
     change_evidence: asRecord(options.mission.change_evidence),
+    post_run_quality: asRecord(options.mission.post_run_quality),
     scenario_family: options.scenarioFamily,
     provider_variant_id: options.providerVariantId,
     feature_size: options.featureSize,
@@ -250,6 +256,34 @@ function hydrateRepoVerificationCommands(repoRecord, verification) {
 }
 
 /**
+ * @param {{
+ *   catalogVerification: Record<string, unknown>,
+ *   profileVerification: Record<string, unknown>,
+ *   mission?: Record<string, unknown>,
+ * }} options
+ */
+function resolveGeneratedProfileVerification(options) {
+  const missionQuality = asRecord(asRecord(options.mission).post_run_quality);
+  const catalogSetupCommands = asStringArray(options.catalogVerification.setup_commands);
+  const profileSetupCommands = asStringArray(options.profileVerification.setup_commands);
+  const catalogVerificationCommands = asStringArray(options.catalogVerification.commands);
+  const profileVerificationCommands = asStringArray(options.profileVerification.commands);
+  const missionPrimaryCommands = asStringArray(missionQuality.primary_commands);
+
+  return {
+    ...options.catalogVerification,
+    ...options.profileVerification,
+    setup_commands: profileSetupCommands.length > 0 ? profileSetupCommands : catalogSetupCommands,
+    commands:
+      profileVerificationCommands.length > 0
+        ? profileVerificationCommands
+        : missionPrimaryCommands.length > 0
+          ? missionPrimaryCommands
+          : catalogVerificationCommands,
+  };
+}
+
+/**
  * @param {Record<string, unknown>} profile
  * @param {Record<string, unknown>} runtimeDefaults
  * @returns {number}
@@ -287,6 +321,7 @@ export function normalizeDeliveryMode(value) {
  *   profilePath: string,
  *   profile: Record<string, unknown>,
  *   catalogEntry?: Record<string, unknown>,
+ *   mission?: Record<string, unknown>,
  *   providerVariant?: Record<string, unknown>,
  *   runId: string,
  *   targetCheckout: ReturnType<typeof materializeTargetCheckout>,
@@ -334,10 +369,14 @@ export function materializeGeneratedProjectProfile(options) {
     kind: "local",
     root: ".",
   };
-  hydrateRepoVerificationCommands(selectedRepo, {
-    ...asRecord(asRecord(options.catalogEntry).verification),
-    ...asRecord(options.profile.verification),
-  });
+  hydrateRepoVerificationCommands(
+    selectedRepo,
+    resolveGeneratedProfileVerification({
+      catalogVerification: asRecord(asRecord(options.catalogEntry).verification),
+      profileVerification: asRecord(options.profile.verification),
+      mission: asRecord(options.mission),
+    }),
+  );
   generatedProjectProfile.repos = [selectedRepo];
 
   const runtimeDefaults = asRecord(generatedProjectProfile.runtime_defaults);

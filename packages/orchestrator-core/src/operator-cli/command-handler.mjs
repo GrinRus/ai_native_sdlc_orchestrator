@@ -416,6 +416,7 @@ export function formatCommandHelp(definition) {
             "- --require-validation-pass enforces validation gate before verify can proceed.",
             "- --routed-dry-run-step executes one routed dry-run step and writes a durable step-result artifact.",
             "- --routed-live-step executes one routed live step when delivery guardrails and supported adapter baseline permit it.",
+            "- --output-quality-baseline accepts prior verify summaries whose warning findings may be marked pre-existing instead of blocking the current verify.",
             "- Use --approved-handoff-ref and --promotion-evidence-refs with --routed-live-step for non-no-write live routes.",
             "- --routed-dry-run-step and --routed-live-step are mutually exclusive.",
             `- --runtime-root defaults to '${RUNTIME_ROOT_DIRNAME}' under the resolved project ref.`,

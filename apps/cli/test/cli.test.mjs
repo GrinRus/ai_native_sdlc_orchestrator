@@ -1052,6 +1052,7 @@ test("operator command help documents routed delivery and audit metadata", () =>
   assert.equal(verifyHelp.exitCode, 0);
   assert.match(verifyHelp.stdout, /--verification-label <label>/);
   assert.match(verifyHelp.stdout, /--repo-build-command <cmd>/);
+  assert.match(verifyHelp.stdout, /--output-quality-baseline <verify-summary>/);
   assert.match(verifyHelp.stdout, /--route-overrides <step=route_id,\.\.\.>/);
   assert.match(verifyHelp.stdout, /verification_label/);
 
@@ -3507,6 +3508,52 @@ test("project verify resolves runtime root and contract metadata", () => {
   });
 });
 
+test("project verify passes output quality baseline through the CLI handler", () => {
+  withTempProject((projectRoot) => {
+    fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, "examples"), path.join(projectRoot, "examples"), { recursive: true });
+    const warningCommand = "node -e \"process.stderr.write('sys:1: ResourceWarning: unclosed file\\\\n')\"";
+
+    const baselineResult = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--verification-label",
+      "baseline-diagnostic",
+      "--repo-test-command",
+      warningCommand,
+    ]);
+    assert.equal(baselineResult.exitCode, 0, baselineResult.stderr);
+    const baselinePayload = JSON.parse(baselineResult.stdout);
+    const baselineSummary = JSON.parse(fs.readFileSync(baselinePayload.verify_summary_file, "utf8"));
+    assert.equal(baselineSummary.status, "failed");
+    assert.equal(baselineSummary.output_quality_failed_commands.length, 1);
+
+    const postRunResult = invokeCli([
+      "project",
+      "verify",
+      "--project-ref",
+      projectRoot,
+      "--verification-label",
+      "post-run-primary",
+      "--repo-test-command",
+      warningCommand,
+      "--output-quality-baseline",
+      baselinePayload.verify_summary_file,
+    ]);
+    assert.equal(postRunResult.exitCode, 0, postRunResult.stderr);
+    const postRunPayload = JSON.parse(postRunResult.stdout);
+    const postRunSummary = JSON.parse(fs.readFileSync(postRunPayload.verify_summary_file, "utf8"));
+
+    assert.equal(postRunSummary.status, "passed");
+    assert.deepEqual(postRunSummary.output_quality_baseline_files, [baselinePayload.verify_summary_file]);
+    assert.equal(postRunSummary.output_quality_baseline_matches.length, 1);
+    assert.equal(postRunSummary.output_quality_failed_commands.length, 0);
+    assert.equal(postRunSummary.output_quality_observed_commands.length, 1);
+  });
+});
+
 test("project verify supports routed dry-run smoke execution with compiled-context linkage", () => {
   withTempProject((projectRoot) => {
     fs.mkdirSync(path.join(projectRoot, ".git"), { recursive: true });
@@ -4485,6 +4532,12 @@ test("W13 run start, review run, and learning handoff produce durable execution 
         projectRoot,
         "--materialize-project-profile",
         "--materialize-bootstrap-assets",
+        "--repo-build-command",
+        "node -e \"process.exit(0)\"",
+        "--repo-lint-command",
+        "node -e \"process.exit(0)\"",
+        "--repo-test-command",
+        "node -e \"process.exit(0)\"",
       ]);
       assert.equal(initResult.exitCode, 0, initResult.stderr);
       configureCodexExternalRuntimeSuccess({ projectRoot });

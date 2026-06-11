@@ -85,7 +85,7 @@ Evidence summary:
 - After this attempt, real external provider adapter profiles were aligned to `timeout_ms=3600000` while keeping `preflight_timeout_ms=120000`, so future full-journey attempts can use the intended 60 minute full-runner bound.
 - `runtime_permission_summary.total=0`; the full-bypass proof did not produce runtime permission interactions.
 - The profile safety policy remained `no-upstream-write`; the target-cleanliness check before execution passed.
-- Strict code-changing inspection reported `strict_code_changing_noop=true` with no meaningful changed paths, so the operator decision blocked continuation to `review`.
+- Strict code-changing inspection reported `strict_code_changing_noop_detection_applied=true` and `strict_code_changing_noop=true` with no meaningful changed paths, so the operator decision blocked continuation to `review`.
 
 This is committed blocked/pending evidence, not promotion evidence. Keep `open-code-primary` as extended candidate coverage until a passing full-journey proof completes with meaningful target changes and closed acceptance status.
 

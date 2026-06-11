@@ -63,6 +63,119 @@ test("verifyProjectRuntime records passing bounded command execution", () => {
   });
 });
 
+test("verifyProjectRuntime records command exit and output evidence", () => {
+  withTempRepo((repoRoot) => {
+    const command = "node -e \"process.stdout.write('ok-output'); process.stderr.write('ok-stderr')\"";
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+      repoTestCommands: [command],
+    });
+
+    assert.equal(result.verifySummary.status, "passed");
+    const step = result.stepResults.find((candidate) => candidate.command === command);
+    assert.ok(step);
+    assert.equal(step.status, "passed");
+    assert.equal(step.exit_code, 0);
+    assert.equal(step.signal, null);
+    assert.equal(step.error_code, null);
+    assert.equal(typeof step.started_at, "string");
+    assert.equal(typeof step.finished_at, "string");
+    assert.equal(typeof step.duration_ms, "number");
+    assert.equal(step.output_excerpt.stdout_tail, "ok-output");
+    assert.equal(step.output_excerpt.stderr_tail, "ok-stderr");
+  });
+});
+
+test("verifyProjectRuntime fails exit-zero commands that emit warning output on stderr", () => {
+  withTempRepo((repoRoot) => {
+    const command = "node -e \"process.stderr.write('sys:1: ResourceWarning: unclosed file\\\\n')\"";
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+      repoTestCommands: [command],
+    });
+
+    assert.equal(result.verifySummary.status, "failed");
+    assert.equal(result.verifySummary.output_quality_failed_commands.length, 1);
+    const step = result.stepResults.find((candidate) => candidate.command === command);
+    assert.ok(step);
+    assert.equal(step.status, "failed");
+    assert.equal(step.exit_code, 0);
+    assert.match(step.summary, /exited 0 but emitted warning output/u);
+    assert.equal(step.output_quality_findings.length, 1);
+    assert.equal(step.output_quality_findings[0].rule_id, "stderr-language-warning");
+    assert.match(step.output_quality_findings[0].excerpt, /ResourceWarning/u);
+    assert.match(step.blocked_next_step, /stderr warning output/u);
+  });
+});
+
+test("verifyProjectRuntime accepts warning output that matches baseline evidence", () => {
+  withTempRepo((repoRoot) => {
+    const command = "node -e \"process.stderr.write('sys:1: ResourceWarning: unclosed file\\\\n')\"";
+    const baseline = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "baseline-diagnostic",
+      repoTestCommands: [command],
+    });
+
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+      repoTestCommands: [command],
+      outputQualityBaselineFiles: [baseline.verifySummaryPath],
+    });
+
+    assert.equal(baseline.verifySummary.status, "failed");
+    assert.equal(result.verifySummary.status, "passed");
+    assert.equal(result.verifySummary.output_quality_failed_commands.length, 0);
+    assert.equal(result.verifySummary.output_quality_observed_commands.length, 1);
+    assert.equal(result.verifySummary.output_quality_baseline_matches.length, 1);
+    assert.deepEqual(result.verifySummary.output_quality_baseline_files, [baseline.verifySummaryPath]);
+    const step = result.stepResults.find((candidate) => candidate.command === command);
+    assert.ok(step);
+    assert.equal(step.status, "passed");
+    assert.match(step.summary, /matched baseline diagnostic evidence/u);
+    assert.equal(step.output_quality_findings.length, 1);
+    assert.equal(step.output_quality_findings[0].baseline_status, "pre_existing");
+    assert.deepEqual(step.output_quality_findings[0].baseline_evidence_refs, [baseline.verifySummaryPath]);
+  });
+});
+
+test("verifyProjectRuntime still fails warning output that is not in the baseline", () => {
+  withTempRepo((repoRoot) => {
+    const baselineCommand = "node -e \"process.stderr.write('sys:1: ResourceWarning: unclosed file\\\\n')\"";
+    const currentCommand = "node -e \"process.stderr.write('sys:1: DeprecationWarning: old api\\\\n')\"";
+    const baseline = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "baseline-diagnostic",
+      repoTestCommands: [baselineCommand],
+    });
+
+    const result = verifyProjectRuntime({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      verificationLabel: "post-run-primary",
+      repoTestCommands: [currentCommand],
+      outputQualityBaselineFiles: [baseline.verifySummaryPath],
+    });
+
+    assert.equal(result.verifySummary.status, "failed");
+    assert.equal(result.verifySummary.output_quality_failed_commands.length, 1);
+    assert.equal(result.verifySummary.output_quality_baseline_matches.length, 0);
+    const step = result.stepResults.find((candidate) => candidate.command === currentCommand);
+    assert.ok(step);
+    assert.equal(step.status, "failed");
+    assert.equal(step.output_quality_findings[0].baseline_status, undefined);
+    assert.match(step.output_quality_findings[0].excerpt, /DeprecationWarning/u);
+  });
+});
+
 test("verifyProjectRuntime keeps labeled step results distinct across repeated verifies", () => {
   withTempRepo((repoRoot) => {
     const primary = verifyProjectRuntime({
@@ -156,6 +269,7 @@ test("verifyProjectRuntime reports blocked next step when bounded command fails"
     assert.equal(result.verifySummary.status, "failed");
     assert.ok(result.stepResults.some((step) => step.status === "failed"));
     assert.ok(result.stepResults.some((step) => step.command_owner === "main"));
+    assert.ok(result.stepResults.some((step) => step.status === "failed" && step.exit_code === 2));
     assert.ok(
       result.stepResults.some(
         (step) => typeof step.blocked_next_step === "string" && step.blocked_next_step.length > 0,
@@ -183,6 +297,8 @@ test("verifyProjectRuntime times out long-running verification commands", () => 
     assert.equal(failedStep.status, "failed");
     assert.equal(failedStep.timed_out, true);
     assert.equal(failedStep.command_timeout_ms, 1000);
+    assert.equal(typeof failedStep.duration_ms, "number");
+    assert.equal(failedStep.exit_code, null);
     assert.match(failedStep.summary, /timed out after 1000ms/u);
 
     const transcript = fs.readFileSync(failedStep.evidence_refs[0], "utf8");

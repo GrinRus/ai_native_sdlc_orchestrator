@@ -7,6 +7,8 @@ activation_hints:
 workflow:
   - id: inspect-changes
     instruction: assess contract alignment, regression risks, and missing evidence
+  - id: inspect-verification-output
+    instruction: treat warnings, resource leaks, deprecations, or suspicious stderr in primary verification output as review findings even when commands exit successfully; only classify them as pre-existing with same-command unchanged-baseline evidence
   - id: classify-findings
     instruction: prioritize issues by severity and identify blocking outcomes
   - id: report-review

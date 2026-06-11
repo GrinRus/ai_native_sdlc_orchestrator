@@ -12,6 +12,9 @@ workflow:
   stages:
     - inspect packet and repo scope
     - execute only project-approved verification commands
+    - verify the working tree that contains the final edits, without stashing, reverting, checking out, or otherwise hiding those edits first
+    - inspect verification stdout and stderr for warnings, resource leaks, deprecations, or skipped assertions introduced by the change; remediate them before reporting pass
+    - treat stderr warning tokens from primary verification as blocking even when the command exits 0, unless the same exact primary command has been rerun on the unchanged baseline and reproduces the same warning
     - capture diff and validation evidence
     - stop on scope expansion or missing prerequisites
 source_refs:

@@ -15,10 +15,30 @@ function unique(values) {
 
 /**
  * @param {unknown} value
+ * @returns {string[]}
+ */
+function asStringArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim())
+    : [];
+}
+
+/**
+ * @param {unknown} value
  * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
   return typeof value === "object" && value !== null ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Array<Record<string, unknown>>}
+ */
+function asRecordArray(value) {
+  return Array.isArray(value)
+    ? value.filter((entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry))
+    : [];
 }
 
 /**
@@ -83,6 +103,167 @@ function deriveAllowedCommands(profile) {
   }
 
   return unique(commands);
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizePathHint(value) {
+  return value.replace(/\\/gu, "/").replace(/^\.\//u, "").replace(/\/+$/u, "");
+}
+
+/**
+ * @param {string} value
+ * @returns {string | null}
+ */
+function pathHintToAllowedPath(value) {
+  const raw = value.trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/\\/gu, "/").replace(/^\.\//u, "");
+  if (normalized.includes("*")) return normalized;
+  if (normalized.endsWith("/")) return `${normalizePathHint(normalized)}/**`;
+  const fileName = normalized.split("/").at(-1) ?? normalized;
+  return fileName.includes(".") ? normalized : `${normalizePathHint(normalized)}/**`;
+}
+
+/**
+ * @param {Record<string, unknown>} artifactPacketBody
+ * @returns {string[]}
+ */
+function deriveMissionAllowedPaths(artifactPacketBody) {
+  const featureRequest = asRecord(artifactPacketBody.feature_request);
+  const requestDocument = asRecord(featureRequest.request_document);
+  const requestChangeEvidence = asRecord(requestDocument.change_evidence);
+  const missionScope = asRecord(artifactPacketBody.mission_scope);
+  return unique(
+    [
+      ...asStringArray(requestChangeEvidence.required_path_prefixes).map(pathHintToAllowedPath),
+      ...asStringArray(featureRequest.allowed_paths).map(pathHintToAllowedPath),
+      ...asStringArray(missionScope.allowed_paths).map(pathHintToAllowedPath),
+    ].filter((entry) => typeof entry === "string" && entry.length > 0),
+  );
+}
+
+/**
+ * @param {Array<{ repo_id: string, paths: string[] }>} repoScopes
+ * @param {string[]} allowedPaths
+ * @returns {Array<{ repo_id: string, paths: string[] }>}
+ */
+function applyAllowedPathsToRepoScopes(repoScopes, allowedPaths) {
+  if (allowedPaths.length === 0) return repoScopes;
+  return repoScopes.map((scope) => ({
+    repo_id: scope.repo_id,
+    paths: scope.paths.includes("**") ? allowedPaths : scope.paths,
+  }));
+}
+
+/**
+ * @param {Record<string, unknown>} requestDocument
+ * @returns {{ primary_commands: string[], diagnostic_commands: string[], diagnostic_failure_mode: string | null }}
+ */
+function deriveVerificationExpectations(requestDocument) {
+  const postRunQuality = asRecord(requestDocument.post_run_quality);
+  const diagnosticFailureMode =
+    typeof postRunQuality.diagnostic_failure_mode === "string" && postRunQuality.diagnostic_failure_mode.trim().length > 0
+      ? postRunQuality.diagnostic_failure_mode.trim()
+      : null;
+  return {
+    primary_commands: unique(asStringArray(postRunQuality.primary_commands)),
+    diagnostic_commands: unique(asStringArray(postRunQuality.diagnostic_commands)),
+    diagnostic_failure_mode: diagnosticFailureMode,
+  };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {Array<Record<string, string>>}
+ */
+function normalizeKpis(value) {
+  return asRecordArray(value)
+    .map((entry) => {
+      const kpiId = typeof entry.kpi_id === "string" && entry.kpi_id.trim().length > 0 ? entry.kpi_id.trim() : null;
+      const name = typeof entry.name === "string" && entry.name.trim().length > 0 ? entry.name.trim() : null;
+      const target = typeof entry.target === "string" && entry.target.trim().length > 0 ? entry.target.trim() : null;
+      const measurement =
+        typeof entry.measurement === "string" && entry.measurement.trim().length > 0 ? entry.measurement.trim() : null;
+      if (!kpiId || !name || !target) return null;
+      return {
+        kpi_id: kpiId,
+        name,
+        target,
+        ...(measurement ? { measurement } : {}),
+      };
+    })
+    .filter((entry) => entry !== null);
+}
+
+/**
+ * @param {{
+ *   artifactPacketBody: Record<string, unknown>,
+ *   objective: string,
+ *   allowedPaths: string[],
+ *   verificationExpectations: { primary_commands: string[], diagnostic_commands: string[], diagnostic_failure_mode: string | null },
+ *   fallbackVerificationCommands?: string[],
+ * }} options
+ */
+function derivePlanningContent(options) {
+  const productIntake = asRecord(options.artifactPacketBody.product_intake);
+  const featureRequest = asRecord(options.artifactPacketBody.feature_request);
+  const requestDocument = asRecord(featureRequest.request_document);
+  const goals = unique([...asStringArray(productIntake.goals), ...asStringArray(requestDocument.goals)]);
+  const definitionOfDone = unique([
+    ...asStringArray(productIntake.definition_of_done),
+    ...asStringArray(requestDocument.definition_of_done),
+  ]);
+  const acceptanceCriteria = unique([
+    ...asStringArray(requestDocument.acceptance_checks),
+    ...definitionOfDone,
+  ]);
+  const expectedEvidence = unique(asStringArray(requestDocument.expected_evidence));
+  const kpis = normalizeKpis(productIntake.kpis).length > 0 ? normalizeKpis(productIntake.kpis) : normalizeKpis(requestDocument.kpis);
+  const implementationCriteria = acceptanceCriteria.length > 0 ? acceptanceCriteria : definitionOfDone;
+  const verificationCommands =
+    options.verificationExpectations.primary_commands.length > 0
+      ? options.verificationExpectations.primary_commands
+      : unique(asStringArray(options.fallbackVerificationCommands));
+  const verificationExpectations = {
+    ...options.verificationExpectations,
+    primary_commands: verificationCommands,
+  };
+  const localTasks = [
+    {
+      task_id: "local-task.implementation",
+      objective: goals[0] ?? options.objective,
+      allowed_paths: options.allowedPaths,
+      acceptance_criteria: implementationCriteria,
+      expected_evidence: expectedEvidence.filter((entry) => !entry.includes("verify")),
+    },
+    {
+      task_id: "local-task.verification",
+      objective: "Run bounded primary verification and preserve diagnostic evidence when configured.",
+      verification_commands: verificationCommands,
+      acceptance_criteria: definitionOfDone.length > 0 ? definitionOfDone : acceptanceCriteria,
+      expected_evidence: unique(["verify-summary", ...expectedEvidence.filter((entry) => entry.includes("review"))]),
+    },
+    {
+      task_id: "local-task.lineage",
+      objective: "Keep review, delivery, audit, and learning evidence linked to the same mission and target checkout.",
+      acceptance_criteria: acceptanceCriteria,
+      expected_evidence: expectedEvidence,
+      kpis,
+    },
+  ].filter((task) => asStringArray(task.acceptance_criteria).length > 0 || asStringArray(task.expected_evidence).length > 0);
+
+  return {
+    goals,
+    definition_of_done: definitionOfDone,
+    acceptance_criteria: acceptanceCriteria,
+    expected_evidence: expectedEvidence,
+    kpis,
+    verification_expectations: verificationExpectations,
+    local_tasks: localTasks,
+  };
 }
 
 /**
@@ -216,9 +397,14 @@ export function prepareHandoffArtifacts(options = {}) {
   const missionTraceability = asRecord(artifactPacketBody.mission_traceability);
   const featureRequest = asRecord(artifactPacketBody.feature_request);
 
-  const repoScopes = deriveRepoScopes(profile);
-  const allowedPaths = unique(repoScopes.flatMap((scope) => scope.paths));
-  const allowedCommands = deriveAllowedCommands(profile);
+  const profileRepoScopes = deriveRepoScopes(profile);
+  const missionAllowedPaths = deriveMissionAllowedPaths(artifactPacketBody);
+  const allowedPaths =
+    missionAllowedPaths.length > 0 ? missionAllowedPaths : unique(profileRepoScopes.flatMap((scope) => scope.paths));
+  const repoScopes = applyAllowedPathsToRepoScopes(profileRepoScopes, allowedPaths);
+  const requestDocument = asRecord(featureRequest.request_document);
+  const verificationExpectations = deriveVerificationExpectations(requestDocument);
+  const allowedCommands = unique([...deriveAllowedCommands(profile), ...verificationExpectations.primary_commands]);
 
   const ticketId =
     typeof options.ticketId === "string" && options.ticketId.trim().length > 0
@@ -226,14 +412,22 @@ export function prepareHandoffArtifacts(options = {}) {
       : `${init.projectId}.wave.bootstrap.v1`;
   const ticketFileName = `wave-ticket-${sanitizeFileSegment(ticketId)}.json`;
   const waveTicketFile = path.join(init.runtimeLayout.artifactsRoot, ticketFileName);
+  const objective =
+    typeof featureRequest.title === "string" && featureRequest.title.trim().length > 0
+      ? featureRequest.title
+      : "Establish a bounded handoff packet from approved bootstrap artifacts.";
+  const planningContent = derivePlanningContent({
+    artifactPacketBody,
+    objective,
+    allowedPaths,
+    verificationExpectations,
+    fallbackVerificationCommands: allowedCommands,
+  });
 
   const waveTicket = {
     ticket_id: ticketId,
     project_id: init.projectId,
-    objective:
-      typeof featureRequest.title === "string" && featureRequest.title.trim().length > 0
-        ? featureRequest.title
-        : "Establish a bounded handoff packet from approved bootstrap artifacts.",
+    objective,
     scope: {
       repo_scopes: repoScopes.map((scope) => scope.repo_id),
       allowed_paths: allowedPaths,
@@ -241,6 +435,13 @@ export function prepareHandoffArtifacts(options = {}) {
     dependencies: [String(artifactPacket.packet_id ?? "unknown-artifact")],
     risk_tier: "medium",
     status: "ready-for-handoff",
+    goals: planningContent.goals,
+    definition_of_done: planningContent.definition_of_done,
+    local_tasks: planningContent.local_tasks,
+    acceptance_criteria: planningContent.acceptance_criteria,
+    expected_evidence: planningContent.expected_evidence,
+    verification_expectations: planningContent.verification_expectations,
+    kpis: planningContent.kpis,
     approved_input_ref: `evidence://${path.relative(init.projectRoot, artifactPacketFile)}`,
     source_refs: {
       artifact_packet_file: artifactPacketFile,
@@ -282,9 +483,17 @@ export function prepareHandoffArtifacts(options = {}) {
     repo_scopes: repoScopes,
     allowed_paths: allowedPaths,
     allowed_commands: allowedCommands,
+    goals: planningContent.goals,
+    definition_of_done: planningContent.definition_of_done,
+    verification_expectations: planningContent.verification_expectations,
     verification_plan: {
       validators: ["contract-shape", "approval-state", "repo-scope"],
-      commands: allowedCommands.slice(0, 3),
+      commands:
+        planningContent.verification_expectations.primary_commands.length > 0
+          ? planningContent.verification_expectations.primary_commands
+          : allowedCommands.slice(0, 3),
+      diagnostic_commands: planningContent.verification_expectations.diagnostic_commands,
+      diagnostic_failure_mode: planningContent.verification_expectations.diagnostic_failure_mode,
     },
     scope_constraints: {
       require_bounded_scope: true,
@@ -296,6 +505,10 @@ export function prepareHandoffArtifacts(options = {}) {
       allow_unlisted_commands: false,
     },
     writeback_mode: writebackMode,
+    local_tasks: planningContent.local_tasks,
+    acceptance_criteria: planningContent.acceptance_criteria,
+    expected_evidence: planningContent.expected_evidence,
+    kpis: planningContent.kpis,
     approval_state: {
       required: true,
       state: "pending",
