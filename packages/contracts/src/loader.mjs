@@ -843,6 +843,68 @@ function validateStepResult(document, source) {
     });
   }
 
+  const outputQualityFindings = validateOptionalArrayField({
+    record: document,
+    source,
+    field: "output_quality_findings",
+    issues,
+  });
+  if (outputQualityFindings) {
+    outputQualityFindings.forEach((entry, index) => {
+      const entryField = `output_quality_findings[${index}]`;
+      if (!isPlainObject(entry)) {
+        issues.push(
+          issue({
+            code: "field_type_mismatch",
+            source,
+            field: entryField,
+            expected: "object",
+            actual: describeActualType(entry),
+            message: `Field '${entryField}' must be 'object'.`,
+          }),
+        );
+        return;
+      }
+
+      for (const field of ["rule_id", "source", "severity", "summary"]) {
+        validateNestedStringField({
+          record: entry,
+          source,
+          field: `${entryField}.${field}`,
+          issues,
+          required: true,
+        });
+      }
+      validateNestedStringField({
+        record: entry,
+        source,
+        field: `${entryField}.excerpt`,
+        issues,
+        required: false,
+      });
+      validateNestedStringField({
+        record: entry,
+        source,
+        field: `${entryField}.baseline_status`,
+        issues,
+        required: false,
+      });
+      validateNestedArrayField({
+        record: entry,
+        source,
+        field: `${entryField}.baseline_evidence_refs`,
+        issues,
+        required: false,
+      });
+      validateStringArrayItems({
+        values: entry.baseline_evidence_refs,
+        source,
+        field: `${entryField}.baseline_evidence_refs`,
+        issues,
+      });
+    });
+  }
+
   const missionSemantics = validateOptionalObjectField({
     record: document,
     source,

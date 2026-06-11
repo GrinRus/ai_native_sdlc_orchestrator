@@ -11,6 +11,8 @@ instructions:
     - target the cited failure mode directly
     - preserve previous accepted work and constraints
     - rerun required verification after every material change
+    - inspect verification stdout/stderr for warnings introduced by the repair and resolve them before claiming the fix complete
+    - treat primary verification stderr warning tokens as blocking even when the command exits 0; only classify them as pre-existing after reproducing the same warning on the unchanged baseline with the same command
 required_inputs:
   packets:
     required:

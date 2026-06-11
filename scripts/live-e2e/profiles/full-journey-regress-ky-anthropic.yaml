@@ -13,6 +13,7 @@ live_e2e:
   agent_decision_policy: required
   interaction_answer_policy: agent-required
   target_write_policy: aor-runtime-only-before-execution
+  target_command_timeout_sec: 120
 implementation_loop:
   enabled: true
   max_iterations: 3
@@ -44,6 +45,12 @@ verification:
   build: true
   lint: true
   tests: project-default
+  setup_commands:
+    - npm install --prefer-offline --no-audit --no-fund
+  commands:
+    - npx xo
+    - npm run build
+    - npx ava test/headers.ts
   eval_suites:
     - suite.regress.short@v1
   harness:

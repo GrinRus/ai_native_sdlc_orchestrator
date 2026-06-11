@@ -123,12 +123,13 @@ When runtime-agent permission mediation is enabled, `permission-mode-blocked` an
 
 When the interaction policy is `fail-closed`, existing diagnostic behavior is preserved and permission readiness failures may remain repair/fail evidence for live E2E proof runs.
 
-`mission_semantics` records the run-level semantic evidence used by the Runtime Harness for the step decision, including `changed_paths`, `non_bootstrap_changed_paths`, `meaningful_changed_paths`, `runner_owned_state_paths`, ignored request input files, and whether strict code-changing no-op detection was applied. Runtime Harness must not emit path whitelist/blacklist verdicts such as legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, or `scope_violation_paths`.
+`mission_semantics` records the run-level semantic evidence used by the Runtime Harness for the step decision, including `changed_paths`, `non_bootstrap_changed_paths`, `meaningful_changed_paths`, `runner_owned_state_paths`, ignored request input files, `strict_code_changing_noop_detection_applied`, and `strict_code_changing_noop` as the detected no-op result. Runtime Harness must not emit path whitelist/blacklist verdicts such as legacy `allowed_paths`, `forbidden_paths`, `mission_scoped_changed_paths`, or `scope_violation_paths`.
 `runner_owned_state_paths[]` is a safety gate for local runner state created inside the target checkout, including `.codex/`, `.claude/`, `.qwen/`, and `.opencode/`. Live runner execution must fail closed with `failure_class=runner-owned-state-leak` and `runtime_harness_decision=block` when these paths are present, because delivery proof must not include runner-local auth, config, skill, or session state as upstream patch content.
 
 ## Boundary rules
 - Runtime Harness reports diagnose AOR runtime behavior and may recommend recertification, but they do not promote or freeze assets.
 - Strict production run closure must prefer `run_decision` when present; older step-only reports remain diagnostic evidence but not run-level ownership proof.
+- Run-level report materialization must aggregate step results explicitly referenced by `run_decision.evidence_refs[]` and `run_transitions[].evidence_refs[]`, including `evidence://.aor/projects/...` refs that point at sibling project runtime layouts for the same target checkout.
 - Strict delivery and release commands must treat an empty `step_decisions[]` set as missing Runtime Harness execution evidence, not as a pass.
 - Strict non-`no-write` delivery and release commands must use the latest existing run-level report for the same `run_id`; they must not create a fresh empty report to satisfy the gate.
 - Strict delivery and release gates require top-level `overall_decision=pass`, `run_decision.overall_decision=pass`, `run_decision.terminal_status=closed`, and non-empty meaningful changed-path evidence when the mission requires code changes.

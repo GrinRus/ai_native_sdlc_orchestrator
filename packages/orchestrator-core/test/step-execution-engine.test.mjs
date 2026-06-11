@@ -260,6 +260,44 @@ test("materializeRuntimeHarnessReport aggregates routed step decisions for one r
   });
 });
 
+test("materializeRuntimeHarnessReport aggregates linked run-decision step evidence", () => {
+  withTempRepo((repoRoot) => {
+    const runId = "runtime-harness-linked-step";
+    const step = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+      runId,
+      stepId: "run.start.implement",
+    });
+    const linkedReportsRoot = path.join(repoRoot, ".aor/projects/sibling-run/reports");
+    fs.mkdirSync(linkedReportsRoot, { recursive: true });
+    const linkedStepResultPath = path.join(linkedReportsRoot, path.basename(step.stepResultPath));
+    fs.renameSync(step.stepResultPath, linkedStepResultPath);
+    const linkedStepResultRef = `evidence://${path.relative(repoRoot, linkedStepResultPath).replace(/\\/g, "/")}`;
+
+    const report = materializeRuntimeHarnessReport({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      runId,
+      runDecision: {
+        overall_decision: "pass",
+        terminal_status: "closed",
+        failure_class: "none",
+        repair_status: "not_required",
+        summary: "Runtime Harness closed linked step evidence.",
+        evidence_refs: [linkedStepResultRef],
+      },
+    });
+
+    assert.equal(report.report.overall_decision, "pass");
+    assert.equal(report.report.step_decisions.length, 1);
+    assert.equal(report.report.step_decisions[0].compiled_context_ref, step.stepResult.routed_execution.context_compilation.compiled_context_ref);
+    assert.ok(report.report.evidence_refs.includes(linkedStepResultRef));
+  });
+});
+
 test("runtime harness classifies structured permission denials before strict no-op repair", () => {
   const outcome = classifyRuntimeStepOutcome(
     {
@@ -822,6 +860,7 @@ test("materializeRuntimeHarnessReport marks strict code-changing live no-op as r
     assert.equal(step.stepResult.mission_outcome, "not_satisfied");
     assert.equal(step.stepResult.runtime_harness_decision, "repair");
     assert.equal(step.stepResult.repair_attempts.length, 1);
+    assert.equal(step.stepResult.mission_semantics.strict_code_changing_noop_detection_applied, true);
     assert.equal(step.stepResult.mission_semantics.strict_code_changing_noop, true);
 
     const report = materializeRuntimeHarnessReport({
@@ -1435,6 +1474,7 @@ test("Runtime Harness applies soft mission strictness for docs-only no-op runs",
     });
 
     assert.equal(result.stepResult.runtime_harness_decision, "pass");
+    assert.equal(result.stepResult.mission_semantics.strict_code_changing_noop_detection_applied, false);
     assert.equal(result.stepResult.mission_semantics.strict_code_changing_noop, false);
     assert.equal(result.stepResult.mission_semantics.mission_type, "docs-only");
     assert.equal(result.stepResult.mission_semantics.strictness_profile, "soft-docs");
@@ -1628,6 +1668,8 @@ test("Runtime Harness does not fail strict runs by path alone", () => {
     assert.equal(step.stepResult.failure_class, "none");
     assert.equal(step.stepResult.runtime_harness_decision, "pass");
     assert.deepEqual(step.stepResult.mission_semantics.meaningful_changed_paths, ["docs/out-of-scope.md"]);
+    assert.equal(step.stepResult.mission_semantics.strict_code_changing_noop_detection_applied, true);
+    assert.equal(step.stepResult.mission_semantics.strict_code_changing_noop, false);
 
     const report = materializeRuntimeHarnessReport({
       projectRef: repoRoot,

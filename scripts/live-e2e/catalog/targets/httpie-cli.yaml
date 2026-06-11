@@ -97,7 +97,9 @@ feature_missions:
       correctly. Add focused regression coverage in `tests/test_httpie_cli.py`
       for failed upgrade propagation, successful upgrade return, and debug
       stderr indentation while preserving the bounded pytest and codestyle
-      slice."
+      slice. The primary pytest command must complete without stderr warning
+      tokens, and new regression tests must use cleanup-safe fixtures or
+      context-managed resources."
     feature_size: medium
     goals:
       - Repair failed plugin upgrade exit status propagation and debug stderr
@@ -122,8 +124,15 @@ feature_missions:
       - preserve failed plugin upgrade exit status instead of falling through to
         implicit success
       - indent every debug pip stderr line with two spaces
+      - primary pytest stderr has no runtime warning tokens
+      - prefer cleanup-safe pytest fixtures or context-managed resources in new
+        tests
       - preserve bounded pytest smoke plus codestyle linkage
       - keep delivery evidence anchored to the target checkout
+    change_evidence:
+      required_path_prefixes:
+        - httpie/manager/tasks/plugins.py
+        - tests/test_httpie_cli.py
     post_run_quality:
       primary_commands:
         - venv/bin/python -m pytest tests/test_httpie_cli.py

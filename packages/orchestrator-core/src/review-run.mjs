@@ -8,6 +8,7 @@ import { initializeProjectRuntime } from "./project-init.mjs";
 import {
   isTransientBackupPath,
   listChangedPaths,
+  matchesScopePattern,
 } from "./shared/mission-scope.mjs";
 
 /**
@@ -44,6 +45,75 @@ function asStringArray(value) {
  */
 function uniqueStrings(values) {
   return [...new Set(values.filter((value) => typeof value === "string" && value.length > 0))];
+}
+
+/**
+ * @param {string} candidate
+ * @returns {boolean}
+ */
+function isTestSourcePath(candidate) {
+  const normalized = candidate.replace(/\\/g, "/");
+  return (
+    /(?:^|\/)(?:test|tests|spec|__tests__)\//u.test(normalized) &&
+    /\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/u.test(normalized)
+  );
+}
+
+/**
+ * @param {string} command
+ * @returns {boolean}
+ */
+function isBroadTestCommand(command) {
+  const normalized = command.trim();
+  if (/(?:^|\s)(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test(?:\s|$)/u.test(normalized)) {
+    return true;
+  }
+  if (/(?:^|\s)(?:npx\s+)?ava(?:\s|$)/u.test(normalized) && !/(?:^|\s)(?:test|tests|spec|__tests__)\/[^\s]+/u.test(normalized)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * @param {string} command
+ * @param {string} changedPath
+ * @returns {boolean}
+ */
+function testCommandCoversChangedPath(command, changedPath) {
+  if (isBroadTestCommand(command)) {
+    return true;
+  }
+  const normalizedCommand = command.replace(/\\/g, "/");
+  const normalizedPath = changedPath.replace(/\\/g, "/");
+  return (
+    normalizedCommand.includes(normalizedPath) ||
+    normalizedCommand.includes(`./${normalizedPath}`) ||
+    normalizedCommand.includes(path.posix.basename(normalizedPath))
+  );
+}
+
+/**
+ * @param {Record<string, unknown> | null} verifySummary
+ * @param {string[]} changedPaths
+ * @returns {{ changedTestPaths: string[], uncoveredTestPaths: string[], testCommands: string[] }}
+ */
+function findChangedTestVerificationGaps(verifySummary, changedPaths) {
+  const changedTestPaths = changedPaths.filter((candidate) => isTestSourcePath(candidate));
+  const commandOverrides = asRecord(asRecord(verifySummary).command_overrides);
+  const testCommands = asStringArray(commandOverrides.test_commands);
+  if (changedTestPaths.length === 0) {
+    return { changedTestPaths, uncoveredTestPaths: [], testCommands };
+  }
+  if (testCommands.length === 0) {
+    return { changedTestPaths, uncoveredTestPaths: changedTestPaths, testCommands };
+  }
+  return {
+    changedTestPaths,
+    uncoveredTestPaths: changedTestPaths.filter(
+      (changedPath) => !testCommands.some((command) => testCommandCoversChangedPath(command, changedPath)),
+    ),
+    testCommands,
+  };
 }
 
 /**
@@ -344,6 +414,39 @@ function summarizeFindings(findings) {
 }
 
 /**
+ * @param {Record<string, unknown>} handoffPacket
+ * @returns {boolean}
+ */
+function isApprovedHandoffPacket(handoffPacket) {
+  const approvalState = asRecord(handoffPacket.approval_state);
+  return asString(handoffPacket.status) === "approved" || asString(approvalState.state) === "approved";
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} handoffPacket
+ * @returns {string[]}
+ */
+function resolveApprovedHandoffAllowedPaths(handoffPacket) {
+  if (!handoffPacket || !isApprovedHandoffPacket(handoffPacket)) {
+    return [];
+  }
+  const allowedPaths = asStringArray(handoffPacket.allowed_paths);
+  if (allowedPaths.some((entry) => entry === "**" || entry === "**/*")) {
+    return [];
+  }
+  return allowedPaths;
+}
+
+/**
+ * @param {string} changedPath
+ * @param {string[]} allowedPaths
+ * @returns {boolean}
+ */
+function isChangedPathInsideApprovedScope(changedPath, allowedPaths) {
+  return allowedPaths.length === 0 || allowedPaths.some((pattern) => matchesScopePattern(pattern, changedPath));
+}
+
+/**
  * @param {{
  *   cwd?: string,
  *   projectRef?: string,
@@ -608,6 +711,35 @@ export function materializeReviewReport(options) {
     if (bootstrapOwnedFiles.has(candidate)) return false;
     return !bootstrapOwnedPrefixes.some((prefix) => candidate === prefix.slice(0, -1) || candidate.startsWith(prefix));
   });
+  const changedTestVerification = findChangedTestVerificationGaps(verifySummary, codeChangedPaths);
+  const approvedHandoffAllowedPaths = resolveApprovedHandoffAllowedPaths(latestHandoffPacket?.document);
+  if (changedTestVerification.uncoveredTestPaths.length > 0) {
+    const commandSummary =
+      changedTestVerification.testCommands.length > 0
+        ? changedTestVerification.testCommands.join("; ")
+        : "no primary test command was recorded";
+    pushFinding({
+      findings: artifactFindings,
+      severity: "warn",
+      category: "artifact-quality",
+      summary: `Primary verification did not explicitly exercise changed test file(s): ${changedTestVerification.uncoveredTestPaths.join(", ")}. Recorded primary test command(s): ${commandSummary}.`,
+      evidenceRefs: fs.existsSync(verifySummaryPath) ? [toEvidenceRef(init.projectRoot, verifySummaryPath)] : [],
+    });
+  }
+  if (approvedHandoffAllowedPaths.length > 0) {
+    const outOfScopeChangedPaths = codeChangedPaths.filter(
+      (changedPath) => !isChangedPathInsideApprovedScope(changedPath, approvedHandoffAllowedPaths),
+    );
+    if (outOfScopeChangedPaths.length > 0) {
+      pushFinding({
+        findings: codeFindings,
+        severity: "fail",
+        category: "code-quality",
+        summary: `Changed path(s) outside approved handoff scope: ${outOfScopeChangedPaths.join(", ")}. Approved scope: ${approvedHandoffAllowedPaths.join(", ")}.`,
+        evidenceRefs: latestHandoffPacket ? [latestHandoffPacket.artifact_ref] : [],
+      });
+    }
+  }
   if (codeChangedPaths.length === 0) {
     pushFinding({
       findings: codeFindings,

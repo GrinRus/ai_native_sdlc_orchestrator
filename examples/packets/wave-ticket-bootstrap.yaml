@@ -12,4 +12,36 @@ dependencies:
   - aor-core.artifact.bootstrap.v1
 risk_tier: medium
 status: ready-for-handoff
+goals:
+  - Produce an approved handoff packet with bounded scope before execution.
+definition_of_done:
+  - Handoff scope, commands, and verification expectations are explicit.
+local_tasks:
+  - task_id: local-task.implementation
+    objective: Prepare the bounded handoff packet from approved bootstrap artifacts.
+    allowed_paths:
+      - docs/**
+      - packages/orchestrator-core/**
+    acceptance_criteria:
+      - Handoff scope, commands, and verification expectations are explicit.
+    expected_evidence:
+      - handoff-packet
+      - review-report
+  - task_id: local-task.verification
+    objective: Run repository integrity checks before handoff approval.
+    verification_commands:
+      - pnpm check
+    expected_evidence:
+      - verify-summary
+acceptance_criteria:
+  - Handoff scope, commands, and verification expectations are explicit.
+expected_evidence:
+  - handoff-packet
+  - verify-summary
+  - review-report
+verification_expectations:
+  primary_commands:
+    - pnpm check
+  diagnostic_commands: []
+  diagnostic_failure_mode: null
 approved_input_ref: evidence://bootstrap/artifact-packet/aor-core.artifact.bootstrap.v1

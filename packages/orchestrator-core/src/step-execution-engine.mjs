@@ -1402,12 +1402,14 @@ export function executeRoutedStep(options) {
   const missionScope = loadMissionScope(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const missionProfile = resolveRuntimeMissionProfile(init.projectRoot, init.runtimeLayout.artifactsRoot);
   const missionScopedChanges = resolveMissionScopedChanges(nonBootstrapChangedPaths, missionScope);
-  const strictCodeChangingNoop =
+  const strictCodeChangingNoopDetectionApplied =
     !dryRun &&
     requestedStepClass === "implement" &&
     (missionProfile.missionType === "code-changing" || missionProfile.missionType === "release") &&
     changedPathStatusBefore.available &&
     changedPathStatusAfter.available;
+  const strictCodeChangingNoop =
+    strictCodeChangingNoopDetectionApplied && missionScopedChanges.meaningfulChangedPaths.length === 0;
   const adapterOutputForStep = asRecord(adapterResponse?.output);
   const externalRunnerForStep = asRecord(adapterOutputForStep.external_runner);
   const stepResult = {
@@ -1502,6 +1504,7 @@ export function executeRoutedStep(options) {
       runner_owned_state_paths: runnerOwnedStatePaths,
       runner_owned_state_paths_during_step: runnerOwnedStatePathsDuringStep,
       ignored_input_files: missionScopedChanges.ignoredInputFiles,
+      strict_code_changing_noop_detection_applied: strictCodeChangingNoopDetectionApplied,
       strict_code_changing_noop: strictCodeChangingNoop,
       mission_type: missionProfile.missionType,
       strictness_profile: missionProfile.strictnessProfile,

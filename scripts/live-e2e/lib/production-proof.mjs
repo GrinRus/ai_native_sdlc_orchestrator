@@ -184,6 +184,16 @@ function assessRuntimeHarnessProof(runtimeHarnessReportFile) {
 }
 
 /**
+ * @param {string[]} expectedPaths
+ * @param {string[]} actualPaths
+ * @returns {string[]}
+ */
+function findMissingChangedPaths(expectedPaths, actualPaths) {
+  const actualPathSet = new Set(actualPaths);
+  return expectedPaths.filter((changedPath) => !actualPathSet.has(changedPath));
+}
+
+/**
  * @param {string | null | undefined} reviewReportFile
  * @returns {{ status: "pass" | "fail", report_file: string | null, changed_paths: string[], findings: string[] }}
  */
@@ -275,6 +285,11 @@ export function applyProductionProofEvidence(options) {
   );
   const review = assessReviewProof(artifacts.review_report_file);
   const noUpstreamWrite = assessNoUpstreamWrite(artifacts);
+  const missingDeliveredRuntimeHarnessPaths = findMissingChangedPaths(
+    runtimeHarness.meaningful_changed_paths,
+    noUpstreamWrite.changed_paths,
+  );
+  const missingDeliveredReviewPaths = findMissingChangedPaths(review.changed_paths, noUpstreamWrite.changed_paths);
   const preflight = assessProductionPreflight(artifacts, options.productionProof);
   const changedPaths = uniqueStrings([
     ...runtimeHarness.meaningful_changed_paths,
@@ -309,6 +324,10 @@ export function applyProductionProofEvidence(options) {
     ...runtimeHarness.findings,
     ...review.findings,
     ...noUpstreamWrite.findings,
+    ...missingDeliveredRuntimeHarnessPaths.map(
+      (changedPath) => `delivery manifest omits Runtime Harness meaningful path: ${changedPath}`,
+    ),
+    ...missingDeliveredReviewPaths.map((changedPath) => `delivery manifest omits review changed path: ${changedPath}`),
     ...(changedPaths.length > 0 ? [] : ["no meaningful changed paths were recorded"]),
     ...(evidenceRefsExist ? [] : ["one or more required proof evidence files are missing"]),
   ]);
@@ -335,6 +354,12 @@ export function applyProductionProofEvidence(options) {
       changed_paths: review.changed_paths,
     },
     no_upstream_write_assertion: noUpstreamWrite,
+    delivery_integrity: {
+      status:
+        missingDeliveredRuntimeHarnessPaths.length === 0 && missingDeliveredReviewPaths.length === 0 ? "pass" : "fail",
+      missing_runtime_harness_changed_paths: missingDeliveredRuntimeHarnessPaths,
+      missing_review_changed_paths: missingDeliveredReviewPaths,
+    },
     preflight: {
       status: preflight.status,
     },

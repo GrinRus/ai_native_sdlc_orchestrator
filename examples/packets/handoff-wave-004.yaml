@@ -23,6 +23,40 @@ allowed_paths:
 allowed_commands:
   - pnpm lint
   - pnpm test
+goals:
+  - Implement bounded multirepo support without unscoped cross-repository writes.
+definition_of_done:
+  - Repo graph, scoped locks, delivery manifest, and integration validation evidence are linked.
+local_tasks:
+  - task_id: local-task.implementation
+    objective: Add bounded multirepo support across backend, mobile, and frontend scopes.
+    allowed_paths:
+      - repos/backend/**
+      - repos/mobile/**
+      - repos/frontend/**
+    acceptance_criteria:
+      - Repo graph, scoped locks, delivery manifest, and integration validation evidence are linked.
+    expected_evidence:
+      - review-report
+      - delivery-manifest
+  - task_id: local-task.verification
+    objective: Run bounded repository checks for the approved multirepo scope.
+    verification_commands:
+      - pnpm test
+    expected_evidence:
+      - verify-summary
+acceptance_criteria:
+  - Repo graph, scoped locks, delivery manifest, and integration validation evidence are linked.
+expected_evidence:
+  - verify-summary
+  - review-report
+  - delivery-manifest
+verification_expectations:
+  primary_commands:
+    - pnpm test
+  diagnostic_commands:
+    - pnpm lint
+  diagnostic_failure_mode: warn
 scope_constraints:
   max_changed_files: 18
   enforce_repo_scope: true

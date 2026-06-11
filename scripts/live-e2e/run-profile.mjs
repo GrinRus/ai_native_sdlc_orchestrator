@@ -410,6 +410,31 @@ function collectDeliveryChangedPaths(artifacts) {
 }
 
 /**
+ * @param {string | null | undefined} reportFile
+ * @returns {string[]}
+ */
+function collectRuntimeHarnessMeaningfulChangedPaths(reportFile) {
+  const report = readJsonIfPresent(asNonEmptyString(reportFile));
+  const stepDecisions = Array.isArray(report.step_decisions) ? report.step_decisions : [];
+  return uniqueStrings(
+    stepDecisions.flatMap((entry) => asStringArray(asRecord(asRecord(entry).mission_semantics).meaningful_changed_paths)),
+  );
+}
+
+/**
+ * @param {string[]} expectedPaths
+ * @param {string[]} actualPaths
+ * @param {string} label
+ * @returns {string[]}
+ */
+function buildMissingDeliveryPathFindings(expectedPaths, actualPaths, label) {
+  const actualPathSet = new Set(actualPaths);
+  return expectedPaths
+    .filter((changedPath) => !actualPathSet.has(changedPath))
+    .map((changedPath) => `delivery manifest omits ${label} changed path: ${changedPath}`);
+}
+
+/**
  * @param {Record<string, unknown>} artifacts
  * @returns {{ status: "pass" | "warn" | "not_pass", delivery_manifest_ref: string | null, review_report_ref: string | null, post_delivery_check_refs: string[], changed_paths: string[], findings: string[] }}
  */
@@ -424,6 +449,16 @@ function buildCodeQualityObservation(artifacts) {
   ]);
   const reviewReport = readJsonIfPresent(reviewReportRef);
   const reviewCodeQuality = asRecord(reviewReport.code_quality);
+  const deliveryManifest = readJsonIfPresent(deliveryManifestRef);
+  const deliveryManifestPresent = Boolean(deliveryManifestRef && Object.keys(deliveryManifest).length > 0);
+  const deliveryPaths = Array.isArray(deliveryManifest.repo_deliveries)
+    ? uniqueStrings(deliveryManifest.repo_deliveries.flatMap((entry) => asStringArray(asRecord(entry).changed_paths)))
+    : [];
+  const reviewPaths = asStringArray(reviewCodeQuality.changed_paths);
+  const runtimeHarnessPaths = collectRuntimeHarnessMeaningfulChangedPaths(
+    asNonEmptyString(artifacts.latest_runtime_harness_report_file) ||
+      asNonEmptyString(artifacts.runtime_harness_report_file),
+  );
   const findings = uniqueStrings([
     ...asFindingStrings(reviewCodeQuality.findings),
     ...(asNonEmptyString(artifacts.provider_execution_status) === "fail"
@@ -437,6 +472,12 @@ function buildCodeQualityObservation(artifacts) {
       ? ["delivery quality gate produced observed findings"]
       : []),
     ...asStringArray(artifacts.delivery_quality_gate_findings),
+    ...(deliveryManifestPresent
+      ? [
+          ...buildMissingDeliveryPathFindings(runtimeHarnessPaths, deliveryPaths, "Runtime Harness meaningful"),
+          ...buildMissingDeliveryPathFindings(reviewPaths, deliveryPaths, "review"),
+        ]
+      : []),
   ]);
   const reviewCodeStatus = normalizeVerdictStatus(reviewCodeQuality.status);
   const status =
@@ -494,6 +535,14 @@ function inferRuntimeHarnessDecision(artifacts) {
 function normalizePreVerdictQualityArtifacts(artifacts, context) {
   const reviewReport = readJsonIfPresent(asNonEmptyString(artifacts.review_report_file));
   const reviewCodeStatus = normalizeVerdictStatus(asRecord(reviewReport.code_quality).status);
+  const reviewArtifactQuality = asRecord(reviewReport.artifact_quality);
+  const reviewArtifactStatus =
+    Object.keys(reviewArtifactQuality).length > 0
+      ? normalizeVerdictStatus(reviewArtifactQuality.status)
+      : null;
+  const evaluationReport = readJsonIfPresent(asNonEmptyString(artifacts.evaluation_report_file));
+  const evaluationStatus =
+    Object.keys(evaluationReport).length > 0 ? normalizeVerdictStatus(evaluationReport.status) : null;
   const changedPaths = collectDeliveryChangedPaths(artifacts);
   const providerEvidenceMaterialized = localEvidenceRefExists(asNonEmptyString(artifacts.adapter_raw_evidence_ref), {
     reportsRoot: context.reportsRoot,
@@ -534,8 +583,11 @@ function normalizePreVerdictQualityArtifacts(artifacts, context) {
   if (!asNonEmptyString(artifacts.quality_gate_decision) && qualityInputsPass) {
     artifacts.quality_gate_decision = "pass";
   }
-  if (!asNonEmptyString(artifacts.artifact_quality_status) && qualityInputsPass) {
-    artifacts.artifact_quality_status = "pass";
+  if (!asNonEmptyString(artifacts.artifact_quality_status)) {
+    artifacts.artifact_quality_status =
+      reviewArtifactStatus ??
+      evaluationStatus ??
+      (qualityInputsPass ? "pass" : artifacts.artifact_quality_status);
   }
 }
 
@@ -1108,6 +1160,43 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "execution_readiness_file",
     "target_cleanliness_before_execution_file",
     "target_cleanliness_before_execution",
+    "routed_step_result_file",
+    "runtime_harness_report_file",
+    "latest_runtime_harness_report_file",
+    "delivery_runtime_harness_report_file",
+    "run_start_runtime_harness_report_file",
+    "runtime_harness_decision",
+    "latest_runtime_harness_decision",
+    "run_start_runtime_harness_decision",
+    "runtime_harness_overall_decision",
+    "adapter_raw_evidence_ref",
+    "provider_execution_status",
+    "real_code_change_status",
+    "code_quality_status",
+    "artifact_quality_status",
+    "quality_gate_decision",
+    "review_report_file",
+    "evaluation_report_file",
+    "post_run_verify_summary_file",
+    "post_run_verify_status",
+    "post_run_diagnostic_verify_summary_file",
+    "post_run_diagnostic_status",
+    "delivery_plan_file",
+    "delivery_manifest_file",
+    "delivery_transcript_file",
+    "delivery_quality_gate_status",
+    "delivery_quality_gate_findings",
+    "delivery_blocking",
+    "release_packet_file",
+    "release_delivery_manifest_file",
+    "release_status",
+    "learning_loop_scorecard_file",
+    "learning_loop_handoff_file",
+    "incident_report_file",
+    "feature_mission_id",
+    "feature_size",
+    "matrix_cell",
+    "coverage_follow_up",
   ]) {
     copyIfMissing(key);
   }
@@ -1870,6 +1959,80 @@ function buildPartialRunnerQualitySummary(options) {
 
 /**
  * @param {{
+ *   base: Record<string, unknown>,
+ *   canonicalStatus: Record<string, unknown>,
+ *   observationReport: Record<string, unknown>,
+ *   finalSkillAgentVerdict: Record<string, unknown>,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function applyFinalSkillAgentVerdictToRunnerQualitySummary(options) {
+  const verdict = asRecord(options.finalSkillAgentVerdict.verdict);
+  if (Object.keys(verdict).length === 0) return options.base;
+  const verdictStatus = toObservationStatus(asNonEmptyString(verdict.status) || "not_pass");
+  const verdictFindings = uniqueStrings([
+    ...asStringArray(verdict.findings),
+    ...asStringArray(options.finalSkillAgentVerdict.missingFindings),
+  ]);
+  const baseRiskFindings = asStringArray(options.base.risk_findings);
+  const acceptancePass = asNonEmptyString(options.canonicalStatus.acceptance_status) === "pass";
+  const completeness = buildLifecycleCompletenessSummary(options.observationReport);
+  const completionComplete = asNonEmptyString(completeness.continuation_status) === "complete";
+  const finalRecommendation =
+    verdictStatus === "pass" && acceptancePass && completionComplete
+      ? "accept"
+      : verdictStatus === "warn" && completionComplete
+        ? "accept_with_findings"
+        : "reject";
+  return {
+    ...options.base,
+    completion_status: asNonEmptyString(options.base.completion_status) || asNonEmptyString(completeness.continuation_status),
+    lifecycle_completeness:
+      typeof options.base.lifecycle_completeness === "object" && options.base.lifecycle_completeness
+        ? options.base.lifecycle_completeness
+        : completeness,
+    mission_satisfaction: verdictStatus === "pass" || verdictStatus === "warn" ? "pass" : "not_pass",
+    risk_findings: uniqueStrings([
+      ...baseRiskFindings,
+      ...verdictFindings,
+      ...asStringArray(options.canonicalStatus.findings),
+    ]),
+    final_recommendation: finalRecommendation,
+    final_skill_agent_verdict_status: verdictStatus,
+  };
+}
+
+/**
+ * @param {{
+ *   base: Record<string, unknown>,
+ *   runnerQualitySummary: Record<string, unknown>,
+ *   finalSkillAgentVerdict: Record<string, unknown>,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function applyFinalSkillAgentVerdictToQualityJudgement(options) {
+  const verdict = asRecord(options.finalSkillAgentVerdict.verdict);
+  if (Object.keys(verdict).length === 0) return options.base;
+  const verdictStatus = toObservationStatus(asNonEmptyString(verdict.status) || "not_pass");
+  return {
+    ...options.base,
+    runner_quality_summary: options.runnerQualitySummary,
+    quality_gate_decision:
+      verdictStatus === "pass" || verdictStatus === "warn"
+        ? asNonEmptyString(options.base.quality_gate_decision) || "pass"
+        : "fail",
+    overall_status:
+      verdictStatus === "pass"
+        ? asNonEmptyString(options.base.overall_status) || "pass"
+        : verdictStatus === "warn"
+          ? "pass_with_findings"
+          : "fail",
+    final_skill_agent_verdict_status: verdictStatus,
+  };
+}
+
+/**
+ * @param {{
  *   profile: Record<string, unknown>,
  *   canonicalStatus: Record<string, unknown>,
  *   runnerQualitySummary: Record<string, unknown>,
@@ -2069,12 +2232,12 @@ export function writeProofRunnerArtifacts(options) {
     `live-e2e-scorecard-target-${normalizeId(options.runId)}.json`,
   );
   const productionProofPolicy = buildProductionProofSummary(options.profile);
+  hydrateFlowArtifactsFromControllerState(options.flowResult.artifacts);
   normalizePreVerdictQualityArtifacts(options.flowResult.artifacts, {
     reportsRoot: options.layout.reportsRoot,
     sourceRoot: options.hostRoot,
     targetCheckoutRoot: asNonEmptyString(options.flowResult.artifacts.target_checkout_root),
   });
-  hydrateFlowArtifactsFromControllerState(options.flowResult.artifacts);
   const observationReport = buildObservationReport({
     runId: options.runId,
     profilePath: options.profilePath,
@@ -2091,12 +2254,41 @@ export function writeProofRunnerArtifacts(options) {
     options.layout.reportsRoot,
     `live-e2e-observation-report-${normalizeId(options.runId)}.json`,
   );
+  const preFinalCanonicalStatus = resolveSummaryCanonicalStatus({
+    profile: options.profile,
+    flowResult: options.flowResult,
+    observationStatus: observationReport.overall_status,
+  });
+  const preFinalRunnerQualitySummary =
+    typeof options.flowResult.artifacts.runner_quality_summary === "object" &&
+    options.flowResult.artifacts.runner_quality_summary
+      ? asRecord(options.flowResult.artifacts.runner_quality_summary)
+      : buildPartialRunnerQualitySummary({
+          canonicalStatus: preFinalCanonicalStatus,
+          observationReport,
+          flowResult: options.flowResult,
+          finalSkillAgentVerdict: { missingFindings: [] },
+        });
+  const preFinalQualityJudgement =
+    typeof options.flowResult.artifacts.quality_judgement === "object" && options.flowResult.artifacts.quality_judgement
+      ? asRecord(options.flowResult.artifacts.quality_judgement)
+      : buildPartialQualityJudgement({
+          profile: options.profile,
+          canonicalStatus: preFinalCanonicalStatus,
+          runnerQualitySummary: preFinalRunnerQualitySummary,
+          flowResult: options.flowResult,
+          observationReport,
+        });
   const finalSkillAgentVerdict = resolveFinalSkillAgentVerdict({
     runId: options.runId,
     reportsRoot: options.layout.reportsRoot,
     sourceRoot: options.hostRoot,
     targetCheckoutRoot: asNonEmptyString(options.flowResult.artifacts.target_checkout_root),
     observationReport,
+    canonicalStatus: preFinalCanonicalStatus,
+    runnerQualitySummary: preFinalRunnerQualitySummary,
+    qualityJudgement: preFinalQualityJudgement,
+    flowResult: options.flowResult,
   });
   observationReport.final_skill_agent_verdict_request_file = finalSkillAgentVerdict.requestFile;
   if (finalSkillAgentVerdict.verdict) {
@@ -2185,6 +2377,14 @@ export function writeProofRunnerArtifacts(options) {
       finalSkillAgentVerdict,
     });
   }
+  if (finalSkillAgentVerdict.verdict) {
+    options.flowResult.artifacts.runner_quality_summary = applyFinalSkillAgentVerdictToRunnerQualitySummary({
+      base: asRecord(options.flowResult.artifacts.runner_quality_summary),
+      canonicalStatus,
+      observationReport,
+      finalSkillAgentVerdict,
+    });
+  }
   if (
     !(
       typeof options.flowResult.artifacts.quality_judgement === "object" && options.flowResult.artifacts.quality_judgement
@@ -2196,6 +2396,13 @@ export function writeProofRunnerArtifacts(options) {
       runnerQualitySummary: asRecord(options.flowResult.artifacts.runner_quality_summary),
       flowResult: options.flowResult,
       observationReport,
+    });
+  }
+  if (finalSkillAgentVerdict.verdict) {
+    options.flowResult.artifacts.quality_judgement = applyFinalSkillAgentVerdictToQualityJudgement({
+      base: asRecord(options.flowResult.artifacts.quality_judgement),
+      runnerQualitySummary: asRecord(options.flowResult.artifacts.runner_quality_summary),
+      finalSkillAgentVerdict,
     });
   }
   resolveFinalSkillAgentVerdict({

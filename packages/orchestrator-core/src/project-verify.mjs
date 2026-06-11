@@ -11,6 +11,19 @@ const NO_WRITE_PREFLIGHT_SEQUENCE = Object.freeze(["clone", "inspect", "analyze"
 const DEFAULT_VERIFICATION_COMMAND_TIMEOUT_MS = 10 * 60 * 1000;
 const MIN_VERIFICATION_COMMAND_TIMEOUT_MS = 1000;
 const COMMAND_OUTPUT_MAX_BUFFER = 20 * 1024 * 1024;
+const COMMAND_OUTPUT_EXCERPT_LINES = 40;
+const OUTPUT_QUALITY_EXCERPT_MAX_LENGTH = 500;
+const OUTPUT_QUALITY_WARNING_PATTERNS = Object.freeze([
+  {
+    ruleId: "stderr-language-warning",
+    source: "stderr",
+    severity: "error",
+    pattern:
+      /\b(?:BytesWarning|DeprecationWarning|EncodingWarning|FutureWarning|ImportWarning|PendingDeprecationWarning|ResourceWarning|RuntimeWarning|SyntaxWarning|UserWarning|Warning):/u,
+    summary: "Verification command emitted warning output on stderr.",
+  },
+]);
+const OUTPUT_QUALITY_BASELINE_STATUS_PRE_EXISTING = "pre_existing";
 
 /**
  * @param {unknown} value
@@ -221,6 +234,157 @@ function buildVerificationCommandEnv() {
 }
 
 /**
+ * @param {string | null | undefined} value
+ * @returns {string}
+ */
+function excerptOutputTail(value) {
+  const text = typeof value === "string" ? value : "";
+  return text.split(/\r?\n/u).slice(-COMMAND_OUTPUT_EXCERPT_LINES).join("\n");
+}
+
+/**
+ * @param {string} text
+ * @param {RegExp} pattern
+ * @returns {string}
+ */
+function excerptFirstMatchingLine(text, pattern) {
+  const line = text.split(/\r?\n/u).find((entry) => pattern.test(entry)) ?? text;
+  return line.length > OUTPUT_QUALITY_EXCERPT_MAX_LENGTH
+    ? `${line.slice(0, OUTPUT_QUALITY_EXCERPT_MAX_LENGTH)}...`
+    : line;
+}
+
+/**
+ * @param {import("node:child_process").SpawnSyncReturns<string>} commandRun
+ * @returns {Array<{ rule_id: string, source: string, severity: string, summary: string, excerpt: string }>}
+ */
+function detectOutputQualityFindings(commandRun) {
+  const stderr = typeof commandRun.stderr === "string" ? commandRun.stderr : "";
+  /** @type {Array<{ rule_id: string, source: string, severity: string, summary: string, excerpt: string }>} */
+  const findings = [];
+
+  for (const rule of OUTPUT_QUALITY_WARNING_PATTERNS) {
+    if (rule.pattern.test(stderr)) {
+      findings.push({
+        rule_id: rule.ruleId,
+        source: rule.source,
+        severity: rule.severity,
+        summary: rule.summary,
+        excerpt: excerptFirstMatchingLine(stderr, rule.pattern),
+      });
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normalizeOutputQualityExcerpt(value) {
+  return typeof value === "string" ? value.trim().replace(/\s+/gu, " ") : "";
+}
+
+/**
+ * @param {unknown} finding
+ * @returns {string | null}
+ */
+function outputQualityFindingKey(finding) {
+  const record = asRecord(finding);
+  const ruleId = typeof record.rule_id === "string" ? record.rule_id.trim() : "";
+  const source = typeof record.source === "string" ? record.source.trim() : "";
+  const excerpt = normalizeOutputQualityExcerpt(record.excerpt);
+  const warningMatch = /\b([A-Za-z]+Warning|Warning):/u.exec(excerpt);
+  if (ruleId && source && warningMatch) {
+    return `${ruleId}::${source}::${warningMatch[1]}`;
+  }
+  if (ruleId && source && excerpt) {
+    return `${ruleId}::${source}::${excerpt.slice(0, 160)}`;
+  }
+  return null;
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} cwd
+ * @returns {string[]}
+ */
+function resolveOutputQualityBaselineFiles(value, cwd) {
+  return asStringArray(value).map((entry) => (path.isAbsolute(entry) ? entry : path.resolve(cwd, entry)));
+}
+
+/**
+ * @param {string[]} baselineFiles
+ * @returns {Map<string, string[]>}
+ */
+function collectOutputQualityBaselineIndex(baselineFiles) {
+  /** @type {Map<string, string[]>} */
+  const baselineIndex = new Map();
+  for (const baselineFile of baselineFiles) {
+    if (!fs.existsSync(baselineFile)) {
+      throw new Error(`Output quality baseline file '${baselineFile}' was not found.`);
+    }
+    const parsed = JSON.parse(fs.readFileSync(baselineFile, "utf8"));
+    const record = asRecord(parsed);
+    /** @type {unknown[]} */
+    const findingGroups = [];
+    const summaryFailedCommands = Array.isArray(record.output_quality_failed_commands)
+      ? record.output_quality_failed_commands
+      : [];
+    const summaryObservedCommands = Array.isArray(record.output_quality_observed_commands)
+      ? record.output_quality_observed_commands
+      : [];
+    for (const entry of [...summaryFailedCommands, ...summaryObservedCommands]) {
+      const findings = asRecord(entry).findings;
+      if (Array.isArray(findings)) {
+        findingGroups.push(...findings);
+      }
+    }
+    const directFindings = record.output_quality_findings;
+    if (Array.isArray(directFindings)) {
+      findingGroups.push(...directFindings);
+    }
+
+    for (const finding of findingGroups) {
+      const key = outputQualityFindingKey(finding);
+      if (!key) continue;
+      const refs = baselineIndex.get(key) ?? [];
+      refs.push(baselineFile);
+      baselineIndex.set(key, Array.from(new Set(refs)));
+    }
+  }
+  return baselineIndex;
+}
+
+/**
+ * @param {Array<{ rule_id: string, source: string, severity: string, summary: string, excerpt: string }>} findings
+ * @param {Map<string, string[]>} baselineIndex
+ * @returns {Array<{ rule_id: string, source: string, severity: string, summary: string, excerpt: string, baseline_status?: string, baseline_evidence_refs?: string[] }>}
+ */
+function annotateOutputQualityFindings(findings, baselineIndex) {
+  return findings.map((finding) => {
+    const key = outputQualityFindingKey(finding);
+    const baselineRefs = key ? baselineIndex.get(key) ?? [] : [];
+    return baselineRefs.length > 0
+      ? {
+          ...finding,
+          baseline_status: OUTPUT_QUALITY_BASELINE_STATUS_PRE_EXISTING,
+          baseline_evidence_refs: baselineRefs,
+        }
+      : finding;
+  });
+}
+
+/**
+ * @param {unknown} finding
+ * @returns {boolean}
+ */
+function isPreExistingOutputQualityFinding(finding) {
+  return asRecord(finding).baseline_status === OUTPUT_QUALITY_BASELINE_STATUS_PRE_EXISTING;
+}
+
+/**
  * @param {unknown} value
  * @returns {number | null}
  */
@@ -308,6 +472,22 @@ function terminateTimedOutProcessGroup(pid) {
  *   isolationMode?: string | null,
  *   commandTimeoutMs?: number | null,
  *   timedOut?: boolean,
+ *   startedAt?: string | null,
+ *   finishedAt?: string | null,
+ *   durationMs?: number | null,
+ *   exitCode?: number | null,
+ *   signal?: string | null,
+ *   errorCode?: string | null,
+ *   outputExcerpt?: { stdout_tail: string, stderr_tail: string } | null,
+ *   outputQualityFindings?: Array<{
+ *     rule_id: string,
+ *     source: string,
+ *     severity: string,
+ *     summary: string,
+ *     excerpt: string,
+ *     baseline_status?: string,
+ *     baseline_evidence_refs?: string[],
+ *   }>,
  * }} options
  * @returns {{ stepResultPath: string, stepResult: Record<string, unknown> }}
  */
@@ -336,6 +516,30 @@ function materializeStepResult(options) {
   }
   if (typeof options.timedOut === "boolean") {
     stepResult.timed_out = options.timedOut;
+  }
+  if (typeof options.startedAt === "string") {
+    stepResult.started_at = options.startedAt;
+  }
+  if (typeof options.finishedAt === "string") {
+    stepResult.finished_at = options.finishedAt;
+  }
+  if (typeof options.durationMs === "number") {
+    stepResult.duration_ms = options.durationMs;
+  }
+  if (Object.hasOwn(options, "exitCode")) {
+    stepResult.exit_code = options.exitCode ?? null;
+  }
+  if (Object.hasOwn(options, "signal")) {
+    stepResult.signal = options.signal ?? null;
+  }
+  if (Object.hasOwn(options, "errorCode")) {
+    stepResult.error_code = options.errorCode ?? null;
+  }
+  if (options.outputExcerpt && typeof options.outputExcerpt === "object") {
+    stepResult.output_excerpt = options.outputExcerpt;
+  }
+  if (Array.isArray(options.outputQualityFindings) && options.outputQualityFindings.length > 0) {
+    stepResult.output_quality_findings = options.outputQualityFindings;
   }
 
   const validation = validateContractDocument({
@@ -385,6 +589,7 @@ function readValidationGateStatus(runtimeLayout) {
  *  repoBuildCommands?: string[],
  *  repoLintCommands?: string[],
  *  repoTestCommands?: string[],
+ *  outputQualityBaselineFiles?: string[],
  *  verificationCommandTimeoutMs?: number,
  * }} options
  */
@@ -410,6 +615,11 @@ export function verifyProjectRuntime(options = {}) {
       ? options.verificationLabel.trim()
       : "default";
   const verificationLabelFilePart = normalizeFilePart(verificationLabel);
+  const outputQualityBaselineFiles = resolveOutputQualityBaselineFiles(
+    options.outputQualityBaselineFiles,
+    options.cwd ?? process.cwd(),
+  );
+  const outputQualityBaselineIndex = collectOutputQualityBaselineIndex(outputQualityBaselineFiles);
   const runId = `${init.projectId}.verify.${verificationLabel}.v1`;
   const workspaceIsolation = prepareWorkspaceIsolation({
     projectRoot: init.projectRoot,
@@ -462,6 +672,8 @@ export function verifyProjectRuntime(options = {}) {
         init.runtimeLayout.reportsRoot,
         `verify-command-${verificationLabelFilePart}-${index + 1}.log`,
       );
+      const startedAtMs = Date.now();
+      const startedAt = new Date(startedAtMs).toISOString();
       const commandRun = spawnSync(item.command, {
         cwd: workspaceIsolation.executionRoot,
         shell: true,
@@ -472,10 +684,27 @@ export function verifyProjectRuntime(options = {}) {
         detached: process.platform !== "win32",
         maxBuffer: COMMAND_OUTPUT_MAX_BUFFER,
       });
+      const finishedAtMs = Date.now();
+      const finishedAt = new Date(finishedAtMs).toISOString();
+      const durationMs = Math.max(0, finishedAtMs - startedAtMs);
       const timedOut = commandTimedOut(commandRun);
       if (timedOut) {
         terminateTimedOutProcessGroup(commandRun.pid);
       }
+      const exitCode = typeof commandRun.status === "number" ? commandRun.status : null;
+      const signal = typeof commandRun.signal === "string" && commandRun.signal.length > 0 ? commandRun.signal : null;
+      const commandError = /** @type {{ code?: unknown } | undefined} */ (commandRun.error);
+      const errorCode = typeof commandError?.code === "string" ? commandError.code : null;
+      const outputQualityFindings =
+        exitCode === 0 && !timedOut
+          ? annotateOutputQualityFindings(detectOutputQualityFindings(commandRun), outputQualityBaselineIndex)
+          : [];
+      const outputQualityFailureFindings = outputQualityFindings.filter(
+        (finding) => !isPreExistingOutputQualityFinding(finding),
+      );
+      const hasOutputQualityFailure = outputQualityFailureFindings.length > 0;
+      const hasPreExistingOutputQualityFindings =
+        outputQualityFindings.length > 0 && outputQualityFailureFindings.length === 0;
 
       const transcript = [
         `command: ${item.command}`,
@@ -488,9 +717,12 @@ export function verifyProjectRuntime(options = {}) {
         `timeout_ms: ${commandTimeoutMs}`,
         `timed_out: ${timedOut}`,
         "node_compile_cache: disabled",
-        `exit_code: ${commandRun.status ?? -1}`,
-        `signal: ${commandRun.signal ?? ""}`,
-        `error_code: ${/** @type {{ code?: unknown } | undefined} */ (commandRun.error)?.code ?? ""}`,
+        `started_at: ${startedAt}`,
+        `finished_at: ${finishedAt}`,
+        `duration_ms: ${durationMs}`,
+        `exit_code: ${exitCode ?? -1}`,
+        `signal: ${signal ?? ""}`,
+        `error_code: ${errorCode ?? ""}`,
         "stdout:",
         commandRun.stdout ?? "",
         "stderr:",
@@ -498,23 +730,31 @@ export function verifyProjectRuntime(options = {}) {
       ].join("\n");
       fs.writeFileSync(transcriptPath, `${transcript}\n`, "utf8");
 
-      const status = commandRun.status === 0 && !timedOut ? "passed" : "failed";
+      const status = commandRun.status === 0 && !timedOut && !hasOutputQualityFailure ? "passed" : "failed";
       const missingPrerequisites =
-        status === "failed" && !timedOut ? inferMissingPrerequisites(item.command, commandRun) : [];
+        status === "failed" && !timedOut && !hasOutputQualityFailure
+          ? inferMissingPrerequisites(item.command, commandRun)
+          : [];
       const blockedNextStep =
         status === "failed"
           ? timedOut
             ? "Inspect transcript, reduce command scope or target hang risk, or raise runtime_defaults.verification_command_timeout_sec before rerunning verify."
-            : missingPrerequisites.length > 0
-            ? `Resolve missing prerequisites (${missingPrerequisites.join("; ")}), then rerun verify.`
-            : "Inspect transcript, fix command prerequisites or command definition ownership, then rerun verify."
+            : hasOutputQualityFailure
+              ? "Inspect stderr warning output, remove or explicitly resolve warning-producing test/code behavior, then rerun verify."
+              : missingPrerequisites.length > 0
+                ? `Resolve missing prerequisites (${missingPrerequisites.join("; ")}), then rerun verify.`
+                : "Inspect transcript, fix command prerequisites or command definition ownership, then rerun verify."
           : null;
 
       const summary =
         status === "passed"
-          ? `Verification command '${item.command}' passed under owner '${item.repoId}'.`
+          ? hasPreExistingOutputQualityFindings
+            ? `Verification command '${item.command}' passed; warning output matched baseline diagnostic evidence.`
+            : `Verification command '${item.command}' passed under owner '${item.repoId}'.`
           : timedOut
             ? `Verification command '${item.command}' timed out after ${commandTimeoutMs}ms.`
+            : hasOutputQualityFailure
+              ? `Verification command '${item.command}' exited 0 but emitted warning output on stderr.`
           : missingPrerequisites.length > 0
             ? `Verification command '${item.command}' failed: missing prerequisite(s) detected.`
             : `Verification command '${item.command}' failed with exit code ${commandRun.status ?? -1}.`;
@@ -543,6 +783,17 @@ export function verifyProjectRuntime(options = {}) {
         isolationMode: workspaceIsolation.mode,
         commandTimeoutMs,
         timedOut,
+        startedAt,
+        finishedAt,
+        durationMs,
+        exitCode,
+        signal,
+        errorCode,
+        outputExcerpt: {
+          stdout_tail: excerptOutputTail(commandRun.stdout),
+          stderr_tail: excerptOutputTail(commandRun.stderr),
+        },
+        outputQualityFindings,
       });
       stepResults.push(stepResult);
       stepResultFiles.push(stepResultPath);
@@ -623,6 +874,43 @@ export function verifyProjectRuntime(options = {}) {
         step_result_ref:
           stepResultFiles[stepResults.indexOf(result)] ?? null,
       })),
+    output_quality_failed_commands: stepResults
+      .filter((result) =>
+        Array.isArray(result.output_quality_findings) &&
+        result.output_quality_findings.some((finding) => !isPreExistingOutputQualityFinding(finding)),
+      )
+      .map((result) => ({
+        repo_scope: result.repo_scope ?? null,
+        command: result.command ?? null,
+        step_result_ref: stepResultFiles[stepResults.indexOf(result)] ?? null,
+        findings: result.output_quality_findings.filter((finding) => !isPreExistingOutputQualityFinding(finding)),
+      })),
+    output_quality_observed_commands: stepResults
+      .filter((result) => Array.isArray(result.output_quality_findings) && result.output_quality_findings.length > 0)
+      .map((result) => ({
+        repo_scope: result.repo_scope ?? null,
+        command: result.command ?? null,
+        step_result_ref: stepResultFiles[stepResults.indexOf(result)] ?? null,
+        findings: result.output_quality_findings,
+      })),
+    output_quality_baseline_files: outputQualityBaselineFiles,
+    output_quality_baseline_matches: stepResults
+      .filter((result) =>
+        Array.isArray(result.output_quality_findings) &&
+        result.output_quality_findings.some((finding) => isPreExistingOutputQualityFinding(finding)),
+      )
+      .map((result) => ({
+        repo_scope: result.repo_scope ?? null,
+        command: result.command ?? null,
+        step_result_ref: stepResultFiles[stepResults.indexOf(result)] ?? null,
+        findings: result.output_quality_findings.filter((finding) => isPreExistingOutputQualityFinding(finding)),
+      })),
+    output_quality_warning_patterns: OUTPUT_QUALITY_WARNING_PATTERNS.map((rule) => ({
+      rule_id: rule.ruleId,
+      source: rule.source,
+      severity: rule.severity,
+      summary: rule.summary,
+    })),
     command_owners: Array.from(
       new Set(
         stepResults

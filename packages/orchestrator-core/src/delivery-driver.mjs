@@ -46,6 +46,66 @@ function uniqueStrings(values) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeChangedPath(value) {
+  return value.trim().replace(/\\/g, "/").replace(/^\.\//u, "");
+}
+
+/**
+ * @param {string} value
+ * @param {string} executionRoot
+ * @returns {string | null}
+ */
+function normalizeExpectedChangedPath(value, executionRoot) {
+  const normalized = normalizeChangedPath(value);
+  if (!normalized) {
+    return null;
+  }
+  if (!path.isAbsolute(normalized)) {
+    return normalized;
+  }
+
+  const relative = path.relative(executionRoot, normalized).replace(/\\/g, "/");
+  if (!relative || relative.startsWith("../")) {
+    return normalized;
+  }
+  return normalizeChangedPath(relative);
+}
+
+/**
+ * @param {Record<string, unknown>} deliveryPlan
+ * @param {string} executionRoot
+ * @returns {string[]}
+ */
+function resolveExpectedMeaningfulChangedPaths(deliveryPlan, executionRoot) {
+  const runtimeHarness = asRecord(asRecord(deliveryPlan.preconditions).runtime_harness);
+  return uniqueStrings(
+    asStringArray(runtimeHarness.meaningful_changed_paths)
+      .map((changedPath) => normalizeExpectedChangedPath(changedPath, executionRoot))
+      .filter((changedPath) => typeof changedPath === "string"),
+  );
+}
+
+/**
+ * @param {{
+ *   mode: string,
+ *   expectedMeaningfulChangedPaths: string[],
+ *   changedPaths: string[],
+ * }} options
+ * @returns {string[]}
+ */
+function findMissingExpectedChangedPaths(options) {
+  if (options.mode === "no-write" || options.expectedMeaningfulChangedPaths.length === 0) {
+    return [];
+  }
+
+  const changedPathSet = new Set(options.changedPaths.map((changedPath) => normalizeChangedPath(changedPath)));
+  return options.expectedMeaningfulChangedPaths.filter((changedPath) => !changedPathSet.has(changedPath));
+}
+
+/**
  * @param {Record<string, unknown>} coordination
  * @param {string[]} repoIds
  * @returns {Array<{ repo_id: string, role: string | null, default_branch: string | null, source_root: string | null, source_kind: string | null }>}
@@ -372,6 +432,7 @@ export function runDeliveryDriver(options = {}) {
 
   const startedAt = new Date().toISOString();
   const gitHeadBefore = readGitHead(executionRoot);
+  const expectedMeaningfulChangedPaths = resolveExpectedMeaningfulChangedPaths(deliveryPlan, executionRoot);
   /** @type {string[]} */
   const commands = [];
   /** @type {string[]} */
@@ -392,6 +453,8 @@ export function runDeliveryDriver(options = {}) {
   let errorMessage = null;
   /** @type {string[] | null} */
   let recoverySteps = null;
+  /** @type {string[]} */
+  let missingExpectedChangedPaths = [];
 
   try {
     if (rerunPreflightIssues.length > 0) {
@@ -414,11 +477,22 @@ export function runDeliveryDriver(options = {}) {
       enableNetworkWrite: options.enableNetworkWrite,
       githubToken: options.githubToken,
       githubCliPath: options.githubCliPath,
+      expectedChangedPaths: expectedMeaningfulChangedPaths,
     });
     commands.push(...modeResult.commands);
     changedPaths = modeResult.changedPaths;
     diffStats = modeResult.diffStats;
     outputs = modeResult.outputs;
+    missingExpectedChangedPaths = findMissingExpectedChangedPaths({
+      mode,
+      expectedMeaningfulChangedPaths,
+      changedPaths,
+    });
+    if (missingExpectedChangedPaths.length > 0) {
+      throw new Error(
+        `Delivery current diff is missing Runtime Harness meaningful changed path(s): ${missingExpectedChangedPaths.join(", ")}.`,
+      );
+    }
   } catch (error) {
     status = "failed";
     errorMessage = error instanceof Error ? error.message : String(error);
@@ -468,6 +542,10 @@ export function runDeliveryDriver(options = {}) {
     },
     changed_paths: changedPaths,
     diff_stats: diffStats,
+    delivery_integrity: {
+      expected_meaningful_changed_paths: expectedMeaningfulChangedPaths,
+      missing_expected_changed_paths: missingExpectedChangedPaths,
+    },
     outputs,
     error: errorMessage,
     recovery_steps: recoverySteps,

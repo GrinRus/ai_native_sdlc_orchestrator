@@ -12,6 +12,9 @@ instructions:
     - obey handoff scope and project rules
     - use concrete packet refs from request.context.required_inputs_resolved or input_packet_refs before broad repository searches
     - prefer deterministic verification over unsupported claims
+    - run verification against the working tree that contains your final edits; do not stash, revert, checkout, or otherwise hide implementation changes before verification
+    - inspect verification stdout/stderr for warnings introduced by your change; fix warning-producing tests or code before claiming completion
+    - treat stderr warning tokens from primary verification, including ResourceWarning, DeprecationWarning, RuntimeWarning, and similar language/runtime warnings, as blocking even when commands exit 0; only call them pre-existing if the same exact command reproduces the same warning on the unchanged baseline
     - stop and escalate instead of expanding scope silently
 required_inputs:
   packets:

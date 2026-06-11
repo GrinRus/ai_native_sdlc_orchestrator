@@ -2287,6 +2287,85 @@ function hasObjectFields(value) {
 }
 
 /**
+ * @param {string} value
+ * @returns {string | null}
+ */
+function localJsonPath(value) {
+  if (!value || value.startsWith("evidence://") || value.startsWith("packet://") || value.startsWith("compiled-context://")) {
+    return null;
+  }
+  return value;
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @returns {boolean}
+ */
+function isExitZeroWarningOutputFailure(stepResult) {
+  const summary = asNonEmptyString(stepResult.summary);
+  return (
+    asNonEmptyString(stepResult.status) === "failed" &&
+    stepResult.exit_code === 0 &&
+    /emitted warning output on stderr/iu.test(summary)
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} summary
+ * @returns {boolean}
+ */
+function verifySummaryFailedOnlyForWarningOutput(summary) {
+  const outputQualityFailures = Array.isArray(summary.output_quality_failed_commands)
+    ? summary.output_quality_failed_commands
+    : [];
+  const timedOutCommands = Array.isArray(summary.timed_out_commands) ? summary.timed_out_commands : [];
+  const stepResultRefs = asStringArray(summary.step_result_refs);
+  if (
+    asNonEmptyString(summary.status) !== "failed" ||
+    outputQualityFailures.length === 0 ||
+    timedOutCommands.length > 0 ||
+    stepResultRefs.length === 0
+  ) {
+    return false;
+  }
+  const stepResults = stepResultRefs
+    .map((ref) => localJsonPath(ref))
+    .filter((ref) => ref && fileExists(/** @type {string} */ (ref)))
+    .map((ref) => readJson(/** @type {string} */ (ref)));
+  if (stepResults.length !== stepResultRefs.length) return false;
+  const failedStepResults = stepResults.filter((stepResult) => asNonEmptyString(stepResult.status) === "failed");
+  return (
+    failedStepResults.length === outputQualityFailures.length &&
+    failedStepResults.length > 0 &&
+    failedStepResults.every((stepResult) => isExitZeroWarningOutputFailure(stepResult))
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {string} observedStatus
+ * @returns {string}
+ */
+function resolveEffectiveTargetBaselineStatus(artifacts, observedStatus) {
+  if (observedStatus !== "warn") return observedStatus;
+  const baselineSummaryFile = localJsonPath(asNonEmptyString(artifacts.baseline_verify_summary_file));
+  const postRunSummaryFile = localJsonPath(asNonEmptyString(artifacts.post_run_verify_summary_file));
+  if (!baselineSummaryFile || !postRunSummaryFile || !fileExists(baselineSummaryFile) || !fileExists(postRunSummaryFile)) {
+    return observedStatus;
+  }
+  const baselineSummary = readJson(baselineSummaryFile);
+  const postRunSummary = readJson(postRunSummaryFile);
+  const postRunOutputQualityFailures = Array.isArray(postRunSummary.output_quality_failed_commands)
+    ? postRunSummary.output_quality_failed_commands
+    : [];
+  return verifySummaryFailedOnlyForWarningOutput(baselineSummary) &&
+    asNonEmptyString(postRunSummary.status) === "passed" &&
+    postRunOutputQualityFailures.length === 0
+    ? "pass"
+    : observedStatus;
+}
+
+/**
  * @param {{
  *   label: string,
  *   field: string,
@@ -2645,6 +2724,7 @@ export function executeInstalledUserFlow(options) {
       profilePath: options.profilePath,
       profile: options.profile,
       catalogEntry: options.catalogEntry,
+      mission: options.mission,
       providerVariant: options.providerVariant,
       runId: options.runId,
       targetCheckout,
@@ -3481,6 +3561,7 @@ export function executeFullJourneyFlow(options) {
       profilePath: options.profilePath,
       profile: options.profile,
       catalogEntry: options.catalogEntry,
+      mission: options.mission,
       providerVariant: options.providerVariant,
       runId: options.runId,
       targetCheckout,
@@ -4144,6 +4225,9 @@ export function executeFullJourneyFlow(options) {
           label: "post-run-primary",
           commands: postRunQualityPolicy.primaryCommands,
         }),
+        ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
+          ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
+          : []),
       ], { iteration, suppressControllerPlan: true });
       artifacts.post_run_verify_summary_file = getStringField(postRunVerify.payload, "verify_summary_file");
       artifacts.post_run_verify_step_result_files = getStringArrayField(postRunVerify.payload, "step_result_files");
@@ -4421,6 +4505,9 @@ export function executeFullJourneyFlow(options) {
           label: "post-run-diagnostic",
           commands: postRunQualityPolicy.diagnosticCommands,
         }),
+        ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
+          ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
+          : []),
       ]);
       artifacts.post_run_diagnostic_verify_summary_file = getStringField(
         postRunDiagnosticVerify.payload,
@@ -4967,9 +5054,10 @@ export function executeFullJourneyFlow(options) {
       artifacts.guided_journey_proof = writtenProof.proof;
     }
 
-    const targetBaselineStatus = asNonEmptyString(artifacts.baseline_verify_status) || "fail";
+    const targetBaselineObservedStatus = asNonEmptyString(artifacts.baseline_verify_status) || "fail";
     const postRunVerificationStatus = asNonEmptyString(artifacts.post_run_verify_status) || "fail";
     const postRunDiagnosticStatus = asNonEmptyString(artifacts.post_run_diagnostic_status) || "pass";
+    const targetBaselineStatus = resolveEffectiveTargetBaselineStatus(artifacts, targetBaselineObservedStatus);
     const runtimeHarnessDecision =
       asNonEmptyString(artifacts.run_start_runtime_harness_decision) ||
       asNonEmptyString(artifacts.runtime_harness_overall_decision) ||
@@ -5073,6 +5161,7 @@ export function executeFullJourneyFlow(options) {
       feature_request_quality: artifacts.intake_artifact_packet_file && artifacts.feature_request_file ? "pass" : "fail",
       scenario_coverage_status: scenarioCoverage.status,
       provider_execution_status: providerExecutionProofStatus,
+      target_baseline_observed_status: targetBaselineObservedStatus,
       target_baseline_status: targetBaselineStatus,
       real_code_change_status: realCodeChangeStatus,
       runner_quality_summary: runnerQualitySummary,
