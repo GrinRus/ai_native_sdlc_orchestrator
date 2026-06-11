@@ -5,7 +5,7 @@ The authoritative planning model for implementation lives in:
 - `docs/backlog/mvp-implementation-backlog.md`
 - `docs/backlog/orchestrator-epics.md`
 - `docs/backlog/slice-dependency-graph.md`
-- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-44-implementation-slices.md`
+- the wave documents `docs/backlog/wave-0-implementation-slices.md` through `docs/backlog/wave-45-implementation-slices.md`
 
 ## Wave summary
 | Wave | Goal | Slice count | Primary epics | Detail doc |
@@ -55,6 +55,7 @@ The authoritative planning model for implementation lives in:
 | W42 | Publish the post-alpha.8 user-facing fix as alpha.9 and then clean up operator-initiated live E2E interruption ownership semantics. | 2 | EPIC-5, EPIC-6, EPIC-7 | `docs/backlog/wave-42-implementation-slices.md` |
 | W43 | Validate the published alpha.10 package and refresh installed-user/live E2E confidence evidence after the operator interruption classification release. | 4 | EPIC-0, EPIC-1, EPIC-6, EPIC-7 | `docs/backlog/wave-43-implementation-slices.md` |
 | W44 | Split discovery/research/spec prompt assets and define readiness transitions while preserving artifact execution compatibility. | 5 | EPIC-0, EPIC-1, EPIC-3, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-44-implementation-slices.md` |
+| W45 | Make review/QA repair cycles bounded, contract-first, operator-visible, and replayable from prompt/context lineage through proof evidence. | 6 | EPIC-0, EPIC-4, EPIC-6, EPIC-7 | `docs/backlog/wave-45-implementation-slices.md` |
 
 ## Post-MVP story allocation
 | Slice ID | Story IDs closed |
@@ -205,6 +206,12 @@ The authoritative planning model for implementation lives in:
 | W44-S03 | artifact readiness and stale transition target: DIS-07, DIS-08, ARC-08, PBO-07, OPS-10 |
 | W44-S04 | context/skill/policy overlay governance target: DIS-08, ARC-08, RQA-06, AIP-11, OPS-10 |
 | W44-S05 | post-implementation docs and live E2E proof target: DIS-08, ARC-08, DEV-04, OPS-06, OPS-10, OPS-11 |
+| W45-S01 | quality repair contract target: DEV-05, DEV-07, RQA-02, RQA-06, OPS-04 |
+| W45-S02 | bounded repair state-machine target: DEV-05, EMP-07, RQA-05, RQA-06, OPS-01 |
+| W45-S03 | quality repair CLI/API target: DEV-05, RQA-02, OPS-04, OPS-10 |
+| W45-S04 | repair-cycle console visibility target: OPS-01, OPS-02, OPS-04, OPS-11, RQA-02 |
+| W45-S05 | repair-loop proof/profile target: DEV-05, RQA-05, OPS-06, OPS-07, FIN-03 |
+| W45-S06 | post-implementation docs/live E2E acceptance target: DEV-05, DEV-07, RQA-02, RQA-05, RQA-06, OPS-04, OPS-06, OPS-07, FIN-03 |
 
 ## W0 — repository and contract foundation
 **Goal:** Turn the design package into a contributor-safe and machine-validated repository foundation.
@@ -776,6 +783,31 @@ upstream artifacts.
   classified follow-up findings.
 
 **Detailed slices:** `docs/backlog/wave-44-implementation-slices.md`
+
+## W45 - bounded review and QA repair loop
+**Goal:** Turn review and QA findings into a bounded cross-stage repair loop
+with explicit repair requests, policy budgets, prompt/context lineage,
+operator-visible next actions, and replayable proof.
+
+**Exit criteria:**
+- W45 is represented across roadmap, master backlog, dependency graph, epic map,
+  README pointer, and owning wave doc.
+- Review and QA repair findings materialize as one shared quality repair request
+  artifact with source gate, finding refs, repair scope, status, evidence refs,
+  and cycle-budget metadata.
+- The runtime state machine supports
+  `implement -> review -> repair -> review -> qa -> repair -> review -> qa`
+  without allowing unbounded automatic reruns.
+- Repair implementation steps receive source repair request refs through
+  compiled prompt/context lineage.
+- CLI/API/web surfaces expose open repair requests, attempts used/remaining,
+  blocker state, and the single next safe action.
+- Proof fixtures and a required post-implementation live E2E acceptance run
+  cover review-origin repair, QA-origin repair, and budget exhaustion.
+- Source-of-truth docs are refreshed after implementation and W45 cannot close
+  as all-ok without passing live E2E run refs.
+
+**Detailed slices:** `docs/backlog/wave-45-implementation-slices.md`
 
 ## Planning rule
 The roadmap is tracked as **wave → epic → slice → local task**. Shared backlog docs hold waves, epics, and slices. Local tasks live inside the owning wave document and can be refined branch-locally without creating new shared backlog items unless the scope becomes a new independently acceptable outcome.

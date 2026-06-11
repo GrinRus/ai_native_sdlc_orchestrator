@@ -210,6 +210,12 @@ graph TD
   W44S03[W44-S03 Artifact readiness state machine and stale transitions]
   W44S04[W44-S04 Context, skill, and policy overlays from evidence]
   W44S05[W44-S05 Post-implementation docs and live E2E validation]
+  W45S01[W45-S01 Quality repair request contract and operating model]
+  W45S02[W45-S02 Cross-stage repair state machine and next-action resolver]
+  W45S03[W45-S03 CLI and control-plane quality repair surfaces]
+  W45S04[W45-S04 Web repair-cycle observability]
+  W45S05[W45-S05 Repair-loop proof fixtures and live profile]
+  W45S06[W45-S06 Documentation refresh and live E2E acceptance]
 
   W0S01 --> W0S02
   W0S02 --> W0S03
@@ -525,6 +531,14 @@ graph TD
   W44S02 --> W44S04
   W44S03 --> W44S04
   W44S04 --> W44S05
+  W44S05 --> W45S01
+  W45S01 --> W45S02
+  W45S02 --> W45S03
+  W45S03 --> W45S04
+  W45S02 --> W45S05
+  W45S03 --> W45S05
+  W45S04 --> W45S05
+  W45S05 --> W45S06
 ```
 
 ## W0 hard dependencies
@@ -913,6 +927,16 @@ graph TD
 | W44-S04 | W44-S02, W44-S03 |
 | W44-S05 | W44-S04 |
 
+## W45 hard dependencies
+| Slice ID | Depends on |
+|---|---|
+| W45-S01 | W44-S05 |
+| W45-S02 | W45-S01 |
+| W45-S03 | W45-S02 |
+| W45-S04 | W45-S03 |
+| W45-S05 | W45-S02, W45-S03, W45-S04 |
+| W45-S06 | W45-S05 |
+
 ## Topological order
 1. W0-S01
 2. W0-S02
@@ -1120,6 +1144,12 @@ graph TD
 204. W44-S03
 205. W44-S04
 206. W44-S05
+207. W45-S01
+208. W45-S02
+209. W45-S03
+210. W45-S04
+211. W45-S05
+212. W45-S06
 
 ## Planning rule
 If a slice becomes too large during implementation, split it by introducing a new slice between existing hard dependencies rather than hiding extra work inside local tasks. Update the owning wave document, the master backlog, the epic map, and this graph together.
