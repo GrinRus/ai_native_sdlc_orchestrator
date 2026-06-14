@@ -1,0 +1,193 @@
+assessment_id: live-e2e.sample.quality-assessment.v1
+run_id: live-e2e.sample.run
+profile_id: live-e2e.full-journey.regress.ky
+generated_at: "2026-05-18T00:10:00.000Z"
+evaluator:
+  kind: swe-agent
+  ref: skill://live-e2e-runner
+  mode: post-run-freeform
+source_run_summary_file: runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+source_observation_report_file: runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+source_run_health_report_file: runtime://reports/live-e2e-run-health-report-live-e2e.sample.run.json
+assessment_request_file: runtime://reports/live-e2e-quality-assessment-request-live-e2e.sample.run.json
+overall_status: warn
+dimensions:
+  artifact_content_quality:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs:
+      - runtime://reports/discovery-research-report-live-e2e.sample.run.yaml
+      - runtime://reports/handoff-packet-live-e2e.sample.run.yaml
+    findings: []
+    recommended_followups: []
+  implementation_correctness:
+    status: warn
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/review-report-live-e2e.sample.run.json
+      - runtime://reports/post-run-verify-summary-live-e2e.sample.run.json
+    findings:
+      - category: implementation-correctness
+        severity: medium
+        summary: Verification passed, but no mission-specific behavioral eval oracle was available.
+        evidence_refs:
+          - runtime://reports/post-run-verify-summary-live-e2e.sample.run.json
+    recommended_followups:
+      - Add mission-specific behavioral assertions to the target verification path.
+  implementation_completeness:
+    status: pass
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/wave-ticket-live-e2e.sample.run.yaml
+      - runtime://reports/delivery-manifest-live-e2e.sample.run.json
+    findings: []
+    recommended_followups: []
+  code_maintainability:
+    status: warn
+    evidence_strength: weak
+    inspected_evidence_refs:
+      - runtime://reports/review-report-live-e2e.sample.run.json
+    findings:
+      - category: follow-up-needed
+        severity: low
+        summary: Static structure was reviewed heuristically; AST-level boundary checks were not run.
+        evidence_refs:
+          - runtime://reports/review-report-live-e2e.sample.run.json
+    recommended_followups:
+      - Run project-native static analysis when available.
+  test_adequacy:
+    status: warn
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/post-run-verify-summary-live-e2e.sample.run.json
+    findings:
+      - category: test-adequacy
+        severity: medium
+        summary: Target verification passed, but changed-source coverage was not proven.
+        evidence_refs:
+          - runtime://reports/post-run-verify-summary-live-e2e.sample.run.json
+    recommended_followups:
+      - Map changed source files to executed target tests.
+  security_review:
+    status: not_evaluated
+    evidence_strength: missing
+    inspected_evidence_refs: []
+    findings:
+      - category: security
+        severity: medium
+        summary: No dedicated security review evidence was produced by this flow.
+        evidence_refs: []
+    recommended_followups:
+      - Inspect secret handling, injection surfaces, authz/authn changes, and file/network access.
+  performance_regression_risk:
+    status: not_evaluated
+    evidence_strength: missing
+    inspected_evidence_refs: []
+    findings:
+      - category: performance
+        severity: low
+        summary: No latency, memory, bundle size, or render-cost evidence was produced.
+        evidence_refs: []
+    recommended_followups:
+      - Add target-appropriate performance smoke evidence for performance-sensitive missions.
+  verification_quality:
+    status: warn
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/post-run-verify-summary-live-e2e.sample.run.json
+      - runtime://reports/evaluation-report-live-e2e.sample.run.json
+    findings:
+      - category: evidence-gap
+        severity: medium
+        summary: Evaluation report was inspected as supporting evidence, not as a strong semantic oracle.
+        evidence_refs:
+          - runtime://reports/evaluation-report-live-e2e.sample.run.json
+    recommended_followups:
+      - Confirm eval suite mission coverage before treating eval status as strong acceptance proof.
+  delivery_safety:
+    status: pass
+    evidence_strength: strong
+    inspected_evidence_refs:
+      - runtime://reports/delivery-manifest-live-e2e.sample.run.json
+      - runtime://reports/no-upstream-write-live-e2e.sample.run.json
+    findings: []
+    recommended_followups: []
+  ui_ux_quality:
+    status: warn
+    evidence_strength: weak
+    inspected_evidence_refs:
+      - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+    findings:
+      - category: ui-ux
+        severity: medium
+        summary: Available evidence proves the AOR operator console rendered; it does not prove target product UX quality.
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+    recommended_followups:
+      - Inspect target product task success, copy clarity, recovery states, and responsive visual evidence for frontend targets.
+  accessibility_quality:
+    status: warn
+    evidence_strength: weak
+    inspected_evidence_refs:
+      - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+    findings:
+      - category: accessibility
+        severity: medium
+        summary: Accessibility evidence is checklist-oriented and lacks keyboard, focus order, contrast, and screen-reader proof.
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+    recommended_followups:
+      - Add axe-style, keyboard, focus, contrast, and screen-reader semantics evidence where UI is in scope.
+  evidence_strength:
+    status: warn
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+      - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+      - runtime://reports/live-e2e-run-health-report-live-e2e.sample.run.json
+    findings:
+      - category: evidence-gap
+        severity: medium
+        summary: Some dimensions rely on heuristic or indirect evidence and are marked weak or not_evaluated.
+        evidence_refs:
+          - runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+    recommended_followups:
+      - Promote weak dimensions only after adding direct evidence.
+  acceptance_criteria_traceability:
+    status: warn
+    evidence_strength: medium
+    inspected_evidence_refs:
+      - runtime://reports/wave-ticket-live-e2e.sample.run.yaml
+      - runtime://reports/review-report-live-e2e.sample.run.json
+    findings:
+      - category: acceptance-traceability
+        severity: medium
+        summary: KPI and DoD linkage was inspected from artifacts, but no strict criterion-to-evidence matrix was generated.
+        evidence_refs:
+          - runtime://reports/wave-ticket-live-e2e.sample.run.yaml
+    recommended_followups:
+      - Add an explicit acceptance criterion to evidence mapping to the assessment notes.
+gap_report:
+  not_evaluated_dimensions:
+    - security_review
+    - performance_regression_risk
+  weak_signal_dimensions:
+    - code_maintainability
+    - ui_ux_quality
+    - accessibility_quality
+  strong_evidence_dimensions:
+    - artifact_content_quality
+    - delivery_safety
+findings:
+  - category: evidence-gap
+    severity: medium
+    summary: Outcome quality is advisory and has weak or missing signals in security, performance, UI/UX, and accessibility.
+    evidence_refs:
+      - runtime://reports/live-e2e-quality-assessment-request-live-e2e.sample.run.json
+recommended_followups:
+  - Add direct semantic acceptance evidence for the target mission before treating this run as product-quality proof.
+evidence_refs:
+  - runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-run-health-report-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-quality-assessment-request-live-e2e.sample.run.json

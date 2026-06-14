@@ -47,7 +47,7 @@ guided_journey:
     - operator-request-patch-only-document-proposal
     - interaction-inbox-answer-audit
     - durable-packets-and-reports
-    - final-skill-agent-verdict
+    - quality-assessment-report
     - no-upstream-write-assertions
   flow_loop_proof:
     enabled: true
@@ -71,7 +71,7 @@ guided_journey:
       - screenshot-or-visual-guardrail
       - task-outcome
       - ux-findings
-      - skill-agent-ui-ux-verdict
+      - browser-task-proof
 operator_requests:
   enabled: true
   default_delivery_mode: no-write

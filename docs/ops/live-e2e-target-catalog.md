@@ -423,13 +423,13 @@ Run-tier taxonomy:
 - `readme-smoke`: README-led no-write installed-user path.
 - `bounded-live`: fast fail-closed provider proof.
 - `full-journey-observation`: delivery-reaching evidence with findings allowed.
-- `acceptance`: required matrix closure when canonical status is fully passing.
+- `acceptance`: required matrix attempt that may qualify only when run-health passes and required evidence is materialized.
 - `production-proof`: strict real-runner proof with no mock and no upstream writes.
 
 Required matrix closure rule:
-- `coverage_status=covered_pass` closes required coverage only for `run_tier=acceptance` or `run_tier=production-proof`.
-- `coverage_status=covered_with_findings` is useful evidence but must not be reported as completed acceptance.
-- `coverage_status=attempted_failed` means the matrix cell was attempted and did not close.
+- required coverage can close only for `run_tier=acceptance` or `run_tier=production-proof` with `live-e2e-run-health-report.overall_status=pass`;
+- run-health findings identify why a run attempt did not qualify;
+- outcome quality findings belong in `live-e2e-quality-assessment-report` and are advisory for acceptance follow-up, not provider qualification status.
 
 Canonical matrix-cell examples:
 - `small/regress/openai-primary`: `full-journey-regress-ky-small-codex.yaml`
@@ -440,7 +440,7 @@ Canonical matrix-cell examples:
 - `large/release/openai-primary`: `full-journey-release-nextjs.yaml`
 
 Production-proof candidate:
-- `full-journey-production-proof-ky-openai.yaml` uses the same curated `ky.regress.small.openai` cell, but enables `production_proof` fail-closed checks. It is the operator profile for W25-S01/W25-S02 real-run proof preparation and must not be counted as completed production proof until a real non-mock W25-S02 run records `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, required target verdicts `pass`, and a passing no-upstream-write assertion.
+- `full-journey-production-proof-ky-openai.yaml` uses the same curated `ky.regress.small.openai` cell, but enables `production_proof` fail-closed checks. It is the operator profile for W25-S01/W25-S02 real-run proof preparation and must not be counted as completed production proof until a real non-mock W25-S02 run records `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, materialized runtime/review/delivery evidence refs, and a passing no-upstream-write assertion.
 - `examples/live-e2e/fixtures/w25-s03/w25-s03-production-proof.json` is the committed sanitized proof fixture for the first completed production proof. It covers only the `ky.regress.small.openai` production cell and must not be generalized to Claude, OpenCode, or broader production-readiness claims without additional executable evidence.
 
 ## Shared no-write preflight baseline
@@ -452,6 +452,6 @@ All targets reuse the same baseline before execution-style stages:
 5. verify
 6. continue only when no-write safety gates pass
 
-For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. Historical bounded summaries used a blocking baseline gate, but bounded deterministic profiles are not current live E2E acceptance inputs. Post-run verification remains mandatory quality evidence for full-journey observation and contributes directly to the step journal and final analysis.
+For full-journey profiles, `verification.baseline_gate.mode` defaults to `diagnostic`: target verification command failures are baseline context when setup, validation, routed dry-run, adapter readiness, and safety gates pass. Historical bounded summaries used a blocking baseline gate, but bounded deterministic profiles are not current live E2E acceptance inputs. Post-run verification remains mandatory factual evidence for full-journey observation and contributes directly to the step journal, run-health, and post-run quality assessment.
 
 See `docs/ops/live-e2e-no-write-preflight.md` for the reusable bounded procedure.

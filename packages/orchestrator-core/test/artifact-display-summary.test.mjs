@@ -165,8 +165,8 @@ test("project state exposes live E2E summaries and nested provider heartbeat", (
       command: "npm install --prefer-offline --no-audit --no-fund",
       created_at: "2026-06-02T00:04:00.000Z",
     });
-    const finalRequestFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-final-skill-agent-verdict-request-ui-proof.json");
-    writeJson(finalRequestFile, {
+    const assessmentRequestFile = path.join(init.runtimeLayout.reportsRoot, "live-e2e-quality-assessment-request-ui-proof.json");
+    writeJson(assessmentRequestFile, {
       run_id: "ui-proof",
       status: "ready",
       created_at: "2026-06-02T00:05:00.000Z",
@@ -229,8 +229,8 @@ test("project state exposes live E2E summaries and nested provider heartbeat", (
       entry.label === "Baseline check: npm install --prefer-offline --no-audit",
     ));
     assert.ok(state.artifact_display_summaries.some((entry) =>
-      entry.raw_ref === finalRequestFile &&
-      entry.label === "Final skill-agent verdict request",
+      entry.raw_ref === assessmentRequestFile &&
+      entry.label === "Live E2E quality assessment request",
     ));
   });
 });

@@ -23,6 +23,8 @@
 - `review-decision.md`
 - `runtime-harness-report.md`
 - `live-e2e-observation-report.md`
+- `live-e2e-run-health-report.md`
+- `live-e2e-quality-assessment-report.md`
 - `multirepo-coordination-status.md`
 - `incident-backfill-proposal.md`
 - `dataset.md`

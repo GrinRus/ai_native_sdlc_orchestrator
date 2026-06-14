@@ -591,7 +591,6 @@ function resolveStepArtifactGateFailures(step, artifacts) {
   if (step === "review") {
     return uniqueStrings([
       failingArtifactGate(artifacts, "review_overall_status", "review"),
-      failingArtifactGate(artifacts, "quality_gate_decision", "quality gate"),
     ]);
   }
   if (step === "qa") {

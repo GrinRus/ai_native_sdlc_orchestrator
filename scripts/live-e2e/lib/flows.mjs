@@ -676,7 +676,7 @@ function buildCachedCommandResult(diagnostic) {
   const transcript = asRecord(readJson(transcriptFile));
   return {
     label: asNonEmptyString(diagnostic.label),
-    ok: commandCompletedForCanonicalStatus(diagnostic),
+    ok: commandCompletedForRun(diagnostic),
     exitCode: typeof diagnostic.exit_code === "number" ? diagnostic.exit_code : 0,
     stdout: asNonEmptyString(transcript.stdout),
     stderr: asNonEmptyString(transcript.stderr),
@@ -721,7 +721,7 @@ function controllerObservedStep(stepController, step, iteration = 1) {
  * @param {Record<string, unknown>} diagnostic
  * @returns {boolean}
  */
-function commandCompletedForCanonicalStatus(diagnostic) {
+function commandCompletedForRun(diagnostic) {
   return asNonEmptyString(diagnostic.status) === "pass" || diagnostic.accepted_nonzero_payload === true;
 }
 
@@ -1210,7 +1210,7 @@ function runGuidedWebSmoke(options) {
       "screenshot or visual guardrail",
       "task outcome",
       "UX findings",
-      "skill-agent UI/UX verdict ref",
+      "browser-task proof ref",
     ],
     app_url: asNonEmptyString(summary.app_url) || null,
     control_plane: asNonEmptyString(summary.control_plane) || null,
@@ -2482,138 +2482,6 @@ function evaluateArtifactConsistency(options) {
     status: findings.length > 0 ? "fail" : "pass",
     findings,
     summary: findings[0] ?? "Full-journey artifact lineage is internally consistent.",
-  };
-}
-
-/**
- * @param {unknown} value
- * @returns {"pass" | "warn" | "fail" | "not_attempted"}
- */
-function normalizeCanonicalStatus(value) {
-  const status = asNonEmptyString(value).toLowerCase();
-  if (status === "pass" || status === "passed" || status === "success") return "pass";
-  if (status === "warn" || status === "warning" || status === "pass_with_findings") return "warn";
-  if (status === "fail" || status === "failed" || status === "not_pass") return "fail";
-  return "not_attempted";
-}
-
-/**
- * @param {Record<string, unknown>} artifacts
- * @returns {"materialized" | "degraded" | "blocked" | "not_materialized"}
- */
-function resolveDeliveryStatus(artifacts) {
-  if (!asNonEmptyString(artifacts.delivery_manifest_file)) return "not_materialized";
-  if (artifacts.delivery_blocking === true) return "blocked";
-  if (asNonEmptyString(artifacts.delivery_quality_gate_status) === "not_pass") return "degraded";
-  return "materialized";
-}
-
-/**
- * @param {{
- *   commandResults: Array<Record<string, unknown>>,
- *   artifacts: Record<string, unknown>,
- *   artifactConsistency: Record<string, unknown>,
- *   reviewReport: Record<string, unknown>,
- *   scenarioCoverage: Record<string, unknown>,
- *   qualityJudgement: Record<string, unknown>,
- *   runTier: string,
- *   scenarioPolicy: Record<string, unknown>,
- * }}
- */
-function buildCanonicalRunStatus(options) {
-  const commandStatus =
-    options.commandResults.length > 0 && options.commandResults.every((entry) => commandCompletedForCanonicalStatus(entry))
-      ? "pass"
-      : "fail";
-  const targetVerificationStatus = normalizeCanonicalStatus(options.artifacts.post_run_verify_status);
-  const intakeGate = asRecord(options.artifacts.intake_quality_gate);
-  const reviewArtifactQualityStatus = normalizeCanonicalStatus(asRecord(options.reviewReport.artifact_quality).status);
-  const artifactConsistencyStatus = normalizeCanonicalStatus(options.artifactConsistency.status);
-  const artifactQualityStatus =
-    asNonEmptyString(intakeGate.status) === "fail" ||
-    reviewArtifactQualityStatus === "fail" ||
-    artifactConsistencyStatus === "fail"
-      ? "fail"
-      : reviewArtifactQualityStatus === "warn" || artifactConsistencyStatus === "warn"
-        ? "warn"
-        : "pass";
-  const deliveryStatus = resolveDeliveryStatus(options.artifacts);
-  const releaseRequired = options.scenarioPolicy.release_required === true;
-  const releaseStatus = releaseRequired
-    ? normalizeCanonicalStatus(options.artifacts.release_status)
-    : asNonEmptyString(options.artifacts.release_status)
-      ? normalizeCanonicalStatus(options.artifacts.release_status)
-      : "not_attempted";
-  const providerExecutionStatus = normalizeCanonicalStatus(options.artifacts.provider_execution_status);
-  const realCodeChangeStatus = normalizeCanonicalStatus(options.artifacts.real_code_change_status);
-  const scenarioCoverageStatus = normalizeCanonicalStatus(options.scenarioCoverage.status);
-  const qualityGateStatus = normalizeCanonicalStatus(options.artifacts.quality_gate_decision);
-  const diagnosticStatus = normalizeCanonicalStatus(options.artifacts.post_run_diagnostic_status);
-  const postRunQualityPolicy = asRecord(options.artifacts.post_run_quality_policy);
-  const diagnosticFailureMode =
-    asNonEmptyString(postRunQualityPolicy.diagnosticFailureMode) === "fail" ? "fail" : "warn";
-  const diagnosticBlocksAcceptance =
-    diagnosticStatus === "fail" || (diagnosticStatus === "warn" && diagnosticFailureMode === "fail");
-  const strictIntakeFailed = intakeGate.strict_required === true && asNonEmptyString(intakeGate.status) === "fail";
-  const releaseMissing = releaseRequired && releaseStatus !== "pass";
-  const fatalAcceptance =
-    deliveryStatus === "not_materialized" ||
-    deliveryStatus === "blocked" ||
-    deliveryStatus === "degraded" ||
-    commandStatus === "fail" ||
-    targetVerificationStatus === "fail" ||
-    strictIntakeFailed ||
-    artifactQualityStatus === "fail" ||
-    providerExecutionStatus === "fail" ||
-    realCodeChangeStatus === "fail" ||
-    scenarioCoverageStatus === "fail" ||
-    qualityGateStatus === "fail" ||
-    diagnosticBlocksAcceptance ||
-    releaseMissing;
-  const acceptanceStatus = fatalAcceptance
-    ? "fail"
-    : asNonEmptyString(options.qualityJudgement.overall_status) === "pass_with_findings"
-      ? "warn"
-      : "pass";
-  const hasMatrixCell = hasObjectFields(asRecord(options.artifacts.matrix_cell));
-  const proofEligibleTier = options.runTier === "acceptance" || options.runTier === "production-proof";
-  const coverageStatus = !hasMatrixCell
-    ? "not_attempted"
-    : acceptanceStatus === "pass" && proofEligibleTier
-      ? "covered_pass"
-    : acceptanceStatus === "warn" && deliveryStatus !== "not_materialized"
-      ? "covered_with_findings"
-      : "attempted_failed";
-  const findings = uniqueStrings([
-    ...(commandStatus === "fail" ? ["One or more public CLI subprocesses failed."] : []),
-    ...(targetVerificationStatus === "fail" ? ["Post-run target verification failed."] : []),
-    ...asStringArray(intakeGate.findings),
-    ...(artifactConsistencyStatus === "fail" ? asStringArray(options.artifactConsistency.findings) : []),
-    ...(deliveryStatus === "blocked" ? ["Delivery evidence was materialized behind a blocking quality finding."] : []),
-    ...(deliveryStatus === "degraded" ? ["Delivery quality gate produced observed findings."] : []),
-    ...(releaseMissing ? ["Required release stage did not materialize strict release-packet evidence."] : []),
-    ...(providerExecutionStatus === "fail" ? ["Provider execution evidence was not materialized."] : []),
-    ...(realCodeChangeStatus === "fail" ? ["No meaningful real code change was observed."] : []),
-    ...(diagnosticBlocksAcceptance ? ["Diagnostic post-run verification reported findings."] : []),
-  ]);
-  return {
-    command_status: commandStatus,
-    target_verification_status: targetVerificationStatus,
-    artifact_quality_status: artifactQualityStatus,
-    delivery_status: deliveryStatus,
-    coverage_status: coverageStatus,
-    acceptance_status: acceptanceStatus,
-    run_tier: options.runTier,
-    release_status: releaseStatus,
-    proof_eligible_tier: proofEligibleTier,
-    required_matrix_acceptance_closed: coverageStatus === "covered_pass" && proofEligibleTier,
-    findings,
-    summary:
-      acceptanceStatus === "pass"
-        ? "Live E2E acceptance evidence passed."
-        : acceptanceStatus === "warn"
-          ? "Live E2E reached delivery with findings; required matrix acceptance is not closed."
-          : "Live E2E did not meet acceptance requirements.",
   };
 }
 
@@ -4259,7 +4127,7 @@ export function executeFullJourneyFlow(options) {
           : executionStageStatus === "fail"
           ? "Execution health evidence failed before post-run quality could be judged."
           : executionStageStatus === "warn"
-            ? "Runtime Harness recorded execution findings; final quality is judged from agent assessment, review, and post-run verification."
+            ? "Runtime Harness recorded execution findings; outcome quality must be assessed after the run from linked evidence."
             : "Baseline diagnostics, run start, run status, and post-run verification completed through public execution lifecycle.";
       markStage(
         stageMap,
@@ -5090,34 +4958,6 @@ export function executeFullJourneyFlow(options) {
       runId: options.runId,
     });
     artifacts.artifact_consistency = artifactConsistency;
-    const runnerQualitySummary = {
-      mission_satisfaction:
-        postRunVerificationStatus === "pass" && realCodeChangeStatus === "pass" && reviewOverallStatus !== "fail"
-          ? "pass"
-          : "not_pass",
-      implementation_relevance: realCodeChangeStatus,
-      diff_quality: normalizeVerdictStatus(asRecord(reviewReport.code_quality).status),
-      verification_interpretation: postRunVerificationStatus,
-      artifact_consistency: artifactConsistency.status,
-      risk_findings: uniqueStrings([
-        ...asStringArray(asRecord(reviewReport.code_quality).findings).map((entry) => asNonEmptyString(asRecord(entry).summary) || entry),
-        ...asStringArray(artifactConsistency.findings),
-      ]),
-      final_recommendation:
-        postRunVerificationStatus === "pass" && realCodeChangeStatus === "pass" && reviewOverallStatus !== "fail"
-          ? "accept"
-          : "reject",
-    };
-    artifacts.runner_quality_summary = runnerQualitySummary;
-    artifacts.quality_gate_decision =
-      postRunVerificationStatus === "pass" &&
-      postRunDiagnosticStatus !== "fail" &&
-      realCodeChangeStatus === "pass" &&
-      reviewOverallStatus !== "fail" &&
-      runnerQualitySummary.mission_satisfaction === "pass"
-        ? "pass"
-        : "fail";
-
     const scenarioCoverage = evaluateScenarioCoverage({
       scenarioPolicy: options.scenarioPolicy,
       stageResults: flattenStageMap(stageMap),
@@ -5133,115 +4973,56 @@ export function executeFullJourneyFlow(options) {
       scenarioCoverage.summary = artifactConsistency.summary;
     }
     artifacts.scenario_coverage = scenarioCoverage;
-    const intakeGateStatus = normalizeVerdictStatus(asRecord(artifacts.intake_quality_gate).status);
     const releaseRequired = options.scenarioPolicy.release_required === true;
-    const deliveryReleaseQuality =
-      artifacts.delivery_blocking === true
-        ? "fail"
-        : releaseRequired
-          ? asNonEmptyString(artifacts.release_status) === "pass" && artifacts.release_packet_file
-            ? "pass"
-            : "fail"
-          : asRecord(options.profile.output_policy).materialize_release_packet === true
-            ? artifacts.release_packet_file
-              ? "pass"
-              : "fail"
-            : artifacts.delivery_manifest_file
-              ? "pass"
-              : "warn";
-    const learningLoopClosure =
+    const releaseMaterializationStatus =
+      releaseRequired || asRecord(options.profile.output_policy).materialize_release_packet === true
+        ? asNonEmptyString(artifacts.release_status) === "pass" && artifacts.release_packet_file
+          ? "materialized"
+          : "missing"
+        : "not_required";
+    const learningLoopMaterializationStatus =
       artifacts.learning_loop_scorecard_file && artifacts.learning_loop_handoff_file && auditPayload.run_audit_records
+        ? "materialized"
+        : "missing";
+    const commandCompletionStatus =
+      commandResults.length > 0 && commandResults.every((entry) => commandCompletedForRun(entry))
         ? "pass"
         : "fail";
-    const qualityJudgement = {
+    const stageCompletionStatus = flattenStageMap(stageMap).some((entry) => asNonEmptyString(entry.status) === "fail")
+      ? "fail"
+      : "pass";
+    artifacts.full_flow_facts = {
       scenario_family: asNonEmptyString(options.profile.scenario_family) || null,
       provider_variant_id: asNonEmptyString(options.profile.provider_variant_id) || null,
       feature_size: options.featureSize,
-      target_selection: "pass",
-      feature_request_quality: artifacts.intake_artifact_packet_file && artifacts.feature_request_file ? "pass" : "fail",
-      scenario_coverage_status: scenarioCoverage.status,
+      run_tier: asNonEmptyString(artifacts.run_tier) || resolveRunTier(options.profile),
+      command_completion_status: commandCompletionStatus,
+      stage_completion_status: stageCompletionStatus,
       provider_execution_status: providerExecutionProofStatus,
       target_baseline_observed_status: targetBaselineObservedStatus,
       target_baseline_status: targetBaselineStatus,
-      real_code_change_status: realCodeChangeStatus,
-      runner_quality_summary: runnerQualitySummary,
       post_run_verification_status: postRunVerificationStatus,
       post_run_diagnostic_status: postRunDiagnosticStatus,
-      discovery_quality:
-        intakeGateStatus === "fail" ? "fail" : normalizeVerdictStatus(asRecord(reviewReport.discovery_quality).status),
-      runtime_success:
-        artifacts.routed_step_result_file &&
-        artifacts.runtime_harness_report_file &&
-        providerExecutionProofStatus === "pass"
-          ? "pass"
-          : "fail",
+      review_overall_status: reviewOverallStatus,
+      feature_size_fit_status: featureSizeFitStatus,
+      real_code_change_status: realCodeChangeStatus,
       runtime_harness_decision: runtimeHarnessDecision,
       run_start_runtime_harness_decision: runtimeHarnessDecision,
       latest_runtime_harness_decision: latestRuntimeHarnessDecision,
-      artifact_quality:
-        intakeGateStatus === "fail"
-          ? "fail"
-          : artifactConsistency.status === "fail"
-          ? "fail"
-          : normalizeVerdictStatus(asRecord(reviewReport.artifact_quality).status),
-      code_quality: normalizeVerdictStatus(asRecord(reviewReport.code_quality).status),
-      feature_size_fit_status: featureSizeFitStatus,
-      delivery_release_quality: deliveryReleaseQuality,
-      learning_loop_closure: learningLoopClosure,
-      quality_gate_decision: artifacts.quality_gate_decision,
-      overall_status: "pass",
+      artifact_consistency_status: artifactConsistency.status,
+      scenario_coverage_state: scenarioCoverage.status,
+      delivery_blocking: artifacts.delivery_blocking === true,
+      delivery_manifest_file: asNonEmptyString(artifacts.delivery_manifest_file) || null,
+      release_required: releaseRequired,
+      release_materialization_status: releaseMaterializationStatus,
+      learning_loop_materialization_status: learningLoopMaterializationStatus,
     };
-    qualityJudgement.feature_request_quality =
-      intakeGateStatus === "fail" ? "fail" : artifacts.intake_artifact_packet_file && artifacts.feature_request_file ? "pass" : "fail";
-    const diagnosticOverallStatus =
-      postRunDiagnosticStatus === "warn" && postRunQualityPolicy.diagnosticFailureMode === "warn"
-        ? "pass"
-        : postRunDiagnosticStatus;
-    const verdictStatuses = [
-      qualityJudgement.target_selection,
-      qualityJudgement.feature_request_quality,
-      qualityJudgement.scenario_coverage_status,
-      qualityJudgement.discovery_quality,
-      qualityJudgement.runtime_success,
-      qualityJudgement.target_baseline_status,
-      qualityJudgement.real_code_change_status,
-      qualityJudgement.post_run_verification_status,
-      diagnosticOverallStatus,
-      qualityJudgement.artifact_quality,
-      qualityJudgement.code_quality,
-      qualityJudgement.provider_execution_status,
-      qualityJudgement.feature_size_fit_status,
-      qualityJudgement.delivery_release_quality,
-      qualityJudgement.learning_loop_closure,
-      qualityJudgement.quality_gate_decision,
-    ];
-    qualityJudgement.overall_status = verdictStatuses.includes("fail")
-      ? "fail"
-      : verdictStatuses.includes("warn")
-        ? "pass_with_findings"
-        : "pass";
-    artifacts.quality_judgement = qualityJudgement;
-    artifacts.canonical_status = buildCanonicalRunStatus({
-      commandResults,
-      artifacts,
-      artifactConsistency,
-      reviewReport,
-      scenarioCoverage,
-      qualityJudgement,
-      runTier: asNonEmptyString(artifacts.run_tier) || resolveRunTier(options.profile),
-      scenarioPolicy: options.scenarioPolicy,
-    });
-    artifacts.command_status = asNonEmptyString(asRecord(artifacts.canonical_status).command_status);
-    artifacts.target_verification_status = asNonEmptyString(asRecord(artifacts.canonical_status).target_verification_status);
-    artifacts.artifact_quality_status = asNonEmptyString(asRecord(artifacts.canonical_status).artifact_quality_status);
-    artifacts.delivery_status = asNonEmptyString(asRecord(artifacts.canonical_status).delivery_status);
-    artifacts.coverage_status = asNonEmptyString(asRecord(artifacts.canonical_status).coverage_status);
-    artifacts.acceptance_status = asNonEmptyString(asRecord(artifacts.canonical_status).acceptance_status);
+    const flowStatus = commandCompletionStatus === "pass" && stageCompletionStatus === "pass" ? "pass" : "fail";
 
     return {
       startedAt,
       finishedAt: nowIso(),
-      status: qualityJudgement.overall_status === "fail" ? "fail" : "pass",
+      status: flowStatus,
       stageResults: flattenStageMap(stageMap),
       commandResults,
       artifacts,

@@ -62,32 +62,26 @@ Profiles may add `verification.baseline_gate.mode`:
 - `blocking` treats any failed baseline verification command as a pre-execution blocker.
 
 Default mode:
-- `full-journey` profiles default to `diagnostic` because they are black-box SDLC quality tests. Pre-run target failures are reported as context, while post-run verification, Runtime Harness, review, delivery, and learning decide the final quality verdict.
+- `full-journey` profiles default to `diagnostic` because they are black-box SDLC lifecycle tests. Pre-run target failures are reported as context, while post-run verification, Runtime Harness, review, delivery, and learning are factual evidence for the separate quality assessment.
 - bounded rehearsal profiles default to `blocking` because their purpose is fast pre-execution readiness proof.
 
 Full-journey reports must distinguish:
 - `baseline_verify_summary_file`, `baseline_verify_status`, and `baseline_verify_gate_decision`
 - `post_run_verify_summary_file` and `post_run_verify_status`
 - `post_run_diagnostic_verify_summary_file` and `post_run_diagnostic_status` when mission diagnostics are configured
-- `provider_execution_status`, `real_code_change_status`, `run_start_runtime_harness_decision`, `latest_runtime_harness_decision`, and `quality_gate_decision`
+- `provider_execution_status`, `real_code_change_status`, `run_start_runtime_harness_decision`, and `latest_runtime_harness_decision`
 
 `provider_execution_status=pass` requires materialized adapter raw execution evidence, not just provider route traceability. `real_code_change_status=pass` requires meaningful changed paths after setup baseline. When the selected mission declares `change_evidence.required_path_prefixes`, at least one meaningful changed path must match one of those prefixes. Backup/editor artifacts, provider-owned runner state, scratch files, unrelated root artifacts, and `.aor/` runtime artifacts are not valid real-code-change evidence.
 
-Run summaries must also carry a canonical status block that is separate from the
-target-level `quality_judgement`:
-- `command_status`: public AOR subprocesses completed and emitted readable payloads.
-- `target_verification_status`: post-run primary target verification result.
-- `artifact_quality_status`: intake, lineage, review, and artifact consistency result.
-- `delivery_status`: `materialized`, `degraded`, `blocked`, or `not_materialized`.
-- `coverage_status`: `covered_pass`, `covered_with_findings`, `attempted_failed`, or `not_attempted`.
-- `acceptance_status`: `pass`, `warn`, or `fail`; `warn` never closes required matrix acceptance.
-- `run_tier`: `readme-smoke`, `bounded-live`, `full-journey-observation`, `acceptance`, or `production-proof`.
-- `release_status`: `pass`, `fail`, `skipped`, or `not_attempted`.
-- `proof_eligible_tier`: whether `run_tier` can close required matrix coverage.
-- `required_matrix_acceptance_closed`: true only for `covered_pass` on an eligible run tier.
+Run summaries must link `live_e2e_run_health_report_file` and carry
+`live_e2e_run_health_overall_status`. Run-health is separate from outcome
+quality and records lifecycle completion, command/controller/provider/target
+environment gaps, evidence gaps, resume/interaction issues, and primary
+failure owner/phase/class.
 
-Target scorecards should mirror the canonical status block so operators can
-inspect either artifact without losing the acceptance decision.
+Target scorecards should mirror factual run-health refs and key evidence refs
+so operators can inspect either artifact without losing run-health context.
+Outcome quality is reported only by `live-e2e-quality-assessment-report`.
 
 `exit_code=0` from a public CLI command is not sufficient for target quality:
 when the referenced verify summary is `failed`, `target_verification_status`

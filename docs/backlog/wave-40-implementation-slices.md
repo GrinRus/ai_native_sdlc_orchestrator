@@ -150,7 +150,7 @@ issues before any release or readiness claim is made.
 - **Primary user story surfaces:** DEV-04, AIP-12, OPS-06, OPS-07.
 
 ### Local tasks
-1. Define provider qualification dimensions: provider, adapter, coverage tier, auth/environment readiness, target setup readiness, provider execution result, operator evidence, and final verdict.
+1. Define provider qualification dimensions: provider, adapter, coverage tier, auth/environment readiness, target setup readiness, provider execution result, operator evidence, and run-health owner/phase/class.
 2. Document how target repository blockers, environment blockers, provider blockers, and AOR product failures are classified and displayed.
 3. Add matrix fixtures or reports for Codex, Claude, OpenCode, and Qwen without making optional providers required release coverage.
 4. Run short live E2E qualification checks where credentials and environment allow; otherwise record explicit fail-closed blocker evidence.

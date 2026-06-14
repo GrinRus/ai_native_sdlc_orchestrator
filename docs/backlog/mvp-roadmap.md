@@ -543,7 +543,7 @@ The authoritative planning model for implementation lives in:
 - Live E2E observation reports use ordered `step_journal` entries and reject legacy matrix fields.
 - `run answer`, API, and web paths resume recorded interaction boundaries when possible.
 - Profiles declare flow range, interaction, frontend, and safety policy.
-- Runner summaries use `quality_judgement` instead of legacy verdict matrices.
+- Runner summaries link factual run-health reports; outcome quality moves to separate post-run assessment reports.
 - Skills, runbooks, proof fixtures, and production-readiness checks align with the new model.
 
 **Detailed slices:** `docs/backlog/wave-27-implementation-slices.md`

@@ -1,0 +1,65 @@
+report_id: live-e2e.sample.run-health.v1
+run_id: live-e2e.sample.run
+profile_id: live-e2e.full-journey.regress.ky
+generated_at: "2026-05-18T00:00:04.000Z"
+source_run_summary_file: runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+source_observation_report_file: runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+overall_status: pass
+lifecycle_completion:
+  status: pass
+  continuation_status: complete
+  included_steps:
+    - discovery
+    - spec
+    - planning
+    - handoff
+    - execution
+    - review
+    - qa
+    - delivery
+  observed_step_count: 8
+  accepted_step_count: 8
+  pending_steps: []
+  blocked_step_id: null
+  blocked_step_instance_id: null
+command_health:
+  status: pass
+  command_count: 18
+  failed_command_count: 0
+  failed_commands: []
+controller_health:
+  status: pass
+  controller_state_ref: runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json
+  missing_phase_evidence: []
+  missing_operator_decision_steps: []
+provider_health:
+  status: pass
+  provider_execution_status: pass
+  provider_step_status_ref: runtime://reports/provider-heartbeat-live-e2e.sample.run.json
+target_environment_health:
+  status: pass
+  target_setup_status: pass
+  target_verification_status: pass
+  failure_owner: null
+  failure_phase: null
+  failure_class: null
+evidence_health:
+  status: pass
+  missing_evidence_refs: []
+  weak_evidence_refs: []
+  evidence_ref_count: 12
+failure_summary:
+  owner: null
+  phase: null
+  class: null
+  summary: null
+resume_interaction_health:
+  status: pass
+  pending_interaction_count: 0
+  pending_decision_count: 0
+  resume_issues: []
+run_findings: []
+evidence_refs:
+  - runtime://reports/live-e2e-run-summary-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+  - runtime://reports/live-e2e-controller-state-live-e2e.sample.run.json

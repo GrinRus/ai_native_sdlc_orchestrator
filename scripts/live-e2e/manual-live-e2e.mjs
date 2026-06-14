@@ -67,31 +67,6 @@ function findDecisionRequestFiles(root, runId) {
 }
 
 /**
- * @param {string} root
- * @param {string} runId
- * @returns {string[]}
- */
-function findFinalVerdictRequestFiles(root, runId) {
-  if (!root || !fs.existsSync(root)) return [];
-  const results = [];
-  const stack = [root];
-  const prefix = `live-e2e-final-skill-agent-verdict-request-${normalizeId(runId)}`;
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-      const next = path.join(current, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(next);
-      } else if (entry.isFile() && entry.name.startsWith(prefix) && entry.name.endsWith(".json")) {
-        results.push(next);
-      }
-    }
-  }
-  return results.sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
-}
-
-/**
  * @param {{ projectRef: string, runtimeRoot: string | null, runId: string }} options
  */
 function resolveRuntimeCandidates(options) {
@@ -191,30 +166,6 @@ function prepareDecisionCli(flags) {
 }
 
 /**
- * @param {{ projectRef: string, runtimeRoot: string | null, runId: string, finalVerdictFile: string }} options
- */
-function installFinalSkillAgentVerdict(options) {
-  const verdictFile = path.resolve(options.finalVerdictFile);
-  if (!fs.existsSync(verdictFile)) {
-    throw new UsageError(`Final skill-agent verdict file '${verdictFile}' was not found.`);
-  }
-  const runtimeCandidates = resolveRuntimeCandidates(options);
-  for (const runtimeRoot of runtimeCandidates) {
-    const requestFile = findFinalVerdictRequestFiles(runtimeRoot, options.runId)[0];
-    if (!requestFile) continue;
-    const request = asRecord(readJson(requestFile));
-    const expectedRef = asNonEmptyString(request.expected_verdict_file);
-    if (!expectedRef) {
-      throw new UsageError(`Final verdict request '${requestFile}' does not declare expected_verdict_file.`);
-    }
-    fs.mkdirSync(path.dirname(expectedRef), { recursive: true });
-    fs.copyFileSync(verdictFile, expectedRef);
-    return expectedRef;
-  }
-  throw new UsageError(`No pending final skill-agent verdict request was found for run '${options.runId}'.`);
-}
-
-/**
  * @param {string[]} rawArgs
  */
 function runCli(rawArgs) {
@@ -226,7 +177,6 @@ function runCli(rawArgs) {
         "Runs exactly one pending live E2E controller step through installed public project flow surfaces.",
         "Use --prepare-decision --request <agent_decision_request_ref> --action <action> to generate a decision artifact from the request rubric.",
         "Use --operator-decision-file <path> after a stop to install the skill-agent decision artifact before resuming.",
-        "Use --final-verdict-file <path> after terminal delivery to install the final skill-agent verdict artifact.",
       ].join("\n"),
     );
     return 0;
@@ -251,27 +201,16 @@ function runCli(rawArgs) {
   const projectRef = /** @type {string} */ (resolveOptionalStringFlag(flags["project-ref"], "project-ref"));
   const runId = /** @type {string} */ (resolveOptionalStringFlag(flags["run-id"], "run-id"));
   const operatorDecisionFile = resolveOptionalStringFlag(flags["operator-decision-file"], "operator-decision-file");
-  const finalVerdictFile = resolveOptionalStringFlag(flags["final-verdict-file"], "final-verdict-file");
   const runtimeRoot = resolveOptionalStringFlag(flags["runtime-root"], "runtime-root");
   let runProfileArgs = rawArgs;
   if (operatorDecisionFile) runProfileArgs = removeStringFlag(runProfileArgs, "operator-decision-file");
-  if (finalVerdictFile) runProfileArgs = removeStringFlag(runProfileArgs, "final-verdict-file");
   let installedOperatorDecisionRef = null;
-  let installedFinalSkillAgentVerdictRef = null;
   if (operatorDecisionFile) {
     installedOperatorDecisionRef = installOperatorDecision({
       projectRef,
       runtimeRoot,
       runId,
       operatorDecisionFile,
-    });
-  }
-  if (finalVerdictFile) {
-    installedFinalSkillAgentVerdictRef = installFinalSkillAgentVerdict({
-      projectRef,
-      runtimeRoot,
-      runId,
-      finalVerdictFile,
     });
   }
 
@@ -302,26 +241,9 @@ function runCli(rawArgs) {
       : asRecord(state.provider_step_status);
   const operatorDecisionStatus = asNonEmptyString(latestObservation.operator_decision_status) || null;
   const summaryFile = asNonEmptyString(runProfileOutput.live_e2e_run_summary_file);
-  const summary = summaryFile && fs.existsSync(summaryFile) ? asRecord(readJson(summaryFile)) : {};
-  const finalSkillAgentVerdictRequestFile = asNonEmptyString(summary.final_skill_agent_verdict_request_file);
-  const finalSkillAgentVerdictFile = asNonEmptyString(summary.final_skill_agent_verdict_file);
-  const finalSkillAgentVerdict = asRecord(summary.final_skill_agent_verdict);
-  const finalSkillAgentVerdictRequest =
-    finalSkillAgentVerdictRequestFile && fs.existsSync(finalSkillAgentVerdictRequestFile)
-      ? asRecord(readJson(finalSkillAgentVerdictRequestFile))
-      : {};
-  const expectedFinalSkillAgentVerdictRef =
-    asNonEmptyString(finalSkillAgentVerdictRequest.expected_verdict_file) || finalSkillAgentVerdictFile || null;
-  const finalSkillAgentVerdictMissing =
-    Boolean(finalSkillAgentVerdictRequestFile) &&
-    (Object.keys(finalSkillAgentVerdict).length === 0 ||
-      !finalSkillAgentVerdictFile ||
-      !fs.existsSync(finalSkillAgentVerdictFile));
   const requiredPublicAction =
     operatorDecisionStatus === "missing"
       ? "operator_decision"
-      : !currentStep && finalSkillAgentVerdictMissing
-        ? "final_skill_agent_verdict"
       : action === "continue"
         ? null
         : action;
@@ -357,10 +279,6 @@ function runCli(rawArgs) {
               recommended_action: asNonEmptyString(providerStepStatus.recommended_action) || null,
             }
           : null,
-        final_skill_agent_verdict_request_ref: finalSkillAgentVerdictRequestFile || null,
-        expected_final_skill_agent_verdict_ref: expectedFinalSkillAgentVerdictRef,
-        final_skill_agent_verdict_ref: finalSkillAgentVerdictFile && fs.existsSync(finalSkillAgentVerdictFile) ? finalSkillAgentVerdictFile : null,
-        installed_final_skill_agent_verdict_ref: installedFinalSkillAgentVerdictRef,
         aor_installation_proof_file: asNonEmptyString(runProfileOutput.aor_installation_proof_file) || null,
         live_e2e_run_summary_file: summaryFile || null,
         live_e2e_controller_state_file: controllerStateFile || null,

@@ -183,9 +183,9 @@ skill-agent-only live E2E model so it proves the full flow-centric loop:
 7. Preserve the existing no-upstream-write default.
 8. Preserve frontend evidence refs for rendered HTML, DOM snapshot,
    accessibility summary, screenshot or visual evidence, task outcome, UX
-   findings, and accepted skill-agent UI/UX verdict.
-9. Preserve the final skill-agent verdict request, accepted final verdict, and
-   non-empty inspected evidence refs.
+   findings, and inspected browser-task evidence.
+9. Preserve run-health refs and post-run quality assessment refs with non-empty
+   inspected evidence refs for evaluated dimensions.
 
 ## W34-S06 implementation trace
 
@@ -194,17 +194,17 @@ contract:
 
 - `installed-user-guided-journey.yaml` keeps
   `live_e2e.frontend_capability=browser-task-proof` and declares browser-task,
-  flow-loop, flow-targeted request, final skill-agent verdict, and
-  no-upstream-write requirements.
+  flow-loop, flow-targeted request, quality-assessment, and no-upstream-write
+  requirements.
 - Guided proof generation records the first completed flow, completed-flow
   read-only state, a distinct follow-up flow, the learning handoff lineage,
   the second-flow intake/next-action files, and
   `operator_request.target_flow_id`.
 - Frontend evidence records rendered HTML, DOM snapshot, accessibility summary,
   screenshot or visual guardrail refs, task outcome, UX findings, and a
-  skill-agent UI/UX verdict ref.
+  browser-task proof ref.
 - Acceptance remains fail-closed when browser-task proof, flow-loop fields,
-  final skill-agent verdict evidence, inspected refs, or no-upstream-write
+  run-health evidence, required assessment refs, inspected refs, or no-upstream-write
   assertions are missing.
 
 ## Out of scope

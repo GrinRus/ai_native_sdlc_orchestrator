@@ -36,7 +36,7 @@ const ARTIFACT_BODY_REGEX = /^.+\.artifact\..+\.body\.json$/;
 const ONBOARDING_REPORT_REGEX = /^onboarding-report\.json$/;
 const NEXT_ACTION_REPORT_REGEX = /^next-action-report.*\.json$/;
 const OPERATOR_REQUEST_REGEX = /^operator-request-.*\.json$/;
-const LIVE_E2E_ARTIFACT_REGEX = /^live-e2e-(agent-decision-request|operator-decision|step-observation|observation-report|run-summary|controller-state|baseline-verify|final-skill-agent-verdict-request|final-skill-agent-verdict).*\.json$/;
+const LIVE_E2E_ARTIFACT_REGEX = /^live-e2e-(agent-decision-request|operator-decision|step-observation|observation-report|run-summary|run-health-report|quality-assessment-request|quality-assessment-report|controller-state|baseline-verify).*\.json$/;
 const LIVE_E2E_COMMAND_TRACE_DIR_REGEX = /^live-e2e-command-traces-/;
 
 /**
@@ -416,22 +416,31 @@ function liveE2eSummaryParts(filePath, document) {
       description: asString(document.summary) ?? "Baseline verification evidence captured before live E2E execution.",
     };
   }
-  if (/live-e2e-final-skill-agent-verdict-request-/u.test(basename)) {
+  if (/live-e2e-run-health-report-/u.test(basename)) {
     return {
       type: "live-e2e-report",
-      stage: "delivery",
-      status: asString(document.status) ?? "ready",
-      label: "Final skill-agent verdict request",
-      description: "Final skill-agent verdict request prepared from accepted operator evidence.",
+      stage: "execution",
+      status: asString(document.overall_status) ?? asString(document.status) ?? "ready",
+      label: "Live E2E run-health report",
+      description: asString(document.summary) ?? "Run-health report for live E2E lifecycle, command, controller, provider, target, environment, and evidence gaps.",
     };
   }
-  if (/live-e2e-final-skill-agent-verdict-/u.test(basename)) {
+  if (/live-e2e-quality-assessment-request-/u.test(basename)) {
     return {
       type: "live-e2e-report",
       stage: "delivery",
-      status: asString(document.status) ?? asString(document.verdict) ?? "ready",
-      label: "Final skill-agent verdict",
-      description: asString(document.summary) ?? "Final skill-agent verdict for the live E2E run.",
+      status: "ready",
+      label: "Live E2E quality assessment request",
+      description: "Post-run request for the launching SWE agent to assess outcome quality separately from run health.",
+    };
+  }
+  if (/live-e2e-quality-assessment-report-/u.test(basename)) {
+    return {
+      type: "live-e2e-report",
+      stage: "delivery",
+      status: asString(document.overall_status) ?? asString(document.status) ?? "ready",
+      label: "Live E2E quality assessment report",
+      description: asString(document.summary) ?? "Post-run SWE-agent outcome quality assessment for artifacts, code, verification, delivery safety, UI/UX, accessibility, and traceability.",
     };
   }
   if (/live-e2e-command-traces-/u.test(filePath)) {

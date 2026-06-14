@@ -1,0 +1,84 @@
+# Live E2E run-health report
+
+## Purpose
+Factual health report for the live E2E run itself.
+
+This report answers whether the runner, controller, environment, provider connection, target checkout/setup, command execution, evidence persistence, and resume/interaction loop behaved well enough to trust the run as an execution attempt.
+
+It must not evaluate outcome quality of produced artifacts, code, tests, security, performance, UI, UX, or accessibility. Those dimensions belong only in `live-e2e-quality-assessment-report`.
+
+## Required fields
+- `report_id`
+- `run_id`
+- `profile_id`
+- `generated_at`
+- `source_run_summary_file`
+- `source_observation_report_file`
+- `overall_status`
+- `lifecycle_completion`
+- `command_health`
+- `controller_health`
+- `provider_health`
+- `target_environment_health`
+- `evidence_health`
+- `failure_summary`
+- `resume_interaction_health`
+- `run_findings`
+- `evidence_refs`
+
+## Status semantics
+`overall_status` is one of:
+- `pass`
+- `warn`
+- `fail`
+- `blocked`
+
+`pass` means the full declared run completed and required run evidence was present.
+
+`warn` means the run completed but had non-blocking run-quality gaps.
+
+`fail` means the live E2E run failed as an execution attempt.
+
+`blocked` means the run could not continue because of setup, provider, environment, operator, policy, or resumability blockers.
+
+## Failure ownership
+Non-passing reports must classify the primary run blocker in `failure_summary`:
+- `owner`: `aor|target_repository|provider|environment|operator|unknown`
+- `phase`: `aor_install|target_checkout|project_bootstrap|intake|readiness|target_setup|target_verification|provider_execution|controller_decision|ui_validation|delivery|release|learning|summary_write|unknown`
+- `class`: non-empty machine-readable class
+- `summary`: operator-readable explanation
+
+Passing reports must set `failure_summary.owner` and `failure_summary.phase` to `null`.
+
+## Section expectations
+`lifecycle_completion` should include included steps, observed step count, accepted step count, pending steps, blocked step id, and continuation status.
+
+`command_health` should include command count, failed command count, and failed command summaries.
+
+`controller_health` should include controller-state refs, missing phase evidence, missing decisions, rejected decisions, and persistence gaps.
+
+`provider_health` should include provider execution status, provider step status, interruption owner/status/reason, and adapter evidence refs when available.
+
+`target_environment_health` should include target setup and target verification facts, without converting target repository failures into provider or AOR product failures.
+
+`evidence_health` should include missing evidence refs, weak evidence refs, and evidence ref counts.
+
+`resume_interaction_health` should include pending interactions, pending decisions, resume failures, and answer audit gaps.
+
+`run_findings[]` are factual run findings. Each finding should include:
+- `category`
+- `severity`
+- `summary`
+- `evidence_refs`
+
+## Forbidden fields
+Run-health reports must not include:
+- `quality_judgement`
+- `runner_quality_summary`
+- `final_skill_agent_verdict`
+- `artifact_content_quality`
+- `target_code_correctness`
+- `target_ui_ux_quality`
+
+## Relationship to qualification
+Provider qualification and run acceptance should use run-health and factual run summary status. They must not depend on code/artifact/UI quality assessment, which is advisory post-run outcome analysis.

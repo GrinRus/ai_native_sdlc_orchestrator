@@ -19,7 +19,7 @@ description: Use when you need to run or assess AOR live E2E profiles through th
 7. Use the qualification loop for the outer medium+ fix-and-rerun workflow:
    - `node ./scripts/live-e2e/qualification-loop.mjs --project-ref . --profile <medium-or-larger-profile>`
    - `passed` means the run can count toward provider qualification;
-   - `needs_fix` means inspect the analysis artifact, patch AOR, commit, and rerun from a fresh isolated workspace;
+   - `needs_fix` means inspect run-health gaps in the analysis artifact, patch AOR or the run setup, commit, and rerun from a fresh isolated workspace;
    - `blocked` means fix credentials, provider setup, safety, or environment before judging product quality.
 8. Treat every path as the same online black-box step controller:
    - plan the next step from `step_journal[].plan`;
@@ -39,4 +39,10 @@ description: Use when you need to run or assess AOR live E2E profiles through th
 10. For interaction questions, decide and submit the answer yourself as the skill-agent operator, only through public control-plane surfaces (`aor run answer` or the HTTP answer route). Verify the answer audit ref, `state_history[]`, and final `interaction_status` before continuing.
 11. For guided profiles, inspect `frontend_interactions[]` and the linked web smoke evidence. Browser/UI evidence must be tied to the relevant step observation.
 12. For full-journey acceptance, ensure the public lifecycle is exercised end-to-end: isolated AOR source install, project bootstrap, intake or mission create, analyze, validate, discovery, spec, wave, handoff, `execution#N -> review#N` repair loop when needed, eval, delivery, and profile-enabled release/learning.
-13. Report `runner_quality_summary`, `quality_judgement`, `canonical_status`, `final_skill_agent_verdict_file`, `implementation_loop.iterations[]`, remaining matrix coverage, controller state, UI/UX evidence when present, and any step journal findings. Do not report legacy `agent_operator_assessment`, `verdict_matrix`, `step_matrix`, artifact-quality matrix fields, or path-scope verdicts.
+13. After the runner completes, inspect `live_e2e_run_health_report_file` before discussing outcome quality. Separate run-health failures (`owner`, `phase`, `class`, command/controller/provider/target/environment/operator/evidence gaps) from code, artifact, delivery, UI/UX, accessibility, and traceability quality.
+14. Prepare a post-run quality assessment request when the run produced a full-flow result:
+   - `node ./scripts/live-e2e/quality-assessment.mjs prepare --run-summary-file <live_e2e_run_summary_file>`
+   - inspect the request, observation report, run-health report, review/eval/harness/delivery/release/learning refs, frontend/browser refs, and acceptance/KPI/DoD refs;
+   - write `live-e2e-quality-assessment-report` as the SWE evaluator in free-form expert mode using the structured dimensions and findings taxonomy;
+   - validate it with `node ./scripts/live-e2e/quality-assessment.mjs validate --assessment-report-file <report>`.
+15. Report `live_e2e_run_health_overall_status`, `live_e2e_run_health_report_file`, `implementation_loop.iterations[]`, controller state, UI/UX evidence when present, quality assessment status/gap report when available, and any step journal findings. Do not report legacy `runner_quality_summary`, `quality_judgement`, `canonical_status`, `final_skill_agent_verdict_file`, `agent_operator_assessment`, `verdict_matrix`, `step_matrix`, artifact-quality matrix fields, or path-scope verdicts.

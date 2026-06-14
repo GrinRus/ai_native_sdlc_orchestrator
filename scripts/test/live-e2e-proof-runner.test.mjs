@@ -42,6 +42,7 @@ import { writeProofRunnerArtifacts } from "../live-e2e/run-profile.mjs";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const runProfileScript = path.join(repoRoot, "scripts/live-e2e/run-profile.mjs");
 const manualLiveE2eScript = path.join(repoRoot, "scripts/live-e2e/manual-live-e2e.mjs");
+const qualityAssessmentScript = path.join(repoRoot, "scripts/live-e2e/quality-assessment.mjs");
 const qualificationLoopScript = path.join(repoRoot, "scripts/live-e2e/qualification-loop.mjs");
 
 function withTempRoot(callback) {
@@ -87,7 +88,7 @@ function writeProfile(tempRoot, liveOverrides, options = {}) {
             "  proof_requirements:",
             "    - browser-task-proof",
             "    - flow-loop-proof",
-            "    - final-skill-agent-verdict",
+            "    - quality-assessment-report",
             "  flow_loop_proof:",
             "    enabled: true",
             "  browser_task_proof:",
@@ -336,31 +337,6 @@ test("production proof fails when delivery manifest omits Runtime Harness change
       learningScorecard: writeJsonFixture(path.join(tempRoot, "learning-loop-scorecard.json")),
       learningHandoff: writeJsonFixture(path.join(tempRoot, "learning-loop-handoff.json")),
     };
-    const qualityJudgement = Object.fromEntries(
-      [
-        "target_selection",
-        "feature_request_quality",
-        "scenario_coverage_status",
-        "provider_execution_status",
-        "target_baseline_status",
-        "real_code_change_status",
-        "post_run_verification_status",
-        "post_run_diagnostic_status",
-        "discovery_quality",
-        "runtime_success",
-        "runtime_harness_decision",
-        "run_start_runtime_harness_decision",
-        "latest_runtime_harness_decision",
-        "artifact_quality",
-        "code_quality",
-        "feature_size_fit_status",
-        "delivery_release_quality",
-        "learning_loop_closure",
-        "quality_gate_decision",
-        "overall_status",
-      ].map((field) => [field, "pass"]),
-    );
-
     const proof = applyProductionProofEvidence({
       productionProof: {
         enabled: true,
@@ -373,7 +349,6 @@ test("production proof fails when delivery manifest omits Runtime Harness change
       flowResult: {
         status: "pass",
         artifacts: {
-          quality_judgement: qualityJudgement,
           live_adapter_preflight_file: requiredFiles.liveAdapterPreflight,
           live_adapter_preflight: {
             status: "pass",
@@ -576,7 +551,7 @@ test("W35 live attempts summary records blockers without claiming product pass",
   assert.match(qwenAttempt.public_observation, /0\.17\.0/u);
   const codexClosure = fixture.attempts.find((entry) => entry.run_id === "w35-s05-codex-small-proof-20260603094440");
   assert.equal(codexClosure.status, "pass");
-  assert.equal(codexClosure.acceptance_status, "pass");
+  assert.equal(codexClosure.run_health_status, "pass");
   assert.equal(codexClosure.product_pass_claimed, true);
   assert.equal(codexClosure.target_setup_status, "pass");
   assert.equal(codexClosure.target_verification_status, "pass");
@@ -1451,12 +1426,14 @@ test("guided flow loop prefers archived first-flow next-action evidence", () => 
   });
 });
 
-test("run summary canonical status is recomputed on resumed final verdicts", () => {
+test("run summary uses run-health instead of canonical outcome verdicts", () => {
   const runProfileSource = fs.readFileSync(runProfileScript, "utf8");
-  assert.doesNotMatch(
-    runProfileSource,
-    /if \(Object\.keys\(existing\)\.length > 0\) return existing/u,
-  );
+  assert.match(runProfileSource, /function buildRunHealthReport/u);
+  assert.match(runProfileSource, /live_e2e_run_health_report_file/u);
+  assert.doesNotMatch(runProfileSource, /quality_judgement/u);
+  assert.doesNotMatch(runProfileSource, /runner_quality_summary/u);
+  assert.doesNotMatch(runProfileSource, /final_skill_agent_verdict/u);
+  assert.doesNotMatch(runProfileSource, /canonical_status/u);
 });
 
 test("proof runner preserves target setup and provider interruption evidence on manual resume", () => {
@@ -1473,23 +1450,30 @@ test("proof runner preserves target setup and provider interruption evidence on 
   assert.match(runProfileSource, /failure_class: operatorStopped \? "operator_stopped" : "provider_blocked"/u);
   assert.match(runProfileSource, /failure_class: "provider_blocked"/u);
   assert.match(runProfileSource, /provider_step_status:[\s\S]*options\.flowResult\.artifacts\.provider_step_status/u);
-  assert.match(runProfileSource, /finalSkillAgentVerdict\.verdict[\s\S]*observationReport\.report_status = "final"/u);
+  assert.match(runProfileSource, /function buildRunHealthReport/u);
+  assert.match(runProfileSource, /source_observation_report_file/u);
 });
 
-test("manual live E2E exposes final skill-agent verdict installation workflow", () => {
+test("manual live E2E exposes operator decisions and leaves outcome assessment post-run", () => {
   const help = spawnSync(process.execPath, [manualLiveE2eScript, "--help"], {
     cwd: repoRoot,
     encoding: "utf8",
   });
   assert.equal(help.status, 0);
-  assert.match(help.stdout, /--final-verdict-file/u);
+  assert.match(help.stdout, /--operator-decision-file/u);
+  assert.doesNotMatch(help.stdout, /--final-verdict-file/u);
 
   const source = fs.readFileSync(manualLiveE2eScript, "utf8");
-  assert.match(source, /installFinalSkillAgentVerdict/u);
-  assert.match(source, /final_skill_agent_verdict/u);
-  assert.match(source, /expected_final_skill_agent_verdict_ref/u);
-  assert.match(source, /requiredPublicAction[\s\S]*final_skill_agent_verdict/u);
-  assert.match(source, /!currentStep && finalSkillAgentVerdictMissing/u);
+  assert.doesNotMatch(source, /installFinalSkillAgentVerdict/u);
+  assert.doesNotMatch(source, /final_skill_agent_verdict/u);
+
+  const assessmentHelp = spawnSync(process.execPath, [qualityAssessmentScript, "--help"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.equal(assessmentHelp.status, 0);
+  assert.match(assessmentHelp.stdout, /quality-assessment\.mjs prepare/u);
+  assert.match(assessmentHelp.stdout, /quality-assessment\.mjs validate/u);
 });
 
 test("xlarge catalog profiles resolve as manual-only matrix cells", () => {
@@ -1618,7 +1602,7 @@ test("proof runner reuses valid installation proof for manual resume", () => {
   });
 });
 
-test("proof runner writes partial quality summaries for blocked live E2E reports", () => {
+test("proof runner writes run-health reports for blocked live E2E reports", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
     const runtimeRoot = path.join(tempRoot, "runtime");
@@ -1783,17 +1767,20 @@ test("proof runner writes partial quality summaries for blocked live E2E reports
     assert.equal(written.summary.status, "blocked");
     assert.equal(written.summary.continuation_status, "blocked");
     assert.equal(written.summary.blocked_step_id, "discovery");
-    assert.equal(written.summary.runner_quality_summary.summary_type, "partial");
-    assert.equal(written.summary.runner_quality_summary.lifecycle_completeness.pending_steps.includes("release"), true);
-    assert.equal(written.summary.runner_quality_summary.final_recommendation, "reject");
-    assert.equal(written.summary.quality_judgement.judgement_type, "partial");
-    assert.equal(written.summary.quality_judgement.provider_execution_status, "not_attempted");
-    assert.notEqual(written.summary.runner_quality_summary, null);
-    assert.notEqual(written.summary.quality_judgement, null);
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "blocked");
+    assert.equal(fs.existsSync(written.summary.live_e2e_run_health_report_file), true);
+    assert.equal(written.runHealthReport.overall_status, "blocked");
+    assert.equal(written.runHealthReport.failure_summary.owner, "operator");
+    assert.equal(written.runHealthReport.failure_summary.phase, "controller_decision");
+    assert.equal(written.runHealthReport.failure_summary.class, "controller_incomplete");
+    assert.equal(written.runHealthReport.controller_health.missing_operator_decision_steps.includes("discovery"), true);
+    assert.equal(written.runHealthReport.resume_interaction_health.pending_decision_count, 1);
+    assert.equal(written.summary.runner_quality_summary, undefined);
+    assert.equal(written.summary.quality_judgement, undefined);
   });
 });
 
-test("proof runner lets final skill-agent verdict override accepted pre-verdict quality", () => {
+test("proof runner writes run-health reports for failed live E2E reports", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
     const runtimeRoot = path.join(tempRoot, "runtime");
@@ -1802,7 +1789,178 @@ test("proof runner lets final skill-agent verdict override accepted pre-verdict 
     fs.mkdirSync(runtimeRoot, { recursive: true });
     fs.mkdirSync(targetCheckoutRoot, { recursive: true });
 
-    const runId = "final-verdict-not-pass";
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "discovery-plan.json",
+        "discovery-execution.json",
+        "discovery-inspection.json",
+        "discovery-classification.json",
+        "discovery-agent-request.json",
+        "discovery-decision.json",
+        "discovery-transcript.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+
+    const runId = "failed-command-run-health";
+    const stepJournalEntry = {
+      sequence: 1,
+      step_id: "discovery",
+      step_instance_id: "discovery",
+      iteration: 1,
+      flow_stage: "discovery",
+      plan: {
+        objective: "Observe discovery.",
+        public_surface: "aor discovery run",
+        command_labels: ["discovery-run"],
+        expected_artifacts: ["analysis_report_file"],
+        inspection_sources: ["command_transcript"],
+        safety_constraints: ["no-upstream-write"],
+      },
+      plan_ref: files["discovery-plan.json"],
+      public_surface: "aor discovery run",
+      transcript_ref: files["discovery-transcript.json"],
+      execution_ref: files["discovery-execution.json"],
+      inspection_ref: files["discovery-inspection.json"],
+      classification_ref: files["discovery-classification.json"],
+      artifact_refs: [files["discovery-transcript.json"]],
+      started_at: "2026-06-09T00:00:00.000Z",
+      finished_at: "2026-06-09T00:00:01.000Z",
+      duration_sec: 1,
+      deterministic_analysis: {
+        status: "not_pass",
+        exit_code: 1,
+        failure_class: "command_failed",
+        missing_evidence: [],
+        recommendation: "diagnose",
+      },
+      semantic_analysis: {
+        status: "not_pass",
+        judge_source: "skill-agent",
+        findings: ["Discovery command failed before artifact quality could be assessed."],
+      },
+      agent_decision_request_ref: files["discovery-agent-request.json"],
+      operator_decision_ref: files["discovery-decision.json"],
+      operator_decision_status: "accepted",
+      inspected_evidence_refs: [files["discovery-transcript.json"]],
+      requested_interaction: null,
+      decision: {
+        action: "diagnose",
+        reason: "Public command failed.",
+      },
+      resume_result: null,
+      frontend_interaction_refs: [],
+      final_step_verdict: "not_pass",
+    };
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.failed-command-run-health",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "release",
+        provider_variant_id: "openai-primary",
+        stages: ["bootstrap", "discovery"],
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "fail",
+        stageResults: [
+          {
+            stage: "discovery",
+            status: "fail",
+            evidence_refs: [files["discovery-transcript.json"]],
+            summary: "Discovery command failed.",
+          },
+        ],
+        commandResults: [
+          {
+            label: "discovery-run",
+            command_surface: "aor discovery run",
+            status: "fail",
+            exit_code: 1,
+            transcript_file: files["discovery-transcript.json"],
+            artifact_refs: [files["discovery-transcript.json"]],
+            summary: "Discovery command failed with exit code 1.",
+          },
+        ],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: [stepJournalEntry],
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "pass",
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "medium",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.summary.status, "not_pass");
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "fail");
+    assert.equal(written.runHealthReport.overall_status, "fail");
+    assert.equal(written.runHealthReport.failure_summary.owner, "aor");
+    assert.equal(written.runHealthReport.failure_summary.phase, "unknown");
+    assert.equal(written.runHealthReport.failure_summary.class, "public_command_failed");
+    assert.equal(written.runHealthReport.command_health.failed_command_count, 1);
+    assert.equal(written.summary.quality_judgement, undefined);
+  });
+});
+
+test("proof runner does not consume final skill-agent verdicts or emit result-quality summaries", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const runId = "no-final-verdict-consumption";
     const includedSteps = ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"];
     const files = Object.fromEntries(
       [
@@ -1818,29 +1976,6 @@ test("proof runner lets final skill-agent verdict override accepted pre-verdict 
     for (const file of Object.values(files)) {
       fs.writeFileSync(file, "{}\n", "utf8");
     }
-
-    const finalVerdictFile = path.join(
-      reportsRoot,
-      `live-e2e-final-skill-agent-verdict-${runId}.json`,
-    );
-    fs.writeFileSync(
-      finalVerdictFile,
-      `${JSON.stringify(
-        {
-          verdict_id: `${runId}.final-skill-agent-verdict.v1`,
-          run_id: runId,
-          status: "not_pass",
-          judge_source: "skill-agent",
-          inspected_evidence_refs: [files["controller-state.json"]],
-          findings: ["QA coverage did not exercise the changed target test file."],
-          final_recommendation: "reject",
-          created_at: "2026-06-09T00:00:03.000Z",
-        },
-        null,
-        2,
-      )}\n`,
-      "utf8",
-    );
 
     const stepJournal = includedSteps.map((step, index) => ({
       sequence: index + 1,
@@ -1965,45 +2100,9 @@ test("proof runner lets final skill-agent verdict override accepted pre-verdict 
           runtime_harness_decision: "pass",
           run_start_runtime_harness_decision: "pass",
           latest_runtime_harness_decision: "pass",
-          quality_gate_decision: "pass",
           delivery_manifest_file: files["delivery-manifest.json"],
           review_report_file: files["review-report.json"],
           evaluation_report_file: files["evaluation-report.json"],
-          runner_quality_summary: {
-            mission_satisfaction: "pass",
-            implementation_relevance: "pass",
-            diff_quality: "pass",
-            verification_interpretation: "pass",
-            artifact_consistency: "pass",
-            risk_findings: [],
-            final_recommendation: "accept",
-          },
-          quality_judgement: {
-            scenario_family: "governance",
-            provider_variant_id: "anthropic-primary",
-            feature_size: "large",
-            target_selection: "pass",
-            feature_request_quality: "pass",
-            scenario_coverage_status: "pass",
-            provider_execution_status: "pass",
-            target_baseline_status: "pass",
-            real_code_change_status: "pass",
-            runner_quality_summary: {
-              final_recommendation: "accept",
-            },
-            post_run_verification_status: "pass",
-            post_run_diagnostic_status: "pass",
-            discovery_quality: "pass",
-            runtime_success: "pass",
-            runtime_harness_decision: "pass",
-            artifact_quality: "pass",
-            code_quality: "pass",
-            feature_size_fit_status: "pass",
-            delivery_release_quality: "pass",
-            learning_loop_closure: "pass",
-            quality_gate_decision: "pass",
-            overall_status: "pass",
-          },
         },
       },
       aorLaunch: {
@@ -2013,16 +2112,18 @@ test("proof runner lets final skill-agent verdict override accepted pre-verdict 
       },
     });
 
-    assert.equal(written.summary.status, "not_pass");
-    assert.equal(written.summary.acceptance_status, "fail");
-    assert.equal(written.summary.runner_quality_summary.final_recommendation, "reject");
-    assert.equal(written.summary.runner_quality_summary.final_skill_agent_verdict_status, "not_pass");
-    assert.equal(written.summary.quality_judgement.overall_status, "fail");
-    assert.match(written.summary.runner_quality_summary.risk_findings.join("\n"), /changed target test file/);
+    assert.equal(written.summary.status, "pass");
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "pass");
+    assert.equal(written.summary.acceptance_status, undefined);
+    assert.equal(written.summary.runner_quality_summary, undefined);
+    assert.equal(written.summary.quality_judgement, undefined);
+    assert.equal(written.summary.final_skill_agent_verdict_file, undefined);
+    assert.equal(written.runHealthReport.overall_status, "pass");
+    assert.equal(written.runHealthReport.failure_summary.owner, null);
   });
 });
 
-test("proof runner final verdict request uses hydrated delivery and verification status before verdict", () => {
+test("proof runner run-health uses hydrated delivery and verification facts", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
     const runtimeRoot = path.join(tempRoot, "runtime");
@@ -2031,7 +2132,7 @@ test("proof runner final verdict request uses hydrated delivery and verification
     fs.mkdirSync(runtimeRoot, { recursive: true });
     fs.mkdirSync(targetCheckoutRoot, { recursive: true });
 
-    const runId = "final-verdict-request-hydrated";
+    const runId = "run-health-hydrated";
     const includedSteps = ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"];
     const files = Object.fromEntries(
       [
@@ -2228,21 +2329,17 @@ test("proof runner final verdict request uses hydrated delivery and verification
       },
     });
 
-    const request = JSON.parse(fs.readFileSync(written.summary.final_skill_agent_verdict_request_file, "utf8"));
-    assert.equal(written.summary.status, "blocked");
-    assert.equal(request.completion_summary.final_verdict_status, "missing");
-    assert.equal(request.completion_summary.delivery_status, "materialized");
-    assert.equal(request.completion_summary.artifact_quality_status, "pass");
-    assert.equal(request.completion_summary.post_run_verification_status, "pass");
-    assert.equal(request.completion_summary.real_code_change_status, "pass");
-    assert.equal(request.current_artifact_status.delivery_status, "materialized");
-    assert.equal(request.current_artifact_status.artifact_quality_status, "pass");
-    assert.equal(request.current_artifact_status.post_run_verification_status, "pass");
-    assert.equal(request.current_artifact_status.real_code_change_status, "pass");
-    assert.equal(request.canonical_status.delivery_status, "materialized");
-    assert.equal(request.canonical_status.target_verification_status, "pass");
-    assert.equal(request.quality_judgement.post_run_verification_status, "pass");
-    assert.equal(request.quality_judgement.real_code_change_status, "pass");
+    assert.equal(written.summary.status, "pass");
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "pass");
+    assert.equal(written.summary.final_skill_agent_verdict_request_file, undefined);
+    assert.equal(written.summary.delivery_manifest_file, files["delivery-manifest.json"]);
+    assert.equal(written.summary.review_report_file, files["review-report.json"]);
+    assert.equal(written.summary.post_run_verify_status, "pass");
+    assert.equal(written.summary.real_code_change_status, "pass");
+    assert.equal(written.runHealthReport.overall_status, "pass");
+    assert.equal(written.runHealthReport.provider_health.provider_execution_status, "completed");
+    assert.equal(written.runHealthReport.target_environment_health.target_verification_status, "pass");
+    assert.equal(written.runHealthReport.failure_summary.owner, null);
   });
 });
 

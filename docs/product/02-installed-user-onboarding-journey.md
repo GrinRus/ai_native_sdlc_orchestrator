@@ -54,7 +54,7 @@ The accepted flow-centric console design reference is
 that direction as the local app target: flow selector, active/completed flow
 boundaries, `New Flow`, closure-to-follow-up behavior, flow-scoped evidence
 views, flow-targeted Ask AOR, and browser-task live E2E proof coverage with
-accepted skill-agent UI/UX verdicts.
+post-run UI/UX quality assessment when UI/UX quality is claimed.
 
 A flow is a runtime/control-plane projection over mission/intake, next-action,
 operator-request, run, review, delivery, release, and learning evidence.
@@ -133,7 +133,7 @@ W21 adds guided UX by composing existing contract families and a small set of ad
 | Operator intervention | `operator-request`, `compiled-context-artifact`, `step-result` | W32-S01 adds runtime-owned Ask AOR/request flow across CLI, API, and web without creating a chat-only bypass; W34-S04 scopes requests to selected flow evidence and `target_flow_id`. |
 | Closure | `next-action-report`, `review-decision`, `delivery-plan`, `delivery-manifest`, `release-packet`, `learning-loop-handoff` | W21-S06 exposes final-stage decisions, blockers, evidence refs, and exact next actions consistently across CLI/API/web. |
 | Flow projection | `control-plane-api`, `intake-request-body`, `next-action-report`, `operator-request`, closure artifacts | W34-S01 defines active/completed flow semantics; W34-S02 implements runtime/control-plane flow list/detail/selected reads, `New Flow` evidence preservation, and completed-flow read-only request guards without adding UI-owned state; W34-S05 links learning closure to follow-up flow creation. |
-| Proof | Live E2E profiles and observation reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, app smoke evidence, durable closure artifacts, and no-upstream-write assertions; W34-S06 extends it with browser-task proof, first-flow completion, second-flow creation, flow-targeted operator requests, accepted skill-agent decisions, and final verdict refs. |
+| Proof | Live E2E profiles, observation reports, run-health reports, and quality assessment reports | W21-S07 proves the clean installed-user journey with first-run CLI transcripts, app smoke evidence, durable closure artifacts, and no-upstream-write assertions; W34-S06 extends it with browser-task proof, first-flow completion, second-flow creation, flow-targeted operator requests, accepted skill-agent decisions, and post-run quality assessment refs. |
 
 ## Out of scope for the guided journey contract
 - implementing `aor doctor`, `aor onboard`, `aor mission create`, `aor next`, or `aor app`;

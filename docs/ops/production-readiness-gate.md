@@ -33,7 +33,7 @@ The default W25 production proof evidence is:
 The gate verifies:
 
 - baseline/production boundary: `pnpm check` is still the repository-integrity gate, and `pnpm production:ready` is separate;
-- W25 real proof fixture: `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, target verdicts pass, and no upstream write occurred;
+- W25 real proof fixture: `proof_scope=full_code_changing_runtime`, `real_code_change_proof_complete=true`, `external_runner_mode=real-external-process`, evidence refs are materialized, and no upstream write occurred;
 - story honesty: all 114 stories remain machine-counted, proof-covered rows cite executable W25 fixture evidence, and OpenCode stories remain blocked until real OpenCode certification exists;
 - source-of-truth alignment: README, self-hosted readiness docs, and this runbook agree on current non-production status and gate usage;
 - W23 hardening evidence: nested contract validation and production-hardened auth scope coverage are present;

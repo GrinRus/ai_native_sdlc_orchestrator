@@ -41,6 +41,12 @@ repository setup/build/test failures and local environment/auth blockers are
 valid fail-closed evidence, but they do not count as AOR product pass or
 provider quality pass.
 
+Provider qualification uses `live-e2e-run-health-report` only for run failure
+classification. It must not use post-run code quality, artifact content quality,
+UI/UX quality, accessibility quality, or the advisory
+`live-e2e-quality-assessment-report` to decide whether a provider path is
+qualified.
+
 ## Status rules
 
 - `qualified`: at least one accepted live E2E attempt satisfies the matrix cell's
@@ -61,6 +67,7 @@ docs for that release.
 Use public live E2E evidence only:
 - run summary;
 - live E2E observation report;
+- live E2E run-health report;
 - Runtime Harness report;
 - routed step result;
 - adapter raw evidence summary;
@@ -100,6 +107,12 @@ node ./scripts/live-e2e/qualification-loop.mjs \
 The generated qualification set includes `provider_qualification_matrix`.
 Short/small diagnostic runs may be cited as blocker or candidate evidence, but
 they do not replace medium-or-larger qualification-loop evidence.
+
+The generated qualification analysis includes `run_health_report_ref`,
+`run_health_status`, and `run_health_gaps`. Treat these as the source for
+provider/environment/operator/AOR-owner follow-up. Use the separate quality
+assessment report for outcome backlog items only after provider qualification is
+recorded.
 
 ## W40 proof notes
 
