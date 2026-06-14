@@ -1951,6 +1951,119 @@ test("proof runner writes run-health reports for failed live E2E reports", () =>
   });
 });
 
+test("proof runner run-health classifies failed live adapter preflight readiness", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "live-adapter-preflight.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+
+    const runId = "failed-adapter-preflight-run-health";
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.failed-adapter-preflight-run-health",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "release",
+        provider_variant_id: "anthropic-primary",
+        stages: ["bootstrap", "discovery"],
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "fail",
+        stageResults: [
+          {
+            stage: "bootstrap",
+            status: "fail",
+            evidence_refs: [files["live-adapter-preflight.json"]],
+            summary: "Live adapter preflight failed permission-readiness for adapter 'claude-code' before run start.",
+          },
+        ],
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: [],
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "pass",
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "medium",
+          live_adapter_preflight_file: files["live-adapter-preflight.json"],
+          live_adapter_preflight: {
+            status: "fail",
+            provider_variant_id: "anthropic-primary",
+            primary_adapter: "claude-code",
+            failure_kind: "permission-mode-blocked",
+            summary: "Live adapter preflight failed permission-readiness for adapter 'claude-code' before run start.",
+          },
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.summary.status, "not_pass");
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "fail");
+    assert.equal(written.runHealthReport.overall_status, "fail");
+    assert.equal(written.runHealthReport.failure_summary.owner, "provider");
+    assert.equal(written.runHealthReport.failure_summary.phase, "readiness");
+    assert.equal(written.runHealthReport.failure_summary.class, "permission-mode-blocked");
+    assert.match(written.runHealthReport.failure_summary.summary, /permission-readiness/u);
+    assert.equal(written.summary.quality_judgement, undefined);
+  });
+});
+
 test("proof runner does not consume final skill-agent verdicts or emit result-quality summaries", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");

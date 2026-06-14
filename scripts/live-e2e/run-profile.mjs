@@ -1482,6 +1482,17 @@ function resolveRunHealthFailure(options) {
       summary: "Run artifacts declared a primary failure owner, phase, or class.",
     };
   }
+  const liveAdapterPreflight = asRecord(options.artifacts.live_adapter_preflight);
+  const liveAdapterPreflightStatus = asNonEmptyString(liveAdapterPreflight.status);
+  if (liveAdapterPreflightStatus && liveAdapterPreflightStatus !== "pass") {
+    const failureKind = asNonEmptyString(liveAdapterPreflight.failure_kind) || "live_adapter_preflight_failed";
+    return {
+      owner: ["missing-command", "missing-live-runtime"].includes(failureKind) ? "environment" : "provider",
+      phase: "readiness",
+      class: failureKind,
+      summary: asNonEmptyString(liveAdapterPreflight.summary) || "Live adapter preflight did not pass.",
+    };
+  }
   if (asNonEmptyString(options.controllerHealth.status) !== "pass") {
     return {
       owner: "operator",
