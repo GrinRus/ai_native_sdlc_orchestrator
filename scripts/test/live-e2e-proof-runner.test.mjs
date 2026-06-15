@@ -41,6 +41,7 @@ import { writeProofRunnerArtifacts } from "../live-e2e/run-profile.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const runProfileScript = path.join(repoRoot, "scripts/live-e2e/run-profile.mjs");
+const fullJourneyFlowScript = path.join(repoRoot, "scripts/live-e2e/lib/flows.mjs");
 const manualLiveE2eScript = path.join(repoRoot, "scripts/live-e2e/manual-live-e2e.mjs");
 const qualityAssessmentScript = path.join(repoRoot, "scripts/live-e2e/quality-assessment.mjs");
 const qualificationLoopScript = path.join(repoRoot, "scripts/live-e2e/qualification-loop.mjs");
@@ -1183,6 +1184,113 @@ test("live adapter preflight applies env_from aliases without leaking values", (
   });
 });
 
+test("live adapter preflight uses a preflight-specific request-artifact prompt and marker edit", () => {
+  withTempRoot((tempRoot) => {
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    const reportsRoot = path.join(tempRoot, "reports");
+    const adapterProfileRoot = path.join(tempRoot, "adapters");
+    const captureFile = path.join(tempRoot, "preflight-calls.jsonl");
+    const runnerScript = path.join(tempRoot, "preflight-runner.mjs");
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(adapterProfileRoot, { recursive: true });
+    fs.writeFileSync(
+      runnerScript,
+      [
+        "import fs from 'node:fs';",
+        "const args = process.argv.slice(2);",
+        "const requestFileIndex = args.indexOf('--request-file');",
+        "const requestFile = requestFileIndex >= 0 ? args[requestFileIndex + 1] : args.find((entry) => entry.endsWith('.json'));",
+        "const message = args.find((entry) => entry.includes('provider work packet')) || '';",
+        "const packet = JSON.parse(fs.readFileSync(requestFile, 'utf8'));",
+        "fs.appendFileSync(process.env.AOR_PREFLIGHT_CAPTURE_FILE, `${JSON.stringify({message, requestFile, step_class: packet.request.step_class})}\\n`);",
+        "const probe = packet.request.edit_probe || packet.request.permission_probe;",
+        "if (probe) fs.writeFileSync(probe.marker_file, probe.expected_marker_contents, 'utf8');",
+        "process.stdout.write(JSON.stringify({status:'success',summary:'preflight ok'}));",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(adapterProfileRoot, "claude-code.yaml"),
+      [
+        "adapter_id: claude-code",
+        "runner_family: claude",
+        "version: 1",
+        "launch_modes:",
+        "  - non-interactive",
+        "capabilities:",
+        "  repo_read: true",
+        "  repo_write: true",
+        "  shell_commands: true",
+        "  structured_output: true",
+        "constraints:",
+        "  requires_local_runtime: true",
+        "execution:",
+        "  runtime_mode: external-process",
+        "  live_baseline: true",
+        "  handler: claude-code-external-runner",
+        "  evidence_namespace: evidence://adapter-live/claude-code",
+        "  external_runtime:",
+        `    command: ${process.execPath}`,
+        "    request_transport: request-artifact",
+        "    request_file:",
+        "      argument: --request-file",
+        "      message: Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}.",
+        "    preflight_timeout_ms: 30000",
+        "    timeout_ms: 30000",
+        "    env_from:",
+        "      AOR_PREFLIGHT_CAPTURE_FILE: AOR_PREFLIGHT_CAPTURE_FILE",
+        "    permission_policy:",
+        "      default_mode: full-bypass",
+        "      modes:",
+        "        full-bypass:",
+        "          args:",
+        `            - ${JSON.stringify(runnerScript)}`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = runLiveAdapterPreflight({
+      targetCheckoutRoot,
+      adapterProfileRoot,
+      providerVariant: {
+        provider: "anthropic",
+        primary_adapter: "claude-code",
+        coverage_tier: "required",
+      },
+      providerVariantId: "anthropic-primary",
+      coverageTier: "required",
+      env: {
+        ...process.env,
+        AOR_PREFLIGHT_CAPTURE_FILE: captureFile,
+      },
+      runnerAuthMode: "host",
+      runnerAuthSource: "host",
+      runtimeAgentPermissionMode: "full-bypass",
+      runtimeAgentInteractionPolicy: "fail-closed",
+      runtimeAgentAutoApprovalProfile: "none",
+      authProbeRequired: true,
+      permissionReadinessRequired: true,
+      runId: "claude-request-artifact-preflight",
+      reportsRoot,
+    });
+
+    assert.equal(result.status, "pass");
+    const calls = fs
+      .readFileSync(captureFile, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    assert.equal(calls.length, 3);
+    assert.ok(calls.every((call) => call.message.includes("Run only the AOR live-adapter preflight")));
+    assert.ok(calls.every((call) => !call.message.includes("Execute the approved AOR implementation")));
+    assert.equal(result.report.edit_readiness.attempts[0].marker_status, "present");
+    assert.equal(result.report.permission_readiness.attempts[0].marker_status, "present");
+  });
+});
+
 test("target checkout materialization supports short physical roots for path-sensitive providers", () => {
   withTempRoot((tempRoot) => {
     const sourceRepo = path.join(tempRoot, "source-repo");
@@ -1443,6 +1551,7 @@ test("run summary uses run-health instead of canonical outcome verdicts", () => 
 
 test("proof runner preserves target setup and provider interruption evidence on manual resume", () => {
   const runProfileSource = fs.readFileSync(runProfileScript, "utf8");
+  const flowSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
   assert.match(runProfileSource, /function hydrateFlowArtifactsFromControllerState/u);
   assert.match(runProfileSource, /artifacts_snapshot/u);
   assert.match(runProfileSource, /target_pre_execution_status/u);
@@ -1457,6 +1566,8 @@ test("proof runner preserves target setup and provider interruption evidence on 
   assert.match(runProfileSource, /provider_step_status:[\s\S]*options\.flowResult\.artifacts\.provider_step_status/u);
   assert.match(runProfileSource, /function buildRunHealthReport/u);
   assert.match(runProfileSource, /source_observation_report_file/u);
+  assert.match(flowSource, /shouldReuseLiveAdapterPreflight/u);
+  assert.match(flowSource, /live_adapter_preflight_reused_after_resume/u);
 });
 
 test("manual live E2E exposes operator decisions and leaves outcome assessment post-run", () => {

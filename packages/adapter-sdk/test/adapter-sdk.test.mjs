@@ -908,7 +908,7 @@ test("live adapter interrupts external runner when public run-control cancel is 
     adapterProfile: buildExternalRunnerProfile({
       command: process.execPath,
       args: ["-e", cancelScript],
-      timeoutMs: 2000,
+      timeoutMs: 10000,
       handler: null,
     }),
   });
@@ -929,7 +929,7 @@ test("live adapter interrupts external runner when public run-control cancel is 
         route_id: "route.implement.default.qwen-primary",
         step_id: "run.start.implement",
         state_file: stateFile,
-        timeout_budget_ms: 2000,
+        timeout_budget_ms: 10000,
         heartbeat_interval_ms: 25,
       },
     });

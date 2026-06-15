@@ -323,6 +323,9 @@ export function runLiveAdapterPreflight(options) {
     "live-e2e-preflight",
     normalizeId(options.runId),
   );
+  const editNonceFile = path.join(permissionProbeRoot, "edit-nonce.txt");
+  const editMarkerFile = path.join(permissionProbeRoot, "edit-marker.txt");
+  const editMarkerContents = `edit-readiness:${options.runId}`;
   const permissionNonceFile = path.join(permissionProbeRoot, "permission-nonce.txt");
   const permissionMarkerFile = path.join(permissionProbeRoot, "permission-marker.txt");
   const permissionMarkerContents = `permission-readiness:${options.runId}`;
@@ -364,8 +367,8 @@ export function runLiveAdapterPreflight(options) {
       const requestFile = path.join(permissionProbeRoot, `preflight-${normalizeId(kind)}-${attempt}-work-packet.json`);
       fs.writeFileSync(requestFile, probeInput, "utf8");
       const requestMessageTemplate =
-        asNonEmptyString(requestFileProfile.message) ??
-        "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read it first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when required, do not write upstream, run requested verification when feasible, and return a final report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet.";
+        asNonEmptyString(requestFileProfile.preflight_message) ||
+        "Run only the AOR live-adapter preflight described in the provider work packet at {provider_work_packet_path}. Read that JSON, follow request.objective exactly, use any request.*_probe file paths when present, do not write upstream, and return a concise preflight report with commands-run, changed-files, verification, and risks. Do not summarize the packet instead of doing the requested check.";
       const requestMessage = requestMessageTemplate
         .replace(/\{provider_work_packet_path\}/gu, requestFile)
         .replace(/\{provider_work_packet_ref\}/gu, requestFile)
@@ -376,8 +379,8 @@ export function runLiveAdapterPreflight(options) {
     } else if (requestTransport === "file-attachment") {
       const requestFileProfile = asRecord(externalRuntime.request_file);
       const requestMessage =
-        asNonEmptyString(requestFileProfile.message) ?? "Follow the attached AOR adapter request JSON.";
-      const requestFileArgument = asNonEmptyString(requestFileProfile.argument) ?? "--file";
+        asNonEmptyString(requestFileProfile.message) || "Follow the attached AOR adapter request JSON.";
+      const requestFileArgument = asNonEmptyString(requestFileProfile.argument) || "--file";
       fs.mkdirSync(permissionProbeRoot, { recursive: true });
       const requestFile = path.join(permissionProbeRoot, `preflight-${normalizeId(kind)}-${attempt}-request.json`);
       fs.writeFileSync(requestFile, probeInput, "utf8");
@@ -500,13 +503,71 @@ export function runLiveAdapterPreflight(options) {
     };
   }
 
-  const editReadiness = editAndPermissionReadinessRequired
-    ? runProbeAttempt(
-        "preflight-edit-readiness",
-        1,
-        "Confirm that the external runner is allowed to perform bounded non-interactive edits in this isolated target checkout. Do not ask questions.",
-      )
-    : null;
+  let editReadiness = null;
+  if (editAndPermissionReadinessRequired) {
+    fs.mkdirSync(permissionProbeRoot, { recursive: true });
+    fs.writeFileSync(editNonceFile, `${editMarkerContents}\n`, "utf8");
+    fs.rmSync(editMarkerFile, { force: true });
+    editReadiness = runProbeAttempt(
+      "preflight-edit-readiness",
+      1,
+      [
+        "Confirm that the external runner can perform one bounded non-interactive edit in this isolated target checkout.",
+        `Read ${editNonceFile}.`,
+        `Write exactly '${editMarkerContents}' to ${editMarkerFile}.`,
+        "Do not ask questions.",
+      ].join(" "),
+      {
+        edit_probe: {
+          nonce_file: editNonceFile,
+          marker_file: editMarkerFile,
+          expected_marker_contents: editMarkerContents,
+        },
+      },
+    );
+    const markerContents = fileExists(editMarkerFile) ? fs.readFileSync(editMarkerFile, "utf8").trim() : "";
+    const markerStatus =
+      markerContents === editMarkerContents
+        ? "present"
+        : markerContents
+          ? "unexpected-contents"
+          : "missing";
+    if (
+      editReadiness.status === "fail" &&
+      editReadiness.failure_kind === "external-runner-timeout" &&
+      markerContents === editMarkerContents
+    ) {
+      editReadiness = {
+        ...editReadiness,
+        status: "pass",
+        failure_kind: null,
+        warning_kind: "post-marker-timeout",
+        warnings: [
+          {
+            code: "post-marker-timeout",
+            summary:
+              "Edit readiness marker matched before the external runner timed out; edit access readiness passed, but runner completion was slow.",
+          },
+        ],
+        marker_file: editMarkerFile,
+        marker_status: markerStatus,
+      };
+    } else if (editReadiness.status === "pass" && markerContents !== editMarkerContents) {
+      editReadiness = {
+        ...editReadiness,
+        status: "fail",
+        failure_kind: "edit-denied",
+        marker_file: editMarkerFile,
+        marker_status: markerStatus,
+      };
+    } else {
+      editReadiness = {
+        ...editReadiness,
+        marker_file: editMarkerFile,
+        marker_status: markerStatus,
+      };
+    }
+  }
   if (editReadiness && editReadiness.status !== "pass") {
     const failureKind = asNonEmptyString(editReadiness.failure_kind) || "permission-mode-blocked";
     const reportPayload = {
@@ -518,6 +579,8 @@ export function runLiveAdapterPreflight(options) {
         status: "fail",
         failure_kind: failureKind,
         attempts: [editReadiness],
+        nonce_file: editNonceFile,
+        marker_file: editMarkerFile,
       },
     };
     if (
@@ -615,6 +678,8 @@ export function runLiveAdapterPreflight(options) {
             enabled: true,
             status: "pass",
             attempts: [editReadiness],
+            nonce_file: editNonceFile,
+            marker_file: editMarkerFile,
           }
         : {
             enabled: false,
@@ -653,6 +718,8 @@ export function runLiveAdapterPreflight(options) {
           enabled: true,
           status: "pass",
           attempts: [editReadiness],
+          nonce_file: editNonceFile,
+          marker_file: editMarkerFile,
         }
       : {
           enabled: false,

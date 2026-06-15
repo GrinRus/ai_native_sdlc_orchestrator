@@ -3556,25 +3556,43 @@ export function executeFullJourneyFlow(options) {
     artifacts.provider_policy_override_files = providerPolicies.policyFiles;
     artifacts.provider_policy_overrides = providerPolicies.policyOverrides;
     const policyOverridesFlag = serializePolicyOverrides(providerPolicies.policyOverrides);
-    const liveAdapterPreflight = runLiveAdapterPreflight({
-      targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
-      adapterProfileRoot: path.join(hostAssets.assetsRoot, "adapters"),
-      providerVariant: options.providerVariant,
-      providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
-      coverageTier: options.coverageTier,
-      env,
-      runnerAuthMode: proofRunnerEnvironment.runnerAuthMode,
-      runnerAuthSource: proofRunnerEnvironment.runnerAuthSource,
-      runtimeAgentPermissionMode: options.runtimeAgentPermissionMode,
-      runtimeAgentInteractionPolicy: options.runtimeAgentInteractionPolicy,
-      runtimeAgentAutoApprovalProfile: options.runtimeAgentAutoApprovalProfile,
-      authProbeRequired: options.authProbeRequired,
-      permissionReadinessRequired: asRecord(options.profile.production_proof).require_permission_readiness === true,
-      runId: options.runId,
-      reportsRoot: options.layout.reportsRoot,
-    });
+    const cachedLiveAdapterPreflight = asRecord(artifacts.live_adapter_preflight);
+    const cachedLiveAdapterPreflightFile = asNonEmptyString(artifacts.live_adapter_preflight_file);
+    const shouldReuseLiveAdapterPreflight =
+      asNonEmptyString(cachedLiveAdapterPreflight.status) === "pass" &&
+      cachedLiveAdapterPreflightFile.length > 0 &&
+      fileExists(cachedLiveAdapterPreflightFile);
+    const liveAdapterPreflight = shouldReuseLiveAdapterPreflight
+      ? {
+          status: "pass",
+          summary:
+            asNonEmptyString(cachedLiveAdapterPreflight.summary) ||
+            "Live adapter preflight reused from earlier manual resume segment.",
+          report: cachedLiveAdapterPreflight,
+          reportFile: cachedLiveAdapterPreflightFile,
+        }
+      : runLiveAdapterPreflight({
+          targetCheckoutRoot: targetCheckout.targetCheckoutRoot,
+          adapterProfileRoot: path.join(hostAssets.assetsRoot, "adapters"),
+          providerVariant: options.providerVariant,
+          providerVariantId: asNonEmptyString(options.profile.provider_variant_id),
+          coverageTier: options.coverageTier,
+          env,
+          runnerAuthMode: proofRunnerEnvironment.runnerAuthMode,
+          runnerAuthSource: proofRunnerEnvironment.runnerAuthSource,
+          runtimeAgentPermissionMode: options.runtimeAgentPermissionMode,
+          runtimeAgentInteractionPolicy: options.runtimeAgentInteractionPolicy,
+          runtimeAgentAutoApprovalProfile: options.runtimeAgentAutoApprovalProfile,
+          authProbeRequired: options.authProbeRequired,
+          permissionReadinessRequired: asRecord(options.profile.production_proof).require_permission_readiness === true,
+          runId: options.runId,
+          reportsRoot: options.layout.reportsRoot,
+        });
     artifacts.live_adapter_preflight_file = liveAdapterPreflight.reportFile;
     artifacts.live_adapter_preflight = liveAdapterPreflight.report;
+    if (shouldReuseLiveAdapterPreflight) {
+      artifacts.live_adapter_preflight_reused_after_resume = true;
+    }
     if (liveAdapterPreflight.status !== "pass") {
       markStage(
         stageMap,
