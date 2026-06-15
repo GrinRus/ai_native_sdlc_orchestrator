@@ -330,10 +330,28 @@ test("live E2E decision helper hydrates late browser-task proof refs", () => {
     const browserProofRequestFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-request-run.json");
     const browserProofFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-run.json");
     const screenshotFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-run.png");
+    const htmlFile = path.join(reportsRoot, "installed-user-guided-web-smoke-run.html");
+    const domFile = path.join(reportsRoot, "installed-user-guided-web-smoke-dom-run.json");
+    const accessibilityFile = path.join(reportsRoot, "installed-user-guided-web-smoke-accessibility-run.json");
+    const visualFile = path.join(reportsRoot, "installed-user-guided-web-smoke-visual-guardrail-run.json");
     fs.writeFileSync(screenshotFile, "png", "utf8");
+    for (const evidenceFile of [htmlFile, domFile, accessibilityFile, visualFile]) {
+      fs.writeFileSync(evidenceFile, "{}", "utf8");
+    }
     fs.writeFileSync(
       browserProofRequestFile,
-      `${JSON.stringify({ expected_browser_task_proof_file: browserProofFile }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          expected_browser_task_proof_file: browserProofFile,
+          expected_rendered_html_file: htmlFile,
+          expected_dom_snapshot_file: domFile,
+          expected_accessibility_summary_file: accessibilityFile,
+          expected_visual_guardrail_file: visualFile,
+          evidence_refs: [htmlFile, domFile, accessibilityFile, visualFile],
+        },
+        null,
+        2,
+      )}\n`,
       "utf8",
     );
     fs.writeFileSync(
@@ -400,13 +418,22 @@ test("live E2E decision helper hydrates late browser-task proof refs", () => {
       action: "continue",
     });
     const preparedDecision = JSON.parse(fs.readFileSync(summary.output_ref, "utf8"));
-    for (const expectedRef of [webSmokeFile, browserProofRequestFile, browserProofFile, screenshotFile]) {
+    for (const expectedRef of [
+      webSmokeFile,
+      browserProofRequestFile,
+      browserProofFile,
+      screenshotFile,
+      htmlFile,
+      domFile,
+      accessibilityFile,
+      visualFile,
+    ]) {
       assert.equal(preparedDecision.inspected_evidence_refs.includes(expectedRef), true);
       assert.equal(preparedDecision.evidence_refs.includes(expectedRef), true);
       assert.equal(preparedDecision.frontend_evidence_refs.includes(expectedRef), true);
       assert.equal(preparedDecision.ui_ux_analysis.frontend_evidence_refs.includes(expectedRef), true);
     }
-    assert.equal(summary.frontend_evidence_ref_count >= 4, true);
+    assert.equal(summary.frontend_evidence_ref_count >= 8, true);
     assert.deepEqual(summary.validation_preview.missing_frontend_evidence_refs, []);
   });
 });
