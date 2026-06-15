@@ -2269,6 +2269,15 @@ test("proof runner reuses valid installation proof for manual resume", () => {
   });
 });
 
+test("source install proof force-refreshes dependencies and smokes intake CLI", () => {
+  const flowsSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
+
+  assert.match(flowsSource, /pnpm-install-frozen-lockfile-force/u);
+  assert.match(flowsSource, /\["install", "--frozen-lockfile", "--force"\]/u);
+  assert.match(flowsSource, /pnpm-aor-intake-create-help/u);
+  assert.match(flowsSource, /\["aor", "intake", "create", "--help"\]/u);
+});
+
 test("proof runner writes run-health reports for blocked live E2E reports", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");

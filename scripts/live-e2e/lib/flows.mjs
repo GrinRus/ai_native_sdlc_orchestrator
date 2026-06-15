@@ -441,10 +441,11 @@ export function prepareAorInstallationProof(options) {
 
   if (effectivePolicy === "source-install-required") {
     addCommand("corepack-enable", "corepack", ["enable"]);
-    addCommand("pnpm-install-frozen-lockfile", "pnpm", ["install", "--frozen-lockfile"]);
+    addCommand("pnpm-install-frozen-lockfile-force", "pnpm", ["install", "--frozen-lockfile", "--force"]);
     addCommand("pnpm-build", "pnpm", ["build"]);
     addCommand("pnpm-aor-help", "pnpm", ["aor", "--help"]);
     addCommand("pnpm-aor-project-init-help", "pnpm", ["aor", "project", "init", "--help"]);
+    addCommand("pnpm-aor-intake-create-help", "pnpm", ["aor", "intake", "create", "--help"]);
     const launcherScript = path.join(installRoot, "aor-session-launcher.sh");
     fs.writeFileSync(
       launcherScript,
