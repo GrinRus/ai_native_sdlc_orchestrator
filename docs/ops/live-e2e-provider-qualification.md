@@ -71,6 +71,8 @@ Use public live E2E evidence only:
 - Runtime Harness report;
 - routed step result;
 - adapter raw evidence summary;
+- request artifact, provider work packet, and context-budget summary when an
+  external provider step was reached;
 - provider heartbeat/progress status;
 - target setup/verification status;
 - accepted skill-agent operator decisions.
@@ -113,6 +115,10 @@ The generated qualification analysis includes `run_health_report_ref`,
 provider/environment/operator/AOR-owner follow-up. Use the separate quality
 assessment report for outcome backlog items only after provider qualification is
 recorded.
+
+Context-budget blockers such as `compiled_context_budget_exceeded` are AOR
+run-health issues in `phase=provider_execution`. They do not prove provider
+quality failure and they do not evaluate produced code or artifacts.
 
 ## W40 proof notes
 

@@ -738,15 +738,16 @@ function buildSetupJournal(artifacts) {
 }
 
 function latestProviderStepStatusFromArtifacts(artifacts) {
+  const candidates = [];
   const direct = asRecord(artifacts.provider_step_status);
-  if (Object.keys(direct).length > 0) return direct;
+  if (Object.keys(direct).length > 0) candidates.push(direct);
 
   const controllerEntries = Array.isArray(artifacts.live_e2e_step_journal_entries)
     ? artifacts.live_e2e_step_journal_entries.map((entry) => asRecord(entry))
     : [];
   for (let index = controllerEntries.length - 1; index >= 0; index -= 1) {
     const providerStepStatus = asRecord(controllerEntries[index].provider_step_status);
-    if (Object.keys(providerStepStatus).length > 0) return providerStepStatus;
+    if (Object.keys(providerStepStatus).length > 0) candidates.push(providerStepStatus);
   }
 
   const commandResults = Array.isArray(artifacts.command_results)
@@ -754,10 +755,23 @@ function latestProviderStepStatusFromArtifacts(artifacts) {
     : [];
   for (let index = commandResults.length - 1; index >= 0; index -= 1) {
     const providerStepStatus = asRecord(commandResults[index].provider_step_status);
-    if (Object.keys(providerStepStatus).length > 0) return providerStepStatus;
+    if (Object.keys(providerStepStatus).length > 0) candidates.push(providerStepStatus);
   }
 
-  return {};
+  candidates.sort((left, right) => providerStatusRank(right) - providerStatusRank(left));
+  return candidates[0] ?? {};
+}
+
+function providerStatusRank(providerStepStatus) {
+  const status = asNonEmptyString(asRecord(providerStepStatus).status);
+  if (["failed", "fail", "completed", "complete", "pass", "succeeded", "interrupted"].includes(status)) return 3;
+  if (["timeout", "timed-out", "timeout-risk"].includes(status)) return 2;
+  if (["running", "silent-running"].includes(status)) return 1;
+  return 0;
+}
+
+function isTransientProviderExecutionStatus(status) {
+  return ["running", "silent-running", "timeout-risk"].includes(asNonEmptyString(status));
 }
 
 function classifyProviderStepStatus(providerStepStatus) {
@@ -861,6 +875,12 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "run_start_runtime_harness_decision",
     "runtime_harness_overall_decision",
     "adapter_raw_evidence_ref",
+    "request_artifact_ref",
+    "provider_work_packet_ref",
+    "context_budget_status",
+    "context_budget_failure_class",
+    "raw_provider_error_summary",
+    "top_context_size_sources",
     "provider_execution_status",
     "real_code_change_status",
     "code_quality_status",
@@ -894,7 +914,10 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
   if (Object.keys(latestProviderStepStatus).length > 0) {
     artifacts.provider_step_status = latestProviderStepStatus;
     const providerClassification = classifyProviderStepStatus(latestProviderStepStatus);
-    if (!asNonEmptyString(artifacts.provider_execution_status)) {
+    if (
+      !asNonEmptyString(artifacts.provider_execution_status) ||
+      isTransientProviderExecutionStatus(artifacts.provider_execution_status)
+    ) {
       artifacts.provider_execution_status = providerClassification.provider_execution_status;
     }
     if (!asNonEmptyString(artifacts.failure_owner) && providerClassification.failure_owner) {
@@ -1289,11 +1312,29 @@ function commandCompletedForRunHealth(diagnostic) {
 }
 
 /**
- * @param {{ flowResult: { commandResults: Array<Record<string, unknown>> } }} options
+ * @param {{ flowResult: { commandResults: Array<Record<string, unknown>> }, observationReport?: Record<string, unknown> }} options
  * @returns {Record<string, unknown>}
  */
 function buildCommandHealth(options) {
-  const failedCommands = options.flowResult.commandResults
+  const commandResults =
+    options.flowResult.commandResults.length > 0
+      ? options.flowResult.commandResults
+      : Array.isArray(options.observationReport?.step_journal)
+        ? options.observationReport.step_journal
+            .map((entry) => asRecord(entry))
+            .filter((entry) => asNonEmptyString(entry.transcript_ref))
+            .map((entry) => ({
+              command_surface: asNonEmptyString(entry.public_surface) || asNonEmptyString(entry.step_id) || "unknown",
+              status: asNonEmptyString(asRecord(entry.deterministic_analysis).status) === "pass" ? "pass" : "fail",
+              exit_code:
+                typeof asRecord(entry.deterministic_analysis).exit_code === "number"
+                  ? asRecord(entry.deterministic_analysis).exit_code
+                  : null,
+              transcript_ref: asNonEmptyString(entry.transcript_ref),
+              summary: asNonEmptyString(asRecord(entry.stage_result).summary) || asNonEmptyString(entry.step_id) || null,
+            }))
+        : [];
+  const failedCommands = commandResults
     .filter((entry) => !commandCompletedForRunHealth(entry))
     .map((entry) => ({
       command_surface: asNonEmptyString(entry.command_surface) || asNonEmptyString(entry.command) || "unknown",
@@ -1304,7 +1345,7 @@ function buildCommandHealth(options) {
     }));
   return {
     status: failedCommands.length === 0 ? "pass" : "fail",
-    command_count: options.flowResult.commandResults.length,
+    command_count: commandResults.length,
     failed_command_count: failedCommands.length,
     failed_commands: failedCommands,
   };
@@ -1350,23 +1391,35 @@ function buildControllerHealth(options) {
  */
 function buildProviderHealth(artifacts) {
   const providerStepStatus = asRecord(artifacts.provider_step_status);
+  const contextBudgetStatus = asNonEmptyString(artifacts.context_budget_status);
+  const contextBudgetFailureClass = asNonEmptyString(artifacts.context_budget_failure_class);
   const providerExecutionStatus =
     asNonEmptyString(artifacts.provider_execution_status) ||
     asNonEmptyString(providerStepStatus.status) ||
+    (contextBudgetFailureClass === "compiled_context_budget_exceeded" || contextBudgetStatus === "fail"
+      ? "blocked"
+      : null) ||
     "not_attempted";
-  const status =
-    providerExecutionStatus === "pass" ||
-    providerExecutionStatus === "completed" ||
-    providerExecutionStatus === "not_attempted"
-      ? "pass"
-      : providerExecutionStatus === "interrupted"
-        ? "blocked"
-        : "fail";
+  const hasContextBudgetBlock =
+    contextBudgetFailureClass === "compiled_context_budget_exceeded" || contextBudgetStatus === "fail";
+  const hasProviderBlock = ["interrupted", "blocked", "provider_blocked", "permission-mode-blocked", "edit-denied"].includes(
+    providerExecutionStatus,
+  );
+  const hasProviderPass = ["pass", "completed", "not_attempted"].includes(providerExecutionStatus);
+  const status = hasContextBudgetBlock || hasProviderBlock ? "blocked" : hasProviderPass ? "pass" : "fail";
   return {
     status,
     provider_execution_status: providerExecutionStatus,
     provider_step_status: Object.keys(providerStepStatus).length > 0 ? providerStepStatus : null,
     adapter_raw_evidence_ref: asNonEmptyString(artifacts.adapter_raw_evidence_ref) || null,
+    request_artifact_ref: asNonEmptyString(artifacts.request_artifact_ref) || null,
+    provider_work_packet_ref: asNonEmptyString(artifacts.provider_work_packet_ref) || null,
+    context_budget_status: contextBudgetStatus || null,
+    context_budget_failure_class: contextBudgetFailureClass || null,
+    top_context_size_sources: Array.isArray(artifacts.top_context_size_sources)
+      ? artifacts.top_context_size_sources
+      : [],
+    raw_provider_error_summary: asNonEmptyString(artifacts.raw_provider_error_summary) || null,
   };
 }
 
@@ -1475,6 +1528,27 @@ function resolveRunHealthFailure(options) {
   const declaredPhase = asNonEmptyString(options.artifacts.failure_phase);
   const declaredClass = asNonEmptyString(options.artifacts.failure_class);
   if (declaredOwner || declaredPhase || declaredClass) {
+    if (declaredClass === "compiled_context_budget_exceeded") {
+      return {
+        owner: declaredOwner || "aor",
+        phase: declaredPhase || "provider_execution",
+        class: declaredClass,
+        summary:
+          asNonEmptyString(options.artifacts.raw_provider_error_summary) ||
+          "Provider work packet exceeded the configured context budget before or during provider execution.",
+      };
+    }
+    if (["provider_work_packet_not_executed", "no-op"].includes(declaredClass)) {
+      return {
+        owner: declaredOwner || "provider",
+        phase: declaredPhase || "provider_execution",
+        class: declaredClass,
+        summary:
+          declaredClass === "provider_work_packet_not_executed"
+            ? "External runtime summarized the provider work packet instead of executing the implementation."
+            : "Runtime Harness detected a strict code-changing no-op during provider execution.",
+      };
+    }
     return {
       owner: declaredOwner || "unknown",
       phase: declaredPhase || "unknown",
@@ -1588,7 +1662,10 @@ function resolveRunHealthFailure(options) {
  */
 function buildRunHealthReport(options) {
   const lifecycleCompletion = buildLifecycleCompletenessSummary(options.observationReport);
-  const commandHealth = buildCommandHealth({ flowResult: options.flowResult });
+  const commandHealth = buildCommandHealth({
+    flowResult: options.flowResult,
+    observationReport: options.observationReport,
+  });
   const controllerHealth = buildControllerHealth({ observationReport: options.observationReport });
   const providerHealth = buildProviderHealth(options.flowResult.artifacts);
   const targetEnvironmentHealth = buildTargetEnvironmentHealth(options.flowResult.artifacts);
@@ -1603,6 +1680,8 @@ function buildRunHealthReport(options) {
     observationStatus === "blocked" ||
     observationStatus === "interaction_required" ||
     asNonEmptyString(controllerHealth.status) === "blocked" ||
+    asNonEmptyString(providerHealth.status) === "blocked" ||
+    asNonEmptyString(targetEnvironmentHealth.status) === "blocked" ||
     asNonEmptyString(resumeInteractionHealth.status) === "blocked";
   const hasFailedRun =
     observationStatus === "not_pass" ||
@@ -1914,6 +1993,20 @@ export function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.adapter_raw_evidence_ref === "string"
         ? options.flowResult.artifacts.adapter_raw_evidence_ref
         : null,
+    request_artifact_ref:
+      typeof options.flowResult.artifacts.request_artifact_ref === "string"
+        ? options.flowResult.artifacts.request_artifact_ref
+        : null,
+    provider_work_packet_ref:
+      typeof options.flowResult.artifacts.provider_work_packet_ref === "string"
+        ? options.flowResult.artifacts.provider_work_packet_ref
+        : null,
+    context_budget_status: asNonEmptyString(options.flowResult.artifacts.context_budget_status) || null,
+    context_budget_failure_class: asNonEmptyString(options.flowResult.artifacts.context_budget_failure_class) || null,
+    raw_provider_error_summary: asNonEmptyString(options.flowResult.artifacts.raw_provider_error_summary) || null,
+    top_context_size_sources: Array.isArray(options.flowResult.artifacts.top_context_size_sources)
+      ? options.flowResult.artifacts.top_context_size_sources
+      : [],
     stage_results: options.flowResult.stageResults,
     command_results: options.flowResult.commandResults,
     artifacts: options.flowResult.artifacts,

@@ -266,7 +266,7 @@ export function runLiveAdapterPreflight(options) {
       runtimeReport,
     );
   }
-  if (!["stdin-json", "file-attachment", "argv-json", "none"].includes(requestTransport)) {
+  if (!["request-artifact", "stdin-json", "file-attachment", "argv-json", "none"].includes(requestTransport)) {
     return fail(
       "request-transport-invalid",
       `Adapter '${adapterId}' live runtime request transport '${requestTransport}' is not supported.`,
@@ -357,6 +357,22 @@ export function runLiveAdapterPreflight(options) {
       probeStdin = probeInput;
     } else if (requestTransport === "argv-json") {
       probeArgs = [...probeArgs, probeInput.trim()];
+    } else if (requestTransport === "request-artifact") {
+      const requestFileProfile = asRecord(externalRuntime.request_file);
+      const requestFileArgument = asNonEmptyString(requestFileProfile.argument);
+      fs.mkdirSync(permissionProbeRoot, { recursive: true });
+      const requestFile = path.join(permissionProbeRoot, `preflight-${normalizeId(kind)}-${attempt}-work-packet.json`);
+      fs.writeFileSync(requestFile, probeInput, "utf8");
+      const requestMessageTemplate =
+        asNonEmptyString(requestFileProfile.message) ??
+        "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read it first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when required, do not write upstream, run requested verification when feasible, and return a final report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet.";
+      const requestMessage = requestMessageTemplate
+        .replace(/\{provider_work_packet_path\}/gu, requestFile)
+        .replace(/\{provider_work_packet_ref\}/gu, requestFile)
+        .replace(/\{request_artifact_ref\}/gu, requestFile);
+      probeArgs = requestFileArgument
+        ? [...probeArgs, requestMessage, requestFileArgument, requestFile]
+        : [...probeArgs, requestMessage];
     } else if (requestTransport === "file-attachment") {
       const requestFileProfile = asRecord(externalRuntime.request_file);
       const requestMessage =

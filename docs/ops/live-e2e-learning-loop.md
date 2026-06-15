@@ -22,12 +22,13 @@ Read `live_e2e_run_health_report_file` first. Classify follow-up for:
 - command failures;
 - controller gaps and missing operator decisions;
 - provider execution issues;
+- context-budget blockers, including `compiled_context_budget_exceeded`;
 - target setup or verification environment issues;
 - missing factual evidence refs;
 - resume or interaction failures.
 
-These are run-quality gaps. Keep them separate from code, artifact, UI/UX, or
-accessibility quality.
+These are run-quality gaps. Keep them separate from code, artifact, AOR
+operator UI/UX, or AOR operator accessibility quality.
 
 ## 3. Inspect outcome quality and evidence linkage
 ```bash

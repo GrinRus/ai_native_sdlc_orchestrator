@@ -40,11 +40,52 @@ const requiredDimensions = Object.freeze([
   "performance_regression_risk",
   "verification_quality",
   "delivery_safety",
-  "ui_ux_quality",
-  "accessibility_quality",
+  "aor_operator_ui_ux_quality",
+  "aor_operator_accessibility_quality",
   "evidence_strength",
   "acceptance_criteria_traceability",
 ]);
+
+const aorOperatorUiSubdimensions = Object.freeze([
+  "task_success",
+  "flow_navigation_clarity",
+  "next_action_clarity",
+  "blocker_and_error_understandability",
+  "recovery_affordance",
+  "state_feedback_loading_empty_error",
+  "visual_stability_responsiveness",
+  "raw_json_independence",
+]);
+
+const aorOperatorAccessibilitySubdimensions = Object.freeze([
+  "keyboard_navigation",
+  "focus_order",
+  "contrast_and_readability",
+  "semantic_structure",
+  "screen_reader_labels",
+  "accessible_error_feedback",
+]);
+
+function buildUiSubdimensions(keys, evidenceFile, category) {
+  return Object.fromEntries(
+    keys.map((key) => [
+      key,
+      {
+        status: "pass",
+        evidence_strength: "strong",
+        evidence_refs: [evidenceFile],
+        findings: [
+          {
+            category,
+            severity: "low",
+            summary: `${key} was inspected through AOR operator UI evidence.`,
+            evidence_refs: [evidenceFile],
+          },
+        ],
+      },
+    ]),
+  );
+}
 
 function buildAssessmentReport(options) {
   const dimensions = Object.fromEntries(
@@ -58,6 +99,16 @@ function buildAssessmentReport(options) {
         recommended_followups: [],
       },
     ]),
+  );
+  dimensions.aor_operator_ui_ux_quality.subdimensions = buildUiSubdimensions(
+    aorOperatorUiSubdimensions,
+    options.evidenceFile,
+    "ui-ux",
+  );
+  dimensions.aor_operator_accessibility_quality.subdimensions = buildUiSubdimensions(
+    aorOperatorAccessibilitySubdimensions,
+    options.evidenceFile,
+    "accessibility",
   );
   dimensions.security_review = {
     status: "not_evaluated",
@@ -102,7 +153,7 @@ function buildAssessmentReport(options) {
         evidence_refs: [options.requestFile],
       },
     ],
-    recommended_followups: ["Attach security evidence when the target change touches sensitive surfaces."],
+    recommended_followups: ["Attach security evidence when the change touches sensitive surfaces."],
     evidence_refs: [options.summaryFile, options.observationFile, options.runHealthFile, options.requestFile],
   };
 }
@@ -117,6 +168,7 @@ test("quality assessment prepare builds a SWE assessment request from full flow 
   const browserProofFile = touch(path.join(reportsRoot, "browser-task-proof-live-e2e.test.run.json"));
   const summaryFile = path.join(reportsRoot, "live-e2e-run-summary-live-e2e.test.run.json");
   writeJson(observationFile, {
+    overall_status: "pass",
     report_status: "final",
     frontend_interactions: [
       {
@@ -139,6 +191,7 @@ test("quality assessment prepare builds a SWE assessment request from full flow 
     provider_variant_id: "openai-primary",
     feature_size: "medium",
     live_e2e_observation_report_file: observationFile,
+    live_e2e_observation_overall_status: "pass",
     live_e2e_run_health_report_file: runHealthFile,
     review_report_file: reviewFile,
     post_run_verify_summary_file: verifyFile,
@@ -156,9 +209,55 @@ test("quality assessment prepare builds a SWE assessment request from full flow 
   assert.equal(request.run_identity.run_health_status, "pass");
   assert.ok(request.dimension_rubric.artifact_content_quality.includes("KPI/DoD traceability"));
   assert.ok(request.dimension_rubric.code_maintainability.includes("architecture boundary fit"));
-  assert.ok(request.dimension_rubric.ui_ux_quality.includes("target product UI/UX"));
+  assert.ok(request.dimension_rubric.aor_operator_ui_ux_quality.includes("AOR installed-user task success"));
+  assert.ok(request.dimension_rubric.aor_operator_ui_ux_subdimensions.includes("raw_json_independence"));
+  assert.equal(JSON.stringify(request.dimension_rubric).includes(["target", "product", "UI"].join(" ")), false);
   assert.ok(request.evidence_refs.review_eval_harness.includes(reviewFile));
-  assert.ok(request.evidence_refs.frontend_browser.includes(browserProofFile));
+  assert.ok(request.evidence_refs.aor_operator_ui.includes(browserProofFile));
+});
+
+test("quality assessment prepare rejects incomplete context-budget blocked runs", () => {
+  const tempRoot = makeTempRoot();
+  const reportsRoot = path.join(tempRoot, "reports");
+  const observationFile = path.join(reportsRoot, "live-e2e-observation-report-live-e2e.test.run.json");
+  const runHealthFile = path.join(reportsRoot, "live-e2e-run-health-report-live-e2e.test.run.json");
+  const summaryFile = path.join(reportsRoot, "live-e2e-run-summary-live-e2e.test.run.json");
+  writeJson(observationFile, {
+    overall_status: "blocked",
+    report_status: "final",
+  });
+  writeJson(runHealthFile, {
+    overall_status: "blocked",
+    provider_health: {
+      context_budget_status: "fail",
+      context_budget_failure_class: "compiled_context_budget_exceeded",
+    },
+    failure_summary: {
+      owner: "aor",
+      phase: "provider_execution",
+      class: "compiled_context_budget_exceeded",
+      summary: "Provider work packet exceeded the deterministic context budget.",
+    },
+    evidence_refs: [observationFile],
+  });
+  writeJson(summaryFile, {
+    run_id: "live-e2e.test.run",
+    profile_id: "live-e2e.full-journey.test",
+    live_e2e_observation_report_file: observationFile,
+    live_e2e_observation_overall_status: "blocked",
+    live_e2e_run_health_report_file: runHealthFile,
+    live_e2e_run_health_overall_status: "blocked",
+    context_budget_failure_class: "compiled_context_budget_exceeded",
+  });
+
+  const result = runQualityAssessment(["prepare", "--run-summary-file", summaryFile]);
+  assert.equal(result.status, 1, result.stdout);
+  assert.match(result.stderr, /completed full flow/u);
+  assert.match(result.stderr, /compiled_context_budget_exceeded/u);
+  assert.equal(
+    fs.existsSync(path.join(reportsRoot, "live-e2e-quality-assessment-request-live-e2e.test.run.json")),
+    false,
+  );
 });
 
 test("quality assessment validate accepts structured free-form SWE assessment", () => {

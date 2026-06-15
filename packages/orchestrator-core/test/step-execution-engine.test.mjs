@@ -121,6 +121,7 @@ function configureCodexExternalRuntime(repoRoot, runtime) {
     "          args:",
     ...permissionArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
     "    request_via_stdin: true",
+    "    stdin_json_scope: test-only",
     "    timeout_ms: 30000",
   ].join("\n");
   const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
@@ -152,6 +153,7 @@ function configureCodexExternalRuntimePermissionModes(repoRoot, runtime) {
     "          args:",
     ...runtime.restrictedArgs.map((argument) => `            - ${JSON.stringify(argument)}`),
     "    request_via_stdin: true",
+    "    stdin_json_scope: test-only",
     "    timeout_ms: 30000",
   ].join("\n");
   const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);
@@ -225,6 +227,10 @@ test("executeRoutedStep resolves route/assets/policy/adapter and persists compil
       assert.equal(
         result.stepResult.routed_execution.adapter_request.context.compiled_context_ref,
         contextCompilation.compiled_context_ref,
+      );
+      assert.equal(
+        result.stepResult.routed_execution.adapter_request.context.compiled_context_file,
+        contextCompilation.compiled_context_file,
       );
       assert.ok(
         result.stepResult.evidence_refs.includes(contextCompilation.compiled_context_ref),

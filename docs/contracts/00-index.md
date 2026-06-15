@@ -33,6 +33,8 @@
 - `compiled-context-artifact.md`
 - `operator-request.md`
 
+Compiled-context and external-runner contracts include context-budget evidence for live adapter-backed steps. Live E2E run-health consumes those facts as run-quality failures only; outcome quality remains in `live-e2e-quality-assessment-report`.
+
 ## Platform assets
 - `provider-route-profile.md`
 - `wrapper-profile.md`

@@ -29,10 +29,30 @@ const REQUIRED_DIMENSIONS = Object.freeze([
   "performance_regression_risk",
   "verification_quality",
   "delivery_safety",
-  "ui_ux_quality",
-  "accessibility_quality",
+  "aor_operator_ui_ux_quality",
+  "aor_operator_accessibility_quality",
   "evidence_strength",
   "acceptance_criteria_traceability",
+]);
+
+const AOR_OPERATOR_UI_UX_SUBDIMENSIONS = Object.freeze([
+  "task_success",
+  "flow_navigation_clarity",
+  "next_action_clarity",
+  "blocker_and_error_understandability",
+  "recovery_affordance",
+  "state_feedback_loading_empty_error",
+  "visual_stability_responsiveness",
+  "raw_json_independence",
+]);
+
+const AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSIONS = Object.freeze([
+  "keyboard_navigation",
+  "focus_order",
+  "contrast_and_readability",
+  "semantic_structure",
+  "screen_reader_labels",
+  "accessible_error_feedback",
 ]);
 
 const FINDING_TAXONOMY = Object.freeze([
@@ -47,6 +67,9 @@ const FINDING_TAXONOMY = Object.freeze([
   "acceptance-traceability",
   "follow-up-needed",
 ]);
+
+const ASSESSABLE_RUN_HEALTH_STATUSES = Object.freeze(["pass", "warn"]);
+const ASSESSABLE_OBSERVATION_STATUSES = Object.freeze(["pass", "warn"]);
 
 const DIMENSION_RUBRIC = Object.freeze({
   artifact_content_quality: [
@@ -114,22 +137,29 @@ const DIMENSION_RUBRIC = Object.freeze({
     "bounded write-back mode",
     "release packet safety",
   ],
-  ui_ux_quality: [
-    "target product UI/UX",
-    "AOR operator UI separated from target UI",
-    "task success",
-    "copy clarity",
-    "responsive visual evidence",
-    "loading empty error and recovery states",
-    "visual overlap risks",
+  aor_operator_ui_ux_quality: [
+    "AOR installed-user task success",
+    "flow navigation clarity",
+    "next action clarity",
+    "blocker and error understandability",
+    "recovery affordance",
+    "loading empty error and recovery state feedback",
+    "visual stability and responsiveness",
+    "operator can proceed without raw JSON inspection",
   ],
-  accessibility_quality: [
+  aor_operator_accessibility_quality: [
     "keyboard navigation",
     "focus order",
-    "contrast",
-    "screen-reader semantics",
-    "axe-style evidence",
-    "checklist limits",
+    "contrast and readability",
+    "semantic structure",
+    "screen-reader labels",
+    "accessible error feedback",
+  ],
+  aor_operator_ui_ux_subdimensions: AOR_OPERATOR_UI_UX_SUBDIMENSIONS,
+  aor_operator_accessibility_subdimensions: AOR_OPERATOR_ACCESSIBILITY_SUBDIMENSIONS,
+  legacy_scope_exclusion: [
+    "Repository-owned frontend behavior is not part of the live E2E AOR operator UI/UX assessment.",
+    "Frontend changes in the checked repository, when a mission includes them, are assessed through implementation and verification dimensions.",
   ],
   evidence_strength: [
     "strong direct signals",
@@ -177,7 +207,7 @@ const EVIDENCE_GROUP_FIELDS = Object.freeze({
     "learning_loop_handoff_file",
     "learning_loop_transcript_file",
   ],
-  frontend_browser: [
+  aor_operator_ui: [
     "guided_web_smoke_summary_file",
     "guided_web_smoke_html_file",
     "guided_web_dom_snapshot_file",
@@ -270,8 +300,10 @@ function collectFrontendRefs(observationReport) {
       asNonEmptyString(interaction.accessibility_summary_ref),
       asNonEmptyString(interaction.visual_guardrail_ref),
       asNonEmptyString(interaction.agent_verdict_ref),
+      asNonEmptyString(interaction.operator_decision_ref),
       ...asStringArray(interaction.screenshot_refs),
       ...asStringArray(interaction.visual_guardrail_refs),
+      ...asStringArray(interaction.operator_decision_refs),
       ...asStringArray(interaction.evidence_refs),
     );
   }
@@ -295,8 +327,8 @@ function buildEvidenceGroups(options) {
     asNonEmptyString(options.runSummary.live_e2e_run_health_report_file),
     ...asStringArray(options.runHealthReport.evidence_refs),
   ]);
-  groups.frontend_browser = uniqueStrings([
-    ...groups.frontend_browser,
+  groups.aor_operator_ui = uniqueStrings([
+    ...groups.aor_operator_ui,
     ...collectFrontendRefs(options.observationReport),
   ]);
   const allRefs = [];
@@ -330,6 +362,50 @@ function resolveLocalEvidenceRef(ref, baseDir) {
     return null;
   }
   return path.isAbsolute(value) ? value : path.resolve(baseDir, value);
+}
+
+/**
+ * @param {Record<string, unknown>} runSummary
+ * @param {Record<string, unknown>} observationReport
+ * @param {Record<string, unknown>} runHealthReport
+ */
+function resolveAssessmentReadiness(runSummary, observationReport, runHealthReport) {
+  const runHealthStatus =
+    asNonEmptyString(runHealthReport.overall_status) ||
+    asNonEmptyString(asRecord(runSummary.run_health).overall_status) ||
+    asNonEmptyString(runSummary.live_e2e_run_health_overall_status) ||
+    null;
+  const observationStatus =
+    asNonEmptyString(observationReport.overall_status) ||
+    asNonEmptyString(runSummary.live_e2e_observation_overall_status) ||
+    null;
+  const failureSummary = asRecord(runHealthReport.failure_summary);
+  const failureClass =
+    asNonEmptyString(failureSummary.class) ||
+    asNonEmptyString(asRecord(runHealthReport.provider_health).context_budget_failure_class) ||
+    asNonEmptyString(runSummary.context_budget_failure_class) ||
+    null;
+  const issues = [];
+  if (!runHealthStatus) {
+    issues.push("source run-health status is missing");
+  } else if (!ASSESSABLE_RUN_HEALTH_STATUSES.includes(runHealthStatus)) {
+    issues.push(`source run-health status is '${runHealthStatus}'`);
+  }
+  if (!observationStatus) {
+    issues.push("source observation status is missing");
+  } else if (!ASSESSABLE_OBSERVATION_STATUSES.includes(observationStatus)) {
+    issues.push(`source observation status is '${observationStatus}'`);
+  }
+  if (failureClass === "compiled_context_budget_exceeded") {
+    issues.push("flow stopped at context-budget guardrail before outcome artifacts were produced");
+  }
+  return {
+    ok: issues.length === 0,
+    runHealthStatus,
+    observationStatus,
+    failureClass,
+    issues,
+  };
 }
 
 /**
@@ -404,6 +480,20 @@ function prepareCli(rawArgs) {
     runHealthFile && fs.existsSync(resolveLocalEvidenceRef(runHealthFile, baseDir) ?? "")
       ? readDocument(resolveLocalEvidenceRef(runHealthFile, baseDir) ?? runHealthFile)
       : {};
+  const readiness = resolveAssessmentReadiness(runSummary, observationReport, runHealthReport);
+  if (!readiness.ok) {
+    throw new UsageError(
+      [
+        "Quality assessment can be prepared only after a completed full flow with pass/warn run-health and observation status.",
+        `run_health_status=${readiness.runHealthStatus ?? "missing"}`,
+        `observation_status=${readiness.observationStatus ?? "missing"}`,
+        readiness.failureClass ? `failure_class=${readiness.failureClass}` : null,
+        `issues=${readiness.issues.join("; ")}`,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    );
+  }
   const requestFile = path.join(baseDir, `live-e2e-quality-assessment-request-${normalizeId(runId)}.json`);
   const expectedAssessmentReportFile = path.join(
     baseDir,
@@ -426,7 +516,7 @@ function prepareCli(rawArgs) {
     separation_contract: {
       live_e2e_observation_report: "factual-only setup, step, command, artifact, and evidence journal",
       live_e2e_run_health_report: "run health only: command, controller, provider, target, environment, operator, and AOR-owner issues",
-      live_e2e_quality_assessment_report: "post-run advisory outcome assessment for artifacts, code, verification, delivery safety, UI/UX, accessibility, and traceability",
+      live_e2e_quality_assessment_report: "post-run advisory outcome assessment for artifacts, code, verification, delivery safety, AOR operator UI/UX, AOR operator accessibility, and traceability",
     },
     run_identity: {
       target_catalog_id: asNonEmptyString(runSummary.target_catalog_id) || null,
@@ -452,7 +542,10 @@ function prepareCli(rawArgs) {
       "Use not_evaluated only with evidence_strength=missing and an explicit finding explaining the gap.",
       "Make gap_report match dimensions: every not_evaluated, weak, and strong dimension must be listed in the corresponding gap_report array.",
       "Treat default evaluation reports as supporting evidence unless their mission coverage is directly inspected.",
-      "Separate AOR operator UI evidence from target product UI/UX evidence.",
+      "Assess only the AOR operator and installed-user UI/UX in the AOR UI dimensions.",
+      "Do not use checked-repository frontend behavior as live E2E AOR operator UI/UX evidence; repository frontend work belongs under implementation and verification dimensions when the mission requires it.",
+      "Treat aor app --smoke as a render guardrail, not UX proof.",
+      "Treat AOR operator UI/UX as strong only when browser/task inspection or explicit SWE inspection cites concrete evidence refs.",
     ],
     evidence_refs: buildEvidenceGroups({
       runSummaryFile,

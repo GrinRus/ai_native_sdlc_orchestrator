@@ -330,6 +330,75 @@ test("new runtime context family examples load through the shared contract path"
   }
 });
 
+test("compiled-context artifact requires budget and compaction reports", () => {
+  const loaded = loadContractFile({
+    filePath: path.join(workspaceRoot, "examples/context/compiled/implement-runner-default.sample.yaml"),
+    family: "compiled-context-artifact",
+  });
+  assert.equal(loaded.ok, true, "expected compiled-context sample to load");
+
+  const missingBudget = structuredClone(loaded.document);
+  delete missingBudget.budget_report;
+
+  const missingBudgetValidation = validateContractDocument({
+    family: "compiled-context-artifact",
+    document: missingBudget,
+    source: "test://compiled-context-missing-budget",
+  });
+
+  assertValidationIssue(missingBudgetValidation, "required_field_missing", "budget_report");
+
+  const invalidSourceBreakdown = structuredClone(loaded.document);
+  invalidSourceBreakdown.budget_report.source_breakdown = [{ source: "context" }];
+
+  const invalidBreakdownValidation = validateContractDocument({
+    family: "compiled-context-artifact",
+    document: invalidSourceBreakdown,
+    source: "test://compiled-context-invalid-breakdown",
+  });
+
+  assertValidationIssue(invalidBreakdownValidation, "required_field_missing", "budget_report.source_breakdown[0].bytes");
+});
+
+test("adapter capability profile rejects unrestricted stdin-json for external-process adapters", () => {
+  const invalidProfile = {
+    adapter_id: "test-live-adapter",
+    version: 1,
+    capabilities: {},
+    constraints: {},
+    execution: {
+      runtime_mode: "external-process",
+      external_runtime: {
+        command: "node",
+        request_transport: "stdin-json",
+      },
+    },
+  };
+
+  const invalidValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: invalidProfile,
+    source: "test://adapter-stdin-json-unscoped",
+  });
+
+  assertValidationIssue(
+    invalidValidation,
+    "required_field_missing",
+    "execution.external_runtime.stdin_json_scope",
+  );
+
+  const validProfile = structuredClone(invalidProfile);
+  validProfile.execution.external_runtime.stdin_json_scope = "test-only";
+
+  const validValidation = validateContractDocument({
+    family: "adapter-capability-profile",
+    document: validProfile,
+    source: "test://adapter-stdin-json-test-only",
+  });
+
+  assert.equal(validValidation.ok, true);
+});
+
 test("runtime harness report example loads through the shared contract path", () => {
   const loaded = loadContractFile({
     filePath: path.join(workspaceRoot, "examples/reports/runtime-harness-report.sample.yaml"),
@@ -1095,6 +1164,53 @@ test("live E2E run-health report separates run failures from outcome quality", (
     assertValidationIssue(missingFactualSectionValidation, "required_field_missing", requiredFactualSection);
   }
 
+  const contextBudgetCandidate = structuredClone(loaded.document);
+  contextBudgetCandidate.overall_status = "blocked";
+  contextBudgetCandidate.provider_health.status = "blocked";
+  contextBudgetCandidate.provider_health.context_budget_status = "fail";
+  contextBudgetCandidate.provider_health.context_budget_failure_class = "compiled_context_budget_exceeded";
+  contextBudgetCandidate.provider_health.top_context_size_sources = [
+    {
+      source: "provider_work_packet.context",
+      bytes: 4096,
+      chars: 4096,
+      estimated_tokens: 1366,
+    },
+  ];
+  contextBudgetCandidate.failure_summary = {
+    owner: "aor",
+    phase: "provider_execution",
+    class: "compiled_context_budget_exceeded",
+    summary: "Provider work packet exceeded the configured context budget.",
+  };
+
+  const contextBudgetValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: contextBudgetCandidate,
+    source: "test://live-e2e-run-health-context-budget",
+  });
+
+  assert.equal(contextBudgetValidation.ok, true);
+
+  const providerPacketNotExecutedCandidate = structuredClone(loaded.document);
+  providerPacketNotExecutedCandidate.overall_status = "fail";
+  providerPacketNotExecutedCandidate.provider_health.status = "pass";
+  providerPacketNotExecutedCandidate.provider_health.provider_execution_status = "completed";
+  providerPacketNotExecutedCandidate.failure_summary = {
+    owner: "provider",
+    phase: "provider_execution",
+    class: "provider_work_packet_not_executed",
+    summary: "External runtime summarized the provider work packet instead of executing implementation.",
+  };
+
+  const providerPacketNotExecutedValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: providerPacketNotExecutedCandidate,
+    source: "test://live-e2e-run-health-provider-work-packet-not-executed",
+  });
+
+  assert.equal(providerPacketNotExecutedValidation.ok, true);
+
   const blockedMissingOwnerCandidate = structuredClone(loaded.document);
   blockedMissingOwnerCandidate.overall_status = "blocked";
   blockedMissingOwnerCandidate.failure_summary.owner = null;
@@ -1234,6 +1350,89 @@ test("live E2E quality assessment report enforces dimensions and evidence gaps",
   });
 
   assertValidationIssue(invalidFindingCategoryValidation, "enum_value_invalid", "findings[0].category");
+
+  const legacyUiDimensionCandidate = structuredClone(loaded.document);
+  legacyUiDimensionCandidate.dimensions.ui_ux_quality = {
+    status: "warn",
+    evidence_strength: "weak",
+    inspected_evidence_refs: [],
+    findings: [],
+    recommended_followups: [],
+  };
+
+  const legacyUiDimensionValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: legacyUiDimensionCandidate,
+    source: "test://live-e2e-quality-assessment-legacy-ui-dimension",
+  });
+
+  assertValidationIssue(legacyUiDimensionValidation, "unsupported_field_present", "dimensions.ui_ux_quality");
+
+  const legacyTargetUiDimensionCandidate = structuredClone(loaded.document);
+  legacyTargetUiDimensionCandidate.dimensions.target_ui_ux_quality = {
+    status: "warn",
+    evidence_strength: "weak",
+    inspected_evidence_refs: [],
+    findings: [],
+    recommended_followups: [],
+  };
+
+  const legacyTargetUiDimensionValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: legacyTargetUiDimensionCandidate,
+    source: "test://live-e2e-quality-assessment-legacy-target-ui-dimension",
+  });
+
+  assertValidationIssue(
+    legacyTargetUiDimensionValidation,
+    "unsupported_field_present",
+    "dimensions.target_ui_ux_quality",
+  );
+
+  const missingUiSubdimensionCandidate = structuredClone(loaded.document);
+  delete missingUiSubdimensionCandidate.dimensions.aor_operator_ui_ux_quality.subdimensions.raw_json_independence;
+
+  const missingUiSubdimensionValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: missingUiSubdimensionCandidate,
+    source: "test://live-e2e-quality-assessment-missing-ui-subdimension",
+  });
+
+  assertValidationIssue(
+    missingUiSubdimensionValidation,
+    "required_field_missing",
+    "dimensions.aor_operator_ui_ux_quality.subdimensions.raw_json_independence",
+  );
+
+  const evaluatedUiSubdimensionMissingRefsCandidate = structuredClone(loaded.document);
+  evaluatedUiSubdimensionMissingRefsCandidate.dimensions.aor_operator_ui_ux_quality.subdimensions.task_success.evidence_refs = [];
+
+  const evaluatedUiSubdimensionMissingRefsValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: evaluatedUiSubdimensionMissingRefsCandidate,
+    source: "test://live-e2e-quality-assessment-ui-subdimension-missing-refs",
+  });
+
+  assertValidationIssue(
+    evaluatedUiSubdimensionMissingRefsValidation,
+    "required_field_missing",
+    "dimensions.aor_operator_ui_ux_quality.subdimensions.task_success.evidence_refs",
+  );
+
+  const notEvaluatedUiSubdimensionMissingFindingCandidate = structuredClone(loaded.document);
+  notEvaluatedUiSubdimensionMissingFindingCandidate.dimensions.aor_operator_accessibility_quality.subdimensions.keyboard_navigation.findings = [];
+
+  const notEvaluatedUiSubdimensionMissingFindingValidation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: notEvaluatedUiSubdimensionMissingFindingCandidate,
+    source: "test://live-e2e-quality-assessment-ui-subdimension-missing-finding",
+  });
+
+  assertValidationIssue(
+    notEvaluatedUiSubdimensionMissingFindingValidation,
+    "required_field_missing",
+    "dimensions.aor_operator_accessibility_quality.subdimensions.keyboard_navigation.findings",
+  );
 });
 
 test("W23 nested canonical contract examples load through the shared contract path", () => {

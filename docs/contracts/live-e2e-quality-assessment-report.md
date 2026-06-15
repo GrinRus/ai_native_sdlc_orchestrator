@@ -3,9 +3,11 @@
 ## Purpose
 Outcome-oriented quality report written after a full live E2E flow by the launching SWE agent.
 
-This report is separate from the run itself. It assesses the quality of the artifacts produced by the flow, the resulting code and verification evidence, delivery safety, and UI/UX/accessibility evidence where applicable. It is advisory for qualification and acceptance unless a separate policy explicitly consumes it.
+This report is separate from the run itself. It assesses the quality of the artifacts produced by the flow, the resulting code and verification evidence, delivery safety, and AOR operator UI/UX/accessibility evidence where applicable. It is advisory for qualification and acceptance unless a separate policy explicitly consumes it.
 
 The assessment is free-form expert work over the linked evidence. It does not rely on predefined fixtures.
+
+`quality-assessment prepare` is valid only after a completed declared flow. The source run-health status must be `pass` or `warn`, and the source observation status must be `pass` or `warn`. Blocked or failed runs, including `compiled_context_budget_exceeded`, stop at factual run-health reporting and must not produce an outcome quality assessment request.
 
 ## Required fields
 - `assessment_id`
@@ -55,8 +57,8 @@ If evidence strength is `missing`, the dimension status must be `not_evaluated`.
 - `performance_regression_risk`
 - `verification_quality`
 - `delivery_safety`
-- `ui_ux_quality`
-- `accessibility_quality`
+- `aor_operator_ui_ux_quality`
+- `aor_operator_accessibility_quality`
 - `evidence_strength`
 - `acceptance_criteria_traceability`
 
@@ -66,6 +68,32 @@ Each dimension contains:
 - `inspected_evidence_refs`
 - `findings`
 - `recommended_followups`
+
+`aor_operator_ui_ux_quality` must include `subdimensions`:
+- `task_success`
+- `flow_navigation_clarity`
+- `next_action_clarity`
+- `blocker_and_error_understandability`
+- `recovery_affordance`
+- `state_feedback_loading_empty_error`
+- `visual_stability_responsiveness`
+- `raw_json_independence`
+
+`aor_operator_accessibility_quality` must include `subdimensions`:
+- `keyboard_navigation`
+- `focus_order`
+- `contrast_and_readability`
+- `semantic_structure`
+- `screen_reader_labels`
+- `accessible_error_feedback`
+
+Each subdimension contains:
+- `status`
+- `evidence_strength`
+- `evidence_refs`
+- `findings`
+
+Subdimensions use the same status and evidence-strength vocabularies as dimensions. Evaluated subdimensions must cite non-empty `evidence_refs[]`. `not_evaluated` subdimensions must use `evidence_strength: missing` and include at least one finding explaining the gap.
 
 ## Dimension rubric
 The SWE evaluator should inspect outcome quality against these stable concerns:
@@ -79,8 +107,8 @@ The SWE evaluator should inspect outcome quality against these stable concerns:
 - `performance_regression_risk`: latency, memory, bundle size, query complexity, render cost, and other mission-relevant regression risks.
 - `verification_quality`: strength of project verify, Runtime Harness, eval, review, and release evidence; default eval reports are supporting evidence unless mission coverage was inspected directly.
 - `delivery_safety`: no-upstream-write proof, delivery manifest correctness, rollback or recovery guidance, bounded write-back mode, and release packet safety.
-- `ui_ux_quality`: target product UI/UX when a target UI exists, AOR operator UI separately, task success, copy clarity, responsive visual evidence, loading/empty/error/recovery states, and visual overlap risks.
-- `accessibility_quality`: keyboard navigation, focus order, contrast, screen-reader semantics, axe-style evidence, and accessibility checklist limits.
+- `aor_operator_ui_ux_quality`: installed-user task success, flow navigation clarity, next-action clarity, blocker/error understandability, recovery affordance, state feedback for loading/empty/error states, visual stability/responsiveness, and whether the operator can proceed without reading raw JSON.
+- `aor_operator_accessibility_quality`: keyboard navigation, focus order, contrast/readability, semantic structure, screen-reader labels, and accessible error feedback for the AOR operator experience.
 - `evidence_strength`: whether the assessment itself has strong, medium, weak, missing, or indirect signals across dimensions.
 - `acceptance_criteria_traceability`: explicit mapping from criteria/KPI/DoD to evidence refs, with uncovered criteria listed as findings.
 
@@ -111,12 +139,10 @@ Each finding should include:
 
 The report must call out where evidence was not inspected, where it was weak or indirect, and where evidence was strong enough to support the judgement. These arrays must match the dimension records: `not_evaluated_dimensions` lists every dimension with `status=not_evaluated`, `weak_signal_dimensions` lists every dimension with `evidence_strength=weak`, and `strong_evidence_dimensions` lists every dimension with `evidence_strength=strong`.
 
-## UI/UX expectations
-The assessment must distinguish:
-- AOR operator UI quality
-- target product UI quality
+## AOR operator UI/UX expectations
+The UI/UX dimensions assess only the AOR operator and installed-user experience. Repository-owned frontend behavior is assessed through implementation and verification dimensions when a mission requires it.
 
-`aor app --smoke` and deterministic render markers are render guardrails, not UX proof. UI/UX assessment should inspect task success, copy clarity, recovery states, visual evidence, responsive behavior, and accessibility evidence, or mark the dimension `not_evaluated`.
+`aor app --smoke` and deterministic render markers are render guardrails, not UX proof. Strong AOR operator UI/UX evidence requires browser/task inspection or explicit SWE inspection citing concrete refs for task success, navigation, next actions, blockers, recovery, visual/responsive behavior, and accessibility. Missing or indirect UI evidence must be reported as `weak` or `not_evaluated`.
 
 ## Forbidden fields
 Quality assessment reports must not include old runner aggregation fields:
@@ -126,3 +152,6 @@ Quality assessment reports must not include old runner aggregation fields:
 - `canonical_status`
 - `acceptance_status`
 - `coverage_status`
+- `ui_ux_quality`
+- `accessibility_quality`
+- `target_ui_ux_quality`

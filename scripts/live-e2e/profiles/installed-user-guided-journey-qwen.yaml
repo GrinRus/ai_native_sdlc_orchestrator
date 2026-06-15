@@ -69,8 +69,11 @@ guided_journey:
       - dom-snapshot
       - accessibility-summary
       - screenshot-or-visual-guardrail
-      - task-outcome
-      - ux-findings
+      - aor-operator-task-success
+      - aor-flow-navigation-and-next-action-clarity
+      - aor-blocker-error-recovery-state-feedback
+      - aor-visual-stability-and-responsiveness
+      - aor-accessibility-findings
       - browser-task-proof
 operator_requests:
   enabled: true

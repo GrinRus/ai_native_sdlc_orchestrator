@@ -78,7 +78,7 @@ Evidence summary:
 
 - The manual controller completed `discovery`, `spec`, `planning`, `handoff`, and reached `execution`.
 - `execution` used route `route.implement.default.open-code-primary`, adapter/provider `open-code`, and the external command `opencode run --format json --dangerously-skip-permissions ... --file <adapter request>`.
-- Request transport was `file-attachment`, matching the OpenCode adapter contract.
+- Request transport was `request-artifact`, matching the external-process adapter contract; OpenCode used its native `--file` binding for the provider work packet.
 - Runtime Harness blocked the run with `failure_class=provider-timeout`, `repair_status=exhausted`, and `runtime_harness_decision=block`.
 - The final OpenCode attempt used the previous `timeout_ms=600000` adapter bound, ended with `timed_out=true`, `signal=SIGKILL`, and `exit_code=null`, and established that the former 10 minute hard cap was too short for this proof lane.
 - Two repair retries were attempted; both hit `provider-timeout` at about 601 seconds, exhausting the policy budget.

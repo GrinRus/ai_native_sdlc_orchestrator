@@ -56,8 +56,11 @@ execution:
       flag: --max-wall-time
       format: duration-seconds
       reserve_ms: 5000
-    request_via_stdin: true
-    request_transport: stdin-json
+    request_via_stdin: false
+    request_transport: request-artifact
+    request_file:
+      mode: pointer-prompt
+      message: Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read it first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when required, do not write upstream, run requested verification when feasible, and return a final report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet.
     execution_root_mode: short-symlink
     preflight_timeout_ms: 120000
     timeout_ms: 3600000

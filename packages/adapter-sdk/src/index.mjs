@@ -11,7 +11,15 @@ import { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs"
 export { resolveExternalRuntimePermissionPolicy } from "./permission-policy.mjs";
 
 const ADAPTER_RESPONSE_STATUSES = Object.freeze(["success", "failed", "blocked"]);
-const EXTERNAL_REQUEST_TRANSPORTS = Object.freeze(["stdin-json", "file-attachment", "argv-json", "none"]);
+const EXTERNAL_REQUEST_TRANSPORTS = Object.freeze([
+  "request-artifact",
+  "stdin-json",
+  "file-attachment",
+  "argv-json",
+  "none",
+]);
+const DEFAULT_CONTEXT_BUDGET_LIMIT_TOKENS = 180_000;
+const CONTEXT_BUDGET_WARN_RATIO = 0.8;
 const SHORT_EXECUTION_ROOT_MODES = Object.freeze(["short-symlink", "short_symlink"]);
 
 const EXTERNAL_RUNTIME_SUPERVISOR_SOURCE = String.raw`
@@ -533,6 +541,72 @@ function requireString(field, value) {
  */
 function asOptionalString(value) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isRunControlInterruptedStatus(value) {
+  const status = asOptionalString(value);
+  return status === "canceled" || status === "cancelled" || status === "interrupted";
+}
+
+/**
+ * @param {Record<string, unknown>} providerStepStatus
+ * @returns {Record<string, unknown>}
+ */
+function readProviderRunControlState(providerStepStatus) {
+  const stateFile = asOptionalString(providerStepStatus.state_file);
+  if (!stateFile) {
+    return {};
+  }
+  try {
+    return asRecord(JSON.parse(fs.readFileSync(stateFile, "utf8")));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * @param {Record<string, unknown>} runControlState
+ * @returns {boolean}
+ */
+function isProviderRunControlInterrupted(runControlState) {
+  return (
+    isRunControlInterruptedStatus(runControlState.status) ||
+    isRunControlInterruptedStatus(asRecord(runControlState.provider_step_status).status)
+  );
+}
+
+/**
+ * @param {Record<string, unknown>} providerStepStatus
+ */
+function markProviderRunControlInterrupted(providerStepStatus) {
+  const stateFile = asOptionalString(providerStepStatus.state_file);
+  if (!stateFile) {
+    return;
+  }
+  const nowIso = new Date().toISOString();
+  const state = readProviderRunControlState(providerStepStatus);
+  const previous = asRecord(state.provider_step_status);
+  state.provider_step_status = {
+    ...previous,
+    status: "interrupted",
+    interruption_owner: asOptionalString(previous.interruption_owner) || "operator",
+    interruption_reason:
+      asOptionalString(previous.interruption_reason) || "External runtime was interrupted by public run-control cancel.",
+    interruption_status: asOptionalString(previous.interruption_status) || "operator-stopped",
+    recommended_action:
+      asOptionalString(previous.recommended_action) ||
+      "Provider was stopped by the operator; save partial evidence, then diagnose or retry the public step.",
+    updated_at: nowIso,
+    finished_at: asOptionalString(previous.finished_at) || nowIso,
+  };
+  state.updated_at = nowIso;
+  try {
+    fs.writeFileSync(stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  } catch {}
 }
 
 /**
@@ -1065,6 +1139,14 @@ function hasInteractiveQuestionRequest(combined) {
  */
 export function classifyExternalRunnerFailure(options) {
   const combined = `${options.stdout ?? ""}\n${options.stderr ?? ""}\n${options.errorMessage ?? ""}`.toLowerCase();
+  if (
+    combined.includes("prompt is too long") ||
+    combined.includes("context window") ||
+    /\binput\s+tokens?.{0,80}(?:exceed|exceeds|exceeded|too\s+large|too\s+long)\b/u.test(combined) ||
+    combined.includes("maximum context")
+  ) {
+    return "compiled_context_budget_exceeded";
+  }
   if (!options.ignoreAuthFailure && (
     /\b401\b/u.test(combined) ||
     combined.includes("unauthorized") ||
@@ -1337,13 +1419,574 @@ function boundedEvidenceSegment(value, maxLength) {
 }
 
 /**
- * @param {{ kind: "request" | "raw", adapterId: string, evidenceToken: string, timestamp: number }} options
+ * @param {{ kind: "request" | "work-packet" | "raw", adapterId: string, evidenceToken: string, timestamp: number }} options
  */
 function buildLiveAdapterEvidenceFileName(options) {
   const adapterSegment = boundedEvidenceSegment(options.adapterId, 40);
   const tokenSegment = boundedEvidenceSegment(options.evidenceToken, 32);
   const tokenHash = createHash("sha256").update(options.evidenceToken).digest("hex").slice(0, 16);
   return `adapter-live-${options.kind}-${adapterSegment}-${tokenSegment}-${tokenHash}-${options.timestamp}.json`;
+}
+
+/**
+ * @param {string} text
+ * @returns {{ bytes: number, chars: number, estimated_tokens: number }}
+ */
+function estimateContextText(text) {
+  const chars = text.length;
+  return {
+    bytes: Buffer.byteLength(text, "utf8"),
+    chars,
+    estimated_tokens: Math.ceil(chars / 3),
+  };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ bytes: number, chars: number, estimated_tokens: number }}
+ */
+function estimateContextValue(value) {
+  return estimateContextText(stableJsonText(value));
+}
+
+/**
+ * @param {Array<{ source: string, value: unknown }>} sources
+ * @returns {Array<{ source: string, bytes: number, chars: number, estimated_tokens: number }>}
+ */
+function buildContextSourceBreakdown(sources) {
+  return sources.map((entry) => ({
+    source: entry.source,
+    ...estimateContextValue(entry.value),
+  }));
+}
+
+/**
+ * @param {Array<{ bytes: number, chars: number, estimated_tokens: number }>} entries
+ * @returns {{ bytes: number, chars: number, estimated_tokens: number }}
+ */
+function sumContextEstimates(entries) {
+  return entries.reduce(
+    (acc, entry) => ({
+      bytes: acc.bytes + entry.bytes,
+      chars: acc.chars + entry.chars,
+      estimated_tokens: acc.estimated_tokens + entry.estimated_tokens,
+    }),
+    { bytes: 0, chars: 0, estimated_tokens: 0 },
+  );
+}
+
+/**
+ * @param {number} estimatedTokens
+ * @param {number | null} budgetLimitTokens
+ * @returns {"pass" | "warn" | "fail" | "not_configured"}
+ */
+function classifyContextBudgetStatus(estimatedTokens, budgetLimitTokens) {
+  if (!budgetLimitTokens || budgetLimitTokens <= 0) return "not_configured";
+  if (estimatedTokens > budgetLimitTokens) return "fail";
+  if (estimatedTokens >= budgetLimitTokens * CONTEXT_BUDGET_WARN_RATIO) return "warn";
+  return "pass";
+}
+
+/**
+ * @param {Record<string, unknown>} externalRuntime
+ * @returns {number}
+ */
+function resolveContextBudgetLimitTokens(externalRuntime) {
+  const contextBudget = asRecord(externalRuntime.context_budget);
+  return asPositiveInteger(contextBudget.max_input_tokens, DEFAULT_CONTEXT_BUDGET_LIMIT_TOKENS);
+}
+
+/**
+ * @param {string} template
+ * @param {Record<string, string | null>} values
+ * @returns {string}
+ */
+function renderRequestArtifactMessage(template, values) {
+  return template.replace(/\{([a-zA-Z0-9_]+)\}/gu, (_, key) => values[key] ?? "");
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function evidencePartFromRef(value) {
+  const ref = asOptionalString(value);
+  if (!ref) return null;
+  const packetSeparator = ref.lastIndexOf("@");
+  return packetSeparator >= 0 ? ref.slice(packetSeparator + 1) : ref;
+}
+
+/**
+ * @param {string | null} projectRoot
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function localPathFromRef(projectRoot, value) {
+  const ref = evidencePartFromRef(value);
+  if (!ref) return null;
+  if (path.isAbsolute(ref)) return ref;
+  if (!ref.startsWith("evidence://")) return null;
+
+  const evidencePath = ref.slice("evidence://".length);
+  if (path.isAbsolute(evidencePath)) return evidencePath;
+  if (!projectRoot || !path.isAbsolute(projectRoot)) return null;
+  return path.resolve(projectRoot, evidencePath);
+}
+
+/**
+ * @param {unknown} value
+ * @param {string[]} output
+ */
+function collectAllowedPaths(value, output) {
+  if (!value || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    for (const entry of value) collectAllowedPaths(entry, output);
+    return;
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    if (key === "allowed_paths" && Array.isArray(entry)) {
+      output.push(...asStringArray(entry));
+      continue;
+    }
+    collectAllowedPaths(entry, output);
+  }
+}
+
+/**
+ * @param {unknown} value
+ * @param {Array<{ role: string, evidence_ref: string, local_path: string, required: boolean, kind: string }>} output
+ * @param {string | null} projectRoot
+ */
+function collectDeliveryPlanRefs(value, output, projectRoot) {
+  if (!value || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    for (const entry of value) collectDeliveryPlanRefs(entry, output, projectRoot);
+    return;
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === "string" && /delivery-plan/iu.test(entry)) {
+      const localPath = localPathFromRef(projectRoot, entry) ?? (path.isAbsolute(entry) ? entry : null);
+      if (localPath) {
+        output.push({
+          role: "delivery_plan",
+          evidence_ref: entry,
+          local_path: localPath,
+          required: false,
+          kind: "delivery-plan",
+        });
+      }
+      continue;
+    }
+    if (/delivery_plan_file|deliveryPlanFile/u.test(key) && typeof entry === "string") {
+      const evidenceRef = toEvidenceRef(projectRoot, entry);
+      const localPath = path.isAbsolute(entry) ? entry : localPathFromRef(projectRoot, evidenceRef);
+      if (localPath) {
+        output.push({
+          role: "delivery_plan",
+          evidence_ref: evidenceRef,
+          local_path: localPath,
+          required: false,
+          kind: "delivery-plan",
+        });
+      }
+      continue;
+    }
+    collectDeliveryPlanRefs(entry, output, projectRoot);
+  }
+}
+
+/**
+ * @param {Record<string, unknown>} envelope
+ * @param {{
+ *   projectRoot?: string | null,
+ *   requestArtifactRef?: string | null,
+ *   requestArtifactFile?: string | null,
+ *   compiledContextRef?: string | null,
+ * }} options
+ * @returns {Array<{ role: string, evidence_ref: string, local_path: string, required: boolean, kind: string }>}
+ */
+function buildResolvedLocalRefs(envelope, options) {
+  const projectRoot = asOptionalString(options.projectRoot);
+  const context = asRecord(envelope.context);
+  const refs = [];
+  const seen = new Set();
+  const addRef = (entry) => {
+    const role = asOptionalString(entry.role);
+    const evidenceRef = asOptionalString(entry.evidence_ref);
+    const localPath = asOptionalString(entry.local_path);
+    const kind = asOptionalString(entry.kind);
+    if (!role || !evidenceRef || !localPath || !kind) return;
+    const key = `${role}\n${evidenceRef}\n${localPath}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    refs.push({
+      role,
+      evidence_ref: evidenceRef,
+      local_path: localPath,
+      required: entry.required === true,
+      kind,
+    });
+  };
+
+  if (options.requestArtifactRef && options.requestArtifactFile) {
+    addRef({
+      role: "full_request_artifact",
+      evidence_ref: options.requestArtifactRef,
+      local_path: options.requestArtifactFile,
+      required: true,
+      kind: "request-artifact",
+    });
+  }
+
+  const compiledContextFile = asOptionalString(context.compiled_context_file);
+  if (compiledContextFile) {
+    addRef({
+      role: "compiled_context",
+      evidence_ref:
+        asOptionalString(options.compiledContextRef) ||
+        asOptionalString(context.compiled_context_ref) ||
+        toEvidenceRef(projectRoot, compiledContextFile),
+      local_path: compiledContextFile,
+      required: true,
+      kind: "compiled-context",
+    });
+  }
+
+  const requiredPackets = Array.isArray(asRecord(asRecord(context.required_inputs_resolved).packets).required)
+    ? asRecord(asRecord(context.required_inputs_resolved).packets).required
+    : [];
+  for (const packet of requiredPackets) {
+    const record = asRecord(packet);
+    const evidenceRef = asOptionalString(record.resolved_ref);
+    const localPath = localPathFromRef(projectRoot, evidenceRef);
+    if (!evidenceRef || !localPath) continue;
+    addRef({
+      role: asOptionalString(record.packet) || "input_packet",
+      evidence_ref: evidenceRef,
+      local_path: localPath,
+      required: record.required !== false,
+      kind: "input-packet",
+    });
+  }
+
+  const deliveryRefs = [];
+  collectDeliveryPlanRefs(envelope, deliveryRefs, projectRoot);
+  for (const deliveryRef of deliveryRefs) addRef(deliveryRef);
+
+  return refs;
+}
+
+/**
+ * @param {Record<string, unknown>} envelope
+ * @returns {Record<string, unknown>}
+ */
+function buildExecutionContract(envelope) {
+  const allowedPathCandidates = [];
+  collectAllowedPaths(envelope, allowedPathCandidates);
+  const policyBundle = asRecord(envelope.policy_bundle);
+  const resolvedBounds = asRecord(policyBundle.resolved_bounds);
+  const commandConstraints = asRecord(resolvedBounds.command_constraints);
+  const allowedCommands = asStringArray(commandConstraints.allowed_commands);
+  return {
+    mode: "execute-implementation",
+    must_open_required_local_refs: true,
+    expected_meaningful_change: {
+      required: envelope.dry_run !== true && asOptionalString(envelope.step_class) === "implement",
+      allowed_target_paths: [...new Set(allowedPathCandidates)],
+      ignore_paths: [".aor/**"],
+      no_op_forbidden: true,
+    },
+    target_checkout_write_policy: {
+      direct_edits_allowed: true,
+      upstream_write_allowed: false,
+      delivery_materialization_downstream: true,
+    },
+    required_commands: allowedCommands,
+    final_report: {
+      required_sections: ["summary", "changed-files", "commands-run", "verification", "risks"],
+      require_diff_or_patch_evidence: true,
+      structured_output_is_final_report_only: true,
+    },
+    blocked_output: {
+      allowed: true,
+      required_fields: ["status", "reason", "evidence_refs"],
+    },
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} envelope
+ * @param {{ adapterId: string, routeId: string, compiledContextRef: string | null, requestArtifactRef: string | null, requestArtifactFile?: string | null, projectRoot?: string | null }} options
+ * @returns {Record<string, unknown>}
+ */
+function buildProviderWorkPacket(envelope, options) {
+  const context = asRecord(envelope.context);
+  const route = asRecord(envelope.route);
+  const routeProfile = asRecord(route.route_profile);
+  const assetBundle = asRecord(envelope.asset_bundle);
+  const policyBundle = asRecord(envelope.policy_bundle);
+  const policy = asRecord(policyBundle.policy);
+  const resolvedBounds = asRecord(policyBundle.resolved_bounds);
+  const adapterRequestRefs = [
+    asOptionalString(options.requestArtifactRef),
+    asOptionalString(context.compiled_context_ref),
+    asOptionalString(context.compiled_context_file),
+    ...asStringArray(context.packet_refs),
+    ...asStringArray(context.context_bundle_refs),
+    ...asStringArray(context.context_doc_refs),
+    ...asStringArray(context.context_rule_refs),
+    ...asStringArray(context.context_skill_refs),
+    ...asStringArray(context.runtime_evidence_refs),
+  ].filter(Boolean);
+
+  return {
+    packet_kind: "aor-provider-work-packet",
+    version: 1,
+    request_id: envelope.request_id,
+    run_id: envelope.run_id,
+    step_id: envelope.step_id,
+    step_class: envelope.step_class,
+    dry_run: envelope.dry_run,
+    adapter_id: options.adapterId,
+    route: {
+      route_id: options.routeId,
+      route_class: asOptionalString(routeProfile.route_class),
+      provider: asOptionalString(asRecord(routeProfile.primary).provider),
+    },
+    asset_refs: {
+      wrapper_ref: asOptionalString(asRecord(assetBundle.wrapper).wrapper_ref),
+      prompt_bundle_ref: asOptionalString(asRecord(assetBundle.prompt_bundle).prompt_bundle_ref),
+      context_bundle_refs: asStringArray(asRecord(assetBundle.context_bundles).bundle_refs),
+    },
+    policy: {
+      policy_id: asOptionalString(policy.policy_id),
+      resolved_bounds: {
+        budget: asRecord(resolvedBounds.budget),
+        writeback_mode: asRecord(resolvedBounds.writeback_mode),
+        command_constraints: asRecord(resolvedBounds.command_constraints),
+      },
+    },
+    input_packet_refs: asStringArray(envelope.input_packet_refs),
+    resolved_local_refs: buildResolvedLocalRefs(envelope, options),
+    execution_contract: buildExecutionContract(envelope),
+    context: {
+      compiled_context_ref: options.compiledContextRef,
+      compiled_context_id: asOptionalString(context.compiled_context_id),
+      compiled_context_fingerprint: asOptionalString(context.compiled_context_fingerprint),
+      context_bundle_refs: asStringArray(context.context_bundle_refs),
+      context_doc_refs: asStringArray(context.context_doc_refs),
+      context_rule_refs: asStringArray(context.context_rule_refs),
+      context_skill_refs: asStringArray(context.context_skill_refs),
+      packet_refs: asStringArray(context.packet_refs),
+      instruction_set: asRecord(context.instruction_set),
+      required_inputs_resolved: asRecord(context.required_inputs_resolved),
+      guardrails: asRecord(context.guardrails),
+      skill_refs: asStringArray(context.skill_refs),
+      provenance: {
+        project_profile_path: asOptionalString(asRecord(context.provenance).project_profile_path),
+        route_profile_source: asOptionalString(asRecord(context.provenance).route_profile_source),
+        wrapper_profile_source: asOptionalString(asRecord(context.provenance).wrapper_profile_source),
+        prompt_bundle_source: asOptionalString(asRecord(context.provenance).prompt_bundle_source),
+        policy_profile_source: asOptionalString(asRecord(context.provenance).policy_profile_source),
+        context_bundle_sources: asStringArray(asRecord(context.provenance).context_bundle_sources),
+        skill_profile_sources: asStringArray(asRecord(context.provenance).skill_profile_sources),
+        input_packet_refs: asStringArray(asRecord(context.provenance).input_packet_refs),
+        runtime_evidence_refs: asStringArray(asRecord(context.provenance).runtime_evidence_refs),
+      },
+    },
+    evidence_refs: [...new Set(adapterRequestRefs)],
+    full_request_artifact_ref: options.requestArtifactRef,
+    output_contract: {
+      return_json: true,
+      preserve_evidence_refs: true,
+    },
+  };
+}
+
+/**
+ * @param {{
+ *   runnerInput: Record<string, unknown>,
+ *   providerWorkPacket: Record<string, unknown>,
+ *   providerWorkPacketText: string,
+ *   launcherPrompt: string,
+ *   budgetLimitTokens: number,
+ * }} options
+ */
+function buildContextBudgetReports(options) {
+  const originalBreakdown = buildContextSourceBreakdown([
+    { source: "request.route", value: asRecord(options.runnerInput.request).route },
+    { source: "request.asset_bundle", value: asRecord(options.runnerInput.request).asset_bundle },
+    { source: "request.policy_bundle", value: asRecord(options.runnerInput.request).policy_bundle },
+    { source: "request.context", value: asRecord(options.runnerInput.request).context },
+    { source: "request.input_packet_refs", value: asRecord(options.runnerInput.request).input_packet_refs },
+    { source: "adapter", value: options.runnerInput.adapter },
+  ]);
+  const originalEstimate = sumContextEstimates(originalBreakdown);
+  const launcherPromptEstimate = {
+    source: "launcher_prompt",
+    ...estimateContextText(options.launcherPrompt),
+  };
+  const providerPacketTextEstimate = estimateContextText(options.providerWorkPacketText);
+  const finalBreakdown = [
+    launcherPromptEstimate,
+    ...buildContextSourceBreakdown([
+      {
+        source: "provider_work_packet.metadata",
+        value: {
+          packet_kind: options.providerWorkPacket.packet_kind,
+          version: options.providerWorkPacket.version,
+          request_id: options.providerWorkPacket.request_id,
+          run_id: options.providerWorkPacket.run_id,
+          step_id: options.providerWorkPacket.step_id,
+          step_class: options.providerWorkPacket.step_class,
+          dry_run: options.providerWorkPacket.dry_run,
+          adapter_id: options.providerWorkPacket.adapter_id,
+          full_request_artifact_ref: options.providerWorkPacket.full_request_artifact_ref,
+          output_contract: options.providerWorkPacket.output_contract,
+        },
+      },
+      { source: "provider_work_packet.route", value: options.providerWorkPacket.route },
+      { source: "provider_work_packet.asset_refs", value: options.providerWorkPacket.asset_refs },
+      { source: "provider_work_packet.policy", value: options.providerWorkPacket.policy },
+      { source: "provider_work_packet.input_packet_refs", value: options.providerWorkPacket.input_packet_refs },
+      { source: "provider_work_packet.resolved_local_refs", value: options.providerWorkPacket.resolved_local_refs },
+      { source: "provider_work_packet.execution_contract", value: options.providerWorkPacket.execution_contract },
+      { source: "provider_work_packet.context", value: options.providerWorkPacket.context },
+      { source: "provider_work_packet.evidence_refs", value: options.providerWorkPacket.evidence_refs },
+    ]),
+  ];
+  const exactFinalEstimate = sumContextEstimates([launcherPromptEstimate, providerPacketTextEstimate]);
+  const componentEstimate = sumContextEstimates(finalBreakdown);
+  const serializationOverhead = {
+    source: "provider_work_packet.serialization_overhead",
+    bytes: Math.max(0, exactFinalEstimate.bytes - componentEstimate.bytes),
+    chars: Math.max(0, exactFinalEstimate.chars - componentEstimate.chars),
+    estimated_tokens: Math.max(0, exactFinalEstimate.estimated_tokens - componentEstimate.estimated_tokens),
+  };
+  if (serializationOverhead.bytes > 0 || serializationOverhead.chars > 0 || serializationOverhead.estimated_tokens > 0) {
+    finalBreakdown.push(serializationOverhead);
+  }
+  const finalEstimate = sumContextEstimates(finalBreakdown);
+  const finalBudgetStatus = classifyContextBudgetStatus(
+    finalEstimate.estimated_tokens,
+    options.budgetLimitTokens,
+  );
+  return {
+    budget_report: {
+      ...finalEstimate,
+      budget_limit_tokens: options.budgetLimitTokens,
+      budget_status: finalBudgetStatus,
+      source_breakdown: finalBreakdown,
+    },
+    compaction_report: {
+      strategy: "deterministic-ref-summary",
+      original_estimate: originalEstimate,
+      final_estimate: finalEstimate,
+      dropped_or_summarized_sources: [
+        "request.route.full_profile",
+        "request.asset_bundle.full_profiles",
+        "request.policy_bundle.full_profile",
+        "runtime_evidence_payloads",
+        "historical_transcripts",
+      ],
+      mandatory_refs_preserved: asStringArray(options.providerWorkPacket.evidence_refs),
+    },
+    top_context_size_sources: [...finalBreakdown]
+      .sort((left, right) => right.estimated_tokens - left.estimated_tokens)
+      .slice(0, 5),
+  };
+}
+
+/**
+ * @param {string} stdout
+ * @param {string} stderr
+ * @param {string | null | undefined} errorMessage
+ * @returns {string | null}
+ */
+function summarizeProviderPromptOverflow(stdout, stderr, errorMessage) {
+  const combined = `${stdout}\n${stderr}\n${errorMessage ?? ""}`;
+  if (
+    /prompt\s+is\s+too\s+long/iu.test(combined) ||
+    /context\s+window/iu.test(combined) ||
+    /input\s+tokens?.{0,80}(?:exceed|exceeds|exceeded|too\s+large|too\s+long)/iu.test(combined) ||
+    /maximum\s+context/iu.test(combined)
+  ) {
+    return sanitizeSummary(combined);
+  }
+  return null;
+}
+
+/**
+ * @param {string} value
+ * @returns {Record<string, unknown> | null}
+ */
+function parseMaybeFencedJsonObject(value) {
+  const trimmed = value.trim();
+  const candidates = [trimmed];
+  const fencedMatch = /```(?:json)?\s*([\s\S]*?)\s*```/iu.exec(trimmed);
+  if (fencedMatch) candidates.unshift(fencedMatch[1].trim());
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      const record = asRecord(parsed);
+      if (Object.keys(record).length > 0) return record;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} runnerPayload
+ * @returns {Record<string, unknown>}
+ */
+function extractProviderFinalReportObject(runnerPayload) {
+  const resultText = asOptionalString(runnerPayload.result);
+  if (resultText) {
+    const parsedResult = parseMaybeFencedJsonObject(resultText);
+    if (parsedResult) return parsedResult;
+  }
+  return runnerPayload;
+}
+
+/**
+ * @param {Record<string, unknown>} record
+ * @returns {boolean}
+ */
+function hasExecutionReportSignals(record) {
+  const keys = new Set(Object.keys(record).map((key) => key.toLowerCase().replace(/-/gu, "_")));
+  return (
+    keys.has("changed_files") ||
+    keys.has("commands_run") ||
+    keys.has("verification") ||
+    keys.has("diff") ||
+    keys.has("patch")
+  );
+}
+
+/**
+ * @param {{ runnerPayload: Record<string, unknown>, stdout: string }} options
+ * @returns {boolean}
+ */
+function isProviderWorkPacketEcho(options) {
+  const finalReport = extractProviderFinalReportObject(options.runnerPayload);
+  const keys = new Set(Object.keys(finalReport).map((key) => key.toLowerCase()));
+  const looksLikePacketSummary =
+    (keys.has("packet_identity") || asOptionalString(finalReport.packet_kind) === "aor-provider-work-packet") &&
+    (keys.has("route_and_policy") || keys.has("route")) &&
+    (keys.has("linked_refs_resolved") || keys.has("input_packet_refs") || keys.has("resolved_local_refs"));
+  if (looksLikePacketSummary && !hasExecutionReportSignals(finalReport)) return true;
+
+  const stdoutLower = options.stdout.toLowerCase();
+  return (
+    stdoutLower.includes("aor-provider-work-packet") &&
+    stdoutLower.includes("packet_identity") &&
+    stdoutLower.includes("route_and_policy") &&
+    stdoutLower.includes("linked_refs_resolved") &&
+    !/"changed[-_]files"\s*:/iu.test(options.stdout) &&
+    !/"commands[-_]run"\s*:/iu.test(options.stdout)
+  );
 }
 
 /**
@@ -1921,6 +2564,91 @@ export function createLiveAdapter(options) {
           ? runtimeEvidenceRoot
           : path.resolve(executionRoot, runtimeEvidenceRoot)
         : null;
+      const requestArtifactDir = evidenceDir ?? path.join(executionRoot, ".aor", "adapter-requests");
+      fs.mkdirSync(requestArtifactDir, { recursive: true });
+      const requestArtifactFile = path.join(
+        requestArtifactDir,
+        buildLiveAdapterEvidenceFileName({
+          kind: "request",
+          adapterId,
+          evidenceToken: normalizedEvidenceToken,
+          timestamp: Date.now(),
+        }),
+      );
+      fs.writeFileSync(requestArtifactFile, serializedRunnerInput, "utf8");
+      const requestArtifactRef = toEvidenceRef(projectRoot, requestArtifactFile);
+
+      const requestFileProfile = asRecord(externalRuntime.request_file);
+      const providerWorkPacket = buildProviderWorkPacket(envelope, {
+        adapterId,
+        routeId,
+        compiledContextRef,
+        requestArtifactRef,
+        requestArtifactFile,
+        projectRoot,
+      });
+      const providerWorkPacketFile = path.join(
+        requestArtifactDir,
+        buildLiveAdapterEvidenceFileName({
+          kind: "work-packet",
+          adapterId,
+          evidenceToken: normalizedEvidenceToken,
+          timestamp: Date.now(),
+        }),
+      );
+      const providerWorkPacketRef = toEvidenceRef(projectRoot, providerWorkPacketFile);
+      if (Array.isArray(providerWorkPacket.resolved_local_refs)) {
+        providerWorkPacket.resolved_local_refs = [
+          ...providerWorkPacket.resolved_local_refs,
+          {
+            role: "provider_work_packet",
+            evidence_ref: providerWorkPacketRef,
+            local_path: providerWorkPacketFile,
+            required: true,
+            kind: "provider-work-packet",
+          },
+        ];
+      }
+      const defaultRequestArtifactMessage =
+        "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when execution_contract.expected_meaningful_change.required is true, do not write upstream, run the requested verification commands when feasible, and return only a final implementation report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet; if implementation is impossible, return a blocked report with reason and evidence refs.";
+      const requestMessage = renderRequestArtifactMessage(
+        asOptionalString(requestFileProfile.message) ?? defaultRequestArtifactMessage,
+        {
+          provider_work_packet_path: providerWorkPacketFile,
+          provider_work_packet_ref: providerWorkPacketRef,
+          request_artifact_ref: requestArtifactRef,
+        },
+      );
+      const budgetLimitTokens = resolveContextBudgetLimitTokens(externalRuntime);
+      const providerWorkPacketText = `${JSON.stringify(providerWorkPacket, null, 2)}\n`;
+      const contextBudgetReports = buildContextBudgetReports({
+        runnerInput,
+        providerWorkPacket,
+        providerWorkPacketText,
+        launcherPrompt: requestMessage,
+        budgetLimitTokens,
+      });
+      fs.writeFileSync(providerWorkPacketFile, providerWorkPacketText, "utf8");
+
+      const writeRawEvidence = (record) => {
+        const rawEvidenceRoot = evidenceDir ?? requestArtifactDir;
+        fs.mkdirSync(rawEvidenceRoot, { recursive: true });
+        const rawEvidenceFile = path.join(
+          rawEvidenceRoot,
+          buildLiveAdapterEvidenceFileName({
+            kind: "raw",
+            adapterId,
+            evidenceToken: normalizedEvidenceToken,
+            timestamp: Date.now(),
+          }),
+        );
+        fs.writeFileSync(rawEvidenceFile, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+        return {
+          rawEvidenceFile,
+          rawEvidenceRef: toEvidenceRef(projectRoot, rawEvidenceFile),
+        };
+      };
+
       let requestInput = undefined;
       let requestFile = null;
       let requestFileRef = null;
@@ -1928,25 +2656,132 @@ export function createLiveAdapter(options) {
         requestInput = serializedRunnerInput;
       } else if (requestTransport === "argv-json") {
         runtimeArgs = [...runtimeArgs, serializedRunnerInput.trim()];
+      } else if (requestTransport === "request-artifact") {
+        const requestFileArgument = asOptionalString(requestFileProfile.argument);
+        requestFile = providerWorkPacketFile;
+        requestFileRef = providerWorkPacketRef;
+        runtimeArgs = requestFileArgument
+          ? [...runtimeArgs, requestMessage, requestFileArgument, providerWorkPacketFile]
+          : [...runtimeArgs, requestMessage];
       } else if (requestTransport === "file-attachment") {
-        const requestFileProfile = asRecord(externalRuntime.request_file);
         const requestMessage =
           asOptionalString(requestFileProfile.message) ?? "Follow the attached AOR adapter request JSON.";
         const requestFileArgument = asOptionalString(requestFileProfile.argument) ?? "--file";
-        const requestDir = evidenceDir ?? path.join(executionRoot, ".aor", "adapter-requests");
-        fs.mkdirSync(requestDir, { recursive: true });
-        requestFile = path.join(
-          requestDir,
-          buildLiveAdapterEvidenceFileName({
-            kind: "request",
-            adapterId,
-            evidenceToken: normalizedEvidenceToken,
-            timestamp: Date.now(),
-          }),
-        );
-        fs.writeFileSync(requestFile, serializedRunnerInput, "utf8");
-        requestFileRef = toEvidenceRef(projectRoot, requestFile);
+        requestFile = requestArtifactFile;
+        requestFileRef = requestArtifactRef;
         runtimeArgs = [...runtimeArgs, requestMessage, requestFileArgument, requestFile];
+      }
+
+      if (contextBudgetReports.budget_report.budget_status === "fail") {
+        const finishedAt = new Date().toISOString();
+        const rawEvidenceRecord = {
+          adapter_id: adapterId,
+          request_id: envelope.request_id,
+          run_id: envelope.run_id,
+          step_id: envelope.step_id,
+          step_class: envelope.step_class,
+          route_id: routeId,
+          started_at: startedAt,
+          finished_at: finishedAt,
+          runtime: {
+            mode: runtimeMode,
+            command: runtimeCommand,
+            args: runtimeArgs,
+            timeout_ms: requestTimeoutMs,
+            request_via_stdin: requestViaStdin,
+            request_transport: requestTransport,
+            request_file: requestFile,
+            request_file_ref: requestFileRef,
+            request_artifact_file: requestArtifactFile,
+            request_artifact_ref: requestArtifactRef,
+            provider_work_packet_file: providerWorkPacketFile,
+            provider_work_packet_ref: providerWorkPacketRef,
+            output_mode: outputMode,
+            execution_root: runnerExecutionRoot,
+            execution_root_mode: executionRootBinding.mode,
+            canonical_execution_root: executionRootBinding.canonicalExecutionRoot,
+            permission_mode: runtimeInvocation.permissionMode,
+            permission_mode_source: runtimeInvocation.source,
+            env_from_applied: runtimeEnvironment.applied,
+            env_from_missing: runtimeEnvironment.missing,
+          },
+          process: {
+            exit_code: null,
+            signal: null,
+            error_code: "COMPILED_CONTEXT_BUDGET_EXCEEDED",
+            error_message: "Provider work packet exceeds configured context budget before provider invocation.",
+            timed_out: false,
+          },
+          context_budget: {
+            budget_report: contextBudgetReports.budget_report,
+            compaction_report: contextBudgetReports.compaction_report,
+            top_context_size_sources: contextBudgetReports.top_context_size_sources,
+          },
+          io: {
+            stdout: "",
+            stderr: "",
+          },
+          provider_progress_events: [],
+        };
+        const { rawEvidenceRef } = writeRawEvidence(rawEvidenceRecord);
+        const evidenceRefs = [
+          `${evidenceNamespace}/${normalizedEvidenceToken}`,
+          requestArtifactRef,
+          providerWorkPacketRef,
+          rawEvidenceRef,
+        ].filter(Boolean);
+        return createAdapterResponseEnvelope({
+          request_id: envelope.request_id,
+          adapter_id: adapterId,
+          status: "blocked",
+          summary: `Provider work packet for adapter '${adapterId}' exceeds the configured context budget before provider invocation.`,
+          output: {
+            mode: "execute",
+            blocked: true,
+            route_id: routeId,
+            provider_adapter: adapterId,
+            compiled_context_ref: compiledContextRef,
+            failure_kind: "compiled_context_budget_exceeded",
+            external_runner: {
+              runtime_mode: runtimeMode,
+              command: runtimeCommand,
+              args: runtimeArgs,
+              execution_root: runnerExecutionRoot,
+              execution_root_mode: executionRootBinding.mode,
+              canonical_execution_root: executionRootBinding.canonicalExecutionRoot,
+              timeout_ms: requestTimeoutMs,
+              permission_mode: runtimeInvocation.permissionMode,
+              permission_mode_source: runtimeInvocation.source,
+              env_from_applied: runtimeEnvironment.applied,
+              env_from_missing: runtimeEnvironment.missing,
+              exit_code: null,
+              signal: null,
+              timed_out: false,
+              request_transport: requestTransport,
+              request_file_ref: requestFileRef,
+              request_artifact_ref: requestArtifactRef,
+              provider_work_packet_ref: providerWorkPacketRef,
+              context_budget_status: contextBudgetReports.budget_report.budget_status,
+              context_budget_failure_class: "compiled_context_budget_exceeded",
+              top_context_size_sources: contextBudgetReports.top_context_size_sources,
+              output_mode: outputMode,
+              provider_progress_events: [],
+              raw_evidence_ref: rawEvidenceRef,
+            },
+            context_budget: {
+              budget_report: contextBudgetReports.budget_report,
+              compaction_report: contextBudgetReports.compaction_report,
+            },
+          },
+          evidence_refs: evidenceRefs,
+          tool_traces: [
+            {
+              phase: "invoke_adapter",
+              kind: handlerKind,
+              detail: "provider work packet exceeded context budget before subprocess spawn",
+            },
+          ],
+        });
       }
 
       const invocation = runExternalRuntimeProcessSync({
@@ -1962,7 +2797,12 @@ export function createLiveAdapter(options) {
       const finishedAt = new Date().toISOString();
 
       const invocationError = invocation.error instanceof Error ? invocation.error : null;
-      const invocationInterrupted = invocationError?.code === "EINTERRUPTED";
+      const durableProviderRunControlState = readProviderRunControlState(asRecord(envelope.provider_step_status));
+      const invocationInterrupted =
+        invocationError?.code === "EINTERRUPTED" || isProviderRunControlInterrupted(durableProviderRunControlState);
+      if (invocationInterrupted) {
+        markProviderRunControlInterrupted(asRecord(envelope.provider_step_status));
+      }
       const invocationTimedOut =
         !invocationInterrupted &&
         (invocationError?.code === "ETIMEDOUT" ||
@@ -1973,6 +2813,11 @@ export function createLiveAdapter(options) {
       const providerProgressEvents = Array.isArray(invocation.providerProgressEvents)
         ? invocation.providerProgressEvents.map((event) => asRecord(event))
         : [];
+      const rawProviderErrorSummary = summarizeProviderPromptOverflow(
+        stdout,
+        stderr,
+        invocationError?.message ?? null,
+      );
 
       const rawEvidenceRecord = {
         adapter_id: adapterId,
@@ -1992,6 +2837,10 @@ export function createLiveAdapter(options) {
           request_transport: requestTransport,
           request_file: requestFile,
           request_file_ref: requestFileRef,
+          request_artifact_file: requestArtifactFile,
+          request_artifact_ref: requestArtifactRef,
+          provider_work_packet_file: providerWorkPacketFile,
+          provider_work_packet_ref: providerWorkPacketRef,
           output_mode: outputMode,
           execution_root: runnerExecutionRoot,
           execution_root_mode: executionRootBinding.mode,
@@ -2012,25 +2861,15 @@ export function createLiveAdapter(options) {
           stdout,
           stderr,
         },
+        context_budget: {
+          budget_report: contextBudgetReports.budget_report,
+          compaction_report: contextBudgetReports.compaction_report,
+          top_context_size_sources: contextBudgetReports.top_context_size_sources,
+        },
         provider_progress_events: providerProgressEvents,
       };
 
-      let rawEvidenceFile = null;
-      let rawEvidenceRef = null;
-      if (evidenceDir) {
-        fs.mkdirSync(evidenceDir, { recursive: true });
-        rawEvidenceFile = path.join(
-          evidenceDir,
-          buildLiveAdapterEvidenceFileName({
-            kind: "raw",
-            adapterId,
-            evidenceToken: normalizedEvidenceToken,
-            timestamp: Date.now(),
-          }),
-        );
-        fs.writeFileSync(rawEvidenceFile, `${JSON.stringify(rawEvidenceRecord, null, 2)}\n`, "utf8");
-        rawEvidenceRef = toEvidenceRef(projectRoot, rawEvidenceFile);
-      }
+      const { rawEvidenceRef } = writeRawEvidence(rawEvidenceRecord);
 
       const { runnerPayload, runnerEvidenceRefs, runnerToolTraces } = parseExternalRunnerStdout(stdout, {
         sanitizeJsonlEvents: runnerFamily === "qwen" && outputMode === "stream-json",
@@ -2059,15 +2898,30 @@ export function createLiveAdapter(options) {
           timed_out: invocationTimedOut,
           request_transport: requestTransport,
           request_file_ref: requestFileRef,
+          request_artifact_ref: requestArtifactRef,
+          provider_work_packet_ref: providerWorkPacketRef,
+          context_budget_status: contextBudgetReports.budget_report.budget_status,
+          context_budget_failure_class:
+            rawProviderErrorSummary || contextBudgetReports.budget_report.budget_status === "fail"
+              ? "compiled_context_budget_exceeded"
+              : null,
+          top_context_size_sources: contextBudgetReports.top_context_size_sources,
+          raw_provider_error_summary: rawProviderErrorSummary,
           output_mode: outputMode,
           provider_progress_events: providerProgressEvents,
           raw_evidence_ref: rawEvidenceRef,
+        },
+        context_budget: {
+          budget_report: contextBudgetReports.budget_report,
+          compaction_report: contextBudgetReports.compaction_report,
         },
         runner_output: runnerPayload,
       };
 
       const evidenceRefs = [
         `${evidenceNamespace}/${normalizedEvidenceToken}`,
+        requestArtifactRef,
+        providerWorkPacketRef,
         ...(rawEvidenceRef ? [rawEvidenceRef] : []),
         ...runnerEvidenceRefs,
       ];
@@ -2139,7 +2993,8 @@ export function createLiveAdapter(options) {
           missingCommand ||
           failureKind === "auth-failed" ||
           failureKind === "permission-mode-blocked" ||
-          failureKind === "edit-denied";
+          failureKind === "edit-denied" ||
+          failureKind === "compiled_context_budget_exceeded";
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,
           adapter_id: adapterId,
@@ -2167,13 +3022,16 @@ export function createLiveAdapter(options) {
             stderr,
             defaultFailureKind: "external-runner-failed",
           });
+        const blocked = [
+          "auth-failed",
+          "permission-mode-blocked",
+          "edit-denied",
+          "compiled_context_budget_exceeded",
+        ].includes(failureKind);
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,
           adapter_id: adapterId,
-          status:
-            failureKind === "auth-failed" || failureKind === "permission-mode-blocked" || failureKind === "edit-denied"
-              ? "blocked"
-              : "failed",
+          status: blocked ? "blocked" : "failed",
           summary: `External runner command '${runtimeCommand}' exited with code ${String(
             invocation.status ?? "null",
           )} for adapter '${adapterId}'.`,
@@ -2181,8 +3039,7 @@ export function createLiveAdapter(options) {
             ...(failureKind === "permission-mode-blocked" || failureKind === "edit-denied"
               ? withRuntimePermissionRequest(baseOutput)
               : baseOutput),
-            blocked:
-              failureKind === "auth-failed" || failureKind === "permission-mode-blocked" || failureKind === "edit-denied",
+            blocked,
             failure_kind: failureKind,
           },
           evidence_refs: evidenceRefs,
@@ -2191,6 +3048,7 @@ export function createLiveAdapter(options) {
       }
 
       const semanticFailureKind =
+        (isProviderWorkPacketEcho({ runnerPayload, stdout }) ? "provider_work_packet_not_executed" : "") ||
         classifyStructuredRunnerFailure({ runnerPayload, runnerToolTraces }) ||
         classifyExternalRunnerFailure({
           stdout,
@@ -2204,6 +3062,7 @@ export function createLiveAdapter(options) {
           "permission-mode-blocked",
           "edit-denied",
           "interactive-question-requested",
+          "compiled_context_budget_exceeded",
         ].includes(semanticFailureKind);
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,

@@ -36,6 +36,16 @@ provider_health:
   status: pass
   provider_execution_status: pass
   provider_step_status_ref: runtime://reports/provider-heartbeat-live-e2e.sample.run.json
+  request_artifact_ref: runtime://reports/adapter-live-request-codex-cli-sample.json
+  provider_work_packet_ref: runtime://reports/adapter-live-work-packet-codex-cli-sample.json
+  context_budget_status: pass
+  context_budget_failure_class: null
+  top_context_size_sources:
+    - source: provider_work_packet.context
+      bytes: 4096
+      chars: 4096
+      estimated_tokens: 1366
+  raw_provider_error_summary: null
 target_environment_health:
   status: pass
   target_setup_status: pass

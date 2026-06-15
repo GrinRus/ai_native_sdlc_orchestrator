@@ -96,17 +96,17 @@ Readiness entries may include target setup and target verification details. Thes
 
 Step-level operator decisions are control-flow evidence only. They decide whether the next public step may run; they are not the final outcome-quality judgement.
 
-`frontend_interactions[]` preserves installed-user UI/browser evidence refs:
+`frontend_interactions[]` preserves factual AOR operator UI/browser evidence refs:
 - rendered HTML
 - screenshot or visual guardrail refs
 - browser-task proof refs
 - DOM snapshot
 - accessibility summary
-- task outcome
-- UX findings captured during the run
+- AOR operator task outcome
+- AOR operator UX findings captured during the run
 - optional agent verdict refs from legacy or guided flows
 
-These are factual evidence refs. UI/UX quality, target-product task success, accessibility depth, visual responsiveness, and operator-console usability are assessed in `live-e2e-quality-assessment-report`.
+These are factual evidence refs. AOR operator UI/UX quality, accessibility depth, visual responsiveness, and installed-user usability are assessed in `live-e2e-quality-assessment-report`.
 
 `final_analysis` preserves factual run closure:
 - `status`

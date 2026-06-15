@@ -21,6 +21,23 @@ import { prepareOperatorDecisionArtifact } from "./lib/decision-helper.mjs";
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const RUN_PROFILE_SCRIPT = path.join(SCRIPT_DIR, "run-profile.mjs");
 
+function providerStatusRank(providerStepStatus) {
+  const status = asNonEmptyString(asRecord(providerStepStatus).status);
+  if (["failed", "fail", "completed", "complete", "pass", "succeeded", "interrupted"].includes(status)) return 3;
+  if (["timeout", "timed-out", "timeout-risk"].includes(status)) return 2;
+  if (["running", "silent-running"].includes(status)) return 1;
+  return 0;
+}
+
+function chooseProviderStepStatus(candidates) {
+  return (
+    candidates
+      .map((entry) => asRecord(entry))
+      .filter((entry) => Object.keys(entry).length > 0)
+      .sort((left, right) => providerStatusRank(right) - providerStatusRank(left))[0] ?? {}
+  );
+}
+
 /**
  * @param {string[]} rawArgs
  * @param {string} flagName
@@ -235,10 +252,10 @@ function runCli(rawArgs) {
     : [];
   const latestObservationFile = stepObservations.at(-1);
   const latestObservation = latestObservationFile ? asRecord(readJson(latestObservationFile)) : {};
-  const providerStepStatus =
-    Object.keys(asRecord(latestObservation.provider_step_status)).length > 0
-      ? asRecord(latestObservation.provider_step_status)
-      : asRecord(state.provider_step_status);
+  const providerStepStatus = chooseProviderStepStatus([
+    state.provider_step_status,
+    latestObservation.provider_step_status,
+  ]);
   const operatorDecisionStatus = asNonEmptyString(latestObservation.operator_decision_status) || null;
   const summaryFile = asNonEmptyString(runProfileOutput.live_e2e_run_summary_file);
   const requiredPublicAction =

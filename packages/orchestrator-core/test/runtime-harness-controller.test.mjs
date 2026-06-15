@@ -54,6 +54,7 @@ function configureCodexExternalRuntime(repoRoot, args) {
     "          args:",
     ...args.map((argument) => `            - ${JSON.stringify(argument)}`),
     "    request_via_stdin: true",
+    "    stdin_json_scope: test-only",
     "    timeout_ms: 30000",
   ].join("\n");
   const updated = source.replace(/execution:\n[\s\S]*?\nsandbox_mode:/u, `${executionBlock}\nsandbox_mode:`);

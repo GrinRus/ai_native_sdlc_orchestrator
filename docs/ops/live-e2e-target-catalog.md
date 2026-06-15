@@ -55,6 +55,8 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - `full-journey-regress-ky-small-qwen.yaml` (`regress/small/qwen-primary`, extended)
     - `full-journey-regress-ky-medium-qwen.yaml` (`regress/medium/qwen-primary`, extended)
     - `full-journey-release-ky-medium-openai.yaml` (`release/medium/openai-primary`)
+    - `full-journey-governance-ky-large-codex.yaml` (`governance/large/openai-primary`, codex-cli)
+    - `full-journey-governance-ky-large-anthropic.yaml` (`governance/large/anthropic-primary`)
   - installed-user browser-task candidate:
     - `installed-user-guided-journey-qwen.yaml` (`regress/small/qwen-primary`, extended)
   - manual-only xlarge profiles:
@@ -437,6 +439,8 @@ Canonical matrix-cell examples:
 - `small/regress/qwen-primary`: `full-journey-regress-ky-small-qwen.yaml`
 - `medium/regress/qwen-primary`: `full-journey-regress-ky-medium-qwen.yaml`
 - `medium/repair/anthropic-primary`: `full-journey-repair-httpie-medium-anthropic.yaml`
+- `large/governance/openai-primary`: `full-journey-governance-ky-large-codex.yaml`
+- `large/governance/anthropic-primary`: `full-journey-governance-ky-large-anthropic.yaml`
 - `large/release/openai-primary`: `full-journey-release-nextjs.yaml`
 
 Production-proof candidate:

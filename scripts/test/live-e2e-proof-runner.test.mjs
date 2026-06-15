@@ -965,9 +965,12 @@ test("target pre-execution status separates target setup, target verification, a
       baselineGateDecision: { status: "warn", decision: "continue_with_warnings", summary: "target verification failed" },
       runResult: { durationSec: 5, timeoutMs: 300000, transcriptFile: path.join(tempRoot, "project-verify.json") },
     });
-    assert.equal(verificationReport.failure_owner, "target_repository");
-    assert.equal(verificationReport.failure_phase, "target_verification");
-    assert.equal(verificationReport.failure_class, "target_verification_blocked");
+    assert.equal(verificationReport.status, "warn");
+    assert.equal(verificationReport.failure_owner, null);
+    assert.equal(verificationReport.failure_phase, null);
+    assert.equal(verificationReport.failure_class, null);
+    assert.equal(verificationReport.target_verification_status.status, "warn");
+    assert.equal(verificationReport.target_verification_status.warning_reason, "Verification command 'npx ava test/headers.ts' failed with exit code 1.");
 
     const aorReport = buildTargetPreExecutionStatusReport({
       verifySummary: {},
@@ -1044,6 +1047,7 @@ test("live adapter preflight honors short execution root aliases", () => {
         "  external_runtime:",
         `    command: ${process.execPath}`,
         "    request_transport: stdin-json",
+        "    stdin_json_scope: test-only",
         "    execution_root_mode: short-symlink",
         "    preflight_timeout_ms: 30000",
         "    timeout_ms: 30000",
@@ -1118,6 +1122,7 @@ test("live adapter preflight applies env_from aliases without leaking values", (
         "  external_runtime:",
         `    command: ${process.execPath}`,
         "    request_transport: stdin-json",
+        "    stdin_json_scope: test-only",
         "    preflight_timeout_ms: 30000",
         "    timeout_ms: 30000",
         "    env_from:",
@@ -1777,6 +1782,364 @@ test("proof runner writes run-health reports for blocked live E2E reports", () =
     assert.equal(written.runHealthReport.resume_interaction_health.pending_decision_count, 1);
     assert.equal(written.summary.runner_quality_summary, undefined);
     assert.equal(written.summary.quality_judgement, undefined);
+  });
+});
+
+test("proof runner classifies context-budget provider blockers as run-health blocked", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "execution-plan.json",
+        "execution-step-result.json",
+        "execution-inspection.json",
+        "execution-classification.json",
+        "execution-agent-request.json",
+        "execution-decision.json",
+        "adapter-request.json",
+        "provider-work-packet.json",
+        "adapter-raw-evidence.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+
+    const runId = "context-budget-blocked-run-health";
+    const stepJournalEntry = {
+      sequence: 1,
+      step_id: "execution",
+      step_instance_id: "execution",
+      iteration: 1,
+      flow_stage: "execution",
+      plan: {
+        objective: "Observe routed live execution.",
+        public_surface: "aor run start",
+        command_labels: ["run-start"],
+        expected_artifacts: ["routed_step_result_file"],
+        inspection_sources: ["adapter_raw_evidence"],
+        safety_constraints: ["no-upstream-write"],
+      },
+      plan_ref: files["execution-plan.json"],
+      public_surface: "aor run start",
+      execution_ref: files["execution-step-result.json"],
+      inspection_ref: files["execution-inspection.json"],
+      classification_ref: files["execution-classification.json"],
+      artifact_refs: [files["adapter-request.json"], files["provider-work-packet.json"], files["adapter-raw-evidence.json"]],
+      started_at: "2026-06-09T00:00:00.000Z",
+      finished_at: "2026-06-09T00:00:01.000Z",
+      duration_sec: 1,
+      deterministic_analysis: {
+        status: "blocked",
+        exit_code: null,
+        failure_class: "compiled_context_budget_exceeded",
+        missing_evidence: [],
+        recommendation: "block",
+      },
+      semantic_analysis: {
+        status: "blocked",
+        judge_source: "skill-agent",
+        findings: ["Provider work packet exceeded the configured context budget before provider invocation."],
+      },
+      agent_decision_request_ref: files["execution-agent-request.json"],
+      operator_decision_ref: files["execution-decision.json"],
+      operator_decision_status: "accepted",
+      inspected_evidence_refs: [files["adapter-raw-evidence.json"]],
+      requested_interaction: null,
+      decision: {
+        action: "block",
+        reason: "Context budget exceeded.",
+      },
+      resume_result: null,
+      frontend_interaction_refs: [],
+      final_step_verdict: "blocked",
+    };
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.context-budget-blocked",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "release",
+        provider_variant_id: "anthropic-primary",
+        stages: ["bootstrap", "execution"],
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "blocked",
+        stageResults: [
+          {
+            stage: "execution",
+            status: "fail",
+            evidence_refs: [files["adapter-raw-evidence.json"]],
+            summary: "Provider work packet exceeded the configured context budget.",
+          },
+        ],
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: [stepJournalEntry],
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "pass",
+          failure_owner: "aor",
+          failure_phase: "provider_execution",
+          failure_class: "compiled_context_budget_exceeded",
+          provider_execution_status: "blocked",
+          adapter_raw_evidence_ref: files["adapter-raw-evidence.json"],
+          request_artifact_ref: files["adapter-request.json"],
+          provider_work_packet_ref: files["provider-work-packet.json"],
+          context_budget_status: "fail",
+          context_budget_failure_class: "compiled_context_budget_exceeded",
+          top_context_size_sources: [
+            {
+              source: "provider_work_packet.context",
+              bytes: 4096,
+              chars: 4096,
+              estimated_tokens: 1366,
+            },
+          ],
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "large",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "blocked");
+    assert.equal(written.runHealthReport.overall_status, "blocked");
+    assert.equal(written.runHealthReport.provider_health.status, "blocked");
+    assert.equal(written.runHealthReport.provider_health.context_budget_status, "fail");
+    assert.equal(written.runHealthReport.provider_health.context_budget_failure_class, "compiled_context_budget_exceeded");
+    assert.equal(written.runHealthReport.failure_summary.owner, "aor");
+    assert.equal(written.runHealthReport.failure_summary.phase, "provider_execution");
+    assert.equal(written.runHealthReport.failure_summary.class, "compiled_context_budget_exceeded");
+  });
+});
+
+test("proof runner propagates provider work-packet non-execution into run-health", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "execution-plan.json",
+        "execution-step-result.json",
+        "execution-inspection.json",
+        "execution-classification.json",
+        "execution-agent-request.json",
+        "execution-decision.json",
+        "execution-transcript.json",
+        "adapter-request.json",
+        "provider-work-packet.json",
+        "adapter-raw-evidence.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+
+    const runId = "provider-work-packet-not-executed-run-health";
+    const stepJournalEntry = {
+      sequence: 1,
+      step_id: "execution",
+      step_instance_id: "execution",
+      iteration: 1,
+      flow_stage: "execution",
+      plan: {
+        objective: "Observe routed live execution.",
+        public_surface: "aor run start",
+        command_labels: ["run-start"],
+        expected_artifacts: ["routed_step_result_file"],
+        inspection_sources: ["adapter_raw_evidence"],
+        safety_constraints: ["no-upstream-write"],
+      },
+      plan_ref: files["execution-plan.json"],
+      public_surface: "aor run start",
+      transcript_ref: files["execution-transcript.json"],
+      execution_ref: files["execution-step-result.json"],
+      inspection_ref: files["execution-inspection.json"],
+      classification_ref: files["execution-classification.json"],
+      artifact_refs: [files["adapter-request.json"], files["provider-work-packet.json"], files["adapter-raw-evidence.json"]],
+      started_at: "2026-06-09T00:00:00.000Z",
+      finished_at: "2026-06-09T00:00:01.000Z",
+      duration_sec: 1,
+      deterministic_analysis: {
+        status: "fail",
+        exit_code: 0,
+        failure_class: "provider_work_packet_not_executed",
+        missing_evidence: [],
+        recommendation: "block",
+      },
+      semantic_analysis: {
+        status: "fail",
+        judge_source: "skill-agent",
+        findings: ["Provider returned a work-packet summary instead of changing the target checkout."],
+      },
+      agent_decision_request_ref: files["execution-agent-request.json"],
+      operator_decision_ref: files["execution-decision.json"],
+      operator_decision_status: "accepted",
+      inspected_evidence_refs: [files["adapter-raw-evidence.json"]],
+      requested_interaction: null,
+      decision: {
+        action: "block",
+        reason: "Provider did not execute the work packet.",
+      },
+      resume_result: null,
+      frontend_interaction_refs: [],
+      final_step_verdict: "fail",
+    };
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.provider-work-packet-not-executed",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "governance",
+        provider_variant_id: "anthropic-primary",
+        stages: ["bootstrap", "execution"],
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "failed",
+        stageResults: [
+          {
+            stage: "execution",
+            status: "fail",
+            evidence_refs: [files["adapter-raw-evidence.json"], files["provider-work-packet.json"]],
+            summary: "Provider summarized the work packet instead of executing implementation.",
+          },
+        ],
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: [stepJournalEntry],
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "pass",
+          failure_owner: "provider",
+          failure_phase: "provider_execution",
+          failure_class: "provider_work_packet_not_executed",
+          provider_execution_status: "completed",
+          adapter_raw_evidence_ref: files["adapter-raw-evidence.json"],
+          request_artifact_ref: files["adapter-request.json"],
+          provider_work_packet_ref: files["provider-work-packet.json"],
+          context_budget_status: "pass",
+          top_context_size_sources: [
+            {
+              source: "provider_work_packet.resolved_local_refs",
+              bytes: 1024,
+              chars: 1024,
+              estimated_tokens: 341,
+            },
+          ],
+          feature_mission_id: "ky-retry-hooks-governance",
+          feature_size: "large",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.runHealthReport.overall_status, "fail");
+    assert.equal(written.runHealthReport.failure_summary.owner, "provider");
+    assert.equal(written.runHealthReport.failure_summary.phase, "provider_execution");
+    assert.equal(written.runHealthReport.failure_summary.class, "provider_work_packet_not_executed");
+    assert.equal(written.runHealthReport.command_health.command_count, 1);
+    assert.equal(written.runHealthReport.command_health.failed_command_count, 1);
+    assert.equal(written.runHealthReport.provider_health.top_context_size_sources[0].source, "provider_work_packet.resolved_local_refs");
   });
 });
 

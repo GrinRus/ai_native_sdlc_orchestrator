@@ -19,3 +19,37 @@ hashes:
 provenance:
   compiler_revision_ref: compiler-revision://runtime-context-foundation@v1
   project_profile_ref: examples/project.aor.yaml
+budget_report:
+  bytes: 4096
+  chars: 4096
+  estimated_tokens: 1024
+  budget_limit_tokens: 180000
+  budget_status: pass
+  source_breakdown:
+    - source: instruction_set
+      bytes: 1200
+      chars: 1200
+      estimated_tokens: 300
+    - source: refs
+      bytes: 900
+      chars: 900
+      estimated_tokens: 225
+    - source: provenance
+      bytes: 600
+      chars: 600
+      estimated_tokens: 150
+compaction_report:
+  strategy: deterministic-ref-summary
+  original_estimate:
+    bytes: 4096
+    chars: 4096
+    estimated_tokens: 1024
+  final_estimate:
+    bytes: 2048
+    chars: 2048
+    estimated_tokens: 512
+  dropped_or_summarized_sources:
+    - route_policy_debug_payloads
+  mandatory_refs_preserved:
+    - packet://handoff/aor-core.wave-004
+    - packet://spec/aor-core.wave-004

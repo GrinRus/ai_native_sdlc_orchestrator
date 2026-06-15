@@ -53,6 +53,7 @@ function withTempRepo(callback) {
  *   env?: Record<string, string>,
  *   envFrom?: Record<string, string>,
  *   nativeTimeoutArg?: Record<string, unknown>,
+ *   contextBudget?: Record<string, unknown>,
  * }} options
  */
 function buildExternalRunnerProfile(options) {
@@ -93,6 +94,9 @@ function buildExternalRunnerProfile(options) {
   }
   if (options.nativeTimeoutArg) {
     execution.external_runtime.native_timeout_arg = options.nativeTimeoutArg;
+  }
+  if (options.contextBudget) {
+    execution.external_runtime.context_budget = options.contextBudget;
   }
   if (options.handler !== null) {
     execution.handler = options.handler ?? "codex-cli-external-runner";
@@ -1256,6 +1260,227 @@ test("live adapter supports file-attached request transport for argv prompt runn
     assert.match(response.output.external_runner.request_file_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-request-/u);
     assert.equal(response.output.runner_output.message_seen, true);
     assert.equal(response.output.runner_output.request_id, "req-open-code-file");
+  });
+});
+
+test("live adapter request-artifact transport sends bounded provider work packet", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const compiledContextFile = path.join(evidenceRoot, "compiled-context.json");
+    fs.mkdirSync(evidenceRoot, { recursive: true });
+    fs.writeFileSync(compiledContextFile, "{}\n", "utf8");
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "const fileIndex=process.argv.indexOf('--work-packet');",
+            "const filePath=fileIndex>=0?process.argv[fileIndex+1]:'';",
+            "const packet=JSON.parse(fs.readFileSync(filePath,'utf8'));",
+            "process.stdout.write(JSON.stringify({",
+            "status:'success',",
+            "summary:'request artifact ok',",
+            "output:{packet_kind:packet.packet_kind,request_id:packet.request_id,has_full_request_ref:Boolean(packet.full_request_artifact_ref),has_context_budget:Boolean(packet.context_budget),resolved_ref_roles:packet.resolved_local_refs.map(ref=>ref.role),execution_contract:packet.execution_contract},",
+            "evidence_refs:['evidence://adapter-live/claude-code/request-artifact']",
+            "}));",
+          ].join(""),
+        ],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: {
+          message: "Open {provider_work_packet_path}.",
+          argument: "--work-packet",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-request-artifact",
+      run_id: "run-request-artifact",
+      step_id: "step-request-artifact",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      input_packet_refs: ["packet://handoff"],
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+        compiled_context_file: compiledContextFile,
+        instruction_set: { objective: "Implement the bounded request-artifact test." },
+        packet_refs: ["packet://handoff"],
+      },
+    });
+
+    assert.equal(response.status, "success");
+    assert.equal(response.output.external_runner.request_transport, "request-artifact");
+    assert.match(response.output.external_runner.request_artifact_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-request-/u);
+    assert.match(response.output.external_runner.provider_work_packet_ref, /^evidence:\/\/\.aor\/projects\/adapter-test\/reports\/adapter-live-work-packet-/u);
+    assert.equal(response.output.external_runner.context_budget_status, "pass");
+    assert.equal(response.output.runner_output.packet_kind, "aor-provider-work-packet");
+    assert.equal(response.output.runner_output.has_full_request_ref, true);
+    assert.equal(response.output.runner_output.has_context_budget, false);
+    assert.ok(response.output.runner_output.resolved_ref_roles.includes("full_request_artifact"));
+    assert.ok(response.output.runner_output.resolved_ref_roles.includes("provider_work_packet"));
+    assert.ok(response.output.runner_output.resolved_ref_roles.includes("compiled_context"));
+    assert.equal(response.output.runner_output.execution_contract.mode, "execute-implementation");
+    assert.equal(response.output.runner_output.execution_contract.must_open_required_local_refs, true);
+    assert.equal(response.output.runner_output.execution_contract.expected_meaningful_change.required, true);
+    assert.equal(response.output.runner_output.execution_contract.expected_meaningful_change.no_op_forbidden, true);
+    assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.direct_edits_allowed, true);
+    assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.upstream_write_allowed, false);
+  });
+});
+
+test("live adapter classifies provider work-packet echo as non-executed", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: [
+          "-e",
+          [
+            "const fs=require('node:fs');",
+            "const fileIndex=process.argv.indexOf('--work-packet');",
+            "const filePath=fileIndex>=0?process.argv[fileIndex+1]:'';",
+            "const packet=JSON.parse(fs.readFileSync(filePath,'utf8'));",
+            "process.stdout.write(JSON.stringify({",
+            "packet_identity:{packet_kind:packet.packet_kind,request_id:packet.request_id,step_id:packet.step_id},",
+            "route_and_policy:{route:packet.route,policy:packet.policy},",
+            "linked_refs_resolved:packet.resolved_local_refs",
+            "}));",
+          ].join(""),
+        ],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: {
+          message: "Open {provider_work_packet_path}.",
+          argument: "--work-packet",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-work-packet-echo",
+      run_id: "run-work-packet-echo",
+      step_id: "step-work-packet-echo",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      input_packet_refs: ["packet://handoff"],
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+        instruction_set: { objective: "Implement the work-packet echo test." },
+      },
+    });
+
+    assert.equal(response.status, "failed");
+    assert.equal(response.output.failure_kind, "provider_work_packet_not_executed");
+    assert.equal(response.output.external_runner.exit_code, 0);
+    assert.equal(response.output.external_runner.provider_work_packet_ref.startsWith("evidence://"), true);
+  });
+});
+
+test("live adapter blocks oversized provider work packet before spawning runtime", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", "process.stdout.write(JSON.stringify({status:'success',summary:'should not spawn'}));"],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: {
+          message: "Open {provider_work_packet_path}.",
+        },
+        contextBudget: {
+          max_input_tokens: 1,
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-oversized",
+      run_id: "run-oversized",
+      step_id: "step-oversized",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
+      policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+        instruction_set: { objective: "x".repeat(200) },
+      },
+    });
+
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "compiled_context_budget_exceeded");
+    assert.equal(response.output.external_runner.exit_code, null);
+    assert.equal(response.output.external_runner.context_budget_status, "fail");
+    assert.equal(response.output.runner_output, undefined);
+    assert.ok(response.output.external_runner.top_context_size_sources.length > 0);
+  });
+});
+
+test("live adapter maps provider prompt overflow to context budget failure", () => {
+  withTempRepo((repoRoot) => {
+    const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
+    const adapter = createLiveAdapter({
+      adapterId: "claude-code",
+      projectRoot: repoRoot,
+      runtimeEvidenceRoot: evidenceRoot,
+      executionRoot: repoRoot,
+      adapterProfile: buildExternalRunnerProfile({
+        command: process.execPath,
+        args: ["-e", "process.stderr.write('Prompt is too long: input tokens exceed context window'); process.exit(1);"],
+        handler: null,
+        requestViaStdin: false,
+        requestTransport: "request-artifact",
+        requestFile: {
+          message: "Open {provider_work_packet_path}.",
+        },
+      }),
+    });
+
+    const response = adapter.execute({
+      request_id: "req-provider-overflow",
+      run_id: "run-provider-overflow",
+      step_id: "step-provider-overflow",
+      step_class: "implement",
+      route: { resolved_route_id: "route.implement.default" },
+      asset_bundle: {},
+      policy_bundle: {},
+      dry_run: false,
+      context: {
+        compiled_context_ref: "compiled-context://compiled-context.aor-core.live.implement",
+      },
+    });
+
+    assert.equal(response.status, "blocked");
+    assert.equal(response.output.failure_kind, "compiled_context_budget_exceeded");
+    assert.equal(response.output.external_runner.context_budget_failure_class, "compiled_context_budget_exceeded");
+    assert.match(response.output.external_runner.raw_provider_error_summary, /Prompt is too long/i);
   });
 });
 

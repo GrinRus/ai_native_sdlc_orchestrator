@@ -112,7 +112,7 @@ dimensions:
       - runtime://reports/no-upstream-write-live-e2e.sample.run.json
     findings: []
     recommended_followups: []
-  ui_ux_quality:
+  aor_operator_ui_ux_quality:
     status: warn
     evidence_strength: weak
     inspected_evidence_refs:
@@ -120,12 +120,91 @@ dimensions:
     findings:
       - category: ui-ux
         severity: medium
-        summary: Available evidence proves the AOR operator console rendered; it does not prove target product UX quality.
+        summary: Available evidence proves the AOR operator console rendered, but it does not prove every installed-user flow usability concern.
         evidence_refs:
           - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
     recommended_followups:
-      - Inspect target product task success, copy clarity, recovery states, and responsive visual evidence for frontend targets.
-  accessibility_quality:
+      - Inspect AOR task success, next-action clarity, blocker recovery, visual stability, and raw JSON independence through browser-task evidence.
+    subdimensions:
+      task_success:
+        status: warn
+        evidence_strength: weak
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: App smoke proves render markers, but no browser task transcript proves the operator completed the flow without assistance.
+            evidence_refs:
+              - runtime://reports/installed-user-guided-web-smoke-live-e2e.sample.run.json
+      flow_navigation_clarity:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: No direct evidence inspected flow navigation clarity across the installed-user journey.
+            evidence_refs: []
+      next_action_clarity:
+        status: warn
+        evidence_strength: weak
+        evidence_refs:
+          - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+        findings:
+          - category: ui-ux
+            severity: low
+            summary: Next-action evidence is indirect through the observation report and not a browser-level usability proof.
+            evidence_refs:
+              - runtime://reports/live-e2e-observation-report-live-e2e.sample.run.json
+      blocker_and_error_understandability:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: No blocker or error state was inspected through the AOR operator UI.
+            evidence_refs: []
+      recovery_affordance:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: No recovery path was inspected through browser-task evidence.
+            evidence_refs: []
+      state_feedback_loading_empty_error:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: ui-ux
+            severity: low
+            summary: Loading, empty, and error state feedback was not captured by the available evidence.
+            evidence_refs: []
+      visual_stability_responsiveness:
+        status: warn
+        evidence_strength: weak
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-smoke-visual-guardrail-live-e2e.sample.run.json
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: Visual evidence is a deterministic guardrail rather than a responsive browser inspection.
+            evidence_refs:
+              - runtime://reports/installed-user-guided-web-smoke-visual-guardrail-live-e2e.sample.run.json
+      raw_json_independence:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: ui-ux
+            severity: medium
+            summary: No evidence shows the operator could complete the flow without reading raw JSON artifacts.
+            evidence_refs: []
+  aor_operator_accessibility_quality:
     status: warn
     evidence_strength: weak
     inspected_evidence_refs:
@@ -137,7 +216,64 @@ dimensions:
         evidence_refs:
           - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
     recommended_followups:
-      - Add axe-style, keyboard, focus, contrast, and screen-reader semantics evidence where UI is in scope.
+      - Add browser-level keyboard, focus, contrast, semantic, screen-reader label, and accessible error feedback evidence for the AOR operator flow.
+    subdimensions:
+      keyboard_navigation:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Keyboard navigation was not inspected.
+            evidence_refs: []
+      focus_order:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Focus order was not inspected.
+            evidence_refs: []
+      contrast_and_readability:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Contrast and readability were not inspected beyond smoke markers.
+            evidence_refs: []
+      semantic_structure:
+        status: warn
+        evidence_strength: weak
+        evidence_refs:
+          - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Accessibility evidence is checklist-oriented and does not prove full semantic structure.
+            evidence_refs:
+              - runtime://reports/installed-user-guided-web-accessibility-live-e2e.sample.run.json
+      screen_reader_labels:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Screen-reader labels were not inspected.
+            evidence_refs: []
+      accessible_error_feedback:
+        status: not_evaluated
+        evidence_strength: missing
+        evidence_refs: []
+        findings:
+          - category: accessibility
+            severity: medium
+            summary: Accessible error feedback was not inspected.
+            evidence_refs: []
   evidence_strength:
     status: warn
     evidence_strength: medium
@@ -173,8 +309,8 @@ gap_report:
     - performance_regression_risk
   weak_signal_dimensions:
     - code_maintainability
-    - ui_ux_quality
-    - accessibility_quality
+    - aor_operator_ui_ux_quality
+    - aor_operator_accessibility_quality
   strong_evidence_dimensions:
     - artifact_content_quality
     - delivery_safety

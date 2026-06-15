@@ -120,6 +120,61 @@ function toProjectEvidenceRef(projectRoot, filePath) {
 }
 
 /**
+ * @param {Record<string, unknown>} stepResult
+ * @param {Record<string, unknown>} adapterOutput
+ * @returns {{ owner: string, phase: string, class: string } | null}
+ */
+function classifyProviderExecutionFailure(stepResult, adapterOutput) {
+  const failureKind = asNonEmptyString(adapterOutput.failure_kind);
+  const stepFailureClass = asNonEmptyString(stepResult.failure_class);
+  const failureClass = failureKind || stepFailureClass;
+  if (!failureClass) {
+    return null;
+  }
+  if (failureClass === "compiled_context_budget_exceeded") {
+    return {
+      owner: "aor",
+      phase: "provider_execution",
+      class: "compiled_context_budget_exceeded",
+    };
+  }
+  if (failureClass === "provider_work_packet_not_executed") {
+    return {
+      owner: "provider",
+      phase: "provider_execution",
+      class: "provider_work_packet_not_executed",
+    };
+  }
+  if (failureClass === "no-op") {
+    return {
+      owner: "provider",
+      phase: "provider_execution",
+      class: "no-op",
+    };
+  }
+  return {
+    owner: "provider",
+    phase: "provider_execution",
+    class: failureClass,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} stepResult
+ * @param {Record<string, unknown>} adapterOutput
+ */
+function applyProviderExecutionFailure(artifacts, stepResult, adapterOutput) {
+  const classification = classifyProviderExecutionFailure(stepResult, adapterOutput);
+  if (!classification) {
+    return;
+  }
+  artifacts.failure_owner = classification.owner;
+  artifacts.failure_phase = classification.phase;
+  artifacts.failure_class = classification.class;
+}
+
+/**
  * @param {string} projectRoot
  * @param {string} packetName
  * @param {string | null | undefined} filePath
@@ -1208,10 +1263,15 @@ function runGuidedWebSmoke(options) {
       "DOM snapshot",
       "accessibility summary",
       "screenshot or visual guardrail",
-      "task outcome",
-      "UX findings",
+      "AOR operator task success",
+      "AOR flow navigation and next action clarity",
+      "AOR blocker, error, recovery, loading, empty, and state-feedback findings",
+      "AOR visual stability and responsive-state findings",
+      "AOR accessibility findings",
       "browser-task proof ref",
     ],
+    assessment_scope:
+      "AOR operator and installed-user UI/UX only; checked-repository frontend behavior belongs to implementation and verification evidence.",
     app_url: asNonEmptyString(summary.app_url) || null,
     control_plane: asNonEmptyString(summary.control_plane) || null,
     project_id: asNonEmptyString(summary.project_id) || null,
@@ -1637,7 +1697,7 @@ export function buildTargetPreExecutionStatusReport(options) {
         timed_out: false,
         missing_prerequisites: [],
       };
-  const verificationStatus = failedVerification
+  let verificationStatus = failedVerification
     ? describeTargetCommandFailure({
         stepResult: failedVerification.document,
         stepResultFile: failedVerification.filePath,
@@ -1679,6 +1739,21 @@ export function buildTargetPreExecutionStatusReport(options) {
           timed_out: false,
           missing_prerequisites: [],
         };
+  const baselineDecision = asNonEmptyString(asRecord(options.baselineGateDecision).decision);
+  if (
+    baselineDecision === "continue_with_warnings" &&
+    !failedSetup &&
+    asNonEmptyString(verificationStatus.status) === "blocked"
+  ) {
+    verificationStatus = {
+      ...verificationStatus,
+      status: "warn",
+      warning_reason: asNonEmptyString(verificationStatus.blocker_reason) || "Baseline target verification failed.",
+      blocker_reason: null,
+      failure_owner: null,
+      failure_class: null,
+    };
+  }
   const statuses = [setupStatus, verificationStatus];
   const blockingStatus =
     statuses.find((status) => asNonEmptyString(status.status) === "blocked") ??
@@ -1699,9 +1774,10 @@ export function buildTargetPreExecutionStatusReport(options) {
           missing_prerequisites: [],
         }
       : null);
+  const warningStatus = statuses.find((status) => asNonEmptyString(status.status) === "warn");
 
   return {
-    status: blockingStatus ? "blocked" : "pass",
+    status: blockingStatus ? "blocked" : warningStatus ? "warn" : "pass",
     provider_independent: true,
     failure_owner: blockingStatus ? asNonEmptyString(blockingStatus.failure_owner) : null,
     failure_phase: blockingStatus ? asNonEmptyString(blockingStatus.failure_phase) : null,
@@ -2846,7 +2922,17 @@ export function executeInstalledUserFlow(options) {
     const adapterOutput = asRecord(adapterResponse.output);
     artifacts.compiled_context_ref = asNonEmptyString(asRecord(routedExecution.context_compilation).compiled_context_ref) || null;
     artifacts.compiled_context_file = asNonEmptyString(asRecord(routedExecution.context_compilation).compiled_context_file) || null;
-    artifacts.adapter_raw_evidence_ref = asNonEmptyString(asRecord(adapterOutput.external_runner).raw_evidence_ref) || null;
+    const externalRunner = asRecord(adapterOutput.external_runner);
+    artifacts.adapter_raw_evidence_ref = asNonEmptyString(externalRunner.raw_evidence_ref) || null;
+    artifacts.request_artifact_ref = asNonEmptyString(externalRunner.request_artifact_ref) || null;
+    artifacts.provider_work_packet_ref = asNonEmptyString(externalRunner.provider_work_packet_ref) || null;
+    artifacts.context_budget_status = asNonEmptyString(externalRunner.context_budget_status) || null;
+    artifacts.context_budget_failure_class = asNonEmptyString(externalRunner.context_budget_failure_class) || null;
+    artifacts.raw_provider_error_summary = asNonEmptyString(externalRunner.raw_provider_error_summary) || null;
+    artifacts.top_context_size_sources = Array.isArray(externalRunner.top_context_size_sources)
+      ? externalRunner.top_context_size_sources
+      : [];
+    applyProviderExecutionFailure(artifacts, routedStepResult, adapterOutput);
     const routedStatus = asNonEmptyString(routedStepResult.status);
     if (routedStatus !== "passed") {
       const failureSummary =
@@ -4029,9 +4115,18 @@ export function executeFullJourneyFlow(options) {
         const routedExecution = asRecord(stepResult.routed_execution);
         artifacts.compiled_context_ref = asNonEmptyString(asRecord(routedExecution.context_compilation).compiled_context_ref) || null;
         artifacts.compiled_context_file = asNonEmptyString(asRecord(routedExecution.context_compilation).compiled_context_file) || null;
-        artifacts.adapter_raw_evidence_ref =
-          asNonEmptyString(asRecord(asRecord(asRecord(routedExecution.adapter_response).output).external_runner).raw_evidence_ref) ||
-          null;
+        const adapterOutput = asRecord(asRecord(routedExecution.adapter_response).output);
+        const externalRunner = asRecord(adapterOutput.external_runner);
+        artifacts.adapter_raw_evidence_ref = asNonEmptyString(externalRunner.raw_evidence_ref) || null;
+        artifacts.request_artifact_ref = asNonEmptyString(externalRunner.request_artifact_ref) || null;
+        artifacts.provider_work_packet_ref = asNonEmptyString(externalRunner.provider_work_packet_ref) || null;
+        artifacts.context_budget_status = asNonEmptyString(externalRunner.context_budget_status) || null;
+        artifacts.context_budget_failure_class = asNonEmptyString(externalRunner.context_budget_failure_class) || null;
+        artifacts.raw_provider_error_summary = asNonEmptyString(externalRunner.raw_provider_error_summary) || null;
+        artifacts.top_context_size_sources = Array.isArray(externalRunner.top_context_size_sources)
+          ? externalRunner.top_context_size_sources
+          : [];
+        applyProviderExecutionFailure(artifacts, stepResult, adapterOutput);
         if (internalTestHooks.drop_adapter_raw_evidence_after_run_start === true) {
           const adapterResponse = asRecord(routedExecution.adapter_response);
           const adapterOutput = asRecord(adapterResponse.output);

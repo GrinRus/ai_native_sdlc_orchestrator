@@ -41,6 +41,17 @@ report, then fail closed without launching an internal repair provider step.
 Public repair remains the outer `execution#N -> review#N` lifecycle loop
 controlled by `implementation_loop`.
 
+All external-process adapters use the same request-artifact pipeline. AOR
+persists the full adapter request as run evidence, builds a bounded provider
+work packet, records context-budget and compaction evidence, and passes only a
+short launcher prompt plus the work-packet path through the adapter's mechanical
+CLI binding. Provider-specific behavior is limited to command flags, auth/env
+mapping, output parsing, timeout args, and optional native file argument names.
+Live baseline adapters must not pass unrestricted full request JSON through
+stdin. If the provider work packet still exceeds the configured context budget
+after deterministic ref-summary compaction, execution blocks before provider
+spawn with `failure_class=compiled_context_budget_exceeded`.
+
 The runner invokes the installed project flow step by step. Each step follows `plan -> execute -> inspect -> classify -> decide -> persist`; the next public command is allowed only after the current step decision is `continue` or after a requested interaction/frontend/manual action is completed through a public surface.
 
 Operator-initiated interventions are public-surface actions, not private runner
@@ -97,6 +108,7 @@ Catalog-backed full-journey profiles:
 - `full-journey-repair-pluggy-medium-anthropic.yaml`
 - `full-journey-governance-pluggy-medium-openai.yaml`
 - `full-journey-governance-pluggy-medium-open-code.yaml`
+- `full-journey-governance-ky-large-codex.yaml`
 - `full-journey-governance-ky-large-openai.yaml`
 - `full-journey-governance-ky-large-anthropic.yaml`
 - `full-journey-release-nextjs.yaml`
@@ -201,6 +213,12 @@ status is active so elapsed/budget/progress remain visible without manual
 refresh. Operator reports and the SPA must not print raw process commands, args,
 env, tokens, or provider secrets; raw evidence remains behind explicit evidence
 refs.
+
+`running`, `silent-running`, and `timeout-risk` are transient provider states.
+Before final observation, run summary, or run-health evidence is written, the
+runner refreshes provider status from durable run-control state so terminal
+`completed`, `failed`, or `interrupted` evidence cannot be hidden by a stale
+observation snapshot.
 
 For Qwen candidate profiles, `provider_step_status` also exposes sanitized
 stream progress from official `stream-json` stdout: `last_progress_at`,
@@ -582,7 +600,7 @@ Judge criteria:
 
 If a profile does not provide an accepted skill-agent operator decision, the runner stops fail-closed and writes the decision request for manual/evaluator continuation.
 
-For guided installed-user runs, deterministic web smoke is only a render guardrail. `frontend_interactions[]` must carry HTML, DOM, accessibility, screenshot or visual-guardrail evidence as factual proof. UI/UX quality is assessed later in `live-e2e-quality-assessment-report`, and the assessment must distinguish AOR operator UI evidence from target product UI/UX evidence. The guided proof must also include `flow_loop.first_flow_id`, `flow_loop.first_flow_status=completed`, `flow_loop.completed_flow_read_only=true`, a distinct `flow_loop.second_flow_id`, `flow_loop.follow_up_source_handoff_ref`, fresh second-flow intake/next-action files, and `flow_loop.operator_request.target_flow_id` pointing at the second flow.
+For guided installed-user runs, deterministic web smoke is only a render guardrail. `frontend_interactions[]` must carry HTML, DOM, accessibility, screenshot or visual-guardrail evidence as factual AOR operator UI proof. AOR operator UI/UX quality is assessed later in `live-e2e-quality-assessment-report`; checked-repository frontend behavior belongs to implementation and verification evidence when the mission requires it. The guided proof must also include `flow_loop.first_flow_id`, `flow_loop.first_flow_status=completed`, `flow_loop.completed_flow_read_only=true`, a distinct `flow_loop.second_flow_id`, `flow_loop.follow_up_source_handoff_ref`, fresh second-flow intake/next-action files, and `flow_loop.operator_request.target_flow_id` pointing at the second flow.
 
 ## Run Health
 The run summary links `live_e2e_run_health_report_file`. This report is the only status source for quality of the run itself. It covers:
@@ -595,7 +613,7 @@ The run summary links `live_e2e_run_health_report_file`. This report is the only
 - resume or interaction issues;
 - primary failure `owner`, `phase`, and `class`.
 
-Run-health must not evaluate produced code, artifact content, test adequacy, security, performance, UI/UX, accessibility, or release readiness. A run can have `overall_status=pass` while the post-run quality assessment still reports weak or failing outcome quality.
+Run-health must not evaluate produced code, artifact content, test adequacy, security, performance, AOR operator UI/UX, accessibility, or release readiness. A run can have `overall_status=pass` while the post-run quality assessment still reports weak or failing outcome quality.
 
 ## Post-Run Quality Assessment
 After the full flow, the launching SWE agent prepares an assessment request:
@@ -612,7 +630,7 @@ node ./scripts/live-e2e/quality-assessment.mjs validate \
   --assessment-report-file <live_e2e_quality_assessment_report_file>
 ```
 
-The assessment report is advisory outcome quality evidence. It must cover artifact content, implementation correctness/completeness, maintainability, tests, security, performance risk, verification quality, delivery safety, UI/UX, accessibility, evidence strength, and acceptance criteria traceability. Every dimension records `status`, `evidence_strength`, inspected refs, findings, and follow-ups. Missing or weak signals must stay visible in `gap_report`.
+The assessment report is advisory outcome quality evidence. It must cover artifact content, implementation correctness/completeness, maintainability, tests, security, performance risk, verification quality, delivery safety, AOR operator UI/UX, AOR operator accessibility, evidence strength, and acceptance criteria traceability. Every dimension records `status`, `evidence_strength`, inspected refs, findings, and follow-ups. The AOR operator UI/UX dimensions also record required subdimensions for task success, flow navigation, next actions, blockers, recovery, state feedback, visual responsiveness, raw JSON independence, keyboard navigation, focus, contrast/readability, semantic structure, screen-reader labels, and accessible error feedback. Missing or weak signals must stay visible in `gap_report`.
 
 ## Operator checks
 - Summary and scorecard files exist under `.aor/projects/<project_id>/reports/`.
@@ -621,6 +639,7 @@ The assessment report is advisory outcome quality evidence. It must cover artifa
 - Full-journey runs resolve one explicit matrix cell and preserve `matrix_cell` plus `coverage_follow_up` in summary, review, audit, and learning artifacts.
 - Full-journey runs use public `project init` with a host-side generated project profile and host-side bootstrap assets under the AOR `.aor/` run state. Target checkouts must not receive proof-runner `examples/`, `context/`, root `project.aor.yaml`, generated route files, or `.aor-live-e2e` scaffolding before agent execution.
 - `routed_step_result_file` exists and references a routed step with `mode=execute`.
+- `request_artifact_ref`, `provider_work_packet_ref`, `context_budget_status`, and `top_context_size_sources[]` are present when an external provider was invoked or blocked by context-budget guardrails.
 - `review_report_file` exists and is contract-valid.
 - `review-report.provider_traceability` matches the requested provider variant and adapter path.
 - `review-report.feature_size_fit` stays inside the declared size budget for the mission.
@@ -628,6 +647,7 @@ The assessment report is advisory outcome quality evidence. It must cover artifa
 - `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and Runtime Harness decisions are factual post-delivery signals. Runtime Harness can block run health for missing execution evidence, adapter crashes, unresolved interaction, blocked runtime state, runner-owned state leaks, or missing mission-relevant source-change evidence. It does not provide the final implementation-quality verdict; `change_evidence.required_path_prefixes` only defines the minimum changed-path evidence that can prove the selected catalog mission was touched.
 - `delivery_manifest_file` exists and is anchored to the target checkout.
 - `live_e2e_run_health_report_file` exists and separates run-health failures from outcome-quality assessment.
+- `compiled_context_budget_exceeded` is a run-health/provider-execution blocker, not an implementation-quality verdict. Do not prepare post-run quality assessment unless the declared full flow produced outcome artifacts.
 - Outcome quality follow-up comes from `live-e2e-quality-assessment-report`, not from the runner summary.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.
 - Guided proof execution starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; the target repository HEAD must remain unchanged and no remote write commands may be recorded unless an explicit future profile opts into network write-back.
