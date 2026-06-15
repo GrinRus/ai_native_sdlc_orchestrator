@@ -635,7 +635,30 @@ node ./scripts/live-e2e/quality-assessment.mjs validate \
   --assessment-report-file <live_e2e_quality_assessment_report_file>
 ```
 
+For strict fix-and-rerun quality closure, run the separate all-pass gate after
+validation:
+
+```bash
+node ./scripts/live-e2e/quality-assessment.mjs gate \
+  --policy all-pass \
+  --assessment-report-file <live_e2e_quality_assessment_report_file>
+```
+
+The gate fails on any `warn`, `fail`, `not_evaluated`, `weak`, `missing`,
+blocking/high/critical/major finding, missing local evidence ref, or missing
+meaningful target changed path. The gate does not change run-health,
+qualification, or acceptance accounting; it only decides whether the local
+quality-driven rerun loop may stop.
+
 The assessment report is advisory outcome quality evidence. It must cover artifact content, implementation correctness/completeness, maintainability, tests, security, performance risk, verification quality, delivery safety, AOR operator UI/UX, AOR operator accessibility, evidence strength, and acceptance criteria traceability. Every dimension records `status`, `evidence_strength`, inspected refs, findings, and follow-ups. The AOR operator UI/UX dimensions also record required subdimensions for task success, flow navigation, next actions, blockers, recovery, state feedback, visual responsiveness, raw JSON independence, keyboard navigation, focus, contrast/readability, semantic structure, screen-reader labels, and accessible error feedback. Missing or weak signals must stay visible in `gap_report`.
+
+Headless full-journey profiles normally do not produce AOR operator UI/UX or
+accessibility evidence. When strict quality closure needs those dimensions, run
+the matching guided installed-user proof for the same AOR commit and pass that
+guided run summary to `quality-assessment prepare` with
+`--paired-aor-operator-ui-run-summary-file`. This paired evidence may be used
+only for AOR operator UI/UX and accessibility; target repository UI remains part
+of implementation and verification evidence when the mission requires it.
 
 ## Operator checks
 - Summary and scorecard files exist under `.aor/projects/<project_id>/reports/`.

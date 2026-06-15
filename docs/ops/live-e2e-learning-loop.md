@@ -43,6 +43,21 @@ Confirm:
 - incident report (if present) links back to `linked_run_refs` and `linked_asset_refs`;
 - handoff file preserves backlog and quality references.
 
+When the run is part of a strict quality-driven closure loop, validate the
+assessment and run the all-pass gate separately:
+
+```bash
+node ./scripts/live-e2e/quality-assessment.mjs validate \
+  --assessment-report-file <live-e2e-quality-assessment-report>
+
+node ./scripts/live-e2e/quality-assessment.mjs gate \
+  --policy all-pass \
+  --assessment-report-file <live-e2e-quality-assessment-report>
+```
+
+All-pass failures become backlog/fix-and-rerun findings. They must not mutate
+the factual run-health report or provider qualification matrix.
+
 ## 4. Move findings into planning
 Use `learning_loop_handoff_file` plus validated quality assessment findings as
 the source for outcome planning updates:
@@ -61,6 +76,7 @@ A run is learning-loop complete when:
 - incident linkage is complete when incident exists;
 - run-health follow-up is either resolved or intentionally parked;
 - quality assessment findings that affect outcome readiness are linked to backlog follow-up;
+- strict all-pass gate findings are resolved or intentionally parked when the run belongs to a quality-driven closure loop;
 - backlog follow-up entry is explicit and traceable to the run id.
 
 ## Governance closure evidence

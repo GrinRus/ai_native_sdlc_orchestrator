@@ -1979,6 +1979,38 @@ export function writeProofRunnerArtifacts(options) {
       typeof options.flowResult.artifacts.generated_project_profile_file === "string"
         ? options.flowResult.artifacts.generated_project_profile_file
         : null,
+    feature_request_file:
+      typeof options.flowResult.artifacts.feature_request_file === "string"
+        ? options.flowResult.artifacts.feature_request_file
+        : null,
+    intake_artifact_packet_file:
+      typeof options.flowResult.artifacts.intake_artifact_packet_file === "string"
+        ? options.flowResult.artifacts.intake_artifact_packet_file
+        : null,
+    intake_artifact_packet_body_file:
+      typeof options.flowResult.artifacts.intake_artifact_packet_body_file === "string"
+        ? options.flowResult.artifacts.intake_artifact_packet_body_file
+        : null,
+    discovery_analysis_report_file:
+      typeof options.flowResult.artifacts.discovery_analysis_report_file === "string"
+        ? options.flowResult.artifacts.discovery_analysis_report_file
+        : null,
+    spec_step_result_file:
+      typeof options.flowResult.artifacts.spec_step_result_file === "string"
+        ? options.flowResult.artifacts.spec_step_result_file
+        : null,
+    approved_handoff_packet_file:
+      typeof options.flowResult.artifacts.approved_handoff_packet_file === "string"
+        ? options.flowResult.artifacts.approved_handoff_packet_file
+        : null,
+    handoff_packet_file:
+      typeof options.flowResult.artifacts.handoff_packet_file === "string"
+        ? options.flowResult.artifacts.handoff_packet_file
+        : null,
+    execution_readiness_file:
+      typeof options.flowResult.artifacts.execution_readiness_file === "string"
+        ? options.flowResult.artifacts.execution_readiness_file
+        : null,
     routed_step_result_file:
       typeof options.flowResult.artifacts.routed_step_result_file === "string"
         ? options.flowResult.artifacts.routed_step_result_file
@@ -2100,6 +2132,10 @@ export function writeProofRunnerArtifacts(options) {
       productionProof?.evidence_refs?.delivery_manifest_file ??
       asNonEmptyString(options.flowResult.artifacts.delivery_manifest_file) ??
       null,
+    delivery_plan_file: asNonEmptyString(options.flowResult.artifacts.delivery_plan_file) || null,
+    release_packet_file: asNonEmptyString(options.flowResult.artifacts.release_packet_file) || null,
+    learning_loop_scorecard_file: asNonEmptyString(options.flowResult.artifacts.learning_loop_scorecard_file) || null,
+    learning_loop_handoff_file: asNonEmptyString(options.flowResult.artifacts.learning_loop_handoff_file) || null,
     review_report_file:
       productionProof?.evidence_refs?.review_report_file ??
       asNonEmptyString(options.flowResult.artifacts.review_report_file) ??

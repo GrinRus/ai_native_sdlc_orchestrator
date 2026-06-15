@@ -70,6 +70,8 @@ const FINDING_TAXONOMY = Object.freeze([
 
 const ASSESSABLE_RUN_HEALTH_STATUSES = Object.freeze(["pass", "warn"]);
 const ASSESSABLE_OBSERVATION_STATUSES = Object.freeze(["pass", "warn"]);
+const ALL_PASS_ALLOWED_EVIDENCE_STRENGTHS = Object.freeze(["medium", "strong"]);
+const BLOCKING_FINDING_SEVERITIES = Object.freeze(["blocker", "critical", "high", "major"]);
 
 const DIMENSION_RUBRIC = Object.freeze({
   artifact_content_quality: [
@@ -228,6 +230,27 @@ const EVIDENCE_GROUP_FIELDS = Object.freeze({
   ],
 });
 
+const ACCEPTANCE_REF_PATTERNS = Object.freeze([
+  /feature-request-/iu,
+  /intake.*artifact.*packet/iu,
+  /artifact-packet/iu,
+  /project-analysis-report/iu,
+  /discovery/iu,
+  /spec/iu,
+  /handoff/iu,
+  /execution-readiness/iu,
+]);
+
+const AOR_OPERATOR_UI_REF_PATTERNS = Object.freeze([
+  /guided-web/iu,
+  /web-smoke/iu,
+  /browser-task-proof/iu,
+  /accessibility/iu,
+  /visual-guardrail/iu,
+  /dom-snapshot/iu,
+  /screenshot/iu,
+]);
+
 /**
  * @param {string} filePath
  * @returns {Record<string, unknown>}
@@ -311,6 +334,15 @@ function collectFrontendRefs(observationReport) {
 }
 
 /**
+ * @param {string[]} refs
+ * @param {RegExp[]} patterns
+ * @returns {string[]}
+ */
+function filterRefsByPatterns(refs, patterns) {
+  return uniqueStrings(refs.filter((ref) => patterns.some((pattern) => pattern.test(ref))));
+}
+
+/**
  * @param {{ runSummaryFile: string, runSummary: Record<string, unknown>, observationReport: Record<string, unknown>, runHealthReport: Record<string, unknown> }} options
  */
 function buildEvidenceGroups(options) {
@@ -321,6 +353,10 @@ function buildEvidenceGroups(options) {
   const groups = Object.fromEntries(
     Object.entries(EVIDENCE_GROUP_FIELDS).map(([group, fields]) => [group, collectNamedRefs(seededSummary, fields)]),
   );
+  const allRefs = [];
+  collectRefsDeep(options.runSummary, allRefs);
+  collectRefsDeep(options.observationReport, allRefs);
+  collectRefsDeep(options.runHealthReport, allRefs);
   groups.run_facts = uniqueStrings([
     ...groups.run_facts,
     asNonEmptyString(options.runSummary.live_e2e_observation_report_file),
@@ -330,14 +366,69 @@ function buildEvidenceGroups(options) {
   groups.aor_operator_ui = uniqueStrings([
     ...groups.aor_operator_ui,
     ...collectFrontendRefs(options.observationReport),
+    ...filterRefsByPatterns(allRefs, AOR_OPERATOR_UI_REF_PATTERNS),
   ]);
-  const allRefs = [];
-  collectRefsDeep(options.runSummary, allRefs);
-  collectRefsDeep(options.observationReport, allRefs);
-  collectRefsDeep(options.runHealthReport, allRefs);
+  groups.acceptance_kpi_dod = uniqueStrings([
+    ...groups.acceptance_kpi_dod,
+    ...filterRefsByPatterns(allRefs, ACCEPTANCE_REF_PATTERNS),
+  ]);
   return {
     ...groups,
     all_known_refs: uniqueStrings([options.runSummaryFile, ...Object.values(groups).flat(), ...allRefs]),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} request
+ * @param {string | null} pairedRunSummaryFile
+ * @param {string} baseDir
+ */
+function attachPairedAorOperatorUiEvidence(request, pairedRunSummaryFile, baseDir) {
+  if (!pairedRunSummaryFile) return;
+  const resolvedPairedSummary = path.resolve(baseDir, pairedRunSummaryFile);
+  if (!fs.existsSync(resolvedPairedSummary)) {
+    throw new UsageError(`Paired AOR operator UI run summary file '${resolvedPairedSummary}' was not found.`);
+  }
+  const pairedRunSummary = asRecord(readJson(resolvedPairedSummary));
+  const pairedObservationFile = asNonEmptyString(pairedRunSummary.live_e2e_observation_report_file);
+  const pairedRunHealthFile =
+    asNonEmptyString(pairedRunSummary.live_e2e_run_health_report_file) ||
+    asNonEmptyString(pairedRunSummary.run_health_report_file);
+  const pairedObservationReport =
+    pairedObservationFile && fs.existsSync(resolveLocalEvidenceRef(pairedObservationFile, path.dirname(resolvedPairedSummary)) ?? "")
+      ? readDocument(resolveLocalEvidenceRef(pairedObservationFile, path.dirname(resolvedPairedSummary)) ?? pairedObservationFile)
+      : {};
+  const pairedRunHealthReport =
+    pairedRunHealthFile && fs.existsSync(resolveLocalEvidenceRef(pairedRunHealthFile, path.dirname(resolvedPairedSummary)) ?? "")
+      ? readDocument(resolveLocalEvidenceRef(pairedRunHealthFile, path.dirname(resolvedPairedSummary)) ?? pairedRunHealthFile)
+      : {};
+  const pairedGroups = buildEvidenceGroups({
+    runSummaryFile: resolvedPairedSummary,
+    runSummary: pairedRunSummary,
+    observationReport: pairedObservationReport,
+    runHealthReport: pairedRunHealthReport,
+  });
+  const evidenceRefs = asRecord(request.evidence_refs);
+  evidenceRefs.paired_aor_operator_ui = uniqueStrings([
+    resolvedPairedSummary,
+    pairedObservationFile,
+    pairedRunHealthFile,
+    ...asStringArray(pairedGroups.aor_operator_ui),
+  ]);
+  evidenceRefs.aor_operator_ui = uniqueStrings([
+    ...asStringArray(evidenceRefs.aor_operator_ui),
+    ...asStringArray(evidenceRefs.paired_aor_operator_ui),
+  ]);
+  evidenceRefs.all_known_refs = uniqueStrings([
+    ...asStringArray(evidenceRefs.all_known_refs),
+    ...asStringArray(pairedGroups.all_known_refs),
+  ]);
+  request.evidence_refs = evidenceRefs;
+  request.paired_aor_operator_ui_proof = {
+    source_run_summary_file: resolvedPairedSummary,
+    source_observation_report_file: pairedObservationFile || null,
+    source_run_health_report_file: pairedRunHealthFile || null,
+    usage: "AOR operator UI/UX and accessibility evidence may be reused when it was produced for the same AOR commit because these dimensions assess the AOR operator experience, not the target repository UI.",
   };
 }
 
@@ -466,6 +557,10 @@ function prepareCli(rawArgs) {
     throw new UsageError(`Run summary file '${runSummaryFile}' was not found.`);
   }
   const runSummary = asRecord(readJson(runSummaryFile));
+  const pairedAorOperatorUiRunSummaryFile = resolveOptionalStringFlag(
+    flags["paired-aor-operator-ui-run-summary-file"],
+    "paired-aor-operator-ui-run-summary-file",
+  );
   const runId = asNonEmptyString(runSummary.run_id) || "live-e2e-run";
   const profileId = asNonEmptyString(runSummary.profile_id) || null;
   const baseDir = path.dirname(runSummaryFile);
@@ -546,6 +641,8 @@ function prepareCli(rawArgs) {
       "Do not use checked-repository frontend behavior as live E2E AOR operator UI/UX evidence; repository frontend work belongs under implementation and verification dimensions when the mission requires it.",
       "Treat aor app --smoke as a render guardrail, not UX proof.",
       "Treat AOR operator UI/UX as strong only when browser/task inspection or explicit SWE inspection cites concrete evidence refs.",
+      "For all-pass policy, security_review and performance_regression_risk must be evaluated with pass status and medium or strong evidence.",
+      "For all-pass policy, AOR operator UI/UX and accessibility may cite a paired guided AOR operator proof from the same AOR commit because those dimensions assess AOR itself, not the target repository UI.",
     ],
     evidence_refs: buildEvidenceGroups({
       runSummaryFile,
@@ -560,6 +657,7 @@ function prepareCli(rawArgs) {
       "Call out dimensions that were not checked, checked with weak signal, or confirmed by strong evidence.",
     ],
   };
+  attachPairedAorOperatorUiEvidence(request, pairedAorOperatorUiRunSummaryFile, path.dirname(runSummaryFile));
   writeJson(requestFile, request);
   process.stdout.write(
     `${JSON.stringify(
@@ -575,6 +673,109 @@ function prepareCli(rawArgs) {
     )}\n`,
   );
   return 0;
+}
+
+/**
+ * @param {Record<string, unknown>} assessment
+ * @param {string} baseDir
+ * @returns {{ ok: boolean, issues: Array<{ code: string, field: string, message: string }> }}
+ */
+function evaluateAllPassGate(assessment, baseDir) {
+  const issues = [];
+  const dimensions = asRecord(assessment.dimensions);
+  if (assessment.overall_status !== "pass") {
+    issues.push({
+      code: "overall_status_not_pass",
+      field: "overall_status",
+      message: `All-pass policy requires overall_status=pass, got '${String(assessment.overall_status)}'.`,
+    });
+  }
+  for (const dimensionKey of REQUIRED_DIMENSIONS) {
+    const dimension = asRecord(dimensions[dimensionKey]);
+    if (dimension.status !== "pass") {
+      issues.push({
+        code: "dimension_status_not_pass",
+        field: `dimensions.${dimensionKey}.status`,
+        message: `All-pass policy requires dimension '${dimensionKey}' to have status=pass.`,
+      });
+    }
+    if (!ALL_PASS_ALLOWED_EVIDENCE_STRENGTHS.includes(asNonEmptyString(dimension.evidence_strength))) {
+      issues.push({
+        code: "dimension_evidence_strength_too_weak",
+        field: `dimensions.${dimensionKey}.evidence_strength`,
+        message: `All-pass policy requires dimension '${dimensionKey}' evidence_strength to be medium or strong.`,
+      });
+    }
+    for (const [subdimensionKey, subdimension] of Object.entries(asRecord(dimension.subdimensions))) {
+      const record = asRecord(subdimension);
+      if (record.status !== "pass") {
+        issues.push({
+          code: "subdimension_status_not_pass",
+          field: `dimensions.${dimensionKey}.subdimensions.${subdimensionKey}.status`,
+          message: `All-pass policy requires AOR operator subdimension '${subdimensionKey}' to have status=pass.`,
+        });
+      }
+      if (!ALL_PASS_ALLOWED_EVIDENCE_STRENGTHS.includes(asNonEmptyString(record.evidence_strength))) {
+        issues.push({
+          code: "subdimension_evidence_strength_too_weak",
+          field: `dimensions.${dimensionKey}.subdimensions.${subdimensionKey}.evidence_strength`,
+          message: `All-pass policy requires AOR operator subdimension '${subdimensionKey}' evidence_strength to be medium or strong.`,
+        });
+      }
+    }
+  }
+  const gapReport = asRecord(assessment.gap_report);
+  for (const field of ["not_evaluated_dimensions", "weak_signal_dimensions"]) {
+    const values = asStringArray(gapReport[field]);
+    if (values.length > 0) {
+      issues.push({
+        code: "gap_report_not_empty",
+        field: `gap_report.${field}`,
+        message: `All-pass policy requires '${field}' to be empty, got ${values.join(", ")}.`,
+      });
+    }
+  }
+  const dimensionFindings = Object.values(dimensions).flatMap((dimension) => {
+    const findings = asRecord(dimension).findings;
+    return Array.isArray(findings) ? findings : [];
+  });
+  const subdimensionFindings = Object.values(dimensions).flatMap((dimension) =>
+    Object.values(asRecord(asRecord(dimension).subdimensions)).flatMap((subdimension) => {
+      const findings = asRecord(subdimension).findings;
+      return Array.isArray(findings) ? findings : [];
+    }),
+  );
+  for (const [field, value] of [
+    ["findings", assessment.findings],
+    ["dimension_findings", dimensionFindings],
+    ["subdimension_findings", subdimensionFindings],
+  ]) {
+    for (const [index, finding] of (Array.isArray(value) ? value : []).entries()) {
+      const severity = asNonEmptyString(asRecord(finding).severity).toLowerCase();
+      if (BLOCKING_FINDING_SEVERITIES.includes(severity)) {
+        issues.push({
+          code: "blocking_finding_present",
+          field: `${field}[${index}].severity`,
+          message: `All-pass policy rejects finding severity '${severity}'.`,
+        });
+      }
+    }
+  }
+  const sourceRunSummaryFile = asNonEmptyString(assessment.source_run_summary_file);
+  const resolvedSummaryFile = sourceRunSummaryFile ? resolveLocalEvidenceRef(sourceRunSummaryFile, baseDir) : null;
+  if (resolvedSummaryFile && fs.existsSync(resolvedSummaryFile)) {
+    const runSummary = asRecord(readJson(resolvedSummaryFile));
+    const meaningfulChangedPaths = asStringArray(runSummary.meaningful_changed_paths);
+    const targetChangedPaths = meaningfulChangedPaths.filter((entry) => !entry.startsWith(".aor/"));
+    if (targetChangedPaths.length === 0) {
+      issues.push({
+        code: "meaningful_target_change_missing",
+        field: "source_run_summary_file.meaningful_changed_paths",
+        message: "All-pass policy requires at least one meaningful target changed path outside .aor/.",
+      });
+    }
+  }
+  return { ok: issues.length === 0, issues };
 }
 
 /**
@@ -622,14 +823,65 @@ function validateCli(rawArgs) {
 /**
  * @param {string[]} rawArgs
  */
+function gateCli(rawArgs) {
+  const flags = parseFlags(rawArgs);
+  const policy = resolveOptionalStringFlag(flags.policy, "policy") ?? "all-pass";
+  if (policy !== "all-pass") {
+    throw new UsageError("Flag '--policy' must be 'all-pass'.");
+  }
+  const assessmentReportFile = path.resolve(
+    resolveOptionalStringFlag(flags["assessment-report-file"], "assessment-report-file") ??
+      (() => {
+        throw new UsageError("Flag '--assessment-report-file' is required.");
+      })(),
+  );
+  if (!fs.existsSync(assessmentReportFile)) {
+    throw new UsageError(`Assessment report file '${assessmentReportFile}' was not found.`);
+  }
+  const assessment = readDocument(assessmentReportFile);
+  const validation = validateContractDocument({
+    family: "live-e2e-quality-assessment-report",
+    document: assessment,
+    source: assessmentReportFile,
+  });
+  const refValidation = validateLocalRefs(assessment, path.dirname(assessmentReportFile));
+  const gate = evaluateAllPassGate(assessment, path.dirname(assessmentReportFile));
+  const ok = validation.ok && refValidation.missing.length === 0 && gate.ok;
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        command: "scripts live-e2e quality-assessment gate",
+        status: ok ? "ok" : "fail",
+        policy,
+        assessment_report_file: assessmentReportFile,
+        contract_validation_ok: validation.ok,
+        contract_issue_count: validation.issues.length,
+        contract_issues: validation.issues,
+        checked_local_ref_count: refValidation.checked.length,
+        skipped_external_ref_count: refValidation.skipped.length,
+        missing_local_refs: refValidation.missing,
+        gate_issue_count: gate.issues.length,
+        gate_issues: gate.issues,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  return ok ? 0 : 1;
+}
+
+/**
+ * @param {string[]} rawArgs
+ */
 function runCli(rawArgs) {
   if (rawArgs.includes("--help") || rawArgs.includes("-h") || rawArgs.length === 0) {
     process.stdout.write(
       [
         "Usage: node ./scripts/live-e2e/quality-assessment.mjs prepare --run-summary-file <file>",
         "       node ./scripts/live-e2e/quality-assessment.mjs validate --assessment-report-file <file>",
+        "       node ./scripts/live-e2e/quality-assessment.mjs gate --policy all-pass --assessment-report-file <file>",
         "",
-        "Prepares and validates post-run outcome quality assessment artifacts without changing run-health or qualification status.",
+        "Prepares, validates, and gates post-run outcome quality assessment artifacts without changing run-health or qualification status.",
       ].join("\n"),
     );
     return 0;
@@ -637,6 +889,7 @@ function runCli(rawArgs) {
   const [command, ...rest] = rawArgs;
   if (command === "prepare") return prepareCli(rest);
   if (command === "validate") return validateCli(rest);
+  if (command === "gate") return gateCli(rest);
   throw new UsageError(`Unknown quality-assessment command '${command}'.`);
 }
 

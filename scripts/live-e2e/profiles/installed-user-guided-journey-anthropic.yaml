@@ -1,0 +1,128 @@
+profile_id: live-e2e.installed-user.guided-journey.anthropic
+version: 1
+journey_mode: full-journey
+flow_kind: guided-regress
+duration_class: long
+live_e2e:
+  flow_range_policy: full_lifecycle
+  installation_policy: source-install-required
+  interaction_capability: public-control-plane
+  frontend_capability: browser-task-proof
+  safety_policy: no-upstream-write
+  operator_mode: skill-agent
+  agent_decision_policy: required
+  interaction_answer_policy: agent-required
+  target_write_policy: aor-runtime-only-before-execution
+  target_checkout_root_mode: short-physical
+  provider_step_timeouts_sec:
+    implement: 3600
+    repair: 3600
+    review: 3600
+    qa: 3600
+implementation_loop:
+  enabled: true
+  max_iterations: 3
+  review_repair_actions:
+    - request-repair
+    - failed-quality-findings
+  stop_on_blocking_review: true
+target_catalog_id: ky
+feature_mission_id: ky-header-regression
+scenario_family: regress
+provider_variant_id: anthropic-primary
+bootstrap_template: github-default
+guided_journey:
+  enabled: true
+  starts_from_first_run: true
+  web_smoke:
+    enabled: true
+    operator_request_controls: true
+  proof_requirements:
+    - cli-transcripts
+    - web-smoke
+    - browser-task-proof
+    - flow-loop-proof
+    - flow-targeted-operator-request
+    - operator-request-no-write-analysis
+    - operator-request-patch-only-document-proposal
+    - interaction-inbox-answer-audit
+    - durable-packets-and-reports
+    - quality-assessment-report
+    - no-upstream-write-assertions
+  flow_loop_proof:
+    enabled: true
+    create_follow_up_from_learning: true
+    create_targeted_operator_request: true
+    required_fields:
+      - first_flow_id
+      - first_flow_status
+      - completed_flow_read_only
+      - second_flow_id
+      - follow_up_source_handoff_ref
+      - new_flow_mission_artifact_packet_file
+      - new_flow_next_action_report_file
+      - operator_request.target_flow_id
+  browser_task_proof:
+    required: true
+    required_evidence:
+      - rendered-html
+      - dom-snapshot
+      - accessibility-summary
+      - screenshot-or-visual-guardrail
+      - aor-operator-task-success
+      - aor-flow-navigation-and-next-action-clarity
+      - aor-blocker-error-recovery-state-feedback
+      - aor-visual-stability-and-responsiveness
+      - aor-accessibility-findings
+      - browser-task-proof
+operator_requests:
+  enabled: true
+  default_delivery_mode: no-write
+  scenarios:
+    - id: no-write-analysis
+      source_surface: cli
+      stage: discovery
+      intent: analyze
+      target_step: planning
+    - id: patch-only-document-proposal
+      source_surface: web
+      stage: review
+      intent: revise-document
+      target_step: review
+      delivery_mode: patch-only
+      allowed_paths:
+        - docs/**
+runtime:
+  mode: ephemeral
+  runtime_root: .aor
+  persist_workspace: false
+stages:
+  - bootstrap
+  - discovery
+  - spec
+  - planning
+  - handoff
+  - execution
+  - review
+  - qa
+  - delivery
+  - release
+  - learning
+verification:
+  build: true
+  lint: true
+  tests: project-default
+  eval_suites:
+    - suite.regress.short@v1
+  harness:
+    enabled: false
+output_policy:
+  materialize_release_packet: true
+  write_back_to_remote: false
+  preferred_delivery_mode: patch-only
+learning_loop:
+  backlog_refs:
+    - docs/backlog/mvp-implementation-backlog.md
+    - docs/backlog/mvp-roadmap.md
+    - docs/ops/live-e2e-standard-runner.md
+    - docs/ops/installed-user-first-run.md

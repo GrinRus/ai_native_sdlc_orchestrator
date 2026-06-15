@@ -47,6 +47,12 @@ UI/UX quality, accessibility quality, or the advisory
 `live-e2e-quality-assessment-report` to decide whether a provider path is
 qualified.
 
+Strict quality-driven fix-and-rerun work may additionally run
+`quality-assessment.mjs gate --policy all-pass` after a completed flow. That
+gate is a local outcome-quality closure check. It can create follow-up work and
+force a local rerun loop, but it does not change provider qualification status,
+release-blocking policy, or run-health owner/phase/class classification.
+
 ## Status rules
 
 - `qualified`: at least one accepted live E2E attempt satisfies the matrix cell's

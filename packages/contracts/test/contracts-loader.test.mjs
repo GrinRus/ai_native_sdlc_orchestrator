@@ -1254,6 +1254,16 @@ test("live E2E quality assessment report enforces dimensions and evidence gaps",
   const loaded = loadContractFile({ filePath: source, family: "live-e2e-quality-assessment-report" });
   assert.equal(loaded.ok, true, "expected live-e2e-quality-assessment-report sample to load");
 
+  const allPassSource = path.join(
+    workspaceRoot,
+    "examples/reports/live-e2e-quality-assessment-report.all-pass.sample.yaml",
+  );
+  const allPassLoaded = loadContractFile({
+    filePath: allPassSource,
+    family: "live-e2e-quality-assessment-report",
+  });
+  assert.equal(allPassLoaded.ok, true, "expected all-pass live-e2e-quality-assessment-report sample to load");
+
   const missingDimensionCandidate = structuredClone(loaded.document);
   delete missingDimensionCandidate.dimensions.security_review;
 

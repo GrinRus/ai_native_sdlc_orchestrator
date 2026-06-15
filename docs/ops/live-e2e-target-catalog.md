@@ -61,6 +61,8 @@ For canonical setup and verification dependency details per profile, use `docs/o
     - `full-journey-governance-ky-large-codex.yaml` (`governance/large/openai-primary`, codex-cli)
     - `full-journey-governance-ky-large-anthropic.yaml` (`governance/large/anthropic-primary`)
   - installed-user browser-task candidate:
+    - `installed-user-guided-journey.yaml` (`regress/small/openai-primary`)
+    - `installed-user-guided-journey-anthropic.yaml` (`regress/small/anthropic-primary`)
     - `installed-user-guided-journey-qwen.yaml` (`regress/small/qwen-primary`, extended)
   - manual-only xlarge profiles:
     - `manual-xlarge-governance-ky-openai.yaml` (`governance/xlarge/openai-primary`)
@@ -424,6 +426,10 @@ Feature-size taxonomy:
 - `large`: cross-package or release/governance lineage with broader artifact expectations.
 - `xlarge`: manual or overnight rehearsal only; do not add xlarge cells to required coverage or qualification sets. Legacy `xl` inputs are accepted as `xlarge`, but new catalog entries must use `xlarge`.
 
+Strict all-pass quality loops may include xlarge as manual observation evidence,
+but xlarge still cannot close required provider qualification or acceptance
+matrix coverage.
+
 Run-tier taxonomy:
 - `readme-smoke`: README-led no-write installed-user path.
 - `bounded-live`: fast fail-closed provider proof.
@@ -435,6 +441,9 @@ Required matrix closure rule:
 - required coverage can close only for `run_tier=acceptance` or `run_tier=production-proof` with `live-e2e-run-health-report.overall_status=pass`;
 - run-health findings identify why a run attempt did not qualify;
 - outcome quality findings belong in `live-e2e-quality-assessment-report` and are advisory for acceptance follow-up, not provider qualification status.
+- local quality-driven rerun loops may additionally require
+  `quality-assessment gate --policy all-pass`; that gate remains separate from
+  run-health and qualification accounting.
 
 Canonical matrix-cell examples:
 - `small/regress/openai-primary`: `full-journey-regress-ky-small-codex.yaml`

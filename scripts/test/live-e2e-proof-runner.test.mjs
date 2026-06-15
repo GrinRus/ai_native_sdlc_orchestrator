@@ -736,40 +736,57 @@ test("HTTPie medium catalog mission declares bounded machine-readable path and w
   );
 });
 
-test("generated live E2E profile allows the selected candidate provider adapter", () => {
+test("generated live E2E profile allows selected guided provider adapters", () => {
   withTempRoot((tempRoot) => {
-    const generatedAssetsRoot = path.join(tempRoot, "assets");
-    fs.mkdirSync(generatedAssetsRoot, { recursive: true });
-
-    const result = materializeGeneratedProjectProfile({
-      hostRoot: repoRoot,
-      profilePath: path.join(repoRoot, "scripts/live-e2e/profiles/installed-user-guided-journey-qwen.yaml"),
-      profile: {
-        runtime: { mode: "ephemeral" },
-        output_policy: { preferred_delivery_mode: "patch-only" },
-        verification: {},
-      },
-      catalogEntry: { verification: {} },
-      providerVariant: {
+    const cases = [
+      {
+        profilePath: path.join(repoRoot, "scripts/live-e2e/profiles/installed-user-guided-journey-qwen.yaml"),
         provider: "qwen",
-        primary_adapter: "qwen-code",
+        adapter: "qwen-code",
+        runId: "qwen-provider-allowlist",
       },
-      runId: "qwen-provider-allowlist",
-      targetCheckout: {
-        targetRepoId: "ky",
-        targetRepoRef: "main",
+      {
+        profilePath: path.join(repoRoot, "scripts/live-e2e/profiles/installed-user-guided-journey-anthropic.yaml"),
+        provider: "anthropic",
+        adapter: "claude-code",
+        runId: "anthropic-provider-allowlist",
       },
-      generatedAssetsRoot,
-    });
+    ];
 
-    const loaded = loadContractFile({
-      filePath: result.generatedProjectProfileFile,
-      family: "project-profile",
-    });
-    assert.equal(loaded.ok, true);
-    assert.ok(loaded.document.allowed_providers.includes("qwen"));
-    assert.ok(loaded.document.allowed_adapters.includes("qwen-code"));
-    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
+    for (const current of cases) {
+      const generatedAssetsRoot = path.join(tempRoot, current.provider, "assets");
+      fs.mkdirSync(generatedAssetsRoot, { recursive: true });
+
+      const result = materializeGeneratedProjectProfile({
+        hostRoot: repoRoot,
+        profilePath: current.profilePath,
+        profile: {
+          runtime: { mode: "ephemeral" },
+          output_policy: { preferred_delivery_mode: "patch-only" },
+          verification: {},
+        },
+        catalogEntry: { verification: {} },
+        providerVariant: {
+          provider: current.provider,
+          primary_adapter: current.adapter,
+        },
+        runId: current.runId,
+        targetCheckout: {
+          targetRepoId: "ky",
+          targetRepoRef: "main",
+        },
+        generatedAssetsRoot,
+      });
+
+      const loaded = loadContractFile({
+        filePath: result.generatedProjectProfileFile,
+        family: "project-profile",
+      });
+      assert.equal(loaded.ok, true);
+      assert.ok(loaded.document.allowed_providers.includes(current.provider));
+      assert.ok(loaded.document.allowed_adapters.includes(current.adapter));
+      assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
+    }
   });
 });
 
@@ -1711,6 +1728,7 @@ test("manual live E2E exposes operator decisions and leaves outcome assessment p
   assert.equal(assessmentHelp.status, 0);
   assert.match(assessmentHelp.stdout, /quality-assessment\.mjs prepare/u);
   assert.match(assessmentHelp.stdout, /quality-assessment\.mjs validate/u);
+  assert.match(assessmentHelp.stdout, /quality-assessment\.mjs gate/u);
 });
 
 test("xlarge catalog profiles resolve as manual-only matrix cells", () => {

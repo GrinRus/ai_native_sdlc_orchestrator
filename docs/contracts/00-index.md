@@ -33,7 +33,7 @@
 - `compiled-context-artifact.md`
 - `operator-request.md`
 
-Compiled-context and external-runner contracts include context-budget evidence for live adapter-backed steps. Live E2E run-health consumes those facts as run-quality failures only; outcome quality remains in `live-e2e-quality-assessment-report`.
+Compiled-context and external-runner contracts include context-budget evidence for live adapter-backed steps. Live E2E run-health consumes those facts as run-quality failures only; outcome quality remains in `live-e2e-quality-assessment-report`. Strict local closure can additionally run the advisory all-pass quality gate, but that gate does not mutate run-health or provider qualification.
 
 ## Platform assets
 - `provider-route-profile.md`
