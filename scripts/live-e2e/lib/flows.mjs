@@ -128,7 +128,7 @@ function classifyProviderExecutionFailure(stepResult, adapterOutput) {
   const failureKind = asNonEmptyString(adapterOutput.failure_kind);
   const stepFailureClass = asNonEmptyString(stepResult.failure_class);
   const failureClass = failureKind || stepFailureClass;
-  if (!failureClass) {
+  if (!failureClass || ["none", "pass", "passed", "completed", "succeeded"].includes(failureClass)) {
     return null;
   }
   if (failureClass === "compiled_context_budget_exceeded") {

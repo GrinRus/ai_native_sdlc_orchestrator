@@ -1308,7 +1308,8 @@ function resolveSummaryRunTier(profile) {
  * @returns {boolean}
  */
 function commandCompletedForRunHealth(diagnostic) {
-  return asNonEmptyString(diagnostic.status) === "pass" || diagnostic.accepted_nonzero_payload === true;
+  return ["pass", "warn", "interaction_required", "resumed"].includes(asNonEmptyString(diagnostic.status)) ||
+    diagnostic.accepted_nonzero_payload === true;
 }
 
 /**
@@ -1325,7 +1326,11 @@ function buildCommandHealth(options) {
             .filter((entry) => asNonEmptyString(entry.transcript_ref))
             .map((entry) => ({
               command_surface: asNonEmptyString(entry.public_surface) || asNonEmptyString(entry.step_id) || "unknown",
-              status: asNonEmptyString(asRecord(entry.deterministic_analysis).status) === "pass" ? "pass" : "fail",
+              status: ["pass", "warn", "interaction_required", "resumed"].includes(
+                asNonEmptyString(asRecord(entry.deterministic_analysis).status),
+              )
+                ? asNonEmptyString(asRecord(entry.deterministic_analysis).status)
+                : "fail",
               exit_code:
                 typeof asRecord(entry.deterministic_analysis).exit_code === "number"
                   ? asRecord(entry.deterministic_analysis).exit_code
@@ -1524,9 +1529,11 @@ function buildResumeInteractionHealth(observationReport) {
  * @returns {Record<string, unknown>}
  */
 function resolveRunHealthFailure(options) {
-  const declaredOwner = asNonEmptyString(options.artifacts.failure_owner);
-  const declaredPhase = asNonEmptyString(options.artifacts.failure_phase);
-  const declaredClass = asNonEmptyString(options.artifacts.failure_class);
+  const rawDeclaredClass = asNonEmptyString(options.artifacts.failure_class);
+  const declaredClassIsNonFailure = ["none", "pass", "passed", "completed", "succeeded"].includes(rawDeclaredClass);
+  const declaredOwner = declaredClassIsNonFailure ? "" : asNonEmptyString(options.artifacts.failure_owner);
+  const declaredPhase = declaredClassIsNonFailure ? "" : asNonEmptyString(options.artifacts.failure_phase);
+  const declaredClass = declaredClassIsNonFailure ? "" : rawDeclaredClass;
   if (declaredOwner || declaredPhase || declaredClass) {
     if (declaredClass === "compiled_context_budget_exceeded") {
       return {

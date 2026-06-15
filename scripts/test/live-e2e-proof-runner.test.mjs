@@ -2930,6 +2930,200 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
   });
 });
 
+test("proof runner run-health ignores repaired review warnings and non-failure class none", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const runId = "run-health-repaired-review-warnings";
+    const baseSteps = ["discovery", "spec", "planning", "handoff", "execution", "qa", "delivery"];
+    const stepEntries = [
+      ...baseSteps.map((step) => ({ step, instance: step, iteration: 1, status: "pass" })),
+      { step: "review", instance: "review", iteration: 1, status: "pass" },
+      { step: "review", instance: "review#2", iteration: 2, status: "warn" },
+      { step: "review", instance: "review#3", iteration: 3, status: "pass" },
+    ].sort((left, right) => {
+      const order = ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"];
+      const stepOrder = order.indexOf(left.step) - order.indexOf(right.step);
+      return stepOrder === 0 ? left.iteration - right.iteration : stepOrder;
+    });
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "review-report.json",
+        "evaluation-report.json",
+        "delivery-manifest.json",
+        "post-run-verify-summary.json",
+        ...stepEntries.map((entry, index) => `${String(index + 1).padStart(2, "0")}-${entry.instance}.json`),
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      writeJsonFixture(file);
+    }
+    writeJsonFixture(files["post-run-verify-summary.json"], { status: "passed" });
+    writeJsonFixture(files["review-report.json"], { overall_status: "pass" });
+    writeJsonFixture(files["delivery-manifest.json"], {
+      repo_deliveries: [
+        {
+          repo_id: "ky",
+          changed_paths: ["source/core/Ky.ts", "test/retry.ts"],
+          writeback_result: "patch-materialized",
+          commit_refs: [],
+        },
+      ],
+    });
+
+    const stepJournal = stepEntries.map((entry, index) => {
+      const ref = files[`${String(index + 1).padStart(2, "0")}-${entry.instance}.json`];
+      return {
+        sequence: index + 1,
+        step_id: entry.step,
+        step_instance_id: entry.instance,
+        iteration: entry.iteration,
+        flow_stage: entry.step,
+        plan_ref: ref,
+        public_surface: `aor ${entry.step}`,
+        transcript_ref: ref,
+        execution_ref: ref,
+        inspection_ref: ref,
+        classification_ref: ref,
+        artifact_refs: [ref],
+        started_at: "2026-06-09T00:00:00.000Z",
+        finished_at: "2026-06-09T00:00:01.000Z",
+        duration_sec: 1,
+        deterministic_analysis: {
+          status: entry.status,
+          exit_code: 0,
+          failure_class: null,
+          missing_evidence: [],
+          recommendation: entry.status === "warn" ? "inspect stage evidence refs" : "continue",
+        },
+        semantic_analysis: {
+          status: entry.status,
+          judge_source: "skill-agent",
+          findings: [],
+        },
+        agent_decision_request_ref: ref,
+        operator_decision_ref: ref,
+        operator_decision_status: "accepted",
+        inspected_evidence_refs: [ref],
+        requested_interaction: null,
+        decision: {
+          action: entry.status === "warn" ? "retry_public_step" : "continue",
+          reason: "Accepted test evidence.",
+        },
+        resume_result: null,
+        frontend_interaction_refs: [],
+        final_step_verdict: entry.status,
+      };
+    });
+
+    writeJsonFixture(files["controller-state.json"], {
+      current_step: null,
+      completed_steps: stepEntries.map((entry) => entry.instance),
+      artifacts_snapshot: {
+        target_checkout_root: targetCheckoutRoot,
+        generated_project_profile_file: files["generated-project.aor.yaml"],
+        feature_request_file: files["feature-request.json"],
+        baseline_verify_summary_file: files["baseline-verify-summary.json"],
+        baseline_verify_status: "pass",
+        delivery_manifest_file: files["delivery-manifest.json"],
+        review_report_file: files["review-report.json"],
+        evaluation_report_file: files["evaluation-report.json"],
+        post_run_verify_summary_file: files["post-run-verify-summary.json"],
+        post_run_verify_status: "pass",
+        provider_execution_status: "completed",
+        failure_owner: "provider",
+        failure_phase: "provider_execution",
+        failure_class: "none",
+        real_code_change_status: "pass",
+        feature_mission_id: "ky-retry-hooks-governance",
+        feature_size: "large",
+      },
+    });
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.run-health-repaired-review-warnings",
+        journey_mode: "full-journey",
+        run_tier: "acceptance",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-retry-hooks-governance",
+        scenario_family: "governance",
+        provider_variant_id: "anthropic-primary",
+        stages: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"],
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "pass",
+        stageResults: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"].map((step) => ({
+          stage: step,
+          status: "pass",
+          evidence_refs: [files["delivery-manifest.json"]],
+          summary: `${step} passed.`,
+        })),
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: stepJournal,
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          failure_owner: "provider",
+          failure_phase: "provider_execution",
+          failure_class: "none",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.summary.status, "pass");
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "pass");
+    assert.equal(written.runHealthReport.overall_status, "pass");
+    assert.equal(written.runHealthReport.command_health.failed_command_count, 0);
+    assert.equal(written.runHealthReport.failure_summary.owner, null);
+    assert.equal(written.runHealthReport.failure_summary.class, null);
+  });
+});
+
 test("proof runner does not report delivery path omissions before manifest exists", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
