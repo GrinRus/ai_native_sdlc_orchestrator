@@ -75,6 +75,14 @@ When Runtime Harness detects a strict code-changing no-op after provider executi
 
 `target_environment_health` should include target setup and target verification facts, without converting target repository failures into provider or AOR product failures.
 
+When baseline target verification passed but post-run target verification fails after provider execution, run-health must preserve the later post-run fact:
+- `target_environment_health.target_verification_status: fail`
+- `failure_summary.owner: target_repository`
+- `failure_summary.phase: target_verification`
+- `failure_summary.class: target_verification_failed`
+
+This is still factual run-health classification. It does not evaluate whether the implementation idea was semantically good; the incomplete run must stop at run-health and must not produce an outcome quality assessment request.
+
 `evidence_health` should include missing evidence refs, weak evidence refs, and evidence ref counts.
 
 `resume_interaction_health` should include pending interactions, pending decisions, resume failures, and answer audit gaps.

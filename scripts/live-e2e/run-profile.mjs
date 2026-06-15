@@ -1436,22 +1436,31 @@ function buildTargetEnvironmentHealth(artifacts) {
   const targetSetupStatus = asRecord(artifacts.target_setup_status);
   const targetVerificationStatus = asRecord(artifacts.target_verification_status_detail);
   const setupStatus = asNonEmptyString(targetSetupStatus.status) || "not_attempted";
+  const postRunVerificationStatus = asNonEmptyString(artifacts.post_run_verify_status);
   const verificationStatus =
+    postRunVerificationStatus ||
     asNonEmptyString(targetVerificationStatus.status) ||
-    asNonEmptyString(artifacts.post_run_verify_status) ||
     "not_attempted";
   const status = [setupStatus, verificationStatus].includes("fail")
     ? "fail"
     : [setupStatus, verificationStatus].includes("blocked")
       ? "blocked"
       : "pass";
+  const inferredFailurePhase =
+    status === "pass" ? null : setupStatus === "fail" || setupStatus === "blocked" ? "target_setup" : "target_verification";
+  const inferredFailureClass =
+    status === "pass"
+      ? null
+      : inferredFailurePhase === "target_setup"
+        ? "target_setup_failed"
+        : "target_verification_failed";
   return {
     status,
     target_setup_status: setupStatus,
     target_verification_status: verificationStatus,
     failure_owner: asNonEmptyString(artifacts.failure_owner) || null,
-    failure_phase: asNonEmptyString(artifacts.failure_phase) || null,
-    failure_class: asNonEmptyString(artifacts.failure_class) || null,
+    failure_phase: asNonEmptyString(artifacts.failure_phase) || inferredFailurePhase,
+    failure_class: asNonEmptyString(artifacts.failure_class) || inferredFailureClass,
   };
 }
 
@@ -1590,14 +1599,6 @@ function resolveRunHealthFailure(options) {
       summary: "Run has pending or failed interaction/resume evidence.",
     };
   }
-  if (asNonEmptyString(options.commandHealth.status) === "fail") {
-    return {
-      owner: "aor",
-      phase: "unknown",
-      class: "public_command_failed",
-      summary: "One or more public live E2E commands failed.",
-    };
-  }
   if (asNonEmptyString(options.providerHealth.status) !== "pass") {
     return {
       owner: "provider",
@@ -1607,14 +1608,25 @@ function resolveRunHealthFailure(options) {
     };
   }
   if (asNonEmptyString(options.targetEnvironmentHealth.status) !== "pass") {
+    const targetPhase = asNonEmptyString(options.targetEnvironmentHealth.failure_phase);
+    const targetClass = asNonEmptyString(options.targetEnvironmentHealth.failure_class);
     return {
       owner: "target_repository",
       phase:
-        asNonEmptyString(options.targetEnvironmentHealth.target_setup_status) === "fail"
+        targetPhase ||
+        (asNonEmptyString(options.targetEnvironmentHealth.target_setup_status) === "fail"
           ? "target_setup"
-          : "target_verification",
-      class: "target_environment_failed",
+          : "target_verification"),
+      class: targetClass || "target_environment_failed",
       summary: "Target setup or target verification failed during the run.",
+    };
+  }
+  if (asNonEmptyString(options.commandHealth.status) === "fail") {
+    return {
+      owner: "aor",
+      phase: "unknown",
+      class: "public_command_failed",
+      summary: "One or more public live E2E commands failed.",
     };
   }
   if (asNonEmptyString(options.evidenceHealth.status) !== "pass") {

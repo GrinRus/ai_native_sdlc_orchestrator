@@ -2437,6 +2437,190 @@ test("proof runner writes run-health reports for failed live E2E reports", () =>
   });
 });
 
+test("proof runner run-health prioritizes post-run target verification failure over public command aggregation", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "execution-transcript.json",
+        "post-run-verify-summary.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    const deliverySteps = ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"];
+    for (const step of deliverySteps) {
+      for (const field of ["plan", "execution", "inspection", "classification", "agent-request", "decision", "transcript"]) {
+        files[`${step}-${field}.json`] = path.join(reportsRoot, `${step}-${field}.json`);
+      }
+    }
+    for (const file of Object.values(files)) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+
+    const runId = "post-run-target-verification-failed-run-health";
+    const stepJournal = deliverySteps.map((step, index) => {
+      const executionStep = step === "execution";
+      return {
+        sequence: index + 1,
+        step_id: step,
+        step_instance_id: step,
+        iteration: 1,
+        flow_stage: step,
+        plan: {
+          objective: `Observe ${step}.`,
+          public_surface: executionStep ? "aor run start" : `aor ${step} run`,
+          command_labels: executionStep ? ["run-start", "project-verify-post-run-primary"] : [`${step}-run`],
+          expected_artifacts: [],
+          inspection_sources: ["command_transcript"],
+          safety_constraints: ["no-upstream-write"],
+        },
+        plan_ref: files[`${step}-plan.json`],
+        public_surface: executionStep ? "aor run start" : `aor ${step} run`,
+        transcript_ref: executionStep ? files["execution-transcript.json"] : files[`${step}-transcript.json`],
+        execution_ref: files[`${step}-execution.json`],
+        inspection_ref: files[`${step}-inspection.json`],
+        classification_ref: files[`${step}-classification.json`],
+        artifact_refs: executionStep
+          ? [files["execution-transcript.json"], files["post-run-verify-summary.json"]]
+          : [files[`${step}-transcript.json`]],
+        started_at: "2026-06-09T00:00:00.000Z",
+        finished_at: "2026-06-09T00:00:01.000Z",
+        duration_sec: 1,
+        deterministic_analysis: {
+          status: executionStep ? "not_pass" : "pass",
+          exit_code: 0,
+          failure_class: executionStep ? "post_run_verification_failed" : null,
+          missing_evidence: [],
+          recommendation: executionStep ? "diagnose" : "continue",
+        },
+        semantic_analysis: {
+          status: executionStep ? "blocked" : "pass",
+          judge_source: "skill-agent",
+          findings: executionStep ? ["Post-run target verification failed after provider execution."] : [],
+        },
+        agent_decision_request_ref: files[`${step}-agent-request.json`],
+        operator_decision_ref: files[`${step}-decision.json`],
+        operator_decision_status: "accepted",
+        inspected_evidence_refs: executionStep
+          ? [files["execution-transcript.json"], files["post-run-verify-summary.json"]]
+          : [files[`${step}-transcript.json`]],
+        requested_interaction: null,
+        decision: {
+          action: executionStep ? "block" : "continue",
+          reason: executionStep ? "Post-run target verification failed." : "Step evidence accepted.",
+        },
+        resume_result: null,
+        frontend_interaction_refs: [],
+        final_step_verdict: executionStep ? "blocked" : "pass",
+      };
+    });
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.post-run-target-verification-failed",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "release",
+        provider_variant_id: "openai-primary",
+        stages: ["bootstrap", "discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"],
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "blocked",
+        stageResults: [
+          {
+            stage: "execution",
+            status: "fail",
+            evidence_refs: [files["execution-transcript.json"], files["post-run-verify-summary.json"]],
+            summary: "Execution produced target changes, but post-run verification failed.",
+          },
+        ],
+        commandResults: [
+          {
+            label: "run-start",
+            command_surface: "aor run start",
+            status: "fail",
+            exit_code: 0,
+            transcript_file: files["execution-transcript.json"],
+            artifact_refs: [files["execution-transcript.json"], files["post-run-verify-summary.json"]],
+            summary: "execution",
+          },
+        ],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: stepJournal,
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "pass",
+          target_setup_status: { status: "pass" },
+          target_verification_status_detail: { status: "pass" },
+          post_run_verify_status: "fail",
+          post_run_verify_summary_file: files["post-run-verify-summary.json"],
+          provider_execution_status: "completed",
+          provider_step_status: { provider: "openai", adapter: "codex-cli", status: "completed" },
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "large",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.runHealthReport.overall_status, "blocked");
+    assert.equal(written.runHealthReport.target_environment_health.status, "fail");
+    assert.equal(written.runHealthReport.target_environment_health.target_verification_status, "fail");
+    assert.equal(written.runHealthReport.failure_summary.owner, "target_repository");
+    assert.equal(written.runHealthReport.failure_summary.phase, "target_verification");
+    assert.equal(written.runHealthReport.failure_summary.class, "target_verification_failed");
+    assert.equal(written.runHealthReport.command_health.failed_command_count, 1);
+  });
+});
+
 test("proof runner run-health classifies failed live adapter preflight readiness", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
