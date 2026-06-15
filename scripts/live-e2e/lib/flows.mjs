@@ -2134,7 +2134,7 @@ function changedPathMatchesRequiredPrefix(changedPath, prefix) {
  * @param {string | null | undefined} reportFile
  * @returns {string[]}
  */
-function collectRuntimeHarnessChangedPaths(reportFile) {
+export function collectRuntimeHarnessChangedPaths(reportFile) {
   const resolvedReportFile = asNonEmptyString(reportFile);
   if (!resolvedReportFile || !fileExists(resolvedReportFile)) {
     return [];

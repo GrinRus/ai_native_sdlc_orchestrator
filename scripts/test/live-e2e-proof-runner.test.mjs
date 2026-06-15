@@ -2929,6 +2929,7 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
         "delivery-manifest.json",
         "review-report.json",
         "evaluation-report.json",
+        "runtime-harness-report.json",
         "post-run-verify-summary.json",
         ...includedSteps.map((step) => `${step}-artifact.json`),
       ].map((name) => [name, path.join(reportsRoot, name)]),
@@ -2964,6 +2965,17 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
           changed_paths: ["httpie/manager/tasks/plugins.py", "tests/test_httpie_cli.py"],
           writeback_result: "patch-materialized",
           commit_refs: [],
+        },
+      ],
+    });
+    writeJsonFixture(files["runtime-harness-report.json"], {
+      overall_decision: "pass",
+      step_decisions: [
+        {
+          mission_semantics: {
+            meaningful_changed_paths: ["source/httpie/core.py", "tests/test_core.py"],
+            non_bootstrap_changed_paths: ["source/httpie/core.py", "tests/test_core.py"],
+          },
         },
       ],
     });
@@ -3033,8 +3045,7 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
         post_run_verify_summary_file: files["post-run-verify-summary.json"],
         post_run_verify_status: "pass",
         provider_execution_status: "completed",
-        real_code_change_status: "pass",
-        meaningful_changed_paths: ["source/httpie/core.py", "tests/test_core.py"],
+        runtime_harness_report_file: files["runtime-harness-report.json"],
         context_budget_status: "pass",
         top_context_size_sources: [
           {
@@ -3098,6 +3109,7 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
         artifacts: {
           host_runtime_root: runtimeRoot,
           host_reports_root: reportsRoot,
+          runtime_harness_report_file: files["runtime-harness-report.json"],
           live_e2e_controller_state_file: files["controller-state.json"],
           live_e2e_step_journal_entries: stepJournal,
           aor_installation: {

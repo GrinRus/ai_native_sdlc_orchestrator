@@ -35,7 +35,13 @@ import {
   resolveCatalogRoot,
   resolveFullJourneyProfile,
 } from "./lib/profile-catalog.mjs";
-import { executeFullJourneyFlow, executeInstalledUserFlow, prepareAorInstallationProof } from "./lib/flows.mjs";
+import {
+  collectRuntimeHarnessChangedPaths,
+  executeFullJourneyFlow,
+  executeInstalledUserFlow,
+  prepareAorInstallationProof,
+  runtimeHarnessReportHasMissionRelevantChanges,
+} from "./lib/flows.mjs";
 import { resolveAuthProbeRequired } from "./lib/preflight.mjs";
 import { applyProductionProofEvidence, buildProductionProofSummary } from "./lib/production-proof.mjs";
 import {
@@ -926,6 +932,34 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
       artifacts.failure_class = providerClassification.failure_class;
     }
   }
+}
+
+function runtimeHarnessReportFilesForSummary(artifacts, productionProof = null) {
+  return uniqueStrings([
+    asNonEmptyString(asRecord(productionProof).evidence_refs?.runtime_harness_report_file),
+    asNonEmptyString(artifacts.latest_runtime_harness_report_file),
+    asNonEmptyString(artifacts.delivery_runtime_harness_report_file),
+    asNonEmptyString(artifacts.runtime_harness_report_file),
+    asNonEmptyString(artifacts.run_start_runtime_harness_report_file),
+  ]);
+}
+
+function refreshRuntimeHarnessChangeEvidenceForSummary(artifacts, mission, productionProof = null) {
+  const runtimeHarnessReportFiles = runtimeHarnessReportFilesForSummary(artifacts, productionProof);
+  if (runtimeHarnessReportFiles.length === 0) {
+    return;
+  }
+  const meaningfulChangedPaths = uniqueStrings(
+    runtimeHarnessReportFiles.flatMap((reportFile) => collectRuntimeHarnessChangedPaths(reportFile)),
+  );
+  if (meaningfulChangedPaths.length > 0) {
+    artifacts.meaningful_changed_paths = meaningfulChangedPaths;
+  }
+  artifacts.real_code_change_status = runtimeHarnessReportFiles.some((reportFile) =>
+    runtimeHarnessReportHasMissionRelevantChanges(reportFile, mission),
+  )
+    ? "pass"
+    : "fail";
 }
 
 function buildStepJournal(options) {
@@ -1889,6 +1923,7 @@ export function writeProofRunnerArtifacts(options) {
   if (productionProof) {
     options.flowResult.artifacts.production_proof = productionProof;
   }
+  refreshRuntimeHarnessChangeEvidenceForSummary(options.flowResult.artifacts, options.mission, productionProof);
   const sourceMetadata = resolveHostSourceMetadata(options.hostRoot);
   const latestRuntimeHarnessReportFile =
     asNonEmptyString(productionProof?.evidence_refs?.runtime_harness_report_file) ||
