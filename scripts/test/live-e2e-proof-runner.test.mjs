@@ -29,6 +29,7 @@ import {
   evaluateBaselineVerifyGate,
   nextActionReportClosesFlow,
   prepareAorInstallationProof,
+  runGuidedWebSmoke,
   runtimeHarnessReportHasMissionRelevantChanges,
   resolveExecutionStageStatusForRuntimeHarnessDecision,
 } from "../live-e2e/lib/flows.mjs";
@@ -1900,6 +1901,83 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     assert.equal(written.runHealthReport.failure_summary.owner, "operator");
     assert.equal(written.runHealthReport.failure_summary.phase, "ui_validation");
     assert.equal(written.runHealthReport.failure_summary.class, "guided_browser_task_proof_missing");
+  });
+});
+
+test("guided browser-task proof request points at a live app surface, not the short-lived smoke URL", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(path.join(targetCheckoutRoot, ".aor"), { recursive: true });
+    const fakeAor = path.join(tempRoot, "fake-aor.mjs");
+    fs.writeFileSync(
+      fakeAor,
+      [
+        "const args = process.argv.slice(2);",
+        "if (args.includes('--smoke')) {",
+        "  console.log(JSON.stringify({",
+        "    command: 'app',",
+        "    mode: 'local-spa',",
+        "    status: 'smoke-pass',",
+        "    app_url: 'http://127.0.0.1:61001/',",
+        "    control_plane: 'http://127.0.0.1:61001',",
+        "    project_id: 'local-target',",
+        "    project_ref: process.cwd(),",
+        "    runtime_root: process.cwd() + '/.aor',",
+        "    html_loaded: true,",
+        "    flow_selector_loaded: true,",
+        "    new_flow_action_loaded: true,",
+        "    first_run_wizard_loaded: true,",
+        "    project_switcher_loaded: true,",
+        "    config_project_id: 'local-target',",
+        "    config_default_project_id: 'local-target',",
+        "    project_index_default_project_id: 'local-target',",
+        "    state_project_id: 'local-target',",
+        "    render_guard_status: 'pass',",
+        "    render_guard: { status: 'pass', findings: [] }",
+        "  }));",
+        "  process.exit(0);",
+        "}",
+        "console.log(JSON.stringify({",
+        "  command: 'app',",
+        "  mode: 'local-spa',",
+        "  status: 'running',",
+        "  app_url: 'http://127.0.0.1:61002/',",
+        "  control_plane: 'http://127.0.0.1:61002',",
+        "  project_id: 'local-target',",
+        "  project_ref: process.cwd(),",
+        "  runtime_root: process.cwd() + '/.aor'",
+        "}));",
+        "setInterval(() => {}, 1000);",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = runGuidedWebSmoke({
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [fakeAor],
+        binaryRef: fakeAor,
+      },
+      targetCheckoutRoot,
+      runId: "guided-live-surface",
+      reportsRoot,
+      env: process.env,
+    });
+    const request = JSON.parse(fs.readFileSync(result.browserTaskProofRequestFile, "utf8"));
+    assert.equal(request.smoke_app_url, "http://127.0.0.1:61001/");
+    assert.equal(request.app_url, "http://127.0.0.1:61002/");
+    assert.equal(request.control_plane, "http://127.0.0.1:61002");
+    assert.equal(request.app_server_status, "running");
+    assert.ok(Number.isInteger(request.app_server_pid));
+    assert.equal(result.summary.browser_task_app_url, "http://127.0.0.1:61002/");
+    try {
+      process.kill(request.app_server_pid, "SIGTERM");
+    } catch {
+      // Test cleanup only.
+    }
   });
 });
 

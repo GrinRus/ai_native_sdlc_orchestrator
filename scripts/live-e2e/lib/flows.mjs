@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -1179,7 +1179,104 @@ function readOperatorRequestDocument(requestFile) {
  *   projectProfileFile?: string,
  * }}
  */
-function runGuidedWebSmoke(options) {
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * @param {string} filePath
+ * @returns {Record<string, unknown>}
+ */
+function tryReadJsonFile(filePath) {
+  try {
+    return asRecord(JSON.parse(fs.readFileSync(filePath, "utf8")));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * @param {{
+ *   aorLaunch: ReturnType<typeof resolveAorLaunch>,
+ *   targetCheckoutRoot: string,
+ *   reportsRoot: string,
+ *   runId: string,
+ *   env: NodeJS.ProcessEnv,
+ *   projectProfileFile?: string,
+ * }}
+ * @returns {Record<string, unknown>}
+ */
+function startGuidedBrowserTaskAppSurface(options) {
+  const stdoutFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-browser-task-app-${normalizeId(options.runId)}.stdout.json`,
+  );
+  const stderrFile = path.join(
+    options.reportsRoot,
+    `installed-user-guided-browser-task-app-${normalizeId(options.runId)}.stderr.log`,
+  );
+  const stdoutFd = fs.openSync(stdoutFile, "w");
+  const stderrFd = fs.openSync(stderrFile, "w");
+  let child;
+  try {
+    child = spawn(
+      options.aorLaunch.command,
+      [
+        ...options.aorLaunch.argsPrefix,
+        "app",
+        "--project-ref",
+        ".",
+        ...(asNonEmptyString(options.projectProfileFile)
+          ? ["--project-profile", asNonEmptyString(options.projectProfileFile)]
+          : []),
+        "--runtime-root",
+        ".aor",
+        "--open",
+        "false",
+        "--json",
+      ],
+      {
+        cwd: options.targetCheckoutRoot,
+        detached: true,
+        env: options.env,
+        stdio: ["ignore", stdoutFd, stderrFd],
+      },
+    );
+    child.unref();
+  } finally {
+    fs.closeSync(stdoutFd);
+    fs.closeSync(stderrFd);
+  }
+
+  const startedAt = nowIso();
+  let launchSummary = {};
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    launchSummary = tryReadJsonFile(stdoutFile);
+    if (asNonEmptyString(launchSummary.app_url) && asNonEmptyString(launchSummary.control_plane)) break;
+    sleepSync(100);
+  }
+
+  const stderr = fileExists(stderrFile) ? fs.readFileSync(stderrFile, "utf8").trim() : "";
+  const status =
+    asNonEmptyString(launchSummary.app_url) && asNonEmptyString(launchSummary.control_plane)
+      ? "running"
+      : "launch_failed";
+  return {
+    kind: "guided-browser-task-app-surface",
+    status,
+    started_at: startedAt,
+    pid: child?.pid ?? null,
+    app_url: asNonEmptyString(launchSummary.app_url) || null,
+    control_plane: asNonEmptyString(launchSummary.control_plane) || null,
+    project_id: asNonEmptyString(launchSummary.project_id) || null,
+    stdout_file: stdoutFile,
+    stderr_file: stderrFile,
+    stderr_summary: stderr ? stderr.slice(0, 1000) : null,
+    launch_summary: launchSummary,
+  };
+}
+
+export function runGuidedWebSmoke(options) {
   const outputHtml = path.join(
     options.reportsRoot,
     `installed-user-guided-web-smoke-${normalizeId(options.runId)}.html`,
@@ -1253,6 +1350,22 @@ function runGuidedWebSmoke(options) {
     asNonEmptyString(summary.config_default_project_id) === asNonEmptyString(summary.project_id) &&
     asNonEmptyString(summary.project_index_default_project_id) === asNonEmptyString(summary.project_id) &&
     asNonEmptyString(summary.state_project_id) === asNonEmptyString(summary.project_id);
+  const browserTaskAppSurface = taskPassed
+    ? startGuidedBrowserTaskAppSurface({
+        aorLaunch: options.aorLaunch,
+        targetCheckoutRoot: options.targetCheckoutRoot,
+        runId: options.runId,
+        reportsRoot: options.reportsRoot,
+        env: options.env,
+        projectProfileFile: options.projectProfileFile,
+      })
+    : {
+        kind: "guided-browser-task-app-surface",
+        status: "not_started",
+        reason: "Guided web smoke did not pass; browser-task proof surface was not started.",
+      };
+  const browserTaskAppUrl = asNonEmptyString(browserTaskAppSurface.app_url) || null;
+  const browserTaskControlPlane = asNonEmptyString(browserTaskAppSurface.control_plane) || null;
   writeJson(browserTaskProofRequestFile, {
     request_id: `${options.runId}.guided-browser-task-proof-request.v1`,
     run_id: options.runId,
@@ -1272,8 +1385,15 @@ function runGuidedWebSmoke(options) {
     ],
     assessment_scope:
       "AOR operator and installed-user UI/UX only; checked-repository frontend behavior belongs to implementation and verification evidence.",
-    app_url: asNonEmptyString(summary.app_url) || null,
-    control_plane: asNonEmptyString(summary.control_plane) || null,
+    app_url: browserTaskAppUrl,
+    control_plane: browserTaskControlPlane,
+    smoke_app_url: asNonEmptyString(summary.app_url) || null,
+    smoke_control_plane: asNonEmptyString(summary.control_plane) || null,
+    app_server_status: asNonEmptyString(browserTaskAppSurface.status) || "unknown",
+    app_server_pid: browserTaskAppSurface.pid ?? null,
+    app_server_stdout_file: asNonEmptyString(browserTaskAppSurface.stdout_file) || null,
+    app_server_stderr_file: asNonEmptyString(browserTaskAppSurface.stderr_file) || null,
+    app_server_launch_summary: browserTaskAppSurface,
     project_id: asNonEmptyString(summary.project_id) || null,
     created_at: nowIso(),
   });
@@ -1375,6 +1495,12 @@ function runGuidedWebSmoke(options) {
   summary.visual_guardrail_file = visualSnapshotFile;
   summary.browser_task_proof_request_file = browserTaskProofRequestFile;
   summary.browser_task_proof_file = Object.keys(browserTaskProof).length > 0 ? browserTaskProofFile : null;
+  summary.browser_task_app_url = browserTaskAppUrl;
+  summary.browser_task_control_plane = browserTaskControlPlane;
+  summary.browser_task_app_server_status = asNonEmptyString(browserTaskAppSurface.status) || "unknown";
+  summary.browser_task_app_server_pid = browserTaskAppSurface.pid ?? null;
+  summary.browser_task_app_server_stdout_file = asNonEmptyString(browserTaskAppSurface.stdout_file) || null;
+  summary.browser_task_app_server_stderr_file = asNonEmptyString(browserTaskAppSurface.stderr_file) || null;
   summary.screenshot_files = browserTaskScreenshotFiles;
   summary.dom_snapshot_ref = summary.dom_snapshot_file;
   summary.accessibility_summary_ref = summary.accessibility_summary_file;

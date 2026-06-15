@@ -578,6 +578,10 @@ Guided full-journey summaries also carry:
 If the guided profile requires `browser-task-proof`, a missing `guided_browser_task_proof_file` or non-passing
 `frontend_interactions[].task_outcome.status` must make run-health non-passing with
 `failure_summary.phase: ui_validation`. The deterministic web smoke remains factual render evidence only.
+The browser proof must be captured against the live app surface recorded in
+`artifacts.guided_browser_task_proof_request_file` as `app_url`/`control_plane`.
+The request also preserves `smoke_app_url` as guardrail history, but that smoke
+server is short-lived and must not be used as the browser-task inspection target.
 
 Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for product observation success when required step evidence is missing.
 
@@ -631,6 +635,11 @@ Judge criteria:
 If a profile does not provide an accepted skill-agent operator decision, the runner stops fail-closed and writes the decision request for manual/evaluator continuation.
 
 For guided installed-user runs, deterministic web smoke is only a render guardrail. `frontend_interactions[]` must carry HTML, DOM, accessibility, screenshot or visual-guardrail evidence as factual AOR operator UI proof. AOR operator UI/UX quality is assessed later in `live-e2e-quality-assessment-report`; checked-repository frontend behavior belongs to implementation and verification evidence when the mission requires it. The guided proof must also include `flow_loop.first_flow_id`, `flow_loop.first_flow_status=completed`, `flow_loop.completed_flow_read_only=true`, a distinct `flow_loop.second_flow_id`, `flow_loop.follow_up_source_handoff_ref`, fresh second-flow intake/next-action files, and `flow_loop.operator_request.target_flow_id` pointing at the second flow.
+When `browser-task-proof` is required, open the `app_url` from
+`guided_browser_task_proof_request_file`; the runner starts that additional live
+surface specifically for skill-agent/browser inspection. Do not rely on the
+`smoke_app_url`, because `aor app --smoke` closes its server after writing the
+guardrail summary.
 
 ## Run Health
 The run summary links `live_e2e_run_health_report_file`. This report is the only status source for quality of the run itself. It covers:

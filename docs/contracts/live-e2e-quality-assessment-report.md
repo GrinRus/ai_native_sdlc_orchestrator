@@ -143,6 +143,9 @@ The report must call out where evidence was not inspected, where it was weak or 
 The UI/UX dimensions assess only the AOR operator and installed-user experience. Repository-owned frontend behavior is assessed through implementation and verification dimensions when a mission requires it.
 
 `aor app --smoke` and deterministic render markers are render guardrails, not UX proof. Strong AOR operator UI/UX evidence requires browser/task inspection or explicit SWE inspection citing concrete refs for task success, navigation, next actions, blockers, recovery, visual/responsive behavior, and accessibility. Missing or indirect UI evidence must be reported as `weak` or `not_evaluated`.
+For guided proofs, the browser/task inspection should use the live `app_url`
+from `guided_browser_task_proof_request_file`. The `smoke_app_url` in that
+request is only guardrail metadata from the short-lived smoke process.
 
 Headless target-project runs may cite a paired guided AOR operator UI proof from
 the same AOR commit for `aor_operator_ui_ux_quality` and

@@ -94,6 +94,10 @@ AOR operator browser-task evidence is a factual run-health blocker, not an outco
 
 The runner should still preserve deterministic app-smoke refs in `frontend_interactions[]`; `aor app --smoke` remains a
 render guardrail and does not satisfy required browser-task proof by itself.
+The corresponding `guided_browser_task_proof_request_file` should identify the
+live browser inspection surface via `app_url`, `control_plane`, and
+`app_server_pid`. `smoke_app_url` is only the short-lived render-guardrail URL
+from `aor app --smoke`.
 
 `resume_interaction_health` should include pending interactions, pending decisions, resume failures, and answer audit gaps.
 
