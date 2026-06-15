@@ -50,7 +50,8 @@ verification:
   commands:
     - npx xo
     - npm run build
-    - npx ava test/main.ts test/hooks.ts test/retry.ts
+    - npx ava test/main.ts test/hooks.ts
+    - "npx ava test/retry.ts --match='*shouldRetry*'"
   eval_suites:
     - suite.governance.integration@v1
   harness:

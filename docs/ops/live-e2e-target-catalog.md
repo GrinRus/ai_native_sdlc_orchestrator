@@ -41,6 +41,9 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - `ky-retry-hooks-governance`
     - `large`, `governance|repair`
     - broader request lifecycle mission with stricter audit/learning closure
+    - post-run primary gate uses `test/main.ts`, `test/hooks.ts`, and focused
+      `test/retry.ts --match='*shouldRetry*'`; the full timing-heavy retry
+      suite remains diagnostic evidence
   - `ky-request-lifecycle-observability-xlarge`
     - `xlarge`, `governance|repair`, manual-only
     - broader retry, hook, public type, and observability rehearsal with operator

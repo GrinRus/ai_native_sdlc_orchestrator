@@ -314,7 +314,8 @@ feature_missions:
       primary_commands:
         - npx xo
         - npm run build
-        - npx ava test/main.ts test/hooks.ts test/retry.ts
+        - npx ava test/main.ts test/hooks.ts
+        - "npx ava test/retry.ts --match='*shouldRetry*'"
       diagnostic_commands:
         - npx playwright install
         - npm test

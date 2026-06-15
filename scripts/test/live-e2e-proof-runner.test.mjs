@@ -904,7 +904,8 @@ test("generated ky large Anthropic profile uses bounded governance verification"
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "npx xo",
       "npm run build",
-      "npx ava test/main.ts test/hooks.ts test/retry.ts",
+      "npx ava test/main.ts test/hooks.ts",
+      "npx ava test/retry.ts --match='*shouldRetry*'",
     ]);
     assert.deepEqual(resolved.mission.post_run_quality.diagnostic_commands, [
       "npx playwright install",
