@@ -774,6 +774,17 @@ function isTransientProviderExecutionStatus(status) {
   return ["running", "silent-running", "timeout-risk"].includes(asNonEmptyString(status));
 }
 
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function artifactValuePresent(value) {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "string") return value.length > 0;
+  if (value && typeof value === "object") return Object.keys(asRecord(value)).length > 0;
+  return value !== null && value !== undefined;
+}
+
 function classifyProviderStepStatus(providerStepStatus) {
   const status = asNonEmptyString(providerStepStatus.status);
   const interruptionOwner = asNonEmptyString(providerStepStatus.interruption_owner);
@@ -833,19 +844,7 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
   const copyIfMissing = (key) => {
     const current = artifacts[key];
     const candidate = snapshot[key];
-    const currentPresent =
-      typeof current === "string"
-        ? current.length > 0
-        : typeof current === "object" && current
-          ? Object.keys(asRecord(current)).length > 0
-          : current !== null && current !== undefined;
-    const candidatePresent =
-      typeof candidate === "string"
-        ? candidate.length > 0
-        : typeof candidate === "object" && candidate
-          ? Object.keys(asRecord(candidate)).length > 0
-          : candidate !== null && candidate !== undefined;
-    if (!currentPresent && candidatePresent) {
+    if (!artifactValuePresent(current) && artifactValuePresent(candidate)) {
       artifacts[key] = candidate;
     }
   };
@@ -874,6 +873,7 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "latest_runtime_harness_decision",
     "run_start_runtime_harness_decision",
     "runtime_harness_overall_decision",
+    "meaningful_changed_paths",
     "adapter_raw_evidence_ref",
     "request_artifact_ref",
     "provider_work_packet_ref",
@@ -1999,6 +1999,9 @@ export function writeProofRunnerArtifacts(options) {
         ? options.flowResult.artifacts.provider_step_status
         : null,
     real_code_change_status: asNonEmptyString(options.flowResult.artifacts.real_code_change_status) || null,
+    meaningful_changed_paths: Array.isArray(options.flowResult.artifacts.meaningful_changed_paths)
+      ? options.flowResult.artifacts.meaningful_changed_paths
+      : [],
     runtime_harness_decision: asNonEmptyString(options.flowResult.artifacts.runtime_harness_decision) || null,
     run_start_runtime_harness_decision:
       asNonEmptyString(options.flowResult.artifacts.run_start_runtime_harness_decision) || null,

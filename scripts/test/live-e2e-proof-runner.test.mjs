@@ -3034,6 +3034,16 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
         post_run_verify_status: "pass",
         provider_execution_status: "completed",
         real_code_change_status: "pass",
+        meaningful_changed_paths: ["source/httpie/core.py", "tests/test_core.py"],
+        context_budget_status: "pass",
+        top_context_size_sources: [
+          {
+            source: "provider_work_packet.context",
+            bytes: 2048,
+            chars: 2048,
+            estimated_tokens: 683,
+          },
+        ],
         feature_mission_id: "httpie-plugin-upgrade-exit-status",
         feature_size: "medium",
         matrix_cell: {
@@ -3120,8 +3130,10 @@ test("proof runner run-health uses hydrated delivery and verification facts", ()
     assert.equal(written.summary.review_report_file, files["review-report.json"]);
     assert.equal(written.summary.post_run_verify_status, "pass");
     assert.equal(written.summary.real_code_change_status, "pass");
+    assert.deepEqual(written.summary.meaningful_changed_paths, ["source/httpie/core.py", "tests/test_core.py"]);
     assert.equal(written.runHealthReport.overall_status, "pass");
     assert.equal(written.runHealthReport.provider_health.provider_execution_status, "completed");
+    assert.equal(written.runHealthReport.provider_health.top_context_size_sources[0].source, "provider_work_packet.context");
     assert.equal(written.runHealthReport.target_environment_health.target_verification_status, "pass");
     assert.equal(written.runHealthReport.failure_summary.owner, null);
   });

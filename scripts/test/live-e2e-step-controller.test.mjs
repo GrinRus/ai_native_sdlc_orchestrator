@@ -1606,6 +1606,19 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
       profile,
       mode: "auto",
     });
+    const executionEvidence = {
+      request_artifact_ref: "evidence://request.json",
+      provider_work_packet_ref: "evidence://work-packet.json",
+      meaningful_changed_paths: ["source/core/Ky.ts", "test/hooks.ts"],
+      top_context_size_sources: [
+        {
+          source: "provider_work_packet.context",
+          bytes: 2048,
+          chars: 2048,
+          estimated_tokens: 683,
+        },
+      ],
+    };
     let sequence = 1;
     for (const [stage, label] of [
       ["discovery", "discovery-run"],
@@ -1621,7 +1634,7 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
         stage,
         stageResult: { stage, status: "pass", evidence_refs: [], summary: "ok" },
         commandResults: [{ label, command_surface: `aor ${stage}`, status: "pass" }],
-        artifacts: {},
+        artifacts: stage === "execution" ? executionEvidence : {},
       });
       sequence += 2;
     }
@@ -1653,6 +1666,9 @@ test("live E2E step controller lets terminal manual continue finalize", () => {
       "delivery",
     ]);
     assert.equal(state.current_step, null);
+    assert.equal(state.artifacts_snapshot.request_artifact_ref, "evidence://request.json");
+    assert.deepEqual(state.artifacts_snapshot.meaningful_changed_paths, ["source/core/Ky.ts", "test/hooks.ts"]);
+    assert.equal(state.artifacts_snapshot.top_context_size_sources[0].source, "provider_work_packet.context");
   });
 });
 

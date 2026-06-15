@@ -5039,18 +5039,24 @@ export function executeFullJourneyFlow(options) {
     const postRunVerificationStatus = asNonEmptyString(artifacts.post_run_verify_status) || "fail";
     const postRunDiagnosticStatus = asNonEmptyString(artifacts.post_run_diagnostic_status) || "pass";
     const targetBaselineStatus = resolveEffectiveTargetBaselineStatus(artifacts, targetBaselineObservedStatus);
+    const runtimeHarnessReportFiles = uniqueStrings([
+      asNonEmptyString(artifacts.latest_runtime_harness_report_file),
+      asNonEmptyString(artifacts.delivery_runtime_harness_report_file),
+      asNonEmptyString(artifacts.runtime_harness_report_file),
+      asNonEmptyString(artifacts.run_start_runtime_harness_report_file),
+    ]);
+    const meaningfulChangedPaths = uniqueStrings(
+      runtimeHarnessReportFiles.flatMap((reportFile) => collectRuntimeHarnessChangedPaths(reportFile)),
+    );
     const runtimeHarnessDecision =
       asNonEmptyString(artifacts.run_start_runtime_harness_decision) ||
       asNonEmptyString(artifacts.runtime_harness_overall_decision) ||
       "unknown";
     const latestRuntimeHarnessDecision =
       asNonEmptyString(artifacts.latest_runtime_harness_decision) || runtimeHarnessDecision;
-    const realCodeChangeStatus = [
-      asNonEmptyString(artifacts.latest_runtime_harness_report_file),
-      asNonEmptyString(artifacts.delivery_runtime_harness_report_file),
-      asNonEmptyString(artifacts.runtime_harness_report_file),
-      asNonEmptyString(artifacts.run_start_runtime_harness_report_file),
-    ].some((reportFile) => reportFile && runtimeHarnessReportHasMissionRelevantChanges(reportFile, options.mission))
+    const realCodeChangeStatus = runtimeHarnessReportFiles.some((reportFile) =>
+      runtimeHarnessReportHasMissionRelevantChanges(reportFile, options.mission),
+    )
       ? "pass"
       : "fail";
     const providerExecutionProofStatus = evidenceRefMaterialized(
@@ -5060,6 +5066,7 @@ export function executeFullJourneyFlow(options) {
       ? "pass"
       : "fail";
     artifacts.real_code_change_status = realCodeChangeStatus;
+    artifacts.meaningful_changed_paths = meaningfulChangedPaths;
     artifacts.runtime_harness_decision = runtimeHarnessDecision;
     artifacts.run_start_runtime_harness_decision = runtimeHarnessDecision;
     artifacts.latest_runtime_harness_decision = latestRuntimeHarnessDecision;
@@ -5119,6 +5126,7 @@ export function executeFullJourneyFlow(options) {
       review_overall_status: reviewOverallStatus,
       feature_size_fit_status: featureSizeFitStatus,
       real_code_change_status: realCodeChangeStatus,
+      meaningful_changed_paths: meaningfulChangedPaths,
       runtime_harness_decision: runtimeHarnessDecision,
       run_start_runtime_harness_decision: runtimeHarnessDecision,
       latest_runtime_harness_decision: latestRuntimeHarnessDecision,

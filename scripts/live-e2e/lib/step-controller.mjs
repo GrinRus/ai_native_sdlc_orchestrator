@@ -134,6 +134,32 @@ export function getLiveE2eIncludedStepsForProfile(profile) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function artifactValuePresent(value) {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "string") return value.length > 0;
+  if (value && typeof value === "object") return Object.keys(asRecord(value)).length > 0;
+  return value !== null && value !== undefined;
+}
+
+/**
+ * @param {Record<string, unknown>} previous
+ * @param {Record<string, unknown>} current
+ * @returns {Record<string, unknown>}
+ */
+function mergeArtifactSnapshots(previous, current) {
+  const merged = { ...previous };
+  for (const [key, value] of Object.entries(current)) {
+    if (artifactValuePresent(value) || !(key in merged)) {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+/**
  * @param {Record<string, unknown>} controllerStop
  * @param {string[]} includedSteps
  * @returns {boolean}
@@ -1325,7 +1351,9 @@ export function createLiveE2eStepController(options) {
     );
     recordPhase(step, "persist", []);
     persistStep(step, entry);
-    state.artifacts_snapshot = JSON.parse(JSON.stringify(input.artifacts ?? {}));
+    state.artifacts_snapshot = JSON.parse(
+      JSON.stringify(mergeArtifactSnapshots(asRecord(state.artifacts_snapshot), input.artifacts ?? {})),
+    );
     state.command_results = JSON.parse(JSON.stringify(input.commandResults ?? []));
     writeJson(stateFile, state);
 
