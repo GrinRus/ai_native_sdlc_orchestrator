@@ -468,6 +468,12 @@ Production-proof profiles add a fail-closed layer on top of full-journey behavio
 
 Guided full-journey profiles set `guided_journey.enabled=true`. They still use the full-journey catalog and public CLI subprocesses, but prepend installed-user shortcuts (`doctor`, `onboard`, `app`, `next`), use `mission create` for the first product intake packet, require an approved `review decide` before delivery/release, run `release prepare`, close `learning handoff`, create a follow-up mission with `--follow-up-source-handoff-ref`, refresh `next` for the second flow, and create a flow-targeted `request create --target-flow-id`. The runner writes `installed-user-guided-journey-proof-<run>.json` and fails the run if the proof is only narrative: required CLI transcripts, packet/report files, flow-loop fields, browser-task/frontend evidence refs, and no-upstream-write assertions must be materialized.
 
+Guided installed-user proof profiles keep provider execution timeouts long enough
+for real runtime work, but target verification commands stay bounded. The guided
+proof exists to produce AOR operator UI/UX and accessibility evidence; target
+full-suite diagnostic commands are supporting facts and must not leave the
+manual runner waiting on an unbounded repository test process.
+
 No proof-runner-side `examples/context/project profile` injection is allowed inside the target checkout on the full-journey path.
 
 ## Inspect

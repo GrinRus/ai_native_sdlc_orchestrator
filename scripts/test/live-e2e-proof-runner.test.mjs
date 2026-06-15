@@ -754,17 +754,14 @@ test("generated live E2E profile allows selected guided provider adapters", () =
     ];
 
     for (const current of cases) {
+      const loadedProfile = loadProofRunnerProfile({ hostRoot: repoRoot, profileRef: current.profilePath });
       const generatedAssetsRoot = path.join(tempRoot, current.provider, "assets");
       fs.mkdirSync(generatedAssetsRoot, { recursive: true });
 
       const result = materializeGeneratedProjectProfile({
         hostRoot: repoRoot,
-        profilePath: current.profilePath,
-        profile: {
-          runtime: { mode: "ephemeral" },
-          output_policy: { preferred_delivery_mode: "patch-only" },
-          verification: {},
-        },
+        profilePath: loadedProfile.profilePath,
+        profile: loadedProfile.profile,
         catalogEntry: { verification: {} },
         providerVariant: {
           provider: current.provider,
@@ -785,7 +782,7 @@ test("generated live E2E profile allows selected guided provider adapters", () =
       assert.equal(loaded.ok, true);
       assert.ok(loaded.document.allowed_providers.includes(current.provider));
       assert.ok(loaded.document.allowed_adapters.includes(current.adapter));
-      assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
+      assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
     }
   });
 });
