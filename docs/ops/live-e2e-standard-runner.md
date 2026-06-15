@@ -472,7 +472,11 @@ Guided installed-user proof profiles keep provider execution timeouts long enoug
 for real runtime work, but target verification commands stay bounded. The guided
 proof exists to produce AOR operator UI/UX and accessibility evidence; target
 full-suite diagnostic commands are supporting facts and must not leave the
-manual runner waiting on an unbounded repository test process.
+manual runner waiting on an unbounded repository test process. Ky guided proof
+profiles therefore override catalog setup with only
+`npm install --prefer-offline --no-audit --no-fund`; Playwright browser
+installation remains diagnostic evidence from the mission policy instead of a
+pre-execution readiness blocker.
 
 No proof-runner-side `examples/context/project profile` injection is allowed inside the target checkout on the full-journey path.
 

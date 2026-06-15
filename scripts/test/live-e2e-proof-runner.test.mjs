@@ -740,6 +740,12 @@ test("generated live E2E profile allows selected guided provider adapters", () =
   withTempRoot((tempRoot) => {
     const cases = [
       {
+        profilePath: path.join(repoRoot, "scripts/live-e2e/profiles/installed-user-guided-journey.yaml"),
+        provider: "openai",
+        adapter: "codex-cli",
+        runId: "openai-provider-allowlist",
+      },
+      {
         profilePath: path.join(repoRoot, "scripts/live-e2e/profiles/installed-user-guided-journey-qwen.yaml"),
         provider: "qwen",
         adapter: "qwen-code",
@@ -783,6 +789,8 @@ test("generated live E2E profile allows selected guided provider adapters", () =
       assert.ok(loaded.document.allowed_providers.includes(current.provider));
       assert.ok(loaded.document.allowed_adapters.includes(current.adapter));
       assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
+      assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
+      assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
     }
   });
 });
