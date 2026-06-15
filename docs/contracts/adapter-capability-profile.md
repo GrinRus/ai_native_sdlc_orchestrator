@@ -55,6 +55,8 @@ Adapters may differ in the CLI flag used to pass the provider work packet, outpu
 
 `execution.external_runtime.preflight_timeout_ms` is optional and controls live adapter preflight probes separately from full step execution. When omitted, live E2E derives a conservative probe timeout from `timeout_ms`. Preflight reports must record both the full `timeout_ms` and selected `preflight_timeout_ms` so slow readiness probes can be distinguished from full runtime execution limits.
 
+Edit-readiness and permission-readiness probes may retry transient external-runner timeouts or generic runner failures once. Contract consumers must read `edit_readiness.attempts[]` and `permission_readiness.attempts[]` as the complete factual attempt history; final readiness still requires a successful marker write or a post-marker-timeout warning with matching marker contents.
+
 For `request-artifact` adapters, live adapter preflight is itself the external
 runtime invocation. The preflight work packet must declare an explicit
 `request.preflight_contract`, and the launcher prompt must keep the runtime on

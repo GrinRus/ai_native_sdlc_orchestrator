@@ -24,6 +24,7 @@ import {
 } from "./common.mjs";
 
 const FORBIDDEN_PREFLIGHT_PROVIDER_COMMANDS = Object.freeze(["codex", "claude", "opencode", "qwen"]);
+const MAX_READINESS_PROBE_ATTEMPTS = 2;
 const DEFAULT_PREFLIGHT_REQUEST_ARTIFACT_MESSAGE = [
   "Run only the AOR live-adapter preflight described in the provider work packet at {provider_work_packet_path}.",
   "Read that JSON once and follow request.objective exactly.",
@@ -97,6 +98,19 @@ function resolvePreflightRequestTransport(externalRuntime) {
     return configuredTransport;
   }
   return externalRuntime.request_via_stdin === false ? "none" : "stdin-json";
+}
+
+/**
+ * @param {Record<string, unknown>} attemptResult
+ * @param {number} attempt
+ * @returns {boolean}
+ */
+function shouldRetryReadinessProbe(attemptResult, attempt) {
+  if (attempt >= MAX_READINESS_PROBE_ATTEMPTS) {
+    return false;
+  }
+  const failureKind = asNonEmptyString(attemptResult.failure_kind);
+  return ["external-runner-timeout", "external-runner-failed"].includes(failureKind);
 }
 
 /**
@@ -525,68 +539,75 @@ export function runLiveAdapterPreflight(options) {
   }
 
   let editReadiness = null;
+  const editReadinessAttempts = [];
   if (editAndPermissionReadinessRequired) {
     fs.mkdirSync(permissionProbeRoot, { recursive: true });
     fs.writeFileSync(editNonceFile, `${editMarkerContents}\n`, "utf8");
     fs.rmSync(editMarkerFile, { force: true });
-    editReadiness = runProbeAttempt(
-      "preflight-edit-readiness",
-      1,
-      [
-        "Confirm that the external runner can perform one bounded non-interactive edit in this isolated target checkout.",
-        `Read ${editNonceFile}.`,
-        `Write exactly '${editMarkerContents}' to ${editMarkerFile}.`,
-        "Do not ask questions.",
-      ].join(" "),
-      {
-        edit_probe: {
-          nonce_file: editNonceFile,
-          marker_file: editMarkerFile,
-          expected_marker_contents: editMarkerContents,
-        },
-      },
-    );
-    const markerContents = fileExists(editMarkerFile) ? fs.readFileSync(editMarkerFile, "utf8").trim() : "";
-    const markerStatus =
-      markerContents === editMarkerContents
-        ? "present"
-        : markerContents
-          ? "unexpected-contents"
-          : "missing";
-    if (
-      editReadiness.status === "fail" &&
-      editReadiness.failure_kind === "external-runner-timeout" &&
-      markerContents === editMarkerContents
-    ) {
-      editReadiness = {
-        ...editReadiness,
-        status: "pass",
-        failure_kind: null,
-        warning_kind: "post-marker-timeout",
-        warnings: [
-          {
-            code: "post-marker-timeout",
-            summary:
-              "Edit readiness marker matched before the external runner timed out; edit access readiness passed, but runner completion was slow.",
+    for (let attempt = 1; attempt <= MAX_READINESS_PROBE_ATTEMPTS; attempt += 1) {
+      editReadiness = runProbeAttempt(
+        "preflight-edit-readiness",
+        attempt,
+        [
+          "Confirm that the external runner can perform one bounded non-interactive edit in this isolated target checkout.",
+          `Read ${editNonceFile}.`,
+          `Write exactly '${editMarkerContents}' to ${editMarkerFile}.`,
+          "Do not ask questions.",
+        ].join(" "),
+        {
+          edit_probe: {
+            nonce_file: editNonceFile,
+            marker_file: editMarkerFile,
+            expected_marker_contents: editMarkerContents,
           },
-        ],
-        marker_file: editMarkerFile,
-        marker_status: markerStatus,
-      };
-    } else if (editReadiness.status === "pass" && markerContents !== editMarkerContents) {
-      editReadiness = {
-        ...editReadiness,
-        status: "fail",
-        failure_kind: "edit-denied",
-        marker_file: editMarkerFile,
-        marker_status: markerStatus,
-      };
-    } else {
-      editReadiness = {
-        ...editReadiness,
-        marker_file: editMarkerFile,
-        marker_status: markerStatus,
-      };
+        },
+      );
+      const markerContents = fileExists(editMarkerFile) ? fs.readFileSync(editMarkerFile, "utf8").trim() : "";
+      const markerStatus =
+        markerContents === editMarkerContents
+          ? "present"
+          : markerContents
+            ? "unexpected-contents"
+            : "missing";
+      if (
+        editReadiness.status === "fail" &&
+        editReadiness.failure_kind === "external-runner-timeout" &&
+        markerContents === editMarkerContents
+      ) {
+        editReadiness = {
+          ...editReadiness,
+          status: "pass",
+          failure_kind: null,
+          warning_kind: "post-marker-timeout",
+          warnings: [
+            {
+              code: "post-marker-timeout",
+              summary:
+                "Edit readiness marker matched before the external runner timed out; edit access readiness passed, but runner completion was slow.",
+            },
+          ],
+          marker_file: editMarkerFile,
+          marker_status: markerStatus,
+        };
+      } else if (editReadiness.status === "pass" && markerContents !== editMarkerContents) {
+        editReadiness = {
+          ...editReadiness,
+          status: "fail",
+          failure_kind: "edit-denied",
+          marker_file: editMarkerFile,
+          marker_status: markerStatus,
+        };
+      } else {
+        editReadiness = {
+          ...editReadiness,
+          marker_file: editMarkerFile,
+          marker_status: markerStatus,
+        };
+      }
+      editReadinessAttempts.push(editReadiness);
+      if (editReadiness.status === "pass" || !shouldRetryReadinessProbe(editReadiness, attempt)) {
+        break;
+      }
     }
   }
   if (editReadiness && editReadiness.status !== "pass") {
@@ -599,7 +620,7 @@ export function runLiveAdapterPreflight(options) {
         enabled: true,
         status: "fail",
         failure_kind: failureKind,
-        attempts: [editReadiness],
+        attempts: editReadinessAttempts,
         nonce_file: editNonceFile,
         marker_file: editMarkerFile,
       },
@@ -622,70 +643,77 @@ export function runLiveAdapterPreflight(options) {
   }
 
   let permissionReadiness = null;
+  const permissionReadinessAttempts = [];
   if (editAndPermissionReadinessRequired) {
     fs.mkdirSync(permissionProbeRoot, { recursive: true });
     fs.writeFileSync(permissionNonceFile, `${permissionMarkerContents}\n`, "utf8");
     fs.rmSync(permissionMarkerFile, { force: true });
-    permissionReadiness = runProbeAttempt(
-      "preflight-permission-readiness",
-      1,
-      [
-        "Confirm that the external runner can read a nonce file and write a marker file in the isolated runtime root.",
-        `Read ${permissionNonceFile}.`,
-        `Write exactly '${permissionMarkerContents}' to ${permissionMarkerFile}.`,
-        "Do not ask questions.",
-      ].join(" "),
-      {
-        permission_probe: {
-          nonce_file: permissionNonceFile,
-          marker_file: permissionMarkerFile,
-          expected_marker_contents: permissionMarkerContents,
-        },
-      },
-    );
-    const markerContents = fileExists(permissionMarkerFile)
-      ? fs.readFileSync(permissionMarkerFile, "utf8").trim()
-      : "";
-    const markerStatus =
-      markerContents === permissionMarkerContents
-        ? "present"
-        : markerContents
-          ? "unexpected-contents"
-          : "missing";
-    if (
-      permissionReadiness.status === "fail" &&
-      permissionReadiness.failure_kind === "external-runner-timeout" &&
-      markerContents === permissionMarkerContents
-    ) {
-      permissionReadiness = {
-        ...permissionReadiness,
-        status: "pass",
-        failure_kind: null,
-        warning_kind: "post-marker-timeout",
-        warnings: [
-          {
-            code: "post-marker-timeout",
-            summary:
-              "Permission readiness marker matched before the external runner timed out; access readiness passed, but runner completion was slow.",
+    for (let attempt = 1; attempt <= MAX_READINESS_PROBE_ATTEMPTS; attempt += 1) {
+      permissionReadiness = runProbeAttempt(
+        "preflight-permission-readiness",
+        attempt,
+        [
+          "Confirm that the external runner can read a nonce file and write a marker file in the isolated runtime root.",
+          `Read ${permissionNonceFile}.`,
+          `Write exactly '${permissionMarkerContents}' to ${permissionMarkerFile}.`,
+          "Do not ask questions.",
+        ].join(" "),
+        {
+          permission_probe: {
+            nonce_file: permissionNonceFile,
+            marker_file: permissionMarkerFile,
+            expected_marker_contents: permissionMarkerContents,
           },
-        ],
-        marker_file: permissionMarkerFile,
-        marker_status: markerStatus,
-      };
-    } else if (permissionReadiness.status === "pass" && markerContents !== permissionMarkerContents) {
-      permissionReadiness = {
-        ...permissionReadiness,
-        status: "fail",
-        failure_kind: "permission-mode-blocked",
-        marker_file: permissionMarkerFile,
-        marker_status: markerStatus,
-      };
-    } else {
-      permissionReadiness = {
-        ...permissionReadiness,
-        marker_file: permissionMarkerFile,
-        marker_status: markerStatus,
-      };
+        },
+      );
+      const markerContents = fileExists(permissionMarkerFile)
+        ? fs.readFileSync(permissionMarkerFile, "utf8").trim()
+        : "";
+      const markerStatus =
+        markerContents === permissionMarkerContents
+          ? "present"
+          : markerContents
+            ? "unexpected-contents"
+            : "missing";
+      if (
+        permissionReadiness.status === "fail" &&
+        permissionReadiness.failure_kind === "external-runner-timeout" &&
+        markerContents === permissionMarkerContents
+      ) {
+        permissionReadiness = {
+          ...permissionReadiness,
+          status: "pass",
+          failure_kind: null,
+          warning_kind: "post-marker-timeout",
+          warnings: [
+            {
+              code: "post-marker-timeout",
+              summary:
+                "Permission readiness marker matched before the external runner timed out; access readiness passed, but runner completion was slow.",
+            },
+          ],
+          marker_file: permissionMarkerFile,
+          marker_status: markerStatus,
+        };
+      } else if (permissionReadiness.status === "pass" && markerContents !== permissionMarkerContents) {
+        permissionReadiness = {
+          ...permissionReadiness,
+          status: "fail",
+          failure_kind: "permission-mode-blocked",
+          marker_file: permissionMarkerFile,
+          marker_status: markerStatus,
+        };
+      } else {
+        permissionReadiness = {
+          ...permissionReadiness,
+          marker_file: permissionMarkerFile,
+          marker_status: markerStatus,
+        };
+      }
+      permissionReadinessAttempts.push(permissionReadiness);
+      if (permissionReadiness.status === "pass" || !shouldRetryReadinessProbe(permissionReadiness, attempt)) {
+        break;
+      }
     }
   }
   if (permissionReadiness && permissionReadiness.status !== "pass") {
@@ -698,7 +726,7 @@ export function runLiveAdapterPreflight(options) {
         ? {
             enabled: true,
             status: "pass",
-            attempts: [editReadiness],
+            attempts: editReadinessAttempts,
             nonce_file: editNonceFile,
             marker_file: editMarkerFile,
           }
@@ -710,7 +738,7 @@ export function runLiveAdapterPreflight(options) {
         enabled: true,
         status: "fail",
         failure_kind: failureKind,
-        attempts: [permissionReadiness],
+        attempts: permissionReadinessAttempts,
         nonce_file: permissionNonceFile,
         marker_file: permissionMarkerFile,
       },
@@ -738,7 +766,7 @@ export function runLiveAdapterPreflight(options) {
       ? {
           enabled: true,
           status: "pass",
-          attempts: [editReadiness],
+          attempts: editReadinessAttempts,
           nonce_file: editNonceFile,
           marker_file: editMarkerFile,
         }
@@ -750,7 +778,7 @@ export function runLiveAdapterPreflight(options) {
       ? {
           enabled: true,
           status: "pass",
-          attempts: [permissionReadiness],
+          attempts: permissionReadinessAttempts,
           nonce_file: permissionNonceFile,
           marker_file: permissionMarkerFile,
         }

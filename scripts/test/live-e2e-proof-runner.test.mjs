@@ -1304,6 +1304,114 @@ test("live adapter preflight uses a preflight-specific request-artifact prompt a
   });
 });
 
+test("live adapter preflight retries transient readiness runner timeouts", () => {
+  withTempRoot((tempRoot) => {
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    const reportsRoot = path.join(tempRoot, "reports");
+    const adapterProfileRoot = path.join(tempRoot, "adapters");
+    const callStateFile = path.join(tempRoot, "preflight-call-state.json");
+    const runnerScript = path.join(tempRoot, "preflight-flaky-runner.mjs");
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(adapterProfileRoot, { recursive: true });
+    fs.writeFileSync(
+      runnerScript,
+      [
+        "import fs from 'node:fs';",
+        "const args = process.argv.slice(2);",
+        "const requestFileIndex = args.indexOf('--request-file');",
+        "const requestFile = requestFileIndex >= 0 ? args[requestFileIndex + 1] : args.find((entry) => entry.endsWith('.json'));",
+        "const packet = JSON.parse(fs.readFileSync(requestFile, 'utf8'));",
+        "const stateFile = process.env.AOR_PREFLIGHT_CALL_STATE_FILE;",
+        "const state = fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : {};",
+        "const stepClass = packet.request.step_class;",
+        "state[stepClass] = (state[stepClass] || 0) + 1;",
+        "fs.writeFileSync(stateFile, JSON.stringify(state));",
+        "if (stepClass === 'preflight-permission-readiness' && state[stepClass] === 1) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10000);",
+        "const probe = packet.request.edit_probe || packet.request.permission_probe;",
+        "if (probe) fs.writeFileSync(probe.marker_file, probe.expected_marker_contents, 'utf8');",
+        "process.stdout.write(JSON.stringify({status:'success',summary:'preflight ok'}));",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(adapterProfileRoot, "codex-cli.yaml"),
+      [
+        "adapter_id: codex-cli",
+        "runner_family: codex",
+        "version: 1",
+        "launch_modes:",
+        "  - non-interactive",
+        "capabilities:",
+        "  repo_read: true",
+        "  repo_write: true",
+        "  shell_commands: true",
+        "  structured_output: true",
+        "constraints:",
+        "  requires_local_runtime: true",
+        "execution:",
+        "  runtime_mode: external-process",
+        "  live_baseline: true",
+        "  handler: codex-cli-external-runner",
+        "  evidence_namespace: evidence://adapter-live/codex-cli",
+        "  external_runtime:",
+        `    command: ${process.execPath}`,
+        "    request_transport: request-artifact",
+        "    request_file:",
+        "      argument: --request-file",
+        "      message: Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}.",
+        "    preflight_timeout_ms: 2000",
+        "    timeout_ms: 30000",
+        "    env_from:",
+        "      AOR_PREFLIGHT_CALL_STATE_FILE: AOR_PREFLIGHT_CALL_STATE_FILE",
+        "    permission_policy:",
+        "      default_mode: full-bypass",
+        "      modes:",
+        "        full-bypass:",
+        "          args:",
+        `            - ${JSON.stringify(runnerScript)}`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = runLiveAdapterPreflight({
+      targetCheckoutRoot,
+      adapterProfileRoot,
+      providerVariant: {
+        provider: "openai",
+        primary_adapter: "codex-cli",
+        coverage_tier: "required",
+      },
+      providerVariantId: "openai-primary",
+      coverageTier: "required",
+      env: {
+        ...process.env,
+        AOR_PREFLIGHT_CALL_STATE_FILE: callStateFile,
+      },
+      runnerAuthMode: "host",
+      runnerAuthSource: "host",
+      runtimeAgentPermissionMode: "full-bypass",
+      runtimeAgentInteractionPolicy: "fail-closed",
+      runtimeAgentAutoApprovalProfile: "none",
+      authProbeRequired: true,
+      permissionReadinessRequired: true,
+      runId: "codex-flaky-permission-readiness",
+      reportsRoot,
+    });
+
+    assert.equal(result.status, "pass");
+    assert.equal(result.report.permission_readiness.attempts.length, 2);
+    assert.equal(result.report.permission_readiness.attempts[0].failure_kind, "external-runner-timeout");
+    assert.equal(result.report.permission_readiness.attempts[0].timed_out, true);
+    assert.equal(result.report.permission_readiness.attempts[1].status, "pass");
+    assert.equal(result.report.permission_readiness.attempts[1].marker_status, "present");
+    const callState = JSON.parse(fs.readFileSync(callStateFile, "utf8"));
+    assert.equal(callState["preflight-permission-readiness"], 2);
+  });
+});
+
 test("target checkout materialization supports short physical roots for path-sensitive providers", () => {
   withTempRoot((tempRoot) => {
     const sourceRepo = path.join(tempRoot, "source-repo");
