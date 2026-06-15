@@ -85,6 +85,16 @@ This is still factual run-health classification. It does not evaluate whether th
 
 `evidence_health` should include missing evidence refs, weak evidence refs, and evidence ref counts.
 
+For guided installed-user profiles that declare `live_e2e.frontend_capability: browser-task-proof`,
+`guided_journey.browser_task_proof.required: true`, or `browser-task-proof` in proof requirements, missing or non-passing
+AOR operator browser-task evidence is a factual run-health blocker, not an outcome-quality verdict:
+- `failure_summary.owner: operator`
+- `failure_summary.phase: ui_validation`
+- `failure_summary.class: guided_browser_task_proof_missing`
+
+The runner should still preserve deterministic app-smoke refs in `frontend_interactions[]`; `aor app --smoke` remains a
+render guardrail and does not satisfy required browser-task proof by itself.
+
 `resume_interaction_health` should include pending interactions, pending decisions, resume failures, and answer audit gaps.
 
 `run_findings[]` are factual run findings. Each finding should include:

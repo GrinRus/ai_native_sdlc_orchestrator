@@ -4471,41 +4471,51 @@ export function executeFullJourneyFlow(options) {
     }
 
     if (postRunQualityPolicy.diagnosticCommands.length > 0) {
-      const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic", [
-        "project",
-        "verify",
-        "--project-ref",
-        ".",
-        "--project-profile",
-        generatedProfile.generatedProjectProfileFile,
-        "--runtime-root",
-        ".aor",
-        "--require-validation-pass",
-        "true",
-        ...buildVerifyOverrideArgs({
-          label: "post-run-diagnostic",
-          commands: postRunQualityPolicy.diagnosticCommands,
-        }),
-        ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
-          ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
-          : []),
-      ]);
-      artifacts.post_run_diagnostic_verify_summary_file = getStringField(
-        postRunDiagnosticVerify.payload,
-        "verify_summary_file",
-      );
-      artifacts.post_run_diagnostic_verify_step_result_files = getStringArrayField(
-        postRunDiagnosticVerify.payload,
-        "step_result_files",
-      );
+      const cachedDiagnosticSummaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
+      const cachedDiagnosticSummary =
+        cachedDiagnosticSummaryFile && fileExists(cachedDiagnosticSummaryFile)
+          ? asRecord(readJson(cachedDiagnosticSummaryFile))
+          : {};
+      const shouldReuseDiagnostic = Object.keys(cachedDiagnosticSummary).length > 0;
+      let postRunDiagnosticVerifyPayload = {};
+      if (!shouldReuseDiagnostic) {
+        const postRunDiagnosticVerify = runCommand("project-verify-post-run-diagnostic", [
+          "project",
+          "verify",
+          "--project-ref",
+          ".",
+          "--project-profile",
+          generatedProfile.generatedProjectProfileFile,
+          "--runtime-root",
+          ".aor",
+          "--require-validation-pass",
+          "true",
+          ...buildVerifyOverrideArgs({
+            label: "post-run-diagnostic",
+            commands: postRunQualityPolicy.diagnosticCommands,
+          }),
+          ...(asNonEmptyString(artifacts.baseline_verify_summary_file)
+            ? ["--output-quality-baseline", /** @type {string} */ (artifacts.baseline_verify_summary_file)]
+            : []),
+        ]);
+        artifacts.post_run_diagnostic_verify_summary_file = getStringField(
+          postRunDiagnosticVerify.payload,
+          "verify_summary_file",
+        );
+        artifacts.post_run_diagnostic_verify_step_result_files = getStringArrayField(
+          postRunDiagnosticVerify.payload,
+          "step_result_files",
+        );
+        postRunDiagnosticVerifyPayload = asRecord(postRunDiagnosticVerify.payload);
+      }
       const diagnosticSummaryFile = asNonEmptyString(artifacts.post_run_diagnostic_verify_summary_file);
       const diagnosticSummary =
         diagnosticSummaryFile && fileExists(diagnosticSummaryFile) ? readJson(diagnosticSummaryFile) : {};
       const diagnosticPassed = asNonEmptyString(diagnosticSummary.status) === "passed";
       artifacts.post_run_diagnostic_status = diagnosticPassed ? "pass" : postRunQualityPolicy.diagnosticFailureMode;
-      const preservedDiagnostic = diagnosticSummaryFile
+      const preservedDiagnostic = diagnosticSummaryFile && !shouldReuseDiagnostic
         ? preserveVerifyArtifacts({
-            verifyPayload: asRecord(postRunDiagnosticVerify.payload),
+            verifyPayload: postRunDiagnosticVerifyPayload,
             summaryFile: diagnosticSummaryFile,
             reportsRoot: options.layout.reportsRoot,
             runId: options.runId,

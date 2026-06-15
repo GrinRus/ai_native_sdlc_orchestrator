@@ -1644,6 +1644,265 @@ test("guided journey proof requires flow-loop and browser-task evidence", () => 
   });
 });
 
+test("proof runner hydrates guided UI refs and blocks missing browser-task proof", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const runId = "guided-ui-proof-missing";
+    const normalizedRunId = "guided-ui-proof-missing";
+    const webSmokeSummaryFile = writeJsonFixture(
+      path.join(reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.json`),
+      {
+        summary_file: path.join(reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.json`),
+        rendered_html_file: path.join(reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.html`),
+        dom_snapshot_file: path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${normalizedRunId}.json`),
+        accessibility_summary_file: path.join(
+          reportsRoot,
+          `installed-user-guided-web-smoke-accessibility-${normalizedRunId}.json`,
+        ),
+        visual_guardrail_file: path.join(
+          reportsRoot,
+          `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`,
+        ),
+        browser_task_proof_request_file: path.join(
+          reportsRoot,
+          `installed-user-guided-browser-task-proof-request-${normalizedRunId}.json`,
+        ),
+        browser_task_proof_file: null,
+        screenshot_files: [],
+        task_outcome: {
+          status: "not_pass",
+          checked_tasks: ["browser-task evidence capture"],
+          findings: ["browser-task-proof requires skill-agent browser evidence."],
+        },
+        ux_findings: ["browser-task-proof requires skill-agent browser evidence."],
+        html_loaded: true,
+        flow_selector_loaded: true,
+        new_flow_action_loaded: true,
+        guided_lifecycle_state: "smoke-pass",
+        detached: true,
+      },
+    );
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "intake-packet.json",
+        "intake-body.json",
+        "discovery-report.json",
+        "spec-step-result.json",
+        "handoff-packet.json",
+        "approved-handoff-packet.json",
+        "runtime-harness-report.json",
+        "review-report.json",
+        "evaluation-report.json",
+        "delivery-manifest.json",
+        "release-packet.json",
+        "learning-scorecard.json",
+        "learning-handoff.json",
+        "post-run-verify-summary.json",
+        "web.html",
+        "web-dom.json",
+        "web-accessibility.json",
+        "web-visual.json",
+        "browser-task-proof-request.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) writeJsonFixture(file);
+    writeJsonFixture(files["browser-task-proof-request.json"], {
+      expected_browser_task_proof_file: path.join(
+        reportsRoot,
+        `installed-user-guided-browser-task-proof-${normalizedRunId}.json`,
+      ),
+    });
+    fs.writeFileSync(path.join(reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.html`), "<main>AOR</main>\n", "utf8");
+    writeJsonFixture(path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${normalizedRunId}.json`));
+    writeJsonFixture(path.join(reportsRoot, `installed-user-guided-web-smoke-accessibility-${normalizedRunId}.json`));
+    writeJsonFixture(path.join(reportsRoot, `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`));
+    writeJsonFixture(path.join(reportsRoot, `installed-user-guided-browser-task-proof-request-${normalizedRunId}.json`), {
+      expected_browser_task_proof_file: path.join(
+        reportsRoot,
+        `installed-user-guided-browser-task-proof-${normalizedRunId}.json`,
+      ),
+    });
+
+    const includedSteps = ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery", "release", "learning"];
+    const stepJournal = includedSteps.map((step, index) => {
+      const ref = writeJsonFixture(path.join(reportsRoot, `${step}-artifact.json`));
+      return {
+        sequence: index + 1,
+        step_id: step,
+        step_instance_id: step,
+        iteration: 1,
+        flow_stage: step,
+        plan: {
+          objective: `${step} objective`,
+          public_surface: `aor ${step}`,
+          command_labels: [`${step}-command`],
+          expected_artifacts: [`${step}-artifact`],
+          inspection_sources: ["command_transcript"],
+          safety_constraints: ["no-upstream-write"],
+        },
+        plan_ref: ref,
+        public_surface: `aor ${step}`,
+        transcript_ref: ref,
+        execution_ref: ref,
+        inspection_ref: ref,
+        classification_ref: ref,
+        artifact_refs: [ref],
+        started_at: "2026-06-09T00:00:00.000Z",
+        finished_at: "2026-06-09T00:00:01.000Z",
+        duration_sec: 1,
+        deterministic_analysis: { status: "pass", exit_code: 0, failure_class: null, missing_evidence: [], recommendation: "continue" },
+        semantic_analysis: { status: "pass", judge_source: "skill-agent", findings: [] },
+        agent_decision_request_ref: ref,
+        operator_decision_ref: ref,
+        operator_decision_status: "accepted",
+        inspected_evidence_refs: [ref],
+        requested_interaction: null,
+        decision: { action: "continue", reason: "Accepted test evidence." },
+        resume_result: null,
+        frontend_interaction_refs: [],
+        final_step_verdict: "pass",
+      };
+    });
+
+    writeJsonFixture(files["controller-state.json"], {
+      current_step: null,
+      completed_steps: includedSteps,
+      artifacts_snapshot: {
+        target_checkout_root: targetCheckoutRoot,
+        generated_project_profile_file: files["generated-project.aor.yaml"],
+        feature_request_file: files["feature-request.json"],
+        intake_artifact_packet_file: files["intake-packet.json"],
+        intake_artifact_packet_body_file: files["intake-body.json"],
+        discovery_analysis_report_file: files["discovery-report.json"],
+        spec_step_result_file: files["spec-step-result.json"],
+        handoff_packet_file: files["handoff-packet.json"],
+        approved_handoff_packet_file: files["approved-handoff-packet.json"],
+        runtime_harness_report_file: files["runtime-harness-report.json"],
+        review_report_file: files["review-report.json"],
+        evaluation_report_file: files["evaluation-report.json"],
+        delivery_manifest_file: files["delivery-manifest.json"],
+        release_packet_file: files["release-packet.json"],
+        learning_loop_scorecard_file: files["learning-scorecard.json"],
+        learning_loop_handoff_file: files["learning-handoff.json"],
+        post_run_verify_summary_file: files["post-run-verify-summary.json"],
+        post_run_verify_status: "pass",
+        provider_execution_status: "completed",
+        real_code_change_status: "pass",
+        guided_web_smoke: JSON.parse(fs.readFileSync(webSmokeSummaryFile, "utf8")),
+        guided_web_smoke_summary_file: webSmokeSummaryFile,
+        guided_web_smoke_html_file: path.join(reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.html`),
+        guided_web_dom_snapshot_file: path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${normalizedRunId}.json`),
+        guided_web_accessibility_summary_file: path.join(
+          reportsRoot,
+          `installed-user-guided-web-smoke-accessibility-${normalizedRunId}.json`,
+        ),
+        guided_web_visual_guardrail_file: path.join(
+          reportsRoot,
+          `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`,
+        ),
+        guided_browser_task_proof_request_file: path.join(
+          reportsRoot,
+          `installed-user-guided-browser-task-proof-request-${normalizedRunId}.json`,
+        ),
+        guided_browser_task_proof_file: null,
+        feature_mission_id: "ky-header-regression",
+        feature_size: "small",
+      },
+    });
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.guided-ui-proof-missing",
+        journey_mode: "full-journey",
+        run_tier: "acceptance",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-header-regression",
+        scenario_family: "regress",
+        provider_variant_id: "openai-primary",
+        stages: includedSteps,
+        live_e2e: {
+          flow_range_policy: "full_lifecycle",
+          frontend_capability: "browser-task-proof",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+        guided_journey: {
+          enabled: true,
+          proof_requirements: ["web-smoke", "browser-task-proof"],
+          browser_task_proof: { required: true },
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "pass",
+        stageResults: includedSteps.map((step) => ({
+          stage: step,
+          status: "pass",
+          evidence_refs: [files["delivery-manifest.json"]],
+          summary: `${step} passed.`,
+        })),
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: stepJournal,
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    const observationReport = JSON.parse(fs.readFileSync(written.summary.live_e2e_observation_report_file, "utf8"));
+    assert.equal(observationReport.frontend_interactions.length, 1);
+    assert.equal(observationReport.frontend_interactions[0].task_outcome.status, "not_pass");
+    assert.equal(written.summary.feature_request_file, files["feature-request.json"]);
+    assert.equal(written.summary.guided_web_smoke_summary_file, webSmokeSummaryFile);
+    assert.equal(written.summary.guided_browser_task_proof_file, null);
+    assert.equal(written.runHealthReport.overall_status, "blocked");
+    assert.equal(written.runHealthReport.evidence_health.status, "blocked");
+    assert.equal(written.runHealthReport.evidence_health.weak_evidence_refs.includes("guided-browser-task-proof"), true);
+    assert.equal(written.runHealthReport.failure_summary.owner, "operator");
+    assert.equal(written.runHealthReport.failure_summary.phase, "ui_validation");
+    assert.equal(written.runHealthReport.failure_summary.class, "guided_browser_task_proof_missing");
+  });
+});
+
 test("guided flow loop prefers archived first-flow next-action evidence", () => {
   withTempRoot((tempRoot) => {
     const targetRoot = path.join(tempRoot, "target");

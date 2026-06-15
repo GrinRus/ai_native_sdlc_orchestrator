@@ -155,6 +155,74 @@ function readJsonIfPresent(filePath) {
 }
 
 /**
+ * @param {string} reportsRoot
+ * @param {string} fileName
+ * @returns {string | null}
+ */
+function existingReportFile(reportsRoot, fileName) {
+  const file = path.join(reportsRoot, fileName);
+  return fileExists(file) ? file : null;
+}
+
+/**
+ * Guided AOR UI smoke files are deterministic report artifacts. Manual resume
+ * can rebuild final reports from durable controller state after those transient
+ * artifact fields have been dropped, so hydrate them before observation and
+ * run-health reports are written.
+ *
+ * @param {Record<string, unknown>} artifacts
+ * @param {{ reportsRoot: string, runId: string }} options
+ */
+function hydrateGuidedUiArtifactsFromReports(artifacts, options) {
+  const normalizedRunId = normalizeId(options.runId);
+  const webSmokeSummaryFile =
+    asNonEmptyString(artifacts.guided_web_smoke_summary_file) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.json`);
+  const webSmoke =
+    Object.keys(asRecord(artifacts.guided_web_smoke)).length > 0
+      ? asRecord(artifacts.guided_web_smoke)
+      : readJsonIfPresent(webSmokeSummaryFile);
+  if (webSmokeSummaryFile) artifacts.guided_web_smoke_summary_file = webSmokeSummaryFile;
+  if (Object.keys(webSmoke).length > 0) {
+    artifacts.guided_web_smoke = webSmoke;
+  }
+  const htmlFile =
+    asNonEmptyString(artifacts.guided_web_smoke_html_file) ||
+    asNonEmptyString(webSmoke.rendered_html_file) ||
+    asNonEmptyString(webSmoke.html_ref) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.html`);
+  const domSnapshotFile =
+    asNonEmptyString(artifacts.guided_web_dom_snapshot_file) ||
+    asNonEmptyString(webSmoke.dom_snapshot_file) ||
+    asNonEmptyString(webSmoke.dom_snapshot_ref) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-dom-${normalizedRunId}.json`);
+  const accessibilitySummaryFile =
+    asNonEmptyString(artifacts.guided_web_accessibility_summary_file) ||
+    asNonEmptyString(webSmoke.accessibility_summary_file) ||
+    asNonEmptyString(webSmoke.accessibility_summary_ref) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-accessibility-${normalizedRunId}.json`);
+  const visualGuardrailFile =
+    asNonEmptyString(artifacts.guided_web_visual_guardrail_file) ||
+    asNonEmptyString(webSmoke.visual_guardrail_file) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`);
+  const browserTaskProofRequestFile =
+    asNonEmptyString(artifacts.guided_browser_task_proof_request_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_request_file) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-browser-task-proof-request-${normalizedRunId}.json`);
+  const browserTaskProofFile =
+    asNonEmptyString(artifacts.guided_browser_task_proof_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_file) ||
+    existingReportFile(options.reportsRoot, `installed-user-guided-browser-task-proof-${normalizedRunId}.json`);
+
+  if (htmlFile) artifacts.guided_web_smoke_html_file = htmlFile;
+  if (domSnapshotFile) artifacts.guided_web_dom_snapshot_file = domSnapshotFile;
+  if (accessibilitySummaryFile) artifacts.guided_web_accessibility_summary_file = accessibilitySummaryFile;
+  if (visualGuardrailFile) artifacts.guided_web_visual_guardrail_file = visualGuardrailFile;
+  if (browserTaskProofRequestFile) artifacts.guided_browser_task_proof_request_file = browserTaskProofRequestFile;
+  if (browserTaskProofFile) artifacts.guided_browser_task_proof_file = browserTaskProofFile;
+}
+
+/**
  * @param {Record<string, unknown>} artifacts
  * @param {Record<string, unknown>} webSmoke
  * @returns {string}
@@ -640,6 +708,74 @@ function buildFrontendInteractions(artifacts, stepJournal = []) {
 }
 
 /**
+ * @param {Record<string, unknown>} profile
+ * @param {Record<string, unknown>} artifacts
+ * @returns {boolean}
+ */
+function expectsGuidedBrowserTaskProof(profile, artifacts) {
+  const liveE2e = asRecord(profile.live_e2e);
+  const guidedJourney = asRecord(profile.guided_journey);
+  const browserTaskProof = asRecord(guidedJourney.browser_task_proof);
+  return (
+    asNonEmptyString(liveE2e.frontend_capability) === "browser-task-proof" ||
+    asStringArray(guidedJourney.proof_requirements).includes("browser-task-proof") ||
+    browserTaskProof.required === true ||
+    Boolean(asNonEmptyString(artifacts.guided_browser_task_proof_request_file))
+  );
+}
+
+/**
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   artifacts: Record<string, unknown>,
+ *   observationReport: Record<string, unknown>,
+ * }} options
+ * @returns {Array<string>}
+ */
+function buildGuidedUiEvidenceGaps(options) {
+  if (!expectsGuidedBrowserTaskProof(options.profile, options.artifacts)) return [];
+  const webSmoke = mergeBrowserTaskProofIntoWebSmoke(options.artifacts, asRecord(options.artifacts.guided_web_smoke));
+  const gaps = [];
+  const summaryFile =
+    asNonEmptyString(options.artifacts.guided_web_smoke_summary_file) ||
+    asNonEmptyString(webSmoke.summary_file);
+  const browserTaskProofRequestFile =
+    asNonEmptyString(options.artifacts.guided_browser_task_proof_request_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_request_file);
+  const browserTaskProofFile =
+    asNonEmptyString(options.artifacts.guided_browser_task_proof_file) ||
+    asNonEmptyString(webSmoke.browser_task_proof_file);
+  const frontendInteractions = Array.isArray(options.observationReport.frontend_interactions)
+    ? options.observationReport.frontend_interactions.map((entry) => asRecord(entry))
+    : [];
+  if (!summaryFile || !fileExists(summaryFile)) {
+    gaps.push("guided-web-smoke-summary");
+  }
+  if (!browserTaskProofRequestFile || !fileExists(browserTaskProofRequestFile)) {
+    gaps.push("guided-browser-task-proof-request");
+  }
+  if (!browserTaskProofFile || !fileExists(browserTaskProofFile)) {
+    gaps.push("guided-browser-task-proof");
+  }
+  const taskOutcome = asRecord(webSmoke.task_outcome);
+  if (asNonEmptyString(taskOutcome.status) && asNonEmptyString(taskOutcome.status) !== "pass") {
+    gaps.push("guided-web-smoke.task_outcome");
+  }
+  if (frontendInteractions.length === 0) {
+    gaps.push("frontend_interactions.guided-web-smoke");
+  }
+  for (const interaction of frontendInteractions) {
+    if (
+      asNonEmptyString(interaction.interaction_id) === "guided-web-smoke" &&
+      asNonEmptyString(interaction.status) !== "pass"
+    ) {
+      gaps.push("frontend_interactions.guided-web-smoke.status");
+    }
+  }
+  return uniqueStrings(gaps);
+}
+
+/**
  * @param {Record<string, unknown>} artifacts
  * @returns {Array<Record<string, unknown>>}
  */
@@ -870,6 +1006,14 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "execution_readiness_file",
     "target_cleanliness_before_execution_file",
     "target_cleanliness_before_execution",
+    "feature_request_file",
+    "intake_artifact_packet_file",
+    "intake_artifact_packet_body_file",
+    "analysis_report_file",
+    "discovery_analysis_report_file",
+    "spec_step_result_file",
+    "handoff_packet_file",
+    "approved_handoff_packet_file",
     "routed_step_result_file",
     "runtime_harness_report_file",
     "latest_runtime_harness_report_file",
@@ -896,6 +1040,22 @@ function hydrateFlowArtifactsFromControllerState(artifacts) {
     "post_run_verify_status",
     "post_run_diagnostic_verify_summary_file",
     "post_run_diagnostic_status",
+    "guided_journey_enabled",
+    "guided_web_smoke",
+    "guided_web_smoke_summary_file",
+    "guided_web_smoke_html_file",
+    "guided_web_dom_snapshot_file",
+    "guided_web_accessibility_summary_file",
+    "guided_web_visual_guardrail_file",
+    "guided_web_screenshot_files",
+    "guided_browser_task_proof_request_file",
+    "guided_browser_task_proof_file",
+    "guided_journey_proof_file",
+    "guided_journey_proof",
+    "new_flow_mission_artifact_packet_file",
+    "new_flow_mission_artifact_packet_body_file",
+    "new_flow_next_action_report_file",
+    "flow_targeted_operator_request_file",
     "delivery_plan_file",
     "delivery_manifest_file",
     "delivery_transcript_file",
@@ -1499,7 +1659,12 @@ function buildTargetEnvironmentHealth(artifacts) {
 }
 
 /**
- * @param {{ observationReport: Record<string, unknown>, stepObservationFiles: string[] }} options
+ * @param {{
+ *   profile: Record<string, unknown>,
+ *   artifacts: Record<string, unknown>,
+ *   observationReport: Record<string, unknown>,
+ *   stepObservationFiles: string[],
+ * }} options
  * @returns {Record<string, unknown>}
  */
 function buildEvidenceHealth(options) {
@@ -1525,10 +1690,21 @@ function buildEvidenceHealth(options) {
     .map((ref, index) => ({ ref: asNonEmptyString(ref), index }))
     .filter((entry) => !entry.ref)
     .map((entry) => `missing-ref-${entry.index}`);
+  const guidedUiEvidenceGaps = buildGuidedUiEvidenceGaps({
+    profile: options.profile,
+    artifacts: options.artifacts,
+    observationReport: options.observationReport,
+  });
+  const status =
+    guidedUiEvidenceGaps.length > 0
+      ? "blocked"
+      : missingEvidenceRefs.length === 0
+        ? "pass"
+        : "warn";
   return {
-    status: missingEvidenceRefs.length === 0 ? "pass" : "warn",
+    status,
     missing_evidence_refs: missingEvidenceRefs,
-    weak_evidence_refs: [],
+    weak_evidence_refs: guidedUiEvidenceGaps,
     evidence_ref_count: uniqueStrings(rawRefs.map((ref) => asNonEmptyString(ref))).length,
   };
 }
@@ -1663,6 +1839,18 @@ function resolveRunHealthFailure(options) {
       summary: "One or more public live E2E commands failed.",
     };
   }
+  if (
+    asStringArray(options.evidenceHealth.weak_evidence_refs).some((ref) =>
+      ref === "guided-browser-task-proof" || ref.startsWith("frontend_interactions.guided-web-smoke"),
+    )
+  ) {
+    return {
+      owner: "operator",
+      phase: "ui_validation",
+      class: "guided_browser_task_proof_missing",
+      summary: "Guided AOR operator UI proof was required but browser-task evidence was missing or did not pass.",
+    };
+  }
   if (asNonEmptyString(options.evidenceHealth.status) !== "pass") {
     return {
       owner: "aor",
@@ -1723,6 +1911,8 @@ function buildRunHealthReport(options) {
   const providerHealth = buildProviderHealth(options.flowResult.artifacts);
   const targetEnvironmentHealth = buildTargetEnvironmentHealth(options.flowResult.artifacts);
   const evidenceHealth = buildEvidenceHealth({
+    profile: options.profile,
+    artifacts: options.flowResult.artifacts,
     observationReport: options.observationReport,
     stepObservationFiles: options.stepObservationFiles,
   });
@@ -1735,6 +1925,7 @@ function buildRunHealthReport(options) {
     asNonEmptyString(controllerHealth.status) === "blocked" ||
     asNonEmptyString(providerHealth.status) === "blocked" ||
     asNonEmptyString(targetEnvironmentHealth.status) === "blocked" ||
+    asNonEmptyString(evidenceHealth.status) === "blocked" ||
     asNonEmptyString(resumeInteractionHealth.status) === "blocked";
   const hasFailedRun =
     observationStatus === "not_pass" ||
@@ -1772,6 +1963,7 @@ function buildRunHealthReport(options) {
     ...failedCommandFindings,
     ...asStringArray(controllerHealth.missing_operator_decision_steps).map((step) => `Missing operator decision for ${step}.`),
     ...asStringArray(evidenceHealth.missing_evidence_refs).map((ref) => `Missing evidence ref: ${ref}.`),
+    ...asStringArray(evidenceHealth.weak_evidence_refs).map((ref) => `Weak or missing required evidence: ${ref}.`),
   ]);
   return {
     report_id: `${options.runId}.live-e2e-run-health.v1`,
@@ -1860,6 +2052,10 @@ export function writeProofRunnerArtifacts(options) {
   );
   const productionProofPolicy = buildProductionProofSummary(options.profile);
   hydrateFlowArtifactsFromControllerState(options.flowResult.artifacts);
+  hydrateGuidedUiArtifactsFromReports(options.flowResult.artifacts, {
+    reportsRoot: options.layout.reportsRoot,
+    runId: options.runId,
+  });
   const observationReport = buildObservationReport({
     runId: options.runId,
     profilePath: options.profilePath,
@@ -2110,6 +2306,16 @@ export function writeProofRunnerArtifacts(options) {
       options.flowResult.artifacts.guided_journey_proof
         ? options.flowResult.artifacts.guided_journey_proof
         : null,
+    guided_web_smoke_summary_file: asNonEmptyString(options.flowResult.artifacts.guided_web_smoke_summary_file) || null,
+    guided_web_smoke_html_file: asNonEmptyString(options.flowResult.artifacts.guided_web_smoke_html_file) || null,
+    guided_web_dom_snapshot_file: asNonEmptyString(options.flowResult.artifacts.guided_web_dom_snapshot_file) || null,
+    guided_web_accessibility_summary_file:
+      asNonEmptyString(options.flowResult.artifacts.guided_web_accessibility_summary_file) || null,
+    guided_web_visual_guardrail_file:
+      asNonEmptyString(options.flowResult.artifacts.guided_web_visual_guardrail_file) || null,
+    guided_browser_task_proof_request_file:
+      asNonEmptyString(options.flowResult.artifacts.guided_browser_task_proof_request_file) || null,
+    guided_browser_task_proof_file: asNonEmptyString(options.flowResult.artifacts.guided_browser_task_proof_file) || null,
     live_e2e_observation_report_file: observationReportFile,
     live_e2e_controller_state_file: asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file) || null,
     live_e2e_step_observation_files: stepObservationFiles,

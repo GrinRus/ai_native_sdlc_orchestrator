@@ -505,6 +505,10 @@ Full-journey summaries must carry:
 - `post_run_verify_status`
 - `post_run_diagnostic_verify_summary_file` when configured
 - `post_run_diagnostic_status`
+
+On manual resume, the runner should reuse an already materialized `post_run_diagnostic_verify_summary_file` instead of
+rerunning diagnostic commands for every delivery/release/learning tail step. A new diagnostic run is required only when
+the preserved summary is missing.
 - `real_code_change_status`
 - `runtime_harness_report_file`
 - `runtime_harness_decision`
@@ -542,6 +546,13 @@ assertion. It intentionally excludes runtime output paths, target checkout conte
 
 Guided full-journey summaries also carry:
 - `guided_journey`
+- top-level `guided_web_smoke_summary_file`
+- top-level `guided_web_smoke_html_file`
+- top-level `guided_web_dom_snapshot_file`
+- top-level `guided_web_accessibility_summary_file`
+- top-level `guided_web_visual_guardrail_file`
+- top-level `guided_browser_task_proof_request_file`
+- top-level `guided_browser_task_proof_file`
 - `artifacts.guided_journey_proof_file`
 - `artifacts.guided_web_smoke_summary_file`
 - `artifacts.guided_web_smoke_html_file`
@@ -563,6 +574,10 @@ Guided full-journey summaries also carry:
 - `artifacts.release_packet_file`
 - `artifacts.target_head_before` and `artifacts.target_head_after`
 - `artifacts.target_git_status_without_runtime`
+
+If the guided profile requires `browser-task-proof`, a missing `guided_browser_task_proof_file` or non-passing
+`frontend_interactions[].task_outcome.status` must make run-health non-passing with
+`failure_summary.phase: ui_validation`. The deterministic web smoke remains factual render evidence only.
 
 Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for product observation success when required step evidence is missing.
 
