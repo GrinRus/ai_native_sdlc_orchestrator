@@ -1941,6 +1941,12 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     assert.equal(hydratedWebSmoke.task_outcome.status, "pass");
     assert.equal(hydratedWebSmoke.browser_task_proof_file, browserTaskProofFile);
     assert.deepEqual(hydratedWebSmoke.screenshot_files, [screenshotFile]);
+    assert.equal(
+      hydratedWebSmoke.ux_findings.some((finding) =>
+        /browser-task-proof requires skill-agent browser evidence/iu.test(finding),
+      ),
+      false,
+    );
     assert.equal(hydrated.runHealthReport.overall_status, "pass");
   });
 });

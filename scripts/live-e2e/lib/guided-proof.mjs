@@ -130,6 +130,9 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
   const proofHasVisualEvidence = screenshotFiles.length > 0 || Boolean(asNonEmptyString(proof.visual_guardrail_file));
   const proofPasses = (proofStatus === "pass" || proofStatus === "warn") && proofHasVisualEvidence;
   if (!proofPasses) return { ...webSmoke, browser_task_proof_file: browserTaskProofFile };
+  const retainedWebSmokeUxFindings = asStringArray(webSmoke.ux_findings).filter(
+    (finding) => !/browser-task-proof requires skill-agent browser evidence/iu.test(finding),
+  );
   return {
     ...webSmoke,
     rendered_html_file:
@@ -157,7 +160,7 @@ function mergeBrowserTaskProofIntoWebSmoke(artifacts, webSmoke) {
       ]),
       findings: asStringArray(proofOutcome.findings),
     },
-    ux_findings: uniqueStrings([...asStringArray(webSmoke.ux_findings), ...asStringArray(proof.ux_findings)]),
+    ux_findings: uniqueStrings([...retainedWebSmokeUxFindings, ...asStringArray(proof.ux_findings)]),
     agent_verdict_ref:
       asNonEmptyString(proof.agent_verdict_ref) ||
       asNonEmptyString(webSmoke.agent_verdict_ref),

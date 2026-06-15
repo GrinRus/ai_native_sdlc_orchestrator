@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 
 import {
@@ -69,7 +70,90 @@ export function resolveFrontendEvidenceRefs(request) {
   return uniqueStrings([
     ...asStringArray(rubric.frontend_evidence_refs),
     ...asStringArray(expected.frontend_evidence_refs),
+    ...resolveLateBrowserTaskProofEvidenceRefs([
+      ...asStringArray(rubric.frontend_evidence_refs),
+      ...asStringArray(expected.frontend_evidence_refs),
+    ]),
   ]);
+}
+
+/**
+ * @param {string} filePath
+ * @returns {Record<string, unknown>}
+ */
+function readJsonIfPresent(filePath) {
+  const resolved = asNonEmptyString(filePath);
+  if (!resolved || !fs.existsSync(resolved)) return {};
+  try {
+    return asRecord(readJson(resolved));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * @param {string} filePath
+ * @returns {boolean}
+ */
+function isLocalJsonFile(filePath) {
+  const resolved = asNonEmptyString(filePath);
+  return Boolean(resolved && path.isAbsolute(resolved) && resolved.endsWith(".json") && fs.existsSync(resolved));
+}
+
+/**
+ * @param {Record<string, unknown>} request
+ * @returns {string[]}
+ */
+function resolveBrowserTaskProofRefsFromRequest(request) {
+  const expectedProofFile = asNonEmptyString(request.expected_browser_task_proof_file);
+  const directProofFile = asNonEmptyString(request.browser_task_proof_file);
+  const proofFile = directProofFile || expectedProofFile;
+  const proof = proofFile && fs.existsSync(proofFile) ? readJsonIfPresent(proofFile) : {};
+  return uniqueStrings([
+    expectedProofFile,
+    directProofFile,
+    Object.keys(proof).length > 0 ? proofFile : "",
+    ...asStringArray(proof.screenshot_files),
+    ...asStringArray(proof.screenshot_refs),
+    asNonEmptyString(proof.rendered_html_file),
+    asNonEmptyString(proof.html_ref),
+    asNonEmptyString(proof.dom_snapshot_file),
+    asNonEmptyString(proof.dom_snapshot_ref),
+    asNonEmptyString(proof.accessibility_summary_file),
+    asNonEmptyString(proof.accessibility_summary_ref),
+    asNonEmptyString(proof.visual_guardrail_file),
+  ]);
+}
+
+/**
+ * @param {Record<string, unknown>} webSmoke
+ * @returns {string[]}
+ */
+function resolveBrowserTaskProofRefsFromWebSmoke(webSmoke) {
+  const requestFile = asNonEmptyString(webSmoke.browser_task_proof_request_file);
+  const request = readJsonIfPresent(requestFile);
+  return uniqueStrings([
+    requestFile,
+    asNonEmptyString(webSmoke.browser_task_proof_file),
+    ...asStringArray(webSmoke.screenshot_files),
+    ...asStringArray(webSmoke.screenshot_refs),
+    ...resolveBrowserTaskProofRefsFromRequest(request),
+  ]);
+}
+
+/**
+ * @param {string[]} frontendRefs
+ * @returns {string[]}
+ */
+function resolveLateBrowserTaskProofEvidenceRefs(frontendRefs) {
+  const refs = [];
+  for (const ref of frontendRefs) {
+    if (!isLocalJsonFile(ref)) continue;
+    const payload = readJsonIfPresent(ref);
+    refs.push(...resolveBrowserTaskProofRefsFromWebSmoke(payload));
+    refs.push(...resolveBrowserTaskProofRefsFromRequest(payload));
+  }
+  return uniqueStrings(refs);
 }
 
 /**
@@ -182,14 +266,14 @@ export function buildOperatorDecisionDraft(options) {
     throw new UsageError(`Decision request does not support action '${action}'.`);
   }
 
-  const inspectedEvidenceRefs = resolveRequiredInspectedEvidenceRefs(request);
-  const evidenceRefs = resolveDecisionEvidenceRefs(request);
+  const frontendRefs = resolveFrontendEvidenceRefs(request);
+  const inspectedEvidenceRefs = uniqueStrings([...resolveRequiredInspectedEvidenceRefs(request), ...frontendRefs]);
+  const evidenceRefs = uniqueStrings([...resolveDecisionEvidenceRefs(request), ...inspectedEvidenceRefs]);
   const semanticStatus = normalizeObservationStatus(
     asNonEmptyString(options.semanticStatus) || defaultSemanticStatus(action, request),
   );
   const expected = asRecord(request.expected_response_shape);
   const operatorContext = asRecord(request.operator_context);
-  const frontendRefs = resolveFrontendEvidenceRefs(request);
   const findings = uniqueStrings([
     ...asStringArray(options.findings),
     asNonEmptyString(options.operatorNote),

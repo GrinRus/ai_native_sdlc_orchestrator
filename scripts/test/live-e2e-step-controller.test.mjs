@@ -308,12 +308,105 @@ test("live E2E decision helper preserves frontend evidence refs in the draft", (
       findings: ["Frontend proof evidence inspected."],
     });
     const preparedDecision = JSON.parse(fs.readFileSync(summary.output_ref, "utf8"));
-    assert.deepEqual(preparedDecision.inspected_evidence_refs, requiredRefs);
+    assert.deepEqual(preparedDecision.inspected_evidence_refs, [...requiredRefs, ...frontendRefs]);
     for (const frontendRef of frontendRefs) {
       assert.equal(preparedDecision.evidence_refs.includes(frontendRef), true);
       assert.equal(preparedDecision.frontend_evidence_refs.includes(frontendRef), true);
       assert.equal(preparedDecision.ui_ux_analysis.frontend_evidence_refs.includes(frontendRef), true);
     }
+    assert.deepEqual(summary.validation_preview.missing_frontend_evidence_refs, []);
+  });
+});
+
+test("live E2E decision helper hydrates late browser-task proof refs", () => {
+  withTempRoot((reportsRoot) => {
+    const requestFile = path.join(reportsRoot, "live-e2e-agent-decision-request-ui-late-proof.json");
+    const expectedDecisionFile = path.join(reportsRoot, "live-e2e-operator-decision-ui-late-proof.json");
+    const requiredRefs = [
+      requestFile,
+      path.join(reportsRoot, "live-e2e-step-inspection-ui-late-proof.json"),
+    ];
+    const webSmokeFile = path.join(reportsRoot, "installed-user-guided-web-smoke-run.json");
+    const browserProofRequestFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-request-run.json");
+    const browserProofFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-run.json");
+    const screenshotFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-run.png");
+    fs.writeFileSync(screenshotFile, "png", "utf8");
+    fs.writeFileSync(
+      browserProofRequestFile,
+      `${JSON.stringify({ expected_browser_task_proof_file: browserProofFile }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      browserProofFile,
+      `${JSON.stringify(
+        {
+          status: "pass",
+          screenshot_files: [screenshotFile],
+          task_outcome: { status: "pass", findings: [] },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      webSmokeFile,
+      `${JSON.stringify(
+        {
+          browser_task_proof_request_file: browserProofRequestFile,
+          browser_task_proof_file: null,
+          task_outcome: { status: "not_pass", findings: ["browser-task-proof requires skill-agent browser evidence."] },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify(
+        {
+          request_id: "ui-late-proof.operator-decision-request",
+          run_id: "ui-late-proof",
+          step_id: "learning",
+          step_instance_id: "learning",
+          iteration: 1,
+          operator_context: { operator_ref: "skill://live-e2e-runner" },
+          deterministic_analysis: { status: "pass" },
+          decision_rubric: {
+            required_evidence_refs: requiredRefs,
+            frontend_evidence_refs: [webSmokeFile],
+          },
+          operator_decision_expected_ref: expectedDecisionFile,
+          expected_response_shape: {
+            action: "continue|frontend_interact|diagnose|block",
+            inspected_evidence_refs: requiredRefs,
+            evidence_refs: requiredRefs,
+            ui_ux_analysis: {
+              status: "pass|warn|not_pass|blocked",
+              task_outcome: "pass|warn|not_pass|blocked",
+              findings: [],
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const summary = prepareOperatorDecisionArtifact({
+      requestFile,
+      action: "continue",
+    });
+    const preparedDecision = JSON.parse(fs.readFileSync(summary.output_ref, "utf8"));
+    for (const expectedRef of [webSmokeFile, browserProofRequestFile, browserProofFile, screenshotFile]) {
+      assert.equal(preparedDecision.inspected_evidence_refs.includes(expectedRef), true);
+      assert.equal(preparedDecision.evidence_refs.includes(expectedRef), true);
+      assert.equal(preparedDecision.frontend_evidence_refs.includes(expectedRef), true);
+      assert.equal(preparedDecision.ui_ux_analysis.frontend_evidence_refs.includes(expectedRef), true);
+    }
+    assert.equal(summary.frontend_evidence_ref_count >= 4, true);
     assert.deepEqual(summary.validation_preview.missing_frontend_evidence_refs, []);
   });
 });
