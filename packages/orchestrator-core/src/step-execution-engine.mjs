@@ -645,6 +645,57 @@ function readLatestAnalysisFeatureTraceability(runtimeLayout) {
 }
 
 /**
+ * @param {unknown} handoffRef
+ * @returns {Record<string, unknown> | null}
+ */
+function readHandoffFeatureTraceability(handoffRef) {
+  const handoffPath = asString(handoffRef);
+  if (!handoffPath || !path.isAbsolute(handoffPath) || !fs.existsSync(handoffPath)) {
+    return null;
+  }
+  try {
+    const document = /** @type {Record<string, unknown>} */ (JSON.parse(fs.readFileSync(handoffPath, "utf8")));
+    const featureTraceability = asRecord(document.feature_traceability);
+    const repoScopePaths = Array.isArray(document.repo_scopes)
+      ? document.repo_scopes.flatMap((scope) => asStringArray(asRecord(scope).paths))
+      : [];
+    return mergeFeatureTraceabilityRecords(
+      featureTraceability,
+      {
+        allowed_paths: uniqueStrings([...asStringArray(document.allowed_paths), ...repoScopePaths]),
+      },
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {...(Record<string, unknown> | null | undefined)} records
+ * @returns {Record<string, unknown> | null}
+ */
+function mergeFeatureTraceabilityRecords(...records) {
+  /** @type {Record<string, unknown>} */
+  const merged = {};
+  for (const record of records) {
+    const source = asRecord(record);
+    for (const [key, value] of Object.entries(source)) {
+      if (Array.isArray(value)) {
+        merged[key] = uniqueStrings([...asStringArray(merged[key]), ...asStringArray(value)]);
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(merged, key)) {
+        continue;
+      }
+      if (value !== null && value !== undefined) {
+        merged[key] = value;
+      }
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : null;
+}
+
+/**
  * @param {{
  *   reportsRoot: string,
  *   runId: string,
@@ -1230,6 +1281,11 @@ export function executeRoutedStep(options) {
         policyOverrides: options.policyOverrides,
       });
       const approvedHandoffRef = asString(options.approvedHandoffRef);
+      featureTraceability = mergeFeatureTraceabilityRecords(
+        featureTraceability,
+        readLatestAnalysisFeatureTraceability(init.runtimeLayout),
+        readHandoffFeatureTraceability(approvedHandoffRef),
+      );
       deliveryPlanResult = materializeDeliveryPlan({
         runtimeLayout: init.runtimeLayout,
         projectId: init.projectId,
@@ -1469,9 +1525,6 @@ export function executeRoutedStep(options) {
           ...asStringArray(adapterResponse?.evidence_refs),
         ]),
       ];
-      if (featureTraceability === null) {
-        featureTraceability = readLatestAnalysisFeatureTraceability(init.runtimeLayout);
-      }
     } catch (error) {
       status = "failed";
       summary = error instanceof Error ? error.message : String(error);

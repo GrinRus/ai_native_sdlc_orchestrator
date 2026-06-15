@@ -659,6 +659,67 @@ test("executeRoutedStep keeps same-step routed artifacts distinct for repeated e
   });
 });
 
+test("executeRoutedStep injects mission traceability before adapter request", () => {
+  withTempRepo((repoRoot) => {
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    fs.writeFileSync(
+      path.join(init.runtimeLayout.reportsRoot, "project-analysis-report.json"),
+      `${JSON.stringify(
+        {
+          report_id: "project-analysis-report",
+          feature_traceability: {
+            mission_id: "ky-retry-hooks-governance",
+            required_path_prefixes: ["source/", "test/", "index.d.ts"],
+            expected_evidence: ["verify-summary", "review-report"],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const handoffFile = path.join(init.runtimeLayout.artifactsRoot, "approved-handoff.json");
+    fs.writeFileSync(
+      handoffFile,
+      `${JSON.stringify(
+        {
+          packet_id: "approved-handoff",
+          feature_traceability: {
+            mission_id: "ky-retry-hooks-governance",
+            request_title: "Exercise retry hooks",
+          },
+          allowed_paths: ["source/**", "test/**", "index.d.ts"],
+          repo_scopes: [{ repo_id: "sindresorhus/ky", paths: ["source/**", "test/**", "index.d.ts"] }],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const result = executeRoutedStep({
+      projectRef: repoRoot,
+      cwd: repoRoot,
+      stepClass: "implement",
+      dryRun: true,
+      runId: "runtime-harness-traceability-adapter-request",
+      stepId: "run.start.implement",
+      approvedHandoffRef: handoffFile,
+      promotionEvidenceRefs: ["evidence://promotion/pass-traceability"],
+      executionRoot: repoRoot,
+    });
+
+    const adapterTraceability = result.stepResult.routed_execution.adapter_request.feature_traceability;
+    assert.deepEqual(adapterTraceability.required_path_prefixes, ["source/", "test/", "index.d.ts"]);
+    assert.deepEqual(adapterTraceability.allowed_paths, ["source/**", "test/**", "index.d.ts"]);
+    assert.deepEqual(result.stepResult.routed_execution.feature_traceability.allowed_paths, [
+      "source/**",
+      "test/**",
+      "index.d.ts",
+    ]);
+  });
+});
+
 test("executeRoutedStep enforces discovery completeness gate for spec build and carries architecture traceability", () => {
   withTempRepo((repoRoot) => {
     const result = executeRoutedStep({
