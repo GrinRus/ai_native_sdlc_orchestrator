@@ -1384,6 +1384,7 @@ export function executeRoutedStep(options) {
         route: routeResolution,
         asset_bundle: assetResolution,
         policy_bundle: policyResolution,
+        feature_traceability: featureTraceability,
         input_packet_refs: uniqueStrings(compiled.context_compilation.resolved_input_packet_refs),
         dry_run: dryRun,
         context: {

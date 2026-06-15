@@ -1309,6 +1309,9 @@ test("live adapter request-artifact transport sends bounded provider work packet
       route: { resolved_route_id: "route.implement.default" },
       asset_bundle: { wrapper: { wrapper_ref: "wrapper://runner@v1" } },
       policy_bundle: { policy: { policy_id: "policy.step.runner.default" } },
+      feature_traceability: {
+        required_path_prefixes: ["source/", "test/", "index.d.ts"],
+      },
       input_packet_refs: ["packet://handoff"],
       dry_run: false,
       context: {
@@ -1333,6 +1336,11 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.equal(response.output.runner_output.execution_contract.mode, "execute-implementation");
     assert.equal(response.output.runner_output.execution_contract.must_open_required_local_refs, true);
     assert.equal(response.output.runner_output.execution_contract.expected_meaningful_change.required, true);
+    assert.deepEqual(response.output.runner_output.execution_contract.expected_meaningful_change.allowed_target_paths, [
+      "source/**",
+      "test/**",
+      "index.d.ts",
+    ]);
     assert.equal(response.output.runner_output.execution_contract.expected_meaningful_change.no_op_forbidden, true);
     assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.direct_edits_allowed, true);
     assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.upstream_write_allowed, false);

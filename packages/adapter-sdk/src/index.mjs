@@ -1545,11 +1545,29 @@ function collectAllowedPaths(value, output) {
   }
   for (const [key, entry] of Object.entries(value)) {
     if (key === "allowed_paths" && Array.isArray(entry)) {
-      output.push(...asStringArray(entry));
+      output.push(...asStringArray(entry).map(pathHintToAllowedPath).filter(Boolean));
+      continue;
+    }
+    if (key === "required_path_prefixes" && Array.isArray(entry)) {
+      output.push(...asStringArray(entry).map(pathHintToAllowedPath).filter(Boolean));
       continue;
     }
     collectAllowedPaths(entry, output);
   }
+}
+
+/**
+ * @param {string} value
+ * @returns {string | null}
+ */
+function pathHintToAllowedPath(value) {
+  const raw = value.trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/\\/gu, "/").replace(/^\.\//u, "");
+  if (normalized.includes("*")) return normalized;
+  if (normalized.endsWith("/")) return `${normalized.replace(/\/+$/u, "")}/**`;
+  const fileName = normalized.split("/").at(-1) ?? normalized;
+  return fileName.includes(".") ? normalized : `${normalized.replace(/\/+$/u, "")}/**`;
 }
 
 /**
@@ -2229,6 +2247,7 @@ export function createAdapterRequestEnvelope(input) {
     route: asRecord(input.route),
     asset_bundle: asRecord(input.asset_bundle),
     policy_bundle: asRecord(input.policy_bundle),
+    feature_traceability: asRecord(input.feature_traceability),
     input_packet_refs: asStringArray(input.input_packet_refs),
     dry_run: Boolean(input.dry_run),
     context: asRecord(input.context),
