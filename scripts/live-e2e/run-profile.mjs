@@ -220,6 +220,52 @@ function hydrateGuidedUiArtifactsFromReports(artifacts, options) {
   if (visualGuardrailFile) artifacts.guided_web_visual_guardrail_file = visualGuardrailFile;
   if (browserTaskProofRequestFile) artifacts.guided_browser_task_proof_request_file = browserTaskProofRequestFile;
   if (browserTaskProofFile) artifacts.guided_browser_task_proof_file = browserTaskProofFile;
+
+  const mergedWebSmoke = mergeBrowserTaskProofIntoWebSmoke(artifacts, asRecord(artifacts.guided_web_smoke));
+  if (Object.keys(mergedWebSmoke).length > 0) {
+    artifacts.guided_web_smoke = mergedWebSmoke;
+    if (webSmokeSummaryFile) writeJson(webSmokeSummaryFile, mergedWebSmoke);
+  }
+}
+
+/**
+ * @param {number} pid
+ * @returns {boolean}
+ */
+function terminateDetachedProcessGroup(pid) {
+  if (process.platform === "win32" || !Number.isInteger(pid) || pid <= 0) return false;
+  for (const target of [-pid, pid]) {
+    try {
+      process.kill(target, "SIGTERM");
+      return true;
+    } catch {
+      // Try the direct child PID when process group termination is unavailable.
+    }
+  }
+  return false;
+}
+
+/**
+ * @param {Record<string, unknown>} artifacts
+ * @param {Record<string, unknown>} runHealthReport
+ * @returns {Record<string, unknown> | null}
+ */
+function cleanupGuidedBrowserTaskAppSurface(artifacts, runHealthReport) {
+  const lifecycle = asRecord(runHealthReport.lifecycle_completion);
+  if (asNonEmptyString(lifecycle.continuation_status) !== "complete") return null;
+  const webSmoke = asRecord(artifacts.guided_web_smoke);
+  const rawPid =
+    artifacts.guided_browser_task_app_server_pid ??
+    webSmoke.browser_task_app_server_pid ??
+    webSmoke.app_server_pid;
+  const pid = typeof rawPid === "number" ? rawPid : Number(rawPid);
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  const terminated = terminateDetachedProcessGroup(pid);
+  return {
+    status: terminated ? "terminated" : "not_running",
+    pid,
+    terminated_at: nowIso(),
+  };
 }
 
 /**
@@ -2112,6 +2158,13 @@ export function writeProofRunnerArtifacts(options) {
   }
   options.flowResult.artifacts.live_e2e_run_health_report_file = runHealthReportFile;
   options.flowResult.artifacts.live_e2e_run_health_overall_status = runHealthReport.overall_status;
+  const guidedBrowserTaskAppServerCleanup = cleanupGuidedBrowserTaskAppSurface(
+    options.flowResult.artifacts,
+    runHealthReport,
+  );
+  if (guidedBrowserTaskAppServerCleanup) {
+    options.flowResult.artifacts.guided_browser_task_app_server_cleanup = guidedBrowserTaskAppServerCleanup;
+  }
   const productionProof = applyProductionProofEvidence({
     productionProof: productionProofPolicy,
     flowResult: options.flowResult,
@@ -2316,6 +2369,11 @@ export function writeProofRunnerArtifacts(options) {
     guided_browser_task_proof_request_file:
       asNonEmptyString(options.flowResult.artifacts.guided_browser_task_proof_request_file) || null,
     guided_browser_task_proof_file: asNonEmptyString(options.flowResult.artifacts.guided_browser_task_proof_file) || null,
+    guided_browser_task_app_server_cleanup:
+      typeof options.flowResult.artifacts.guided_browser_task_app_server_cleanup === "object" &&
+      options.flowResult.artifacts.guided_browser_task_app_server_cleanup
+        ? options.flowResult.artifacts.guided_browser_task_app_server_cleanup
+        : null,
     live_e2e_observation_report_file: observationReportFile,
     live_e2e_controller_state_file: asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file) || null,
     live_e2e_step_observation_files: stepObservationFiles,

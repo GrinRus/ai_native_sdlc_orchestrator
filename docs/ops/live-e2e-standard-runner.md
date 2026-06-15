@@ -582,6 +582,9 @@ The browser proof must be captured against the live app surface recorded in
 `artifacts.guided_browser_task_proof_request_file` as `app_url`/`control_plane`.
 The request also preserves `smoke_app_url` as guardrail history, but that smoke
 server is short-lived and must not be used as the browser-task inspection target.
+The same request must also name the expected proof file and deterministic
+HTML/DOM/accessibility/visual guardrail refs so the operator can cite stable
+local evidence without re-deriving paths.
 
 Each command and stage result should carry status, duration, transcript or artifact refs when available, failure class, missing evidence, and a recommendation. A command exit code of `0` is not enough for product observation success when required step evidence is missing.
 
@@ -639,7 +642,11 @@ When `browser-task-proof` is required, open the `app_url` from
 `guided_browser_task_proof_request_file`; the runner starts that additional live
 surface specifically for skill-agent/browser inspection. Do not rely on the
 `smoke_app_url`, because `aor app --smoke` closes its server after writing the
-guardrail summary.
+guardrail summary. If browser proof is written after the smoke summary, final
+report assembly must rehydrate `guided_web_smoke.task_outcome` and
+`frontend_interactions[]` from the proof file before run-health is finalized.
+After the lifecycle is complete, the temporary proof app surface should be
+terminated and recorded in the run summary cleanup field.
 
 ## Run Health
 The run summary links `live_e2e_run_health_report_file`. This report is the only status source for quality of the run itself. It covers:

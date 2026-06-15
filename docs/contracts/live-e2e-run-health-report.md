@@ -97,7 +97,11 @@ render guardrail and does not satisfy required browser-task proof by itself.
 The corresponding `guided_browser_task_proof_request_file` should identify the
 live browser inspection surface via `app_url`, `control_plane`, and
 `app_server_pid`. `smoke_app_url` is only the short-lived render-guardrail URL
-from `aor app --smoke`.
+from `aor app --smoke`. The request should also carry the expected browser proof
+file and deterministic HTML/DOM/accessibility/visual guardrail refs. Before
+final run-health classification, the runner should rehydrate late browser proof
+into the guided web smoke evidence; only missing or non-passing evidence after
+that hydration is a `guided_browser_task_proof_missing` blocker.
 
 `resume_interaction_health` should include pending interactions, pending decisions, resume failures, and answer audit gaps.
 

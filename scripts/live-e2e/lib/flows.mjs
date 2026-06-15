@@ -1370,6 +1370,11 @@ export function runGuidedWebSmoke(options) {
     request_id: `${options.runId}.guided-browser-task-proof-request.v1`,
     run_id: options.runId,
     expected_browser_task_proof_file: browserTaskProofFile,
+    rendered_html_file: outputHtml,
+    dom_snapshot_file: domSnapshotFile,
+    accessibility_summary_file: accessibilitySummaryFile,
+    visual_guardrail_file: visualSnapshotFile,
+    evidence_refs: uniqueStrings([outputHtml, domSnapshotFile, accessibilitySummaryFile, visualSnapshotFile]),
     required_surface: "installed-user local AOR app",
     required_evidence: [
       "rendered HTML",
@@ -1385,6 +1390,11 @@ export function runGuidedWebSmoke(options) {
     ],
     assessment_scope:
       "AOR operator and installed-user UI/UX only; checked-repository frontend behavior belongs to implementation and verification evidence.",
+    instructions: [
+      "Open app_url, not smoke_app_url. smoke_app_url is the short-lived deterministic render guardrail.",
+      "Capture browser-task evidence for AOR operator task success, next-action clarity, recovery/error states, responsive stability, and accessibility.",
+      "Write the completed proof to expected_browser_task_proof_file before accepting the learning operator decision.",
+    ],
     app_url: browserTaskAppUrl,
     control_plane: browserTaskControlPlane,
     smoke_app_url: asNonEmptyString(summary.app_url) || null,

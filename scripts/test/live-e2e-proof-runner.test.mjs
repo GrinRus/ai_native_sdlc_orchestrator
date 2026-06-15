@@ -1821,7 +1821,7 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
       },
     });
 
-    const written = writeProofRunnerArtifacts({
+    const writeOptions = {
       hostRoot: repoRoot,
       hostProjectId: "aor-test",
       layout: { reportsRoot, runtimeRoot },
@@ -1887,7 +1887,9 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
         argsPrefix: [],
         binaryRef: runProfileScript,
       },
-    });
+    };
+
+    const written = writeProofRunnerArtifacts(writeOptions);
 
     const observationReport = JSON.parse(fs.readFileSync(written.summary.live_e2e_observation_report_file, "utf8"));
     assert.equal(observationReport.frontend_interactions.length, 1);
@@ -1901,6 +1903,45 @@ test("proof runner hydrates guided UI refs and blocks missing browser-task proof
     assert.equal(written.runHealthReport.failure_summary.owner, "operator");
     assert.equal(written.runHealthReport.failure_summary.phase, "ui_validation");
     assert.equal(written.runHealthReport.failure_summary.class, "guided_browser_task_proof_missing");
+
+    const browserTaskProofFile = path.join(
+      reportsRoot,
+      `installed-user-guided-browser-task-proof-${normalizedRunId}.json`,
+    );
+    const screenshotFile = path.join(reportsRoot, `installed-user-guided-browser-task-proof-${normalizedRunId}.png`);
+    fs.writeFileSync(screenshotFile, "png", "utf8");
+    writeJsonFixture(browserTaskProofFile, {
+      status: "pass",
+      rendered_html_file: path.join(reportsRoot, `installed-user-guided-web-smoke-${normalizedRunId}.html`),
+      dom_snapshot_file: path.join(reportsRoot, `installed-user-guided-web-smoke-dom-${normalizedRunId}.json`),
+      accessibility_summary_file: path.join(
+        reportsRoot,
+        `installed-user-guided-web-smoke-accessibility-${normalizedRunId}.json`,
+      ),
+      visual_guardrail_file: path.join(
+        reportsRoot,
+        `installed-user-guided-web-smoke-visual-guardrail-${normalizedRunId}.json`,
+      ),
+      screenshot_files: [screenshotFile],
+      task_outcome: {
+        status: "pass",
+        checked_tasks: ["browser-task evidence capture", "operator task interaction"],
+        findings: [],
+      },
+      ux_findings: ["The AOR operator flow selector and next action were inspectable."],
+    });
+
+    const hydrated = writeProofRunnerArtifacts(writeOptions);
+    const hydratedObservation = JSON.parse(fs.readFileSync(hydrated.summary.live_e2e_observation_report_file, "utf8"));
+    const hydratedWebSmoke = JSON.parse(fs.readFileSync(webSmokeSummaryFile, "utf8"));
+    assert.equal(hydrated.summary.guided_browser_task_proof_file, browserTaskProofFile);
+    assert.equal(hydratedObservation.frontend_interactions[0].task_outcome.status, "pass");
+    assert.equal(hydratedObservation.frontend_interactions[0].browser_task_proof_ref, browserTaskProofFile);
+    assert.deepEqual(hydratedObservation.frontend_interactions[0].screenshot_refs, [screenshotFile]);
+    assert.equal(hydratedWebSmoke.task_outcome.status, "pass");
+    assert.equal(hydratedWebSmoke.browser_task_proof_file, browserTaskProofFile);
+    assert.deepEqual(hydratedWebSmoke.screenshot_files, [screenshotFile]);
+    assert.equal(hydrated.runHealthReport.overall_status, "pass");
   });
 });
 
@@ -1971,6 +2012,29 @@ test("guided browser-task proof request points at a live app surface, not the sh
     assert.equal(request.app_url, "http://127.0.0.1:61002/");
     assert.equal(request.control_plane, "http://127.0.0.1:61002");
     assert.equal(request.app_server_status, "running");
+    assert.equal(
+      request.rendered_html_file,
+      path.join(reportsRoot, "installed-user-guided-web-smoke-guided-live-surface.html"),
+    );
+    assert.equal(
+      request.dom_snapshot_file,
+      path.join(reportsRoot, "installed-user-guided-web-smoke-dom-guided-live-surface.json"),
+    );
+    assert.equal(
+      request.accessibility_summary_file,
+      path.join(reportsRoot, "installed-user-guided-web-smoke-accessibility-guided-live-surface.json"),
+    );
+    assert.equal(
+      request.visual_guardrail_file,
+      path.join(reportsRoot, "installed-user-guided-web-smoke-visual-guardrail-guided-live-surface.json"),
+    );
+    assert.deepEqual(request.evidence_refs, [
+      request.rendered_html_file,
+      request.dom_snapshot_file,
+      request.accessibility_summary_file,
+      request.visual_guardrail_file,
+    ]);
+    assert.match(request.instructions.join("\n"), /Open app_url, not smoke_app_url/u);
     assert.ok(Number.isInteger(request.app_server_pid));
     assert.equal(result.summary.browser_task_app_url, "http://127.0.0.1:61002/");
     try {
