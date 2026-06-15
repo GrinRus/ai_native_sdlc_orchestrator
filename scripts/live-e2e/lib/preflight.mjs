@@ -23,6 +23,16 @@ import {
   writeJson,
 } from "./common.mjs";
 
+const FORBIDDEN_PREFLIGHT_PROVIDER_COMMANDS = Object.freeze(["codex", "claude", "opencode", "qwen"]);
+const DEFAULT_PREFLIGHT_REQUEST_ARTIFACT_MESSAGE = [
+  "Run only the AOR live-adapter preflight described in the provider work packet at {provider_work_packet_path}.",
+  "Read that JSON once and follow request.objective exactly.",
+  "Do not invoke provider CLIs or nested agents such as codex, claude, opencode, or qwen from inside this preflight; this provider invocation is already the auth/runtime probe.",
+  "If the packet has no request.edit_probe or request.permission_probe, run no shell commands and immediately return a concise final preflight report with status, commands-run: [], changed-files: [], verification, and risks.",
+  "If a probe path is present, only read/write the explicitly named probe files and then return the same concise final report.",
+  "Do not write upstream and do not summarize the packet instead of completing the requested preflight.",
+].join(" ");
+
 /**
  * @param {Record<string, unknown>} profile
  * @returns {boolean}
@@ -330,7 +340,12 @@ export function runLiveAdapterPreflight(options) {
   const permissionMarkerFile = path.join(permissionProbeRoot, "permission-marker.txt");
   const permissionMarkerContents = `permission-readiness:${options.runId}`;
 
-  const buildProbeInput = (stepClass, objective, extraRequest = {}) => `${JSON.stringify({
+  const buildProbeInput = (stepClass, objective, extraRequest = {}) => {
+    const requestExtras = asRecord(extraRequest);
+    const hasProbe =
+      Object.keys(asRecord(requestExtras.edit_probe)).length > 0 ||
+      Object.keys(asRecord(requestExtras.permission_probe)).length > 0;
+    return `${JSON.stringify({
     request: {
       request_id: `live-adapter-preflight.${stepClass}`,
       run_id: options.runId,
@@ -338,6 +353,12 @@ export function runLiveAdapterPreflight(options) {
       step_class: stepClass,
       objective,
       non_interactive: true,
+      preflight_contract: {
+        auth_probe_is_this_invocation: true,
+        shell_commands_allowed: hasProbe ? "explicit-probe-files-only" : "none",
+        forbidden_provider_commands: [...FORBIDDEN_PREFLIGHT_PROVIDER_COMMANDS],
+        final_report_required: true,
+      },
       ...extraRequest,
     },
     adapter: {
@@ -346,6 +367,7 @@ export function runLiveAdapterPreflight(options) {
       permission_mode: runtimeInvocation.permissionMode,
     },
   })}\n`;
+  };
   const runProbeAttempt = (kind, attempt, objective, extraRequest = {}) => {
     const probeInput = buildProbeInput(kind, objective, extraRequest);
     let probeArgs = [
@@ -367,8 +389,7 @@ export function runLiveAdapterPreflight(options) {
       const requestFile = path.join(permissionProbeRoot, `preflight-${normalizeId(kind)}-${attempt}-work-packet.json`);
       fs.writeFileSync(requestFile, probeInput, "utf8");
       const requestMessageTemplate =
-        asNonEmptyString(requestFileProfile.preflight_message) ||
-        "Run only the AOR live-adapter preflight described in the provider work packet at {provider_work_packet_path}. Read that JSON, follow request.objective exactly, use any request.*_probe file paths when present, do not write upstream, and return a concise preflight report with commands-run, changed-files, verification, and risks. Do not summarize the packet instead of doing the requested check.";
+        asNonEmptyString(requestFileProfile.preflight_message) || DEFAULT_PREFLIGHT_REQUEST_ARTIFACT_MESSAGE;
       const requestMessage = requestMessageTemplate
         .replace(/\{provider_work_packet_path\}/gu, requestFile)
         .replace(/\{provider_work_packet_ref\}/gu, requestFile)

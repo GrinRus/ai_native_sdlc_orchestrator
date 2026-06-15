@@ -1203,7 +1203,7 @@ test("live adapter preflight uses a preflight-specific request-artifact prompt a
         "const requestFile = requestFileIndex >= 0 ? args[requestFileIndex + 1] : args.find((entry) => entry.endsWith('.json'));",
         "const message = args.find((entry) => entry.includes('provider work packet')) || '';",
         "const packet = JSON.parse(fs.readFileSync(requestFile, 'utf8'));",
-        "fs.appendFileSync(process.env.AOR_PREFLIGHT_CAPTURE_FILE, `${JSON.stringify({message, requestFile, step_class: packet.request.step_class})}\\n`);",
+        "fs.appendFileSync(process.env.AOR_PREFLIGHT_CAPTURE_FILE, `${JSON.stringify({message, requestFile, step_class: packet.request.step_class, preflight_contract: packet.request.preflight_contract})}\\n`);",
         "const probe = packet.request.edit_probe || packet.request.permission_probe;",
         "if (probe) fs.writeFileSync(probe.marker_file, probe.expected_marker_contents, 'utf8');",
         "process.stdout.write(JSON.stringify({status:'success',summary:'preflight ok'}));",
@@ -1285,7 +1285,19 @@ test("live adapter preflight uses a preflight-specific request-artifact prompt a
       .map((line) => JSON.parse(line));
     assert.equal(calls.length, 3);
     assert.ok(calls.every((call) => call.message.includes("Run only the AOR live-adapter preflight")));
+    assert.ok(calls.every((call) => call.message.includes("Do not invoke provider CLIs")));
+    assert.ok(calls.every((call) => call.message.includes("commands-run: []")));
     assert.ok(calls.every((call) => !call.message.includes("Execute the approved AOR implementation")));
+    assert.equal(calls[0].preflight_contract.auth_probe_is_this_invocation, true);
+    assert.equal(calls[0].preflight_contract.shell_commands_allowed, "none");
+    assert.deepEqual(calls[0].preflight_contract.forbidden_provider_commands, [
+      "codex",
+      "claude",
+      "opencode",
+      "qwen",
+    ]);
+    assert.equal(calls[1].preflight_contract.shell_commands_allowed, "explicit-probe-files-only");
+    assert.equal(calls[2].preflight_contract.shell_commands_allowed, "explicit-probe-files-only");
     assert.equal(result.report.edit_readiness.attempts[0].marker_status, "present");
     assert.equal(result.report.permission_readiness.attempts[0].marker_status, "present");
   });

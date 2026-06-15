@@ -435,6 +435,11 @@ Full-journey layer:
 - resolves `target_catalog_id`, `feature_mission_id`, `scenario_family`, and `provider_variant_id` from the curated internal catalog;
 - uses public `aor project init` with a host-side generated project profile plus repo command overrides derived from the curated catalog;
 - preflights the selected provider adapter before execution so missing live runtime metadata, missing commands, auth failures, edit-readiness failures, and permission-mode blocks fail before `run start`;
+- keeps adapter preflight self-contained: the provider invocation used for
+  readiness must not recursively launch provider CLIs such as `codex`,
+  `claude`, `opencode`, or `qwen`; auth-only request-artifact probes should
+  return a concise preflight report without shell commands, and edit/permission
+  probes may only touch the named nonce and marker files;
 - records auth probe attempts and retries one transient auth/runtime probe failure before failing the proof;
 - splits verification into `readiness`, `baseline_diagnostic`, and `post_run_quality` phases;
 - treats full-journey baseline target verification as diagnostic by default: failed target `verification.commands` are preserved as context, but setup failures, missing prerequisites, failed validation, missing or failed routed dry-run, provider readiness failure, and unsafe write-back policy still block before execution;

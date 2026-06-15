@@ -55,6 +55,16 @@ Adapters may differ in the CLI flag used to pass the provider work packet, outpu
 
 `execution.external_runtime.preflight_timeout_ms` is optional and controls live adapter preflight probes separately from full step execution. When omitted, live E2E derives a conservative probe timeout from `timeout_ms`. Preflight reports must record both the full `timeout_ms` and selected `preflight_timeout_ms` so slow readiness probes can be distinguished from full runtime execution limits.
 
+For `request-artifact` adapters, live adapter preflight is itself the external
+runtime invocation. The preflight work packet must declare an explicit
+`request.preflight_contract`, and the launcher prompt must keep the runtime on
+that contract: auth-only probes return a concise final preflight report without
+running shell commands, while edit or permission probes may only read/write the
+named nonce and marker files. Preflight prompts must forbid recursive provider
+CLI calls such as invoking `codex`, `claude`, `opencode`, or `qwen` from inside
+the already-running provider process; otherwise readiness can time out while
+testing the provider by launching another provider.
+
 `execution.external_runtime.native_timeout_arg` is optional and lets AOR pass the resolved per-request timeout to CLIs that can self-terminate before AOR has to kill the process group. The object supports:
 - `flag`: the CLI flag to append, such as `--max-wall-time`.
 - `format`: `seconds` for a plain integer or `duration-seconds` for values such as `295s`.
