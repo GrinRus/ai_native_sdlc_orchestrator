@@ -2603,6 +2603,14 @@ function App() {
     () => evidenceRowsForFlow(selectedFlow, evidenceRows, { draft: draftSurface }),
     [selectedFlow, evidenceRows, draftSurface],
   );
+  const selectedFlowRuntimeTrace = useMemo(() => {
+    if (!selectedFlow?.flow_id || flowRuntimeTrace?.flow_id !== selectedFlow.flow_id) return null;
+    return flowRuntimeTrace;
+  }, [flowRuntimeTrace, selectedFlow?.flow_id]);
+  const selectedFlowEvidenceGraph = useMemo(() => {
+    if (!selectedFlow?.flow_id || flowEvidenceGraph?.flow_id !== selectedFlow.flow_id) return null;
+    return flowEvidenceGraph;
+  }, [flowEvidenceGraph, selectedFlow?.flow_id]);
   const workbenchEvidenceRows = useMemo(
     () => {
       if (draftSurface) return [];
@@ -2622,17 +2630,17 @@ function App() {
   }, [workbenchEvidenceRows, selectedRef]);
 
   const interactions = useMemo(() => {
-    return flowScopedInteractions(stepResults, selectedFlow, flowRuntimeTrace, { draft: draftSurface });
-  }, [stepResults, selectedFlow, flowRuntimeTrace, draftSurface]);
+    return flowScopedInteractions(stepResults, selectedFlow, selectedFlowRuntimeTrace, { draft: draftSurface });
+  }, [stepResults, selectedFlow, selectedFlowRuntimeTrace, draftSurface]);
   const operatorDecisionRequests = useMemo(() => {
-    return operatorDecisionRequestsForFlow(selectedFlow, flowRuntimeTrace, workbenchEvidenceRows, { draft: draftSurface });
-  }, [selectedFlow, flowRuntimeTrace, workbenchEvidenceRows, draftSurface]);
+    return operatorDecisionRequestsForFlow(selectedFlow, selectedFlowRuntimeTrace, workbenchEvidenceRows, { draft: draftSurface });
+  }, [selectedFlow, selectedFlowRuntimeTrace, workbenchEvidenceRows, draftSurface]);
   const providerStepStatus = useMemo(
     () => resolveProviderStepStatus(projectState, runs),
     [projectState, runs],
   );
   const executionEvidence = useMemo(() => {
-    const flowExecutionEvidence = executionEvidenceForFlow(selectedFlow, runs, flowRuntimeTrace, { draft: draftSurface });
+    const flowExecutionEvidence = executionEvidenceForFlow(selectedFlow, runs, selectedFlowRuntimeTrace, { draft: draftSurface });
     if (flowExecutionEvidence || draftSurface || selectedFlow?.flow_id || !providerStepStatus) return flowExecutionEvidence;
     return {
       run_id: providerStepStatus.route_id ?? providerStepStatus.step_id ?? "live-e2e",
@@ -2649,7 +2657,7 @@ function App() {
       actions: [],
       provider_step_status: providerStepStatus,
     };
-  }, [selectedFlow, runs, flowRuntimeTrace, draftSurface, providerStepStatus]);
+  }, [selectedFlow, runs, selectedFlowRuntimeTrace, draftSurface, providerStepStatus]);
   const providerEvidenceRows = useMemo(() => {
     return workbenchEvidenceRows.filter((row) => artifactFilterMatches(row, "provider"));
   }, [workbenchEvidenceRows]);
@@ -2984,6 +2992,8 @@ function App() {
     setDraftFollowUpHandoffRef(null);
     setSelectedFlow(flow);
     setSelectedFlowId(flow?.flow_id ?? null);
+    setFlowEvidenceGraph(null);
+    setFlowRuntimeTrace(null);
     setSelectedStage(flowStageId(flow, nextAction, projectState));
     if (apiProjectBase) {
       loadFlowWorkbench(apiProjectBase, flow).catch((err) => setError(err instanceof Error ? err.message : String(err)));
@@ -3390,8 +3400,8 @@ function App() {
       </section>
 
       <section className="workbench-row graph-trace-row">
-        <EvidenceGraphPanel graph={flowEvidenceGraph} />
-        <RuntimeTracePanel trace={flowRuntimeTrace} />
+        <EvidenceGraphPanel graph={selectedFlowEvidenceGraph} />
+        <RuntimeTracePanel trace={selectedFlowRuntimeTrace} />
       </section>
 
       <section className="workbench-row secondary-workbench-row">
