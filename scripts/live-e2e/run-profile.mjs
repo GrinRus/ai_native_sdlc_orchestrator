@@ -155,6 +155,24 @@ function readJsonIfPresent(filePath) {
 }
 
 /**
+ * @param {Record<string, unknown>} controllerState
+ * @param {string[]} includedSteps
+ * @returns {boolean}
+ */
+function isLiveE2eControllerStateInProgress(controllerState, includedSteps) {
+  const state = asRecord(controllerState);
+  if (Object.keys(state).length === 0) return false;
+
+  const completedSteps = new Set(asStringArray(state.completed_steps));
+  const allIncludedStepsCompleted =
+    includedSteps.length > 0 && includedSteps.every((step) => completedSteps.has(step));
+  const hasCurrentStep = Boolean(asNonEmptyString(state.current_step));
+  const pendingDecision = asRecord(state.pending_decision);
+  const hasPendingDecision = Object.keys(pendingDecision).length > 0;
+  return hasCurrentStep || hasPendingDecision || !allIncludedStepsCompleted;
+}
+
+/**
  * @param {string} reportsRoot
  * @param {string} fileName
  * @returns {string | null}
@@ -1428,7 +1446,12 @@ function buildObservationReport(options) {
   const setupJournal = buildSetupJournal(options.flowResult.artifacts);
   const operatorContext = resolveLiveE2eOperatorContext(options.profile);
   const controllerStop = asRecord(options.flowResult.artifacts.live_e2e_controller_stop);
-  const reportStatus = isLiveE2eControllerStopInProgress(controllerStop, includedSteps) ? "in_progress" : "final";
+  const controllerState = readJsonIfPresent(asNonEmptyString(options.flowResult.artifacts.live_e2e_controller_state_file));
+  const reportStatus =
+    isLiveE2eControllerStopInProgress(controllerStop, includedSteps) ||
+    isLiveE2eControllerStateInProgress(controllerState, includedSteps)
+      ? "in_progress"
+      : "final";
   const stepJournal = buildStepJournal({
     profile: options.profile,
     flowResult: options.flowResult,

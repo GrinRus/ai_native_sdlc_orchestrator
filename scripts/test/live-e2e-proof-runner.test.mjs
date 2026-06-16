@@ -2456,6 +2456,191 @@ test("proof runner writes run-health reports for blocked live E2E reports", () =
   });
 });
 
+test("proof runner keeps partial controller observations in progress when pending steps lack decisions", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const runId = "partial-guided-ui-proof-blocked";
+    const genericEvidence = path.join(reportsRoot, "generic-evidence.json");
+    const installProof = path.join(reportsRoot, "install-proof.json");
+    const controllerState = path.join(reportsRoot, "controller-state.json");
+    const generatedProject = path.join(reportsRoot, "generated-project.aor.yaml");
+    const featureRequest = path.join(reportsRoot, "feature-request.json");
+    const baselineVerify = path.join(reportsRoot, "baseline-verify-summary.json");
+    for (const file of [genericEvidence, installProof, generatedProject, featureRequest, baselineVerify]) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+    fs.writeFileSync(
+      controllerState,
+      `${JSON.stringify(
+        {
+          current_step: "qa",
+          completed_steps: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa"],
+          pending_decision: {
+            action: "diagnose",
+            reason: "Skill-agent operator decision is required before continuation.",
+            next_step: "delivery",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const makeStep = (step, sequence, status = "accepted") => {
+      const planRef = path.join(reportsRoot, `${sequence}-${step}-plan.json`);
+      const executionRef = path.join(reportsRoot, `${sequence}-${step}-execution.json`);
+      const inspectionRef = path.join(reportsRoot, `${sequence}-${step}-inspection.json`);
+      const classificationRef = path.join(reportsRoot, `${sequence}-${step}-classification.json`);
+      const requestRef = path.join(reportsRoot, `${sequence}-${step}-request.json`);
+      const decisionRef = path.join(reportsRoot, `${sequence}-${step}-decision.json`);
+      for (const file of [planRef, executionRef, inspectionRef, classificationRef, requestRef, decisionRef]) {
+        fs.writeFileSync(file, "{}\n", "utf8");
+      }
+      return {
+        sequence,
+        step_id: step,
+        step_instance_id: step,
+        iteration: 1,
+        flow_stage: step,
+        plan: {
+          objective: `Observe ${step}.`,
+          public_surface: `aor ${step}`,
+          command_labels: [step],
+          expected_artifacts: [genericEvidence],
+          inspection_sources: ["command_transcript"],
+          safety_constraints: ["black-box-public-surfaces-only"],
+        },
+        plan_ref: planRef,
+        public_surface: `aor ${step}`,
+        execution_ref: executionRef,
+        inspection_ref: inspectionRef,
+        classification_ref: classificationRef,
+        artifact_refs: [genericEvidence],
+        started_at: "2026-06-09T00:00:00.000Z",
+        finished_at: "2026-06-09T00:00:01.000Z",
+        duration_sec: 1,
+        deterministic_analysis: {
+          status: status === "accepted" ? "pass" : "blocked",
+          exit_code: 0,
+          failure_class: null,
+          missing_evidence: [],
+          recommendation: status === "accepted" ? "continue" : "diagnose",
+        },
+        semantic_analysis: {
+          status: status === "accepted" ? "pass" : "blocked",
+          judge_source: status === "accepted" ? "skill-agent" : null,
+          findings: status === "accepted" ? [] : ["Skill-agent operator decision is required before continuation."],
+        },
+        agent_decision_request_ref: requestRef,
+        operator_decision_ref: status === "accepted" ? decisionRef : null,
+        operator_decision_status: status,
+        inspected_evidence_refs: status === "accepted" ? [requestRef, executionRef, inspectionRef, classificationRef] : [],
+        requested_interaction: null,
+        decision: {
+          action: status === "accepted" ? "continue" : "diagnose",
+          reason:
+            status === "accepted"
+              ? "Public step completed with required evidence."
+              : "Skill-agent operator decision is required before continuation.",
+          next_step: status === "accepted" ? null : "delivery",
+        },
+        resume_result: null,
+        frontend_interaction_refs: [],
+        final_step_verdict: status === "accepted" ? "pass" : "blocked",
+      };
+    };
+
+    const stepEntries = ["discovery", "spec", "planning", "handoff", "execution", "review"].map((step, index) =>
+      makeStep(step, index + 1),
+    );
+    stepEntries.push(makeStep("qa", 7, "missing"));
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.partial-guided-proof-blocked",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "release",
+        provider_variant_id: "openai-primary",
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "blocked",
+        stageResults: [
+          {
+            stage: "qa",
+            status: "fail",
+            evidence_refs: [genericEvidence],
+            summary: "Guided AOR operator UI proof was missing.",
+          },
+        ],
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: controllerState,
+          live_e2e_step_journal_entries: stepEntries,
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: installProof,
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: generatedProject,
+          feature_request_file: featureRequest,
+          baseline_verify_summary_file: baselineVerify,
+          baseline_verify_status: "pass",
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "medium",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    const observationReport = JSON.parse(fs.readFileSync(written.summary.live_e2e_observation_report_file, "utf8"));
+    assert.equal(observationReport.report_status, "in_progress");
+    assert.equal(written.summary.status, "blocked");
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "blocked");
+    assert.equal(written.runHealthReport.overall_status, "blocked");
+    assert.equal(written.runHealthReport.controller_health.missing_operator_decision_steps.includes("qa"), true);
+    assert.equal(written.runHealthReport.failure_summary.owner, "operator");
+  });
+});
+
 test("proof runner classifies context-budget provider blockers as run-health blocked", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
