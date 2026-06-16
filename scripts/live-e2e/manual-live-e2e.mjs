@@ -83,6 +83,16 @@ function findDecisionRequestFiles(root, runId) {
   return results.sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs);
 }
 
+function isPendingDecisionRequestFile(requestFile) {
+  try {
+    const request = asRecord(readJson(requestFile));
+    const expectedRef = asNonEmptyString(request.operator_decision_expected_ref);
+    return Boolean(expectedRef && !fs.existsSync(expectedRef));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * @param {{ projectRef: string, runtimeRoot: string | null, runId: string }} options
  */
@@ -105,7 +115,7 @@ function installOperatorDecision(options) {
   }
   const runtimeCandidates = resolveRuntimeCandidates(options);
   for (const runtimeRoot of runtimeCandidates) {
-    const requestFile = findDecisionRequestFiles(runtimeRoot, options.runId)[0];
+    const requestFile = findDecisionRequestFiles(runtimeRoot, options.runId).find(isPendingDecisionRequestFile);
     if (!requestFile) continue;
     const request = asRecord(readJson(requestFile));
     const expectedRef = asNonEmptyString(request.operator_decision_expected_ref);
@@ -137,7 +147,7 @@ function resolveDecisionPrepareRequestFile(options) {
     runId: options.runId,
   });
   for (const runtimeRoot of runtimeCandidates) {
-    const requestFile = findDecisionRequestFiles(runtimeRoot, options.runId)[0];
+    const requestFile = findDecisionRequestFiles(runtimeRoot, options.runId).find(isPendingDecisionRequestFile);
     if (requestFile) return requestFile;
   }
   throw new UsageError(`No pending live E2E operator decision request was found for run '${options.runId}'.`);
@@ -264,6 +274,10 @@ function runCli(rawArgs) {
       : action === "continue"
         ? null
         : action;
+  const pendingOperatorDecisionRequired = requiredPublicAction === "operator_decision";
+  const agentDecisionRequestRef = pendingOperatorDecisionRequired
+    ? asNonEmptyString(latestObservation.agent_decision_request_ref) || null
+    : null;
   process.stdout.write(
     `${JSON.stringify(
       {
@@ -274,7 +288,7 @@ function runCli(rawArgs) {
         completed_steps: Array.isArray(state.completed_steps) ? state.completed_steps : [],
         decision: Object.keys(pendingDecision).length > 0 ? pendingDecision : null,
         required_public_action: requiredPublicAction,
-        agent_decision_request_ref: asNonEmptyString(latestObservation.agent_decision_request_ref) || null,
+        agent_decision_request_ref: agentDecisionRequestRef,
         operator_decision_ref: asNonEmptyString(latestObservation.operator_decision_ref) || null,
         installed_operator_decision_ref: installedOperatorDecisionRef,
         operator_decision_status: operatorDecisionStatus,

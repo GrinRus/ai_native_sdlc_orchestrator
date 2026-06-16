@@ -2203,6 +2203,83 @@ test("manual live E2E exposes operator decisions and leaves outcome assessment p
   assert.match(assessmentHelp.stdout, /quality-assessment\.mjs gate/u);
 });
 
+test("manual decision preparation ignores stale accepted request files when request is implicit", () => {
+  withTempRoot((tempRoot) => {
+    const runId = "manual-stale-request";
+    const projectRoot = path.join(tempRoot, "project");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const reportsRoot = path.join(runtimeRoot, "projects/aor-core/reports");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const evidenceRef = writeJsonFixture(path.join(reportsRoot, "evidence.json"), { status: "pass" });
+
+    const pendingDecisionRef = path.join(reportsRoot, "pending-decision.json");
+    const pendingRequestRef = writeJsonFixture(
+      path.join(reportsRoot, `live-e2e-agent-decision-request-${runId}-02-spec.json`),
+      {
+        request_id: `${runId}.spec.operator-decision-request`,
+        step_id: "spec",
+        step_instance_id: "spec",
+        operator_decision_expected_ref: pendingDecisionRef,
+        deterministic_analysis: { status: "pass" },
+        decision_rubric: { required_evidence_refs: [evidenceRef] },
+        expected_response_shape: {
+          action: "continue|diagnose|block",
+          inspected_evidence_refs: [evidenceRef],
+          evidence_refs: [evidenceRef],
+        },
+      },
+    );
+
+    const staleDecisionRef = writeJsonFixture(path.join(reportsRoot, "stale-decision.json"), { action: "continue" });
+    const staleRequestRef = writeJsonFixture(
+      path.join(reportsRoot, `live-e2e-agent-decision-request-${runId}-01-discovery.json`),
+      {
+        request_id: `${runId}.discovery.operator-decision-request`,
+        step_id: "discovery",
+        step_instance_id: "discovery",
+        operator_decision_expected_ref: staleDecisionRef,
+        deterministic_analysis: { status: "pass" },
+        decision_rubric: { required_evidence_refs: [evidenceRef] },
+        expected_response_shape: {
+          action: "continue|diagnose|block",
+          inspected_evidence_refs: [evidenceRef],
+          evidence_refs: [evidenceRef],
+        },
+      },
+    );
+    const now = new Date();
+    fs.utimesSync(pendingRequestRef, new Date(now.getTime() - 10_000), new Date(now.getTime() - 10_000));
+    fs.utimesSync(staleRequestRef, now, now);
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        manualLiveE2eScript,
+        "--prepare-decision",
+        "--project-ref",
+        projectRoot,
+        "--runtime-root",
+        runtimeRoot,
+        "--run-id",
+        runId,
+        "--action",
+        "continue",
+        "--dry-run",
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.status, "preview");
+    assert.equal(output.request_ref, pendingRequestRef);
+    assert.equal(output.output_ref, pendingDecisionRef);
+  });
+});
+
 test("run-profile returns existing terminal pass reports without rebuilding run-health", () => {
   withTempRoot((tempRoot) => {
     const runId = "terminal-pass-idempotent";
