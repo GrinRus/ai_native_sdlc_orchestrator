@@ -118,6 +118,22 @@ test("buildAdapterRegistry loads adapter capability profiles through shared cont
   });
 });
 
+test("request-artifact adapter launcher prompts mention output quality policy", () => {
+  withTempRepo((repoRoot) => {
+    const registry = buildAdapterRegistry({
+      adaptersRoot: path.join(repoRoot, "examples/adapters"),
+    });
+
+    for (const adapterId of ["claude-code", "codex-cli", "open-code", "qwen-code"]) {
+      const adapter = registry.get(adapterId);
+      const message = adapter?.profile?.execution?.external_runtime?.request_file?.message;
+      assert.equal(typeof message, "string", `${adapterId} request_file.message must be present`);
+      assert.match(message, /execution_contract\.output_quality_policy/u, adapterId);
+      assert.match(message, /warning-producing stdout\/stderr/u, adapterId);
+    }
+  });
+});
+
 test("resolveAdapterForRoute passes when required capabilities are declared by selected adapter", () => {
   withTempRepo((repoRoot) => {
     const routeResolution = resolveRouteForStep({
