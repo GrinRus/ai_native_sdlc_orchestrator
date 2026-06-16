@@ -187,6 +187,82 @@ function existingReportFile(reportsRoot, fileName) {
 }
 
 /**
+ * @param {{ layout: { reportsRoot: string }, runId: string, profile: Record<string, unknown> }} options
+ * @returns {Record<string, unknown> | null}
+ */
+function loadExistingTerminalProofRunnerArtifacts(options) {
+  const normalizedRunId = normalizeId(options.runId);
+  const summaryFile = existingReportFile(options.layout.reportsRoot, `live-e2e-run-summary-${normalizedRunId}.json`);
+  if (!summaryFile) return null;
+  const summary = readJsonIfPresent(summaryFile);
+  if (asNonEmptyString(summary.status) !== "pass") return null;
+
+  const runHealthReportFile =
+    asNonEmptyString(summary.live_e2e_run_health_report_file) ||
+    existingReportFile(options.layout.reportsRoot, `live-e2e-run-health-report-${normalizedRunId}.json`);
+  const runHealthReport = readJsonIfPresent(runHealthReportFile);
+  if (asNonEmptyString(runHealthReport.overall_status) !== "pass") return null;
+
+  const observationReportFile =
+    asNonEmptyString(summary.live_e2e_observation_report_file) ||
+    existingReportFile(options.layout.reportsRoot, `live-e2e-observation-report-${normalizedRunId}.json`);
+  const observationReport = readJsonIfPresent(observationReportFile);
+  if (
+    asNonEmptyString(observationReport.report_status) !== "final" ||
+    toObservationStatus(asNonEmptyString(observationReport.overall_status)) !== "pass"
+  ) {
+    return null;
+  }
+
+  const controllerStateFile = asNonEmptyString(summary.live_e2e_controller_state_file);
+  const controllerState = readJsonIfPresent(controllerStateFile);
+  if (isLiveE2eControllerStateInProgress(controllerState, getIncludedStepsForProfile(options.profile))) return null;
+
+  return {
+    summary,
+    summaryFile,
+    runHealthReport,
+    runHealthReportFile,
+    observationReport,
+    observationReportFile,
+  };
+}
+
+/**
+ * @param {{ runId: string, existing: Record<string, unknown> }} options
+ */
+function writeExistingProofRunnerOutput(options) {
+  const summary = asRecord(options.existing.summary);
+  const runHealthReport = asRecord(options.existing.runHealthReport);
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        command: "scripts live-e2e run-profile",
+        status: "ok",
+        run_id: options.runId,
+        live_e2e_run_status: asNonEmptyString(summary.status) || null,
+        live_e2e_run_health_status: asNonEmptyString(runHealthReport.overall_status) || null,
+        live_e2e_run_summary_file: asNonEmptyString(options.existing.summaryFile) || null,
+        live_e2e_run_health_report_file: asNonEmptyString(options.existing.runHealthReportFile) || null,
+        live_e2e_observation_report_file:
+          asNonEmptyString(summary.live_e2e_observation_report_file) ||
+          asNonEmptyString(options.existing.observationReportFile) ||
+          null,
+        aor_installation_proof_file: asNonEmptyString(summary.aor_installation_proof_file) || null,
+        live_e2e_controller_state_file: asNonEmptyString(summary.live_e2e_controller_state_file) || null,
+        live_e2e_step_observation_files: asStringArray(summary.live_e2e_step_observation_files),
+        live_e2e_scorecard_files: asStringArray(summary.scorecard_files),
+        learning_loop_scorecard_file: asNonEmptyString(summary.learning_loop_scorecard_file) || null,
+        learning_loop_handoff_file: asNonEmptyString(summary.learning_loop_handoff_file) || null,
+        incident_report_file: asNonEmptyString(summary.incident_report_file) || null,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+/**
  * Guided AOR UI smoke files are deterministic report artifacts. Manual resume
  * can rebuild final reports from durable controller state after those transient
  * artifact fields have been dropped, so hydrate them before observation and
@@ -1869,6 +1945,14 @@ function resolveRunHealthFailure(options) {
       summary: asNonEmptyString(liveAdapterPreflight.summary) || "Live adapter preflight did not pass.",
     };
   }
+  if (asNonEmptyString(options.observationReport.report_status) === "in_progress") {
+    return {
+      owner: "operator",
+      phase: "controller_decision",
+      class: "controller_incomplete",
+      summary: "Live E2E observation is still in progress and requires a terminal controller decision.",
+    };
+  }
   if (asNonEmptyString(options.controllerHealth.status) !== "pass") {
     return {
       owner: "operator",
@@ -1955,10 +2039,10 @@ function resolveRunHealthFailure(options) {
     };
   }
   return {
-    owner: null,
-    phase: null,
-    class: null,
-    summary: null,
+    owner: "aor",
+    phase: "summary_write",
+    class: "unclassified_run_health_failure",
+    summary: "Run-health was non-passing without a more specific factual failure classification.",
   };
 }
 
@@ -2609,6 +2693,14 @@ function runCli(rawArgs) {
     runtimeRootOverride: effectiveRuntimeRoot,
     hostProjectId,
   });
+  const existingTerminalArtifacts = loadExistingTerminalProofRunnerArtifacts({ layout, runId, profile });
+  if (existingTerminalArtifacts) {
+    writeExistingProofRunnerOutput({
+      runId,
+      existing: existingTerminalArtifacts,
+    });
+    return 0;
+  }
   let aorInstallation;
   let installationFailure = null;
   try {

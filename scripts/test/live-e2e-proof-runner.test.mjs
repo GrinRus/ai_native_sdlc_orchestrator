@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 
 import { loadContractFile } from "../../packages/contracts/src/index.mjs";
 import {
+  discoverHostProjectId,
+  ensureRuntimeLayout,
   loadCatalogTarget,
   loadProofRunnerProfile,
   resolveCatalogRoot,
@@ -2141,6 +2143,104 @@ test("manual live E2E exposes operator decisions and leaves outcome assessment p
   assert.match(assessmentHelp.stdout, /quality-assessment\.mjs prepare/u);
   assert.match(assessmentHelp.stdout, /quality-assessment\.mjs validate/u);
   assert.match(assessmentHelp.stdout, /quality-assessment\.mjs gate/u);
+});
+
+test("run-profile returns existing terminal pass reports without rebuilding run-health", () => {
+  withTempRoot((tempRoot) => {
+    const runId = "terminal-pass-idempotent";
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const profilePath = path.join(repoRoot, "scripts/live-e2e/profiles/full-journey-regress-ky.yaml");
+    const hostProjectId = discoverHostProjectId(repoRoot);
+    const layout = ensureRuntimeLayout({
+      hostRoot: repoRoot,
+      runtimeRootOverride: runtimeRoot,
+      hostProjectId,
+    });
+    const includedSteps = ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"];
+    const controllerStateFile = path.join(layout.reportsRoot, `live-e2e-controller-state-${runId}.json`);
+    const observationReportFile = path.join(layout.reportsRoot, `live-e2e-observation-report-${runId}.json`);
+    const runHealthReportFile = path.join(layout.reportsRoot, `live-e2e-run-health-report-${runId}.json`);
+    const summaryFile = path.join(layout.reportsRoot, `live-e2e-run-summary-${runId}.json`);
+    const scorecardFile = path.join(layout.reportsRoot, `live-e2e-scorecard-target-${runId}.json`);
+    const installProofFile = path.join(layout.reportsRoot, `live-e2e-aor-installation-proof-${runId}.json`);
+    const stepObservationFile = path.join(layout.reportsRoot, `live-e2e-step-observation-${runId}-08-delivery.json`);
+
+    writeJsonFixture(controllerStateFile, {
+      current_step: null,
+      completed_steps: includedSteps,
+      pending_decision: {
+        action: "continue",
+        reason: "Skill-agent accepted public evidence and required inspection refs.",
+        next_step: null,
+      },
+    });
+    writeJsonFixture(observationReportFile, {
+      report_id: `${runId}.live-e2e-observation.v2`,
+      run_id: runId,
+      report_status: "final",
+      overall_status: "pass",
+      flow_range: {
+        included_steps: includedSteps,
+      },
+      step_journal: [],
+      evidence_refs: [controllerStateFile],
+    });
+    writeJsonFixture(runHealthReportFile, {
+      report_id: `${runId}.live-e2e-run-health.v1`,
+      run_id: runId,
+      overall_status: "pass",
+      failure_summary: {
+        owner: null,
+        phase: null,
+        class: null,
+        summary: null,
+      },
+    });
+    writeJsonFixture(scorecardFile);
+    writeJsonFixture(installProofFile);
+    writeJsonFixture(stepObservationFile);
+    writeJsonFixture(summaryFile, {
+      run_id: runId,
+      status: "pass",
+      run_health_status: "pass",
+      live_e2e_run_health_report_file: runHealthReportFile,
+      live_e2e_observation_report_file: observationReportFile,
+      live_e2e_controller_state_file: controllerStateFile,
+      live_e2e_step_observation_files: [stepObservationFile],
+      aor_installation_proof_file: installProofFile,
+      scorecard_files: [scorecardFile],
+    });
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        runProfileScript,
+        "--project-ref",
+        repoRoot,
+        "--profile",
+        profilePath,
+        "--run-id",
+        runId,
+        "--runtime-root",
+        runtimeRoot,
+        "--controller-mode",
+        "manual",
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.live_e2e_run_status, "pass");
+    assert.equal(output.live_e2e_run_health_status, "pass");
+    assert.equal(output.live_e2e_run_summary_file, summaryFile);
+    assert.equal(output.live_e2e_run_health_report_file, runHealthReportFile);
+    assert.deepEqual(output.live_e2e_step_observation_files, [stepObservationFile]);
+    assert.doesNotMatch(result.stderr, /run-health report failed contract validation/u);
+  });
 });
 
 test("xlarge catalog profiles resolve as manual-only matrix cells", () => {
