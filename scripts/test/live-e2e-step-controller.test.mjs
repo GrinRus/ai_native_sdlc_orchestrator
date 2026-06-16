@@ -269,6 +269,9 @@ test("live E2E decision helper preserves frontend evidence refs in the draft", (
       path.join(reportsRoot, "guided-web-accessibility.json"),
       path.join(reportsRoot, "guided-web-screenshot.png"),
     ];
+    for (const frontendRef of frontendRefs) {
+      fs.writeFileSync(frontendRef, "{}\n", "utf8");
+    }
     fs.writeFileSync(
       requestFile,
       `${JSON.stringify(
@@ -301,6 +304,7 @@ test("live E2E decision helper preserves frontend evidence refs in the draft", (
       )}\n`,
       "utf8",
     );
+    fs.writeFileSync(expectedDecisionFile, "{}\n", "utf8");
 
     const summary = prepareOperatorDecisionArtifact({
       requestFile,
@@ -435,6 +439,104 @@ test("live E2E decision helper hydrates late browser-task proof refs", () => {
     }
     assert.equal(summary.frontend_evidence_ref_count >= 8, true);
     assert.deepEqual(summary.validation_preview.missing_frontend_evidence_refs, []);
+  });
+});
+
+test("live E2E decision helper rejects continue when late browser-task proof is missing", () => {
+  withTempRoot((reportsRoot) => {
+    const requestFile = path.join(reportsRoot, "live-e2e-agent-decision-request-ui-missing-late-proof.json");
+    const expectedDecisionFile = path.join(
+      reportsRoot,
+      "live-e2e-operator-decision-ui-missing-late-proof.json",
+    );
+    const requiredRefs = [
+      requestFile,
+      path.join(reportsRoot, "live-e2e-step-inspection-ui-missing-late-proof.json"),
+    ];
+    const webSmokeFile = path.join(reportsRoot, "installed-user-guided-web-smoke-run.json");
+    const browserProofRequestFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-request-run.json");
+    const browserProofFile = path.join(reportsRoot, "installed-user-guided-browser-task-proof-run.json");
+    const htmlFile = path.join(reportsRoot, "installed-user-guided-web-smoke-run.html");
+    const domFile = path.join(reportsRoot, "installed-user-guided-web-smoke-dom-run.json");
+    const accessibilityFile = path.join(reportsRoot, "installed-user-guided-web-smoke-accessibility-run.json");
+    const visualFile = path.join(reportsRoot, "installed-user-guided-web-smoke-visual-guardrail-run.json");
+    for (const evidenceFile of [htmlFile, domFile, accessibilityFile, visualFile]) {
+      fs.writeFileSync(evidenceFile, "{}\n", "utf8");
+    }
+    fs.writeFileSync(
+      browserProofRequestFile,
+      `${JSON.stringify(
+        {
+          expected_browser_task_proof_file: browserProofFile,
+          expected_rendered_html_file: htmlFile,
+          expected_dom_snapshot_file: domFile,
+          expected_accessibility_summary_file: accessibilityFile,
+          expected_visual_guardrail_file: visualFile,
+          evidence_refs: [htmlFile, domFile, accessibilityFile, visualFile],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      webSmokeFile,
+      `${JSON.stringify(
+        {
+          browser_task_proof_request_file: browserProofRequestFile,
+          browser_task_proof_file: null,
+          task_outcome: { status: "not_pass", findings: ["browser-task-proof requires skill-agent browser evidence."] },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(
+      requestFile,
+      `${JSON.stringify(
+        {
+          request_id: "ui-missing-late-proof.operator-decision-request",
+          run_id: "ui-missing-late-proof",
+          step_id: "learning",
+          step_instance_id: "learning",
+          iteration: 1,
+          operator_context: { operator_ref: "skill://live-e2e-runner" },
+          deterministic_analysis: { status: "pass" },
+          decision_rubric: {
+            required_evidence_refs: requiredRefs,
+            frontend_evidence_refs: [webSmokeFile],
+          },
+          operator_decision_expected_ref: expectedDecisionFile,
+          expected_response_shape: {
+            action: "continue|frontend_interact|diagnose|block",
+            inspected_evidence_refs: requiredRefs,
+            evidence_refs: requiredRefs,
+            ui_ux_analysis: {
+              status: "pass|warn|not_pass|blocked",
+              task_outcome: "pass|warn|not_pass|blocked",
+              findings: [],
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const summary = prepareOperatorDecisionArtifact({
+      requestFile,
+      action: "continue",
+    });
+    assert.equal(summary.status, "rejected");
+    assert.equal(fs.existsSync(summary.output_ref), false);
+    assert.equal(summary.validation_preview.missing_frontend_evidence_refs.includes(browserProofFile), true);
+    assert.equal(
+      summary.validation_preview.rejection_risks.includes("Decision is missing required frontend evidence refs."),
+      true,
+    );
+    assert.equal(summary.decision_preview.inspected_evidence_refs.includes(browserProofFile), false);
   });
 });
 

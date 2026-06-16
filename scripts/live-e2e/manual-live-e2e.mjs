@@ -179,7 +179,7 @@ function prepareDecisionCli(flags) {
     write: !dryRun,
   });
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
-  return 0;
+  return asNonEmptyString(summary.status) === "rejected" ? 1 : 0;
 }
 
 /**

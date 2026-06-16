@@ -67,13 +67,14 @@ export function resolveRequiredInspectedEvidenceRefs(request) {
 export function resolveFrontendEvidenceRefs(request) {
   const rubric = asRecord(request.decision_rubric);
   const expected = asRecord(request.expected_response_shape);
-  return uniqueStrings([
+  const frontendRefs = uniqueStrings([
     ...asStringArray(rubric.frontend_evidence_refs),
     ...asStringArray(expected.frontend_evidence_refs),
-    ...resolveLateBrowserTaskProofEvidenceRefs([
-      ...asStringArray(rubric.frontend_evidence_refs),
-      ...asStringArray(expected.frontend_evidence_refs),
-    ]),
+  ]);
+  const availableFrontendRefs = filterAvailableEvidenceRefs(frontendRefs);
+  return uniqueStrings([
+    ...availableFrontendRefs,
+    ...resolveLateBrowserTaskProofEvidenceRefs(frontendRefs, { includeExpectedMissing: false }),
   ]);
 }
 
@@ -101,30 +102,68 @@ function isLocalJsonFile(filePath) {
 }
 
 /**
- * @param {Record<string, unknown>} request
+ * @param {string} evidenceRef
+ * @returns {boolean}
+ */
+function evidenceRefExists(evidenceRef) {
+  const ref = asNonEmptyString(evidenceRef);
+  if (!ref) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(ref)) {
+    if (!ref.startsWith("evidence://")) return true;
+    const evidencePath = ref.slice("evidence://".length);
+    return path.isAbsolute(evidencePath) ? fs.existsSync(evidencePath) : true;
+  }
+  if (path.isAbsolute(ref)) return fs.existsSync(ref);
+  if (ref.startsWith(".") || ref.includes("/") || ref.includes("\\")) return fs.existsSync(path.resolve(ref));
+  return true;
+}
+
+/**
+ * @param {string[]} refs
  * @returns {string[]}
  */
-function resolveBrowserTaskProofRefsFromRequest(request) {
+function filterAvailableEvidenceRefs(refs) {
+  return uniqueStrings(refs).filter((ref) => evidenceRefExists(ref));
+}
+
+/**
+ * @param {string} ref
+ * @param {boolean} includeExpectedMissing
+ * @returns {string}
+ */
+function includeEvidenceRef(ref, includeExpectedMissing) {
+  const resolved = asNonEmptyString(ref);
+  if (!resolved) return "";
+  return includeExpectedMissing || evidenceRefExists(resolved) ? resolved : "";
+}
+
+/**
+ * @param {Record<string, unknown>} request
+ * @param {{ includeExpectedMissing?: boolean }} [options]
+ * @returns {string[]}
+ */
+function resolveBrowserTaskProofRefsFromRequest(request, options = {}) {
+  const includeExpectedMissing = options.includeExpectedMissing === true;
   const expectedProofFile = asNonEmptyString(request.expected_browser_task_proof_file);
   const directProofFile = asNonEmptyString(request.browser_task_proof_file);
   const proofFile = directProofFile || expectedProofFile;
   const proof = proofFile && fs.existsSync(proofFile) ? readJsonIfPresent(proofFile) : {};
   return uniqueStrings([
-    expectedProofFile,
-    directProofFile,
+    includeEvidenceRef(expectedProofFile, includeExpectedMissing),
+    includeEvidenceRef(directProofFile, includeExpectedMissing),
     Object.keys(proof).length > 0 ? proofFile : "",
-    asNonEmptyString(request.expected_rendered_html_file),
-    asNonEmptyString(request.expected_dom_snapshot_file),
-    asNonEmptyString(request.expected_accessibility_summary_file),
-    asNonEmptyString(request.expected_visual_guardrail_file),
-    asNonEmptyString(request.rendered_html_file),
-    asNonEmptyString(request.html_ref),
-    asNonEmptyString(request.dom_snapshot_file),
-    asNonEmptyString(request.dom_snapshot_ref),
-    asNonEmptyString(request.accessibility_summary_file),
-    asNonEmptyString(request.accessibility_summary_ref),
-    asNonEmptyString(request.visual_guardrail_file),
-    ...asStringArray(request.evidence_refs),
+    includeEvidenceRef(asNonEmptyString(request.expected_rendered_html_file), includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(request.expected_dom_snapshot_file), includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(request.expected_accessibility_summary_file), includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(request.expected_visual_guardrail_file), includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(request.rendered_html_file), includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(request.html_ref), includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(request.dom_snapshot_file), includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(request.dom_snapshot_ref), includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(request.accessibility_summary_file), includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(request.accessibility_summary_ref), includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(request.visual_guardrail_file), includeExpectedMissing),
+    ...asStringArray(request.evidence_refs).map((ref) => includeEvidenceRef(ref, includeExpectedMissing)),
     ...asStringArray(proof.screenshot_files),
     ...asStringArray(proof.screenshot_refs),
     asNonEmptyString(proof.rendered_html_file),
@@ -139,33 +178,53 @@ function resolveBrowserTaskProofRefsFromRequest(request) {
 
 /**
  * @param {Record<string, unknown>} webSmoke
+ * @param {{ includeExpectedMissing?: boolean }} [options]
  * @returns {string[]}
  */
-function resolveBrowserTaskProofRefsFromWebSmoke(webSmoke) {
+function resolveBrowserTaskProofRefsFromWebSmoke(webSmoke, options = {}) {
+  const includeExpectedMissing = options.includeExpectedMissing === true;
   const requestFile = asNonEmptyString(webSmoke.browser_task_proof_request_file);
   const request = readJsonIfPresent(requestFile);
   return uniqueStrings([
-    requestFile,
-    asNonEmptyString(webSmoke.browser_task_proof_file),
+    includeEvidenceRef(requestFile, includeExpectedMissing),
+    includeEvidenceRef(asNonEmptyString(webSmoke.browser_task_proof_file), includeExpectedMissing),
     ...asStringArray(webSmoke.screenshot_files),
     ...asStringArray(webSmoke.screenshot_refs),
-    ...resolveBrowserTaskProofRefsFromRequest(request),
+    ...resolveBrowserTaskProofRefsFromRequest(request, options),
   ]);
 }
 
 /**
  * @param {string[]} frontendRefs
+ * @param {{ includeExpectedMissing?: boolean }} [options]
  * @returns {string[]}
  */
-function resolveLateBrowserTaskProofEvidenceRefs(frontendRefs) {
+function resolveLateBrowserTaskProofEvidenceRefs(frontendRefs, options = {}) {
   const refs = [];
   for (const ref of frontendRefs) {
     if (!isLocalJsonFile(ref)) continue;
     const payload = readJsonIfPresent(ref);
-    refs.push(...resolveBrowserTaskProofRefsFromWebSmoke(payload));
-    refs.push(...resolveBrowserTaskProofRefsFromRequest(payload));
+    refs.push(...resolveBrowserTaskProofRefsFromWebSmoke(payload, options));
+    refs.push(...resolveBrowserTaskProofRefsFromRequest(payload, options));
   }
   return uniqueStrings(refs);
+}
+
+/**
+ * @param {Record<string, unknown>} request
+ * @returns {string[]}
+ */
+function resolveRequiredFrontendEvidenceRefs(request) {
+  const rubric = asRecord(request.decision_rubric);
+  const expected = asRecord(request.expected_response_shape);
+  const frontendRefs = uniqueStrings([
+    ...asStringArray(rubric.frontend_evidence_refs),
+    ...asStringArray(expected.frontend_evidence_refs),
+  ]);
+  return uniqueStrings([
+    ...frontendRefs,
+    ...resolveLateBrowserTaskProofEvidenceRefs(frontendRefs, { includeExpectedMissing: true }),
+  ]);
 }
 
 /**
@@ -221,13 +280,13 @@ function defaultReason(action) {
 function buildValidationPreview(options) {
   const supportedActions = resolveSupportedDecisionActions(options.request);
   const requiredRefs = resolveRequiredInspectedEvidenceRefs(options.request);
-  const frontendRefs = resolveFrontendEvidenceRefs(options.request);
+  const frontendRefs = resolveRequiredFrontendEvidenceRefs(options.request);
   const deterministicStatus = normalizeObservationStatus(
     asNonEmptyString(asRecord(options.request.deterministic_analysis).status),
   );
   const semanticStatus = normalizeObservationStatus(options.semanticStatus);
   const missingRequired = requiredRefs.filter((ref) => !options.inspectedEvidenceRefs.includes(ref));
-  const missingFrontend = frontendRefs.filter((ref) => !options.evidenceRefs.includes(ref));
+  const missingFrontend = frontendRefs.filter((ref) => !options.evidenceRefs.includes(ref) || !evidenceRefExists(ref));
   const rejectionRisks = uniqueStrings([
     supportedActions.includes(options.action) ? "" : `Action '${options.action}' is not supported by the request.`,
     missingRequired.length > 0 ? "Decision is missing required inspected evidence refs." : "",
@@ -252,6 +311,16 @@ function buildValidationPreview(options) {
     rejection_risks: rejectionRisks,
     corrected_draft_available: missingRequired.length > 0 || missingFrontend.length > 0,
   };
+}
+
+/**
+ * @param {string} action
+ * @param {Record<string, unknown>} validationPreview
+ * @returns {boolean}
+ */
+function shouldRejectPreparedDecision(action, validationPreview) {
+  const rejectionRisks = asStringArray(validationPreview.rejection_risks);
+  return action === "continue" && rejectionRisks.length > 0;
 }
 
 /**
@@ -363,12 +432,17 @@ export function prepareOperatorDecisionArtifact(options) {
     inspectedEvidenceRefs: asStringArray(decision.inspected_evidence_refs),
     evidenceRefs: asStringArray(decision.evidence_refs),
   });
+  const rejected = shouldRejectPreparedDecision(asNonEmptyString(decision.action), validationPreview);
   if (options.write !== false) {
-    writeJson(outputFile, decision);
+    if (rejected) {
+      fs.rmSync(outputFile, { force: true });
+    } else {
+      writeJson(outputFile, decision);
+    }
   }
   return {
     command: "scripts live-e2e decision prepare",
-    status: options.write === false ? "preview" : "prepared",
+    status: rejected ? "rejected" : options.write === false ? "preview" : "prepared",
     action: asNonEmptyString(decision.action),
     request_ref: requestFile,
     output_ref: outputFile,
@@ -377,7 +451,9 @@ export function prepareOperatorDecisionArtifact(options) {
     frontend_evidence_ref_count: asStringArray(decision.frontend_evidence_refs).length,
     validation_preview: validationPreview,
     install_hint:
-      "Resume with manual-live-e2e using the same --project-ref, --profile, --run-id, and --operator-decision-file <output_ref>.",
+      rejected
+        ? "Do not resume with this draft. Materialize the missing evidence refs or choose diagnose/block."
+        : "Resume with manual-live-e2e using the same --project-ref, --profile, --run-id, and --operator-decision-file <output_ref>.",
     decision_preview: decision,
   };
 }
