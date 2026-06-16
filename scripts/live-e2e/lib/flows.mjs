@@ -1746,10 +1746,62 @@ function resolveTargetFailurePhase(stepResult, setupCommandSet, verificationComm
 
 /**
  * @param {Record<string, unknown>} stepResult
+ * @returns {string}
+ */
+function targetFailureTextCorpus(stepResult) {
+  const outputExcerpt = asRecord(stepResult.output_excerpt);
+  return [
+    stepResult.command,
+    stepResult.summary,
+    stepResult.error,
+    stepResult.error_code,
+    stepResult.stderr,
+    stepResult.stdout,
+    outputExcerpt.stdout_tail,
+    outputExcerpt.stderr_tail,
+  ]
+    .map((value) => asNonEmptyString(value))
+    .filter(Boolean)
+    .join("\n")
+    .toLowerCase();
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @returns {string | null}
+ */
+function resolveTargetEnvironmentFailureClass(stepResult) {
+  const corpus = targetFailureTextCorpus(stepResult);
+  if (
+    corpus.includes("enospc") ||
+    corpus.includes("no space left on device") ||
+    corpus.includes("disk quota exceeded") ||
+    corpus.includes("insufficient disk space") ||
+    corpus.includes("not enough space")
+  ) {
+    return "environment_disk_space_exhausted";
+  }
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
  * @returns {"environment" | "target_repository"}
  */
 function resolveTargetFailureOwner(stepResult) {
-  return asStringArray(stepResult.missing_prerequisites).length > 0 ? "environment" : "target_repository";
+  return resolveTargetEnvironmentFailureClass(stepResult) || asStringArray(stepResult.missing_prerequisites).length > 0
+    ? "environment"
+    : "target_repository";
+}
+
+/**
+ * @param {Record<string, unknown>} stepResult
+ * @param {"target_setup" | "target_verification"} phase
+ * @returns {string}
+ */
+function resolveTargetFailureClass(stepResult, phase) {
+  return resolveTargetEnvironmentFailureClass(stepResult) ??
+    (phase === "target_setup" ? "target_setup_blocked" : "target_verification_blocked");
 }
 
 /**
@@ -1763,6 +1815,7 @@ function resolveTargetFailureOwner(stepResult) {
 function describeTargetCommandFailure(options) {
   const phase = resolveTargetFailurePhase(options.stepResult, options.setupCommandSet, options.verificationCommandSet);
   const owner = resolveTargetFailureOwner(options.stepResult);
+  const failureClass = resolveTargetFailureClass(options.stepResult, phase);
   const command = asNonEmptyString(options.stepResult.command) || null;
   const summary = asNonEmptyString(options.stepResult.summary) || "Target command failed.";
   const evidenceRefs = uniqueStrings([options.stepResultFile, ...asStringArray(options.stepResult.evidence_refs)]);
@@ -1777,7 +1830,7 @@ function describeTargetCommandFailure(options) {
     evidence_refs: evidenceRefs,
     failure_owner: owner,
     failure_phase: phase,
-    failure_class: phase === "target_setup" ? "target_setup_blocked" : "target_verification_blocked",
+    failure_class: failureClass,
     provider_independent: true,
     timed_out: options.stepResult.timed_out === true,
     missing_prerequisites: asStringArray(options.stepResult.missing_prerequisites),
@@ -1854,9 +1907,9 @@ export function buildTargetPreExecutionStatusReport(options) {
           blocker_reason: "Target verification was not judged because target setup blocked first.",
           evidence_ref: setupStatus.evidence_ref,
           evidence_refs: asStringArray(setupStatus.evidence_refs),
-          failure_owner: "target_repository",
-          failure_phase: "target_verification",
-          failure_class: "target_setup_blocked",
+          failure_owner: asNonEmptyString(setupStatus.failure_owner) || null,
+          failure_phase: asNonEmptyString(setupStatus.failure_phase) || "target_setup",
+          failure_class: asNonEmptyString(setupStatus.failure_class) || "target_setup_blocked",
           provider_independent: true,
           timed_out: false,
           missing_prerequisites: [],
@@ -1983,13 +2036,16 @@ export function evaluateBaselineVerifyGate(options) {
     const command = asNonEmptyString(failedStep.document.command);
     const missingPrerequisites = asStringArray(failedStep.document.missing_prerequisites);
     const summary = asNonEmptyString(failedStep.document.summary) || "Verification step failed.";
+    const environmentFailureClass = resolveTargetEnvironmentFailureClass(failedStep.document);
     failedCommands.push({
       command,
       summary,
       missing_prerequisites: missingPrerequisites,
       step_result_file: failedStep.filePath,
     });
-    if (missingPrerequisites.length > 0) {
+    if (environmentFailureClass) {
+      blockingReasons.push(`${environmentFailureClass}:${command || "unknown"}`);
+    } else if (missingPrerequisites.length > 0) {
       blockingReasons.push(`missing-prerequisite:${command || "unknown"}`);
     } else if (command && setupCommandSet.has(command)) {
       blockingReasons.push(`readiness-command-failed:${command}`);
@@ -2001,6 +2057,10 @@ export function evaluateBaselineVerifyGate(options) {
   }
 
   if (blockingReasons.length > 0) {
+    const failedStepDocument = failedSteps.length > 0 ? failedSteps[0].document : null;
+    const failedStepPhase = failedStepDocument
+      ? resolveTargetFailurePhase(failedStepDocument, setupCommandSet, verificationCommandSet)
+      : null;
     return {
       phase: "baseline_diagnostic",
       mode: options.mode,
@@ -2012,22 +2072,20 @@ export function evaluateBaselineVerifyGate(options) {
       failed_commands: failedCommands,
       routed_step_result_file: routedStepResultFile || null,
       failure_owner:
-        failedSteps.length > 0
-          ? resolveTargetFailureOwner(failedSteps[0].document)
+        failedStepDocument
+          ? resolveTargetFailureOwner(failedStepDocument)
           : blockingReasons.some((reason) => reason.startsWith("routed-dry-run"))
             ? "aor"
             : "target_repository",
       failure_phase:
-        failedSteps.length > 0
-          ? resolveTargetFailurePhase(failedSteps[0].document, setupCommandSet, verificationCommandSet)
+        failedStepPhase
+          ? failedStepPhase
           : blockingReasons.some((reason) => reason.startsWith("routed-dry-run"))
             ? "controller_decision"
             : "target_verification",
       failure_class:
-        failedSteps.length > 0
-          ? resolveTargetFailurePhase(failedSteps[0].document, setupCommandSet, verificationCommandSet) === "target_setup"
-            ? "target_setup_blocked"
-            : "target_verification_blocked"
+        failedStepDocument && failedStepPhase
+          ? resolveTargetFailureClass(failedStepDocument, failedStepPhase)
           : blockingReasons.some((reason) => reason.startsWith("routed-dry-run"))
             ? "aor_failure"
             : "target_verification_blocked",

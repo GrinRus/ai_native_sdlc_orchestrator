@@ -1020,6 +1020,64 @@ test("target pre-execution status separates target setup, target verification, a
   });
 });
 
+test("target pre-execution status classifies disk exhaustion as environment failure", () => {
+  withTempRoot((tempRoot) => {
+    const setupTranscript = writeJsonFixture(path.join(tempRoot, "setup-transcript.json"));
+    const setupStepFile = writeJsonFixture(path.join(tempRoot, "setup-step.json"), {
+      status: "failed",
+      command: "yarn install --immutable",
+      summary: "Verification command 'yarn install --immutable' failed with exit code 1.",
+      evidence_refs: [setupTranscript],
+      command_timeout_ms: 600000,
+      timed_out: false,
+      missing_prerequisites: [],
+      output_excerpt: {
+        stdout_tail: "YN0001: Error: ENOSPC: no space left on device, copyfile '.yarn/cache/example.zip'",
+        stderr_tail: "",
+      },
+    });
+
+    const baselineDecision = evaluateBaselineVerifyGate({
+      verifySummary: { status: "failed", validation_gate_status: "pass" },
+      verifyPayload: {},
+      stepResultFiles: [setupStepFile],
+      setupCommands: ["yarn install --immutable"],
+      verificationCommands: ["yarn g:lint"],
+      mode: "blocking",
+    });
+    assert.equal(baselineDecision.failure_owner, "environment");
+    assert.equal(baselineDecision.failure_phase, "target_setup");
+    assert.equal(baselineDecision.failure_class, "environment_disk_space_exhausted");
+    assert.equal(
+      baselineDecision.blocking_reasons.includes("environment_disk_space_exhausted:yarn install --immutable"),
+      true,
+    );
+
+    const setupReport = buildTargetPreExecutionStatusReport({
+      verifySummary: { status: "failed", command_timeout_ms: 600000 },
+      verifyPayload: { verify_summary_file: path.join(tempRoot, "verify-summary.json") },
+      stepResultFiles: [setupStepFile],
+      setupCommands: ["yarn install --immutable"],
+      verificationCommands: ["yarn g:lint"],
+      baselineGateDecision: baselineDecision,
+      runResult: {
+        durationSec: 9,
+        timeoutMs: 900000,
+        transcriptFile: path.join(tempRoot, "project-verify.json"),
+      },
+    });
+    assert.equal(setupReport.status, "blocked");
+    assert.equal(setupReport.failure_owner, "environment");
+    assert.equal(setupReport.failure_phase, "target_setup");
+    assert.equal(setupReport.failure_class, "environment_disk_space_exhausted");
+    assert.equal(setupReport.target_setup_status.failure_owner, "environment");
+    assert.equal(setupReport.target_setup_status.failure_class, "environment_disk_space_exhausted");
+    assert.equal(setupReport.target_verification_status.status, "not_attempted");
+    assert.equal(setupReport.target_verification_status.failure_owner, "environment");
+    assert.equal(setupReport.target_verification_status.failure_class, "environment_disk_space_exhausted");
+  });
+});
+
 test("baseline verify gate annotates blocker owner and phase", () => {
   withTempRoot((tempRoot) => {
     const stepFile = writeJsonFixture(path.join(tempRoot, "verify-step.json"), {
@@ -3550,6 +3608,176 @@ test("proof runner run-health prioritizes post-run target verification failure o
     assert.equal(written.runHealthReport.failure_summary.phase, "target_verification");
     assert.equal(written.runHealthReport.failure_summary.class, "target_verification_failed");
     assert.equal(written.runHealthReport.command_health.failed_command_count, 1);
+  });
+});
+
+test("proof runner preserves environment owner from target setup status in run-health", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    const deliverySteps = ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"];
+    for (const step of deliverySteps) {
+      for (const field of ["plan", "execution", "inspection", "classification", "agent-request", "decision", "transcript"]) {
+        files[`${step}-${field}.json`] = path.join(reportsRoot, `${step}-${field}.json`);
+      }
+    }
+    for (const file of Object.values(files)) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+
+    const stepJournal = deliverySteps.map((step, index) => ({
+      sequence: index + 1,
+      step_id: step,
+      step_instance_id: step,
+      iteration: 1,
+      flow_stage: step,
+      plan: {
+        objective: `Observe ${step}.`,
+        public_surface: `aor ${step} run`,
+        command_labels: [`${step}-run`],
+        expected_artifacts: [],
+        inspection_sources: ["command_transcript"],
+        safety_constraints: ["no-upstream-write"],
+      },
+      plan_ref: files[`${step}-plan.json`],
+      public_surface: `aor ${step} run`,
+      transcript_ref: files[`${step}-transcript.json`],
+      execution_ref: files[`${step}-execution.json`],
+      inspection_ref: files[`${step}-inspection.json`],
+      classification_ref: files[`${step}-classification.json`],
+      artifact_refs: [files[`${step}-transcript.json`]],
+      started_at: "2026-06-09T00:00:00.000Z",
+      finished_at: "2026-06-09T00:00:01.000Z",
+      duration_sec: 1,
+      deterministic_analysis: {
+        status: step === "execution" ? "not_pass" : "pass",
+        exit_code: step === "execution" ? 1 : 0,
+        failure_class: step === "execution" ? "target_setup_blocked" : null,
+        missing_evidence: [],
+        recommendation: step === "execution" ? "diagnose" : "continue",
+      },
+      semantic_analysis: {
+        status: step === "execution" ? "blocked" : "pass",
+        judge_source: "skill-agent",
+        findings: step === "execution" ? ["Target setup failed before provider execution."] : [],
+      },
+      agent_decision_request_ref: files[`${step}-agent-request.json`],
+      operator_decision_ref: files[`${step}-decision.json`],
+      operator_decision_status: "accepted",
+      inspected_evidence_refs: [files[`${step}-transcript.json`]],
+      requested_interaction: null,
+      decision: {
+        action: step === "execution" ? "block" : "continue",
+        reason: step === "execution" ? "Target setup failed before provider execution." : "Step evidence accepted.",
+      },
+      resume_result: null,
+      frontend_interaction_refs: [],
+      final_step_verdict: step === "execution" ? "blocked" : "pass",
+    }));
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId: "environment-target-setup-run-health",
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.environment-target-setup",
+        journey_mode: "full-journey",
+        target_catalog_id: "nextjs",
+        feature_mission_id: "nextjs-typeguard-regression",
+        scenario_family: "regress",
+        provider_variant_id: "openai-primary",
+        stages: ["bootstrap", "discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"],
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "blocked",
+        stageResults: [
+          {
+            stage: "execution",
+            status: "fail",
+            evidence_refs: [files["baseline-verify-summary.json"]],
+            summary: "Target setup failed before provider execution.",
+          },
+        ],
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: stepJournal,
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "fail",
+          target_setup_status: {
+            status: "blocked",
+            failure_owner: "environment",
+            failure_phase: "target_setup",
+            failure_class: "environment_disk_space_exhausted",
+          },
+          target_verification_status_detail: {
+            status: "not_attempted",
+            failure_owner: "environment",
+            failure_phase: "target_setup",
+            failure_class: "environment_disk_space_exhausted",
+          },
+          feature_mission_id: "nextjs-typeguard-regression",
+          feature_size: "large",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.runHealthReport.overall_status, "blocked");
+    assert.equal(written.runHealthReport.target_environment_health.status, "blocked");
+    assert.equal(written.runHealthReport.target_environment_health.failure_owner, "environment");
+    assert.equal(written.runHealthReport.target_environment_health.failure_class, "environment_disk_space_exhausted");
+    assert.equal(written.runHealthReport.failure_summary.owner, "environment");
+    assert.equal(written.runHealthReport.failure_summary.phase, "target_setup");
+    assert.equal(written.runHealthReport.failure_summary.class, "environment_disk_space_exhausted");
   });
 });
 

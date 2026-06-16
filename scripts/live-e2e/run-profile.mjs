@@ -1800,13 +1800,26 @@ function buildTargetEnvironmentHealth(artifacts) {
       : inferredFailurePhase === "target_setup"
         ? "target_setup_failed"
         : "target_verification_failed";
+  const blockingTargetStatus =
+    setupStatus === "fail" || setupStatus === "blocked"
+      ? targetSetupStatus
+      : verificationStatus === "fail" || verificationStatus === "blocked"
+        ? targetVerificationStatus
+        : {};
   return {
     status,
     target_setup_status: setupStatus,
     target_verification_status: verificationStatus,
-    failure_owner: asNonEmptyString(artifacts.failure_owner) || null,
-    failure_phase: asNonEmptyString(artifacts.failure_phase) || inferredFailurePhase,
-    failure_class: asNonEmptyString(artifacts.failure_class) || inferredFailureClass,
+    failure_owner:
+      asNonEmptyString(artifacts.failure_owner) || asNonEmptyString(blockingTargetStatus.failure_owner) || null,
+    failure_phase:
+      asNonEmptyString(artifacts.failure_phase) ||
+      asNonEmptyString(blockingTargetStatus.failure_phase) ||
+      inferredFailurePhase,
+    failure_class:
+      asNonEmptyString(artifacts.failure_class) ||
+      asNonEmptyString(blockingTargetStatus.failure_class) ||
+      inferredFailureClass,
   };
 }
 
@@ -1978,10 +1991,11 @@ function resolveRunHealthFailure(options) {
     };
   }
   if (asNonEmptyString(options.targetEnvironmentHealth.status) !== "pass") {
+    const targetOwner = asNonEmptyString(options.targetEnvironmentHealth.failure_owner);
     const targetPhase = asNonEmptyString(options.targetEnvironmentHealth.failure_phase);
     const targetClass = asNonEmptyString(options.targetEnvironmentHealth.failure_class);
     return {
-      owner: "target_repository",
+      owner: targetOwner || "target_repository",
       phase:
         targetPhase ||
         (asNonEmptyString(options.targetEnvironmentHealth.target_setup_status) === "fail"
