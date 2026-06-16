@@ -4483,8 +4483,9 @@ export function executeFullJourneyFlow(options) {
       reviewOverallStatus = normalizeVerdictStatus(reviewReport.overall_status);
       featureSizeFitStatus = normalizeVerdictStatus(asRecord(reviewReport.feature_size_fit).status);
       const reviewRepairActions = new Set(implementationLoopPolicy.reviewRepairActions);
+      const reviewNeedsRepair = reviewOverallStatus !== "pass";
       const repairNeeded =
-        (reviewOverallStatus === "fail" &&
+        (reviewNeedsRepair &&
           (reviewRepairActions.has("request-repair") || reviewRepairActions.has("repair"))) ||
         (artifacts.post_run_verify_status === "fail" && reviewRepairActions.has("failed-quality-findings"));
       const canRepair =
@@ -4505,12 +4506,14 @@ export function executeFullJourneyFlow(options) {
       markStage(
         stageMap,
         "review",
-        canRepair ? "warn" : reviewOverallStatus === "fail" ? "fail" : "pass",
+        canRepair ? "warn" : reviewOverallStatus === "fail" ? "fail" : reviewOverallStatus === "warn" ? "warn" : "pass",
         uniqueStrings([reviewRun.transcriptFile, ...collectStringRefs(reviewRun.payload)]),
         canRepair
           ? `Review requested public repair iteration ${iteration + 1}.`
           : reviewOverallStatus === "fail"
             ? "Review report failed."
+            : reviewOverallStatus === "warn"
+              ? "Review report produced warnings that require operator review before approval."
             : "Review report materialized.",
         canRepair
           ? {
@@ -4589,7 +4592,7 @@ export function executeFullJourneyFlow(options) {
         if (
           artifacts.implementation_loop_blocked === true ||
           lastIteration.repair_requested === true ||
-          reviewOverallStatus === "fail" ||
+          reviewOverallStatus !== "pass" ||
           artifacts.post_run_verify_status === "fail"
         ) {
           artifacts.implementation_loop_exhausted = true;
@@ -4602,7 +4605,7 @@ export function executeFullJourneyFlow(options) {
     if (artifacts.implementation_loop_exhausted === true) {
       throw new Error("Implementation repair loop exhausted before review and verification passed.");
     }
-    if (reviewOverallStatus === "fail" || artifacts.post_run_verify_status === "fail") {
+    if (reviewOverallStatus !== "pass" || artifacts.post_run_verify_status === "fail") {
       throw new Error("Implementation review or post-run verification failed before delivery.");
     }
     if (guidedJourneyEnabled) {

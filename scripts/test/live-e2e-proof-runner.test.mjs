@@ -2573,6 +2573,15 @@ test("source install proof force-refreshes dependencies and smokes intake CLI", 
   assert.match(flowsSource, /\["aor", "intake", "create", "--help"\]/u);
 });
 
+test("full journey review warnings request repair instead of passing into QA approval", () => {
+  const flowsSource = fs.readFileSync(fullJourneyFlowScript, "utf8");
+
+  assert.match(flowsSource, /const reviewNeedsRepair = reviewOverallStatus !== "pass"/u);
+  assert.match(flowsSource, /reviewNeedsRepair[\s\S]*reviewRepairActions\.has\("request-repair"\)/u);
+  assert.match(flowsSource, /reviewOverallStatus === "warn" \? "warn" : "pass"/u);
+  assert.match(flowsSource, /reviewOverallStatus !== "pass" \|\| artifacts\.post_run_verify_status === "fail"/u);
+});
+
 test("proof runner writes run-health reports for blocked live E2E reports", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");
