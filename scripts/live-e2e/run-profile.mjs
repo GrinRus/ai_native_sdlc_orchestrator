@@ -168,7 +168,11 @@ function isLiveE2eControllerStateInProgress(controllerState, includedSteps) {
     includedSteps.length > 0 && includedSteps.every((step) => completedSteps.has(step));
   const hasCurrentStep = Boolean(asNonEmptyString(state.current_step));
   const pendingDecision = asRecord(state.pending_decision);
-  const hasPendingDecision = Object.keys(pendingDecision).length > 0;
+  const pendingAction = asNonEmptyString(pendingDecision.action);
+  const pendingNextStep = asNonEmptyString(pendingDecision.next_step);
+  const terminalPendingContinue =
+    pendingAction === "continue" && !pendingNextStep && !hasCurrentStep && allIncludedStepsCompleted;
+  const hasPendingDecision = Object.keys(pendingDecision).length > 0 && !terminalPendingContinue;
   return hasCurrentStep || hasPendingDecision || !allIncludedStepsCompleted;
 }
 

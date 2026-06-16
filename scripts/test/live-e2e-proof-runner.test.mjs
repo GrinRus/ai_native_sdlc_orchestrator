@@ -2638,6 +2638,105 @@ test("proof runner keeps partial controller observations in progress when pendin
     assert.equal(written.runHealthReport.overall_status, "blocked");
     assert.equal(written.runHealthReport.controller_health.missing_operator_decision_steps.includes("qa"), true);
     assert.equal(written.runHealthReport.failure_summary.owner, "operator");
+
+    const terminalControllerState = path.join(reportsRoot, "controller-state-terminal.json");
+    fs.writeFileSync(
+      terminalControllerState,
+      `${JSON.stringify(
+        {
+          current_step: null,
+          completed_steps: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"],
+          pending_decision: {
+            action: "continue",
+            reason: "Skill-agent accepted public evidence and required inspection refs.",
+            next_step: null,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    const terminalEntries = ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"].map(
+      (step, index) => makeStep(step, index + 1),
+    );
+    const terminalDeliveryManifest = path.join(reportsRoot, "delivery-manifest.json");
+    fs.writeFileSync(terminalDeliveryManifest, "{}\n", "utf8");
+    const terminalWritten = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId: `${runId}-terminal`,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.partial-guided-proof-terminal",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "release",
+        provider_variant_id: "openai-primary",
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:03.000Z",
+        status: "pass",
+        stageResults: [
+          {
+            stage: "delivery",
+            status: "pass",
+            evidence_refs: [terminalDeliveryManifest],
+            summary: "Delivery completed.",
+          },
+        ],
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: terminalControllerState,
+          live_e2e_step_journal_entries: terminalEntries,
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: installProof,
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: generatedProject,
+          feature_request_file: featureRequest,
+          baseline_verify_summary_file: baselineVerify,
+          baseline_verify_status: "pass",
+          delivery_manifest_file: terminalDeliveryManifest,
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "medium",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+    const terminalObservationReport = JSON.parse(
+      fs.readFileSync(terminalWritten.summary.live_e2e_observation_report_file, "utf8"),
+    );
+    assert.equal(terminalObservationReport.report_status, "final");
+    assert.equal(terminalWritten.summary.status, "pass");
+    assert.equal(terminalWritten.runHealthReport.overall_status, "pass");
   });
 });
 
