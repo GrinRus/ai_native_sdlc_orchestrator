@@ -3426,6 +3426,187 @@ test("proof runner classifies context-budget provider blockers as run-health blo
   });
 });
 
+test("proof runner classifies provider context-window overflow as provider run-health blocked", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "execution-plan.json",
+        "execution-step-result.json",
+        "execution-inspection.json",
+        "execution-classification.json",
+        "execution-agent-request.json",
+        "execution-decision.json",
+        "adapter-request.json",
+        "provider-work-packet.json",
+        "adapter-raw-evidence.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      fs.writeFileSync(file, "{}\n", "utf8");
+    }
+
+    const runId = "provider-context-window-blocked-run-health";
+    const stepJournalEntry = {
+      sequence: 1,
+      step_id: "execution",
+      step_instance_id: "execution",
+      iteration: 1,
+      flow_stage: "execution",
+      plan: {
+        objective: "Observe routed live execution.",
+        public_surface: "aor run start",
+        command_labels: ["run-start"],
+        expected_artifacts: ["routed_step_result_file"],
+        inspection_sources: ["adapter_raw_evidence"],
+        safety_constraints: ["no-upstream-write"],
+      },
+      plan_ref: files["execution-plan.json"],
+      public_surface: "aor run start",
+      execution_ref: files["execution-step-result.json"],
+      inspection_ref: files["execution-inspection.json"],
+      classification_ref: files["execution-classification.json"],
+      artifact_refs: [files["adapter-request.json"], files["provider-work-packet.json"], files["adapter-raw-evidence.json"]],
+      started_at: "2026-06-09T00:00:00.000Z",
+      finished_at: "2026-06-09T00:00:01.000Z",
+      duration_sec: 1,
+      deterministic_analysis: {
+        status: "blocked",
+        exit_code: 1,
+        failure_class: "provider_context_window_exceeded",
+        missing_evidence: [],
+        recommendation: "block",
+      },
+      semantic_analysis: {
+        status: "blocked",
+        judge_source: "skill-agent",
+        findings: ["Provider exhausted its context window during execution after accepting a bounded work packet."],
+      },
+      agent_decision_request_ref: files["execution-agent-request.json"],
+      operator_decision_ref: files["execution-decision.json"],
+      operator_decision_status: "accepted",
+      inspected_evidence_refs: [files["adapter-raw-evidence.json"]],
+      requested_interaction: null,
+      decision: {
+        action: "block",
+        reason: "Provider context window exceeded.",
+      },
+      resume_result: null,
+      frontend_interaction_refs: [],
+      final_step_verdict: "blocked",
+    };
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.provider-context-window-blocked",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-release-doc-typing",
+        scenario_family: "release",
+        provider_variant_id: "anthropic-primary",
+        stages: ["bootstrap", "execution"],
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "blocked",
+        stageResults: [
+          {
+            stage: "execution",
+            status: "fail",
+            evidence_refs: [files["adapter-raw-evidence.json"]],
+            summary: "Provider exhausted its context window during execution.",
+          },
+        ],
+        commandResults: [],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: [stepJournalEntry],
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "pass",
+          failure_owner: "provider",
+          failure_phase: "provider_execution",
+          failure_class: "provider_context_window_exceeded",
+          provider_execution_status: "blocked",
+          adapter_raw_evidence_ref: files["adapter-raw-evidence.json"],
+          request_artifact_ref: files["adapter-request.json"],
+          provider_work_packet_ref: files["provider-work-packet.json"],
+          context_budget_status: "pass",
+          context_budget_failure_class: "provider_context_window_exceeded",
+          raw_provider_error_summary: "Prompt is too long: input tokens exceed context window",
+          top_context_size_sources: [
+            {
+              source: "provider_work_packet.context",
+              bytes: 2048,
+              chars: 2048,
+              estimated_tokens: 682,
+            },
+          ],
+          feature_mission_id: "ky-release-doc-typing",
+          feature_size: "large",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "blocked");
+    assert.equal(written.runHealthReport.overall_status, "blocked");
+    assert.equal(written.runHealthReport.provider_health.status, "blocked");
+    assert.equal(written.runHealthReport.provider_health.context_budget_status, "pass");
+    assert.equal(written.runHealthReport.provider_health.context_budget_failure_class, "provider_context_window_exceeded");
+    assert.match(written.runHealthReport.provider_health.raw_provider_error_summary, /Prompt is too long/i);
+    assert.equal(written.runHealthReport.failure_summary.owner, "provider");
+    assert.equal(written.runHealthReport.failure_summary.phase, "provider_execution");
+    assert.equal(written.runHealthReport.failure_summary.class, "provider_context_window_exceeded");
+  });
+});
+
 test("proof runner propagates provider work-packet non-execution into run-health", () => {
   withTempRoot((tempRoot) => {
     const reportsRoot = path.join(tempRoot, "reports");

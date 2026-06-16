@@ -122,9 +122,10 @@ provider/environment/operator/AOR-owner follow-up. Use the separate quality
 assessment report for outcome backlog items only after provider qualification is
 recorded.
 
-Context-budget blockers such as `compiled_context_budget_exceeded` are AOR
-run-health issues in `phase=provider_execution`. They do not prove provider
-quality failure and they do not evaluate produced code or artifacts.
+Context-budget blockers such as `compiled_context_budget_exceeded` and
+provider-side overflow blockers such as `provider_context_window_exceeded` are
+run-health issues in `phase=provider_execution`. They do not evaluate produced
+code or artifacts.
 
 ## W40 proof notes
 

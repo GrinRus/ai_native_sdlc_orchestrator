@@ -726,6 +726,11 @@ of implementation and verification evidence when the mission requires it.
 - `delivery_manifest_file` exists and is anchored to the target checkout.
 - `live_e2e_run_health_report_file` exists and separates run-health failures from outcome-quality assessment.
 - `compiled_context_budget_exceeded` is a run-health/provider-execution blocker, not an implementation-quality verdict. Do not prepare post-run quality assessment unless the declared full flow produced outcome artifacts.
+- `provider_context_window_exceeded` is the corresponding post-spawn provider
+  overflow class. It means the bounded provider work packet passed AOR's
+  deterministic budget, but the external runtime exhausted its own conversation
+  context while executing. Preserve the raw provider summary and treat the run
+  as blocked before outcome quality assessment.
 - Outcome quality follow-up comes from `live-e2e-quality-assessment-report`, not from the runner summary.
 - Proof runner execution stays CLI-only and remains valid with web UI detached.
 - Guided proof execution starts from `aor doctor`, `aor onboard`, `aor app`, and `aor next`; the target repository HEAD must remain unchanged and no remote write commands may be recorded unless an explicit future profile opts into network write-back.

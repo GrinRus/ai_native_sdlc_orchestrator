@@ -129,7 +129,7 @@ test("request-artifact adapter launcher prompts mention output quality policy", 
       const message = adapter?.profile?.execution?.external_runtime?.request_file?.message;
       assert.equal(typeof message, "string", `${adapterId} request_file.message must be present`);
       assert.match(message, /execution_contract\.output_quality_policy/u, adapterId);
-      assert.match(message, /warning-producing stdout\/stderr/u, adapterId);
+      assert.doesNotMatch(message, /warning-producing stdout\/stderr/u, adapterId);
     }
   });
 });
@@ -1475,7 +1475,7 @@ test("live adapter blocks oversized provider work packet before spawning runtime
   });
 });
 
-test("live adapter maps provider prompt overflow to context budget failure", () => {
+test("live adapter maps provider prompt overflow to provider context-window failure", () => {
   withTempRepo((repoRoot) => {
     const evidenceRoot = path.join(repoRoot, ".aor", "projects", "adapter-test", "reports");
     const adapter = createLiveAdapter({
@@ -1510,8 +1510,9 @@ test("live adapter maps provider prompt overflow to context budget failure", () 
     });
 
     assert.equal(response.status, "blocked");
-    assert.equal(response.output.failure_kind, "compiled_context_budget_exceeded");
-    assert.equal(response.output.external_runner.context_budget_failure_class, "compiled_context_budget_exceeded");
+    assert.equal(response.output.failure_kind, "provider_context_window_exceeded");
+    assert.equal(response.output.external_runner.context_budget_status, "pass");
+    assert.equal(response.output.external_runner.context_budget_failure_class, "provider_context_window_exceeded");
     assert.match(response.output.external_runner.raw_provider_error_summary, /Prompt is too long/i);
   });
 });

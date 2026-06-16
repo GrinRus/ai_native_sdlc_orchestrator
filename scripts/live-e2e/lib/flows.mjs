@@ -138,6 +138,13 @@ function classifyProviderExecutionFailure(stepResult, adapterOutput) {
       class: "compiled_context_budget_exceeded",
     };
   }
+  if (failureClass === "provider_context_window_exceeded") {
+    return {
+      owner: "provider",
+      phase: "provider_execution",
+      class: "provider_context_window_exceeded",
+    };
+  }
   if (failureClass === "provider_work_packet_not_executed") {
     return {
       owner: "provider",

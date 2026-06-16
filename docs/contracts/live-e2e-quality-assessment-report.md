@@ -7,7 +7,7 @@ This report is separate from the run itself. It assesses the quality of the arti
 
 The assessment is free-form expert work over the linked evidence. It does not rely on predefined fixtures.
 
-`quality-assessment prepare` is valid only after a completed declared flow. The source run-health status must be `pass` or `warn`, and the source observation status must be `pass` or `warn`. Blocked or failed runs, including `compiled_context_budget_exceeded`, stop at factual run-health reporting and must not produce an outcome quality assessment request.
+`quality-assessment prepare` is valid only after a completed declared flow. The source run-health status must be `pass` or `warn`, and the source observation status must be `pass` or `warn`. Blocked or failed runs, including `compiled_context_budget_exceeded` and `provider_context_window_exceeded`, stop at factual run-health reporting and must not produce an outcome quality assessment request.
 
 ## Required fields
 - `assessment_id`

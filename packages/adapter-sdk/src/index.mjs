@@ -1145,7 +1145,7 @@ export function classifyExternalRunnerFailure(options) {
     /\binput\s+tokens?.{0,80}(?:exceed|exceeds|exceeded|too\s+large|too\s+long)\b/u.test(combined) ||
     combined.includes("maximum context")
   ) {
-    return "compiled_context_budget_exceeded";
+    return "provider_context_window_exceeded";
   }
   if (!options.ignoreAuthFailure && (
     /\b401\b/u.test(combined) ||
@@ -2642,7 +2642,7 @@ export function createLiveAdapter(options) {
         ];
       }
       const defaultRequestArtifactMessage =
-        "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when execution_contract.expected_meaningful_change.required is true, do not write upstream, run the requested verification commands when feasible, and enforce execution_contract.output_quality_policy by fixing warning-producing stdout/stderr from primary or diagnostic verification before final reporting. Return only a final implementation report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet; if implementation is impossible, return a blocked report with reason and evidence refs.";
+        "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when execution_contract.expected_meaningful_change.required is true, follow execution_contract.output_quality_policy and all execution_contract constraints, do not write upstream, run the requested verification commands when feasible, and return only a final implementation report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet; if implementation is impossible, return a blocked report with reason and evidence refs.";
       const requestMessage = renderRequestArtifactMessage(
         asOptionalString(requestFileProfile.message) ?? defaultRequestArtifactMessage,
         {
@@ -2934,9 +2934,11 @@ export function createLiveAdapter(options) {
           provider_work_packet_ref: providerWorkPacketRef,
           context_budget_status: contextBudgetReports.budget_report.budget_status,
           context_budget_failure_class:
-            rawProviderErrorSummary || contextBudgetReports.budget_report.budget_status === "fail"
+            contextBudgetReports.budget_report.budget_status === "fail"
               ? "compiled_context_budget_exceeded"
-              : null,
+              : rawProviderErrorSummary
+                ? "provider_context_window_exceeded"
+                : null,
           top_context_size_sources: contextBudgetReports.top_context_size_sources,
           raw_provider_error_summary: rawProviderErrorSummary,
           output_mode: outputMode,
@@ -3026,7 +3028,8 @@ export function createLiveAdapter(options) {
           failureKind === "auth-failed" ||
           failureKind === "permission-mode-blocked" ||
           failureKind === "edit-denied" ||
-          failureKind === "compiled_context_budget_exceeded";
+          failureKind === "compiled_context_budget_exceeded" ||
+          failureKind === "provider_context_window_exceeded";
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,
           adapter_id: adapterId,
@@ -3059,6 +3062,7 @@ export function createLiveAdapter(options) {
           "permission-mode-blocked",
           "edit-denied",
           "compiled_context_budget_exceeded",
+          "provider_context_window_exceeded",
         ].includes(failureKind);
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,
@@ -3095,6 +3099,7 @@ export function createLiveAdapter(options) {
           "edit-denied",
           "interactive-question-requested",
           "compiled_context_budget_exceeded",
+          "provider_context_window_exceeded",
         ].includes(semanticFailureKind);
         return createAdapterResponseEnvelope({
           request_id: envelope.request_id,

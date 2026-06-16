@@ -64,7 +64,13 @@ For provider execution blocked before the external runtime starts because the bo
 - `failure_summary.phase: provider_execution`
 - `failure_summary.class: compiled_context_budget_exceeded`
 
-For provider-reported prompt overflow after invocation, run-health should still classify the issue as context-budget related and preserve `raw_provider_error_summary` plus `adapter_raw_evidence_ref`; it must not collapse this into a generic provider blocker.
+For provider-reported prompt overflow after invocation, run-health must keep
+pre-spawn budget facts separate. `provider_health.context_budget_status` remains
+the measured provider work-packet status, while
+`provider_health.context_budget_failure_class` and `failure_summary.class` use
+`provider_context_window_exceeded`. Preserve `raw_provider_error_summary` plus
+`adapter_raw_evidence_ref`; do not collapse this into a generic provider
+blocker or the pre-spawn `compiled_context_budget_exceeded` class.
 
 When the external runtime completes but only echoes or summarizes the provider work packet, run-health must preserve the execution failure as:
 - `failure_summary.owner: provider`

@@ -1744,15 +1744,14 @@ function buildProviderHealth(artifacts) {
   const providerStepStatus = asRecord(artifacts.provider_step_status);
   const contextBudgetStatus = asNonEmptyString(artifacts.context_budget_status);
   const contextBudgetFailureClass = asNonEmptyString(artifacts.context_budget_failure_class);
+  const hasContextBudgetBlock =
+    ["compiled_context_budget_exceeded", "provider_context_window_exceeded"].includes(contextBudgetFailureClass) ||
+    contextBudgetStatus === "fail";
   const providerExecutionStatus =
     asNonEmptyString(artifacts.provider_execution_status) ||
     asNonEmptyString(providerStepStatus.status) ||
-    (contextBudgetFailureClass === "compiled_context_budget_exceeded" || contextBudgetStatus === "fail"
-      ? "blocked"
-      : null) ||
+    (hasContextBudgetBlock ? "blocked" : null) ||
     "not_attempted";
-  const hasContextBudgetBlock =
-    contextBudgetFailureClass === "compiled_context_budget_exceeded" || contextBudgetStatus === "fail";
   const hasProviderBlock = ["interrupted", "blocked", "provider_blocked", "permission-mode-blocked", "edit-denied"].includes(
     providerExecutionStatus,
   );
@@ -1919,14 +1918,16 @@ function resolveRunHealthFailure(options) {
   const declaredPhase = declaredClassIsNonFailure ? "" : asNonEmptyString(options.artifacts.failure_phase);
   const declaredClass = declaredClassIsNonFailure ? "" : rawDeclaredClass;
   if (declaredOwner || declaredPhase || declaredClass) {
-    if (declaredClass === "compiled_context_budget_exceeded") {
+    if (["compiled_context_budget_exceeded", "provider_context_window_exceeded"].includes(declaredClass)) {
       return {
-        owner: declaredOwner || "aor",
+        owner: declaredOwner || (declaredClass === "provider_context_window_exceeded" ? "provider" : "aor"),
         phase: declaredPhase || "provider_execution",
         class: declaredClass,
         summary:
           asNonEmptyString(options.artifacts.raw_provider_error_summary) ||
-          "Provider work packet exceeded the configured context budget before or during provider execution.",
+          (declaredClass === "provider_context_window_exceeded"
+            ? "External runtime exhausted its provider conversation context during execution."
+            : "Provider work packet exceeded the configured context budget before provider execution."),
       };
     }
     if (["provider_work_packet_not_executed", "no-op"].includes(declaredClass)) {
