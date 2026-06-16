@@ -438,11 +438,40 @@ function executionEvidenceForFlow(selectedFlow, runs, runtimeTrace, { draft = fa
   if (traceRunIds.size === 0) return null;
   const candidates = (Array.isArray(runs) ? runs : []).filter((run) => traceRunIds.has(run.run_id) && run.execution_evidence);
   const selectedRun = candidates.find((run) => run.provider_step_status?.status && !["completed", "failed", "interrupted"].includes(run.provider_step_status.status))
-    ?? candidates.at(-1)
+    ?? strongestExecutionEvidenceRun(candidates)
     ?? null;
   return selectedRun?.execution_evidence
     ? { ...selectedRun.execution_evidence, run_id: selectedRun.run_id, provider_step_status: selectedRun.provider_step_status ?? null }
     : null;
+}
+
+function strongestExecutionEvidenceRun(candidates) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+  return candidates.reduce((best, run, index) => {
+    if (!run?.execution_evidence) return best;
+    const candidate = { run, score: executionEvidenceScore(run, index) };
+    return !best || candidate.score > best.score ? candidate : best;
+  }, null)?.run ?? null;
+}
+
+function executionEvidenceScore(run, index) {
+  const evidence = run?.execution_evidence ?? {};
+  const missionRelevant = Array.isArray(evidence.changed_path_groups)
+    ? evidence.changed_path_groups.find((group) => group.group_id === "mission-relevant")
+    : null;
+  const missionPathCount = Array.isArray(missionRelevant?.paths) ? missionRelevant.paths.length : 0;
+  let score = index;
+  if (evidence.status === "pass") score += 1000;
+  if (evidence.real_code_change_status === "pass") score += 800;
+  if (missionPathCount > 0) score += 600 + Math.min(missionPathCount, 20);
+  if (evidence.runtime_harness_decision === "pass") score += 300;
+  if (evidence.review_status === "pass") score += 200;
+  if (evidence.post_run_verification_status === "pass") score += 100;
+  if (Array.isArray(evidence.blockers) && evidence.blockers.length > 0) score -= 500;
+  const runId = String(run?.run_id ?? "");
+  if (runId.includes(".verify.")) score -= 200;
+  if (runId.includes(".routed-execution.")) score -= 100;
+  return score;
 }
 
 function executionStatusRows(evidence) {

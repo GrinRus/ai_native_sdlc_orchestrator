@@ -175,7 +175,13 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     '"exit-0"',
     "Execution Evidence",
     "executionEvidenceForFlow",
+    "strongestExecutionEvidenceRun",
+    "executionEvidenceScore",
     "execution_evidence",
+    'real_code_change_status === "pass"',
+    'group.group_id === "mission-relevant"',
+    'runId.includes(".verify.")',
+    'runId.includes(".routed-execution.")',
     "Provider execution",
     "Runtime Harness",
     "Real code change",
@@ -202,6 +208,11 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.match(css, /\.flow-selector\s*\{[\s\S]*?flex: 0 0 360px;/u, "Flow selector should not intercept project switcher clicks");
   assert.ok(css.includes(".provider-heartbeat-rail"), "SPA CSS should define provider heartbeat stage rail layout");
   assert.ok(css.includes(".execution-evidence-panel"), "SPA CSS should define execution evidence panel layout");
+  assert.equal(
+    source.includes("candidates.at(-1)"),
+    false,
+    "SPA should not show the last trace run when a stronger implementation execution evidence run exists",
+  );
   assert.ok(css.includes(".path-group-row.runner-owned-leak"), "SPA CSS should visibly distinguish runner-owned state leaks");
   assert.ok(css.includes(".execution-action-grid"), "SPA CSS should define public execution action controls");
   assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
