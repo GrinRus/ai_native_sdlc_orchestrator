@@ -2280,6 +2280,66 @@ test("manual decision preparation ignores stale accepted request files when requ
   });
 });
 
+test("manual resume installs an already prepared decision through its source request ref", () => {
+  withTempRoot((tempRoot) => {
+    const runId = "manual-prepared-decision";
+    const projectRoot = path.join(tempRoot, "project");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const reportsRoot = path.join(runtimeRoot, "projects/aor-core/reports");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const evidenceRef = writeJsonFixture(path.join(reportsRoot, "evidence.json"), { status: "pass" });
+    const decisionRef = path.join(reportsRoot, "operator-decision.json");
+    const requestRef = writeJsonFixture(
+      path.join(reportsRoot, `live-e2e-agent-decision-request-${runId}-01-discovery.json`),
+      {
+        request_id: `${runId}.discovery.operator-decision-request`,
+        step_id: "discovery",
+        step_instance_id: "discovery",
+        operator_decision_expected_ref: decisionRef,
+        deterministic_analysis: { status: "pass" },
+        decision_rubric: { required_evidence_refs: [evidenceRef] },
+        expected_response_shape: {
+          action: "continue|diagnose|block",
+          inspected_evidence_refs: [evidenceRef],
+          evidence_refs: [evidenceRef],
+        },
+      },
+    );
+    writeJsonFixture(decisionRef, {
+      action: "continue",
+      source_agent_decision_request_ref: requestRef,
+      inspected_evidence_refs: [evidenceRef],
+    });
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        manualLiveE2eScript,
+        "--project-ref",
+        projectRoot,
+        "--profile",
+        path.join(tempRoot, "missing-profile.yaml"),
+        "--runtime-root",
+        runtimeRoot,
+        "--run-id",
+        runId,
+        "--operator-decision-file",
+        decisionRef,
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+      },
+    );
+
+    assert.notEqual(result.status, 0);
+    assert.doesNotMatch(
+      `${result.stdout}\n${result.stderr}`,
+      /No pending live E2E operator decision request was found/u,
+    );
+  });
+});
+
 test("run-profile returns existing terminal pass reports without rebuilding run-health", () => {
   withTempRoot((tempRoot) => {
     const runId = "terminal-pass-idempotent";

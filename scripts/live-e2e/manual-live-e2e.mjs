@@ -113,6 +113,20 @@ function installOperatorDecision(options) {
   if (!fs.existsSync(decisionFile)) {
     throw new UsageError(`Operator decision file '${decisionFile}' was not found.`);
   }
+  const decision = asRecord(readJson(decisionFile));
+  const sourceRequestRef = asNonEmptyString(decision.source_agent_decision_request_ref);
+  if (sourceRequestRef && fs.existsSync(sourceRequestRef)) {
+    const request = asRecord(readJson(sourceRequestRef));
+    const expectedRef = asNonEmptyString(request.operator_decision_expected_ref);
+    if (!expectedRef) {
+      throw new UsageError(`Decision request '${sourceRequestRef}' does not declare operator_decision_expected_ref.`);
+    }
+    fs.mkdirSync(path.dirname(expectedRef), { recursive: true });
+    if (path.resolve(decisionFile) !== path.resolve(expectedRef)) {
+      fs.copyFileSync(decisionFile, expectedRef);
+    }
+    return expectedRef;
+  }
   const runtimeCandidates = resolveRuntimeCandidates(options);
   for (const runtimeRoot of runtimeCandidates) {
     const requestFile = findDecisionRequestFiles(runtimeRoot, options.runId).find(isPendingDecisionRequestFile);
