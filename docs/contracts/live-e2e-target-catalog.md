@@ -57,6 +57,13 @@ Feature missions may add `post_run_quality`:
 - `diagnostic_commands` are additional evidence. A failing diagnostic command is reported with `diagnostic_failure_mode` (`warn` by default) and must not hide a passing primary gate.
 - If `post_run_quality` is omitted, `verification.commands` remain the primary post-run gate.
 
+For strict quality closure, catalog missions should make warning-clean command
+output part of the Definition of Done when the target ecosystem can emit
+runtime warnings while returning exit code 0. The provider-facing execution
+contract treats warning tokens such as Python `ResourceWarning` and
+`DeprecationWarning` as failures for all-pass assessment unless the same command
+and warning are proven pre-existing on an unchanged baseline.
+
 Profiles may add `verification.baseline_gate.mode`:
 - `diagnostic` records pre-provider target verification as baseline context and allows provider execution when setup, validation, routed dry-run, adapter readiness, and no-write safety gates pass.
 - `blocking` treats any failed baseline verification command as a pre-execution blocker.

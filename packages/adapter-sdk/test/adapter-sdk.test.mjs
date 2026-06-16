@@ -1344,6 +1344,14 @@ test("live adapter request-artifact transport sends bounded provider work packet
     assert.equal(response.output.runner_output.execution_contract.expected_meaningful_change.no_op_forbidden, true);
     assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.direct_edits_allowed, true);
     assert.equal(response.output.runner_output.execution_contract.target_checkout_write_policy.upstream_write_allowed, false);
+    assert.equal(response.output.runner_output.execution_contract.output_quality_policy.warning_clean_required, true);
+    assert.equal(response.output.runner_output.execution_contract.output_quality_policy.exit_zero_warning_output_is_failure, true);
+    assert.ok(
+      response.output.runner_output.execution_contract.output_quality_policy.applies_to.includes(
+        "verification_expectations.diagnostic_commands",
+      ),
+    );
+    assert.ok(response.output.runner_output.execution_contract.output_quality_policy.stderr_warning_tokens.includes("ResourceWarning"));
   });
 });
 

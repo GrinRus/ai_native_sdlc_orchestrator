@@ -105,6 +105,9 @@ For canonical setup and verification dependency details per profile, use `docs/o
   - use `make install` before `make test` / `make codestyle`
 - Full-journey verification baseline:
   - use the bounded CLI pytest slice plus `make codestyle`, not the entire repo-wide `make test` matrix
+  - large and xlarge all-pass closure requires primary and diagnostic pytest
+    output to be warning-clean; exit-0 `ResourceWarning` stderr is a target
+    outcome-quality gap, not acceptable all-pass evidence
 - Failure-safe defaults:
   - `write_back_to_remote=false`
   - preferred delivery mode: `patch-only`

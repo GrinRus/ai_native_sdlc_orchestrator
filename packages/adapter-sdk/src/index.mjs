@@ -1720,6 +1720,19 @@ function buildExecutionContract(envelope) {
       delivery_materialization_downstream: true,
     },
     required_commands: allowedCommands,
+    output_quality_policy: {
+      warning_clean_required: true,
+      applies_to: [
+        "required_commands",
+        "verification_expectations.primary_commands",
+        "verification_expectations.diagnostic_commands",
+      ],
+      stderr_warning_tokens: ["ResourceWarning", "DeprecationWarning", "RuntimeWarning", "UnhandledPromiseRejectionWarning"],
+      exit_zero_warning_output_is_failure: true,
+      baseline_exception_requires_same_command_unchanged_baseline: true,
+      required_runner_action:
+        "Inspect stdout/stderr from primary and diagnostic verification. Fix warning-producing code or tests before final reporting.",
+    },
     final_report: {
       required_sections: ["summary", "changed-files", "commands-run", "verification", "risks"],
       require_diff_or_patch_evidence: true,
@@ -2629,7 +2642,7 @@ export function createLiveAdapter(options) {
         ];
       }
       const defaultRequestArtifactMessage =
-        "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when execution_contract.expected_meaningful_change.required is true, do not write upstream, run the requested verification commands when feasible, and return only a final implementation report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet; if implementation is impossible, return a blocked report with reason and evidence refs.";
+        "Execute the approved AOR implementation using the provider work packet at {provider_work_packet_path}. Read that JSON first, open every required resolved_local_refs[].local_path, make direct edits in the ephemeral target checkout when execution_contract.expected_meaningful_change.required is true, do not write upstream, run the requested verification commands when feasible, and enforce execution_contract.output_quality_policy by fixing warning-producing stdout/stderr from primary or diagnostic verification before final reporting. Return only a final implementation report with changed-files, commands-run, verification, and risks. Do not stop after summarizing the packet; if implementation is impossible, return a blocked report with reason and evidence refs.";
       const requestMessage = renderRequestArtifactMessage(
         asOptionalString(requestFileProfile.message) ?? defaultRequestArtifactMessage,
         {

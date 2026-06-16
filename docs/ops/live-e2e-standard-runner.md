@@ -458,6 +458,12 @@ Full-journey layer:
 - gates continuation after every observed public step by the online live E2E controller decision.
 - keeps `release` and `learning` outside `step_journal[]` for `delivery_default` profiles; full-lifecycle profiles, including bounded full-lifecycle profiles, execute profile-declared terminal stages as ordinary observed steps. Governance profiles that declare `learning` must reach learning closure even when release is not required.
 - requires post-run diagnostic evidence to be `pass` under the strict quality-assessment `all-pass` policy. Non-blocking diagnostic warnings remain valid factual run evidence, but they must be fixed, scoped out, or explicitly kept outside all-pass closure.
+- passes an explicit output-quality policy to external runtime agents in the
+  provider work packet. The agent must inspect primary and diagnostic
+  verification stdout/stderr and fix warning-producing target code or tests
+  before final reporting; exit-0 warnings such as Python `ResourceWarning` are
+  outcome-quality failures for `all-pass` unless they match unchanged-baseline
+  evidence.
 
 Production-proof profiles add a fail-closed layer on top of full-journey behavior:
 - runner auth probe is required;
