@@ -138,7 +138,7 @@ feature_missions:
         - venv/bin/python -m pytest tests/test_httpie_cli.py
         - make codestyle
       diagnostic_commands:
-        - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py
+        - venv/bin/python -W ignore::ResourceWarning -m pytest tests/test_cli.py tests/test_output.py
           tests/test_regressions.py tests/test_httpie_cli.py
       diagnostic_failure_mode: warn
     supported_scenarios:
@@ -192,7 +192,7 @@ feature_missions:
           tests/test_regressions.py
         - make codestyle
       diagnostic_commands:
-        - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py
+        - venv/bin/python -W ignore::ResourceWarning -m pytest tests/test_cli.py tests/test_output.py
           tests/test_regressions.py tests/test_httpie_cli.py
       diagnostic_failure_mode: warn
     supported_scenarios:
@@ -260,7 +260,7 @@ feature_missions:
           tests/test_regressions.py
         - make codestyle
       diagnostic_commands:
-        - venv/bin/python -m pytest tests/test_cli.py tests/test_output.py
+        - venv/bin/python -W ignore::ResourceWarning -m pytest tests/test_cli.py tests/test_output.py
           tests/test_regressions.py tests/test_httpie_cli.py
       diagnostic_failure_mode: warn
     supported_scenarios:

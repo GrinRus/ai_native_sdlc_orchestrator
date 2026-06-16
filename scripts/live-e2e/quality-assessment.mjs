@@ -774,6 +774,14 @@ function evaluateAllPassGate(assessment, baseDir) {
         message: "All-pass policy requires at least one meaningful target changed path outside .aor/.",
       });
     }
+    const postRunDiagnosticStatus = asNonEmptyString(runSummary.post_run_diagnostic_status);
+    if (postRunDiagnosticStatus && postRunDiagnosticStatus !== "pass") {
+      issues.push({
+        code: "post_run_diagnostic_not_pass",
+        field: "source_run_summary_file.post_run_diagnostic_status",
+        message: `All-pass policy requires post_run_diagnostic_status=pass when diagnostic evidence is present, got '${postRunDiagnosticStatus}'.`,
+      });
+    }
   }
   return { ok: issues.length === 0, issues };
 }

@@ -450,6 +450,7 @@ test("quality assessment all-pass gate rejects warning, missing evidence, and mi
   writeJson(summaryFile, {
     run_id: "live-e2e.test.run",
     meaningful_changed_paths: [".aor/projects/test/report.json"],
+    post_run_diagnostic_status: "warn",
   });
   const report = buildAssessmentReport({
     evidenceFile,
@@ -492,4 +493,5 @@ test("quality assessment all-pass gate rejects warning, missing evidence, and mi
     ),
   );
   assert.ok(output.gate_issues.some((issue) => issue.code === "meaningful_target_change_missing"));
+  assert.ok(output.gate_issues.some((issue) => issue.code === "post_run_diagnostic_not_pass"));
 });

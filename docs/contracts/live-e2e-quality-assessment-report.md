@@ -172,6 +172,7 @@ It fails when:
 - `overall_status` is not `pass`;
 - any required dimension or AOR operator subdimension is not `pass`;
 - any dimension or subdimension uses `evidence_strength: weak|missing`;
+- the source run summary has `post_run_diagnostic_status` and it is not `pass`;
 - `gap_report.not_evaluated_dimensions` or `gap_report.weak_signal_dimensions`
   is non-empty;
 - blocker, critical, high, or major findings remain;

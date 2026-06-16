@@ -791,7 +791,7 @@ test("generated live E2E profile allows selected guided provider adapters", () =
       assert.equal(loaded.ok, true);
       assert.ok(loaded.document.allowed_providers.includes(current.provider));
       assert.ok(loaded.document.allowed_adapters.includes(current.adapter));
-      assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 120);
+      assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
       assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
       assert.equal(loaded.document.repos[0].lint_commands.includes("npx playwright install"), false);
     }
