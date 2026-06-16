@@ -924,7 +924,7 @@ test("generated ky large Anthropic profile uses bounded governance verification"
       family: "project-profile",
     });
     assert.equal(loaded.ok, true);
-    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 600);
+    assert.equal(loaded.document.runtime_defaults.verification_command_timeout_sec, 1800);
     assert.deepEqual(loaded.document.repos[0].lint_commands, ["npm install --prefer-offline --no-audit --no-fund"]);
     assert.deepEqual(loaded.document.repos[0].test_commands, [
       "npx xo",
