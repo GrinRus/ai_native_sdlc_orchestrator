@@ -808,9 +808,9 @@ function FlowSelector({ flows, selectedFlowId, newFlowDraft, onSelectFlow, onNew
   const value = newFlowDraft ? "__new__" : selectedFlowId ?? "";
   return (
     <div className="flow-selector">
-      <label>
+      <label htmlFor="flow-selector-control">
         <span>Flow</span>
-        <select name="flow-selector" value={value} aria-label="Flow selector" onChange={(event) => onSelectFlow(event.target.value)}>
+        <select id="flow-selector-control" name="flow-selector" value={value} aria-label="Flow selector" onChange={(event) => onSelectFlow(event.target.value)}>
           {newFlowDraft ? <option value="__new__">New flow draft</option> : null}
           {flows.length === 0 ? <option value="">No active flow</option> : null}
           {activeFlows.length > 0 ? (
@@ -861,9 +861,11 @@ function ProjectSwitcher({ projects, activeProjectId, onSelectProject, onOpenAdd
   const activeProject = projects.find((project) => project.project_id === activeProjectId) ?? projects[0] ?? null;
   return (
     <div className="project-switcher" aria-label="Project switcher">
-      <label>
+      <label htmlFor="project-switcher-control">
         <span>Project switcher</span>
         <select
+          id="project-switcher-control"
+          name="project-switcher"
           value={activeProject?.project_id ?? ""}
           onChange={(event) => onSelectProject(event.target.value)}
           disabled={busy || projects.length === 0}

@@ -105,6 +105,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "Project Context",
     "Runtime Readiness",
     "Project switcher",
+    'htmlFor="project-switcher-control"',
+    'id="project-switcher-control"',
+    'name="project-switcher"',
     "Add local project",
     "Runtime root preview",
     "Add and initialize",
@@ -129,6 +132,9 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
     "activeProject?.runtime_root",
     "Create the first no-write mission packet, then resolve the first next action.",
     "No active flow",
+    'htmlFor="flow-selector-control"',
+    'id="flow-selector-control"',
+    'name="flow-selector"',
     "Readiness prepares the runtime before a flow is created",
     "selectedStageRuntimeState",
     "Upcoming stage. The current recommended action remains scoped",
@@ -201,8 +207,23 @@ test("packaged SPA exposes installed-user guided mission controls", () => {
   assert.ok(css.includes(".copy-feedback"), "SPA CSS should define copy fallback feedback layout");
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"), "SPA CSS should keep the mobile stage rail within the viewport");
   assert.ok(css.includes(".stage-row .stage-copy strong"), "SPA CSS should allow mobile stage labels to wrap");
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.project-switcher\s*\{[\s\S]*?grid-template-columns: 1fr;[\s\S]*?min-width: 0;/u,
+    "SPA CSS should collapse the project switcher on mobile instead of creating horizontal scroll",
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.project-switcher-meta code,\s*\.top-context code\s*\{[\s\S]*?white-space: normal;/u,
+    "SPA CSS should wrap long runtime paths on mobile",
+  );
   assert.ok(css.includes("grid-template-columns: repeat(auto-fit, minmax(92px, 1fr))"), "SPA CSS should keep the mobile flow timeline within the viewport");
   assert.ok(css.includes(".timeline-step::before"), "SPA CSS should disable connector overflow for the mobile flow timeline");
+  assert.match(
+    css,
+    /@media \(max-width: 860px\) \{[\s\S]*?\.graph-flow-node::after\s*\{[\s\S]*?display: none;/u,
+    "SPA CSS should disable graph connector overflow on mobile",
+  );
   assert.ok(css.includes(".trace-table table"), "SPA CSS should make runtime trace tables responsive on mobile");
   assert.ok(css.includes(".right-rail"), "SPA CSS should define evidence rail layout");
 });
