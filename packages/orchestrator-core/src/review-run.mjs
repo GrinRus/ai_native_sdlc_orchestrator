@@ -53,9 +53,21 @@ function uniqueStrings(values) {
  */
 function isTestSourcePath(candidate) {
   const normalized = candidate.replace(/\\/g, "/");
+  const fileName = path.posix.basename(normalized);
+  const segments = normalized.split("/");
+  const testDirectoryIndex = segments.findIndex((segment) => ["test", "tests", "spec"].includes(segment));
+  const hasConventionalTestDirectory =
+    testDirectoryIndex === 0 ||
+    (testDirectoryIndex === 1 && segments[0] === "src") ||
+    (testDirectoryIndex === 2 && ["apps", "packages", "libs", "services"].includes(segments[0])) ||
+    (testDirectoryIndex === 3 &&
+      ["apps", "packages", "libs", "services"].includes(segments[0]) &&
+      segments[2] === "src");
   return (
-    /(?:^|\/)(?:test|tests|spec|__tests__)\//u.test(normalized) &&
-    /\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/u.test(normalized)
+    /\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/u.test(normalized) &&
+    (/(?:^|\/)__tests__\//u.test(normalized) ||
+      /\.(?:test|spec)\.(?:cjs|cts|js|jsx|mjs|mts|ts|tsx)$/u.test(fileName) ||
+      hasConventionalTestDirectory)
   );
 }
 

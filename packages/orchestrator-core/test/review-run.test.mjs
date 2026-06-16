@@ -279,6 +279,53 @@ test("review report treats package workspace test commands as covering changed p
   });
 });
 
+test("review report does not treat test support config files as changed test specs", () => {
+  withGitRepo((repoRoot) => {
+    const runId = "run.review-test-support-config";
+    const supportPath = path.join(repoRoot, "apps/nextjs-app/config/tests/AppTestProviders.tsx");
+    fs.mkdirSync(path.dirname(supportPath), { recursive: true });
+    fs.writeFileSync(
+      path.join(repoRoot, "apps/nextjs-app/package.json"),
+      `${JSON.stringify({ name: "@your-org/nextjs-app" }, null, 2)}\n`,
+      "utf8",
+    );
+    fs.writeFileSync(supportPath, "export function AppTestProviders({ children }) { return children; }\n", "utf8");
+    runGit(repoRoot, ["add", "."]);
+    runGit(repoRoot, ["-c", "user.name=AOR Test", "-c", "user.email=aor@example.test", "commit", "-m", "add test support config"]);
+    fs.writeFileSync(
+      supportPath,
+      "export function AppTestProviders({ children }) { return <>{children}</>; }\n",
+      "utf8",
+    );
+    const init = initializeProjectRuntime({ cwd: repoRoot, projectRef: repoRoot });
+    writeReviewRuntimeFixture(init, runId);
+    writeJson(path.join(init.runtimeLayout.reportsRoot, "verify-summary-post-run-primary.json"), {
+      run_id: `${runId}.verify.post-run-primary.v1`,
+      verification_label: "post-run-primary",
+      status: "passed",
+      command_source: "cli-override",
+      command_overrides: {
+        build_commands: ["yarn g:typecheck"],
+        lint_commands: [],
+        test_commands: ["yarn workspace @your-org/ts-utils test-unit"],
+      },
+      step_result_refs: [],
+    });
+
+    const { reviewReport } = materializeReviewReport({
+      cwd: repoRoot,
+      projectRef: repoRoot,
+      runId,
+    });
+
+    assert.ok(
+      reviewReport.artifact_quality.findings.every(
+        (finding) => !String(finding.summary).includes("Primary verification did not explicitly exercise changed test file"),
+      ),
+    );
+  });
+});
+
 test("review report fails changed paths outside approved handoff scope", () => {
   withGitRepo((repoRoot) => {
     const runId = "run.review-handoff-scope";
