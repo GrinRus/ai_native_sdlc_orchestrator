@@ -75,11 +75,81 @@ function isBroadTestCommand(command) {
 }
 
 /**
- * @param {string} command
+ * @param {string} value
+ * @returns {string}
+ */
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+/**
+ * @param {string} projectRoot
  * @param {string} changedPath
+ * @returns {{ packageName: string | null, packageDir: string | null }}
+ */
+function findNearestPackageContext(projectRoot, changedPath) {
+  const normalizedProjectRoot = path.resolve(projectRoot);
+  const absolutePath = path.resolve(normalizedProjectRoot, changedPath);
+  let currentDir = fs.statSync(absolutePath, { throwIfNoEntry: false })?.isDirectory()
+    ? absolutePath
+    : path.dirname(absolutePath);
+  while (currentDir.startsWith(normalizedProjectRoot)) {
+    const packageJsonPath = path.join(currentDir, "package.json");
+    if (fs.existsSync(packageJsonPath)) {
+      const packageJson = readJson(packageJsonPath);
+      const packageName = asString(packageJson.name);
+      const packageDir = path.relative(normalizedProjectRoot, currentDir).replace(/\\/g, "/");
+      return {
+        packageName,
+        packageDir: packageDir === "" ? "." : packageDir,
+      };
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      break;
+    }
+    currentDir = parentDir;
+  }
+  return { packageName: null, packageDir: null };
+}
+
+/**
+ * @param {string} command
+ * @param {{ packageName: string | null, packageDir: string | null }} packageContext
  * @returns {boolean}
  */
-function testCommandCoversChangedPath(command, changedPath) {
+function testCommandCoversChangedPackage(command, packageContext) {
+  const normalizedCommand = command.replace(/\\/g, "/");
+  const packageName = packageContext.packageName;
+  const packageDir = packageContext.packageDir;
+  if (packageName) {
+    const escapedPackageName = escapeRegExp(packageName);
+    if (new RegExp(`(?:^|\\s)yarn\\s+workspace\\s+${escapedPackageName}(?:\\s|$)`, "u").test(normalizedCommand)) {
+      return true;
+    }
+    if (new RegExp(`(?:^|\\s)(?:pnpm|npm)\\s+[^\\n]*--workspace(?:=|\\s+)${escapedPackageName}(?:\\s|$)`, "u").test(normalizedCommand)) {
+      return true;
+    }
+    if (new RegExp(`(?:^|\\s)pnpm\\s+[^\\n]*(?:--filter|-F)(?:=|\\s+)${escapedPackageName}(?:\\s|$)`, "u").test(normalizedCommand)) {
+      return true;
+    }
+  }
+  if (packageDir && packageDir !== ".") {
+    const escapedPackageDir = escapeRegExp(packageDir);
+    if (new RegExp(`(?:^|\\s)(?:pnpm\\s+[^\\n]*(?:--filter|-F)|npm\\s+[^\\n]*--workspace)(?:=|\\s+)\\.?/?${escapedPackageDir}(?:\\s|$)`, "u").test(normalizedCommand)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * @param {string} command
+ * @param {string} changedPath
+ * @param {string} projectRoot
+ * @returns {boolean}
+ */
+function testCommandCoversChangedPath(command, changedPath, projectRoot) {
   if (isBroadTestCommand(command)) {
     return true;
   }
@@ -88,16 +158,18 @@ function testCommandCoversChangedPath(command, changedPath) {
   return (
     normalizedCommand.includes(normalizedPath) ||
     normalizedCommand.includes(`./${normalizedPath}`) ||
-    normalizedCommand.includes(path.posix.basename(normalizedPath))
+    normalizedCommand.includes(path.posix.basename(normalizedPath)) ||
+    testCommandCoversChangedPackage(command, findNearestPackageContext(projectRoot, changedPath))
   );
 }
 
 /**
  * @param {Record<string, unknown> | null} verifySummary
  * @param {string[]} changedPaths
+ * @param {string} projectRoot
  * @returns {{ changedTestPaths: string[], uncoveredTestPaths: string[], testCommands: string[] }}
  */
-function findChangedTestVerificationGaps(verifySummary, changedPaths) {
+function findChangedTestVerificationGaps(verifySummary, changedPaths, projectRoot) {
   const changedTestPaths = changedPaths.filter((candidate) => isTestSourcePath(candidate));
   const commandOverrides = asRecord(asRecord(verifySummary).command_overrides);
   const testCommands = asStringArray(commandOverrides.test_commands);
@@ -110,7 +182,7 @@ function findChangedTestVerificationGaps(verifySummary, changedPaths) {
   return {
     changedTestPaths,
     uncoveredTestPaths: changedTestPaths.filter(
-      (changedPath) => !testCommands.some((command) => testCommandCoversChangedPath(command, changedPath)),
+      (changedPath) => !testCommands.some((command) => testCommandCoversChangedPath(command, changedPath, projectRoot)),
     ),
     testCommands,
   };
@@ -711,7 +783,7 @@ export function materializeReviewReport(options) {
     if (bootstrapOwnedFiles.has(candidate)) return false;
     return !bootstrapOwnedPrefixes.some((prefix) => candidate === prefix.slice(0, -1) || candidate.startsWith(prefix));
   });
-  const changedTestVerification = findChangedTestVerificationGaps(verifySummary, codeChangedPaths);
+  const changedTestVerification = findChangedTestVerificationGaps(verifySummary, codeChangedPaths, init.projectRoot);
   const approvedHandoffAllowedPaths = resolveApprovedHandoffAllowedPaths(latestHandoffPacket?.document);
   if (changedTestVerification.uncoveredTestPaths.length > 0) {
     const commandSummary =
