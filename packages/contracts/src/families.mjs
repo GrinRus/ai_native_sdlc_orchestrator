@@ -79,6 +79,7 @@ const LIVE_E2E_RUN_FAILURE_PHASE_VALUES = [
   "target_setup",
   "target_verification",
   "provider_execution",
+  "review",
   "controller_decision",
   "ui_validation",
   "delivery",

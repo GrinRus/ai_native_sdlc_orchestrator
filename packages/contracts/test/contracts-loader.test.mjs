@@ -1211,6 +1211,23 @@ test("live E2E run-health report separates run failures from outcome quality", (
 
   assert.equal(providerPacketNotExecutedValidation.ok, true);
 
+  const reviewLoopExhaustedCandidate = structuredClone(loaded.document);
+  reviewLoopExhaustedCandidate.overall_status = "blocked";
+  reviewLoopExhaustedCandidate.failure_summary = {
+    owner: "provider",
+    phase: "review",
+    class: "implementation_repair_loop_exhausted",
+    summary: "Implementation repair loop exhausted before review passed.",
+  };
+
+  const reviewLoopExhaustedValidation = validateContractDocument({
+    family: "live-e2e-run-health-report",
+    document: reviewLoopExhaustedCandidate,
+    source: "test://live-e2e-run-health-review-loop-exhausted",
+  });
+
+  assert.equal(reviewLoopExhaustedValidation.ok, true);
+
   const blockedMissingOwnerCandidate = structuredClone(loaded.document);
   blockedMissingOwnerCandidate.overall_status = "blocked";
   blockedMissingOwnerCandidate.failure_summary.owner = null;

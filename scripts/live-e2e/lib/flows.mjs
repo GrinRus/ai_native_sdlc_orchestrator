@@ -4503,17 +4503,39 @@ export function executeFullJourneyFlow(options) {
         artifacts.implementation_loop_blocked_reason =
           "Runtime Harness produced a blocking execution-health finding before public repair could continue.";
       }
+      const terminalReviewFailure = !canRepair && (reviewNeedsRepair || artifacts.post_run_verify_status === "fail");
+      if (terminalReviewFailure) {
+        const repairLoopExhausted = implementationLoopPolicy.enabled && iteration >= implementationLoopPolicy.maxIterations;
+        artifacts.failure_owner =
+          asNonEmptyString(artifacts.failure_owner) ||
+          (reviewNeedsRepair ? "provider" : "target_repository");
+        artifacts.failure_phase =
+          asNonEmptyString(artifacts.failure_phase) ||
+          (reviewNeedsRepair ? "review" : "target_verification");
+        artifacts.failure_class =
+          asNonEmptyString(artifacts.failure_class) ||
+          (repairLoopExhausted
+            ? "implementation_repair_loop_exhausted"
+            : reviewNeedsRepair
+              ? "review_quality_not_approved"
+              : "post_run_verification_failed");
+        artifacts.implementation_loop_failure_summary =
+          artifacts.post_run_verify_status === "fail" && reviewNeedsRepair
+            ? "Implementation repair loop stopped because review did not pass and post-run verification failed."
+            : reviewNeedsRepair
+              ? "Implementation repair loop stopped because review did not pass."
+              : "Implementation repair loop stopped because post-run verification failed.";
+      }
       markStage(
         stageMap,
         "review",
-        canRepair ? "warn" : reviewOverallStatus === "fail" ? "fail" : reviewOverallStatus === "warn" ? "warn" : "pass",
+        canRepair ? "warn" : terminalReviewFailure ? "fail" : "pass",
         uniqueStrings([reviewRun.transcriptFile, ...collectStringRefs(reviewRun.payload)]),
         canRepair
           ? `Review requested public repair iteration ${iteration + 1}.`
-          : reviewOverallStatus === "fail"
-            ? "Review report failed."
-            : reviewOverallStatus === "warn"
-              ? "Review report produced warnings that require operator review before approval."
+          : terminalReviewFailure
+            ? asNonEmptyString(artifacts.implementation_loop_failure_summary) ||
+              "Implementation review or post-run verification did not pass."
             : "Review report materialized.",
         canRepair
           ? {

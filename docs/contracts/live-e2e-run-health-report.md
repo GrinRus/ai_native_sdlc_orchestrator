@@ -44,7 +44,7 @@ It must not evaluate outcome quality of produced artifacts, code, tests, securit
 ## Failure ownership
 Non-passing reports must classify the primary run blocker in `failure_summary`:
 - `owner`: `aor|target_repository|provider|environment|operator|unknown`
-- `phase`: `aor_install|target_checkout|project_bootstrap|intake|readiness|target_setup|target_verification|provider_execution|controller_decision|ui_validation|delivery|release|learning|summary_write|unknown`
+- `phase`: `aor_install|target_checkout|project_bootstrap|intake|readiness|target_setup|target_verification|provider_execution|review|controller_decision|ui_validation|delivery|release|learning|summary_write|unknown`
 - `class`: non-empty machine-readable class
 - `summary`: operator-readable explanation
 
@@ -82,6 +82,13 @@ When baseline target verification passed but post-run target verification fails 
 - `failure_summary.class: target_verification_failed`
 
 This is still factual run-health classification. It does not evaluate whether the implementation idea was semantically good; the incomplete run must stop at run-health and must not produce an outcome quality assessment request.
+
+When the public `execution#N -> review#N` repair loop exhausts before review passes, run-health must classify the terminal blocker from the final review evidence instead of letting the next QA step fail with missing evidence:
+- `failure_summary.owner: provider`
+- `failure_summary.phase: review`
+- `failure_summary.class: implementation_repair_loop_exhausted`
+
+When review is non-passing and no repair action is available, but the configured repair loop was not exhausted, use `failure_summary.class: review_quality_not_approved`. Both cases are run-completion blockers; they are not substitutes for post-run outcome quality assessment because the declared flow did not complete.
 
 `evidence_health` should include missing evidence refs, weak evidence refs, and evidence ref counts.
 

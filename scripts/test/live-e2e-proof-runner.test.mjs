@@ -2578,7 +2578,9 @@ test("full journey review warnings request repair instead of passing into QA app
 
   assert.match(flowsSource, /const reviewNeedsRepair = reviewOverallStatus !== "pass"/u);
   assert.match(flowsSource, /reviewNeedsRepair[\s\S]*reviewRepairActions\.has\("request-repair"\)/u);
-  assert.match(flowsSource, /reviewOverallStatus === "warn" \? "warn" : "pass"/u);
+  assert.match(flowsSource, /const terminalReviewFailure = !canRepair && \(reviewNeedsRepair \|\| artifacts\.post_run_verify_status === "fail"\)/u);
+  assert.match(flowsSource, /implementation_repair_loop_exhausted/u);
+  assert.match(flowsSource, /canRepair \? "warn" : terminalReviewFailure \? "fail" : "pass"/u);
   assert.match(flowsSource, /reviewOverallStatus !== "pass" \|\| artifacts\.post_run_verify_status === "fail"/u);
 });
 
@@ -2757,6 +2759,207 @@ test("proof runner writes run-health reports for blocked live E2E reports", () =
     assert.equal(written.runHealthReport.resume_interaction_health.pending_decision_count, 1);
     assert.equal(written.summary.runner_quality_summary, undefined);
     assert.equal(written.summary.quality_judgement, undefined);
+  });
+});
+
+test("proof runner preserves exhausted implementation repair loop as review run-health failure", () => {
+  withTempRoot((tempRoot) => {
+    const reportsRoot = path.join(tempRoot, "reports");
+    const runtimeRoot = path.join(tempRoot, "runtime");
+    const targetCheckoutRoot = path.join(tempRoot, "target");
+    fs.mkdirSync(reportsRoot, { recursive: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(targetCheckoutRoot, { recursive: true });
+
+    const files = Object.fromEntries(
+      [
+        "controller-state.json",
+        "install-proof.json",
+        "generated-project.aor.yaml",
+        "feature-request.json",
+        "baseline-verify-summary.json",
+        "review-report.json",
+        "post-run-verify-summary.json",
+        "review-plan.json",
+        "review-transcript.json",
+        "review-inspection.json",
+        "review-classification.json",
+        "review-agent-request.json",
+        "review-operator-decision.json",
+      ].map((name) => [name, path.join(reportsRoot, name)]),
+    );
+    for (const file of Object.values(files)) {
+      writeJsonFixture(file);
+    }
+    writeJsonFixture(files["review-report.json"], {
+      overall_status: "warn",
+      findings: [
+        {
+          severity: "warn",
+          summary: "Test plan count was lowered in 'test/headers.ts'.",
+          evidence_refs: [files["review-report.json"]],
+        },
+      ],
+    });
+    writeJsonFixture(files["post-run-verify-summary.json"], { status: "passed" });
+    writeJsonFixture(files["review-operator-decision.json"], {
+      action: "block",
+      status: "accepted",
+      semantic_analysis: {
+        status: "blocked",
+        judge_source: "skill-agent",
+        findings: ["Review did not pass after the implementation repair budget was exhausted."],
+      },
+      inspected_evidence_refs: [files["review-transcript.json"], files["review-report.json"]],
+      evidence_refs: [files["review-transcript.json"], files["review-report.json"]],
+    });
+
+    const runId = "implementation-loop-exhausted-review";
+    const reviewEntry = {
+      sequence: 1,
+      step_id: "review",
+      step_instance_id: "review#3",
+      iteration: 3,
+      flow_stage: "review",
+      plan: {
+        objective: "Observe final review.",
+        public_surface: "aor review run",
+        command_labels: ["review-run"],
+        expected_artifacts: ["review_report_file"],
+        inspection_sources: ["command_transcript"],
+        safety_constraints: ["no-upstream-write"],
+      },
+      plan_ref: files["review-plan.json"],
+      public_surface: "aor review run",
+      transcript_ref: files["review-transcript.json"],
+      execution_ref: files["review-transcript.json"],
+      inspection_ref: files["review-inspection.json"],
+      classification_ref: files["review-classification.json"],
+      artifact_refs: [files["review-transcript.json"], files["review-report.json"]],
+      started_at: "2026-06-09T00:00:00.000Z",
+      finished_at: "2026-06-09T00:00:01.000Z",
+      duration_sec: 1,
+      deterministic_analysis: {
+        status: "not_pass",
+        exit_code: 0,
+        failure_class: "stage-failed",
+        missing_evidence: [],
+        recommendation: "inspect stage evidence refs and command transcripts",
+      },
+      semantic_analysis: {
+        status: "blocked",
+        judge_source: "skill-agent",
+        findings: ["Implementation repair loop stopped because review did not pass."],
+      },
+      agent_decision_request_ref: files["review-agent-request.json"],
+      operator_decision_ref: files["review-operator-decision.json"],
+      operator_decision_status: "accepted",
+      inspected_evidence_refs: [files["review-transcript.json"], files["review-report.json"]],
+      requested_interaction: null,
+      decision: {
+        action: "block",
+        reason: "Review did not pass after the implementation repair budget was exhausted.",
+      },
+      resume_result: null,
+      frontend_interaction_refs: [],
+      final_step_verdict: "blocked",
+    };
+
+    const written = writeProofRunnerArtifacts({
+      hostRoot: repoRoot,
+      hostProjectId: "aor-test",
+      layout: { reportsRoot, runtimeRoot },
+      runId,
+      profilePath: path.join(tempRoot, "profile.yaml"),
+      profile: {
+        profile_id: "live-e2e.test.implementation-loop-exhausted-review",
+        journey_mode: "full-journey",
+        target_catalog_id: "ky",
+        feature_mission_id: "ky-undefined-header-removal",
+        scenario_family: "regress",
+        provider_variant_id: "openai-primary",
+        stages: ["discovery", "spec", "planning", "handoff", "execution", "review", "qa", "delivery"],
+        live_e2e: {
+          flow_range_policy: "delivery_default",
+          operator_mode: "skill-agent",
+          agent_decision_policy: "required",
+          interaction_answer_policy: "agent-required",
+          target_write_policy: "aor-runtime-only-before-execution",
+        },
+      },
+      flowResult: {
+        startedAt: "2026-06-09T00:00:00.000Z",
+        finishedAt: "2026-06-09T00:00:02.000Z",
+        status: "blocked",
+        stageResults: [
+          {
+            stage: "review",
+            status: "fail",
+            evidence_refs: [files["review-transcript.json"], files["review-report.json"]],
+            summary: "Implementation repair loop stopped because review did not pass.",
+          },
+        ],
+        commandResults: [
+          {
+            label: "review-run",
+            command_surface: "aor review run",
+            status: "pass",
+            exit_code: 0,
+            transcript_file: files["review-transcript.json"],
+            artifact_refs: [files["review-report.json"]],
+          },
+        ],
+        artifacts: {
+          host_runtime_root: runtimeRoot,
+          host_reports_root: reportsRoot,
+          live_e2e_controller_state_file: files["controller-state.json"],
+          live_e2e_step_journal_entries: [reviewEntry],
+          aor_installation: {
+            status: "pass",
+            declared_policy: "source-install-required",
+            effective_policy: "source-install-required",
+            install_mode: "repo-local",
+            source_channel: "source-only-alpha",
+            workspace_root: tempRoot,
+            runtime_root: runtimeRoot,
+            original_source_root: repoRoot,
+            installed_source_root: repoRoot,
+            launcher_ref: runProfileScript,
+            command_transcripts: [],
+          },
+          aor_installation_proof_file: files["install-proof.json"],
+          target_checkout_root: targetCheckoutRoot,
+          generated_project_profile_file: files["generated-project.aor.yaml"],
+          feature_request_file: files["feature-request.json"],
+          baseline_verify_summary_file: files["baseline-verify-summary.json"],
+          baseline_verify_status: "pass",
+          review_report_file: files["review-report.json"],
+          post_run_verify_summary_file: files["post-run-verify-summary.json"],
+          post_run_verify_status: "pass",
+          provider_execution_status: "completed",
+          real_code_change_status: "pass",
+          meaningful_changed_paths: ["source/utils/merge.ts", "test/headers.ts"],
+          feature_mission_id: "ky-undefined-header-removal",
+          feature_size: "small",
+          failure_owner: "provider",
+          failure_phase: "review",
+          failure_class: "implementation_repair_loop_exhausted",
+        },
+      },
+      aorLaunch: {
+        command: process.execPath,
+        argsPrefix: [],
+        binaryRef: runProfileScript,
+      },
+    });
+
+    assert.equal(written.summary.live_e2e_run_health_overall_status, "blocked");
+    assert.equal(written.summary.failure_owner, "provider");
+    assert.equal(written.summary.failure_phase, "review");
+    assert.equal(written.summary.failure_class, "implementation_repair_loop_exhausted");
+    assert.equal(written.runHealthReport.failure_summary.owner, "provider");
+    assert.equal(written.runHealthReport.failure_summary.phase, "review");
+    assert.equal(written.runHealthReport.failure_summary.class, "implementation_repair_loop_exhausted");
   });
 });
 

@@ -714,6 +714,7 @@ of implementation and verification evidence when the mission requires it.
 - `review-report.provider_traceability` matches the requested provider variant and adapter path.
 - `review-report.feature_size_fit` stays inside the declared size budget for the mission.
 - `review-report.artifact_quality.verify_summary_ref` points at the post-run `project verify` summary.
+- If the final `execution#N -> review#N` iteration still has non-passing review evidence after the repair budget is exhausted, the runner must stop at factual run-health with `failure_summary.phase=review` and `failure_summary.class=implementation_repair_loop_exhausted`; it must not continue into QA or create a post-run quality assessment.
 - `post_run_verify_status`, `provider_execution_status`, `real_code_change_status`, and Runtime Harness decisions are factual post-delivery signals. Runtime Harness can block run health for missing execution evidence, adapter crashes, unresolved interaction, blocked runtime state, runner-owned state leaks, or missing mission-relevant source-change evidence. It does not provide the final implementation-quality verdict; `change_evidence.required_path_prefixes` only defines the minimum changed-path evidence that can prove the selected catalog mission was touched.
 - `delivery_manifest_file` exists and is anchored to the target checkout.
 - `live_e2e_run_health_report_file` exists and separates run-health failures from outcome-quality assessment.
