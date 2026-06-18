@@ -273,8 +273,7 @@ provider-independent verification evidence. The 2026-06-03 W35 retry then
 closed the slice:
 
 - Codex small proof `w35-s05-codex-small-proof-20260603094440` completed with
-  `summary_status=pass`, `acceptance_status=pass`, `coverage_status=covered_pass`,
-  accepted operator decisions for all eight included steps,
+  a passing summary, covered proof evidence, accepted operator decisions for all eight included steps,
   `target_setup_status.status=pass`,
   `target_verification_status_detail.status=pass`, and
   `provider_step_status.status=completed`.
