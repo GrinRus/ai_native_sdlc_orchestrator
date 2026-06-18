@@ -10,7 +10,8 @@ versioned AOR snapshots.
 ## [0.1.0-alpha.11] - 2026-06-11
 
 - Added live E2E quality gates for mission-scoped verification, delivery path
-  integrity, final skill-agent verdict hydration, and artifact completeness.
+  integrity, run-health evidence, post-run quality assessment, and artifact
+  completeness.
 - Hardened Runtime Harness, review, delivery, and handoff artifacts so
   mission-relevant changed paths, goals, Definition of Done, KPIs, and
   post-run verification commands stay traceable through the run.

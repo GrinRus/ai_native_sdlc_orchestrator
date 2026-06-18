@@ -40,7 +40,7 @@
       "provider_variant_id": "openai-primary",
       "status": "pass",
       "public_observation": "Codex small proof completed all included skill-agent-only steps with accepted operator decisions, passing run health, and no upstream write.",
-      "summary_status": "pass",
+      "run_summary_status": "pass",
       "run_health_status": "pass",
       "target_setup_status": "pass",
       "target_verification_status": "pass",
